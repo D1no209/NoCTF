@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
+    <ProjectReference Include="../NoCTF.Core/NoCTF.Core.csproj" />
+    <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+  </ItemGroup>
+
+</Project>
