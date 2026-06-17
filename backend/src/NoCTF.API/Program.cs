@@ -108,6 +108,7 @@ builder.Services.AddNoCtfApplicationCore();
 
 // Leaderboard services
 builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
+builder.Services.AddScoped<ILeaderboardProjectionBuilder>(sp => (LeaderboardService)sp.GetRequiredService<ILeaderboardService>());
 builder.Services.AddSingleton<IRedisLeaderboardCache, RedisLeaderboardCache>();
 builder.Services.AddScoped<ISubmissionEventHandler, LeaderboardSyncHandler>();
 builder.Services.AddScoped<IBackgroundTaskQueue, BackgroundTaskQueue>();
