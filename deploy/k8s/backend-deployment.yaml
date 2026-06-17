@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: noctf
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: noctf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: noctf-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: noctf-config
+          env:
+            - name: JwtSettings__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: jwt-secret
+            - name: ConnectionStrings__DefaultConnection
+              value: "Host=postgres;Port=5432;Database=noctf;Username=postgres;Password=$(DB_PASSWORD)"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: db-password
+            - name: StorageProvider__S3__AccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: minio-access-key
+            - name: StorageProvider__S3__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: minio-secret-key
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          # AWD challenge mode requires Docker socket access for container orchestration.
+          # Uncomment the volumeMount and volume below only on privileged nodes with Docker.
+          # volumeMounts:
+          #   - name: docker-sock
+          #     mountPath: /var/run/docker.sock
+      # volumes:
+      #   - name: docker-sock
+      #     hostPath:
+      #       path: /var/run/docker.sock
+      #       type: Socket

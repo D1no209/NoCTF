@@ -9,7 +9,8 @@ public enum SubmissionResult
     WrongFlag,
     InvalidFormat,
     CompetitionNotStarted,
-    CompetitionEnded
+    CompetitionEnded,
+    NotImplemented
 }
 
 public enum ValidationResult

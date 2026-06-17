@@ -21,7 +21,7 @@ public class JwtTokenService(IConfiguration configuration)
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(JwtRegisteredClaimNames.Name, user.UserName),
-            new Claim("role", user.Role.ToString().ToLowerInvariant()),
+            new Claim("role", user.Role.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

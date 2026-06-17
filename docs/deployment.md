@@ -1,0 +1,180 @@
+# Deployment Guide
+
+This guide covers deploying NoCTF with Docker Compose (recommended for single-node setups) or Kubernetes (recommended for production).
+
+## Docker Compose
+
+The fastest way to get NoCTF running is with the provided `deploy/docker-compose.yml`.
+
+### Services
+
+| Service | Image | Purpose |
+|---------|-------|---------|
+| `postgres` | `postgres:16` | Primary database |
+| `redis` | `redis:7` | SignalR backplane and leaderboard cache |
+| `minio` | `minio/minio:latest` | S3-compatible object storage |
+| `backend` | Built from `backend/Dockerfile` | NoCTF API |
+| `frontend` | Built from `frontend/Dockerfile` | Vue 3 SPA served by Nginx |
+
+### Steps
+
+1. Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` and set strong values for the required secrets:
+
+```bash
+POSTGRES_PASSWORD=change_me_strong_password
+JWT_SECRET=change_me_at_least_32_chars_long_secret_key
+MINIO_ROOT_PASSWORD=change_me_minio_password
+```
+
+3. Start the stack:
+
+```bash
+cd deploy && docker compose up --build -d
+```
+
+4. Verify health:
+
+```bash
+curl http://localhost:8080/api/health
+```
+
+5. Open the app at `http://localhost`.
+
+### Notes
+
+- The backend mounts `/var/run/docker.sock` so it can manage challenge containers directly on the host.
+- Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
+
+## Kubernetes
+
+NoCTF includes a full set of K8s manifests under `deploy/k8s/`.
+
+### Prerequisites
+
+- Kubernetes cluster (v1.25+)
+- `kubectl` configured for your cluster
+- NGINX Ingress Controller installed
+- Metrics Server installed (required for HPA)
+
+### Creating Secrets
+
+Use `kubectl create secret` instead of editing `secret.yaml` to avoid committing credentials:
+
+```bash
+kubectl create namespace noctf
+
+kubectl create secret generic noctf-secrets \
+  --namespace noctf \
+  --from-literal=jwt-secret='your-jwt-secret-at-least-32-chars' \
+  --from-literal=db-password='your-db-password' \
+  --from-literal=minio-access-key='your-minio-access-key' \
+  --from-literal=minio-secret-key='your-minio-secret-key'
+```
+
+### Build and Load Images
+
+From the repo root:
+
+```bash
+docker build -t noctf-backend:latest ./backend
+docker build -t noctf-frontend:latest ./frontend
+```
+
+For local clusters, load the images:
+
+```bash
+# kind
+kind load docker-image noctf-backend:latest
+kind load docker-image noctf-frontend:latest
+
+# minikube
+minikube image load noctf-backend:latest
+minikube image load noctf-frontend:latest
+```
+
+### Apply Manifests
+
+Apply in order to satisfy dependencies, or apply the entire directory at once:
+
+```bash
+# Ordered apply
+kubectl apply -f deploy/k8s/namespace.yaml
+kubectl apply -f deploy/k8s/secret.yaml
+kubectl apply -f deploy/k8s/configmap.yaml
+kubectl apply -f deploy/k8s/postgres-pvc.yaml
+kubectl apply -f deploy/k8s/postgres-deployment.yaml
+kubectl apply -f deploy/k8s/postgres-service.yaml
+kubectl apply -f deploy/k8s/redis-deployment.yaml
+kubectl apply -f deploy/k8s/redis-service.yaml
+kubectl apply -f deploy/k8s/backend-deployment.yaml
+kubectl apply -f deploy/k8s/backend-service.yaml
+kubectl apply -f deploy/k8s/backend-hpa.yaml
+kubectl apply -f deploy/k8s/frontend-deployment.yaml
+kubectl apply -f deploy/k8s/frontend-service.yaml
+kubectl apply -f deploy/k8s/ingress.yaml
+kubectl apply -f deploy/k8s/networkpolicy.yaml
+```
+
+Or apply everything at once:
+
+```bash
+kubectl apply -f deploy/k8s/
+```
+
+### Ingress Setup
+
+The ingress is configured for `noctf.local`. Add it to your hosts file:
+
+```bash
+# Replace <ingress-ip> with the actual external IP of your ingress controller
+echo "<ingress-ip> noctf.local" | sudo tee -a /etc/hosts
+```
+
+Verify:
+
+```bash
+kubectl get ingress -n noctf
+kubectl get all -n noctf
+kubectl get hpa -n noctf
+```
+
+### AWD Privileged Node Requirements
+
+AWD mode requires access to a Docker socket for spawning challenge containers. This is **disabled by default** for security.
+
+To enable it on a privileged node, uncomment the `volumeMounts` and `volumes` sections in `deploy/k8s/backend-deployment.yaml`:
+
+```yaml
+volumeMounts:
+  - name: docker-sock
+    mountPath: /var/run/docker.sock
+volumes:
+  - name: docker-sock
+    hostPath:
+      path: /var/run/docker.sock
+      type: Socket
+```
+
+Consider using a dedicated node pool with taints/tolerations for AWD workloads so privileged container access is isolated from the rest of your cluster.
+
+### Network Policy Notes
+
+`networkpolicy.yaml` enforces a default-deny posture:
+
+- Backend can reach postgres (5432) and redis (6379)
+- Frontend accepts traffic on port 80 from anywhere
+- Backend accepts traffic only from the `ingress-nginx` namespace
+- AWD challenge pods accept traffic only from pods labeled `app=noctf-checker`
+- DNS egress (port 53) is allowed for all pods
+
+Make sure the `ingress-nginx` namespace has the label `kubernetes.io/metadata.name: ingress-nginx`:
+
+```bash
+kubectl get namespace ingress-nginx --show-labels
+```

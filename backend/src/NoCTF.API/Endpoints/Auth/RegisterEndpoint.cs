@@ -18,7 +18,7 @@ public class RegisterResponse
     public string UserName { get; set; } = string.Empty;
 }
 
-public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<RegisterRequest, RegisterResponse>
+public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<RegisterRequest, RegisterResponse>, IAuditableEndpoint
 {
     public override void Configure()
     {
