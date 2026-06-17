@@ -21,6 +21,9 @@ public interface IContainerManager
 {
     Task<ContainerInstance> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default);
     Task DestroyContainerAsync(ContainerInstance container, CancellationToken cancellationToken = default);
+    Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default);
+    Task<ComposeDeployment> ComposeUpAsync(ComposeConfig config, CancellationToken cancellationToken = default);
+    Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken cancellationToken = default);
 }
 
 public interface IContainerProvider<TClient, TMetadata>
@@ -43,4 +46,10 @@ public interface IPluginModule
     string Name { get; }
     string Version { get; }
     void ConfigureServices(IServiceCollection services);
+}
+
+public interface IAwdpPatchService
+{
+    Task<Guid> SubmitPatchAsync(Guid competitionId, Guid teamId, Guid challengeId, Stream patchArchive, string fileName, CancellationToken ct = default);
+    Task ValidatePatchAsync(Guid submissionId, CancellationToken ct = default);
 }

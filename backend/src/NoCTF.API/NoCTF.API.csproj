@@ -11,19 +11,29 @@
     <ProjectReference Include="../NoCTF.Core/NoCTF.Core.csproj" />
     <ProjectReference Include="../NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
     <ProjectReference Include="../NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
-    <ProjectReference Include="../NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj" />
-    <ProjectReference Include="../NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
-    <ProjectReference Include="../NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
-    <ProjectReference Include="../NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
     <ProjectReference Include="../NoCTF.Container.Docker/NoCTF.Container.Docker.csproj" />
     <ProjectReference Include="../NoCTF.Container.K8s/NoCTF.Container.K8s.csproj" />
   </ItemGroup>
+
+  <Target Name="CopyPlugins" AfterTargets="Build">
+    <MakeDir Directories="$(TargetDir)plugins" />
+    <ItemGroup>
+      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.CTF/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.CTF.dll" />
+      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.AWD/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.AWD.dll" />
+      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.AWDP/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.AWDP.dll" />
+      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.KoH/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.KoH.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginDlls)" DestinationFolder="$(TargetDir)plugins/" SkipUnchangedFiles="true" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="FastEndpoints" Version="5.33.0" />
     <PackageReference Include="FastEndpoints.Security" Version="5.33.0" />
     <PackageReference Include="FastEndpoints.Swagger" Version="5.33.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

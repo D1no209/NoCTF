@@ -24,6 +24,36 @@ public record ContainerInstance(
     DateTime? ExpectedStopAt = null
 );
 
+public record ContainerRunResult(
+    string ContainerId,
+    int ExitCode,
+    string? StdOut,
+    string? StdErr,
+    DateTime StartedAt,
+    DateTime FinishedAt
+);
+
+public record ComposeConfig(
+    string ProjectName,
+    string ComposeYaml,
+    Dictionary<string, string>? EnvironmentVariables = null,
+    Dictionary<string, string>? Labels = null,
+    TimeSpan? Ttl = null
+);
+
+public record ComposeDeployment(
+    Guid Id,
+    Guid CompetitionId,
+    Guid? TeamId,
+    Guid? ChallengeId,
+    string ProviderType,
+    string ProjectName,
+    string ComposeYaml,
+    string Status,
+    DateTime StartedAt,
+    DateTime? ExpectedStopAt = null
+);
+
 public record GameContext(
     Guid CompetitionId,
     GameModeType GameMode,

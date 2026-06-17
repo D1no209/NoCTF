@@ -22,6 +22,230 @@ namespace NoCTF.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("NoCTF.Core.AwdAttackRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AttackerTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FlagContent")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VictimTeamId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_awdattackrecords_competition");
+
+                    b.HasIndex("CompetitionId", "RoundNumber")
+                        .HasDatabaseName("ix_awdattackrecords_competition_round");
+
+                    b.ToTable("AwdAttackRecords");
+                });
+
+            modelBuilder.Entity("NoCTF.Core.AwdCheckResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Detail")
+                        .HasColumnType("text");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_awdcheckresults_competition");
+
+                    b.HasIndex("CompetitionId", "RoundNumber")
+                        .HasDatabaseName("ix_awdcheckresults_competition_round");
+
+                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId", "RoundNumber")
+                        .HasDatabaseName("ix_awdcheckresults_competition_team_challenge_round");
+
+                    b.ToTable("AwdCheckResults");
+                });
+
+            modelBuilder.Entity("NoCTF.Core.AwdFlag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FlagContent")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_awdflags_competition");
+
+                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId", "RoundNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awdflags_competition_team_challenge_round");
+
+                    b.ToTable("AwdFlags");
+                });
+
+            modelBuilder.Entity("NoCTF.Core.AwdGameBox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContainerInstanceId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastFlagRefreshedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_awdgameboxes_competition");
+
+                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awdgameboxes_competition_team_challenge");
+
+                    b.ToTable("AwdGameBoxes");
+                });
+
+            modelBuilder.Entity("NoCTF.Core.AwdRound", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EndTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_awdrounds_competition");
+
+                    b.ToTable("AwdRounds");
+                });
+
+            modelBuilder.Entity("NoCTF.Core.AwdpPatchSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PatchArchiveUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ValidatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ValidationDetail")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_awdpatchsubmissions_competition");
+
+                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId")
+                        .HasDatabaseName("ix_awdpatchsubmissions_competition_team_challenge");
+
+                    b.ToTable("AwdpPatchSubmissions");
+                });
+
             modelBuilder.Entity("NoCTF.Core.Challenge", b =>
                 {
                     b.Property<Guid>("Id")
@@ -35,6 +259,15 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("ContainerImage")
+                        .HasColumnType("text");
+
+                    b.Property<int>("ContainerMode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ComposeProjectName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ComposeYaml")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
@@ -68,8 +301,20 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("AttackPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("BeenAttackedPenalty")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("ControlPointsPerInterval")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DefensePoints")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
@@ -77,11 +322,32 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("FlagFormat")
+                        .HasColumnType("text");
+
+                    b.Property<string>("FlagPath")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("FlagValidityRounds")
+                        .HasColumnType("integer");
+
                     b.Property<int>("GameModeType")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("PollIntervalSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RoundDurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ServiceDownPenalty")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ServiceOnlinePoints")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("timestamp with time zone");
@@ -92,6 +358,9 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int?>("TotalRounds")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -125,6 +394,38 @@ namespace NoCTF.Infrastructure.Migrations
                     b.ToTable("CompetitionCollaborators");
                 });
 
+            modelBuilder.Entity("NoCTF.Core.KohControlRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EndTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_kohcontrolrecords_competition");
+
+                    b.HasIndex("CompetitionId", "ChallengeId")
+                        .HasDatabaseName("ix_kohcontrolrecords_competition_challenge");
+
+                    b.ToTable("KohControlRecords");
+                });
+
             modelBuilder.Entity("NoCTF.Core.ScoreEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -146,6 +447,9 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.Property<string>("Reason")
                         .HasColumnType("text");
+
+                    b.Property<int?>("RoundNumber")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("TeamId")
                         .HasColumnType("uuid");
@@ -290,8 +594,111 @@ namespace NoCTF.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("NoCTF.Infrastructure.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Diff")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EndpointPath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EntityId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EntityType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Exception")
+                        .HasColumnType("text");
+
+                    b.Property<string>("HttpMethod")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("text");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserName")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("NoCTF.Core.Challenge", b =>
                 {
+                    b.OwnsOne("NoCTF.Core.CheckerConfig", "CheckerConfig", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Command")
+                                .HasColumnType("text");
+
+                            b1.Property<string>("ExpCommand")
+                                .HasColumnType("text");
+
+                            b1.Property<string>("ExpImage")
+                                .HasColumnType("text");
+
+                            b1.Property<string>("Image")
+                                .HasColumnType("text");
+
+                            b1.Property<int?>("TimeoutSeconds")
+                                .HasColumnType("integer");
+
+                            b1.HasKey("ChallengeId");
+
+                            b1.ToTable("Challenges");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId");
+                        });
+
+                    b.OwnsOne("NoCTF.Core.KohAgentConfig", "KohAgentConfig", b1 =>
+                        {
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("ApiKey")
+                                .HasColumnType("text");
+
+                            b1.Property<int>("Port")
+                                .HasColumnType("integer");
+
+                            b1.HasKey("ChallengeId");
+
+                            b1.ToTable("Challenges");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId");
+                        });
+
                     b.OwnsOne("NoCTF.Core.PointsConfig", "PointsConfig", b1 =>
                         {
                             b1.Property<Guid>("ChallengeId")
@@ -317,6 +724,10 @@ namespace NoCTF.Infrastructure.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("ChallengeId");
                         });
+
+                    b.Navigation("CheckerConfig");
+
+                    b.Navigation("KohAgentConfig");
 
                     b.Navigation("PointsConfig")
                         .IsRequired();

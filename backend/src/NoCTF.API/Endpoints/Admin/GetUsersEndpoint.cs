@@ -17,7 +17,7 @@ public class GetUsersEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRe
     public override void Configure()
     {
         Get("/api/admin/users");
-        Roles("Admin");
+        Roles("Admin", "Organizer");
     }
 
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)

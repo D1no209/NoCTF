@@ -1,0 +1,5 @@
+{
+  "SpaProxyServer": {
+    "ServerUrl": "http://localhost:5173"
+  }
+}

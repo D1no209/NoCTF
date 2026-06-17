@@ -10,6 +10,8 @@
     <ProjectReference Include="../NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
     <ProjectReference Include="../NoCTF.Core/NoCTF.Core.csproj" />
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+    <ProjectReference Include="../NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
+    <ProjectReference Include="../NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
   </ItemGroup>
 
 </Project>

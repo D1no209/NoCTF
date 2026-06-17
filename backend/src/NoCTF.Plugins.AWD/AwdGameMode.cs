@@ -1,0 +1,155 @@
+using Microsoft.EntityFrameworkCore;
+using NoCTF.Application;
+using NoCTF.Core;
+using NoCTF.Infrastructure;
+using NoCTF.PluginBase;
+
+namespace NoCTF.Plugins.AWD;
+
+/// <summary>
+/// AWD game mode: handles flag-stealing submissions and round notifications.
+/// </summary>
+public class AwdGameMode : IGameMode
+{
+    private readonly ApplicationDbContext _db;
+    private readonly IHubNotifierService _hubNotifier;
+
+    public GameModeType Type => GameModeType.Awd;
+
+    public AwdGameMode(ApplicationDbContext db, IHubNotifierService hubNotifier)
+    {
+        _db = db;
+        _hubNotifier = hubNotifier;
+    }
+
+    public Task InitializeAsync(GameContext context, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// Called by AwdRoundEngine on each round tick. Notifies clients that a new round started.
+    /// </summary>
+    public async Task OnRoundTickAsync(GameContext context, CancellationToken cancellationToken = default)
+    {
+        if (!context.Configuration.TryGetValue("RoundNumber", out var roundStr) ||
+            !int.TryParse(roundStr, out var roundNumber))
+            return;
+
+        await _hubNotifier.NotifyRoundStartedAsync(context.CompetitionId, roundNumber, cancellationToken);
+    }
+
+    /// <summary>
+    /// Processes an AWD flag submission (flag stealing).
+    /// Validates the flag, checks for self-attack and duplicates, records the attack, and awards points.
+    /// </summary>
+    public async Task<SubmissionResult> ProcessSubmissionAsync(
+        SubmissionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        // Find the AwdFlag matching the submitted content for this competition
+        var flag = await _db.AwdFlags
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(f => f.CompetitionId == context.CompetitionId
+                                   && f.FlagContent == context.FlagContent, cancellationToken);
+
+        if (flag is null)
+            return SubmissionResult.WrongFlag;
+
+        // Self-attack prevention
+        if (flag.TeamId == context.TeamId)
+            return SubmissionResult.WrongFlag;
+
+        // Get the current (latest) round number
+        var latestRound = await _db.AwdRounds
+            .IgnoreQueryFilters()
+            .Where(r => r.CompetitionId == context.CompetitionId)
+            .OrderByDescending(r => r.RoundNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (latestRound is null)
+            return SubmissionResult.WrongFlag;
+
+        int currentRound = latestRound.RoundNumber;
+
+        // Flag validity window check
+        var competition = await _db.Competitions
+            .IgnoreQueryFilters()
+            .FirstAsync(c => c.Id == context.CompetitionId, cancellationToken);
+
+        int validityRounds = competition.FlagValidityRounds ?? 2;
+        int minValidRound = currentRound - validityRounds + 1;
+
+        if (flag.RoundNumber < minValidRound)
+            return SubmissionResult.WrongFlag;
+
+        // Duplicate attack prevention: same attacker/victim/challenge/round
+        var isDuplicate = await _db.AwdAttackRecords
+            .IgnoreQueryFilters()
+            .AnyAsync(a => a.CompetitionId == context.CompetitionId
+                        && a.AttackerTeamId == context.TeamId
+                        && a.VictimTeamId == flag.TeamId
+                        && a.ChallengeId == flag.ChallengeId
+                        && a.RoundNumber == flag.RoundNumber, cancellationToken);
+
+        if (isDuplicate)
+            return SubmissionResult.WrongFlag;
+
+        // Record the attack
+        _db.AwdAttackRecords.Add(new AwdAttackRecord
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = context.CompetitionId,
+            AttackerTeamId = context.TeamId,
+            VictimTeamId = flag.TeamId,
+            ChallengeId = flag.ChallengeId,
+            RoundNumber = flag.RoundNumber,
+            FlagContent = context.FlagContent,
+            Timestamp = DateTime.UtcNow
+        });
+
+        // Award attacker points immediately
+        int attackPoints = competition.AttackPoints ?? 50;
+        _db.ScoreEvents.Add(new ScoreEvent
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = context.CompetitionId,
+            TeamId = context.TeamId,
+            ChallengeId = flag.ChallengeId,
+            EventType = "awd_attack",
+            PointsDelta = attackPoints,
+            Reason = $"Captured flag from team {flag.TeamId} (round {flag.RoundNumber})",
+            Timestamp = DateTime.UtcNow,
+            RoundNumber = flag.RoundNumber
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Broadcast attack log via SignalR — look up names for the notification
+        var attackerTeam = await _db.Teams
+            .IgnoreQueryFilters()
+            .Where(t => t.Id == context.TeamId)
+            .Select(t => t.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var victimTeam = await _db.Teams
+            .IgnoreQueryFilters()
+            .Where(t => t.Id == flag.TeamId)
+            .Select(t => t.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var challenge = await _db.Challenges
+            .IgnoreQueryFilters()
+            .Where(c => c.Id == flag.ChallengeId)
+            .Select(c => c.Title)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        await _hubNotifier.NotifyAttackLogAsync(
+            context.CompetitionId,
+            context.TeamId, attackerTeam ?? context.TeamId.ToString(),
+            flag.TeamId, victimTeam ?? flag.TeamId.ToString(),
+            flag.ChallengeId, challenge ?? flag.ChallengeId.ToString(),
+            flag.RoundNumber,
+            cancellationToken);
+
+        return SubmissionResult.Accepted;
+    }
+}

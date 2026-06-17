@@ -20,7 +20,7 @@ public class LoginResponse
     public string Role { get; set; } = string.Empty;
 }
 
-public class LoginEndpoint(ApplicationDbContext dbContext, JwtTokenService jwtService) : Endpoint<LoginRequest, LoginResponse>
+public class LoginEndpoint(ApplicationDbContext dbContext, JwtTokenService jwtService) : Endpoint<LoginRequest, LoginResponse>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -52,7 +52,7 @@ public class LoginEndpoint(ApplicationDbContext dbContext, JwtTokenService jwtSe
         {
             AccessToken = jwtService.GenerateToken(user),
             UserName = user.UserName,
-            Role = user.Role.ToString().ToLowerInvariant()
+            Role = user.Role.ToString()
         }, cancellation: ct);
     }
 }

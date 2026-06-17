@@ -1,6 +1,3 @@
-﻿namespace NoCTF.Plugins.AWDP;
+namespace NoCTF.Plugins.AWDP;
 
-public class Class1
-{
-
-}
+// Placeholder — replaced by AwdpGameMode, AwdpPatchService, AwdpModule

@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.11" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
@@ -26,6 +27,10 @@
     <ProjectReference Include="../../src/NoCTF.Core/NoCTF.Core.csproj" />
     <ProjectReference Include="../../src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
     <ProjectReference Include="../../src/NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
   </ItemGroup>
 
 </Project>
