@@ -104,6 +104,8 @@ builder.Services.AddSingleton<ILoggerProvider, LogStreamerLoggerProvider>();
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(redisConnection));
 
+builder.Services.AddNoCtfApplicationCore();
+
 // Leaderboard services
 builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
 builder.Services.AddSingleton<IRedisLeaderboardCache, RedisLeaderboardCache>();

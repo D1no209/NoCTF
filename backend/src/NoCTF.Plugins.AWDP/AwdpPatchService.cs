@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -13,6 +14,7 @@ public class AwdpPatchService(
     ApplicationDbContext db,
     IContainerManager containerManager,
     IStorageProvider storageProvider,
+    IScoreSignalEmitter scoreSignalEmitter,
     ILogger<AwdpPatchService> logger) : IAwdpPatchService
 {
     /// <summary>
@@ -74,10 +76,6 @@ public class AwdpPatchService(
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .FirstAsync(c => c.Id == submission.ChallengeId, ct);
-
-        var competition = await db.Competitions
-            .IgnoreQueryFilters()
-            .FirstAsync(c => c.Id == submission.CompetitionId, ct);
 
         var gameBox = await db.AwdGameBoxes
             .IgnoreQueryFilters()
@@ -277,34 +275,19 @@ public class AwdpPatchService(
             submission.ValidatedAt = DateTime.UtcNow;
             submission.ValidationDetail = "Checker passed and EXP failed — patch verified.";
 
-            int defensePoints = competition.DefensePoints ?? 100;
-            var alreadyAwarded = await db.ScoreEvents
-                .IgnoreQueryFilters()
-                .AnyAsync(e =>
-                    e.CompetitionId == submission.CompetitionId &&
-                    e.TeamId == submission.TeamId &&
-                    e.ChallengeId == submission.ChallengeId &&
-                    e.EventType == "awdp_defense" &&
-                    e.Reason == $"Patch verified for submission {submission.Id}", ct);
-
-            if (!alreadyAwarded)
-            {
-                db.ScoreEvents.Add(new ScoreEvent
-                {
-                    Id = Guid.NewGuid(),
-                    CompetitionId = submission.CompetitionId,
-                    TeamId = submission.TeamId,
-                    ChallengeId = submission.ChallengeId,
-                    EventType = "awdp_defense",
-                    PointsDelta = defensePoints,
-                    Reason = $"Patch verified for submission {submission.Id}",
-                    Timestamp = DateTime.UtcNow
-                });
-            }
+            await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+                CompetitionId: submission.CompetitionId,
+                TeamId: submission.TeamId,
+                SignalType: ScoreSignalTypes.PatchVerified,
+                IdempotencyKey: $"awdp:{submission.Id:N}:verified",
+                SubjectType: "challenge",
+                SubjectId: submission.ChallengeId,
+                PayloadJson: ScoringJson.Serialize(new { submissionId = submission.Id }),
+                OccurredAt: submission.ValidatedAt), ct);
 
             logger.LogInformation(
-                "Patch verified for submission {SubmissionId}. Awarded {Points} defense points.",
-                submissionId, defensePoints);
+                "Patch verified for submission {SubmissionId}; emitted patch verification score signal.",
+                submissionId);
         }
         else
         {

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -25,10 +26,21 @@ public class AwdScoreEngineTests
     }
 
     private static AwdScoreEngine CreateScoreEngine(ApplicationDbContext db)
-        => new(db, new NullLeaderboardService(), new NullHubNotifier(), NullLogger<AwdScoreEngine>.Instance);
+        => new(db, new NullLeaderboardService(), new NullHubNotifier(), CreateScoreSignalEmitter(db), NullLogger<AwdScoreEngine>.Instance);
 
     private static AwdGameMode CreateGameMode(ApplicationDbContext db)
-        => new(db, new NullHubNotifier());
+        => new(db, new NullHubNotifier(), CreateScoreSignalEmitter(db));
+
+    private static IScoreSignalEmitter CreateScoreSignalEmitter(ApplicationDbContext db)
+    {
+        var writer = new ScoreEventWriter(db);
+        IScoringStrategy[] strategies = [new RoundAccumulationScoringStrategy(db, writer)];
+        return new ScoreSignalEmitter(
+            db,
+            strategies,
+            new CompetitionScoringProfileResolver(db),
+            NullLogger<ScoreSignalEmitter>.Instance);
+    }
 
     private static void SeedCompetition(ApplicationDbContext db, Guid competitionId,
         int attackPoints = 50, int serviceOnlinePoints = 100, int serviceDownPenalty = 50,
@@ -160,7 +172,7 @@ public class AwdScoreEngineTests
         Assert.Single(events);
         Assert.Equal(100, events[0].PointsDelta);
         Assert.Equal(teamId, events[0].TeamId);
-        Assert.Equal("awd_round_score", events[0].EventType);
+        Assert.Equal("awd.service-online", events[0].EventType);
         Assert.Equal(1, events[0].RoundNumber);
     }
 
@@ -203,12 +215,10 @@ public class AwdScoreEngineTests
         await engine.CalculateRoundScoreAsync(competitionId, roundNumber: 1);
 
         var events = await db.ScoreEvents.IgnoreQueryFilters().ToListAsync();
-        // Victim: +100 (healthy) - 50 (attacked) = +50
-        var victimEvent = events.Single(e => e.TeamId == victimTeamId);
-        Assert.Equal(50, victimEvent.PointsDelta);
+        // Victim: +100 (healthy) - 50 (attacked) = +50 across two scoring facts
+        Assert.Equal(50, events.Where(e => e.TeamId == victimTeamId).Sum(e => e.PointsDelta));
         // Attacker: +100 (healthy), no penalty
-        var attackerEvent = events.Single(e => e.TeamId == attackerTeamId);
-        Assert.Equal(100, attackerEvent.PointsDelta);
+        Assert.Equal(100, events.Where(e => e.TeamId == attackerTeamId).Sum(e => e.PointsDelta));
     }
 
     [Fact]

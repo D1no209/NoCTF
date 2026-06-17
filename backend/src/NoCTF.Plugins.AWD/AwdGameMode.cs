@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -13,13 +14,18 @@ public class AwdGameMode : IGameMode
 {
     private readonly ApplicationDbContext _db;
     private readonly IHubNotifierService _hubNotifier;
+    private readonly IScoreSignalEmitter _scoreSignalEmitter;
 
     public GameModeType Type => GameModeType.Awd;
 
-    public AwdGameMode(ApplicationDbContext db, IHubNotifierService hubNotifier)
+    public AwdGameMode(
+        ApplicationDbContext db,
+        IHubNotifierService hubNotifier,
+        IScoreSignalEmitter scoreSignalEmitter)
     {
         _db = db;
         _hubNotifier = hubNotifier;
+        _scoreSignalEmitter = scoreSignalEmitter;
     }
 
     public Task InitializeAsync(GameContext context, CancellationToken cancellationToken = default)
@@ -39,7 +45,7 @@ public class AwdGameMode : IGameMode
 
     /// <summary>
     /// Processes an AWD flag submission (flag stealing).
-    /// Validates the flag, checks for self-attack and duplicates, records the attack, and awards points.
+    /// Validates the flag, checks for self-attack and duplicates, records the attack, and emits a scoring signal.
     /// </summary>
     public async Task<SubmissionResult> ProcessSubmissionAsync(
         SubmissionContext context,
@@ -106,22 +112,19 @@ public class AwdGameMode : IGameMode
             Timestamp = DateTime.UtcNow
         });
 
-        // Award attacker points immediately
-        int attackPoints = competition.AttackPoints ?? 50;
-        _db.ScoreEvents.Add(new ScoreEvent
-        {
-            Id = Guid.NewGuid(),
-            CompetitionId = context.CompetitionId,
-            TeamId = context.TeamId,
-            ChallengeId = flag.ChallengeId,
-            EventType = "awd_attack",
-            PointsDelta = attackPoints,
-            Reason = $"Captured flag from team {flag.TeamId} (round {flag.RoundNumber})",
-            Timestamp = DateTime.UtcNow,
-            RoundNumber = flag.RoundNumber
-        });
-
         await _db.SaveChangesAsync(cancellationToken);
+
+        await _scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+            CompetitionId: context.CompetitionId,
+            TeamId: context.TeamId,
+            SignalType: ScoreSignalTypes.AttackAccepted,
+            IdempotencyKey: $"awd:{flag.RoundNumber}:{context.TeamId:N}:{flag.TeamId:N}:{flag.ChallengeId:N}:attack",
+            SubjectType: "challenge",
+            SubjectId: flag.ChallengeId,
+            ActorUserId: context.UserId,
+            RoundNumber: flag.RoundNumber,
+            PayloadJson: ScoringJson.Serialize(new { victimTeamId = flag.TeamId }),
+            OccurredAt: DateTime.UtcNow), cancellationToken);
 
         // Broadcast attack log via SignalR — look up names for the notification
         var attackerTeam = await _db.Teams

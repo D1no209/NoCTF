@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Scoring;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.Application.Leaderboard;
@@ -8,11 +9,16 @@ public interface ILeaderboardService
     Task<IReadOnlyList<LeaderboardEntry>> CalculateLeaderboardAsync(Guid competitionId, CancellationToken ct = default);
 }
 
+public interface ILeaderboardProjectionBuilder
+{
+    Task<IReadOnlyList<ScoreboardRow>> BuildAsync(Guid competitionId, CancellationToken ct = default);
+}
+
 /// <summary>
 /// Calculates the leaderboard by aggregating ScoreEvents (total score) and Submissions (solve count + first-blood).
 /// Tie-breaker: equal score → earlier first correct submission ranks higher.
 /// </summary>
-public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService
+public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, ILeaderboardProjectionBuilder
 {
     public async Task<IReadOnlyList<LeaderboardEntry>> CalculateLeaderboardAsync(
         Guid competitionId,
@@ -70,9 +76,10 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService
             };
         }).ToList();
 
-        // Sort: descending score, then ascending first-solve time (tie-breaker)
+        // Sort: descending score, then solved challenges, then ascending first-solve time.
         var sorted = entries
             .OrderByDescending(e => e.TotalScore)
+            .ThenByDescending(e => e.SolvedCount)
             .ThenBy(e => e.FirstSolveAt ?? DateTime.MaxValue)
             .ToList();
 
@@ -84,5 +91,42 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService
             SolvedCount: e.SolvedCount,
             FirstSolveAt: e.FirstSolveAt
         )).ToList();
+    }
+
+    public async Task<IReadOnlyList<ScoreboardRow>> BuildAsync(Guid competitionId, CancellationToken ct = default)
+    {
+        var entries = await CalculateLeaderboardAsync(competitionId, ct);
+        var scoreEvents = await db.ScoreEvents
+            .IgnoreQueryFilters()
+            .Where(e => e.CompetitionId == competitionId)
+            .GroupBy(e => new { e.TeamId, e.ScoringKey })
+            .Select(g => new { g.Key.TeamId, g.Key.ScoringKey, Points = g.Sum(e => (long)e.PointsDelta) })
+            .ToListAsync(ct);
+
+        var metricsByTeam = scoreEvents
+            .GroupBy(e => e.TeamId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyDictionary<string, long>)g.ToDictionary(
+                    e => string.IsNullOrWhiteSpace(e.ScoringKey) ? "legacy" : e.ScoringKey,
+                    e => e.Points,
+                    StringComparer.OrdinalIgnoreCase));
+
+        return entries.Select(e =>
+        {
+            metricsByTeam.TryGetValue(e.TeamId, out var metrics);
+            metrics ??= new Dictionary<string, long>();
+            return new ScoreboardRow(
+                e.Rank,
+                e.TeamId,
+                e.TeamName,
+                e.TotalScore,
+                metrics,
+                new Dictionary<string, string>
+                {
+                    ["solvedCount"] = e.SolvedCount.ToString(),
+                    ["firstSolveAt"] = e.FirstSolveAt?.ToString("O") ?? string.Empty
+                });
+        }).ToList();
     }
 }

@@ -1,4 +1,6 @@
 using FastEndpoints;
+using NoCTF.Application.CompetitionModes;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -41,6 +43,8 @@ public class CreateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoin
             Title = req.Title,
             Description = req.Description,
             GameModeType = req.GameModeType,
+            ModeKey = CompetitionModeDefaults.GetModeKey(req.GameModeType),
+            ScoringProfileJson = ScoringJson.Serialize(CompetitionModeDefaults.GetScoringProfile(req.GameModeType)),
             OwnerId = userId,
             StartTime = req.StartTime,
             EndTime = req.EndTime,

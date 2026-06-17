@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -27,7 +28,19 @@ public class AwdpPatchServiceTests
         IContainerManager containerManager,
         IStorageProvider? storageProvider = null)
         => new(db, containerManager, storageProvider ?? new NullStorageProvider(),
+               CreateScoreSignalEmitter(db),
                NullLogger<AwdpPatchService>.Instance);
+
+    private static IScoreSignalEmitter CreateScoreSignalEmitter(ApplicationDbContext db)
+    {
+        var writer = new ScoreEventWriter(db);
+        IScoringStrategy[] strategies = [new OneShotVerificationScoringStrategy(db, writer)];
+        return new ScoreSignalEmitter(
+            db,
+            strategies,
+            new CompetitionScoringProfileResolver(db),
+            NullLogger<ScoreSignalEmitter>.Instance);
+    }
 
     private static Guid SeedCompetition(ApplicationDbContext db, Guid competitionId, int defensePoints = 150)
     {
@@ -179,7 +192,7 @@ public class AwdpPatchServiceTests
 
         var scoreEvent = await db.ScoreEvents
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(se => se.TeamId == teamId && se.EventType == "awdp_defense");
+            .FirstOrDefaultAsync(se => se.TeamId == teamId && se.EventType == "awdp.patch-verified");
 
         Assert.NotNull(scoreEvent);
         Assert.Equal(200, scoreEvent.PointsDelta);
@@ -216,7 +229,7 @@ public class AwdpPatchServiceTests
         // No defense points awarded
         var scoreEvent = await db.ScoreEvents
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(se => se.TeamId == teamId && se.EventType == "awdp_defense");
+            .FirstOrDefaultAsync(se => se.TeamId == teamId && se.EventType == "awdp.patch-verified");
         Assert.Null(scoreEvent);
 
         // Container was recreated (create called twice: patched + rollback)

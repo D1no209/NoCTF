@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application;
 using NoCTF.Application.Events;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -8,25 +9,25 @@ using NoCTF.PluginBase;
 namespace NoCTF.Plugins.CTF;
 
 /// <summary>
-/// CTF game mode: validates flags, prevents duplicate solves, writes Submission + ScoreEvent,
-/// recalculates dynamic scoring, and fires SignalR notifications via ISubmissionEventHandler.
+/// CTF game mode: validates flags, prevents duplicate solves, records submissions,
+/// emits neutral scoring signals, and fires SignalR notifications via ISubmissionEventHandler.
 /// </summary>
 public class CtfGameMode : IGameMode
 {
     private readonly ApplicationDbContext _db;
     private readonly ISubmissionEventHandler _submissionEventHandler;
-    private readonly DynamicScoringCalculator _scoringCalculator;
+    private readonly IScoreSignalEmitter _scoreSignalEmitter;
 
     public GameModeType Type => GameModeType.Ctf;
 
     public CtfGameMode(
         ApplicationDbContext db,
         ISubmissionEventHandler submissionEventHandler,
-        DynamicScoringCalculator scoringCalculator)
+        IScoreSignalEmitter scoreSignalEmitter)
     {
         _db = db;
         _submissionEventHandler = submissionEventHandler;
-        _scoringCalculator = scoringCalculator;
+        _scoreSignalEmitter = scoreSignalEmitter;
     }
 
     public Task InitializeAsync(GameContext context, CancellationToken cancellationToken = default)
@@ -91,8 +92,7 @@ public class CtfGameMode : IGameMode
             return SubmissionResult.WrongFlag;
         }
 
-        // Count existing correct solves for this challenge (excluding this team's new solve)
-        // to determine dynamic score at time of solve
+        // Count existing correct solves for first blood notification only.
         var solveCount = await _db.Submissions
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -102,26 +102,9 @@ public class CtfGameMode : IGameMode
                 s.IsCorrect,
                 cancellationToken);
 
-        // solveCount is the count BEFORE this solve; after adding this submission it becomes solveCount+1
-        var pointsAwarded = _scoringCalculator.Calculate(solveCount + 1, challenge.PointsConfig);
-
         // Check if this is first blood (no prior correct solves)
         var isFirstBlood = solveCount == 0;
 
-        // Write ScoreEvent (points are derived from ScoreEvents, not stored in Submission)
-        var scoreEvent = new ScoreEvent
-        {
-            Id = Guid.NewGuid(),
-            CompetitionId = context.CompetitionId,
-            TeamId = context.TeamId,
-            ChallengeId = context.ChallengeId,
-            EventType = "FlagSolved",
-            PointsDelta = pointsAwarded,
-            Reason = $"Solved challenge '{challenge.Title}'",
-            Timestamp = DateTime.UtcNow
-        };
-
-        _db.ScoreEvents.Add(scoreEvent);
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
@@ -135,8 +118,17 @@ public class CtfGameMode : IGameMode
             return SubmissionResult.AlreadySolved;
         }
 
-        // Recalculate scores for all teams that solved this challenge (dynamic scoring)
-        await RecalculateDynamicScoresAsync(context.CompetitionId, context.ChallengeId, challenge, cancellationToken);
+        await _scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+            CompetitionId: context.CompetitionId,
+            TeamId: context.TeamId,
+            SignalType: ScoreSignalTypes.SolveAccepted,
+            IdempotencyKey: $"ctf:{context.TeamId:N}:{context.ChallengeId:N}:solve",
+            SubjectType: "challenge",
+            SubjectId: context.ChallengeId,
+            ActorUserId: context.UserId,
+            PayloadJson: ScoringJson.Serialize(new { submissionId = submission.Id }),
+            OccurredAt: submission.SubmittedAt), cancellationToken);
+
         await transaction.CommitAsync(cancellationToken);
 
         // Load team name for notification
@@ -146,6 +138,16 @@ public class CtfGameMode : IGameMode
             .FirstOrDefaultAsync(t => t.Id == context.TeamId, cancellationToken);
 
         var teamName = team?.Name ?? context.TeamId.ToString();
+
+        var pointsAwarded = await _db.ScoreEvents
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(e =>
+                e.CompetitionId == context.CompetitionId &&
+                e.TeamId == context.TeamId &&
+                e.ChallengeId == context.ChallengeId &&
+                e.ScoringKey == ScoringKeys.DecaySolve)
+            .SumAsync(e => e.PointsDelta, cancellationToken);
 
         // Fire post-solve event: updates leaderboard cache + SignalR notifications
         await _submissionEventHandler.HandleAsync(new SubmissionSolvedEvent(
@@ -171,70 +173,4 @@ public class CtfGameMode : IGameMode
                 s.IsCorrect,
                 cancellationToken);
 
-    /// <summary>
-    /// After a new solve, recalculate and update ScoreEvents for all teams that solved this challenge.
-    /// Dynamic scoring means earlier solvers' points decrease as more teams solve.
-    /// We add a correction ScoreEvent to adjust each prior solver's score.
-    /// </summary>
-    private async Task RecalculateDynamicScoresAsync(
-        Guid competitionId,
-        Guid challengeId,
-        Challenge challenge,
-        CancellationToken cancellationToken)
-    {
-        // Get all correct solves for this challenge, ordered by time
-        var solves = await _db.Submissions
-            .AsNoTracking()
-            .Where(s =>
-                s.CompetitionId == competitionId &&
-                s.ChallengeId == challengeId &&
-                s.IsCorrect)
-            .OrderBy(s => s.SubmittedAt)
-            .Select(s => new { s.TeamId, s.SubmittedAt })
-            .ToListAsync(cancellationToken);
-
-        var totalSolves = solves.Count;
-        var newPoints = _scoringCalculator.Calculate(totalSolves, challenge.PointsConfig);
-
-        // For each prior solver, compute their current total ScoreEvent points for this challenge
-        // and emit a correction so their final total equals newPoints.
-        for (int i = 0; i < totalSolves; i++)
-        {
-            // The latest solver already received the correct points in ProcessSubmissionAsync
-            if (i == totalSolves - 1)
-                continue;
-
-            var teamId = solves[i].TeamId;
-
-            var currentTotal = await _db.ScoreEvents
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .Where(se =>
-                    se.CompetitionId == competitionId &&
-                    se.TeamId == teamId &&
-                    se.ChallengeId == challengeId &&
-                    (se.EventType == "FlagSolved" || se.EventType == "ScoreCorrection"))
-                .SumAsync(se => (long)se.PointsDelta, cancellationToken);
-
-            var delta = newPoints - (int)currentTotal;
-            if (delta != 0)
-            {
-                var correction = new ScoreEvent
-                {
-                    Id = Guid.NewGuid(),
-                    CompetitionId = competitionId,
-                    TeamId = teamId,
-                    ChallengeId = challengeId,
-                    EventType = "ScoreCorrection",
-                    PointsDelta = delta,
-                    Reason = $"Dynamic score adjustment for challenge '{challenge.Title}'",
-                    Timestamp = DateTime.UtcNow
-                };
-                _db.ScoreEvents.Add(correction);
-            }
-        }
-
-        if (_db.ChangeTracker.HasChanges())
-            await _db.SaveChangesAsync(cancellationToken);
-    }
 }

@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using NoCTF.Application.BackgroundTasks;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.PluginBase;
 using NoCTF.Plugins.AWD;
 
@@ -20,9 +22,11 @@ public class AwdpModule : IPluginModule
         // AWDP game mode
         services.AddScoped<AwdpGameMode>();
         services.AddScoped<IGameMode>(sp => sp.GetRequiredService<AwdpGameMode>());
+        services.AddScoped<ICompetitionModeProvider, AwdpModeProvider>();
 
         // Patch service
         services.AddScoped<AwdpPatchService>();
         services.AddScoped<IAwdpPatchService>(sp => sp.GetRequiredService<AwdpPatchService>());
+        services.AddScoped<ICompetitionJobHandler, AwdpPatchValidationJobHandler>();
     }
 }

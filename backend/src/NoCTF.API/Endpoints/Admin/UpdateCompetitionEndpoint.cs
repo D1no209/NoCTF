@@ -1,5 +1,7 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.CompetitionModes;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -40,7 +42,11 @@ public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoin
         competition.EndTime = req.EndTime;
 
         if (Enum.TryParse<GameModeType>(req.GameModeType, ignoreCase: true, out var mode))
+        {
             competition.GameModeType = mode;
+            competition.ModeKey = CompetitionModeDefaults.GetModeKey(mode);
+            competition.ScoringProfileJson = ScoringJson.Serialize(CompetitionModeDefaults.GetScoringProfile(mode));
+        }
 
         if (Enum.TryParse<CompetitionStatus>(req.Status, ignoreCase: true, out var status))
             competition.Status = status;

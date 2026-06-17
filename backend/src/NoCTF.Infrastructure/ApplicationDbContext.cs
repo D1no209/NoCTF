@@ -15,6 +15,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<ScoreEvent> ScoreEvents => Set<ScoreEvent>();
+    public DbSet<ScoreSignal> ScoreSignals => Set<ScoreSignal>();
     public DbSet<AwdRound> AwdRounds => Set<AwdRound>();
     public DbSet<AwdAttackRecord> AwdAttackRecords => Set<AwdAttackRecord>();
     public DbSet<AwdFlag> AwdFlags => Set<AwdFlag>();
@@ -57,6 +58,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<ScoreEvent>()
             .HasIndex(se => new { se.CompetitionId, se.TeamId })
             .HasDatabaseName("ix_scoreevents_competition_team");
+
+        modelBuilder.Entity<ScoreEvent>()
+            .HasIndex(se => new { se.CompetitionId, se.IdempotencyKey })
+            .IsUnique()
+            .HasFilter("\"IdempotencyKey\" <> ''")
+            .HasDatabaseName("ux_scoreevents_competition_idempotency");
+
+        modelBuilder.Entity<ScoreSignal>()
+            .HasIndex(s => new { s.CompetitionId, s.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("ux_scoresignals_competition_idempotency");
+
+        modelBuilder.Entity<ScoreSignal>()
+            .HasIndex(s => new { s.CompetitionId, s.TeamId, s.SignalType })
+            .HasDatabaseName("ix_scoresignals_competition_team_type");
 
         modelBuilder.Entity<Challenge>()
             .HasIndex(c => c.CompetitionId)

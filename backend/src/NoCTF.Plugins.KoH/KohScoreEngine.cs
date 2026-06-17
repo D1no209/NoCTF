@@ -1,23 +1,25 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.Plugins.KoH;
 
 /// <summary>
-/// Handles KoH scoring logic: updating control records and awarding points per interval.
+/// Handles KoH control-record tracking and emits control-held scoring signals.
 /// Extracted for testability.
 /// </summary>
 public class KohScoreEngine(
     ApplicationDbContext db,
     ILeaderboardService leaderboard,
-    IHubNotifierService hubNotifier)
+    IHubNotifierService hubNotifier,
+    IScoreSignalEmitter scoreSignalEmitter)
 {
     /// <summary>
     /// Updates the control record for a challenge based on the current controller.
-    /// Awards points if the same team holds control, or transitions to a new controller.
+    /// Emits a scoring signal if the same team holds control, or transitions to a new controller.
     /// </summary>
     public async Task UpdateControlAsync(
         Guid competitionId,
@@ -37,21 +39,18 @@ public class KohScoreEngine(
 
         if (activeRecord?.TeamId == newControllerTeamId)
         {
-            // Same controller — award points for this interval
+            // Same controller — emit a scoring fact for this interval.
             if (newControllerTeamId.HasValue)
             {
-                db.ScoreEvents.Add(new ScoreEvent
-                {
-                    Id = Guid.NewGuid(),
-                    CompetitionId = competitionId,
-                    TeamId = newControllerTeamId.Value,
-                    ChallengeId = challengeId,
-                    EventType = "koh_control",
-                    PointsDelta = controlPointsPerInterval,
-                    Reason = $"Controlled challenge {challengeId} for one poll interval",
-                    Timestamp = now
-                });
-                await db.SaveChangesAsync(ct);
+                await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+                    CompetitionId: competitionId,
+                    TeamId: newControllerTeamId.Value,
+                    SignalType: ScoreSignalTypes.ControlHeld,
+                    IdempotencyKey: $"koh:{challengeId:N}:{newControllerTeamId.Value:N}:{now:yyyyMMddHHmmss}",
+                    SubjectType: "challenge",
+                    SubjectId: challengeId,
+                    PayloadJson: ScoringJson.Serialize(new { source = "poll" }),
+                    OccurredAt: now), ct);
                 await leaderboard.CalculateLeaderboardAsync(competitionId, ct);
             }
         }
