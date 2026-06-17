@@ -11,10 +11,14 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/vue-table'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -54,19 +58,16 @@ const newPassword = ref('')
 const actionError = ref('')
 
 const { data: users, isLoading } = useQuery({
-  queryKey: ['admin-users'],
-  queryFn: async () => {
-    const res = await client.get<{ 200: UserDto[] }, unknown, false>({ url: '/api/admin/users' })
-    return res.data ?? []
-  },
+  queryKey: queryKeys.adminUsers,
+  queryFn: () => adminApi.users<UserDto[]>(),
 })
 
 const changeRoleMutation = useMutation({
   mutationFn: async ({ id, role }: { id: string; role: string }) => {
-    await client.post({ url: `/api/admin/users/${id}/role`, body: { role } })
+    await adminApi.updateUserRole(id, role)
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['admin-users'] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminUsers })
     roleDialog.value = false
     actionError.value = ''
   },
@@ -75,7 +76,7 @@ const changeRoleMutation = useMutation({
 
 const resetPasswordMutation = useMutation({
   mutationFn: async ({ id, password }: { id: string; password: string }) => {
-    await client.post({ url: `/api/admin/users/${id}/reset-password`, body: { newPassword: password } })
+    await adminApi.resetUserPassword(id, password)
   },
   onSuccess: () => {
     passwordDialog.value = false
@@ -146,11 +147,12 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">{{ t('admin.users.title') }}</h1>
-      <Badge variant="destructive">{{ t('admin.users.adminOnly') }}</Badge>
-    </div>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.users.title')">
+      <template #actions>
+        <Badge variant="destructive">{{ t('admin.users.adminOnly') }}</Badge>
+      </template>
+    </PageHeader>
 
     <div class="flex items-center gap-3">
       <Input
@@ -160,7 +162,7 @@ const table = useVueTable({
       />
     </div>
 
-    <div class="rounded-md border">
+    <ResponsiveTableShell dense>
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -203,7 +205,7 @@ const table = useVueTable({
           </template>
         </TableBody>
       </Table>
-    </div>
+    </ResponsiveTableShell>
 
     <!-- Pagination -->
     <div class="flex items-center justify-between">
@@ -228,11 +230,11 @@ const table = useVueTable({
         </DialogHeader>
         <div class="space-y-3 py-2">
           <Label>{{ t('admin.users.newRole') }}</Label>
-          <select v-model="newRole" class="w-full border rounded-md px-3 py-2 text-sm bg-background">
+          <Select v-model="newRole">
             <option value="user">{{ t('admin.users.roleUser') }}</option>
             <option value="organizer">{{ t('admin.users.roleOrganizer') }}</option>
             <option value="admin">{{ t('admin.users.roleAdmin') }}</option>
-          </select>
+          </Select>
           <p v-if="actionError" class="text-sm text-destructive">{{ actionError }}</p>
         </div>
         <DialogFooter>

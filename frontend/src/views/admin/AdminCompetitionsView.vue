@@ -11,10 +11,14 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/vue-table'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -66,25 +70,20 @@ const form = ref({
 })
 
 const { data: competitions, isLoading } = useQuery({
-  queryKey: ['admin-competitions'],
-  queryFn: async () => {
-    const res = await client.get<{ 200: CompetitionAdminDto[] }, unknown, false>({
-      url: '/api/admin/competitions',
-    })
-    return res.data ?? []
-  },
+  queryKey: queryKeys.adminCompetitions,
+  queryFn: () => adminApi.competitions<CompetitionAdminDto[]>(),
 })
 
 const saveMutation = useMutation({
   mutationFn: async () => {
     if (isCreating.value) {
-      await client.post({ url: '/api/admin/competitions', body: form.value })
+      await adminApi.createCompetition(form.value)
     } else {
-      await client.put({ url: `/api/admin/competitions/${selectedComp.value!.id}`, body: form.value })
+      await adminApi.updateCompetition(selectedComp.value!.id, form.value)
     }
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['admin-competitions'] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminCompetitions })
     editDialog.value = false
     actionError.value = ''
   },
@@ -93,10 +92,10 @@ const saveMutation = useMutation({
 
 const deleteMutation = useMutation({
   mutationFn: async (id: string) => {
-    await client.delete({ url: `/api/admin/competitions/${id}` })
+    await adminApi.deleteCompetition(id)
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['admin-competitions'] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminCompetitions })
     deleteDialog.value = false
   },
 })
@@ -191,15 +190,16 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">{{ t('admin.competitions.title') }}</h1>
-      <Button @click="openCreate">{{ t('admin.competitions.create') }}</Button>
-    </div>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.competitions.title')">
+      <template #actions>
+        <Button @click="openCreate">{{ t('admin.competitions.create') }}</Button>
+      </template>
+    </PageHeader>
 
     <Input v-model="globalFilter" :placeholder="t('admin.competitions.searchPlaceholder')" class="max-w-xs" />
 
-    <div class="rounded-md border">
+    <ResponsiveTableShell dense>
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -232,7 +232,7 @@ const table = useVueTable({
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </ResponsiveTableShell>
 
     <div class="flex items-center justify-between">
       <span class="text-sm text-muted-foreground">
@@ -261,22 +261,22 @@ const table = useVueTable({
           </div>
           <div>
             <Label>{{ t('admin.competitions.gameMode') }}</Label>
-            <select v-model="form.gameModeType" class="w-full border rounded-md px-3 py-2 text-sm bg-background mt-1">
+            <Select v-model="form.gameModeType" class="mt-1">
               <option value="Ctf">{{ t('admin.competitions.modeCtf') }}</option>
               <option value="Awd">{{ t('admin.competitions.modeAwd') }}</option>
               <option value="Awdp">{{ t('admin.competitions.modeAwdp') }}</option>
               <option value="Koh">{{ t('admin.competitions.modeKoh') }}</option>
-            </select>
+            </Select>
           </div>
           <div>
             <Label>{{ t('admin.competitions.status') }}</Label>
-            <select v-model="form.status" class="w-full border rounded-md px-3 py-2 text-sm bg-background mt-1">
+            <Select v-model="form.status" class="mt-1">
               <option value="Draft">{{ t('competitions.status.draft') }}</option>
               <option value="Published">{{ t('competitions.status.published') }}</option>
               <option value="Running">{{ t('competitions.status.running') }}</option>
               <option value="Paused">{{ t('competitions.status.paused') }}</option>
               <option value="Finished">{{ t('competitions.status.finished') }}</option>
-            </select>
+            </Select>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>

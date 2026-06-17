@@ -15,7 +15,7 @@ public class CompetitionPermissionService(ApplicationDbContext dbContext) : ICom
     public async Task<bool> CanManageCompetitionAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken = default)
     {
         var user = await dbContext.Users.FindAsync(new object[] { userId }, cancellationToken);
-        if (user?.Role == UserRole.Admin || user?.Role == UserRole.Organizer)
+        if (user?.Role == UserRole.Admin)
             return true;
 
         var competition = await dbContext.Competitions

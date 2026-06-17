@@ -11,9 +11,12 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/vue-table'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -56,19 +59,16 @@ const teamMembers = ref<TeamMemberDto[]>([])
 const loadingMembers = ref(false)
 
 const { data: teams, isLoading } = useQuery({
-  queryKey: ['admin-teams'],
-  queryFn: async () => {
-    const res = await client.get<{ 200: TeamDto[] }, unknown, false>({ url: '/api/admin/teams' })
-    return res.data ?? []
-  },
+  queryKey: queryKeys.adminTeams,
+  queryFn: () => adminApi.teams<TeamDto[]>(),
 })
 
 const disbandMutation = useMutation({
   mutationFn: async (id: string) => {
-    await client.delete({ url: `/api/admin/teams/${id}` })
+    await adminApi.deleteTeam(id)
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['admin-teams'] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminTeams })
     disbandDialog.value = false
   },
 })
@@ -78,10 +78,7 @@ async function openMembersDialog(team: TeamDto) {
   loadingMembers.value = true
   membersDialog.value = true
   try {
-    const res = await client.get<{ 200: TeamMemberDto[] }, unknown, false>({
-      url: `/api/admin/teams/${team.id}/members`,
-    })
-    teamMembers.value = res.data ?? []
+    teamMembers.value = await adminApi.teamMembers<TeamMemberDto[]>(team.id)
   } finally {
     loadingMembers.value = false
   }
@@ -131,12 +128,12 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <h1 class="text-2xl font-bold">{{ t('admin.teams.title') }}</h1>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.teams.title')" />
 
     <Input v-model="globalFilter" :placeholder="t('admin.teams.searchPlaceholder')" class="max-w-xs" />
 
-    <div class="rounded-md border">
+    <ResponsiveTableShell dense>
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -169,7 +166,7 @@ const table = useVueTable({
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </ResponsiveTableShell>
 
     <div class="flex items-center justify-between">
       <span class="text-sm text-muted-foreground">

@@ -7,8 +7,11 @@ import {
   getCoreRowModel,
   createColumnHelper,
 } from '@tanstack/vue-table'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { Badge } from '@/components/ui/badge'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -27,13 +30,8 @@ interface PluginDto {
 }
 
 const { data: plugins, isLoading } = useQuery({
-  queryKey: ['admin-plugins'],
-  queryFn: async () => {
-    const res = await client.get<{ 200: PluginDto[] }, unknown, false>({
-      url: '/api/admin/plugins',
-    })
-    return res.data ?? []
-  },
+  queryKey: queryKeys.adminPlugins,
+  queryFn: () => adminApi.plugins<PluginDto[]>(),
 })
 
 function typeVariant(type: string): 'default' | 'secondary' | 'outline' | 'destructive' {
@@ -62,12 +60,10 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">{{ t('admin.plugins.title') }}</h1>
-    </div>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.plugins.title')" />
 
-    <div class="rounded-md border">
+    <ResponsiveTableShell dense>
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -93,6 +89,6 @@ const table = useVueTable({
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </ResponsiveTableShell>
   </div>
 </template>

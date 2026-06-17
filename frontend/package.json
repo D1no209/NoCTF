@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write src/",
-    "generate-api": "openapi-ts"
+    "fetch-openapi": "node scripts/ensure-openapi-artifact.mjs",
+    "generate-api": "openapi-ts && node scripts/patch-generated-client.mjs"
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.0",

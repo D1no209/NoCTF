@@ -45,11 +45,7 @@ public class DockerManager(DockerProvider provider) : IContainerManager
             Cmd = config.Command?.Split(' ') ?? null,
             Env = config.EnvironmentVariables?.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList() ?? [],
             Labels = config.Labels ?? new Dictionary<string, string>(),
-            HostConfig = new HostConfig
-            {
-                NetworkMode = config.NetworkName ?? "bridge",
-                AutoRemove = false
-            }
+            HostConfig = DockerHostConfigFactory.Create(config, publishAllPorts: false)
         };
 
         // Pull image if needed

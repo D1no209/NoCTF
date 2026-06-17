@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, h } from 'vue'
+import { computed, ref, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -8,11 +8,15 @@ import {
   getPaginationRowModel,
   createColumnHelper,
 } from '@tanstack/vue-table'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { useRoute } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -58,37 +62,26 @@ const actionError = ref('')
 
 // Load competitions for dropdown
 const { data: competitions } = useQuery({
-  queryKey: ['admin-competitions-list'],
-  queryFn: async () => {
-    const res = await client.get<{ 200: CompetitionOption[] }, unknown, false>({
-      url: '/api/admin/competitions',
-    })
-    return res.data ?? []
-  },
+  queryKey: queryKeys.adminCompetitions,
+  queryFn: () => adminApi.competitions<CompetitionOption[]>(),
 })
 
 // Load collaborators for selected competition
 const { data: collaborators, isLoading } = useQuery({
-  queryKey: ['collaborators', selectedCompetitionId],
+  queryKey: computed(() => queryKeys.adminCollaborators(selectedCompetitionId.value)),
   queryFn: async () => {
     if (!selectedCompetitionId.value) return []
-    const res = await client.get<{ 200: CollaboratorDto[] }, unknown, false>({
-      url: `/api/competitions/${selectedCompetitionId.value}/collaborators`,
-    })
-    return res.data ?? []
+    return adminApi.collaborators<CollaboratorDto[]>(selectedCompetitionId.value)
   },
   enabled: () => !!selectedCompetitionId.value,
 })
 
 // User search for add dialog
 const { data: userSearchResults } = useQuery({
-  queryKey: ['user-search', newUserSearch],
+  queryKey: computed(() => ['admin-user-search', newUserSearch.value]),
   queryFn: async () => {
     if (!newUserSearch.value || newUserSearch.value.length < 2) return []
-    const res = await client.get<{ 200: { id: string; userName: string }[] }, unknown, false>({
-      url: '/api/admin/users',
-    })
-    const all = res.data ?? []
+    const all = await adminApi.users<{ id: string; userName: string }[]>()
     return all.filter(u => u.userName.toLowerCase().includes(newUserSearch.value.toLowerCase()))
   },
   enabled: () => newUserSearch.value.length >= 2,
@@ -96,13 +89,10 @@ const { data: userSearchResults } = useQuery({
 
 const addMutation = useMutation({
   mutationFn: async () => {
-    await client.post({
-      url: `/api/competitions/${selectedCompetitionId.value}/collaborators`,
-      body: { userId: newUserId.value, role: newRole.value },
-    })
+    await adminApi.addCollaborator(selectedCompetitionId.value, { userId: newUserId.value, role: newRole.value })
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['collaborators', selectedCompetitionId] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminCollaborators(selectedCompetitionId.value) })
     addDialog.value = false
     newUserId.value = ''
     newUserSearch.value = ''
@@ -113,12 +103,10 @@ const addMutation = useMutation({
 
 const removeMutation = useMutation({
   mutationFn: async (userId: string) => {
-    await client.delete({
-      url: `/api/competitions/${selectedCompetitionId.value}/collaborators/${userId}`,
-    })
+    await adminApi.removeCollaborator(selectedCompetitionId.value, userId)
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['collaborators', selectedCompetitionId] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminCollaborators(selectedCompetitionId.value) })
     removeDialog.value = false
   },
 })
@@ -168,24 +156,24 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <h1 class="text-2xl font-bold">{{ t('admin.collaborators.title') }}</h1>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.collaborators.title')" />
 
     <!-- Competition selector -->
     <div class="flex items-center gap-3">
       <Label class="shrink-0">{{ t('admin.collaborators.competitionLabel') }}</Label>
-      <select
+      <Select
         v-model="selectedCompetitionId"
-        class="border rounded-md px-3 py-2 text-sm bg-background max-w-xs"
+        class="max-w-xs"
       >
         <option value="">{{ t('admin.collaborators.selectCompetition') }}</option>
         <option v-for="c in competitions" :key="c.id" :value="c.id">{{ c.title }}</option>
-      </select>
+      </Select>
       <Button v-if="selectedCompetitionId" @click="addDialog = true">{{ t('admin.collaborators.addCollaborator') }}</Button>
     </div>
 
     <template v-if="selectedCompetitionId">
-      <div class="rounded-md border">
+      <ResponsiveTableShell dense>
         <Table>
           <TableHeader>
             <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -209,7 +197,7 @@ const table = useVueTable({
             </TableRow>
           </TableBody>
         </Table>
-      </div>
+      </ResponsiveTableShell>
 
       <div class="flex items-center justify-between">
         <span class="text-sm text-muted-foreground">
@@ -248,10 +236,10 @@ const table = useVueTable({
           </div>
           <div>
             <Label>{{ t('admin.collaborators.role') }}</Label>
-            <select v-model="newRole" class="w-full border rounded-md px-3 py-2 text-sm bg-background mt-1">
+            <Select v-model="newRole" class="mt-1">
               <option value="Manager">{{ t('admin.collaborators.roleManager') }}</option>
               <option value="Observer">{{ t('admin.collaborators.roleObserver') }}</option>
-            </select>
+            </Select>
           </div>
           <p v-if="actionError" class="text-sm text-destructive">{{ actionError }}</p>
         </div>

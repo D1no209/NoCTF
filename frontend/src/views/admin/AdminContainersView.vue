@@ -7,8 +7,11 @@ import {
   getCoreRowModel,
   createColumnHelper,
 } from '@tanstack/vue-table'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -40,21 +43,16 @@ const destroyDialog = ref(false)
 const selectedContainer = ref<ContainerDto | null>(null)
 
 const { data: containers, isLoading } = useQuery({
-  queryKey: ['admin-containers'],
-  queryFn: async () => {
-    const res = await client.get<{ 200: ContainerDto[] }, unknown, false>({
-      url: '/api/admin/containers',
-    })
-    return res.data ?? []
-  },
+  queryKey: queryKeys.adminContainers,
+  queryFn: () => adminApi.containers<ContainerDto[]>(),
 })
 
 const destroyMutation = useMutation({
   mutationFn: async (containerId: string) => {
-    await client.delete({ url: `/api/admin/containers/${encodeURIComponent(containerId)}` })
+    await adminApi.destroyContainer(containerId)
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['admin-containers'] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminContainers })
     destroyDialog.value = false
   },
 })
@@ -90,12 +88,10 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">{{ t('admin.containers.title') }}</h1>
-    </div>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.containers.title')" />
 
-    <div class="rounded-md border">
+    <ResponsiveTableShell dense min-width="980px">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -121,7 +117,7 @@ const table = useVueTable({
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </ResponsiveTableShell>
 
     <!-- Destroy Confirmation -->
     <Dialog v-model:open="destroyDialog">

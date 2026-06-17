@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import { client } from '@/api/generated/client.gen'
+import { competitionApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import CompetitionDetailView from './CompetitionDetailView.vue'
 import AwdDashboardView from './AwdDashboardView.vue'
 import KohDashboardView from './KohDashboardView.vue'
@@ -16,14 +17,8 @@ interface CompetitionDetail {
 }
 
 const { data: competition } = useQuery({
-  queryKey: computed(() => ['competition', id.value]),
-  queryFn: async () => {
-    const res = await client.get<{ 200: CompetitionDetail }, unknown, false>({
-      url: '/api/competitions/{id}',
-      path: { id: id.value },
-    })
-    return res.data ?? null
-  },
+  queryKey: computed(() => queryKeys.competition(id.value)),
+  queryFn: () => competitionApi.get<CompetitionDetail>(id.value),
   enabled: computed(() => !!id.value),
 })
 

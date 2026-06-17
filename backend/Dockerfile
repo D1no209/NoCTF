@@ -15,26 +15,47 @@ COPY src/NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj src/NoCTF.Plugins.AWD/
 COPY src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj src/NoCTF.Plugins.AWDP/
 COPY src/NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj src/NoCTF.Plugins.CTF/
 COPY src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj src/NoCTF.Plugins.KoH/
+COPY src/NoCTF.Runner.Client/NoCTF.Runner.Client.csproj src/NoCTF.Runner.Client/
+COPY src/NoCTF.Runner/NoCTF.Runner.csproj src/NoCTF.Runner/
+COPY src/NoCTF.Worker/NoCTF.Worker.csproj src/NoCTF.Worker/
 
 RUN dotnet restore src/NoCTF.API/NoCTF.API.csproj
+RUN dotnet restore src/NoCTF.Worker/NoCTF.Worker.csproj
+RUN dotnet restore src/NoCTF.Runner/NoCTF.Runner.csproj
 
 # Copy all source and publish
 COPY . .
-RUN dotnet publish src/NoCTF.API/NoCTF.API.csproj -c Release -o /app/publish --no-restore
-
-# Copy plugin DLLs into publish output
-RUN mkdir -p /app/publish/plugins && \
-    cp /src/src/NoCTF.Plugins.CTF/bin/Release/net8.0/NoCTF.Plugins.CTF.dll /app/publish/plugins/ && \
-    cp /src/src/NoCTF.Plugins.AWD/bin/Release/net8.0/NoCTF.Plugins.AWD.dll /app/publish/plugins/ && \
-    cp /src/src/NoCTF.Plugins.AWDP/bin/Release/net8.0/NoCTF.Plugins.AWDP.dll /app/publish/plugins/ && \
-    cp /src/src/NoCTF.Plugins.KoH/bin/Release/net8.0/NoCTF.Plugins.KoH.dll /app/publish/plugins/
+RUN mkdir -p /app/api/plugins /app/worker /app/runner && \
+    dotnet publish src/NoCTF.API/NoCTF.API.csproj -c Release -o /app/api --no-restore && \
+    dotnet publish src/NoCTF.Worker/NoCTF.Worker.csproj -c Release -o /app/worker --no-restore && \
+    dotnet publish src/NoCTF.Runner/NoCTF.Runner.csproj -c Release -o /app/runner --no-restore && \
+    dotnet publish src/NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj -c Release -o /app/api/plugins --no-restore && \
+    dotnet publish src/NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj -c Release -o /app/api/plugins --no-restore && \
+    dotnet publish src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj -c Release -o /app/api/plugins --no-restore && \
+    dotnet publish src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj -c Release -o /app/api/plugins --no-restore
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS api
 WORKDIR /app
 
-COPY --from=build /app/publish .
+COPY --from=build /app/api .
 
 EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "NoCTF.API.dll"]
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS worker
+WORKDIR /app
+
+COPY --from=build /app/worker .
+
+ENTRYPOINT ["dotnet", "NoCTF.Worker.dll"]
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runner
+WORKDIR /app
+
+COPY --from=build /app/runner .
+
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "NoCTF.Runner.dll"]

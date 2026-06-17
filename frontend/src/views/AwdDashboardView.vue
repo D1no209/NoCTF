@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, RouterLink } from 'vue-router'
-import { useQuery } from '@tanstack/vue-query'
-import { client } from '@/api/generated/client.gen'
+import { useRoute } from 'vue-router'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { competitionApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { useAuthStore } from '@/stores/auth'
-import NavBar from '@/components/layout/NavBar.vue'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import RoundTimer from '@/components/game/RoundTimer.vue'
 import ServiceStatusGrid from '@/components/game/ServiceStatusGrid.vue'
 import type { ServiceStatus } from '@/components/game/ServiceStatusGrid.vue'
@@ -16,8 +18,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
 
 const { t } = useI18n()
+const qc = useQueryClient()
 
 // Props: optional gameModeType to show Defense Phase badge
 const props = withDefaults(defineProps<{ gameModeType?: string }>(), { gameModeType: 'Awd' })
@@ -47,41 +51,43 @@ interface Challenge {
   title: string
 }
 
+interface PatchSubmissionStatus {
+  id?: string
+  submissionId?: string
+  challengeId: string
+  challengeName?: string
+  challengeTitle?: string
+  status: 'Pending' | 'Running' | 'Retrying' | 'Applied' | 'Verified' | 'Rejected' | 'Failed'
+  submittedAt?: string
+  createdAt?: string
+  lastError?: string
+  validationLog?: string
+}
+
 const { data: dashboard, refetch: refetchDashboard } = useQuery({
-  queryKey: computed(() => ['awd-dashboard', competitionId.value]),
-  queryFn: async () => {
-    const res = await client.get<{ 200: AwdDashboardResponse }, unknown, false>({
-      url: '/api/competitions/{id}/awd-dashboard',
-      path: { id: competitionId.value },
-    })
-    return res.data ?? null
-  },
+  queryKey: computed(() => queryKeys.awdDashboard(competitionId.value)),
+  queryFn: () => competitionApi.awdDashboard<AwdDashboardResponse>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
   refetchInterval: 10_000,
 })
 
 const { data: teams } = useQuery({
-  queryKey: computed(() => ['teams', competitionId.value]),
-  queryFn: async () => {
-    const res = await client.get<{ 200: Team[] }, unknown, false>({
-      url: '/api/competitions/{id}/teams',
-      path: { id: competitionId.value },
-    })
-    return res.data ?? []
-  },
+  queryKey: computed(() => queryKeys.teams(competitionId.value)),
+  queryFn: () => competitionApi.teams<Team[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
 const { data: challenges } = useQuery({
-  queryKey: computed(() => ['challenges', competitionId.value]),
-  queryFn: async () => {
-    const res = await client.get<{ 200: Challenge[] }, unknown, false>({
-      url: '/api/competitions/{id}/challenges',
-      path: { id: competitionId.value },
-    })
-    return res.data ?? []
-  },
+  queryKey: computed(() => queryKeys.challenges(competitionId.value)),
+  queryFn: () => competitionApi.challenges<Challenge[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
+})
+
+const { data: patchSubmissions } = useQuery({
+  queryKey: computed(() => queryKeys.patchSubmissions(competitionId.value)),
+  queryFn: () => competitionApi.patchSubmissions<PatchSubmissionStatus[]>(competitionId.value),
+  enabled: computed(() => !!competitionId.value && isAwdp.value),
+  refetchInterval: computed(() => isAwdp.value ? 10_000 : false),
 })
 
 // ── Derived state ───────────────────────────────────────────────────────────
@@ -129,14 +135,7 @@ const patchMessage = ref('')
 const patchSubmissionId = ref('')
 const isDragOver = ref(false)
 
-// Patch status list per challenge
-interface PatchSubmissionStatus {
-  challengeId: string
-  challengeName: string
-  status: 'Pending' | 'Verified' | 'Rejected'
-  submittedAt: string
-}
-const patchStatuses = ref<PatchSubmissionStatus[]>([])
+const patchStatuses = computed(() => patchSubmissions.value ?? [])
 
 function onPatchFileChange(e: Event) {
   const input = e.target as HTMLInputElement
@@ -165,36 +164,15 @@ async function submitPatch() {
   patchMessage.value = ''
   patchSubmissionId.value = ''
   try {
-    const form = new FormData()
-    form.append('file', patchFile.value)
-    const res = await fetch(
-      `/api/competitions/${competitionId.value}/challenges/${patchChallenge.value}/patch`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${auth.accessToken}` },
-        body: form,
-      }
+    const data = await competitionApi.submitPatch<{ submissionId?: string }>(
+      competitionId.value,
+      patchChallenge.value,
+      patchFile.value,
     )
-    if (res.status === 202) {
-      const data = await res.json()
       patchStatus.value = 'success'
-      patchSubmissionId.value = data.submissionId
+      patchSubmissionId.value = data?.submissionId ?? ''
       patchMessage.value = t('awd.patchSubmitted')
-      // Add to patch status list
-      const ch = challenges.value?.find((c) => c.id === patchChallenge.value)
-      const existing = patchStatuses.value.findIndex((p) => p.challengeId === patchChallenge.value)
-      const entry: PatchSubmissionStatus = {
-        challengeId: patchChallenge.value,
-        challengeName: ch?.title ?? patchChallenge.value,
-        status: 'Pending',
-        submittedAt: new Date().toISOString(),
-      }
-      if (existing >= 0) patchStatuses.value.splice(existing, 1, entry)
-      else patchStatuses.value.push(entry)
-    } else {
-      patchStatus.value = 'error'
-      patchMessage.value = t('awd.uploadFailed', { status: res.status })
-    }
+      qc.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId.value) })
   } catch {
     patchStatus.value = 'error'
     patchMessage.value = t('awd.patchUploadFailed')
@@ -208,19 +186,15 @@ const submitStatus = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 const submitMessage = ref('')
 
 async function submitFlag() {
-  if (!flagInput.value.trim()) return
+  if (!flagInput.value.trim() || !selectedChallenge.value) return
   submitStatus.value = 'loading'
   submitMessage.value = ''
   try {
-    const res = await client.post<{ 200: { correct: boolean; message?: string } }, unknown, false>({
-      url: '/api/competitions/{id}/submit',
-      path: { id: competitionId.value },
-      body: {
-        flagContent: flagInput.value.trim(),
-        challengeId: selectedChallenge.value || undefined,
-      },
-    })
-    const data = res.data
+    const data = await competitionApi.submitFlag<{ correct?: boolean; message?: string }>(
+      competitionId.value,
+      selectedChallenge.value,
+      flagInput.value.trim(),
+    )
     if (data?.correct) {
       submitStatus.value = 'success'
       submitMessage.value = t('challenges.correctFlag')
@@ -237,33 +211,29 @@ async function submitFlag() {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-background">
-    <NavBar />
-
-    <!-- Header: round timer -->
-    <header class="border-b bg-card px-6 py-4">
-      <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <RouterLink
-            :to="`/competitions/${competitionId}`"
-            class="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            ← {{ t('nav.back') }}
-          </RouterLink>
-          <Badge variant="outline" class="font-mono text-xs">AWD</Badge>
+  <AppLayout>
+    <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4">
+      <PageHeader
+        title="AWD"
+        :back-to="`/competitions/${competitionId}`"
+        :back-label="t('nav.back')"
+      >
+        <template #actions>
           <Badge v-if="isAwdp" variant="secondary" class="text-xs">{{ t('awd.defensePhase') }}</Badge>
-        </div>
+          <Badge variant="outline" class="font-mono text-xs">AWD</Badge>
+        </template>
+      </PageHeader>
+
+      <div class="rounded-md border bg-card px-4 py-3">
         <RoundTimer
           :round="round"
           :remaining-seconds="remainingSeconds"
           :total-seconds="totalSeconds"
         />
-        <div class="w-24" />
       </div>
-    </header>
 
-    <!-- Main grid -->
-    <div class="flex-1 max-w-[1600px] mx-auto w-full grid grid-cols-12 gap-4 p-4">
+      <!-- Main grid -->
+      <div class="grid w-full grid-cols-12 gap-4">
       <!-- Left: Service Status -->
       <div class="col-span-12 lg:col-span-3">
         <ServiceStatusGrid :services="services" />
@@ -279,29 +249,27 @@ async function submitFlag() {
             <!-- Victim team select -->
             <div class="space-y-1">
               <label class="text-sm font-medium text-foreground">{{ t('awd.victimTeam') }}</label>
-              <select
+              <Select
                 v-model="selectedVictim"
-                class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">{{ t('awd.selectTeam') }}</option>
                 <option v-for="team in teams" :key="team.id" :value="team.id">
                   {{ team.name }}
                 </option>
-              </select>
+              </Select>
             </div>
 
             <!-- Challenge select -->
             <div class="space-y-1">
               <label class="text-sm font-medium text-foreground">{{ t('common.challenge') }}</label>
-              <select
+              <Select
                 v-model="selectedChallenge"
-                class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">{{ t('awd.selectChallenge') }}</option>
                 <option v-for="ch in challenges" :key="ch.id" :value="ch.id">
                   {{ ch.title }}
                 </option>
-              </select>
+              </Select>
             </div>
 
             <!-- Flag input -->
@@ -335,7 +303,7 @@ async function submitFlag() {
         </Card>
 
         <!-- Upload Patch (AWDP) -->
-        <Card class="mt-4">
+        <Card v-if="isAwdp" class="mt-4">
           <CardHeader>
             <CardTitle>{{ t('awd.uploadPatch') }}</CardTitle>
           </CardHeader>
@@ -343,15 +311,14 @@ async function submitFlag() {
             <!-- Challenge select -->
             <div class="space-y-1">
               <label class="text-sm font-medium text-foreground">{{ t('common.challenge') }}</label>
-              <select
+              <Select
                 v-model="patchChallenge"
-                class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">{{ t('awd.selectChallenge') }}</option>
                 <option v-for="ch in challenges" :key="ch.id" :value="ch.id">
                   {{ ch.title }}
                 </option>
-              </select>
+              </Select>
             </div>
 
             <!-- Drag-and-drop file area -->
@@ -412,11 +379,11 @@ async function submitFlag() {
                 :key="ps.challengeId"
                 class="flex items-center justify-between gap-2 text-sm"
               >
-                <span class="truncate font-medium">{{ ps.challengeName }}</span>
+                <span class="truncate font-medium">{{ ps.challengeName ?? ps.challengeTitle ?? ps.challengeId }}</span>
                 <Badge
                   :class="[
                     ps.status === 'Verified' ? 'bg-green-500/15 text-green-600 border-green-500/30' :
-                    ps.status === 'Rejected' ? 'bg-red-500/15 text-red-600 border-red-500/30' :
+                    ['Rejected', 'Failed'].includes(ps.status) ? 'bg-red-500/15 text-red-600 border-red-500/30' :
                     'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
                   ]"
                   variant="outline"
@@ -434,6 +401,7 @@ async function submitFlag() {
       <div class="col-span-12 lg:col-span-3">
         <AttackLogFeed :logs="attackLogs" />
       </div>
+      </div>
     </div>
-  </div>
+  </AppLayout>
 </template>

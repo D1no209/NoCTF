@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import LanguageSwitch from '@/components/LanguageSwitch.vue'
+import { Alert } from '@/components/ui/alert'
+import AuthLayout from '@/components/layout/AuthLayout.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
@@ -64,11 +65,8 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background flex items-center justify-center p-8 relative">
-    <div class="absolute top-4 right-4">
-      <LanguageSwitch />
-    </div>
-    <Card class="w-full max-w-sm">
+  <AuthLayout :subtitle="t('auth.registerSubtitle')">
+    <Card class="w-full">
       <CardHeader>
         <CardTitle class="text-2xl">{{ t('auth.registerTitle') }}</CardTitle>
         <CardDescription>{{ t('auth.registerSubtitle') }}</CardDescription>
@@ -111,7 +109,7 @@ async function handleSubmit() {
             <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
           </div>
 
-          <p v-if="serverError" class="text-sm text-destructive">{{ serverError }}</p>
+          <Alert v-if="serverError" variant="destructive">{{ serverError }}</Alert>
 
           <Button type="submit" :disabled="loading" class="w-full">
             {{ loading ? t('auth.registering') : t('auth.register') }}
@@ -126,5 +124,5 @@ async function handleSubmit() {
         </form>
       </CardContent>
     </Card>
-  </div>
+  </AuthLayout>
 </template>

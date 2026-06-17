@@ -3,9 +3,10 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSignalR } from '@/composables/useSignalR'
 import { useAuthStore } from '@/stores/auth'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import PageHeader from '@/components/layout/PageHeader.vue'
 
 const { t } = useI18n()
 
@@ -71,10 +72,7 @@ signalR.connection.value?.on('ReceiveLogEntry', (entry: LogEntryDto) => {
 
 async function fetchHistorical() {
   try {
-    const res = await client.get<{ 200: LogEntryDto[] }, unknown, false>({ url: '/api/admin/logs' })
-    if (res.data) {
-      logs.value = [...res.data, ...logs.value]
-    }
+    logs.value = [...await adminApi.logs<LogEntryDto[]>(), ...logs.value]
   } catch {
     // non-fatal
   }
@@ -88,10 +86,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="p-6 flex flex-col h-full gap-4">
+  <div class="flex h-full flex-col gap-4 p-4 md:p-6">
     <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-2">
-      <h1 class="text-2xl font-bold">{{ t('admin.logs.title') }}</h1>
+    <PageHeader :title="t('admin.logs.title')">
+      <template #actions>
       <div class="flex items-center gap-2 flex-wrap">
         <!-- Level filters -->
         <div class="flex gap-1">
@@ -118,7 +116,8 @@ onMounted(async () => {
           {{ signalR.isConnected.value ? t('common.live') : t('common.disconnected') }}
         </Badge>
       </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Log viewer -->
     <div

@@ -103,6 +103,10 @@
   },
   "competitions": {
     "title": "Competitions",
+    "subtitle": "Browse active and upcoming events, then enter the competition workspace.",
+    "searchPlaceholder": "Search competitions...",
+    "emptyDescription": "There are no competitions matching the current filters.",
+    "enter": "Enter",
     "loading": "Loading competitions...",
     "loadError": "Failed to load competitions.",
     "empty": "No competitions available.",
@@ -130,6 +134,7 @@
     "incorrectFlag": "Incorrect flag. Try again.",
     "submissionFailed": "Submission failed. Please try again.",
     "alreadySolved": "You have already solved this challenge.",
+    "unsolved": "Unsolved",
     "solves": "{count} solve",
     "solves_plural": "{count} solves",
     "empty": "No challenges available.",

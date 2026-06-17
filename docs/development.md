@@ -5,7 +5,7 @@ This guide explains how to set up a local development environment for NoCTF.
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js 20+](https://nodejs.org/)
+- [Node.js 20.19+ or 22.12+](https://nodejs.org/) (required by the current Vite toolchain)
 - [pnpm](https://pnpm.io/installation)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL, Redis, and container features)
 
@@ -17,10 +17,10 @@ Optional but recommended:
 
 The backend is an ASP.NET Core application using FastEndpoints. In development mode it can proxy the frontend Vite dev server automatically.
 
-1. Start the required infrastructure services (PostgreSQL and Redis) with Docker Compose:
+1. Start the required infrastructure services (PostgreSQL, Redis, MinIO, and Runner when testing container-backed modes) with Docker Compose:
 
 ```bash
-cd deploy && docker compose up -d postgres redis
+cd deploy && docker compose up -d postgres redis minio runner
 ```
 
 2. Ensure your local environment is configured. The backend reads from `appsettings.Development.json` and environment variables. At minimum you need a connection string and JWT secret. Example:
@@ -91,13 +91,19 @@ The frontend uses a typed API client generated from the backend OpenAPI spec.
 
 1. Make sure the backend is running locally.
 
-2. Generate the client:
+2. Fetch the backend OpenAPI artifact:
+
+```bash
+cd frontend && pnpm fetch-openapi
+```
+
+3. Generate the client:
 
 ```bash
 cd frontend && pnpm generate-api
 ```
 
-This runs `openapi-ts` and creates/updates the client code in the frontend source tree.
+This runs `openapi-ts` against `backend/artifacts/openapi/swagger.json` and creates/updates the client code in the frontend source tree.
 
 ## Running Tests
 
@@ -125,6 +131,9 @@ backend/src/
   NoCTF.Infrastructure/# DbContext, migrations, storage, tenanting
   NoCTF.PluginBase/    # Plugin contracts
   NoCTF.Container.Docker/  # Docker orchestration
+  NoCTF.Runner.Client/ # HTTP client and contracts for runner calls
+  NoCTF.Runner/        # Runtime boundary that owns Docker access
+  NoCTF.Worker/        # Background task processor
   NoCTF.Plugins.CTF/   # CTF plugin
   NoCTF.Plugins.AWD/   # AWD plugin
   NoCTF.Plugins.AWDP/  # AWDP plugin

@@ -27,3 +27,13 @@ public enum CompetitionStatus
     Paused,
     Finished
 }
+
+public enum BackgroundTaskStatus
+{
+    Pending,
+    Running,
+    Succeeded,
+    Failed,
+    Retrying,
+    Cancelled
+}

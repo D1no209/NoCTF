@@ -45,6 +45,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+      target: api
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
@@ -54,16 +55,54 @@ services:
       JwtSettings__Secret: ${JWT_SECRET}
       JwtSettings__Issuer: ${JWT_ISSUER:-NoCTF}
       JwtSettings__Audience: ${JWT_AUDIENCE:-NoCTF}
+      Database__AutoMigrate: "true"
+      SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
+      SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
+      SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:-Admin@123456}
       StorageProvider__Local__BasePath: /app/uploads
-      Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
     volumes:
       - backend_uploads:/app/uploads
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    expose:
+      - "8080"
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: worker
+    restart: unless-stopped
+    environment:
+      ConnectionStrings__DefaultConnection: >-
+        Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      StorageProvider__Local__BasePath: /app/uploads
+      Runner__BaseUrl: http://runner:8080
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      runner:
+        condition: service_started
+
+  runner:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: runner
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
 

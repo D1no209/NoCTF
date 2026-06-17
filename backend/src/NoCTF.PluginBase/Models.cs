@@ -8,7 +8,22 @@ public record ContainerConfig(
     Dictionary<int, int>? PortMappings = null,
     string? NetworkName = null,
     string? RegistryAuth = null,
-    TimeSpan? Ttl = null
+    TimeSpan? Ttl = null,
+    ContainerResourceLimits? ResourceLimits = null,
+    ContainerSecurityPolicy? SecurityPolicy = null
+);
+
+public record ContainerResourceLimits(
+    long MemoryBytes = 268435456,
+    long NanoCpus = 500000000,
+    long PidsLimit = 128
+);
+
+public record ContainerSecurityPolicy(
+    bool NoNewPrivileges = true,
+    bool ReadonlyRootfs = false,
+    bool RunAsNonRoot = true,
+    IReadOnlyList<string>? CapDrop = null
 );
 
 public record ContainerInstance(

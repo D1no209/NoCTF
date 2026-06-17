@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import StatTile from '@/components/layout/StatTile.vue'
+import DataState from '@/components/state/DataState.vue'
 
 const { t } = useI18n()
 
@@ -26,8 +29,7 @@ let intervalId: ReturnType<typeof setInterval> | null = null
 async function fetchHealth() {
   loading.value = true
   try {
-    const res = await client.get<{ 200: HealthResponse }, unknown, false>({ url: '/api/health' })
-    health.value = res.data ?? null
+    health.value = await adminApi.health<HealthResponse>()
     lastUpdated.value = new Date()
   } catch {
     health.value = null
@@ -59,9 +61,9 @@ function statusIcon(status: string) {
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">{{ t('admin.health.title') }}</h1>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.health.title')">
+      <template #actions>
       <div class="flex items-center gap-3">
         <span v-if="lastUpdated" class="text-xs text-muted-foreground">
           {{ t('common.lastUpdated') }} {{ lastUpdated.toLocaleTimeString() }}
@@ -70,16 +72,17 @@ function statusIcon(status: string) {
           {{ loading ? t('common.check') : t('common.refresh') }}
         </Button>
       </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Overall status -->
-    <div v-if="health" class="flex items-center gap-3 p-4 rounded-lg border">
-      <span class="text-2xl">{{ statusIcon(health.status) }}</span>
-      <div>
-        <p class="font-semibold">{{ t('admin.health.overallStatus') }}</p>
-        <Badge :variant="statusVariant(health.status)">{{ health.status }}</Badge>
-      </div>
-    </div>
+    <StatTile
+      v-if="health"
+      :label="t('admin.health.overallStatus')"
+      :value="health.status"
+      :description="statusIcon(health.status)"
+      :tone="health.status === 'Healthy' ? 'success' : health.status === 'Degraded' ? 'warning' : 'danger'"
+    />
 
     <!-- Individual checks -->
     <div v-if="health" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -98,13 +101,15 @@ function statusIcon(status: string) {
       </div>
     </div>
 
-    <div v-else-if="!loading" class="text-center text-muted-foreground py-8">
-      {{ t('admin.health.unableToFetch') }}
-    </div>
-
-    <div v-if="loading && !health" class="text-center text-muted-foreground py-8">
-      {{ t('admin.health.checking') }}
-    </div>
+    <DataState
+      v-else
+      :loading="loading"
+      :error="!loading"
+      :loading-title="t('admin.health.checking')"
+      :error-title="t('admin.health.unableToFetch')"
+      :retry-label="t('common.refresh')"
+      @retry="fetchHealth()"
+    />
 
     <p class="text-xs text-muted-foreground">{{ t('admin.health.autoRefresh') }}</p>
   </div>

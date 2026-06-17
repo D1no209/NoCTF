@@ -71,7 +71,6 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
             ContainerMode = challenge.ContainerMode,
             ComposeYaml = challenge.ComposeYaml,
             ComposeProjectName = challenge.ComposeProjectName,
-            FlagSecret = challenge.FlagSecret,
             AttachmentUrl = challenge.AttachmentUrl,
             CheckerConfig = challenge.CheckerConfig is null ? null : new CheckerConfigDto
             {
