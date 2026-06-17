@@ -26,15 +26,13 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
             Cmd = config.Command?.Split(' ') ?? null,
             Env = config.EnvironmentVariables?.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList() ?? [],
             Labels = config.Labels ?? new Dictionary<string, string>(),
-            HostConfig = new HostConfig
-            {
-                PublishAllPorts = config.PortMappings is null || config.PortMappings.Count == 0,
-                PortBindings = config.PortMappings?.ToDictionary(
+            HostConfig = DockerHostConfigFactory.Create(
+                config,
+                config.PortMappings is null || config.PortMappings.Count == 0,
+                config.PortMappings?.ToDictionary(
                     kvp => $"{kvp.Key}/tcp",
                     kvp => (IList<PortBinding>)new List<PortBinding> { new() { HostPort = kvp.Value == 0 ? "0" : kvp.Value.ToString() } }
-                ) ?? new Dictionary<string, IList<PortBinding>>(),
-                NetworkMode = config.NetworkName ?? "bridge"
-            }
+                ) ?? new Dictionary<string, IList<PortBinding>>())
         };
 
         // Ensure image exists (pull if needed)

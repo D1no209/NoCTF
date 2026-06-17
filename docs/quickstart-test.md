@@ -33,17 +33,16 @@ http://localhost:5173
 - 填写邮箱、用户名、密码（至少 8 位）
 - 注册后系统会自动分配 **User** 角色
 
-#### 3. 创建 Admin / Organizer 账号（用于管理后台）
+#### 3. 使用初始 Admin 账号（用于管理后台）
 
-目前前端注册只能创建普通用户。要体验管理后台，需要通过 API 直接注册一个管理员账号：
+首次启动时，后端会在数据库中没有管理员的情况下自动创建初始管理员：
 
-```bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@noctf.local","userName":"admin","password":"Admin123!","role":"Admin"}'
+```text
+邮箱：admin@noctf.local
+密码：Admin@123456
 ```
 
-> 如果注册端点不支持带 `role` 的注册，可直接用刚刚注册的第一个账号登录，然后通过数据库修改角色，或者通过 Swagger 调用管理员相关的 API。
+可通过 `.env` 或环境变量 `SEED_ADMIN_EMAIL`、`SEED_ADMIN_USERNAME`、`SEED_ADMIN_PASSWORD` 修改初始管理员。
 
 #### 4. 登录
 - 使用邮箱 + 密码登录
@@ -51,7 +50,7 @@ curl -X POST http://localhost:5000/api/auth/register \
 
 #### 5. 创建赛事并添加题目（Admin）
 
-以 `admin@noctf.local` / `Admin123!` 登录后：
+以 `admin@noctf.local` / `Admin@123456` 登录后：
 
 1. 进入 **管理后台**：http://localhost:5173/admin/competitions
 2. 点击 **Create**，填写赛事名称、赛制类型（CTF / AWD / AWDP / KoH）、起止时间
@@ -158,20 +157,20 @@ pnpm dev
 
 ## 测试账号快速创建
 
-如果你不想通过前端注册，可以直接 curl 创建测试账号：
+如果你不想通过前端注册，可以直接 curl 创建普通测试账号：
 
-### 创建管理员
+### 创建普通用户
 ```bash
 curl -X POST http://localhost:5000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@noctf.local","userName":"admin","password":"Admin123!"}'
+  -d '{"email":"player@noctf.local","userName":"player","password":"Player123!"}'
 ```
 
-然后登录获取 JWT：
+管理员账号由启动种子自动创建。登录管理员获取 JWT：
 ```bash
 curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@noctf.local","password":"Admin123!"}'
+  -d '{"email":"admin@noctf.local","password":"Admin@123456"}'
 ```
 
 返回的 `accessToken` 可用于后续 API 调用：

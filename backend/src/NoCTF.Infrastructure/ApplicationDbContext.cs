@@ -22,6 +22,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AwdCheckResult> AwdCheckResults => Set<AwdCheckResult>();
     public DbSet<AwdpPatchSubmission> AwdpPatchSubmissions => Set<AwdpPatchSubmission>();
     public DbSet<KohControlRecord> KohControlRecords => Set<KohControlRecord>();
+    public DbSet<BackgroundTaskItem> BackgroundTasks => Set<BackgroundTaskItem>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -47,6 +48,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(s => new { s.CompetitionId, s.TeamId })
             .HasDatabaseName("ix_submissions_competition_team");
 
+        modelBuilder.Entity<Submission>()
+            .HasIndex(s => new { s.CompetitionId, s.TeamId, s.ChallengeId })
+            .IsUnique()
+            .HasFilter("\"IsCorrect\" = true")
+            .HasDatabaseName("ux_submissions_correct_once");
+
         modelBuilder.Entity<ScoreEvent>()
             .HasIndex(se => new { se.CompetitionId, se.TeamId })
             .HasDatabaseName("ix_scoreevents_competition_team");
@@ -64,10 +71,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .IsUnique()
             .HasDatabaseName("ix_teammembers_team_user");
 
+        modelBuilder.Entity<TeamMember>()
+            .HasIndex(tm => new { tm.CompetitionId, tm.UserId })
+            .IsUnique()
+            .HasDatabaseName("ix_teammembers_competition_user");
+
         modelBuilder.Entity<CompetitionCollaborator>()
             .HasIndex(cc => new { cc.CompetitionId, cc.UserId })
             .IsUnique()
             .HasDatabaseName("ix_competitioncollaborators_competition_user");
+
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Email)
+            .IsUnique()
+            .HasDatabaseName("ix_users_email");
+
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.UserName)
+            .IsUnique()
+            .HasDatabaseName("ix_users_username");
 
         modelBuilder.Entity<AwdRound>()
             .HasIndex(r => r.CompetitionId)
@@ -129,6 +151,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<KohControlRecord>()
             .HasIndex(r => new { r.CompetitionId, r.ChallengeId })
             .HasDatabaseName("ix_kohcontrolrecords_competition_challenge");
+
+        modelBuilder.Entity<BackgroundTaskItem>()
+            .HasIndex(t => new { t.Status, t.LockedUntil, t.CreatedAt })
+            .HasDatabaseName("ix_backgroundtasks_dispatch");
+
+        modelBuilder.Entity<BackgroundTaskItem>()
+            .HasIndex(t => new { t.CompetitionId, t.Type })
+            .HasDatabaseName("ix_backgroundtasks_competition_type");
     }
 
     private static void SetTenantQueryFilter<TEntity>(ModelBuilder builder, ITenantContext tenantContext)

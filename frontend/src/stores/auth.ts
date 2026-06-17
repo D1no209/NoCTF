@@ -1,10 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { client } from '@/api/generated/client.gen'
-import {
-  noCtfapiEndpointsAuthLoginEndpoint,
-  noCtfapiEndpointsAuthRegisterEndpoint,
-} from '@/api/generated/sdk.gen'
+import { authApi, setAuthToken } from '@/api/noctf'
 
 interface UserInfo {
   userName: string
@@ -21,19 +17,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Configure client auth header on init if token exists
   if (accessToken.value) {
-    client.setConfig({
-      headers: { Authorization: `Bearer ${accessToken.value}` },
-    })
+    setAuthToken(accessToken.value)
   }
 
   async function login(email: string, password: string) {
-    const { data, error } = await noCtfapiEndpointsAuthLoginEndpoint({
-      body: { email, password },
-    })
-
-    if (error || !data) {
-      throw new Error('Login failed')
-    }
+    const data = await authApi.login(email, password)
 
     const token = data.accessToken ?? ''
     accessToken.value = token
@@ -41,19 +29,11 @@ export const useAuthStore = defineStore('auth', () => {
 
     localStorage.setItem('accessToken', token)
     localStorage.setItem('authUser', JSON.stringify(user.value))
-    client.setConfig({
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    setAuthToken(token)
   }
 
   async function register(userName: string, email: string, password: string) {
-    const { data, error } = await noCtfapiEndpointsAuthRegisterEndpoint({
-      body: { userName, email, password },
-    })
-
-    if (error || !data) {
-      throw new Error('Registration failed')
-    }
+    await authApi.register(userName, email, password)
   }
 
   function logout() {
@@ -61,7 +41,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     localStorage.removeItem('accessToken')
     localStorage.removeItem('authUser')
-    client.setConfig({ headers: { Authorization: '' } })
+    setAuthToken(null)
   }
 
   return { user, accessToken, isAuthenticated, userRole, login, register, logout }

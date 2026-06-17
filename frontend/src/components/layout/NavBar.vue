@@ -7,6 +7,7 @@ import { useScoreStore } from '@/stores/score'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
+import { LayoutDashboard } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -15,6 +16,7 @@ const router = useRouter()
 
 const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
 const displayName = computed(() => scoreStore.myTeamName ?? auth.user?.userName ?? '')
+const canManage = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
 
 async function handleLogout() {
   auth.logout()
@@ -25,7 +27,7 @@ async function handleLogout() {
 
 <template>
   <header class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-    <div class="max-w-6xl mx-auto px-8 h-14 flex items-center justify-between gap-4">
+    <div class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
       <div class="flex items-center gap-6">
         <RouterLink to="/competitions" class="font-bold text-lg tracking-tight hover:opacity-80 transition-opacity">
           NoCTF
@@ -37,6 +39,15 @@ async function handleLogout() {
             active-class="text-foreground font-medium"
           >
             {{ t('nav.competitions') }}
+          </RouterLink>
+          <RouterLink
+            v-if="canManage"
+            to="/admin"
+            class="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+            active-class="text-foreground font-medium"
+          >
+            <LayoutDashboard class="size-4" />
+            {{ t('nav.admin') }}
           </RouterLink>
         </nav>
       </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { client } from '@/api/generated/client.gen'
+import { competitionApi } from '@/api/noctf'
 import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
 import { useSignalR } from '@/composables/useSignalR'
@@ -34,12 +34,9 @@ let pollInterval: ReturnType<typeof setInterval> | null = null
 
 async function fetchLeaderboard() {
   try {
-    const res = await client.get<{ 200: { entries?: NoCtfapiEndpointsCompetitionsLeaderboardEntryDto[] } }, unknown, false>({
-      url: '/api/competitions/{competitionId}/leaderboard',
-      path: { competitionId: props.competitionId },
-    })
-    if (res.data?.entries) {
-      entries.value = res.data.entries
+    const data = await competitionApi.leaderboard(props.competitionId)
+    if (data?.entries) {
+      entries.value = data.entries
       scoreStore.updateFromLeaderboard(entries.value)
       emit('scoreUpdate', entries.value)
     }

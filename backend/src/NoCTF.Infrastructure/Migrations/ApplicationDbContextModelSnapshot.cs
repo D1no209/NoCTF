@@ -246,6 +246,55 @@ namespace NoCTF.Infrastructure.Migrations
                     b.ToTable("AwdpPatchSubmissions");
                 });
 
+            modelBuilder.Entity("NoCTF.Core.BackgroundTaskItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId", "Type")
+                        .HasDatabaseName("ix_backgroundtasks_competition_type");
+
+                    b.HasIndex("Status", "LockedUntil", "CreatedAt")
+                        .HasDatabaseName("ix_backgroundtasks_dispatch");
+
+                    b.ToTable("BackgroundTasks");
+                });
+
             modelBuilder.Entity("NoCTF.Core.Challenge", b =>
                 {
                     b.Property<Guid>("Id")
@@ -258,17 +307,17 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ContainerImage")
-                        .HasColumnType("text");
-
-                    b.Property<int>("ContainerMode")
-                        .HasColumnType("integer");
-
                     b.Property<string>("ComposeProjectName")
                         .HasColumnType("text");
 
                     b.Property<string>("ComposeYaml")
                         .HasColumnType("text");
+
+                    b.Property<string>("ContainerImage")
+                        .HasColumnType("text");
+
+                    b.Property<int>("ContainerMode")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -502,6 +551,11 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("CompetitionId", "TeamId")
                         .HasDatabaseName("ix_submissions_competition_team");
 
+                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_submissions_correct_once")
+                        .HasFilter("\"IsCorrect\" = true");
+
                     b.ToTable("Submissions");
                 });
 
@@ -541,6 +595,9 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -554,6 +611,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_teammembers_competition_user");
 
                     b.HasIndex("TeamId", "UserId")
                         .IsUnique()
@@ -590,6 +651,14 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_email");
+
+                    b.HasIndex("UserName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_username");
 
                     b.ToTable("Users");
                 });

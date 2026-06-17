@@ -16,7 +16,6 @@ public class ChallengeAdminDto
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
-    public string? FlagSecret { get; set; }
     public string? AttachmentUrl { get; set; }
     public CheckerConfigDto? CheckerConfig { get; set; }
     public PointsConfigDto PointsConfig { get; set; } = new();
@@ -57,7 +56,6 @@ public class GetChallengesAdminEndpoint(ApplicationDbContext db) : Endpoint<Empt
                 ContainerMode = c.ContainerMode,
                 ComposeYaml = c.ComposeYaml,
                 ComposeProjectName = c.ComposeProjectName,
-                FlagSecret = c.FlagSecret,
                 AttachmentUrl = c.AttachmentUrl,
                 CheckerConfig = c.CheckerConfig == null ? null : new CheckerConfigDto
                 {

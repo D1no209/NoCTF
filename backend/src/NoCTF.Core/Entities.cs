@@ -35,6 +35,7 @@ public class Team : ITenantEntity
 public class TeamMember
 {
     public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
     public Guid UserId { get; set; }
     public TeamMemberRole Role { get; set; }
@@ -259,4 +260,19 @@ public class KohControlRecord : ITenantEntity
     public Guid TeamId { get; set; }
     public DateTime StartTime { get; set; }
     public DateTime? EndTime { get; set; }
+}
+
+public class BackgroundTaskItem : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public BackgroundTaskStatus Status { get; set; }
+    public string PayloadJson { get; set; } = "{}";
+    public int AttemptCount { get; set; }
+    public int MaxAttempts { get; set; } = 3;
+    public string? LastError { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public DateTime? LockedUntil { get; set; }
 }

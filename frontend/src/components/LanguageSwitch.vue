@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Select } from '@/components/ui/select'
 
 const { locale } = useI18n()
 
@@ -18,12 +19,12 @@ watch(selected, (val) => {
 </script>
 
 <template>
-  <select
+  <Select
     v-model="selected"
-    class="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+    class="h-8 w-auto cursor-pointer px-2"
   >
     <option v-for="opt in options" :key="opt.value" :value="opt.value">
       {{ opt.label }}
     </option>
-  </select>
+  </Select>
 </template>

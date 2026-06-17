@@ -11,12 +11,27 @@ public class TenantResolutionMiddleware(RequestDelegate next)
         {
             tenantContext.SetCompetitionId(competitionId);
         }
-        else if (context.Request.Headers.TryGetValue("X-Competition-Id", out var headerValue)
-                 && Guid.TryParse(headerValue.ToString(), out var headerCompetitionId))
+        else if (TryGetCompetitionIdFromRoute(context.Request.Path, out var routeCompetitionId))
         {
-            tenantContext.SetCompetitionId(headerCompetitionId);
+            tenantContext.SetCompetitionId(routeCompetitionId);
         }
 
         await next(context);
+    }
+
+    private static bool TryGetCompetitionIdFromRoute(PathString path, out Guid competitionId)
+    {
+        competitionId = Guid.Empty;
+        var segments = path.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        for (var i = 0; i < segments.Length - 1; i++)
+        {
+            if (string.Equals(segments[i], "competitions", StringComparison.OrdinalIgnoreCase) &&
+                Guid.TryParse(segments[i + 1], out competitionId))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

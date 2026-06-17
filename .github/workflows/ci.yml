@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: noctf
+          POSTGRES_USER: noctf
+          POSTGRES_PASSWORD: noctf_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U noctf -d noctf"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.14.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Restore backend
+        run: dotnet restore backend/NoCTF.slnx
+
+      - name: Build backend
+        run: dotnet build backend/NoCTF.slnx --no-restore
+
+      - name: Test backend
+        run: dotnet test backend/NoCTF.slnx --no-build
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: frontend
+        run: pnpm build
+
+      - name: Generate OpenAPI artifact and client
+        shell: bash
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:5000
+          ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=noctf_test_password
+          ConnectionStrings__Redis: localhost:6379
+          JwtSettings__Secret: ci_secret_value_with_at_least_32_chars
+          Database__AutoMigrate: 'true'
+        run: |
+          dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj &
+          api_pid=$!
+          for i in {1..60}; do
+            if curl -fsS http://localhost:5000/api/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          cd frontend
+          pnpm fetch-openapi
+          pnpm generate-api
+          cd ..
+          kill "$api_pid"
+          git diff --exit-code frontend/src/api/generated frontend/src/api/client-config.ts

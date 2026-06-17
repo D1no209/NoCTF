@@ -11,9 +11,15 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/vue-table'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { Alert } from '@/components/ui/alert'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -54,7 +60,6 @@ interface ChallengeAdminDto {
   containerMode: 'SingleImage' | 'DockerCompose' | number
   composeYaml?: string
   composeProjectName?: string
-  flagSecret?: string
   attachmentUrl?: string
   checkerConfig?: CheckerConfigDto
   pointsConfig: PointsConfigDto
@@ -72,6 +77,8 @@ const deleteDialog = ref(false)
 const selectedChallenge = ref<ChallengeAdminDto | null>(null)
 const isCreating = ref(false)
 const actionError = ref('')
+const revealDialog = ref(false)
+const revealedSecret = ref('')
 
 const defaultForm = () => ({
   competitionId: '',
@@ -93,23 +100,13 @@ const defaultForm = () => ({
 const form = ref(defaultForm())
 
 const { data: challenges, isLoading } = useQuery({
-  queryKey: ['admin-challenges'],
-  queryFn: async () => {
-    const res = await client.get<{ 200: ChallengeAdminDto[] }, unknown, false>({
-      url: '/api/admin/challenges',
-    })
-    return res.data ?? []
-  },
+  queryKey: queryKeys.adminChallenges,
+  queryFn: () => adminApi.challenges<ChallengeAdminDto[]>(),
 })
 
 const { data: competitions } = useQuery({
-  queryKey: ['admin-competitions-options'],
-  queryFn: async () => {
-    const res = await client.get<{ 200: CompetitionOption[] }, unknown, false>({
-      url: '/api/admin/competitions',
-    })
-    return res.data ?? []
-  },
+  queryKey: queryKeys.adminCompetitions,
+  queryFn: () => adminApi.competitions<CompetitionOption[]>(),
 })
 
 const saveMutation = useMutation({
@@ -131,13 +128,13 @@ const saveMutation = useMutation({
       pointsConfig: { initialPoints: form.value.initialPoints, minimumPoints: form.value.minimumPoints },
     }
     if (isCreating.value) {
-      await client.post({ url: '/api/admin/challenges', body })
+      await adminApi.createChallenge(body)
     } else {
-      await client.put({ url: `/api/admin/challenges/${selectedChallenge.value!.id}`, body })
+      await adminApi.updateChallenge(selectedChallenge.value!.id, body)
     }
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['admin-challenges'] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminChallenges })
     editDialog.value = false
     actionError.value = ''
   },
@@ -146,12 +143,21 @@ const saveMutation = useMutation({
 
 const deleteMutation = useMutation({
   mutationFn: async (id: string) => {
-    await client.delete({ url: `/api/admin/challenges/${id}` })
+    await adminApi.deleteChallenge(id)
   },
   onSuccess: () => {
-    qc.invalidateQueries({ queryKey: ['admin-challenges'] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminChallenges })
     deleteDialog.value = false
   },
+})
+
+const revealMutation = useMutation({
+  mutationFn: async (id: string) => adminApi.revealChallengeSecret<{ flagSecret?: string; secret?: string }>(id),
+  onSuccess: (data) => {
+    revealedSecret.value = data.flagSecret ?? data.secret ?? ''
+    actionError.value = ''
+  },
+  onError: () => { actionError.value = t('admin.challenges.revealError') },
 })
 
 function openCreate() {
@@ -174,7 +180,7 @@ function openEdit(c: ChallengeAdminDto) {
     containerMode: c.containerMode === 1 || c.containerMode === 'DockerCompose' ? 'DockerCompose' : 'SingleImage',
     composeYaml: c.composeYaml ?? '',
     composeProjectName: c.composeProjectName ?? '',
-    flagSecret: c.flagSecret ?? '',
+    flagSecret: '',
     attachmentUrl: c.attachmentUrl ?? '',
     checkerImage: c.checkerConfig?.image ?? '',
     checkerCommand: c.checkerConfig?.command ?? '',
@@ -188,6 +194,13 @@ function openEdit(c: ChallengeAdminDto) {
 function openDelete(c: ChallengeAdminDto) {
   selectedChallenge.value = c
   deleteDialog.value = true
+}
+
+function openReveal(c: ChallengeAdminDto) {
+  selectedChallenge.value = c
+  revealedSecret.value = ''
+  actionError.value = ''
+  revealDialog.value = true
 }
 
 const columnHelper = createColumnHelper<ChallengeAdminDto>()
@@ -210,6 +223,7 @@ const columns = [
       const c = info.row.original
       return h('div', { class: 'flex gap-1' }, [
         h(Button, { size: 'sm', variant: 'outline', onClick: () => openEdit(c) }, () => t('common.edit')),
+        h(Button, { size: 'sm', variant: 'outline', onClick: () => openReveal(c) }, () => t('admin.challenges.revealSecret')),
         h(Button, { size: 'sm', variant: 'destructive', onClick: () => openDelete(c) }, () => t('common.delete')),
       ])
     },
@@ -235,15 +249,16 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">{{ t('admin.challenges.title') }}</h1>
-      <Button @click="openCreate">{{ t('admin.challenges.create') }}</Button>
-    </div>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.challenges.title')">
+      <template #actions>
+        <Button @click="openCreate">{{ t('admin.challenges.create') }}</Button>
+      </template>
+    </PageHeader>
 
     <Input v-model="globalFilter" :placeholder="t('admin.challenges.searchPlaceholder')" class="max-w-xs" />
 
-    <div class="rounded-md border">
+    <ResponsiveTableShell dense min-width="920px">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -276,7 +291,7 @@ const table = useVueTable({
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </ResponsiveTableShell>
 
     <div class="flex items-center justify-between">
       <span class="text-sm text-muted-foreground">
@@ -297,10 +312,10 @@ const table = useVueTable({
         <div class="space-y-3 py-2">
           <div>
             <Label>{{ t('admin.challenges.competition') }}</Label>
-            <select v-model="form.competitionId" class="w-full border rounded-md px-3 py-2 text-sm bg-background mt-1">
+            <Select v-model="form.competitionId" class="mt-1">
               <option disabled value="">{{ t('admin.challenges.selectCompetition') }}</option>
               <option v-for="comp in competitions" :key="comp.id" :value="comp.id">{{ comp.title }}</option>
-            </select>
+            </Select>
           </div>
           <div>
             <Label>{{ t('admin.challenges.titleColumn') }}</Label>
@@ -308,21 +323,21 @@ const table = useVueTable({
           </div>
           <div>
             <Label>{{ t('admin.challenges.description') }}</Label>
-            <textarea
+            <Textarea
               v-model="form.description"
               :placeholder="t('admin.challenges.optionalDescription')"
               rows="3"
-              class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              class="mt-1 resize-none"
             />
           </div>
           <div>
             <Label>{{ t('admin.challenges.type') }}</Label>
-            <select v-model="form.typeId" class="w-full border rounded-md px-3 py-2 text-sm bg-background mt-1">
+            <Select v-model="form.typeId" class="mt-1">
               <option value="ctf">CTF</option>
               <option value="awd">AWD</option>
               <option value="awdp">AWDP</option>
               <option value="koh">KoH</option>
-            </select>
+            </Select>
           </div>
           <div>
             <Label>{{ t('admin.challenges.flagSecret') }}</Label>
@@ -334,10 +349,10 @@ const table = useVueTable({
           </div>
           <div>
             <Label>{{ t('admin.challenges.containerMode') }}</Label>
-            <select v-model="form.containerMode" class="w-full border rounded-md px-3 py-2 text-sm bg-background mt-1">
+            <Select v-model="form.containerMode" class="mt-1">
               <option value="SingleImage">{{ t('admin.challenges.singleImage') }}</option>
               <option value="DockerCompose">{{ t('admin.challenges.dockerCompose') }}</option>
-            </select>
+            </Select>
           </div>
           <div v-if="form.containerMode === 'DockerCompose'">
             <Label>{{ t('admin.challenges.composeProjectName') }}</Label>
@@ -345,11 +360,11 @@ const table = useVueTable({
           </div>
           <div v-if="form.containerMode === 'DockerCompose'" class="md:col-span-2">
             <Label>{{ t('admin.challenges.composeYaml') }}</Label>
-            <textarea
+            <Textarea
               v-model="form.composeYaml"
               :placeholder="t('admin.challenges.composeYamlPlaceholder')"
               rows="10"
-              class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
+              class="mt-1 resize-y font-mono"
             />
             <p class="mt-1 text-xs text-muted-foreground">{{ t('admin.challenges.composeYamlHelp') }}</p>
           </div>
@@ -401,6 +416,34 @@ const table = useVueTable({
             @click="deleteMutation.mutate(selectedChallenge!.id)"
           >
             {{ t('common.delete') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Reveal Secret Confirmation -->
+    <Dialog v-model:open="revealDialog">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ t('admin.challenges.revealSecret') }}</DialogTitle>
+        </DialogHeader>
+        <div class="space-y-3 py-2">
+          <p class="text-sm text-muted-foreground">
+            {{ t('admin.challenges.revealSecretAuditHint') }}
+          </p>
+          <Alert v-if="revealedSecret" class="font-mono break-all">
+            {{ revealedSecret }}
+          </Alert>
+          <p v-if="actionError" class="text-sm text-destructive">{{ actionError }}</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="revealDialog = false">{{ t('common.close') }}</Button>
+          <Button
+            variant="destructive"
+            :disabled="revealMutation.isPending.value || !selectedChallenge"
+            @click="revealMutation.mutate(selectedChallenge!.id)"
+          >
+            {{ revealedSecret ? t('common.refresh') : t('admin.challenges.revealSecret') }}
           </Button>
         </DialogFooter>
       </DialogContent>

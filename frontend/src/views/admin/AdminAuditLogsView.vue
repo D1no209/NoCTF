@@ -10,10 +10,13 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/vue-table'
-import { client } from '@/api/generated/client.gen'
+import { adminApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -73,18 +76,9 @@ const queryParams = computed(() => ({
 }))
 
 const { data, isLoading, refetch } = useQuery({
-  queryKey: ['admin-audit-logs', queryParams],
+  queryKey: computed(() => queryKeys.adminAuditLogs(page.value, queryParams.value)),
   queryFn: async () => {
-    const params = new URLSearchParams()
-    if (queryParams.value.userName) params.set('userName', queryParams.value.userName)
-    if (queryParams.value.action) params.set('action', queryParams.value.action)
-    if (queryParams.value.entityType) params.set('entityType', queryParams.value.entityType)
-    params.set('page', String(queryParams.value.page))
-    params.set('pageSize', String(queryParams.value.pageSize))
-    const res = await client.get<{ 200: AuditLogsResponse }, unknown, false>({
-      url: `/api/admin/audit-logs?${params.toString()}`,
-    })
-    return res.data ?? { items: [], total: 0, page: 1, pageSize }
+    return adminApi.auditLogs<AuditLogsResponse>(queryParams.value)
   },
 })
 
@@ -172,14 +166,15 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">{{ t('admin.auditLogs.title') }}</h1>
+  <div class="space-y-4 p-4 md:p-6">
+    <PageHeader :title="t('admin.auditLogs.title')">
+      <template #actions>
       <div class="flex gap-2">
         <Button variant="outline" size="sm" @click="refetch()">{{ t('admin.auditLogs.refresh') }}</Button>
         <Button variant="outline" size="sm" @click="exportCsv()">{{ t('admin.auditLogs.exportCsv') }}</Button>
       </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Filters -->
     <div class="flex flex-wrap gap-3">
@@ -190,7 +185,7 @@ const table = useVueTable({
     </div>
 
     <!-- Table -->
-    <div class="rounded-md border">
+    <ResponsiveTableShell dense min-width="1080px">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -233,7 +228,7 @@ const table = useVueTable({
           </template>
         </TableBody>
       </Table>
-    </div>
+    </ResponsiveTableShell>
 
     <!-- Pagination -->
     <div class="flex items-center justify-between">

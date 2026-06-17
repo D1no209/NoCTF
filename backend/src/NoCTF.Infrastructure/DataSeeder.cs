@@ -1,17 +1,22 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NoCTF.Core;
 
 namespace NoCTF.Infrastructure;
 
 public static class DataSeeder
 {
-    public static async Task SeedAsync(ApplicationDbContext db)
+    public static async Task SeedAsync(ApplicationDbContext db, IConfiguration? configuration = null)
     {
         // Only seed if database is accessible
         try
         {
-            var existingAdmin = await db.Users.FirstOrDefaultAsync(u => u.Email == "admin@noctf.local");
+            var adminEmail = configuration?["SeedAdmin:Email"] ?? "admin@noctf.local";
+            var adminUserName = configuration?["SeedAdmin:UserName"] ?? "admin";
+            var adminPassword = configuration?["SeedAdmin:Password"] ?? "Admin@123456";
+
+            var existingAdmin = await db.Users.FirstOrDefaultAsync(u => u.Email == adminEmail);
             if (existingAdmin is not null)
             {
                 // If admin@noctf.local exists but is not Admin, promote it
@@ -30,9 +35,9 @@ public static class DataSeeder
             var admin = new User
             {
                 Id = Guid.NewGuid(),
-                Email = "admin@noctf.local",
-                UserName = "admin",
-                PasswordHash = hasher.HashPassword(null!, "Admin@123456"),
+                Email = adminEmail,
+                UserName = adminUserName,
+                PasswordHash = hasher.HashPassword(null!, adminPassword),
                 Role = UserRole.Admin,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,

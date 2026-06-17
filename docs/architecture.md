@@ -105,7 +105,7 @@ JWT tokens for SignalR WebSocket connections can be passed via the `access_token
 
 Every competition is a fully isolated tenant.
 
-- **Tenant resolution**: `TenantResolutionMiddleware` reads the `competition_id` claim from the JWT, or falls back to the `X-Competition-Id` header
+- **Tenant resolution**: `TenantResolutionMiddleware` reads the `competition_id` claim from the JWT, or derives the competition id from `/api/competitions/{id}` routes after authentication. Client-provided `X-Competition-Id` is not trusted.
 - **Tenant context**: `ITenantContext` stores the current `CompetitionId` for the request scope
 - **Global query filters**: EF Core automatically applies a filter on `CompetitionId` to every tenant-scoped entity, ensuring cross-competition data leaks are impossible
 - **Admin bypass**: Admin queries can call `.IgnoreQueryFilters()` when global operations are required (for example, the round engine)

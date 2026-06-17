@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, RouterLink } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { client } from '@/api/generated/client.gen'
+import { competitionApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import SectionHeader from '@/components/layout/SectionHeader.vue'
+import DataState from '@/components/state/DataState.vue'
 import ChallengeCard from '@/components/game/ChallengeCard.vue'
 import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import ScoreboardView from '@/components/game/ScoreboardView.vue'
@@ -44,38 +50,20 @@ interface SubmissionsResponse {
 }
 
 const { data: competition, isLoading: loadingComp } = useQuery({
-  queryKey: computed(() => ['competition', competitionId.value]),
-  queryFn: async () => {
-    const res = await client.get<{ 200: Competition }, unknown, false>({
-      url: '/api/competitions/{id}',
-      path: { id: competitionId.value },
-    })
-    return res.data ?? null
-  },
+  queryKey: computed(() => queryKeys.competition(competitionId.value)),
+  queryFn: () => competitionApi.get<Competition>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
 const { data: challenges, isLoading: loadingChallenges } = useQuery({
-  queryKey: computed(() => ['challenges', competitionId.value]),
-  queryFn: async () => {
-    const res = await client.get<{ 200: Challenge[] }, unknown, false>({
-      url: '/api/competitions/{id}/challenges',
-      path: { id: competitionId.value },
-    })
-    return res.data ?? []
-  },
+  queryKey: computed(() => queryKeys.challenges(competitionId.value)),
+  queryFn: () => competitionApi.challenges<Challenge[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
 const { data: submissionsResponse, refetch: refetchSubmissions } = useQuery({
-  queryKey: computed(() => ['submissions', competitionId.value]),
-  queryFn: async () => {
-    const res = await client.get<{ 200: SubmissionsResponse }, unknown, false>({
-      url: '/api/competitions/{id}/submissions',
-      path: { id: competitionId.value },
-    })
-    return res.data ?? null
-  },
+  queryKey: computed(() => queryKeys.submissions(competitionId.value)),
+  queryFn: () => competitionApi.submissions<SubmissionsResponse>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
@@ -84,6 +72,8 @@ const solvedIds = computed(() => new Set((submissionsResponse.value?.solvedChall
 // Modal state
 const modalOpen = ref(false)
 const selectedChallenge = ref<Challenge | null>(null)
+const typeFilter = ref('all')
+const solveFilter = ref('all')
 
 function openChallenge(challenge: Challenge) {
   selectedChallenge.value = challenge
@@ -92,7 +82,7 @@ function openChallenge(challenge: Challenge) {
 
 function onChallengeSolved() {
   refetchSubmissions()
-  queryClient.invalidateQueries({ queryKey: ['submissions', competitionId.value] })
+  queryClient.invalidateQueries({ queryKey: queryKeys.submissions(competitionId.value) })
 }
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -107,54 +97,78 @@ function formatDate(iso: string) {
 }
 
 const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
+const filteredChallenges = computed(() => {
+  return (challenges.value ?? []).filter((challenge) => {
+    const solved = solvedIds.value.has(challenge.id)
+    const matchesType = typeFilter.value === 'all' || challenge.typeId.toLowerCase() === typeFilter.value
+    const matchesSolve = solveFilter.value === 'all' || (solveFilter.value === 'solved' ? solved : !solved)
+    return matchesType && matchesSolve
+  })
+})
+
+const challengeTypes = computed(() => {
+  return Array.from(new Set((challenges.value ?? []).map((challenge) => challenge.typeId.toLowerCase()))).sort()
+})
 </script>
 
 <template>
-  <div class="min-h-screen bg-background p-8">
-    <div class="max-w-6xl mx-auto">
-      <div class="mb-6">
-        <RouterLink to="/competitions" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          ← {{ t('nav.backToCompetitions') }}
-        </RouterLink>
-      </div>
-
-      <div v-if="isLoading" class="text-muted-foreground">{{ t('common.loading') }}</div>
-
-      <template v-else>
+  <AppLayout>
+    <div class="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 md:px-6">
+      <DataState
+        :loading="isLoading"
+        :empty="!competition"
+        :loading-title="t('common.loading')"
+        :empty-title="t('competitions.empty')"
+      >
         <!-- Competition Header -->
-        <div class="mb-8" v-if="competition">
-          <div class="flex items-start gap-3 mb-2">
-            <h1 class="text-3xl font-bold tracking-tight">{{ competition.title }}</h1>
+        <PageHeader
+          v-if="competition"
+          :title="competition.title"
+          :description="competition.description"
+          back-to="/competitions"
+          :back-label="t('nav.backToCompetitions')"
+        >
+          <template #actions>
             <Badge :variant="statusVariant(competition.status)" class="mt-1">
               {{ competition.status }}
             </Badge>
-          </div>
-          <p v-if="competition.description" class="text-muted-foreground mb-3">
-            {{ competition.description }}
-          </p>
-          <div class="flex gap-6 text-sm text-muted-foreground">
-            <span>{{ t('competitions.startLabel') }} {{ formatDate(competition.startTime) }}</span>
-            <span>{{ t('competitions.endLabel') }} {{ formatDate(competition.endTime) }}</span>
-          </div>
+          </template>
+        </PageHeader>
+
+        <div v-if="competition" class="flex flex-wrap gap-4 rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">
+          <span>{{ t('competitions.startLabel') }} {{ formatDate(competition.startTime) }}</span>
+          <span>{{ t('competitions.endLabel') }} {{ formatDate(competition.endTime) }}</span>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
           <!-- Challenges Grid -->
-          <div class="lg:col-span-2">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-xl font-semibold">{{ t('challenges.title') }}</h2>
+          <div class="space-y-4">
+            <SectionHeader :title="t('challenges.title')">
+              <template #actions>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Select v-model="typeFilter" class="w-36">
+                    <option value="all">{{ t('common.all') }} {{ t('common.type') }}</option>
+                    <option v-for="type in challengeTypes" :key="type" :value="type">{{ type }}</option>
+                  </Select>
+                  <Select v-model="solveFilter" class="w-36">
+                    <option value="all">{{ t('common.all') }}</option>
+                    <option value="solved">{{ t('challenges.solved') }}</option>
+                    <option value="unsolved">{{ t('challenges.unsolved') }}</option>
+                  </Select>
+                </div>
+              </template>
               <span v-if="challenges" class="text-sm text-muted-foreground">
                 {{ t('challenges.solvedCount', { solved: solvedIds.size, total: challenges.length }) }}
               </span>
-            </div>
+            </SectionHeader>
 
-            <div v-if="!challenges || challenges.length === 0" class="text-muted-foreground">
-              {{ t('challenges.empty') }}
-            </div>
-
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <DataState
+              :empty="filteredChallenges.length === 0"
+              :empty-title="t('challenges.empty')"
+            >
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div
-                v-for="challenge in challenges"
+                v-for="challenge in filteredChallenges"
                 :key="challenge.id"
                 @click="openChallenge(challenge)"
               >
@@ -164,16 +178,17 @@ const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
                 />
               </div>
             </div>
+            </DataState>
           </div>
 
           <!-- Scoreboard -->
-          <div class="lg:col-span-1">
+          <aside class="lg:sticky lg:top-20 lg:self-start">
             <ScoreboardView
               :competition-id="competitionId"
             />
-          </div>
+          </aside>
         </div>
-      </template>
+      </DataState>
     </div>
 
     <!-- Challenge Modal -->
@@ -185,5 +200,5 @@ const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
       :solved="solvedIds.has(selectedChallenge.id)"
       @solved="onChallengeSolved"
     />
-  </div>
+  </AppLayout>
 </template>

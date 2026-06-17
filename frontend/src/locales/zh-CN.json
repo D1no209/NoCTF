@@ -103,6 +103,10 @@
   },
   "competitions": {
     "title": "比赛",
+    "subtitle": "浏览正在进行和即将开始的赛事，进入对应比赛工作区。",
+    "searchPlaceholder": "搜索比赛...",
+    "emptyDescription": "当前筛选条件下没有匹配的比赛。",
+    "enter": "进入",
     "loading": "正在加载比赛...",
     "loadError": "加载比赛失败",
     "empty": "暂无比赛",
@@ -130,6 +134,7 @@
     "incorrectFlag": "Flag 错误，请重试",
     "submissionFailed": "提交失败，请重试",
     "alreadySolved": "你已经解出了这道题",
+    "unsolved": "未解出",
     "solves": "{count} 次解出",
     "solves_plural": "{count} 次解出",
     "empty": "暂无题目",

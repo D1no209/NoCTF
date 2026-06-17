@@ -1,5 +1,5 @@
 using System.Text;
-using System.Text.Json;
+using System.Security.Claims;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -17,8 +17,10 @@ using NoCTF.API.Plugins;
 using NoCTF.API.SignalR;
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.Application;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.Events;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Security;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 using StackExchange.Redis;
@@ -40,6 +42,10 @@ builder.Services.AddCors(options =>
 // JWT Configuration
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var jwtSecret = jwtSettings.GetValue<string>("Secret")!;
+if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+{
+    throw new InvalidOperationException("JwtSettings:Secret must be configured and at least 32 characters long.");
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -52,7 +58,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSettings.GetValue<string>("Issuer") ?? "NoCTF",
             ValidAudience = jwtSettings.GetValue<string>("Audience") ?? "NoCTF",
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            NameClaimType = ClaimTypes.Name,
+            RoleClaimType = ClaimTypes.Role
         };
 
         // Allow JWT from query string for SignalR WebSocket connections
@@ -100,6 +108,8 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
 builder.Services.AddSingleton<IRedisLeaderboardCache, RedisLeaderboardCache>();
 builder.Services.AddScoped<ISubmissionEventHandler, LeaderboardSyncHandler>();
+builder.Services.AddScoped<IBackgroundTaskQueue, BackgroundTaskQueue>();
+builder.Services.AddScoped<IPatchArchiveValidator, PatchArchiveValidator>();
 
 builder.Services.AddFastEndpoints();
 builder.Services.SwaggerDocument(o =>
@@ -150,16 +160,17 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-// Seed default admin
-try
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await DataSeeder.SeedAsync(db);
-}
-catch
-{
-    // Ignore seed errors during startup (migrations may not be applied yet)
+    var autoMigrate = builder.Configuration.GetValue("Database:AutoMigrate", !app.Environment.IsDevelopment());
+
+    if (autoMigrate)
+    {
+        await db.Database.MigrateAsync();
+    }
+
+    await DataSeeder.SeedAsync(db, builder.Configuration);
 }
 
 // Wire hub context into LogBuffer so it can broadcast log entries via SignalR
@@ -181,6 +192,7 @@ app.UseCors("Frontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.UseFastEndpoints(c =>
 {
@@ -215,8 +227,6 @@ app.MapGet("/api/health", async (HealthCheckService healthCheckService) =>
     var statusCode = report.Status == HealthStatus.Healthy ? 200 : 503;
     return Results.Json(result, statusCode: statusCode);
 }).AllowAnonymous();
-
-app.UseMiddleware<TenantResolutionMiddleware>();
 
 // SignalR hub endpoints
 app.MapHub<LeaderboardHub>("/hubs/leaderboard");

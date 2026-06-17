@@ -65,6 +65,12 @@ public class AwdpPatchService(
             .IgnoreQueryFilters()
             .FirstAsync(s => s.Id == submissionId, ct);
 
+        if (submission.Status == AwdpPatchStatus.Verified)
+        {
+            logger.LogInformation("Patch submission {SubmissionId} is already verified; skipping validation.", submissionId);
+            return;
+        }
+
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .FirstAsync(c => c.Id == submission.ChallengeId, ct);
@@ -272,17 +278,29 @@ public class AwdpPatchService(
             submission.ValidationDetail = "Checker passed and EXP failed — patch verified.";
 
             int defensePoints = competition.DefensePoints ?? 100;
-            db.ScoreEvents.Add(new ScoreEvent
+            var alreadyAwarded = await db.ScoreEvents
+                .IgnoreQueryFilters()
+                .AnyAsync(e =>
+                    e.CompetitionId == submission.CompetitionId &&
+                    e.TeamId == submission.TeamId &&
+                    e.ChallengeId == submission.ChallengeId &&
+                    e.EventType == "awdp_defense" &&
+                    e.Reason == $"Patch verified for submission {submission.Id}", ct);
+
+            if (!alreadyAwarded)
             {
-                Id = Guid.NewGuid(),
-                CompetitionId = submission.CompetitionId,
-                TeamId = submission.TeamId,
-                ChallengeId = submission.ChallengeId,
-                EventType = "awdp_defense",
-                PointsDelta = defensePoints,
-                Reason = $"Patch verified for challenge {submission.ChallengeId}",
-                Timestamp = DateTime.UtcNow
-            });
+                db.ScoreEvents.Add(new ScoreEvent
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = submission.CompetitionId,
+                    TeamId = submission.TeamId,
+                    ChallengeId = submission.ChallengeId,
+                    EventType = "awdp_defense",
+                    PointsDelta = defensePoints,
+                    Reason = $"Patch verified for submission {submission.Id}",
+                    Timestamp = DateTime.UtcNow
+                });
+            }
 
             logger.LogInformation(
                 "Patch verified for submission {SubmissionId}. Awarded {Points} defense points.",

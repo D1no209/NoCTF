@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { client } from '@/api/generated/client.gen'
+import { competitionApi } from '@/api/noctf'
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Alert } from '@/components/ui/alert'
 
 interface Challenge {
   id: string
@@ -70,13 +71,13 @@ async function submitFlag() {
   submitError.value = null
 
   try {
-    const res = await client.post<{ 200: SubmitResponse }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/submit',
-      path: { id: props.competitionId, challengeId: props.challenge.id },
-      body: { flag: flagInput.value.trim() },
-    })
+    const data = await competitionApi.submitFlag<SubmitResponse>(
+      props.competitionId,
+      props.challenge.id,
+      flagInput.value.trim(),
+    )
 
-    if (res.data?.correct) {
+    if (data?.correct) {
       submitResult.value = 'correct'
       emit('solved')
     } else {
@@ -143,24 +144,15 @@ async function submitFlag() {
         </div>
 
         <!-- Result feedback -->
-        <div
-          v-if="submitResult === 'correct'"
-          class="rounded-md bg-green-500/10 border border-green-500/30 px-4 py-3 text-sm font-semibold text-green-700 dark:text-green-400"
-        >
-          ✓ {{ t('challenges.correctFlag') }}
-        </div>
-        <div
-          v-else-if="submitResult === 'incorrect'"
-          class="rounded-md bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm font-semibold text-destructive"
-        >
-          ✗ {{ t('challenges.incorrectFlag') }}
-        </div>
-        <div
-          v-else-if="submitError"
-          class="rounded-md bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive"
-        >
+        <Alert v-if="submitResult === 'correct'" variant="success">
+          {{ t('challenges.correctFlag') }}
+        </Alert>
+        <Alert v-else-if="submitResult === 'incorrect'" variant="destructive">
+          {{ t('challenges.incorrectFlag') }}
+        </Alert>
+        <Alert v-else-if="submitError" variant="destructive">
           {{ submitError }}
-        </div>
+        </Alert>
 
         <div v-if="solved && submitResult !== 'correct'" class="text-sm text-muted-foreground italic">
           {{ t('challenges.alreadySolved') }}

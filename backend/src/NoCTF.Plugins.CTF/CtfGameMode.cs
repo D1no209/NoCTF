@@ -66,6 +66,8 @@ public class CtfGameMode : IGameMode
         var flagSecret = challenge.FlagSecret ?? string.Empty;
         var isCorrect = FlagValidator.IsMatch(context.FlagContent, flagSecret);
 
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
         // Record submission regardless of correctness
         var submission = new Submission
         {
@@ -85,6 +87,7 @@ public class CtfGameMode : IGameMode
         if (!isCorrect)
         {
             await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return SubmissionResult.WrongFlag;
         }
 
@@ -119,10 +122,22 @@ public class CtfGameMode : IGameMode
         };
 
         _db.ScoreEvents.Add(scoreEvent);
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            if (!await HasCorrectSolveAsync(context, cancellationToken))
+                throw;
+
+            await transaction.RollbackAsync(cancellationToken);
+            return SubmissionResult.AlreadySolved;
+        }
 
         // Recalculate scores for all teams that solved this challenge (dynamic scoring)
         await RecalculateDynamicScoresAsync(context.CompetitionId, context.ChallengeId, challenge, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         // Load team name for notification
         var team = await _db.Teams
@@ -144,6 +159,17 @@ public class CtfGameMode : IGameMode
 
         return SubmissionResult.Accepted;
     }
+
+    private Task<bool> HasCorrectSolveAsync(SubmissionContext context, CancellationToken cancellationToken)
+        => _db.Submissions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(s =>
+                s.CompetitionId == context.CompetitionId &&
+                s.TeamId == context.TeamId &&
+                s.ChallengeId == context.ChallengeId &&
+                s.IsCorrect,
+                cancellationToken);
 
     /// <summary>
     /// After a new solve, recalculate and update ScoreEvents for all teams that solved this challenge.

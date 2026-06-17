@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.BackgroundTasks;
+using NoCTF.Application.Security;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 
@@ -23,9 +25,21 @@ public class SubmitPatchResponse
 /// Accepts multipart/form-data with a fix.tar.gz file.
 /// Creates a Pending patch submission and triggers async validation.
 /// </summary>
-public class SubmitPatchEndpoint(ApplicationDbContext dbContext, IAwdpPatchService patchService)
+public class SubmitPatchEndpoint(
+    ApplicationDbContext dbContext,
+    IAwdpPatchService patchService,
+    IBackgroundTaskQueue backgroundTaskQueue,
+    IPatchArchiveValidator patchArchiveValidator,
+    IConfiguration configuration)
     : Endpoint<SubmitPatchRequest, SubmitPatchResponse>
 {
+    private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "application/gzip",
+        "application/x-gzip",
+        "application/octet-stream"
+    };
+
     public override void Configure()
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/patch");
@@ -65,7 +79,37 @@ public class SubmitPatchEndpoint(ApplicationDbContext dbContext, IAwdpPatchServi
             return;
         }
 
-        await using var stream = file.OpenReadStream();
+        var maxBytes = configuration.GetValue<long>("PatchUpload:MaxBytes", 5 * 1024 * 1024);
+        if (file.Length <= 0 || file.Length > maxBytes)
+        {
+            await SendAsync(new SubmitPatchResponse { Status = "invalid_size" }, 400, ct);
+            return;
+        }
+
+        if (!file.FileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) &&
+            !file.FileName.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase))
+        {
+            await SendAsync(new SubmitPatchResponse { Status = "invalid_extension" }, 400, ct);
+            return;
+        }
+
+        if (!AllowedContentTypes.Contains(file.ContentType))
+        {
+            await SendAsync(new SubmitPatchResponse { Status = "invalid_content_type" }, 400, ct);
+            return;
+        }
+
+        await using var stream = new MemoryStream();
+        await file.CopyToAsync(stream, ct);
+        stream.Position = 0;
+        var validation = await patchArchiveValidator.ValidateAsync(stream, ct);
+        if (!validation.IsValid)
+        {
+            await SendAsync(new SubmitPatchResponse { Status = validation.Error ?? "invalid_archive" }, 400, ct);
+            return;
+        }
+
+        stream.Position = 0;
         var submissionId = await patchService.SubmitPatchAsync(
             req.Id,
             teamMember.TeamId,
@@ -74,18 +118,11 @@ public class SubmitPatchEndpoint(ApplicationDbContext dbContext, IAwdpPatchServi
             file.FileName,
             ct);
 
-        // Fire-and-forget validation (background task)
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await patchService.ValidatePatchAsync(submissionId);
-            }
-            catch
-            {
-                // Validation errors are persisted inside ValidatePatchAsync
-            }
-        }, CancellationToken.None);
+        await backgroundTaskQueue.EnqueueAsync(
+            req.Id,
+            BackgroundTaskTypes.AwdpPatchValidation,
+            new AwdpPatchValidationPayload(submissionId),
+            ct);
 
         await SendAsync(new SubmitPatchResponse
         {

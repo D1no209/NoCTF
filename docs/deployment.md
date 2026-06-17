@@ -14,6 +14,8 @@ The fastest way to get NoCTF running is with the provided `deploy/docker-compose
 | `redis` | `redis:7` | SignalR backplane and leaderboard cache |
 | `minio` | `minio/minio:latest` | S3-compatible object storage |
 | `backend` | Built from `backend/Dockerfile` | NoCTF API |
+| `worker` | Built from `backend/Dockerfile` | Durable background task processor |
+| `runner` | Built from `backend/Dockerfile` | Isolated Docker/K8s execution boundary |
 | `frontend` | Built from `frontend/Dockerfile` | Vue 3 SPA served by Nginx |
 
 ### Steps
@@ -48,7 +50,7 @@ curl http://localhost:8080/api/health
 
 ### Notes
 
-- The backend mounts `/var/run/docker.sock` so it can manage challenge containers directly on the host.
+- The backend does not mount `/var/run/docker.sock`. Container access is isolated in the `runner` service; the worker calls runner over the internal Compose network.
 - Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
 
 ## Kubernetes
@@ -146,9 +148,9 @@ kubectl get hpa -n noctf
 
 ### AWD Privileged Node Requirements
 
-AWD mode requires access to a Docker socket for spawning challenge containers. This is **disabled by default** for security.
+AWD mode requires access to a container runtime for spawning challenge containers. This should be isolated to a dedicated Runner deployment.
 
-To enable it on a privileged node, uncomment the `volumeMounts` and `volumes` sections in `deploy/k8s/backend-deployment.yaml`:
+To enable Docker-backed Runner on a privileged node, mount the Docker socket only in a dedicated runner deployment:
 
 ```yaml
 volumeMounts:
@@ -161,7 +163,7 @@ volumes:
       type: Socket
 ```
 
-Consider using a dedicated node pool with taints/tolerations for AWD workloads so privileged container access is isolated from the rest of your cluster.
+Use a dedicated node pool with taints/tolerations for Runner workloads so privileged container access is isolated from API, Worker, database, and frontend pods.
 
 ### Network Policy Notes
 
