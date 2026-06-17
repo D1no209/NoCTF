@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -24,7 +25,18 @@ public class KohScoreEngineTests
     }
 
     private static KohScoreEngine CreateEngine(ApplicationDbContext db, KohHubNotifierSpy? notifier = null)
-        => new(db, new NullLeaderboardKoh(), notifier ?? new KohHubNotifierSpy());
+        => new(db, new NullLeaderboardKoh(), notifier ?? new KohHubNotifierSpy(), CreateScoreSignalEmitter(db));
+
+    private static IScoreSignalEmitter CreateScoreSignalEmitter(ApplicationDbContext db)
+    {
+        var writer = new ScoreEventWriter(db);
+        IScoringStrategy[] strategies = [new ControlIntervalScoringStrategy(db, writer)];
+        return new ScoreSignalEmitter(
+            db,
+            strategies,
+            new CompetitionScoringProfileResolver(db),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ScoreSignalEmitter>.Instance);
+    }
 
     private static void SeedCompetition(ApplicationDbContext db, Guid competitionId, int controlPoints = 10)
     {
@@ -88,7 +100,7 @@ public class KohScoreEngineTests
         {
             Assert.Equal(teamId, e.TeamId);
             Assert.Equal(15, e.PointsDelta);
-            Assert.Equal("koh_control", e.EventType);
+            Assert.Equal("koh.control-interval", e.EventType);
         });
     }
 

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.PluginBase;
 
 namespace NoCTF.Plugins.AWD;
@@ -16,6 +17,7 @@ public class AwdModule : IPluginModule
         // Game mode (scoped to match DbContext lifetime)
         services.AddScoped<AwdGameMode>();
         services.AddScoped<IGameMode>(sp => sp.GetRequiredService<AwdGameMode>());
+        services.AddScoped<ICompetitionModeProvider, AwdModeProvider>();
 
         // Flag service (scoped — uses DbContext)
         services.AddScoped<AwdFlagService>();

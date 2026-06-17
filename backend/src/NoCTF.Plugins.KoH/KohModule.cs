@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.PluginBase;
 
 namespace NoCTF.Plugins.KoH;
@@ -16,6 +17,7 @@ public class KohModule : IPluginModule
         // Game mode (scoped to match DbContext lifetime)
         services.AddScoped<KohGameMode>();
         services.AddScoped<IGameMode>(sp => sp.GetRequiredService<KohGameMode>());
+        services.AddScoped<ICompetitionModeProvider, KohModeProvider>();
 
         // Score engine (scoped — uses DbContext)
         services.AddScoped<KohScoreEngine>();

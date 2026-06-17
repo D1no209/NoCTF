@@ -1,19 +1,51 @@
+# Environment and local secrets
 .env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local tool state
 .sisyphus/
 .playwright-mcp/
+.vs/
+.vscode/
+.idea/
 
-# Build outputs
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.user
+*.suo
+*.swp
+*.tmp
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# .NET build/test outputs
 **/bin/
 **/obj/
+**/TestResults/
+**/coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+# Frontend build/dependency outputs
 frontend/dist/
 frontend/node_modules/
 frontend/.vite/
+frontend/.turbo/
+frontend/.cache/
+frontend/playwright-report/
+frontend/test-results/
+
+# Backend generated artifacts. Keep the OpenAPI artifact when explicitly generated.
 backend/artifacts/*
 !backend/artifacts/openapi/
 !backend/artifacts/openapi/swagger.json
-
-# Local editor/runtime files
-.vs/
-.vscode/
-*.user
-*.suo

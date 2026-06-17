@@ -1,12 +1,9 @@
-using System.Text.Json;
 using NoCTF.Application.BackgroundTasks;
-using NoCTF.PluginBase;
 
 namespace NoCTF.Worker;
 
 public class Worker(IServiceScopeFactory scopeFactory, ILogger<Worker> logger) : BackgroundService
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(10);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -30,7 +27,9 @@ public class Worker(IServiceScopeFactory scopeFactory, ILogger<Worker> logger) :
 
                 try
                 {
-                    await ExecuteTaskAsync(scope.ServiceProvider, task.Type, task.PayloadJson, stoppingToken);
+                    var registry = scope.ServiceProvider.GetRequiredService<ICompetitionJobRegistry>();
+                    var handler = registry.GetRequiredHandler(task.Type);
+                    await handler.ExecuteAsync(task, stoppingToken);
                     await queue.MarkSucceededAsync(task.Id, stoppingToken);
                 }
                 catch (Exception ex)
@@ -60,24 +59,4 @@ public class Worker(IServiceScopeFactory scopeFactory, ILogger<Worker> logger) :
             logger.LogWarning("Recovered {Count} expired running background tasks.", recovered);
     }
 
-    private static async Task ExecuteTaskAsync(
-        IServiceProvider services,
-        string type,
-        string payloadJson,
-        CancellationToken cancellationToken)
-    {
-        switch (type)
-        {
-            case BackgroundTaskTypes.AwdpPatchValidation:
-            {
-                var payload = JsonSerializer.Deserialize<AwdpPatchValidationPayload>(payloadJson, JsonOptions)
-                    ?? throw new InvalidOperationException("Invalid AWDP patch validation payload.");
-                var patchService = services.GetRequiredService<IAwdpPatchService>();
-                await patchService.ValidatePatchAsync(payload.SubmissionId, cancellationToken);
-                break;
-            }
-            default:
-                throw new NotSupportedException($"Unknown background task type '{type}'.");
-        }
-    }
 }

@@ -50,6 +50,8 @@ public class Competition : ITenantEntity
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public GameModeType GameModeType { get; set; }
+    public string ModeKey { get; set; } = string.Empty;
+    public string ScoringProfileJson { get; set; } = string.Empty;
     public Guid OwnerId { get; set; }
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
@@ -129,13 +131,32 @@ public class ScoreEvent : ITenantEntity
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
     public Guid? ChallengeId { get; set; }
+    public string ScoringKey { get; set; } = string.Empty;
     public string EventType { get; set; } = string.Empty;
     public int PointsDelta { get; set; }
     public string? Reason { get; set; }
     public DateTime Timestamp { get; set; }
+    public Guid? SourceSignalId { get; set; }
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public string MetadataJson { get; set; } = "{}";
 
     /// <summary>AWD round number; null for CTF score events.</summary>
     public int? RoundNumber { get; set; }
+}
+
+public class ScoreSignal : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid? ActorUserId { get; set; }
+    public string SubjectType { get; set; } = string.Empty;
+    public Guid? SubjectId { get; set; }
+    public string SignalType { get; set; } = string.Empty;
+    public DateTime OccurredAt { get; set; }
+    public int? RoundNumber { get; set; }
+    public string PayloadJson { get; set; } = "{}";
+    public string IdempotencyKey { get; set; } = string.Empty;
 }
 
 /// <summary>Represents a single AWD round within a competition.</summary>

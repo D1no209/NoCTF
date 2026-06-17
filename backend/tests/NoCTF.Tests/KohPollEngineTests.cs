@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -25,11 +26,22 @@ public class KohPollEngineTests
     }
 
     private static KohScoreEngine CreateEngine(ApplicationDbContext db, NullKohHubNotifier? notifier = null)
-        => new(db, new NullLeaderboardServiceKoh(), notifier ?? new NullKohHubNotifier());
+        => new(db, new NullLeaderboardServiceKoh(), notifier ?? new NullKohHubNotifier(), CreateScoreSignalEmitter(db));
 
-    private static Guid SeedCompetition(ApplicationDbContext db, int controlPoints = 10)
+    private static IScoreSignalEmitter CreateScoreSignalEmitter(ApplicationDbContext db)
     {
-        var id = Guid.NewGuid();
+        var writer = new ScoreEventWriter(db);
+        IScoringStrategy[] strategies = [new ControlIntervalScoringStrategy(db, writer)];
+        return new ScoreSignalEmitter(
+            db,
+            strategies,
+            new CompetitionScoringProfileResolver(db),
+            NullLogger<ScoreSignalEmitter>.Instance);
+    }
+
+    private static Guid SeedCompetition(ApplicationDbContext db, Guid? competitionId = null, int controlPoints = 10)
+    {
+        var id = competitionId ?? Guid.NewGuid();
         db.Competitions.Add(new Competition
         {
             Id = id,
@@ -72,7 +84,7 @@ public class KohPollEngineTests
         var competitionId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
 
-        SeedCompetition(db, controlPoints: 10);
+        SeedCompetition(db, competitionId, controlPoints: 10);
         var teamId = SeedTeam(db, competitionId, "Team A");
         var challengeId = Guid.NewGuid();
         var now = DateTime.UtcNow;
@@ -93,7 +105,7 @@ public class KohPollEngineTests
         {
             Assert.Equal(teamId, e.TeamId);
             Assert.Equal(10, e.PointsDelta);
-            Assert.Equal("koh_control", e.EventType);
+            Assert.Equal("koh.control-interval", e.EventType);
         });
     }
 
@@ -106,7 +118,7 @@ public class KohPollEngineTests
         var competitionId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
 
-        SeedCompetition(db, controlPoints: 10);
+        SeedCompetition(db, competitionId, controlPoints: 10);
         var teamA = SeedTeam(db, competitionId, "Team A");
         var teamB = SeedTeam(db, competitionId, "Team B");
         var challengeId = Guid.NewGuid();
@@ -147,7 +159,7 @@ public class KohPollEngineTests
         var competitionId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
 
-        SeedCompetition(db, controlPoints: 10);
+        SeedCompetition(db, competitionId, controlPoints: 10);
         var teamA = SeedTeam(db, competitionId, "Team A");
         var teamB = SeedTeam(db, competitionId, "Team B");
         var challengeId = Guid.NewGuid();
@@ -171,7 +183,7 @@ public class KohPollEngineTests
         var competitionId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
 
-        SeedCompetition(db, controlPoints: 10);
+        SeedCompetition(db, competitionId, controlPoints: 10);
         var challengeId = Guid.NewGuid();
 
         var engine = CreateEngine(db);
@@ -195,7 +207,7 @@ public class KohPollEngineTests
         var competitionId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
 
-        SeedCompetition(db, controlPoints: 10);
+        SeedCompetition(db, competitionId, controlPoints: 10);
         var teamA = SeedTeam(db, competitionId, "Team A");
         var challengeId = Guid.NewGuid();
         var t0 = DateTime.UtcNow;

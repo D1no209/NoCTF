@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.PluginBase;
 
 namespace NoCTF.Plugins.CTF;
@@ -19,6 +20,7 @@ public class CtfModule : IPluginModule
         // Game mode (scoped to match DbContext lifetime)
         services.AddScoped<CtfGameMode>();
         services.AddScoped<IGameMode>(sp => sp.GetRequiredService<CtfGameMode>());
+        services.AddScoped<ICompetitionModeProvider, CtfModeProvider>();
 
         // Challenge types (singleton — stateless)
         services.AddSingleton<IChallengeType, StaticFlagChallengeType>();

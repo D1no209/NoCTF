@@ -2,19 +2,21 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.Plugins.AWD;
 
 /// <summary>
-/// Calculates round scores for all teams based on service health and attack records.
-/// Writes a ScoreEvent per team and refreshes the leaderboard.
+/// Emits round scoring signals for all teams based on service health and attack records.
+/// Scoring strategies convert those facts into ScoreEvents.
 /// </summary>
 public class AwdScoreEngine(
     ApplicationDbContext db,
     ILeaderboardService leaderboardService,
     IHubNotifierService hubNotifier,
+    IScoreSignalEmitter scoreSignalEmitter,
     ILogger<AwdScoreEngine> logger)
 {
     public async Task CalculateRoundScoreAsync(Guid competitionId, int roundNumber, CancellationToken ct = default)
@@ -35,8 +37,6 @@ public class AwdScoreEngine(
 
         foreach (var team in teams)
         {
-            int roundScoreDelta = 0;
-
             foreach (var challenge in challenges)
             {
                 // Service health
@@ -50,9 +50,29 @@ public class AwdScoreEngine(
                     .FirstOrDefaultAsync(ct);
 
                 if (check?.Status == AwdCheckStatus.Healthy)
-                    roundScoreDelta += competition.ServiceOnlinePoints ?? 100;
+                {
+                    await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+                        CompetitionId: competitionId,
+                        TeamId: team.Id,
+                        SignalType: ScoreSignalTypes.ServiceCheckPassed,
+                        IdempotencyKey: $"awd:{roundNumber}:{team.Id:N}:{challenge.Id:N}:service:passed",
+                        SubjectType: "challenge",
+                        SubjectId: challenge.Id,
+                        RoundNumber: roundNumber,
+                        OccurredAt: check.CheckedAt), ct);
+                }
                 else if (check?.Status == AwdCheckStatus.Down)
-                    roundScoreDelta -= competition.ServiceDownPenalty ?? 50;
+                {
+                    await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+                        CompetitionId: competitionId,
+                        TeamId: team.Id,
+                        SignalType: ScoreSignalTypes.ServiceCheckFailed,
+                        IdempotencyKey: $"awd:{roundNumber}:{team.Id:N}:{challenge.Id:N}:service:failed",
+                        SubjectType: "challenge",
+                        SubjectId: challenge.Id,
+                        RoundNumber: roundNumber,
+                        OccurredAt: check.CheckedAt), ct);
+                }
 
                 // Been attacked penalty (any unique attacker this round for this team+challenge)
                 var wasAttacked = await db.AwdAttackRecords
@@ -63,26 +83,18 @@ public class AwdScoreEngine(
                                && a.RoundNumber == roundNumber, ct);
 
                 if (wasAttacked)
-                    roundScoreDelta -= competition.BeenAttackedPenalty ?? 50;
-            }
-
-            if (roundScoreDelta != 0)
-            {
-                db.ScoreEvents.Add(new ScoreEvent
                 {
-                    Id = Guid.NewGuid(),
-                    CompetitionId = competitionId,
-                    TeamId = team.Id,
-                    EventType = "awd_round_score",
-                    PointsDelta = roundScoreDelta,
-                    Reason = $"Round {roundNumber} score",
-                    Timestamp = DateTime.UtcNow,
-                    RoundNumber = roundNumber
-                });
+                    await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+                        CompetitionId: competitionId,
+                        TeamId: team.Id,
+                        SignalType: ScoreSignalTypes.ServiceAttacked,
+                        IdempotencyKey: $"awd:{roundNumber}:{team.Id:N}:{challenge.Id:N}:been-attacked",
+                        SubjectType: "challenge",
+                        SubjectId: challenge.Id,
+                        RoundNumber: roundNumber), ct);
+                }
             }
         }
-
-        await db.SaveChangesAsync(ct);
 
         // Refresh leaderboard and push snapshot
         try
