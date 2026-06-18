@@ -15,8 +15,6 @@ import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import PageHeader from '@/components/layout/PageHeader.vue'
-import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -30,7 +28,23 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
+import { 
+  Search, 
+  RotateCw, 
+  Download, 
+  Eye, 
+  Loader2, 
+  FileJson, 
+  ShieldAlert, 
+  CheckCircle2,
+  Clock,
+  User as UserIcon,
+  Globe
+} from 'lucide-vue-next'
+import { vAutoAnimate } from '@formkit/auto-animate/vue'
+import { toast } from 'vue-sonner'
 
 const { t } = useI18n()
 
@@ -75,7 +89,7 @@ const queryParams = computed(() => ({
   pageSize,
 }))
 
-const { data, isLoading, refetch } = useQuery({
+const { data, isLoading, refetch, isFetching } = useQuery({
   queryKey: computed(() => queryKeys.adminAuditLogs(page.value, queryParams.value)),
   queryFn: async () => {
     return adminApi.auditLogs<AuditLogsResponse>(queryParams.value)
@@ -103,23 +117,28 @@ function formatJson(json?: string) {
 function exportCsv() {
   const items = logs.value
   if (!items.length) return
-  const headers = [t('admin.auditLogs.timestamp'), t('admin.auditLogs.user'), t('admin.auditLogs.action'), t('admin.auditLogs.endpoint'), t('admin.auditLogs.method'), t('admin.auditLogs.status')]
-  const rows = items.map(l => [
-    l.timestamp,
-    l.userName ?? '',
-    l.action,
-    l.endpointPath,
-    l.httpMethod,
-    l.exception ? t('common.error') : t('common.success'),
-  ])
-  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  try {
+    const headers = [t('admin.auditLogs.timestamp'), t('admin.auditLogs.user'), t('admin.auditLogs.action'), t('admin.auditLogs.endpoint'), t('admin.auditLogs.method'), t('admin.auditLogs.status')]
+    const rows = items.map(l => [
+      l.timestamp,
+      l.userName ?? '',
+      l.action,
+      l.endpointPath,
+      l.httpMethod,
+      l.exception ? t('common.error') : t('common.success'),
+    ])
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Audit logs exported.')
+  } catch {
+    toast.error('Export failed.')
+  }
 }
 
 const columnHelper = createColumnHelper<AuditLogDto>()
@@ -127,24 +146,39 @@ const columnHelper = createColumnHelper<AuditLogDto>()
 const columns = [
   columnHelper.accessor('timestamp', {
     header: t('admin.auditLogs.timestamp'),
-    cell: info => new Date(info.getValue()).toLocaleString(),
+    cell: info => h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
+      h(Clock, { class: 'size-3 text-muted-foreground' }),
+      h('span', new Date(info.getValue()).toLocaleString())
+    ]),
     enableSorting: true,
   }),
-  columnHelper.accessor('userName', { header: t('admin.auditLogs.user'), enableSorting: true }),
-  columnHelper.accessor('action', { header: t('admin.auditLogs.action'), enableSorting: true }),
-  columnHelper.accessor('entityType', { header: t('admin.auditLogs.entityType') }),
-  columnHelper.accessor('endpointPath', { header: t('admin.auditLogs.endpoint') }),
+  columnHelper.accessor('userName', { 
+    header: t('admin.auditLogs.user'), 
+    enableSorting: true,
+    cell: info => h('div', { class: 'flex items-center gap-2' }, [
+      h(UserIcon, { class: 'size-3 text-muted-foreground' }),
+      h('span', info.getValue() || 'Anonymous')
+    ])
+  }),
+  columnHelper.accessor('action', { 
+    header: t('admin.auditLogs.action'), 
+    enableSorting: true,
+    cell: info => h(Badge, { variant: 'outline', class: 'font-mono text-[10px]' }, () => info.getValue())
+  }),
+  columnHelper.accessor('endpointPath', { 
+    header: t('admin.auditLogs.endpoint'),
+    cell: info => h('code', { class: 'text-[10px] bg-muted px-1 rounded truncate max-w-[150px] inline-block' }, info.getValue())
+  }),
   columnHelper.accessor('exception', {
     header: t('admin.auditLogs.status'),
     cell: info => {
       const val = info.getValue()
-      return h(Badge, { variant: val ? 'destructive' : 'default' }, () => val ? t('common.error') : t('common.success'))
+      return h('div', { class: 'flex items-center justify-center' }, [
+        val 
+          ? h(ShieldAlert, { class: 'size-4 text-destructive' }) 
+          : h(CheckCircle2, { class: 'size-4 text-green-500' })
+      ])
     },
-  }),
-  columnHelper.display({
-    id: 'actions',
-    header: '',
-    cell: info => h(Button, { size: 'sm', variant: 'outline', onClick: () => openDetail(info.row.original) }, () => t('admin.auditLogs.details')),
   }),
 ]
 
@@ -166,76 +200,103 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-4 p-4 md:p-6">
-    <PageHeader :title="t('admin.auditLogs.title')">
-      <template #actions>
-      <div class="flex gap-2">
-        <Button variant="outline" size="sm" @click="refetch()">{{ t('admin.auditLogs.refresh') }}</Button>
-        <Button variant="outline" size="sm" @click="exportCsv()">{{ t('admin.auditLogs.exportCsv') }}</Button>
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="space-y-1">
+        <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.auditLogs.title') }}</h2>
+        <p class="text-sm text-muted-foreground">Track all administrative actions and security events.</p>
       </div>
-      </template>
-    </PageHeader>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" size="sm" @click="refetch()" :disabled="isFetching">
+          <RotateCw class="mr-2 size-4" :class="{ 'animate-spin': isFetching }" />
+          {{ t('admin.auditLogs.refresh') }}
+        </Button>
+        <Button variant="outline" size="sm" @click="exportCsv()">
+          <Download class="mr-2 size-4" />
+          {{ t('admin.auditLogs.exportCsv') }}
+        </Button>
+      </div>
+    </div>
 
     <!-- Filters -->
-    <div class="flex flex-wrap gap-3">
-      <Input v-model="filterUserName" :placeholder="t('admin.auditLogs.filterUser')" class="max-w-xs" @keyup.enter="page = 1; refetch()" />
-      <Input v-model="filterAction" :placeholder="t('admin.auditLogs.filterAction')" class="max-w-xs" @keyup.enter="page = 1; refetch()" />
-      <Input v-model="filterEntityType" :placeholder="t('admin.auditLogs.filterEntity')" class="max-w-xs" @keyup.enter="page = 1; refetch()" />
-      <Button size="sm" @click="page = 1; refetch()">{{ t('common.search') }}</Button>
+    <div class="grid gap-4 p-4 rounded-xl border bg-muted/30 md:grid-cols-4 items-end">
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Username</label>
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input v-model="filterUserName" :placeholder="t('admin.auditLogs.filterUser')" class="pl-9 h-9" @keyup.enter="page = 1; refetch()" />
+        </div>
+      </div>
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Action</label>
+        <Input v-model="filterAction" :placeholder="t('admin.auditLogs.filterAction')" class="h-9" @keyup.enter="page = 1; refetch()" />
+      </div>
+      <div class="space-y-2">
+        <label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Entity Type</label>
+        <Input v-model="filterEntityType" :placeholder="t('admin.auditLogs.filterEntity')" class="h-9" @keyup.enter="page = 1; refetch()" />
+      </div>
+      <Button class="h-9" @click="page = 1; refetch()">{{ t('common.search') }}</Button>
     </div>
 
     <!-- Table -->
-    <ResponsiveTableShell dense min-width="1080px">
+    <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
             <TableHead
               v-for="header in headerGroup.headers"
               :key="header.id"
+              class="h-11 px-4 text-left align-middle font-medium text-muted-foreground"
               :class="header.column.getCanSort() ? 'cursor-pointer select-none' : ''"
               @click="header.column.getToggleSortingHandler()?.($event)"
             >
               <template v-if="!header.isPlaceholder">
-                {{ header.column.columnDef.header as string }}
-                <span v-if="header.column.getIsSorted() === 'asc'"> ↑</span>
-                <span v-else-if="header.column.getIsSorted() === 'desc'"> ↓</span>
+                <div class="flex items-center gap-2">
+                  <span>{{ header.column.columnDef.header as string }}</span>
+                  <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
+                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
+                </div>
               </template>
             </TableHead>
+            <TableHead class="w-[60px] text-right px-4"></TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          <template v-if="isLoading">
-            <TableRow>
-              <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">{{ t('admin.auditLogs.loading') }}</TableCell>
-            </TableRow>
-          </template>
-          <template v-else-if="logs.length === 0">
-            <TableRow>
-              <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">{{ t('admin.auditLogs.empty') }}</TableCell>
-            </TableRow>
-          </template>
-          <template v-else>
-            <TableRow
-              v-for="row in table.getRowModel().rows"
-              :key="row.id"
-              :class="row.original.exception ? 'bg-destructive/10' : ''"
-            >
-              <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
-                <component :is="() => cell.renderValue()" v-if="cell.column.id === 'exception' || cell.column.id === 'actions'" />
-                <template v-else>{{ cell.getValue() }}</template>
-              </TableCell>
-            </TableRow>
-          </template>
+        <TableBody v-auto-animate>
+          <TableRow v-if="isLoading">
+            <TableCell :colspan="columns.length + 1" class="h-24 text-center">
+              <Loader2 class="size-5 animate-spin mx-auto text-muted-foreground" />
+            </TableCell>
+          </TableRow>
+          <TableRow v-else-if="logs.length === 0">
+            <TableCell :colspan="columns.length + 1" class="h-24 text-center text-muted-foreground text-sm">
+              {{ t('admin.auditLogs.empty') }}
+            </TableCell>
+          </TableRow>
+          <TableRow
+            v-else
+            v-for="row in table.getRowModel().rows"
+            :key="row.id"
+            class="group hover:bg-muted/50 transition-colors"
+          >
+            <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
+              <component :is="() => cell.renderValue()" />
+            </TableCell>
+            <TableCell class="px-4 py-3 text-right">
+              <Button variant="ghost" size="icon" class="size-8 opacity-0 group-hover:opacity-100 transition-opacity" @click="openDetail(row.original)">
+                <Eye class="size-4" />
+              </Button>
+            </TableCell>
+          </TableRow>
         </TableBody>
       </Table>
-    </ResponsiveTableShell>
+    </div>
 
     <!-- Pagination -->
     <div class="flex items-center justify-between">
-      <span class="text-sm text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         {{ t('admin.auditLogs.pageTotal', { page, totalPages, total }) }}
-      </span>
-      <div class="flex gap-2">
+      </p>
+      <div class="flex items-center gap-2">
         <Button size="sm" variant="outline" :disabled="page <= 1" @click="page--; refetch()">{{ t('common.previous') }}</Button>
         <Button size="sm" variant="outline" :disabled="page >= totalPages" @click="page++; refetch()">{{ t('common.next') }}</Button>
       </div>
@@ -243,33 +304,75 @@ const table = useVueTable({
 
     <!-- Detail Dialog -->
     <Dialog v-model:open="detailDialog">
-      <DialogContent class="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{{ t('admin.auditLogs.detailDialogTitle') }}</DialogTitle>
+      <DialogContent class="sm:max-w-[700px] max-h-[85vh] flex flex-col p-0">
+        <DialogHeader class="p-6 pb-0">
+          <DialogTitle class="flex items-center gap-2 text-xl">
+            <FileJson class="size-5 text-primary" />
+            {{ t('admin.auditLogs.detailDialogTitle') }}
+          </DialogTitle>
+          <DialogDescription>Full structural breakdown of the audit event.</DialogDescription>
         </DialogHeader>
-        <div v-if="selectedLog" class="space-y-3 text-sm">
-          <div class="grid grid-cols-2 gap-2">
-            <div><span class="font-medium">{{ t('admin.auditLogs.timestamp') }}</span> {{ new Date(selectedLog.timestamp).toLocaleString() }}</div>
-            <div><span class="font-medium">{{ t('admin.auditLogs.user') }}</span> {{ selectedLog.userName ?? t('admin.auditLogs.anonymous') }}</div>
-            <div><span class="font-medium">{{ t('admin.auditLogs.action') }}</span> {{ selectedLog.action }}</div>
-            <div><span class="font-medium">{{ t('admin.auditLogs.method') }}</span> {{ selectedLog.httpMethod }}</div>
-            <div><span class="font-medium">{{ t('admin.auditLogs.endpoint') }}</span> {{ selectedLog.endpointPath }}</div>
-            <div><span class="font-medium">{{ t('admin.auditLogs.ip') }}</span> {{ selectedLog.ipAddress ?? '-' }}</div>
+        
+        <div v-if="selectedLog" class="flex-1 overflow-y-auto p-6 pt-4 space-y-6">
+          <!-- Metadata Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">User</span>
+              <p class="text-sm font-medium">{{ selectedLog.userName || 'Anonymous' }}</p>
+            </div>
+            <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">Action</span>
+              <Badge variant="outline" class="mt-0.5 font-mono">{{ selectedLog.action }}</Badge>
+            </div>
+            <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">IP Address</span>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <Globe class="size-3 text-muted-foreground" />
+                <p class="text-sm font-mono">{{ selectedLog.ipAddress || '-' }}</p>
+              </div>
+            </div>
           </div>
-          <div v-if="selectedLog.exception" class="p-2 bg-destructive/10 rounded text-destructive text-xs">
-            <span class="font-medium">{{ t('admin.auditLogs.error') }}</span> {{ selectedLog.exception }}
+
+          <!-- HTTP Detail -->
+          <div class="rounded-lg border overflow-hidden">
+            <div class="bg-muted/50 px-4 py-2 border-b flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider">Endpoint Details</span>
+              <Badge :variant="selectedLog.httpMethod === 'POST' || selectedLog.httpMethod === 'PUT' ? 'default' : 'secondary'">
+                {{ selectedLog.httpMethod }}
+              </Badge>
+            </div>
+            <div class="p-4 bg-muted/20">
+              <code class="text-xs break-all text-primary font-mono font-bold">{{ selectedLog.endpointPath }}</code>
+            </div>
           </div>
-          <div v-if="selectedLog.newValues">
-            <p class="font-medium mb-1">{{ t('admin.auditLogs.newValues') }}</p>
-            <pre class="bg-muted p-2 rounded text-xs overflow-auto max-h-40">{{ formatJson(selectedLog.newValues) }}</pre>
+
+          <!-- Exception if any -->
+          <div v-if="selectedLog.exception" class="p-4 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
+            <div class="flex items-center gap-2 text-destructive">
+              <ShieldAlert class="size-4" />
+              <span class="text-xs font-bold uppercase tracking-wider">Exception Logged</span>
+            </div>
+            <pre class="text-[10px] font-mono whitespace-pre-wrap break-all opacity-80">{{ selectedLog.exception }}</pre>
           </div>
-          <div v-if="selectedLog.oldValues">
-            <p class="font-medium mb-1">{{ t('admin.auditLogs.oldValues') }}</p>
-            <pre class="bg-muted p-2 rounded text-xs overflow-auto max-h-40">{{ formatJson(selectedLog.oldValues) }}</pre>
-          </div>
-          <div v-if="selectedLog.diff">
-            <p class="font-medium mb-1">{{ t('admin.auditLogs.diff') }}</p>
-            <pre class="bg-muted p-2 rounded text-xs overflow-auto max-h-40">{{ formatJson(selectedLog.diff) }}</pre>
+
+          <!-- JSON Payloads -->
+          <div class="space-y-4">
+            <div v-if="selectedLog.diff" class="space-y-2">
+              <div class="flex items-center justify-between px-1">
+                <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">Changes (Diff)</span>
+              </div>
+              <pre class="bg-zinc-950 text-emerald-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.diff) }}</pre>
+            </div>
+
+            <div v-if="selectedLog.newValues" class="space-y-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">New Values</span>
+              <pre class="bg-zinc-950 text-blue-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.newValues) }}</pre>
+            </div>
+
+            <div v-if="selectedLog.oldValues" class="space-y-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Old Values</span>
+              <pre class="bg-zinc-950 text-rose-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.oldValues) }}</pre>
+            </div>
           </div>
         </div>
       </DialogContent>

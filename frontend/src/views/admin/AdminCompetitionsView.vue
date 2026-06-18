@@ -15,10 +15,14 @@ import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import PageHeader from '@/components/layout/PageHeader.vue'
-import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -33,9 +37,30 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { useRouter } from 'vue-router'
+import { 
+  MoreHorizontal, 
+  Plus, 
+  Search, 
+  Edit, 
+  Users2, 
+  Trash2, 
+  ExternalLink,
+  Loader2
+} from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
+import { vAutoAnimate } from '@formkit/auto-animate/vue'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -58,7 +83,6 @@ const editDialog = ref(false)
 const deleteDialog = ref(false)
 const selectedComp = ref<CompetitionAdminDto | null>(null)
 const isCreating = ref(false)
-const actionError = ref('')
 
 const form = ref({
   title: '',
@@ -85,9 +109,11 @@ const saveMutation = useMutation({
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCompetitions })
     editDialog.value = false
-    actionError.value = ''
+    toast.success(isCreating.value ? t('admin.competitions.createSuccess') : t('admin.competitions.updateSuccess'))
   },
-  onError: () => { actionError.value = t('admin.competitions.saveError') },
+  onError: () => { 
+    toast.error(t('admin.competitions.saveError'))
+  },
 })
 
 const deleteMutation = useMutation({
@@ -97,14 +123,17 @@ const deleteMutation = useMutation({
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCompetitions })
     deleteDialog.value = false
+    toast.success(t('admin.competitions.deleteSuccess'))
   },
+  onError: () => {
+    toast.error(t('admin.competitions.deleteError'))
+  }
 })
 
 function openCreate() {
   isCreating.value = true
   selectedComp.value = null
   form.value = { title: '', description: '', gameModeType: 'Ctf', startTime: '', endTime: '', status: 'Draft' }
-  actionError.value = ''
   editDialog.value = true
 }
 
@@ -119,7 +148,6 @@ function openEdit(comp: CompetitionAdminDto) {
     endTime: comp.endTime ? comp.endTime.slice(0, 16) : '',
     status: comp.status,
   }
-  actionError.value = ''
   editDialog.value = true
 }
 
@@ -133,18 +161,27 @@ function goCollaborators(comp: CompetitionAdminDto) {
 }
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (status === 'running') return 'default'
-  if (status === 'published') return 'secondary'
-  if (status === 'finished') return 'outline'
-  if (status === 'draft') return 'outline'
+  const s = status.toLowerCase()
+  if (s === 'running' || s === 'active') return 'default'
+  if (s === 'published') return 'secondary'
+  if (s === 'finished' || s === 'ended') return 'outline'
+  if (s === 'draft') return 'outline'
   return 'secondary'
 }
 
 const columnHelper = createColumnHelper<CompetitionAdminDto>()
 
 const columns = [
-  columnHelper.accessor('title', { header: t('admin.competitions.titleColumn'), enableSorting: true }),
-  columnHelper.accessor('gameModeType', { header: t('admin.competitions.mode'), enableSorting: true }),
+  columnHelper.accessor('title', { 
+    header: t('admin.competitions.titleColumn'), 
+    enableSorting: true,
+    cell: (info) => info.getValue() 
+  }),
+  columnHelper.accessor('gameModeType', { 
+    header: t('admin.competitions.mode'), 
+    enableSorting: true,
+    cell: (info) => h(Badge, { variant: 'outline', class: 'font-mono' }, () => info.getValue())
+  }),
   columnHelper.accessor('status', {
     header: t('admin.competitions.status'),
     cell: (info) => h(Badge, { variant: statusVariant(info.getValue()) }, () => info.getValue()),
@@ -156,18 +193,6 @@ const columns = [
   columnHelper.accessor('endTime', {
     header: t('admin.competitions.end'),
     cell: (info) => new Date(info.getValue()).toLocaleDateString(),
-  }),
-  columnHelper.display({
-    id: 'actions',
-    header: t('common.actions'),
-    cell: (info) => {
-      const comp = info.row.original
-      return h('div', { class: 'flex gap-1 flex-wrap' }, [
-        h(Button, { size: 'sm', variant: 'outline', onClick: () => openEdit(comp) }, () => t('common.edit')),
-        h(Button, { size: 'sm', variant: 'outline', onClick: () => goCollaborators(comp) }, () => t('admin.competitions.collaborators')),
-        h(Button, { size: 'sm', variant: 'destructive', onClick: () => openDelete(comp) }, () => t('common.delete')),
-      ])
-    },
   }),
 ]
 
@@ -190,109 +215,194 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-4 p-4 md:p-6">
-    <PageHeader :title="t('admin.competitions.title')">
-      <template #actions>
-        <Button @click="openCreate">{{ t('admin.competitions.create') }}</Button>
-      </template>
-    </PageHeader>
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="space-y-1">
+        <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.competitions.title') }}</h2>
+        <p class="text-sm text-muted-foreground">{{ t('admin.competitions.subtitle', 'Manage and monitor all competitions.') }}</p>
+      </div>
+      <Button @click="openCreate" class="shrink-0">
+        <Plus class="mr-2 size-4" />
+        {{ t('admin.competitions.create') }}
+      </Button>
+    </div>
 
-    <Input v-model="globalFilter" :placeholder="t('admin.competitions.searchPlaceholder')" class="max-w-xs" />
+    <div class="flex items-center gap-2">
+      <div class="relative w-full max-w-sm">
+        <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input v-model="globalFilter" :placeholder="t('admin.competitions.searchPlaceholder')" class="pl-10" />
+      </div>
+    </div>
 
-    <ResponsiveTableShell dense>
+    <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
             <TableHead
               v-for="header in headerGroup.headers"
               :key="header.id"
+              class="h-11 px-4 text-left align-middle font-medium text-muted-foreground"
               :class="header.column.getCanSort() ? 'cursor-pointer select-none' : ''"
               @click="header.column.getToggleSortingHandler()?.($event)"
             >
               <template v-if="!header.isPlaceholder">
-                {{ header.column.columnDef.header as string }}
-                <span v-if="header.column.getIsSorted() === 'asc'"> ↑</span>
-                <span v-else-if="header.column.getIsSorted() === 'desc'"> ↓</span>
+                <div class="flex items-center gap-2">
+                  <span>{{ header.column.columnDef.header as string }}</span>
+                  <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
+                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
+                </div>
               </template>
             </TableHead>
+            <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody v-auto-animate>
           <TableRow v-if="isLoading">
-            <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">{{ t('admin.competitions.loading') }}</TableCell>
+            <TableCell :colspan="columns.length + 1" class="h-24 text-center">
+              <div class="flex items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 class="size-4 animate-spin" />
+                <span>{{ t('admin.competitions.loading') }}</span>
+              </div>
+            </TableCell>
           </TableRow>
           <TableRow v-else-if="table.getRowModel().rows.length === 0">
-            <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">{{ t('admin.competitions.empty') }}</TableCell>
+            <TableCell :colspan="columns.length + 1" class="h-24 text-center text-muted-foreground">
+              {{ t('admin.competitions.empty') }}
+            </TableCell>
           </TableRow>
-          <TableRow v-else v-for="row in table.getRowModel().rows" :key="row.id">
-            <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
-              <component :is="() => cell.renderValue()" v-if="['status', 'actions', 'startTime', 'endTime'].includes(cell.column.id)" />
-              <template v-else>{{ cell.getValue() }}</template>
+          <TableRow 
+            v-else 
+            v-for="row in table.getRowModel().rows" 
+            :key="row.id"
+            class="group transition-colors hover:bg-muted/50"
+          >
+            <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
+              <component :is="() => cell.renderValue()" />
+            </TableCell>
+            <TableCell class="px-4 py-3 text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="icon" class="size-8 h-8 w-8 p-0">
+                    <span class="sr-only">Open menu</span>
+                    <MoreHorizontal class="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="w-[160px]">
+                  <DropdownMenuLabel>{{ t('common.actions') }}</DropdownMenuLabel>
+                  <DropdownMenuItem @click="openEdit(row.original)">
+                    <Edit class="mr-2 size-4" />
+                    {{ t('common.edit') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @click="goCollaborators(row.original)">
+                    <Users2 class="mr-2 size-4" />
+                    {{ t('admin.competitions.collaborators') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem @click="router.push(`/competitions/${row.original.id}`)">
+                    <ExternalLink class="mr-2 size-4" />
+                    {{ t('admin.competitions.viewPublic') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem @click="openDelete(row.original)" class="text-destructive focus:text-destructive">
+                    <Trash2 class="mr-2 size-4" />
+                    {{ t('common.delete') }}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
-    </ResponsiveTableShell>
+    </div>
 
     <div class="flex items-center justify-between">
-      <span class="text-sm text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
-      </span>
-      <div class="flex gap-2">
-        <Button size="sm" variant="outline" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">{{ t('common.previous') }}</Button>
-        <Button size="sm" variant="outline" :disabled="!table.getCanNextPage()" @click="table.nextPage()">{{ t('common.next') }}</Button>
+      </p>
+      <div class="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="!table.getCanPreviousPage()"
+          @click="table.previousPage()"
+        >
+          {{ t('common.previous') }}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="!table.getCanNextPage()"
+          @click="table.nextPage()"
+        >
+          {{ t('common.next') }}
+        </Button>
       </div>
     </div>
 
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="editDialog">
-      <DialogContent class="max-w-lg">
+      <DialogContent class="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{{ isCreating ? t('admin.competitions.createDialogTitle') : t('admin.competitions.editDialogTitle') }}</DialogTitle>
+          <DialogDescription>
+            {{ isCreating ? 'Set up a new competition.' : 'Update existing competition details.' }}
+          </DialogDescription>
         </DialogHeader>
-        <div class="space-y-3 py-2">
-          <div>
-            <Label>{{ t('admin.competitions.titleColumn') }}</Label>
-            <Input v-model="form.title" :placeholder="t('admin.competitions.titleColumn')" class="mt-1" />
+        <div class="grid gap-4 py-4">
+          <div class="grid gap-2">
+            <Label for="title">{{ t('admin.competitions.titleColumn') }}</Label>
+            <Input id="title" v-model="form.title" :placeholder="t('admin.competitions.titleColumn')" />
           </div>
-          <div>
-            <Label>{{ t('admin.competitions.description') }}</Label>
-            <Input v-model="form.description" :placeholder="t('admin.competitions.description')" class="mt-1" />
+          <div class="grid gap-2">
+            <Label for="description">{{ t('admin.competitions.description') }}</Label>
+            <Input id="description" v-model="form.description" :placeholder="t('admin.competitions.description')" />
           </div>
-          <div>
-            <Label>{{ t('admin.competitions.gameMode') }}</Label>
-            <Select v-model="form.gameModeType" class="mt-1">
-              <option value="Ctf">{{ t('admin.competitions.modeCtf') }}</option>
-              <option value="Awd">{{ t('admin.competitions.modeAwd') }}</option>
-              <option value="Awdp">{{ t('admin.competitions.modeAwdp') }}</option>
-              <option value="Koh">{{ t('admin.competitions.modeKoh') }}</option>
-            </Select>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitions.gameMode') }}</Label>
+              <Select v-model="form.gameModeType">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Ctf">{{ t('admin.competitions.modeCtf') }}</SelectItem>
+                  <SelectItem value="Awd">{{ t('admin.competitions.modeAwd') }}</SelectItem>
+                  <SelectItem value="Awdp">{{ t('admin.competitions.modeAwdp') }}</SelectItem>
+                  <SelectItem value="Koh">{{ t('admin.competitions.modeKoh') }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitions.status') }}</Label>
+              <Select v-model="form.status">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Draft">{{ t('competitions.status.draft') }}</SelectItem>
+                  <SelectItem value="Published">{{ t('competitions.status.published') }}</SelectItem>
+                  <SelectItem value="Running">{{ t('competitions.status.running') }}</SelectItem>
+                  <SelectItem value="Paused">{{ t('competitions.status.paused') }}</SelectItem>
+                  <SelectItem value="Finished">{{ t('competitions.status.finished') }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div>
-            <Label>{{ t('admin.competitions.status') }}</Label>
-            <Select v-model="form.status" class="mt-1">
-              <option value="Draft">{{ t('competitions.status.draft') }}</option>
-              <option value="Published">{{ t('competitions.status.published') }}</option>
-              <option value="Running">{{ t('competitions.status.running') }}</option>
-              <option value="Paused">{{ t('competitions.status.paused') }}</option>
-              <option value="Finished">{{ t('competitions.status.finished') }}</option>
-            </Select>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="grid gap-2">
               <Label>{{ t('admin.competitions.startTime') }}</Label>
-              <Input v-model="form.startTime" type="datetime-local" class="mt-1" />
+              <Input v-model="form.startTime" type="datetime-local" />
             </div>
-            <div>
+            <div class="grid gap-2">
               <Label>{{ t('admin.competitions.endTime') }}</Label>
-              <Input v-model="form.endTime" type="datetime-local" class="mt-1" />
+              <Input v-model="form.endTime" type="datetime-local" />
             </div>
           </div>
-          <p v-if="actionError" class="text-sm text-destructive">{{ actionError }}</p>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="editDialog = false">{{ t('common.cancel') }}</Button>
+          <Button variant="outline" @click="editDialog = false" :disabled="saveMutation.isPending.value">{{ t('common.cancel') }}</Button>
           <Button :disabled="saveMutation.isPending.value || !form.title" @click="saveMutation.mutate()">
+            <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ isCreating ? t('common.create') : t('common.save') }}
           </Button>
         </DialogFooter>
@@ -304,8 +414,13 @@ const table = useVueTable({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ t('admin.competitions.deleteDialogTitle') }}</DialogTitle>
+          <DialogDescription>
+            This action cannot be undone. This will permanently delete the competition and all associated data.
+          </DialogDescription>
         </DialogHeader>
-        <p class="text-sm py-2" v-html="t('admin.competitions.deleteConfirm', { title: selectedComp?.title })"></p>
+        <div class="py-4">
+          <p class="text-sm font-medium">Are you sure you want to delete <span class="font-bold text-foreground">"{{ selectedComp?.title }}"</span>?</p>
+        </div>
         <DialogFooter>
           <Button variant="outline" @click="deleteDialog = false">{{ t('common.cancel') }}</Button>
           <Button
@@ -313,6 +428,7 @@ const table = useVueTable({
             :disabled="deleteMutation.isPending.value"
             @click="deleteMutation.mutate(selectedComp!.id)"
           >
+            <Loader2 v-if="deleteMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ t('common.delete') }}
           </Button>
         </DialogFooter>

@@ -6,7 +6,6 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { useAuthStore } from '@/stores/auth'
-import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import RoundTimer from '@/components/game/RoundTimer.vue'
 import ServiceStatusGrid from '@/components/game/ServiceStatusGrid.vue'
@@ -18,12 +17,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Select } from '@/components/ui/select'
+import { 
+  Select, 
+  SelectContent, 
+  SelectGroup, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select'
+import { toast } from 'vue-sonner'
+import { Loader2, Upload, CheckCircle2 } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const qc = useQueryClient()
 
-// Props: optional gameModeType to show Defense Phase badge
 const props = withDefaults(defineProps<{ gameModeType?: string }>(), { gameModeType: 'Awd' })
 const isAwdp = computed(() => props.gameModeType?.toLowerCase() === 'awdp')
 
@@ -90,17 +97,12 @@ const { data: patchSubmissions } = useQuery({
   refetchInterval: computed(() => isAwdp.value ? 10_000 : false),
 })
 
-// ── Derived state ───────────────────────────────────────────────────────────
-
 const round = computed(() => dashboard.value?.currentRound ?? 0)
 const remainingSeconds = computed(() => dashboard.value?.remainingSeconds ?? 0)
 const totalSeconds = computed(() => dashboard.value?.roundDurationSeconds ?? 300)
 const services = computed<ServiceStatus[]>(() => dashboard.value?.services ?? [])
 
-// ── Attack log (real-time via SignalR) ──────────────────────────────────────
-
 const attackLogs = ref<AttackLogDto[]>([])
-
 const signalR = useSignalR({
   hubUrl: '/hubs/game',
   accessToken: () => auth.accessToken,
@@ -111,10 +113,9 @@ signalR.onRoundStarted((_roundNumber) => {
 })
 
 signalR.onAttackLog((log) => {
-  attackLogs.value.push(log)
-  // Keep last 100 entries
+  attackLogs.value.unshift(log)
   if (attackLogs.value.length > 100) {
-    attackLogs.value.splice(0, attackLogs.value.length - 100)
+    attackLogs.value.splice(100)
   }
 })
 
@@ -126,15 +127,10 @@ onUnmounted(() => {
   signalR.stop()
 })
 
-// ── Patch submission ────────────────────────────────────────────────────────
-
 const patchChallenge = ref('')
 const patchFile = ref<File | null>(null)
-const patchStatus = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
-const patchMessage = ref('')
-const patchSubmissionId = ref('')
+const patchLoading = ref(false)
 const isDragOver = ref(false)
-
 const patchStatuses = computed(() => patchSubmissions.value ?? [])
 
 function onPatchFileChange(e: Event) {
@@ -142,53 +138,35 @@ function onPatchFileChange(e: Event) {
   patchFile.value = input.files?.[0] ?? null
 }
 
-function onDragOver(e: DragEvent) {
-  e.preventDefault()
-  isDragOver.value = true
-}
-
-function onDragLeave() {
-  isDragOver.value = false
-}
-
-function onDrop(e: DragEvent) {
-  e.preventDefault()
-  isDragOver.value = false
-  const file = e.dataTransfer?.files?.[0]
-  if (file) patchFile.value = file
-}
-
 async function submitPatch() {
   if (!patchFile.value || !patchChallenge.value) return
-  patchStatus.value = 'loading'
-  patchMessage.value = ''
-  patchSubmissionId.value = ''
+  patchLoading.value = true
   try {
     const data = await competitionApi.submitPatch<{ submissionId?: string }>(
       competitionId.value,
       patchChallenge.value,
       patchFile.value,
     )
-      patchStatus.value = 'success'
-      patchSubmissionId.value = data?.submissionId ?? ''
-      patchMessage.value = t('awd.patchSubmitted')
-      qc.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId.value) })
+    toast.success(t('awd.patchSubmitted'), {
+      description: data?.submissionId ? `Submission ID: ${data.submissionId}` : undefined
+    })
+    qc.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId.value) })
+    patchFile.value = null
   } catch {
-    patchStatus.value = 'error'
-    patchMessage.value = t('awd.patchUploadFailed')
+    toast.error(t('awd.patchUploadFailed'))
+  } finally {
+    patchLoading.value = false
   }
 }
 
 const selectedVictim = ref('')
 const selectedChallenge = ref('')
 const flagInput = ref('')
-const submitStatus = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
-const submitMessage = ref('')
+const flagLoading = ref(false)
 
 async function submitFlag() {
   if (!flagInput.value.trim() || !selectedChallenge.value) return
-  submitStatus.value = 'loading'
-  submitMessage.value = ''
+  flagLoading.value = true
   try {
     const data = await competitionApi.submitFlag<{ correct?: boolean; message?: string }>(
       competitionId.value,
@@ -196,144 +174,167 @@ async function submitFlag() {
       flagInput.value.trim(),
     )
     if (data?.correct) {
-      submitStatus.value = 'success'
-      submitMessage.value = t('challenges.correctFlag')
+      toast.success(t('challenges.correctFlag'))
       flagInput.value = ''
     } else {
-      submitStatus.value = 'error'
-      submitMessage.value = data?.message ?? t('challenges.incorrectFlag')
+      toast.error(data?.message ?? t('challenges.incorrectFlag'))
     }
   } catch {
-    submitStatus.value = 'error'
-    submitMessage.value = t('challenges.submissionFailed')
+    toast.error(t('challenges.submissionFailed'))
+  } finally {
+    flagLoading.value = false
   }
 }
 </script>
 
 <template>
-  <AppLayout>
-    <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4">
-      <PageHeader
-        title="AWD"
-        :back-to="`/competitions/${competitionId}`"
-        :back-label="t('nav.back')"
-      >
-        <template #actions>
-          <Badge v-if="isAwdp" variant="secondary" class="text-xs">{{ t('awd.defensePhase') }}</Badge>
-          <Badge variant="outline" class="font-mono text-xs">AWD</Badge>
-        </template>
-      </PageHeader>
+  <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-6">
+    <PageHeader
+      title="AWD Dashboard"
+      :description="isAwdp ? 'Attack with Defense and Patch' : 'Attack with Defense'"
+    >
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <Badge v-if="isAwdp" variant="secondary" class="animate-pulse bg-blue-500/10 text-blue-500 border-blue-500/20">
+            {{ t('awd.defensePhase') }}
+          </Badge>
+          <Badge variant="outline" class="font-mono text-xs uppercase tracking-widest bg-muted/30">
+            Mode: {{ props.gameModeType }}
+          </Badge>
+        </div>
+      </template>
+    </PageHeader>
 
-      <div class="rounded-md border bg-card px-4 py-3">
-        <RoundTimer
-          :round="round"
-          :remaining-seconds="remainingSeconds"
-          :total-seconds="totalSeconds"
-        />
-      </div>
+    <div class="rounded-xl border bg-card/50 backdrop-blur-sm p-4 shadow-sm">
+      <RoundTimer
+        :round="round"
+        :remaining-seconds="remainingSeconds"
+        :total-seconds="totalSeconds"
+      />
+    </div>
 
-      <!-- Main grid -->
-      <div class="grid w-full grid-cols-12 gap-4">
+    <!-- Main grid -->
+    <div class="grid w-full grid-cols-12 gap-6">
       <!-- Left: Service Status -->
-      <div class="col-span-12 lg:col-span-3">
+      <div class="col-span-12 lg:col-span-3 space-y-4">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground px-1">
+          {{ t('awd.serviceStatus') }}
+        </h2>
         <ServiceStatusGrid :services="services" />
       </div>
 
-      <!-- Center: Flag Submission -->
-      <div class="col-span-12 lg:col-span-6">
-        <Card>
+      <!-- Center: Controls -->
+      <div class="col-span-12 lg:col-span-6 space-y-6">
+        <!-- Submit Flag -->
+        <Card class="shadow-md border-primary/10">
           <CardHeader>
-            <CardTitle>{{ t('awd.submitFlag') }}</CardTitle>
+            <CardTitle class="flex items-center gap-2">
+              <CheckCircle2 class="size-5 text-primary" />
+              {{ t('awd.submitFlag') }}
+            </CardTitle>
           </CardHeader>
-          <CardContent class="space-y-3">
-            <!-- Victim team select -->
-            <div class="space-y-1">
-              <label class="text-sm font-medium text-foreground">{{ t('awd.victimTeam') }}</label>
-              <Select
-                v-model="selectedVictim"
-              >
-                <option value="">{{ t('awd.selectTeam') }}</option>
-                <option v-for="team in teams" :key="team.id" :value="team.id">
-                  {{ team.name }}
-                </option>
-              </Select>
+          <CardContent class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <label class="text-xs font-bold uppercase text-muted-foreground">{{ t('awd.victimTeam') }}</label>
+                <Select v-model="selectedVictim">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="t('awd.selectTeam')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem v-for="team in teams" :key="team.id" :value="team.id">
+                        {{ team.name }}
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-xs font-bold uppercase text-muted-foreground">{{ t('common.challenge') }}</label>
+                <Select v-model="selectedChallenge">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="t('awd.selectChallenge')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem v-for="ch in challenges" :key="ch.id" :value="ch.id">
+                        {{ ch.title }}
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <!-- Challenge select -->
-            <div class="space-y-1">
-              <label class="text-sm font-medium text-foreground">{{ t('common.challenge') }}</label>
-              <Select
-                v-model="selectedChallenge"
-              >
-                <option value="">{{ t('awd.selectChallenge') }}</option>
-                <option v-for="ch in challenges" :key="ch.id" :value="ch.id">
-                  {{ ch.title }}
-                </option>
-              </Select>
+            <div class="space-y-2">
+              <label class="text-xs font-bold uppercase text-muted-foreground">{{ t('awd.flag') }}</label>
+              <div class="flex gap-2">
+                <Input
+                  v-model="flagInput"
+                  :placeholder="t('challenges.flagPlaceholder')"
+                  class="font-mono"
+                  @keydown.enter="submitFlag"
+                  :disabled="flagLoading"
+                />
+                <Button
+                  :disabled="flagLoading || !flagInput.trim() || !selectedChallenge"
+                  @click="submitFlag"
+                  class="shrink-0"
+                >
+                  <Loader2 v-if="flagLoading" class="mr-2 size-4 animate-spin" />
+                  {{ t('awd.submitFlag') }}
+                </Button>
+              </div>
             </div>
-
-            <!-- Flag input -->
-            <div class="space-y-1">
-              <label class="text-sm font-medium text-foreground">{{ t('awd.flag') }}</label>
-              <Input
-                v-model="flagInput"
-                :placeholder="t('challenges.flagPlaceholder')"
-                class="font-mono"
-                @keydown.enter="submitFlag"
-              />
-            </div>
-
-            <Button
-              class="w-full"
-              :disabled="submitStatus === 'loading' || !flagInput.trim()"
-              @click="submitFlag"
-            >
-              {{ submitStatus === 'loading' ? t('common.submitting') : t('awd.submitFlag') }}
-            </Button>
-
-            <!-- Status message -->
-            <p
-              v-if="submitMessage"
-              class="text-sm text-center"
-              :class="submitStatus === 'success' ? 'text-green-500' : 'text-red-500'"
-            >
-              {{ submitMessage }}
-            </p>
           </CardContent>
         </Card>
 
         <!-- Upload Patch (AWDP) -->
-        <Card v-if="isAwdp" class="mt-4">
-          <CardHeader>
-            <CardTitle>{{ t('awd.uploadPatch') }}</CardTitle>
-          </CardHeader>
-          <CardContent class="space-y-3">
-            <!-- Challenge select -->
-            <div class="space-y-1">
-              <label class="text-sm font-medium text-foreground">{{ t('common.challenge') }}</label>
-              <Select
-                v-model="patchChallenge"
-              >
-                <option value="">{{ t('awd.selectChallenge') }}</option>
-                <option v-for="ch in challenges" :key="ch.id" :value="ch.id">
-                  {{ ch.title }}
-                </option>
-              </Select>
-            </div>
+        <transition name="slide-up">
+          <Card v-if="isAwdp" class="shadow-md border-blue-500/10">
+            <CardHeader>
+              <CardTitle class="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                <Upload class="size-5" />
+                {{ t('awd.uploadPatch') }}
+              </CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <div class="space-y-2">
+                <label class="text-xs font-bold uppercase text-muted-foreground">{{ t('common.challenge') }}</label>
+                <Select v-model="patchChallenge">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="t('awd.selectChallenge')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem v-for="ch in challenges" :key="ch.id" :value="ch.id">
+                        {{ ch.title }}
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <!-- Drag-and-drop file area -->
-            <div class="space-y-1">
-              <label class="text-sm font-medium text-foreground">{{ t('awd.patchArchive') }}</label>
               <div
-                class="relative flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-6 text-sm transition-colors cursor-pointer"
-                :class="isDragOver ? 'border-primary bg-primary/5 text-primary' : 'border-input text-muted-foreground hover:border-primary/50'"
-                @dragover="onDragOver"
-                @dragleave="onDragLeave"
-                @drop="onDrop"
+                class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 transition-all hover:bg-muted/50"
+                :class="[
+                  isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/20',
+                  patchFile ? 'bg-muted/30' : ''
+                ]"
+                @dragover.prevent="isDragOver = true"
+                @dragleave.prevent="isDragOver = false"
+                @drop.prevent="isDragOver = false; patchFile = $event.dataTransfer?.files[0] || null"
                 @click="($refs.patchFileInput as HTMLInputElement)?.click()"
               >
-                <span v-if="patchFile" class="font-medium text-foreground truncate max-w-full">{{ patchFile.name }}</span>
-                <span v-else>{{ t('awd.dropFile') }}</span>
+                <div class="flex size-10 items-center justify-center rounded-full bg-background shadow-sm border group-hover:scale-110 transition-transform">
+                  <Upload class="size-5 text-muted-foreground" />
+                </div>
+                <div class="text-center">
+                  <p class="text-sm font-medium">{{ patchFile ? patchFile.name : t('awd.dropFile') }}</p>
+                  <p class="text-xs text-muted-foreground mt-1">.tar.gz or .tgz max 10MB</p>
+                </div>
                 <input
                   ref="patchFileInput"
                   type="file"
@@ -342,66 +343,69 @@ async function submitFlag() {
                   @change="onPatchFileChange"
                 />
               </div>
-            </div>
 
-            <Button
-              class="w-full"
-              variant="outline"
-              :disabled="patchStatus === 'loading' || !patchFile || !patchChallenge"
-              @click="submitPatch"
-            >
-              {{ patchStatus === 'loading' ? t('common.uploading') : t('awd.submitPatch') }}
-            </Button>
-
-            <!-- Status message -->
-            <p
-              v-if="patchMessage"
-              class="text-sm text-center"
-              :class="patchStatus === 'success' ? 'text-green-500' : 'text-red-500'"
-            >
-              {{ patchMessage }}
-            </p>
-            <p v-if="patchSubmissionId" class="text-xs text-muted-foreground text-center font-mono">
-              ID: {{ patchSubmissionId }}
-            </p>
-          </CardContent>
-        </Card>
+              <Button
+                variant="secondary"
+                class="w-full bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+                :disabled="patchLoading || !patchFile || !patchChallenge"
+                @click="submitPatch"
+              >
+                <Loader2 v-if="patchLoading" class="mr-2 size-4 animate-spin" />
+                {{ t('awd.submitPatch') }}
+              </Button>
+            </CardContent>
+          </Card>
+        </transition>
 
         <!-- Patch Status List (AWDP) -->
-        <Card v-if="patchStatuses.length > 0" class="mt-4">
-          <CardHeader>
-            <CardTitle class="text-sm">{{ t('awd.patchStatus') }}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul class="space-y-2">
-              <li
-                v-for="ps in patchStatuses"
-                :key="ps.challengeId"
-                class="flex items-center justify-between gap-2 text-sm"
-              >
-                <span class="truncate font-medium">{{ ps.challengeName ?? ps.challengeTitle ?? ps.challengeId }}</span>
-                <Badge
-                  :class="[
-                    ps.status === 'Verified' ? 'bg-green-500/15 text-green-600 border-green-500/30' :
-                    ['Rejected', 'Failed'].includes(ps.status) ? 'bg-red-500/15 text-red-600 border-red-500/30' :
-                    'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
-                  ]"
-                  variant="outline"
-                  class="shrink-0 text-xs font-mono"
+        <transition name="fade">
+          <Card v-if="isAwdp && patchStatuses.length > 0" class="shadow-sm">
+            <CardHeader class="pb-2">
+              <CardTitle class="text-sm font-bold uppercase text-muted-foreground">{{ t('awd.patchStatus') }}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div class="divide-y">
+                <div
+                  v-for="ps in patchStatuses"
+                  :key="ps.challengeId"
+                  class="flex items-center justify-between py-2.5 first:pt-0 last:pb-0"
                 >
-                  {{ ps.status }}
-                </Badge>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
+                  <span class="text-sm font-medium">{{ ps.challengeName ?? ps.challengeTitle ?? ps.challengeId }}</span>
+                  <Badge
+                    :variant="ps.status === 'Verified' ? 'default' : ps.status === 'Rejected' || ps.status === 'Failed' ? 'destructive' : 'secondary'"
+                    class="text-[10px] uppercase font-bold tracking-tighter h-5"
+                  >
+                    {{ ps.status }}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </transition>
       </div>
 
       <!-- Right: Attack Log -->
-      <div class="col-span-12 lg:col-span-3">
+      <div class="col-span-12 lg:col-span-3 space-y-4">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground px-1">
+          {{ t('awd.realtimeActivity') }}
+        </h2>
         <AttackLogFeed :logs="attackLogs" />
       </div>
-      </div>
     </div>
-  </AppLayout>
+  </div>
 </template>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.slide-up-enter-active, .slide-up-leave-active { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.slide-up-enter-from { opacity: 0; transform: translateY(20px); }
+.slide-up-leave-to { opacity: 0; transform: translateY(-20px); }
+
+/* Custom scrollbar for better UX in logs if applicable */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+</style>

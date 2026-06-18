@@ -15,10 +15,14 @@ import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import PageHeader from '@/components/layout/PageHeader.vue'
-import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
 import {
   Table,
   TableBody,
@@ -33,8 +37,28 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
+import { 
+  Search, 
+  MoreHorizontal, 
+  UserCog, 
+  KeyRound, 
+  ShieldAlert, 
+  User as UserIcon,
+  Loader2,
+  Lock
+} from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
+import { vAutoAnimate } from '@formkit/auto-animate/vue'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -55,7 +79,6 @@ const passwordDialog = ref(false)
 const selectedUser = ref<UserDto | null>(null)
 const newRole = ref('user')
 const newPassword = ref('')
-const actionError = ref('')
 
 const { data: users, isLoading } = useQuery({
   queryKey: queryKeys.adminUsers,
@@ -69,9 +92,9 @@ const changeRoleMutation = useMutation({
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminUsers })
     roleDialog.value = false
-    actionError.value = ''
+    toast.success(t('admin.users.roleUpdateSuccess', 'User role updated.'))
   },
-  onError: () => { actionError.value = t('admin.users.actionErrorRole') },
+  onError: () => { toast.error(t('admin.users.actionErrorRole')) },
 })
 
 const resetPasswordMutation = useMutation({
@@ -81,50 +104,48 @@ const resetPasswordMutation = useMutation({
   onSuccess: () => {
     passwordDialog.value = false
     newPassword.value = ''
-    actionError.value = ''
+    toast.success(t('admin.users.passwordResetSuccess', 'Password reset successfully.'))
   },
-  onError: () => { actionError.value = t('admin.users.actionErrorPassword') },
+  onError: () => { toast.error(t('admin.users.actionErrorPassword')) },
 })
 
 function openRoleDialog(user: UserDto) {
   selectedUser.value = user
-  newRole.value = user.role
-  actionError.value = ''
+  newRole.value = user.role.toLowerCase()
   roleDialog.value = true
 }
 
 function openPasswordDialog(user: UserDto) {
   selectedUser.value = user
   newPassword.value = ''
-  actionError.value = ''
   passwordDialog.value = true
 }
 
 function roleVariant(role: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (role === 'admin') return 'destructive'
-  if (role === 'organizer') return 'default'
+  const r = role.toLowerCase()
+  if (r === 'admin') return 'destructive'
+  if (r === 'organizer') return 'default'
   return 'secondary'
 }
 
 const columnHelper = createColumnHelper<UserDto>()
 
 const columns = [
-  columnHelper.accessor('userName', { header: t('admin.users.username'), enableSorting: true }),
-  columnHelper.accessor('email', { header: t('admin.users.email'), enableSorting: true }),
+  columnHelper.accessor('userName', { 
+    header: t('admin.users.username'), 
+    enableSorting: true,
+    cell: (info) => h('div', { class: 'flex items-center gap-2' }, [
+      h(UserIcon, { class: 'size-3.5 text-muted-foreground' }),
+      h('span', { class: 'font-medium' }, info.getValue())
+    ])
+  }),
+  columnHelper.accessor('email', { 
+    header: t('admin.users.email'), 
+    enableSorting: true 
+  }),
   columnHelper.accessor('role', {
     header: t('admin.users.role'),
     cell: (info) => h(Badge, { variant: roleVariant(info.getValue()) }, () => info.getValue()),
-  }),
-  columnHelper.display({
-    id: 'actions',
-    header: t('common.actions'),
-    cell: (info) => {
-      const user = info.row.original
-      return h('div', { class: 'flex gap-2' }, [
-        h(Button, { size: 'sm', variant: 'outline', onClick: () => openRoleDialog(user) }, () => t('admin.users.changeRole')),
-        h(Button, { size: 'sm', variant: 'outline', onClick: () => openPasswordDialog(user) }, () => t('admin.users.resetPassword')),
-      ])
-    },
   }),
 ]
 
@@ -147,76 +168,105 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-4 p-4 md:p-6">
-    <PageHeader :title="t('admin.users.title')">
-      <template #actions>
-        <Badge variant="destructive">{{ t('admin.users.adminOnly') }}</Badge>
-      </template>
-    </PageHeader>
-
-    <div class="flex items-center gap-3">
-      <Input
-        v-model="globalFilter"
-        :placeholder="t('admin.users.searchPlaceholder')"
-        class="max-w-xs"
-      />
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.users.title') }}</h2>
+          <Badge variant="destructive" class="text-[10px] uppercase font-black tracking-widest px-1.5 h-4">
+            {{ t('admin.users.adminOnly') }}
+          </Badge>
+        </div>
+        <p class="text-sm text-muted-foreground">Manage user accounts and global permissions.</p>
+      </div>
     </div>
 
-    <ResponsiveTableShell dense>
+    <div class="flex items-center gap-2">
+      <div class="relative w-full max-w-sm">
+        <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input v-model="globalFilter" :placeholder="t('admin.users.searchPlaceholder')" class="pl-10" />
+      </div>
+    </div>
+
+    <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
             <TableHead
               v-for="header in headerGroup.headers"
               :key="header.id"
+              class="h-11 px-4 text-left align-middle font-medium text-muted-foreground"
               :class="header.column.getCanSort() ? 'cursor-pointer select-none' : ''"
               @click="header.column.getToggleSortingHandler()?.($event)"
             >
               <template v-if="!header.isPlaceholder">
-                {{ header.column.columnDef.header as string }}
-                <span v-if="header.column.getIsSorted() === 'asc'"> ↑</span>
-                <span v-else-if="header.column.getIsSorted() === 'desc'"> ↓</span>
+                <div class="flex items-center gap-2">
+                  <span>{{ header.column.columnDef.header as string }}</span>
+                  <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
+                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
+                </div>
               </template>
             </TableHead>
+            <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          <template v-if="isLoading">
-            <TableRow>
-              <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">
-                {{ t('admin.users.loading') }}
-              </TableCell>
-            </TableRow>
-          </template>
-          <template v-else-if="table.getRowModel().rows.length === 0">
-            <TableRow>
-              <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">
-                {{ t('admin.users.empty') }}
-              </TableCell>
-            </TableRow>
-          </template>
-          <template v-else>
-            <TableRow v-for="row in table.getRowModel().rows" :key="row.id">
-              <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
-                <component :is="() => cell.renderValue()" v-if="cell.column.id === 'role' || cell.column.id === 'actions'" />
-                <template v-else>{{ cell.getValue() }}</template>
-              </TableCell>
-            </TableRow>
-          </template>
+        <TableBody v-auto-animate>
+          <TableRow v-if="isLoading">
+            <TableCell :colspan="columns.length + 1" class="h-24 text-center">
+              <div class="flex items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 class="size-4 animate-spin" />
+                <span>{{ t('admin.users.loading') }}</span>
+              </div>
+            </TableCell>
+          </TableRow>
+          <TableRow v-else-if="table.getRowModel().rows.length === 0">
+            <TableCell :colspan="columns.length + 1" class="h-24 text-center text-muted-foreground">
+              {{ t('admin.users.empty') }}
+            </TableCell>
+          </TableRow>
+          <TableRow 
+            v-else 
+            v-for="row in table.getRowModel().rows" 
+            :key="row.id"
+            class="group transition-colors hover:bg-muted/50"
+          >
+            <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
+              <component :is="() => cell.renderValue()" />
+            </TableCell>
+            <TableCell class="px-4 py-3 text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="icon" class="size-8 p-0">
+                    <MoreHorizontal class="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="w-[180px]">
+                  <DropdownMenuLabel>{{ t('common.actions') }}</DropdownMenuLabel>
+                  <DropdownMenuItem @click="openRoleDialog(row.original)">
+                    <UserCog class="mr-2 size-4" />
+                    {{ t('admin.users.changeRole') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @click="openPasswordDialog(row.original)">
+                    <KeyRound class="mr-2 size-4" />
+                    {{ t('admin.users.resetPassword') }}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TableCell>
+          </TableRow>
         </TableBody>
       </Table>
-    </ResponsiveTableShell>
+    </div>
 
-    <!-- Pagination -->
     <div class="flex items-center justify-between">
-      <span class="text-sm text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
-      </span>
-      <div class="flex gap-2">
-        <Button size="sm" variant="outline" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
+      </p>
+      <div class="flex items-center space-x-2">
+        <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
           {{ t('common.previous') }}
         </Button>
-        <Button size="sm" variant="outline" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
+        <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
           {{ t('common.next') }}
         </Button>
       </div>
@@ -224,18 +274,32 @@ const table = useVueTable({
 
     <!-- Change Role Dialog -->
     <Dialog v-model:open="roleDialog">
-      <DialogContent>
+      <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>{{ t('admin.users.dialogChangeRole', { name: selectedUser?.userName }) }}</DialogTitle>
+          <DialogDescription>Update the system permissions for this user.</DialogDescription>
         </DialogHeader>
-        <div class="space-y-3 py-2">
-          <Label>{{ t('admin.users.newRole') }}</Label>
-          <Select v-model="newRole">
-            <option value="user">{{ t('admin.users.roleUser') }}</option>
-            <option value="organizer">{{ t('admin.users.roleOrganizer') }}</option>
-            <option value="admin">{{ t('admin.users.roleAdmin') }}</option>
-          </Select>
-          <p v-if="actionError" class="text-sm text-destructive">{{ actionError }}</p>
+        <div class="py-4 space-y-4">
+          <div class="space-y-2">
+            <Label>{{ t('admin.users.newRole') }}</Label>
+            <Select v-model="newRole">
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">{{ t('admin.users.roleUser') }}</SelectItem>
+                <SelectItem value="organizer">{{ t('admin.users.roleOrganizer') }}</SelectItem>
+                <SelectItem value="admin">{{ t('admin.users.roleAdmin') }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div v-if="newRole === 'admin'" class="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex gap-3">
+            <ShieldAlert class="size-5 text-destructive shrink-0" />
+            <p class="text-xs text-destructive font-medium leading-tight">
+              Giving administrative access provides full control over all competitions and system settings.
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" @click="roleDialog = false">{{ t('common.cancel') }}</Button>
@@ -243,6 +307,7 @@ const table = useVueTable({
             :disabled="changeRoleMutation.isPending.value"
             @click="changeRoleMutation.mutate({ id: selectedUser!.id, role: newRole })"
           >
+            <Loader2 v-if="changeRoleMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ t('common.save') }}
           </Button>
         </DialogFooter>
@@ -251,21 +316,32 @@ const table = useVueTable({
 
     <!-- Reset Password Dialog -->
     <Dialog v-model:open="passwordDialog">
-      <DialogContent>
+      <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>{{ t('admin.users.dialogResetPassword', { name: selectedUser?.userName }) }}</DialogTitle>
+          <DialogDescription>Set a new temporary password for the user.</DialogDescription>
         </DialogHeader>
-        <div class="space-y-3 py-2">
-          <Label>{{ t('admin.users.newPassword') }}</Label>
-          <Input v-model="newPassword" type="password" :placeholder="t('admin.users.newPassword')" />
-          <p v-if="actionError" class="text-sm text-destructive">{{ actionError }}</p>
+        <div class="py-4 space-y-4">
+          <div class="space-y-2">
+            <Label>{{ t('admin.users.newPassword') }}</Label>
+            <div class="relative">
+              <Lock class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input 
+                v-model="newPassword" 
+                type="password" 
+                class="pl-10"
+                placeholder="Minimum 8 characters" 
+              />
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" @click="passwordDialog = false">{{ t('common.cancel') }}</Button>
           <Button
-            :disabled="resetPasswordMutation.isPending.value || !newPassword"
+            :disabled="resetPasswordMutation.isPending.value || !newPassword || newPassword.length < 8"
             @click="resetPasswordMutation.mutate({ id: selectedUser!.id, password: newPassword })"
           >
+            <Loader2 v-if="resetPasswordMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ t('common.reset') }}
           </Button>
         </DialogFooter>

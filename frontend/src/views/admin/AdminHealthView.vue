@@ -1,12 +1,24 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/noctf'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import PageHeader from '@/components/layout/PageHeader.vue'
-import StatTile from '@/components/layout/StatTile.vue'
-import DataState from '@/components/state/DataState.vue'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { 
+  HeartPulse, 
+  Activity, 
+  Database, 
+  Zap, 
+  Server, 
+  AlertTriangle, 
+  CheckCircle2, 
+  RotateCw,
+  Clock
+} from 'lucide-vue-next'
+import { vAutoAnimate } from '@formkit/auto-animate/vue'
+import { toast } from 'vue-sonner'
 
 const { t } = useI18n()
 
@@ -26,21 +38,22 @@ const loading = ref(false)
 const lastUpdated = ref<Date | null>(null)
 let intervalId: ReturnType<typeof setInterval> | null = null
 
-async function fetchHealth() {
-  loading.value = true
+async function fetchHealth(silent = false) {
+  if (!silent) loading.value = true
   try {
     health.value = await adminApi.health<HealthResponse>()
     lastUpdated.value = new Date()
   } catch {
     health.value = null
+    toast.error('System health check failed.')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
 onMounted(() => {
   fetchHealth()
-  intervalId = setInterval(fetchHealth, 10000)
+  intervalId = setInterval(() => fetchHealth(true), 15000)
 })
 
 onUnmounted(() => {
@@ -48,69 +61,127 @@ onUnmounted(() => {
 })
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (status === 'Healthy') return 'default'
-  if (status === 'Degraded') return 'secondary'
+  const s = status.toLowerCase()
+  if (s === 'healthy') return 'default'
+  if (s === 'degraded' || s === 'warning') return 'secondary'
   return 'destructive'
 }
 
-function statusIcon(status: string) {
-  if (status === 'Healthy') return '🟢'
-  if (status === 'Degraded') return '🟡'
-  return '🔴'
+const overallHealthy = computed(() => health.value?.status.toLowerCase() === 'healthy')
+
+function getServiceIcon(name: string) {
+  const n = name.toLowerCase()
+  if (n.includes('database') || n.includes('pg') || n.includes('sql')) return Database
+  if (n.includes('redis') || n.includes('cache')) return Zap
+  if (n.includes('rabbit') || n.includes('bus')) return Server
+  return Activity
 }
 </script>
 
 <template>
-  <div class="space-y-4 p-4 md:p-6">
-    <PageHeader :title="t('admin.health.title')">
-      <template #actions>
-      <div class="flex items-center gap-3">
-        <span v-if="lastUpdated" class="text-xs text-muted-foreground">
-          {{ t('common.lastUpdated') }} {{ lastUpdated.toLocaleTimeString() }}
-        </span>
-        <Button variant="outline" size="sm" :disabled="loading" @click="fetchHealth()">
-          {{ loading ? t('common.check') : t('common.refresh') }}
-        </Button>
+  <div class="space-y-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="space-y-1">
+        <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.health.title') }}</h2>
+        <p class="text-sm text-muted-foreground">Real-time status monitoring for core system components.</p>
       </div>
-      </template>
-    </PageHeader>
-
-    <!-- Overall status -->
-    <StatTile
-      v-if="health"
-      :label="t('admin.health.overallStatus')"
-      :value="health.status"
-      :description="statusIcon(health.status)"
-      :tone="health.status === 'Healthy' ? 'success' : health.status === 'Degraded' ? 'warning' : 'danger'"
-    />
-
-    <!-- Individual checks -->
-    <div v-if="health" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div
-        v-for="check in health.checks"
-        :key="check.name"
-        class="p-4 rounded-lg border space-y-2"
-        :class="check.status !== 'Healthy' ? 'border-destructive bg-destructive/5' : 'border-border'"
-      >
-        <div class="flex items-center justify-between">
-          <span class="font-medium capitalize">{{ check.name }}</span>
-          <span class="text-lg">{{ statusIcon(check.status) }}</span>
+      <div class="flex items-center gap-3">
+        <div v-if="lastUpdated" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 border text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <Clock class="size-3" />
+          Updated: {{ lastUpdated.toLocaleTimeString() }}
         </div>
-        <Badge :variant="statusVariant(check.status)">{{ check.status }}</Badge>
-        <p v-if="check.description" class="text-xs text-muted-foreground">{{ check.description }}</p>
+        <Button variant="outline" size="sm" :disabled="loading" @click="fetchHealth()">
+          <RotateCw class="mr-2 size-4" :class="{ 'animate-spin': loading }" />
+          {{ t('common.refresh') }}
+        </Button>
       </div>
     </div>
 
-    <DataState
-      v-else
-      :loading="loading"
-      :error="!loading"
-      :loading-title="t('admin.health.checking')"
-      :error-title="t('admin.health.unableToFetch')"
-      :retry-label="t('common.refresh')"
-      @retry="fetchHealth()"
-    />
+    <!-- Overall Status Banner -->
+    <div v-if="health" v-auto-animate>
+      <div 
+        class="relative overflow-hidden rounded-2xl border p-6 flex flex-col sm:flex-row items-center gap-6 transition-all duration-500"
+        :class="overallHealthy ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-destructive/5 border-destructive/20'"
+      >
+        <div 
+          class="flex size-16 items-center justify-center rounded-2xl shadow-lg transition-transform hover:scale-110"
+          :class="overallHealthy ? 'bg-emerald-500 text-white' : 'bg-destructive text-white'"
+        >
+          <HeartPulse class="size-8" :class="{ 'animate-pulse': overallHealthy }" />
+        </div>
+        
+        <div class="flex-1 text-center sm:text-left space-y-1">
+          <h3 class="text-2xl font-black uppercase tracking-tight">
+            System Status: <span :class="overallHealthy ? 'text-emerald-500' : 'text-destructive'">{{ health.status }}</span>
+          </h3>
+          <p class="text-sm text-muted-foreground max-w-lg">
+            {{ overallHealthy ? 'All systems are operational and performing within normal parameters.' : 'One or more system components are experiencing issues.' }}
+          </p>
+        </div>
 
-    <p class="text-xs text-muted-foreground">{{ t('admin.health.autoRefresh') }}</p>
+        <div class="hidden lg:flex items-center gap-2">
+           <Badge v-for="i in 3" :key="i" variant="outline" class="bg-background/50 border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+             <CheckCircle2 class="size-3 mr-1" /> ONLINE
+           </Badge>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skeleton Grid -->
+    <div v-if="loading && !health" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <Skeleton v-for="i in 6" :key="i" class="h-32 rounded-xl" />
+    </div>
+
+    <!-- Component Grid -->
+    <div v-if="health" v-auto-animate class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <Card 
+        v-for="check in health.checks" 
+        :key="check.name"
+        class="group transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 overflow-hidden"
+      >
+        <CardHeader class="pb-3 border-b bg-muted/20">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="bg-background p-2 rounded-lg border shadow-sm group-hover:text-primary transition-colors">
+                <component :is="getServiceIcon(check.name)" class="size-4" />
+              </div>
+              <CardTitle class="text-sm font-bold uppercase tracking-wide truncate max-w-[120px]">
+                {{ check.name }}
+              </CardTitle>
+            </div>
+            <Badge :variant="statusVariant(check.status)" class="text-[9px] font-black tracking-widest uppercase px-1.5 h-4">
+              {{ check.status }}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent class="pt-4">
+          <div class="flex flex-col gap-2">
+            <p v-if="check.description" class="text-xs text-muted-foreground leading-relaxed italic">
+              {{ check.description }}
+            </p>
+            <div class="flex items-center gap-1.5 mt-2">
+              <div class="size-1.5 rounded-full" :class="check.status === 'Healthy' ? 'bg-emerald-500' : 'bg-destructive'" />
+              <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
+                {{ check.status === 'Healthy' ? 'Operational' : 'Action Required' }}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    <div v-if="!loading && !health" class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-2xl bg-muted/10">
+      <div class="size-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4">
+        <AlertTriangle class="size-8" />
+      </div>
+      <h3 class="text-xl font-bold">Health Check Unavailable</h3>
+      <p class="text-sm text-muted-foreground mt-2 max-w-xs">Could not reach the system health API. Please check server logs.</p>
+      <Button variant="outline" class="mt-6" @click="fetchHealth()">Try Again</Button>
+    </div>
+
+    <div class="flex items-center gap-2 px-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-50">
+      <RotateCw class="size-3 animate-spin" />
+      Auto-refreshing every 15 seconds
+    </div>
   </div>
 </template>
