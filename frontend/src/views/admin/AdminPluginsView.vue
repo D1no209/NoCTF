@@ -1,25 +1,20 @@
 <script setup lang="ts">
-import { h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery } from '@tanstack/vue-query'
-import {
-  useVueTable,
-  getCoreRowModel,
-  createColumnHelper,
-} from '@tanstack/vue-table'
 import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Badge } from '@/components/ui/badge'
-import PageHeader from '@/components/layout/PageHeader.vue'
-import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { 
+  Plug, 
+  Puzzle, 
+  Gamepad2, 
+  HardDrive, 
+  CheckCircle2, 
+  ShieldCheck
+} from 'lucide-vue-next'
+import { vAutoAnimate } from '@formkit/auto-animate/vue'
 
 const { t } = useI18n()
 
@@ -35,60 +30,93 @@ const { data: plugins, isLoading } = useQuery({
 })
 
 function typeVariant(type: string): 'default' | 'secondary' | 'outline' | 'destructive' {
-  if (type === 'GameMode') return 'default'
-  if (type === 'ChallengeType') return 'secondary'
-  if (type === 'ContainerProvider') return 'outline'
+  const t = type.toLowerCase()
+  if (t.includes('gamemode')) return 'default'
+  if (t.includes('challenge')) return 'secondary'
+  if (t.includes('container')) return 'outline'
   return 'outline'
 }
 
-const columnHelper = createColumnHelper<PluginDto>()
-
-const columns = [
-  columnHelper.accessor('name', { header: t('admin.plugins.name') }),
-  columnHelper.accessor('type', {
-    header: t('admin.plugins.type'),
-    cell: (info) => h(Badge, { variant: typeVariant(info.getValue()) }, () => info.getValue()),
-  }),
-  columnHelper.accessor('version', { header: t('admin.plugins.version') }),
-]
-
-const table = useVueTable({
-  get data() { return plugins.value ?? [] },
-  columns,
-  getCoreRowModel: getCoreRowModel(),
-})
+function getPluginIcon(type: string) {
+  const t = type.toLowerCase()
+  if (t.includes('gamemode')) return Gamepad2
+  if (t.includes('challenge')) return Puzzle
+  if (t.includes('container')) return HardDrive
+  return Plug
+}
 </script>
 
 <template>
-  <div class="space-y-4 p-4 md:p-6">
-    <PageHeader :title="t('admin.plugins.title')" />
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="space-y-1">
+        <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.plugins.title') }}</h2>
+        <p class="text-sm text-muted-foreground">Manage and review installed game modes and system extensions.</p>
+      </div>
+    </div>
 
-    <ResponsiveTableShell dense>
-      <Table>
-        <TableHeader>
-          <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
-            <TableHead v-for="header in headerGroup.headers" :key="header.id">
-              <template v-if="!header.isPlaceholder">
-                {{ header.column.columnDef.header as string }}
-              </template>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow v-if="isLoading">
-            <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">{{ t('admin.plugins.loading') }}</TableCell>
-          </TableRow>
-          <TableRow v-else-if="table.getRowModel().rows.length === 0">
-            <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">{{ t('admin.plugins.empty') }}</TableCell>
-          </TableRow>
-          <TableRow v-else v-for="row in table.getRowModel().rows" :key="row.id">
-            <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
-              <component :is="() => cell.renderValue()" v-if="cell.column.id === 'type'" />
-              <template v-else>{{ cell.getValue() }}</template>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </ResponsiveTableShell>
+    <!-- Stats Summary -->
+    <div v-if="plugins" class="flex items-center gap-6 p-4 rounded-xl border bg-muted/30">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Total Plugins</span>
+        <Badge variant="secondary" class="font-mono">{{ plugins.length }}</Badge>
+      </div>
+      <div class="h-4 w-px bg-border" />
+      <div class="flex items-center gap-2">
+        <ShieldCheck class="size-4 text-emerald-500" />
+        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Core Engine</span>
+        <span class="text-xs font-mono opacity-60">v1.0.0-stable</span>
+      </div>
+    </div>
+
+    <!-- Skeleton Grid -->
+    <div v-if="isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <Skeleton v-for="i in 8" :key="i" class="h-40 rounded-xl" />
+    </div>
+
+    <!-- Plugin Grid -->
+    <div v-else v-auto-animate class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <Card 
+        v-for="plugin in plugins" 
+        :key="plugin.name"
+        class="group transition-all duration-300 hover:shadow-lg hover:border-primary/20 overflow-hidden flex flex-col"
+      >
+        <CardHeader class="pb-3 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="bg-primary/5 p-2 rounded-lg border border-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+              <component :is="getPluginIcon(plugin.type)" class="size-5" />
+            </div>
+            <Badge variant="outline" class="font-mono text-[10px] opacity-70">
+              v{{ plugin.version }}
+            </Badge>
+          </div>
+          <div>
+            <CardTitle class="text-base font-bold truncate">{{ plugin.name }}</CardTitle>
+            <CardDescription class="text-[10px] font-black uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
+              <div class="size-1 rounded-full bg-primary" />
+              {{ plugin.type }}
+            </CardDescription>
+          </div>
+        </CardHeader>
+        
+        <CardContent class="mt-auto pt-0">
+          <div class="flex items-center justify-between border-t pt-4 mt-2">
+            <Badge :variant="typeVariant(plugin.type)" class="text-[9px] px-1.5 h-4 uppercase tracking-tighter">
+              Active
+            </Badge>
+            <div class="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+              <CheckCircle2 class="size-3 text-emerald-500" />
+              Verified
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    <div v-if="!isLoading && plugins?.length === 0" class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-xl">
+      <Plug class="size-12 text-muted-foreground mb-4 opacity-20" />
+      <h3 class="text-lg font-medium">{{ t('admin.plugins.empty') }}</h3>
+      <p class="text-sm text-muted-foreground mt-1">No external plugins are currently loaded into the system.</p>
+    </div>
   </div>
 </template>

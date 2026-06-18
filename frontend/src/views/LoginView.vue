@@ -1,108 +1,113 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { toast } from 'vue-sonner'
+import * as z from 'zod'
+import { useForm } from 'vee-validate'
+import { toTypedSchema } from '@vee-validate/zod'
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Alert } from '@/components/ui/alert'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
-import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { Loader2 } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
-
-const email = ref('')
-const password = ref('')
-const errors = ref({ email: '', password: '' })
-const serverError = ref('')
 const loading = ref(false)
 
-function validate() {
-  errors.value = { email: '', password: '' }
-  let valid = true
+const formSchema = toTypedSchema(z.object({
+  email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
+  password: z.string().min(8, t('validation.passwordMin')),
+}))
 
-  if (!email.value) {
-    errors.value.email = t('validation.emailRequired')
-    valid = false
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-    errors.value.email = t('validation.emailInvalid')
-    valid = false
-  }
+const form = useForm({
+  validationSchema: formSchema,
+})
 
-  if (!password.value) {
-    errors.value.password = t('validation.passwordRequired')
-    valid = false
-  } else if (password.value.length < 8) {
-    errors.value.password = t('validation.passwordMin')
-    valid = false
-  }
-
-  return valid
-}
-
-async function handleSubmit() {
-  if (!validate()) return
-  serverError.value = ''
+const onSubmit = form.handleSubmit(async (values) => {
   loading.value = true
   try {
-    await auth.login(email.value, password.value)
+    await auth.login(values.email, values.password)
+    toast.success(t('auth.loginSuccess'))
     await router.push('/competitions')
-  } catch {
-    serverError.value = t('errors.loginFailed')
+  } catch (error: any) {
+    toast.error(t('errors.loginFailed'))
   } finally {
     loading.value = false
   }
-}
+})
 </script>
 
 <template>
   <AuthLayout :subtitle="t('auth.loginSubtitle')">
-    <Card class="w-full">
-      <CardHeader>
-        <CardTitle class="text-2xl">{{ t('auth.loginTitle') }}</CardTitle>
+    <Card class="w-full border-none shadow-lg sm:border">
+      <CardHeader class="space-y-1">
+        <CardTitle class="text-2xl font-bold tracking-tight">{{ t('auth.loginTitle') }}</CardTitle>
         <CardDescription>{{ t('auth.loginSubtitle') }}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
-          <div class="flex flex-col gap-1.5">
-            <Label for="email">{{ t('auth.email') }}</Label>
-            <Input
-              id="email"
-              v-model="email"
-              type="email"
-              autocomplete="email"
-              :placeholder="t('auth.email')"
-            />
-            <p v-if="errors.email" class="text-sm text-destructive">{{ errors.email }}</p>
-          </div>
+        <form @submit="onSubmit" class="space-y-4">
+          <FormField v-slot="{ componentField }" name="email">
+            <FormItem>
+              <FormLabel>{{ t('auth.email') }}</FormLabel>
+              <FormControl>
+                <Input 
+                  type="email" 
+                  placeholder="name@example.com" 
+                  v-bind="componentField" 
+                  :disabled="loading"
+                  autocomplete="email"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
-          <div class="flex flex-col gap-1.5">
-            <Label for="password">{{ t('auth.password') }}</Label>
-            <Input
-              id="password"
-              v-model="password"
-              type="password"
-              autocomplete="current-password"
-              :placeholder="t('auth.password')"
-            />
-            <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
-          </div>
+          <FormField v-slot="{ componentField }" name="password">
+            <FormItem>
+              <FormLabel>{{ t('auth.password') }}</FormLabel>
+              <FormControl>
+                <Input 
+                  type="password" 
+                  v-bind="componentField" 
+                  :disabled="loading"
+                  autocomplete="current-password"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
-          <Alert v-if="serverError" variant="destructive">{{ serverError }}</Alert>
-
-          <Button type="submit" :disabled="loading" class="w-full">
+          <Button type="submit" class="w-full" :disabled="loading">
+            <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
             {{ loading ? t('auth.loggingIn') : t('auth.login') }}
           </Button>
 
-          <p class="text-sm text-center text-muted-foreground">
-            {{ t('auth.noAccount') }}
-            <RouterLink to="/register" class="text-primary underline-offset-4 hover:underline">
+          <div class="relative py-2">
+            <div class="absolute inset-0 flex items-center">
+              <span class="w-full border-t" />
+            </div>
+            <div class="relative flex justify-center text-xs uppercase">
+              <span class="bg-card px-2 text-muted-foreground">{{ t('auth.noAccount') }}</span>
+            </div>
+          </div>
+
+          <Button variant="outline" type="button" class="w-full" as-child :disabled="loading">
+            <RouterLink to="/register">
               {{ t('auth.signUp') }}
             </RouterLink>
-          </p>
+          </Button>
         </form>
       </CardContent>
     </Card>

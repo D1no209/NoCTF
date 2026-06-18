@@ -13,9 +13,12 @@
     "generate-api": "openapi-ts && node scripts/patch-generated-client.mjs"
   },
   "dependencies": {
+    "@formkit/auto-animate": "^0.9.0",
+    "@lucide/vue": "^1.20.0",
     "@microsoft/signalr": "^10.0.0",
     "@tanstack/vue-query": "^5.97.0",
     "@tanstack/vue-table": "^8.21.3",
+    "@vee-validate/zod": "^4.15.1",
     "@vueuse/core": "^14.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -23,9 +26,12 @@
     "pinia": "^3.0.4",
     "reka-ui": "^2.9.5",
     "tailwind-merge": "^3.5.0",
+    "vee-validate": "^4.15.1",
     "vue": "^3.5.32",
     "vue-i18n": "11",
-    "vue-router": "4"
+    "vue-router": "4",
+    "vue-sonner": "^2.0.9",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^8.1.1",

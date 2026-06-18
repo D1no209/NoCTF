@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  SidebarInset,
+} from '@/components/ui/sidebar'
 import {
   Activity,
   ClipboardList,
@@ -17,13 +27,14 @@ import {
   Trophy,
   User,
   Users,
-  Menu,
+  LogOut,
+  Home,
 } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
-const mobileNavOpen = ref(false)
+const route = useRoute()
 
 const isAdmin = computed(() => auth.userRole === 'Admin')
 
@@ -52,63 +63,90 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted/20 lg:flex">
-    <header class="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4 lg:hidden">
-      <div class="flex items-center gap-2">
-        <span class="font-semibold tracking-tight">NoCTF</span>
-        <Badge variant="secondary" class="text-xs">{{ t('nav.admin') }}</Badge>
-      </div>
-      <Button variant="outline" size="sm" @click="mobileNavOpen = !mobileNavOpen">
-        <Menu class="size-4" />
-      </Button>
-    </header>
-
-    <!-- Sidebar -->
-    <aside
-      class="border-r bg-card flex-col shrink-0 lg:flex lg:min-h-screen lg:w-56"
-      :class="mobileNavOpen ? 'flex' : 'hidden'"
-    >
-      <div class="p-4 border-b">
-        <div class="flex items-center gap-2">
-          <span class="text-lg font-bold tracking-tight">NoCTF</span>
-          <Badge variant="secondary" class="text-xs">{{ t('nav.admin') }}</Badge>
+  <SidebarProvider>
+    <Sidebar collapsible="icon">
+      <SidebarHeader class="border-b h-14 flex items-center px-4 justify-between">
+        <div class="flex items-center gap-2 overflow-hidden">
+          <div class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
+            <Trophy class="size-4" />
+          </div>
+          <div class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+            <span class="truncate font-semibold">NoCTF Admin</span>
+            <span class="truncate text-xs text-muted-foreground">{{ auth.user?.userName }}</span>
+          </div>
         </div>
-        <p class="text-xs text-muted-foreground mt-1 truncate">{{ auth.user?.userName }}</p>
-      </div>
+      </SidebarHeader>
 
-      <nav class="flex-1 p-3 space-y-1">
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.to"
-          :to="item.to"
-          class="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-          active-class="bg-accent text-accent-foreground font-medium"
-          @click="mobileNavOpen = false"
-        >
-          <component :is="item.icon" class="size-4 shrink-0" />
-          <span>{{ item.label }}</span>
-        </RouterLink>
-      </nav>
+      <SidebarContent class="py-4">
+        <SidebarMenu>
+          <SidebarMenuItem v-for="item in navItems" :key="item.to">
+            <SidebarMenuButton 
+              as-child 
+              :tooltip="item.label"
+              :active="route.path === item.to"
+            >
+              <RouterLink :to="item.to" class="flex items-center gap-3">
+                <component :is="item.icon" class="size-4" />
+                <span>{{ item.label }}</span>
+              </RouterLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarContent>
 
-      <div class="p-3 border-t space-y-2">
-        <div class="px-3">
-          <LanguageSwitch />
+      <SidebarFooter class="border-t p-4 space-y-4 group-data-[collapsible=icon]:p-2">
+        <div class="group-data-[collapsible=icon]:hidden">
+           <LanguageSwitch />
         </div>
-        <RouterLink
-          to="/competitions"
-          class="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-        >
-          ← {{ t('nav.backToApp') }}
-        </RouterLink>
-        <Button variant="ghost" size="sm" class="w-full justify-start text-muted-foreground" @click="handleLogout">
-          {{ t('auth.logout') }}
-        </Button>
-      </div>
-    </aside>
+        
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton as-child tooltip="Back to App">
+              <RouterLink to="/competitions" class="flex items-center gap-3">
+                <Home class="size-4" />
+                <span>{{ t('nav.backToApp') }}</span>
+              </RouterLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton @click="handleLogout" tooltip="Logout">
+              <LogOut class="size-4" />
+              <span>{{ t('auth.logout') }}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
 
-    <!-- Main content -->
-    <main class="min-w-0 flex-1 overflow-auto">
-      <RouterView />
-    </main>
-  </div>
+    <SidebarInset>
+      <header class="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 sticky top-0 z-10">
+        <SidebarTrigger class="-ml-1" />
+        <div class="h-4 w-px bg-border mx-2" />
+        <h1 class="text-sm font-semibold truncate">
+          {{ navItems.find(i => i.to === route.path)?.label || 'Admin' }}
+        </h1>
+      </header>
+      
+      <main class="flex-1 p-4 md:p-6 lg:p-8">
+        <transition
+          name="fade"
+          mode="out-in"
+        >
+          <RouterView :key="route.fullPath" />
+        </transition>
+      </main>
+    </SidebarInset>
+  </SidebarProvider>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

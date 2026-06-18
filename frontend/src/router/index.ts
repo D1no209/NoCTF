@@ -28,21 +28,25 @@ const router = createRouter({
     },
     {
       path: '/competitions/:id',
-      name: 'competition-detail',
-      component: () => import('@/views/CompetitionGatewayView.vue'),
+      component: () => import('@/components/layout/GameLayout.vue'),
       meta: { requiresAuth: true },
-    },
-    {
-      path: '/competitions/:id/awd',
-      name: 'awd-dashboard',
-      component: () => import('@/views/AwdDashboardView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/competitions/:id/koh',
-      name: 'koh-dashboard',
-      component: () => import('@/views/KohDashboardView.vue'),
-      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'competition-detail',
+          component: () => import('@/views/CompetitionGatewayView.vue'),
+        },
+        {
+          path: 'awd',
+          name: 'awd-dashboard',
+          component: () => import('@/views/AwdDashboardView.vue'),
+        },
+        {
+          path: 'koh',
+          name: 'koh-dashboard',
+          component: () => import('@/views/KohDashboardView.vue'),
+        },
+      ]
     },
     {
       path: '/admin',

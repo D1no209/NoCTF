@@ -15,11 +15,15 @@ import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Alert } from '@/components/ui/alert'
-import PageHeader from '@/components/layout/PageHeader.vue'
-import ResponsiveTableShell from '@/components/layout/ResponsiveTableShell.vue'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -34,8 +38,29 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
+import { 
+  Plus, 
+  Search, 
+  MoreHorizontal, 
+  Edit, 
+  Key, 
+  Trash2, 
+  Loader2, 
+  Box
+} from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
+import { vAutoAnimate } from '@formkit/auto-animate/vue'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -76,7 +101,6 @@ const editDialog = ref(false)
 const deleteDialog = ref(false)
 const selectedChallenge = ref<ChallengeAdminDto | null>(null)
 const isCreating = ref(false)
-const actionError = ref('')
 const revealDialog = ref(false)
 const revealedSecret = ref('')
 
@@ -136,9 +160,9 @@ const saveMutation = useMutation({
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminChallenges })
     editDialog.value = false
-    actionError.value = ''
+    toast.success(isCreating.value ? t('admin.challenges.createSuccess') : t('admin.challenges.updateSuccess'))
   },
-  onError: () => { actionError.value = t('admin.challenges.saveError') },
+  onError: () => { toast.error(t('admin.challenges.saveError')) },
 })
 
 const deleteMutation = useMutation({
@@ -148,23 +172,23 @@ const deleteMutation = useMutation({
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminChallenges })
     deleteDialog.value = false
+    toast.success(t('admin.challenges.deleteSuccess'))
   },
+  onError: () => { toast.error(t('admin.challenges.deleteError')) }
 })
 
 const revealMutation = useMutation({
   mutationFn: async (id: string) => adminApi.revealChallengeSecret<{ flagSecret?: string; secret?: string }>(id),
   onSuccess: (data) => {
     revealedSecret.value = data.flagSecret ?? data.secret ?? ''
-    actionError.value = ''
   },
-  onError: () => { actionError.value = t('admin.challenges.revealError') },
+  onError: () => { toast.error(t('admin.challenges.revealError')) },
 })
 
 function openCreate() {
   isCreating.value = true
   selectedChallenge.value = null
   form.value = defaultForm()
-  actionError.value = ''
   editDialog.value = true
 }
 
@@ -187,7 +211,6 @@ function openEdit(c: ChallengeAdminDto) {
     initialPoints: c.pointsConfig?.initialPoints ?? 500,
     minimumPoints: c.pointsConfig?.minimumPoints ?? 100,
   }
-  actionError.value = ''
   editDialog.value = true
 }
 
@@ -199,35 +222,29 @@ function openDelete(c: ChallengeAdminDto) {
 function openReveal(c: ChallengeAdminDto) {
   selectedChallenge.value = c
   revealedSecret.value = ''
-  actionError.value = ''
   revealDialog.value = true
 }
 
 const columnHelper = createColumnHelper<ChallengeAdminDto>()
 
 const columns = [
-  columnHelper.accessor('title', { header: t('admin.challenges.titleColumn'), enableSorting: true }),
-  columnHelper.accessor('typeId', { header: t('admin.challenges.type'), enableSorting: true }),
+  columnHelper.accessor('title', { 
+    header: t('admin.challenges.titleColumn'), 
+    enableSorting: true 
+  }),
+  columnHelper.accessor('typeId', { 
+    header: t('admin.challenges.type'), 
+    enableSorting: true,
+    cell: (info) => h(Badge, { variant: 'secondary', class: 'uppercase font-bold text-[10px]' }, () => info.getValue())
+  }),
   columnHelper.accessor('containerImage', {
     header: t('admin.challenges.containerImage'),
-    cell: (info) => info.getValue() ?? '—',
+    cell: (info) => info.getValue() ? h('code', { class: 'text-xs bg-muted px-1 rounded' }, info.getValue()) : h('span', { class: 'text-muted-foreground' }, '—'),
   }),
-  columnHelper.accessor('checkerConfig', {
-    header: t('admin.challenges.checkerImage'),
-    cell: (info) => info.getValue()?.image ?? '—',
-  }),
-  columnHelper.display({
-    id: 'actions',
-    header: t('common.actions'),
-    cell: (info) => {
-      const c = info.row.original
-      return h('div', { class: 'flex gap-1' }, [
-        h(Button, { size: 'sm', variant: 'outline', onClick: () => openEdit(c) }, () => t('common.edit')),
-        h(Button, { size: 'sm', variant: 'outline', onClick: () => openReveal(c) }, () => t('admin.challenges.revealSecret')),
-        h(Button, { size: 'sm', variant: 'destructive', onClick: () => openDelete(c) }, () => t('common.delete')),
-      ])
-    },
-  }),
+  columnHelper.accessor('pointsConfig', {
+    header: 'Points',
+    cell: (info) => `${info.getValue().minimumPoints} → ${info.getValue().initialPoints}`
+  })
 ]
 
 const table = useVueTable({
@@ -249,152 +266,230 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-4 p-4 md:p-6">
-    <PageHeader :title="t('admin.challenges.title')">
-      <template #actions>
-        <Button @click="openCreate">{{ t('admin.challenges.create') }}</Button>
-      </template>
-    </PageHeader>
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="space-y-1">
+        <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.challenges.title') }}</h2>
+        <p class="text-sm text-muted-foreground">Manage challenges and container configurations.</p>
+      </div>
+      <Button @click="openCreate">
+        <Plus class="mr-2 size-4" />
+        {{ t('admin.challenges.create') }}
+      </Button>
+    </div>
 
-    <Input v-model="globalFilter" :placeholder="t('admin.challenges.searchPlaceholder')" class="max-w-xs" />
+    <div class="flex items-center gap-2">
+      <div class="relative w-full max-w-sm">
+        <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input v-model="globalFilter" :placeholder="t('admin.challenges.searchPlaceholder')" class="pl-10" />
+      </div>
+    </div>
 
-    <ResponsiveTableShell dense min-width="920px">
+    <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
             <TableHead
               v-for="header in headerGroup.headers"
               :key="header.id"
+              class="h-11 px-4 text-left align-middle font-medium text-muted-foreground"
               :class="header.column.getCanSort() ? 'cursor-pointer select-none' : ''"
               @click="header.column.getToggleSortingHandler()?.($event)"
             >
               <template v-if="!header.isPlaceholder">
-                {{ header.column.columnDef.header as string }}
-                <span v-if="header.column.getIsSorted() === 'asc'"> ↑</span>
-                <span v-else-if="header.column.getIsSorted() === 'desc'"> ↓</span>
+                <div class="flex items-center gap-2">
+                  <span>{{ header.column.columnDef.header as string }}</span>
+                  <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
+                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
+                </div>
               </template>
             </TableHead>
+            <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody v-auto-animate>
           <TableRow v-if="isLoading">
-            <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">{{ t('admin.challenges.loading') }}</TableCell>
+            <TableCell :colspan="columns.length + 1" class="h-24 text-center">
+              <div class="flex items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 class="size-4 animate-spin" />
+                <span>{{ t('admin.challenges.loading') }}</span>
+              </div>
+            </TableCell>
           </TableRow>
           <TableRow v-else-if="table.getRowModel().rows.length === 0">
-            <TableCell :colspan="columns.length" class="text-center text-muted-foreground py-8">{{ t('admin.challenges.empty') }}</TableCell>
+            <TableCell :colspan="columns.length + 1" class="h-24 text-center text-muted-foreground">
+              {{ t('admin.challenges.empty') }}
+            </TableCell>
           </TableRow>
-          <TableRow v-else v-for="row in table.getRowModel().rows" :key="row.id">
-            <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
-              <component :is="() => cell.renderValue()" v-if="['actions', 'containerImage', 'checkerConfig'].includes(cell.column.id)" />
-              <template v-else>{{ cell.getValue() }}</template>
+          <TableRow 
+            v-else 
+            v-for="row in table.getRowModel().rows" 
+            :key="row.id"
+            class="group transition-colors hover:bg-muted/50"
+          >
+            <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
+              <component :is="() => cell.renderValue()" />
+            </TableCell>
+            <TableCell class="px-4 py-3 text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="icon" class="size-8 h-8 w-8 p-0">
+                    <span class="sr-only">Open menu</span>
+                    <MoreHorizontal class="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="w-[180px]">
+                  <DropdownMenuLabel>{{ t('common.actions') }}</DropdownMenuLabel>
+                  <DropdownMenuItem @click="openEdit(row.original)">
+                    <Edit class="mr-2 size-4" />
+                    {{ t('common.edit') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @click="openReveal(row.original)">
+                    <Key class="mr-2 size-4" />
+                    {{ t('admin.challenges.revealSecret') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem @click="openDelete(row.original)" class="text-destructive focus:text-destructive">
+                    <Trash2 class="mr-2 size-4" />
+                    {{ t('common.delete') }}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
-    </ResponsiveTableShell>
+    </div>
 
     <div class="flex items-center justify-between">
-      <span class="text-sm text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
-      </span>
-      <div class="flex gap-2">
-        <Button size="sm" variant="outline" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">{{ t('common.previous') }}</Button>
-        <Button size="sm" variant="outline" :disabled="!table.getCanNextPage()" @click="table.nextPage()">{{ t('common.next') }}</Button>
+      </p>
+      <div class="flex items-center space-x-2">
+        <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
+          {{ t('common.previous') }}
+        </Button>
+        <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
+          {{ t('common.next') }}
+        </Button>
       </div>
     </div>
 
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="editDialog">
-      <DialogContent class="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ isCreating ? t('admin.challenges.createDialogTitle') : t('admin.challenges.editDialogTitle') }}</DialogTitle>
+          <DialogDescription>Define challenge settings and deployment details.</DialogDescription>
         </DialogHeader>
-        <div class="space-y-3 py-2">
-          <div>
-            <Label>{{ t('admin.challenges.competition') }}</Label>
-            <Select v-model="form.competitionId" class="mt-1">
-              <option disabled value="">{{ t('admin.challenges.selectCompetition') }}</option>
-              <option v-for="comp in competitions" :key="comp.id" :value="comp.id">{{ comp.title }}</option>
-            </Select>
+        <div class="grid gap-6 py-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.challenges.competition') }}</Label>
+              <Select v-model="form.competitionId">
+                <SelectTrigger>
+                  <SelectValue :placeholder="t('admin.challenges.selectCompetition')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="comp in competitions" :key="comp.id" :value="comp.id">{{ comp.title }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.challenges.type') }}</Label>
+              <Select v-model="form.typeId">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ctf">CTF</SelectItem>
+                  <SelectItem value="awd">AWD</SelectItem>
+                  <SelectItem value="awdp">AWDP</SelectItem>
+                  <SelectItem value="koh">KoH</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div>
-            <Label>{{ t('admin.challenges.titleColumn') }}</Label>
-            <Input v-model="form.title" :placeholder="t('admin.challenges.titleColumn')" class="mt-1" />
+
+          <div class="grid gap-2">
+            <Label for="ctitle">{{ t('admin.challenges.titleColumn') }}</Label>
+            <Input id="ctitle" v-model="form.title" />
           </div>
-          <div>
-            <Label>{{ t('admin.challenges.description') }}</Label>
-            <Textarea
-              v-model="form.description"
-              :placeholder="t('admin.challenges.optionalDescription')"
-              rows="3"
-              class="mt-1 resize-none"
-            />
+
+          <div class="grid gap-2">
+            <Label for="cdesc">{{ t('admin.challenges.description') }}</Label>
+            <Textarea id="cdesc" v-model="form.description" class="resize-none" rows="2" />
           </div>
-          <div>
-            <Label>{{ t('admin.challenges.type') }}</Label>
-            <Select v-model="form.typeId" class="mt-1">
-              <option value="ctf">CTF</option>
-              <option value="awd">AWD</option>
-              <option value="awdp">AWDP</option>
-              <option value="koh">KoH</option>
-            </Select>
+
+          <div class="grid gap-2">
+            <Label class="flex items-center gap-2">
+              <Key class="size-3.5" />
+              {{ t('admin.challenges.flagSecret') }}
+            </Label>
+            <Input v-model="form.flagSecret" placeholder="Static flag or secret prefix" />
           </div>
-          <div>
-            <Label>{{ t('admin.challenges.flagSecret') }}</Label>
-            <Input v-model="form.flagSecret" :placeholder="t('admin.challenges.flagSecretPlaceholder')" class="mt-1" />
+
+          <div class="border rounded-lg p-4 space-y-4 bg-muted/30">
+            <div class="flex items-center gap-2 text-sm font-bold uppercase tracking-wider">
+              <Box class="size-4" />
+              Deployment & Container
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div class="grid gap-2">
+                <Label>{{ t('admin.challenges.containerMode') }}</Label>
+                <Select v-model="form.containerMode">
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SingleImage">{{ t('admin.challenges.singleImage') }}</SelectItem>
+                    <SelectItem value="DockerCompose">{{ t('admin.challenges.dockerCompose') }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="grid gap-2" v-if="form.containerMode === 'SingleImage'">
+                <Label>{{ t('admin.challenges.containerImage') }}</Label>
+                <Input v-model="form.containerImage" placeholder="e.g. noctf/web-ch:latest" />
+              </div>
+              <div class="grid gap-2" v-else>
+                <Label>Project Name</Label>
+                <Input v-model="form.composeProjectName" placeholder="compose-proj" />
+              </div>
+            </div>
+
+            <div v-if="form.containerMode === 'DockerCompose'" class="grid gap-2">
+              <Label>Compose YAML</Label>
+              <Textarea v-model="form.composeYaml" class="font-mono text-xs" rows="6" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div class="grid gap-2">
+                <Label>Checker Image</Label>
+                <Input v-model="form.checkerImage" placeholder="Optional" />
+              </div>
+              <div class="grid gap-2">
+                <Label>Checker Command</Label>
+                <Input v-model="form.checkerCommand" placeholder="Optional" />
+              </div>
+            </div>
           </div>
-          <div>
-            <Label>{{ t('admin.challenges.containerImage') }}</Label>
-            <Input v-model="form.containerImage" :placeholder="t('admin.challenges.containerImagePlaceholder')" class="mt-1" />
-          </div>
-          <div>
-            <Label>{{ t('admin.challenges.containerMode') }}</Label>
-            <Select v-model="form.containerMode" class="mt-1">
-              <option value="SingleImage">{{ t('admin.challenges.singleImage') }}</option>
-              <option value="DockerCompose">{{ t('admin.challenges.dockerCompose') }}</option>
-            </Select>
-          </div>
-          <div v-if="form.containerMode === 'DockerCompose'">
-            <Label>{{ t('admin.challenges.composeProjectName') }}</Label>
-            <Input v-model="form.composeProjectName" :placeholder="t('admin.challenges.composeProjectNamePlaceholder')" class="mt-1" />
-          </div>
-          <div v-if="form.containerMode === 'DockerCompose'" class="md:col-span-2">
-            <Label>{{ t('admin.challenges.composeYaml') }}</Label>
-            <Textarea
-              v-model="form.composeYaml"
-              :placeholder="t('admin.challenges.composeYamlPlaceholder')"
-              rows="10"
-              class="mt-1 resize-y font-mono"
-            />
-            <p class="mt-1 text-xs text-muted-foreground">{{ t('admin.challenges.composeYamlHelp') }}</p>
-          </div>
-          <div>
-            <Label>{{ t('admin.challenges.checkerImage') }}</Label>
-            <Input v-model="form.checkerImage" :placeholder="t('admin.challenges.checkerImagePlaceholder')" class="mt-1" />
-          </div>
-          <div>
-            <Label>{{ t('admin.challenges.checkerCommand') }}</Label>
-            <Input v-model="form.checkerCommand" :placeholder="t('admin.challenges.checkerCommandPlaceholder')" class="mt-1" />
-          </div>
-          <div>
-            <Label>{{ t('admin.challenges.attachmentUrl') }}</Label>
-            <Input v-model="form.attachmentUrl" :placeholder="t('admin.challenges.attachmentUrlPlaceholder')" class="mt-1" />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="grid gap-2">
               <Label>{{ t('admin.challenges.initialPoints') }}</Label>
-              <Input v-model.number="form.initialPoints" type="number" min="0" class="mt-1" />
+              <Input v-model.number="form.initialPoints" type="number" />
             </div>
-            <div>
+            <div class="grid gap-2">
               <Label>{{ t('admin.challenges.minPoints') }}</Label>
-              <Input v-model.number="form.minimumPoints" type="number" min="0" class="mt-1" />
+              <Input v-model.number="form.minimumPoints" type="number" />
             </div>
           </div>
-          <p v-if="actionError" class="text-sm text-destructive">{{ actionError }}</p>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="editDialog = false">{{ t('common.cancel') }}</Button>
+          <Button variant="outline" @click="editDialog = false" :disabled="saveMutation.isPending.value">{{ t('common.cancel') }}</Button>
           <Button :disabled="saveMutation.isPending.value || !form.title || !form.competitionId" @click="saveMutation.mutate()">
+            <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ isCreating ? t('common.create') : t('common.save') }}
           </Button>
         </DialogFooter>
@@ -406,44 +501,39 @@ const table = useVueTable({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ t('admin.challenges.deleteDialogTitle') }}</DialogTitle>
+          <DialogDescription>Permanently remove this challenge.</DialogDescription>
         </DialogHeader>
-        <p class="text-sm py-2" v-html="t('admin.challenges.deleteConfirm', { title: selectedChallenge?.title })"></p>
+        <div class="py-4">
+          <p class="text-sm">Delete <span class="font-bold">"{{ selectedChallenge?.title }}"</span>?</p>
+        </div>
         <DialogFooter>
           <Button variant="outline" @click="deleteDialog = false">{{ t('common.cancel') }}</Button>
-          <Button
-            variant="destructive"
-            :disabled="deleteMutation.isPending.value"
-            @click="deleteMutation.mutate(selectedChallenge!.id)"
-          >
+          <Button variant="destructive" :disabled="deleteMutation.isPending.value" @click="deleteMutation.mutate(selectedChallenge!.id)">
+            <Loader2 v-if="deleteMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ t('common.delete') }}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
 
-    <!-- Reveal Secret Confirmation -->
+    <!-- Reveal Secret -->
     <Dialog v-model:open="revealDialog">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ t('admin.challenges.revealSecret') }}</DialogTitle>
         </DialogHeader>
-        <div class="space-y-3 py-2">
-          <p class="text-sm text-muted-foreground">
-            {{ t('admin.challenges.revealSecretAuditHint') }}
-          </p>
-          <Alert v-if="revealedSecret" class="font-mono break-all">
-            {{ revealedSecret }}
-          </Alert>
-          <p v-if="actionError" class="text-sm text-destructive">{{ actionError }}</p>
+        <div class="space-y-4 py-4">
+          <p class="text-sm text-muted-foreground">{{ t('admin.challenges.revealSecretAuditHint') }}</p>
+          <div v-if="revealedSecret" class="relative group">
+            <pre class="bg-muted p-4 rounded-lg font-mono text-sm break-all whitespace-pre-wrap border">{{ revealedSecret }}</pre>
+            <Button variant="ghost" size="sm" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" @click="revealedSecret = ''">Clear</Button>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" @click="revealDialog = false">{{ t('common.close') }}</Button>
-          <Button
-            variant="destructive"
-            :disabled="revealMutation.isPending.value || !selectedChallenge"
-            @click="revealMutation.mutate(selectedChallenge!.id)"
-          >
-            {{ revealedSecret ? t('common.refresh') : t('admin.challenges.revealSecret') }}
+          <Button variant="destructive" :disabled="revealMutation.isPending.value" @click="revealMutation.mutate(selectedChallenge!.id)">
+            <Loader2 v-if="revealMutation.isPending.value" class="mr-2 size-4 animate-spin" />
+            {{ revealedSecret ? t('common.refresh') : 'Reveal Secret' }}
           </Button>
         </DialogFooter>
       </DialogContent>
