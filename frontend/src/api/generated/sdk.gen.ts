@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetApiHealthData, GetApiHealthResponses, NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointData, NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointErrors, NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointResponses, NoCtfapiEndpointsAdminGetUsersEndpointData, NoCtfapiEndpointsAdminGetUsersEndpointErrors, NoCtfapiEndpointsAdminGetUsersEndpointResponses, NoCtfapiEndpointsAuthLoginEndpointData, NoCtfapiEndpointsAuthLoginEndpointResponses, NoCtfapiEndpointsAuthRefreshTokenEndpointData, NoCtfapiEndpointsAuthRefreshTokenEndpointErrors, NoCtfapiEndpointsAuthRefreshTokenEndpointResponses, NoCtfapiEndpointsAuthRegisterEndpointData, NoCtfapiEndpointsAuthRegisterEndpointResponses, NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointData, NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointErrors, NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointResponses, NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointData, NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponses, NoCtfapiEndpointsTeamsUpdateTeamEndpointData, NoCtfapiEndpointsTeamsUpdateTeamEndpointErrors, NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses } from './types.gen';
+import type { GetApiHealthData, GetApiHealthResponses, NoCtfapiEndpointsAdminAddCollaboratorEndpointData, NoCtfapiEndpointsAdminAddCollaboratorEndpointErrors, NoCtfapiEndpointsAdminAddCollaboratorEndpointResponses, NoCtfapiEndpointsAdminCreateChallengeEndpointData, NoCtfapiEndpointsAdminCreateChallengeEndpointErrors, NoCtfapiEndpointsAdminCreateChallengeEndpointResponses, NoCtfapiEndpointsAdminDeleteChallengeEndpointData, NoCtfapiEndpointsAdminDeleteChallengeEndpointErrors, NoCtfapiEndpointsAdminDeleteChallengeEndpointResponses, NoCtfapiEndpointsAdminDeleteCompetitionEndpointData, NoCtfapiEndpointsAdminDeleteCompetitionEndpointErrors, NoCtfapiEndpointsAdminDeleteCompetitionEndpointResponses, NoCtfapiEndpointsAdminDeleteTeamEndpointData, NoCtfapiEndpointsAdminDeleteTeamEndpointErrors, NoCtfapiEndpointsAdminDeleteTeamEndpointResponses, NoCtfapiEndpointsAdminDestroyContainerEndpointData, NoCtfapiEndpointsAdminDestroyContainerEndpointErrors, NoCtfapiEndpointsAdminDestroyContainerEndpointResponses, NoCtfapiEndpointsAdminGetAdminLogsEndpointData, NoCtfapiEndpointsAdminGetAdminLogsEndpointErrors, NoCtfapiEndpointsAdminGetAdminLogsEndpointResponses, NoCtfapiEndpointsAdminGetAuditLogsEndpointData, NoCtfapiEndpointsAdminGetAuditLogsEndpointErrors, NoCtfapiEndpointsAdminGetAuditLogsEndpointResponses, NoCtfapiEndpointsAdminGetChallengesAdminEndpointData, NoCtfapiEndpointsAdminGetChallengesAdminEndpointErrors, NoCtfapiEndpointsAdminGetChallengesAdminEndpointResponses, NoCtfapiEndpointsAdminGetCollaboratorsEndpointData, NoCtfapiEndpointsAdminGetCollaboratorsEndpointErrors, NoCtfapiEndpointsAdminGetCollaboratorsEndpointResponses, NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointData, NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointErrors, NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointResponses, NoCtfapiEndpointsAdminGetContainersEndpointData, NoCtfapiEndpointsAdminGetContainersEndpointErrors, NoCtfapiEndpointsAdminGetContainersEndpointResponses, NoCtfapiEndpointsAdminGetPluginsEndpointData, NoCtfapiEndpointsAdminGetPluginsEndpointErrors, NoCtfapiEndpointsAdminGetPluginsEndpointResponses, NoCtfapiEndpointsAdminGetTeamMembersEndpointData, NoCtfapiEndpointsAdminGetTeamMembersEndpointErrors, NoCtfapiEndpointsAdminGetTeamMembersEndpointResponses, NoCtfapiEndpointsAdminGetTeamsEndpointData, NoCtfapiEndpointsAdminGetTeamsEndpointErrors, NoCtfapiEndpointsAdminGetTeamsEndpointResponses, NoCtfapiEndpointsAdminGetUsersEndpointData, NoCtfapiEndpointsAdminGetUsersEndpointErrors, NoCtfapiEndpointsAdminGetUsersEndpointResponses, NoCtfapiEndpointsAdminRebuildScoreboardEndpointData, NoCtfapiEndpointsAdminRebuildScoreboardEndpointErrors, NoCtfapiEndpointsAdminRebuildScoreboardEndpointResponses, NoCtfapiEndpointsAdminRemoveCollaboratorEndpointData, NoCtfapiEndpointsAdminRemoveCollaboratorEndpointErrors, NoCtfapiEndpointsAdminRemoveCollaboratorEndpointResponses, NoCtfapiEndpointsAdminResetUserPasswordEndpointData, NoCtfapiEndpointsAdminResetUserPasswordEndpointErrors, NoCtfapiEndpointsAdminResetUserPasswordEndpointResponses, NoCtfapiEndpointsAdminRevealChallengeSecretEndpointData, NoCtfapiEndpointsAdminRevealChallengeSecretEndpointErrors, NoCtfapiEndpointsAdminRevealChallengeSecretEndpointResponses, NoCtfapiEndpointsAdminUpdateChallengeEndpointData, NoCtfapiEndpointsAdminUpdateChallengeEndpointErrors, NoCtfapiEndpointsAdminUpdateChallengeEndpointResponses, NoCtfapiEndpointsAdminUpdateCompetitionEndpointData, NoCtfapiEndpointsAdminUpdateCompetitionEndpointErrors, NoCtfapiEndpointsAdminUpdateCompetitionEndpointResponses, NoCtfapiEndpointsAdminUpdateUserRoleEndpointData, NoCtfapiEndpointsAdminUpdateUserRoleEndpointErrors, NoCtfapiEndpointsAdminUpdateUserRoleEndpointResponses, NoCtfapiEndpointsAuthLoginEndpointData, NoCtfapiEndpointsAuthLoginEndpointResponses, NoCtfapiEndpointsAuthRefreshTokenEndpointData, NoCtfapiEndpointsAuthRefreshTokenEndpointErrors, NoCtfapiEndpointsAuthRefreshTokenEndpointResponses, NoCtfapiEndpointsAuthRegisterEndpointData, NoCtfapiEndpointsAuthRegisterEndpointResponses, NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointData, NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointErrors, NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointResponses, NoCtfapiEndpointsCompetitionsGetAwdDashboardEndpointData, NoCtfapiEndpointsCompetitionsGetAwdDashboardEndpointResponses, NoCtfapiEndpointsCompetitionsGetChallengesEndpointData, NoCtfapiEndpointsCompetitionsGetChallengesEndpointResponses, NoCtfapiEndpointsCompetitionsGetCompetitionCapabilitiesEndpointData, NoCtfapiEndpointsCompetitionsGetCompetitionCapabilitiesEndpointResponses, NoCtfapiEndpointsCompetitionsGetCompetitionEndpointData, NoCtfapiEndpointsCompetitionsGetCompetitionEndpointResponses, NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointData, NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointResponses, NoCtfapiEndpointsCompetitionsGetCompetitionsEndpointData, NoCtfapiEndpointsCompetitionsGetCompetitionsEndpointResponses, NoCtfapiEndpointsCompetitionsGetCompetitionViewEndpointData, NoCtfapiEndpointsCompetitionsGetCompetitionViewEndpointResponses, NoCtfapiEndpointsCompetitionsGetKohDashboardEndpointData, NoCtfapiEndpointsCompetitionsGetKohDashboardEndpointResponses, NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointData, NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponses, NoCtfapiEndpointsCompetitionsGetPatchSubmissionEndpointData, NoCtfapiEndpointsCompetitionsGetPatchSubmissionEndpointErrors, NoCtfapiEndpointsCompetitionsGetPatchSubmissionEndpointResponses, NoCtfapiEndpointsCompetitionsGetPatchSubmissionsEndpointData, NoCtfapiEndpointsCompetitionsGetPatchSubmissionsEndpointErrors, NoCtfapiEndpointsCompetitionsGetPatchSubmissionsEndpointResponses, NoCtfapiEndpointsCompetitionsGetSubmissionsEndpointData, NoCtfapiEndpointsCompetitionsGetSubmissionsEndpointErrors, NoCtfapiEndpointsCompetitionsGetSubmissionsEndpointResponses, NoCtfapiEndpointsCompetitionsPostCompetitionActionEndpointData, NoCtfapiEndpointsCompetitionsPostCompetitionActionEndpointErrors, NoCtfapiEndpointsCompetitionsPostCompetitionActionEndpointResponses, NoCtfapiEndpointsCompetitionsSubmitFlagEndpointData, NoCtfapiEndpointsCompetitionsSubmitFlagEndpointErrors, NoCtfapiEndpointsCompetitionsSubmitFlagEndpointResponses, NoCtfapiEndpointsCompetitionsSubmitPatchEndpointData, NoCtfapiEndpointsCompetitionsSubmitPatchEndpointErrors, NoCtfapiEndpointsCompetitionsSubmitPatchEndpointResponses, NoCtfapiEndpointsTeamsCreateTeamEndpointData, NoCtfapiEndpointsTeamsCreateTeamEndpointErrors, NoCtfapiEndpointsTeamsCreateTeamEndpointResponses, NoCtfapiEndpointsTeamsJoinTeamEndpointData, NoCtfapiEndpointsTeamsJoinTeamEndpointErrors, NoCtfapiEndpointsTeamsJoinTeamEndpointResponses, NoCtfapiEndpointsTeamsLeaveTeamEndpointData, NoCtfapiEndpointsTeamsLeaveTeamEndpointErrors, NoCtfapiEndpointsTeamsLeaveTeamEndpointResponses, NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointData, NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointErrors, NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointResponses, NoCtfapiEndpointsTeamsTransferCaptainEndpointData, NoCtfapiEndpointsTeamsTransferCaptainEndpointErrors, NoCtfapiEndpointsTeamsTransferCaptainEndpointResponses, NoCtfapiEndpointsTeamsUpdateTeamEndpointData, NoCtfapiEndpointsTeamsUpdateTeamEndpointErrors, NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -18,6 +18,44 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: Record<string, unknown>;
 };
 
+export const noCtfapiEndpointsTeamsCreateTeamEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsTeamsCreateTeamEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsTeamsCreateTeamEndpointResponses, NoCtfapiEndpointsTeamsCreateTeamEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/teams',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const noCtfapiEndpointsTeamsJoinTeamEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsTeamsJoinTeamEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsTeamsJoinTeamEndpointResponses, NoCtfapiEndpointsTeamsJoinTeamEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/teams/{teamId}/join',
+    ...options
+});
+
+export const noCtfapiEndpointsTeamsLeaveTeamEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsTeamsLeaveTeamEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsTeamsLeaveTeamEndpointResponses, NoCtfapiEndpointsTeamsLeaveTeamEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/teams/{teamId}/leave',
+    ...options
+});
+
+export const noCtfapiEndpointsTeamsTransferCaptainEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsTeamsTransferCaptainEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsTeamsTransferCaptainEndpointResponses, NoCtfapiEndpointsTeamsTransferCaptainEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/teams/{teamId}/transfer-captain',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const noCtfapiEndpointsTeamsRemoveTeamMemberEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointData, ThrowOnError>) => (options.client ?? client).delete<NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointResponses, NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/teams/{teamId}/members/{userId}',
+    ...options
+});
+
 export const noCtfapiEndpointsTeamsUpdateTeamEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsTeamsUpdateTeamEndpointData, ThrowOnError>) => (options.client ?? client).put<NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses, NoCtfapiEndpointsTeamsUpdateTeamEndpointErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
     url: '/api/teams/{id}',
@@ -27,6 +65,8 @@ export const noCtfapiEndpointsTeamsUpdateTeamEndpoint = <ThrowOnError extends bo
         ...options.headers
     }
 });
+
+export const noCtfapiEndpointsCompetitionsGetCompetitionsEndpoint = <ThrowOnError extends boolean = false>(options?: Options<NoCtfapiEndpointsCompetitionsGetCompetitionsEndpointData, ThrowOnError>) => (options?.client ?? client).get<NoCtfapiEndpointsCompetitionsGetCompetitionsEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions', ...options });
 
 export const noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointResponses, NoCtfapiEndpointsCompetitionsCreateCompetitionEndpointErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
@@ -38,7 +78,61 @@ export const noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint = <ThrowOnEr
     }
 });
 
+export const noCtfapiEndpointsCompetitionsGetAwdDashboardEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetAwdDashboardEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetAwdDashboardEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions/{id}/awd-dashboard', ...options });
+
+export const noCtfapiEndpointsCompetitionsGetChallengesEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetChallengesEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetChallengesEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions/{id}/challenges', ...options });
+
+export const noCtfapiEndpointsCompetitionsGetCompetitionEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetCompetitionEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetCompetitionEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions/{id}', ...options });
+
+export const noCtfapiEndpointsCompetitionsGetKohDashboardEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetKohDashboardEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetKohDashboardEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions/{id}/koh-dashboard', ...options });
+
 export const noCtfapiEndpointsCompetitionsGetLeaderboardEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions/{competitionId}/leaderboard', ...options });
+
+export const noCtfapiEndpointsCompetitionsGetPatchSubmissionsEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetPatchSubmissionsEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetPatchSubmissionsEndpointResponses, NoCtfapiEndpointsCompetitionsGetPatchSubmissionsEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/patch-submissions',
+    ...options
+});
+
+export const noCtfapiEndpointsCompetitionsGetPatchSubmissionEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetPatchSubmissionEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetPatchSubmissionEndpointResponses, NoCtfapiEndpointsCompetitionsGetPatchSubmissionEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/patch-submissions/{submissionId}',
+    ...options
+});
+
+export const noCtfapiEndpointsCompetitionsGetSubmissionsEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetSubmissionsEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetSubmissionsEndpointResponses, NoCtfapiEndpointsCompetitionsGetSubmissionsEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/submissions',
+    ...options
+});
+
+export const noCtfapiEndpointsCompetitionsSubmitFlagEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsSubmitFlagEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsCompetitionsSubmitFlagEndpointResponses, NoCtfapiEndpointsCompetitionsSubmitFlagEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/challenges/{challengeId}/submit',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const noCtfapiEndpointsCompetitionsSubmitPatchEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsSubmitPatchEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsCompetitionsSubmitPatchEndpointResponses, NoCtfapiEndpointsCompetitionsSubmitPatchEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/challenges/{challengeId}/patch',
+    ...options
+});
+
+export const noCtfapiEndpointsCompetitionsGetCompetitionCapabilitiesEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetCompetitionCapabilitiesEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetCompetitionCapabilitiesEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions/{id}/capabilities', ...options });
+
+export const noCtfapiEndpointsCompetitionsPostCompetitionActionEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsPostCompetitionActionEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsCompetitionsPostCompetitionActionEndpointResponses, NoCtfapiEndpointsCompetitionsPostCompetitionActionEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/actions/{actionKey}',
+    ...options
+});
+
+export const noCtfapiEndpointsCompetitionsGetCompetitionViewEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetCompetitionViewEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetCompetitionViewEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions/{id}/views/{viewKey}', ...options });
+
+export const noCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointResponses, unknown, ThrowOnError>({ url: '/api/competitions/{id}/scoreboard', ...options });
 
 export const noCtfapiEndpointsAuthLoginEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAuthLoginEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsAuthLoginEndpointResponses, unknown, ThrowOnError>({
     url: '/api/auth/login',
@@ -64,9 +158,121 @@ export const noCtfapiEndpointsAuthRegisterEndpoint = <ThrowOnError extends boole
     }
 });
 
+export const noCtfapiEndpointsAdminGetCollaboratorsEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminGetCollaboratorsEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsAdminGetCollaboratorsEndpointResponses, NoCtfapiEndpointsAdminGetCollaboratorsEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/collaborators',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminAddCollaboratorEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminAddCollaboratorEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsAdminAddCollaboratorEndpointResponses, NoCtfapiEndpointsAdminAddCollaboratorEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/collaborators',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const noCtfapiEndpointsAdminGetChallengesAdminEndpoint = <ThrowOnError extends boolean = false>(options?: Options<NoCtfapiEndpointsAdminGetChallengesAdminEndpointData, ThrowOnError>) => (options?.client ?? client).get<NoCtfapiEndpointsAdminGetChallengesAdminEndpointResponses, NoCtfapiEndpointsAdminGetChallengesAdminEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/challenges',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminCreateChallengeEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminCreateChallengeEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsAdminCreateChallengeEndpointResponses, NoCtfapiEndpointsAdminCreateChallengeEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/challenges',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const noCtfapiEndpointsAdminDeleteChallengeEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminDeleteChallengeEndpointData, ThrowOnError>) => (options.client ?? client).delete<NoCtfapiEndpointsAdminDeleteChallengeEndpointResponses, NoCtfapiEndpointsAdminDeleteChallengeEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/challenges/{id}',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminUpdateChallengeEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminUpdateChallengeEndpointData, ThrowOnError>) => (options.client ?? client).put<NoCtfapiEndpointsAdminUpdateChallengeEndpointResponses, NoCtfapiEndpointsAdminUpdateChallengeEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/challenges/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const noCtfapiEndpointsAdminDeleteCompetitionEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminDeleteCompetitionEndpointData, ThrowOnError>) => (options.client ?? client).delete<NoCtfapiEndpointsAdminDeleteCompetitionEndpointResponses, NoCtfapiEndpointsAdminDeleteCompetitionEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/competitions/{id}',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminUpdateCompetitionEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminUpdateCompetitionEndpointData, ThrowOnError>) => (options.client ?? client).put<NoCtfapiEndpointsAdminUpdateCompetitionEndpointResponses, NoCtfapiEndpointsAdminUpdateCompetitionEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/competitions/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const noCtfapiEndpointsAdminDeleteTeamEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminDeleteTeamEndpointData, ThrowOnError>) => (options.client ?? client).delete<NoCtfapiEndpointsAdminDeleteTeamEndpointResponses, NoCtfapiEndpointsAdminDeleteTeamEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/teams/{id}',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminDestroyContainerEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminDestroyContainerEndpointData, ThrowOnError>) => (options.client ?? client).delete<NoCtfapiEndpointsAdminDestroyContainerEndpointResponses, NoCtfapiEndpointsAdminDestroyContainerEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/containers/{id}',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminGetAdminLogsEndpoint = <ThrowOnError extends boolean = false>(options?: Options<NoCtfapiEndpointsAdminGetAdminLogsEndpointData, ThrowOnError>) => (options?.client ?? client).get<NoCtfapiEndpointsAdminGetAdminLogsEndpointResponses, NoCtfapiEndpointsAdminGetAdminLogsEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/logs',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminGetAuditLogsEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminGetAuditLogsEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsAdminGetAuditLogsEndpointResponses, NoCtfapiEndpointsAdminGetAuditLogsEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/audit-logs',
+    ...options
+});
+
 export const noCtfapiEndpointsAdminGetCompetitionsAdminEndpoint = <ThrowOnError extends boolean = false>(options?: Options<NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointData, ThrowOnError>) => (options?.client ?? client).get<NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointResponses, NoCtfapiEndpointsAdminGetCompetitionsAdminEndpointErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
     url: '/api/admin/competitions',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminGetContainersEndpoint = <ThrowOnError extends boolean = false>(options?: Options<NoCtfapiEndpointsAdminGetContainersEndpointData, ThrowOnError>) => (options?.client ?? client).get<NoCtfapiEndpointsAdminGetContainersEndpointResponses, NoCtfapiEndpointsAdminGetContainersEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/containers',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminGetPluginsEndpoint = <ThrowOnError extends boolean = false>(options?: Options<NoCtfapiEndpointsAdminGetPluginsEndpointData, ThrowOnError>) => (options?.client ?? client).get<NoCtfapiEndpointsAdminGetPluginsEndpointResponses, NoCtfapiEndpointsAdminGetPluginsEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/plugins',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminGetTeamMembersEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminGetTeamMembersEndpointData, ThrowOnError>) => (options.client ?? client).get<NoCtfapiEndpointsAdminGetTeamMembersEndpointResponses, NoCtfapiEndpointsAdminGetTeamMembersEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/teams/{id}/members',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminGetTeamsEndpoint = <ThrowOnError extends boolean = false>(options?: Options<NoCtfapiEndpointsAdminGetTeamsEndpointData, ThrowOnError>) => (options?.client ?? client).get<NoCtfapiEndpointsAdminGetTeamsEndpointResponses, NoCtfapiEndpointsAdminGetTeamsEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/teams',
     ...options
 });
 
@@ -74,6 +280,44 @@ export const noCtfapiEndpointsAdminGetUsersEndpoint = <ThrowOnError extends bool
     security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
     url: '/api/admin/users',
     ...options
+});
+
+export const noCtfapiEndpointsAdminRebuildScoreboardEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminRebuildScoreboardEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsAdminRebuildScoreboardEndpointResponses, NoCtfapiEndpointsAdminRebuildScoreboardEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/competitions/{id}/scoreboard/rebuild',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminRemoveCollaboratorEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminRemoveCollaboratorEndpointData, ThrowOnError>) => (options.client ?? client).delete<NoCtfapiEndpointsAdminRemoveCollaboratorEndpointResponses, NoCtfapiEndpointsAdminRemoveCollaboratorEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/competitions/{id}/collaborators/{userId}',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminResetUserPasswordEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminResetUserPasswordEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsAdminResetUserPasswordEndpointResponses, NoCtfapiEndpointsAdminResetUserPasswordEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/users/{id}/reset-password',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const noCtfapiEndpointsAdminRevealChallengeSecretEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminRevealChallengeSecretEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsAdminRevealChallengeSecretEndpointResponses, NoCtfapiEndpointsAdminRevealChallengeSecretEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/challenges/{id}/reveal-secret',
+    ...options
+});
+
+export const noCtfapiEndpointsAdminUpdateUserRoleEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsAdminUpdateUserRoleEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsAdminUpdateUserRoleEndpointResponses, NoCtfapiEndpointsAdminUpdateUserRoleEndpointErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/admin/users/{id}/role',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 export const getApiHealth = <ThrowOnError extends boolean = false>(options?: Options<GetApiHealthData, ThrowOnError>) => (options?.client ?? client).get<GetApiHealthResponses, unknown, ThrowOnError>({ url: '/api/health', ...options });
