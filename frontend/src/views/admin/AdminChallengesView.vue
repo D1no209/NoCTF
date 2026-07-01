@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, h } from 'vue'
+import { computed, ref, h, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
+  FlexRender,
   useVueTable,
   getCoreRowModel,
   getPaginationRowModel,
@@ -60,7 +61,6 @@ import {
   Box
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { vAutoAnimate } from '@formkit/auto-animate/vue'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -133,24 +133,46 @@ const { data: competitions } = useQuery({
   queryFn: () => adminApi.competitions<CompetitionOption[]>(),
 })
 
+const canSave = computed(() => Boolean(form.value.title.trim()) && Boolean(selectedCompetitionId()))
+
+function selectedCompetitionId() {
+  return form.value.competitionId || competitions.value?.[0]?.id || ''
+}
+
+watch(competitions, (items) => {
+  if (isCreating.value && !form.value.competitionId && items?.length) {
+    form.value.competitionId = items[0].id
+  }
+})
+
+function challengePayload() {
+  return {
+    competitionId: selectedCompetitionId() || undefined,
+    title: form.value.title.trim(),
+    description: form.value.description.trim() || undefined,
+    typeId: form.value.typeId,
+    containerImage: form.value.containerImage.trim() || undefined,
+    containerMode: form.value.containerMode === 'DockerCompose' ? 1 : 0,
+    composeYaml: form.value.composeYaml.trim() || undefined,
+    composeProjectName: form.value.composeProjectName.trim() || undefined,
+    flagSecret: form.value.flagSecret.trim() || undefined,
+    attachmentUrl: form.value.attachmentUrl.trim() || undefined,
+    checkerConfig: (form.value.checkerImage.trim() || form.value.checkerCommand.trim())
+      ? { image: form.value.checkerImage.trim() || undefined, command: form.value.checkerCommand.trim() || undefined }
+      : undefined,
+    pointsConfig: {
+      initialPoints: Number(form.value.initialPoints) || 500,
+      minimumPoints: Number(form.value.minimumPoints) || 100,
+    },
+  }
+}
+
 const saveMutation = useMutation({
   mutationFn: async () => {
-    const body = {
-      competitionId: form.value.competitionId || undefined,
-      title: form.value.title,
-      description: form.value.description || undefined,
-      typeId: form.value.typeId,
-      containerImage: form.value.containerImage || undefined,
-      containerMode: form.value.containerMode === 'DockerCompose' ? 1 : 0,
-      composeYaml: form.value.composeYaml || undefined,
-      composeProjectName: form.value.composeProjectName || undefined,
-      flagSecret: form.value.flagSecret || undefined,
-      attachmentUrl: form.value.attachmentUrl || undefined,
-      checkerConfig: (form.value.checkerImage || form.value.checkerCommand)
-        ? { image: form.value.checkerImage || undefined, command: form.value.checkerCommand || undefined }
-        : undefined,
-      pointsConfig: { initialPoints: form.value.initialPoints, minimumPoints: form.value.minimumPoints },
+    if (!canSave.value) {
+      throw new Error('invalid_challenge_form')
     }
+    const body = challengePayload()
     if (isCreating.value) {
       await adminApi.createChallenge(body)
     } else {
@@ -189,6 +211,7 @@ function openCreate() {
   isCreating.value = true
   selectedChallenge.value = null
   form.value = defaultForm()
+  form.value.competitionId = competitions.value?.[0]?.id ?? ''
   editDialog.value = true
 }
 
@@ -298,7 +321,7 @@ const table = useVueTable({
             >
               <template v-if="!header.isPlaceholder">
                 <div class="flex items-center gap-2">
-                  <span>{{ header.column.columnDef.header as string }}</span>
+                  <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
                   <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
                   <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
                 </div>
@@ -307,7 +330,7 @@ const table = useVueTable({
             <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody v-auto-animate>
+        <TableBody>
           <TableRow v-if="isLoading">
             <TableCell :colspan="columns.length + 1" class="h-24 text-center">
               <div class="flex items-center justify-center gap-2 text-muted-foreground">
@@ -328,7 +351,7 @@ const table = useVueTable({
             class="group transition-colors hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
-              <component :is="() => cell.renderValue()" />
+              <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
             </TableCell>
             <TableCell class="px-4 py-3 text-right">
               <DropdownMenu>
@@ -488,7 +511,7 @@ const table = useVueTable({
         </div>
         <DialogFooter>
           <Button variant="outline" @click="editDialog = false" :disabled="saveMutation.isPending.value">{{ t('common.cancel') }}</Button>
-          <Button :disabled="saveMutation.isPending.value || !form.title || !form.competitionId" @click="saveMutation.mutate()">
+          <Button :disabled="saveMutation.isPending.value || !canSave" @click="saveMutation.mutate()">
             <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ isCreating ? t('common.create') : t('common.save') }}
           </Button>

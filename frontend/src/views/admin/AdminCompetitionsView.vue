@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, h } from 'vue'
+import { computed, ref, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
+  FlexRender,
   useVueTable,
   getCoreRowModel,
   getPaginationRowModel,
@@ -60,7 +61,6 @@ import {
   Loader2
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { vAutoAnimate } from '@formkit/auto-animate/vue'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -93,6 +93,39 @@ const form = ref({
   status: 'Draft',
 })
 
+function toDateTimeLocal(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
+function defaultSchedule() {
+  const start = new Date()
+  start.setMinutes(start.getMinutes() + 5)
+  const end = new Date(start)
+  end.setHours(end.getHours() + 2)
+  return {
+    startTime: toDateTimeLocal(start),
+    endTime: toDateTimeLocal(end),
+  }
+}
+
+const isScheduleValid = computed(() => {
+  if (!form.value.startTime || !form.value.endTime) return false
+  return new Date(form.value.endTime).getTime() > new Date(form.value.startTime).getTime()
+})
+
+const canSave = computed(() => Boolean(form.value.title.trim()) && isScheduleValid.value)
+
+function competitionPayload() {
+  return {
+    ...form.value,
+    title: form.value.title.trim(),
+    description: form.value.description.trim() || undefined,
+    startTime: new Date(form.value.startTime).toISOString(),
+    endTime: new Date(form.value.endTime).toISOString(),
+  }
+}
+
 const { data: competitions, isLoading } = useQuery({
   queryKey: queryKeys.adminCompetitions,
   queryFn: () => adminApi.competitions<CompetitionAdminDto[]>(),
@@ -100,10 +133,14 @@ const { data: competitions, isLoading } = useQuery({
 
 const saveMutation = useMutation({
   mutationFn: async () => {
+    if (!canSave.value) {
+      throw new Error('invalid_competition_form')
+    }
+    const body = competitionPayload()
     if (isCreating.value) {
-      await adminApi.createCompetition(form.value)
+      await adminApi.createCompetition(body)
     } else {
-      await adminApi.updateCompetition(selectedComp.value!.id, form.value)
+      await adminApi.updateCompetition(selectedComp.value!.id, body)
     }
   },
   onSuccess: () => {
@@ -111,7 +148,7 @@ const saveMutation = useMutation({
     editDialog.value = false
     toast.success(isCreating.value ? t('admin.competitions.createSuccess') : t('admin.competitions.updateSuccess'))
   },
-  onError: () => { 
+  onError: () => {
     toast.error(t('admin.competitions.saveError'))
   },
 })
@@ -133,7 +170,7 @@ const deleteMutation = useMutation({
 function openCreate() {
   isCreating.value = true
   selectedComp.value = null
-  form.value = { title: '', description: '', gameModeType: 'Ctf', startTime: '', endTime: '', status: 'Draft' }
+  form.value = { title: '', description: '', gameModeType: 'Ctf', status: 'Draft', ...defaultSchedule() }
   editDialog.value = true
 }
 
@@ -247,7 +284,7 @@ const table = useVueTable({
             >
               <template v-if="!header.isPlaceholder">
                 <div class="flex items-center gap-2">
-                  <span>{{ header.column.columnDef.header as string }}</span>
+                  <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
                   <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
                   <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
                 </div>
@@ -256,7 +293,7 @@ const table = useVueTable({
             <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody v-auto-animate>
+        <TableBody>
           <TableRow v-if="isLoading">
             <TableCell :colspan="columns.length + 1" class="h-24 text-center">
               <div class="flex items-center justify-center gap-2 text-muted-foreground">
@@ -277,7 +314,7 @@ const table = useVueTable({
             class="group transition-colors hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
-              <component :is="() => cell.renderValue()" />
+              <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
             </TableCell>
             <TableCell class="px-4 py-3 text-right">
               <DropdownMenu>
@@ -401,7 +438,7 @@ const table = useVueTable({
         </div>
         <DialogFooter>
           <Button variant="outline" @click="editDialog = false" :disabled="saveMutation.isPending.value">{{ t('common.cancel') }}</Button>
-          <Button :disabled="saveMutation.isPending.value || !form.title" @click="saveMutation.mutate()">
+          <Button :disabled="saveMutation.isPending.value || !canSave" @click="saveMutation.mutate()">
             <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ isCreating ? t('common.create') : t('common.save') }}
           </Button>
