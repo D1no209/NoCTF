@@ -33,6 +33,12 @@ function unwrap<T>(result: ApiResult<T>, fallback = 'Request failed'): T {
   return result.data as T
 }
 
+export function apiUrl(path: string) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
+  if (!baseUrl || /^https?:\/\//i.test(path)) return path
+  return new URL(path, baseUrl).toString()
+}
+
 export function setAuthToken(token: string | null) {
   client.setConfig({
     headers: { Authorization: token ? `Bearer ${token}` : '' },
@@ -237,6 +243,11 @@ export const adminApi = {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/audit-logs', query }), 'Failed to load audit logs')
   },
   async health<T = unknown>() {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/health' }), 'Failed to load health')
+    const response = await fetch(apiUrl('/api/health'))
+    const data = await response.json().catch(() => undefined)
+    if (!response.ok && !data) {
+      throw new ApiError('Failed to load health', response.status)
+    }
+    return data as T
   },
 }

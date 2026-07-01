@@ -52,6 +52,16 @@ public class DockerHealthCheck(IConfiguration configuration) : IHealthCheck
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
 
+            var runnerBaseUrl = configuration["Runner:BaseUrl"];
+            if (!string.IsNullOrWhiteSpace(runnerBaseUrl))
+            {
+                using var httpClient = new HttpClient { BaseAddress = new Uri(runnerBaseUrl) };
+                var response = await httpClient.GetAsync("/runner/health", timeoutCts.Token);
+                return response.IsSuccessStatusCode
+                    ? HealthCheckResult.Healthy()
+                    : HealthCheckResult.Unhealthy($"Runner health returned {(int)response.StatusCode}");
+            }
+
             var dockerHost = configuration["Docker:Host"];
             var config = dockerHost is not null
                 ? new DockerClientConfiguration(new Uri(dockerHost))

@@ -1,5 +1,6 @@
 import { ref, onUnmounted } from 'vue'
 import * as signalR from '@microsoft/signalr'
+import { apiUrl } from '@/api/noctf'
 
 export interface AttackLogDto {
   attackerTeamId: string
@@ -21,13 +22,17 @@ export interface UseSignalROptions {
   onReconnected?: () => void
 }
 
+function resolveHubUrl(hubUrl: string) {
+  return apiUrl(hubUrl)
+}
+
 export function useSignalR(options: UseSignalROptions) {
   const connection = ref<signalR.HubConnection | null>(null)
   const isConnected = ref(false)
   const error = ref<Error | null>(null)
 
   const builder = new signalR.HubConnectionBuilder()
-    .withUrl(options.hubUrl, {
+    .withUrl(resolveHubUrl(options.hubUrl), {
       accessTokenFactory: options.accessToken ? () => options.accessToken!() ?? '' : undefined,
     })
 
