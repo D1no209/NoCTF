@@ -95,7 +95,7 @@ async function openMembersDialog(team: TeamDto) {
   try {
     teamMembers.value = await adminApi.teamMembers<TeamMemberDto[]>(team.id)
   } catch {
-    toast.error('Failed to load members.')
+    toast.error(t('admin.teams.loadMembersError'))
   } finally {
     loadingMembers.value = false
   }

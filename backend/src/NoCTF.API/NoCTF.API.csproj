@@ -4,7 +4,20 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <SpaRoot>..\..\..\frontend\</SpaRoot>
+    <SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>
+    <SpaProxyLaunchCommand>bun run dev</SpaProxyLaunchCommand>
+    <BuildSpaOnPublish Condition="'$(BuildSpaOnPublish)' == ''">true</BuildSpaOnPublish>
   </PropertyGroup>
+
+  <Target Name="BuildSpaForPublish" AfterTargets="Publish" Condition="'$(BuildSpaOnPublish)' == 'true'">
+    <Exec WorkingDirectory="$(SpaRoot)" Command="bun install --frozen-lockfile" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="bun run build" />
+    <ItemGroup>
+      <SpaDistFiles Include="$(SpaRoot)dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SpaDistFiles)" DestinationFiles="@(SpaDistFiles->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />

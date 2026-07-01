@@ -82,27 +82,7 @@ spec:
           protocol: TCP
 
 ---
-# 5. Allow ingress to frontend from any source
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ingress-to-frontend
-  namespace: noctf
-  labels:
-    app.kubernetes.io/part-of: noctf
-spec:
-  podSelector:
-    matchLabels:
-      app: frontend
-  policyTypes:
-    - Ingress
-  ingress:
-    - ports:
-        - port: 80
-          protocol: TCP
-
----
-# 6. Allow ingress to backend from ingress-controller namespace
+# 5. Allow ingress to backend from ingress-controller namespace
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -126,7 +106,7 @@ spec:
           protocol: TCP
 
 ---
-# 7. Allow ingress to postgres only from backend
+# 6. Allow ingress to postgres only from backend
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -150,7 +130,7 @@ spec:
           protocol: TCP
 
 ---
-# 8. Allow ingress to redis only from backend
+# 7. Allow ingress to redis only from backend
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -174,7 +154,7 @@ spec:
           protocol: TCP
 
 ---
-# 9. Allow ingress to AWD challenge pods only from checker pods (label: app=noctf-checker)
+# 8. Allow ingress to AWD challenge pods only from checker pods (label: app=noctf-checker)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

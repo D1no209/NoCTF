@@ -32,7 +32,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:4173")
+        policy.WithOrigins(
+                  "http://localhost:5173",
+                  "http://127.0.0.1:5173",
+                  "http://localhost:4173",
+                  "http://127.0.0.1:4173")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // required for SignalR WebSocket/SSE
@@ -191,6 +195,12 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/api/files"
 });
 
+if (!app.Environment.IsDevelopment())
+{
+    var spaFileProvider = new PhysicalFileProvider(Path.Combine(Environment.CurrentDirectory, "wwwroot"));
+    app.UseSpaStaticFiles(new StaticFileOptions { FileProvider = spaFileProvider });
+}
+
 app.UseCors("Frontend");
 
 app.UseAuthentication();
@@ -238,10 +248,29 @@ app.MapHub<MonitorHub>("/hubs/monitor");
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseWhen(
+        context =>
+            !context.Request.Path.StartsWithSegments("/api") &&
+            !context.Request.Path.StartsWithSegments("/hubs") &&
+            !context.Request.Path.StartsWithSegments("/swagger"),
+        spaApp => spaApp.UseSpa(spa =>
+    {
+        spa.UseProxyToSpaDevelopmentServer("http://localhost:5173");
+    }));
+}
+else
+{
+    var spaFileProvider = new PhysicalFileProvider(Path.Combine(Environment.CurrentDirectory, "wwwroot"));
     app.UseSpa(spa =>
     {
-        spa.Options.SourcePath = "../../frontend";
-        spa.Options.DevServerPort = 5173;
+        spa.Options.DefaultPageStaticFileOptions = new StaticFileOptions
+        {
+            FileProvider = spaFileProvider,
+            OnPrepareResponse = fileCtx =>
+            {
+                fileCtx.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            }
+        };
     });
 }
 

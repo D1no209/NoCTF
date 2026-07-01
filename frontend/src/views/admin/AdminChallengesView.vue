@@ -239,7 +239,7 @@ const columns = [
   }),
   columnHelper.accessor('containerImage', {
     header: t('admin.challenges.containerImage'),
-    cell: (info) => info.getValue() ? h('code', { class: 'text-xs bg-muted px-1 rounded' }, info.getValue()) : h('span', { class: 'text-muted-foreground' }, '—'),
+    cell: (info) => info.getValue() ? h('code', { class: 'text-xs bg-muted px-1 rounded' }, info.getValue()) : h('span', { class: 'text-muted-foreground' }, '-'),
   }),
   columnHelper.accessor('pointsConfig', {
     header: 'Points',

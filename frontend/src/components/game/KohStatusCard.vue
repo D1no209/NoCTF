@@ -33,7 +33,7 @@ const controllerLabel = computed(() =>
 
 const durationLabel = computed(() => {
   const s = props.status.controlDurationSeconds
-  if (s <= 0) return '—'
+  if (s <= 0) return '-'
   const m = Math.floor(s / 60)
   const sec = s % 60
   return m > 0 ? `${m}m ${sec}s` : `${sec}s`

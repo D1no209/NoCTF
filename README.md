@@ -13,7 +13,7 @@ A modern, extensible CTF/AWD/AWDP/KoH competition platform built with .NET 8 and
 ## Tech Stack
 
 - **Backend**: .NET 8, FastEndpoints, SignalR, EF Core + PostgreSQL
-- **Frontend**: Vue 3, Vite, pnpm, Tailwind CSS, shadcn-vue
+- **Frontend**: Vue 3, Vite, Bun, Tailwind CSS, shadcn-vue
 - **Real-time / Cache**: Redis (SignalR backplane + leaderboard cache)
 - **Storage**: Local filesystem or S3-compatible (MinIO)
 - **Containers**: Docker
@@ -38,7 +38,7 @@ cd deploy && docker compose up --build -d
 4. Check the API health endpoint:
 
 ```bash
-curl http://localhost:8080/api/health
+curl http://localhost/api/health
 ```
 
 5. Open the app in your browser:

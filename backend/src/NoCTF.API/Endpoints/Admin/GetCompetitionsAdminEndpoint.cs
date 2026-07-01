@@ -9,7 +9,11 @@ public class CompetitionSummaryDto
 {
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string GameModeType { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
     public Guid OwnerId { get; set; }
 }
 
@@ -29,7 +33,11 @@ public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext) : Endp
             {
                 Id = c.Id,
                 Title = c.Title,
+                Description = c.Description,
+                GameModeType = c.GameModeType.ToString(),
                 Status = c.Status.ToString().ToLowerInvariant(),
+                StartTime = c.StartTime,
+                EndTime = c.EndTime,
                 OwnerId = c.OwnerId
             })
             .ToListAsync(ct);

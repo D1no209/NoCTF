@@ -13,10 +13,9 @@ The fastest way to get NoCTF running is with the provided `deploy/docker-compose
 | `postgres` | `postgres:16` | Primary database |
 | `redis` | `redis:7` | SignalR backplane and leaderboard cache |
 | `minio` | `minio/minio:latest` | S3-compatible object storage |
-| `backend` | Built from `backend/Dockerfile` | NoCTF API |
+| `backend` | Built from `backend/Dockerfile` | NoCTF API and Vue SPA static files |
 | `worker` | Built from `backend/Dockerfile` | Durable background task processor |
 | `runner` | Built from `backend/Dockerfile` | Isolated Docker/K8s execution boundary |
-| `frontend` | Built from `frontend/Dockerfile` | Vue 3 SPA served by Nginx |
 
 ### Steps
 
@@ -36,6 +35,14 @@ MINIO_ROOT_PASSWORD=change_me_minio_password
 
 3. Start the stack:
 
+If Docker image pulls must use your local proxy on Windows PowerShell, set the proxy variables in the same terminal first:
+
+```powershell
+$env:HTTP_PROXY='http://127.0.0.1:7897'
+$env:HTTPS_PROXY='http://127.0.0.1:7897'
+$env:ALL_PROXY='http://127.0.0.1:7897'
+```
+
 ```bash
 cd deploy && docker compose up --build -d
 ```
@@ -43,7 +50,7 @@ cd deploy && docker compose up --build -d
 4. Verify health:
 
 ```bash
-curl http://localhost:8080/api/health
+curl http://localhost/api/health
 ```
 
 5. Open the app at `http://localhost`.
@@ -51,6 +58,7 @@ curl http://localhost:8080/api/health
 ### Notes
 
 - The backend does not mount `/var/run/docker.sock`. Container access is isolated in the `runner` service; the worker calls runner over the internal Compose network.
+- The Docker Compose API image builds the Vue SPA with Bun and serves the built `dist` from ASP.NET Core `wwwroot`, so no separate Nginx frontend container is required.
 - Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
 
 ## Kubernetes
@@ -84,8 +92,7 @@ kubectl create secret generic noctf-secrets \
 From the repo root:
 
 ```bash
-docker build -t noctf-backend:latest ./backend
-docker build -t noctf-frontend:latest ./frontend
+docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
 ```
 
 For local clusters, load the images:
@@ -93,11 +100,9 @@ For local clusters, load the images:
 ```bash
 # kind
 kind load docker-image noctf-backend:latest
-kind load docker-image noctf-frontend:latest
 
 # minikube
 minikube image load noctf-backend:latest
-minikube image load noctf-frontend:latest
 ```
 
 ### Apply Manifests
@@ -117,8 +122,6 @@ kubectl apply -f deploy/k8s/redis-service.yaml
 kubectl apply -f deploy/k8s/backend-deployment.yaml
 kubectl apply -f deploy/k8s/backend-service.yaml
 kubectl apply -f deploy/k8s/backend-hpa.yaml
-kubectl apply -f deploy/k8s/frontend-deployment.yaml
-kubectl apply -f deploy/k8s/frontend-service.yaml
 kubectl apply -f deploy/k8s/ingress.yaml
 kubectl apply -f deploy/k8s/networkpolicy.yaml
 ```
@@ -163,14 +166,13 @@ volumes:
       type: Socket
 ```
 
-Use a dedicated node pool with taints/tolerations for Runner workloads so privileged container access is isolated from API, Worker, database, and frontend pods.
+Use a dedicated node pool with taints/tolerations for Runner workloads so privileged container access is isolated from API, Worker, and database pods.
 
 ### Network Policy Notes
 
 `networkpolicy.yaml` enforces a default-deny posture:
 
 - Backend can reach postgres (5432) and redis (6379)
-- Frontend accepts traffic on port 80 from anywhere
 - Backend accepts traffic only from the `ingress-nginx` namespace
 - AWD challenge pods accept traffic only from pods labeled `app=noctf-checker`
 - DNS egress (port 53) is allowed for all pods

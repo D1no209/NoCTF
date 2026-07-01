@@ -37,8 +37,7 @@ kubectl create secret generic noctf-secrets \
 
 ```bash
 # From repo root
-docker build -t noctf-backend:latest ./backend
-docker build -t noctf-frontend:latest ./frontend
+docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
 ```
 
 For local clusters (kind/minikube), load images:
@@ -46,11 +45,9 @@ For local clusters (kind/minikube), load images:
 ```bash
 # kind
 kind load docker-image noctf-backend:latest
-kind load docker-image noctf-frontend:latest
 
 # minikube
 minikube image load noctf-backend:latest
-minikube image load noctf-frontend:latest
 ```
 
 ## Apply Order
@@ -78,8 +75,6 @@ kubectl apply -f redis-service.yaml
 kubectl apply -f backend-deployment.yaml
 kubectl apply -f backend-service.yaml
 kubectl apply -f backend-hpa.yaml
-kubectl apply -f frontend-deployment.yaml
-kubectl apply -f frontend-service.yaml
 
 # 6. Networking
 kubectl apply -f ingress.yaml
@@ -124,8 +119,7 @@ The backend pod will also need a privileged security context or appropriate RBAC
 The `networkpolicy.yaml` enforces a default-deny posture:
 - All ingress/egress is denied by default
 - Backend can reach postgres (5432) and redis (6379)
-- Frontend accepts traffic from anywhere on port 80
-- Backend accepts traffic only from the ingress-nginx namespace
+- Backend accepts traffic only from the ingress-nginx namespace and serves both API and SPA static files
 - AWD challenge pods accept traffic only from pods labeled `app=noctf-checker`
 - DNS (port 53) egress is allowed for all pods
 

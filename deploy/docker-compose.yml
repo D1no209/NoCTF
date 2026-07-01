@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:16
     restart: unless-stopped
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-noctf}
       POSTGRES_USER: ${POSTGRES_USER:-noctf}
@@ -17,6 +19,8 @@ services:
   redis:
     image: redis:7
     restart: unless-stopped
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -43,9 +47,13 @@ services:
 
   backend:
     build:
-      context: ../backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
       target: api
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
@@ -67,14 +75,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    expose:
-      - "8080"
+    ports:
+      - "80:8080"
 
   worker:
     build:
-      context: ../backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
       target: worker
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
     restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: >-
@@ -94,9 +106,13 @@ services:
 
   runner:
     build:
-      context: ../backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
       target: runner
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
@@ -105,16 +121,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
-
-  frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
 
 volumes:
   postgres_data:

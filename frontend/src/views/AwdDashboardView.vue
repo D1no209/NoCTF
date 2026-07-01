@@ -6,7 +6,6 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { useAuthStore } from '@/stores/auth'
-import PageHeader from '@/components/layout/PageHeader.vue'
 import RoundTimer from '@/components/game/RoundTimer.vue'
 import ServiceStatusGrid from '@/components/game/ServiceStatusGrid.vue'
 import type { ServiceStatus } from '@/components/game/ServiceStatusGrid.vue'
@@ -188,24 +187,8 @@ async function submitFlag() {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-6">
-    <PageHeader
-      title="AWD Dashboard"
-      :description="isAwdp ? 'Attack with Defense and Patch' : 'Attack with Defense'"
-    >
-      <template #actions>
-        <div class="flex items-center gap-2">
-          <Badge v-if="isAwdp" variant="secondary" class="animate-pulse bg-blue-500/10 text-blue-500 border-blue-500/20">
-            {{ t('awd.defensePhase') }}
-          </Badge>
-          <Badge variant="outline" class="font-mono text-xs uppercase tracking-widest bg-muted/30">
-            Mode: {{ props.gameModeType }}
-          </Badge>
-        </div>
-      </template>
-    </PageHeader>
-
-    <div class="rounded-xl border bg-card/50 backdrop-blur-sm p-4 shadow-sm">
+  <div class="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-4 py-6 md:px-6">
+    <div class="noctf-panel rounded-xl p-5">
       <RoundTimer
         :round="round"
         :remaining-seconds="remainingSeconds"
@@ -226,7 +209,7 @@ async function submitFlag() {
       <!-- Center: Controls -->
       <div class="col-span-12 lg:col-span-6 space-y-6">
         <!-- Submit Flag -->
-        <Card class="shadow-md border-primary/10">
+        <Card class="noctf-panel border-primary/10">
           <CardHeader>
             <CardTitle class="flex items-center gap-2">
               <CheckCircle2 class="size-5 text-primary" />
@@ -293,7 +276,7 @@ async function submitFlag() {
 
         <!-- Upload Patch (AWDP) -->
         <transition name="slide-up">
-          <Card v-if="isAwdp" class="shadow-md border-blue-500/10">
+          <Card v-if="isAwdp" class="noctf-panel border-blue-500/10">
             <CardHeader>
               <CardTitle class="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                 <Upload class="size-5" />
@@ -359,7 +342,7 @@ async function submitFlag() {
 
         <!-- Patch Status List (AWDP) -->
         <transition name="fade">
-          <Card v-if="isAwdp && patchStatuses.length > 0" class="shadow-sm">
+          <Card v-if="isAwdp && patchStatuses.length > 0" class="noctf-panel">
             <CardHeader class="pb-2">
               <CardTitle class="text-sm font-bold uppercase text-muted-foreground">{{ t('awd.patchStatus') }}</CardTitle>
             </CardHeader>

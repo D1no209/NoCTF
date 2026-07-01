@@ -14,12 +14,12 @@
 
 ## 方式一：本地开发模式（当前已就绪）
 
-由于当前环境的 Docker 无法拉取 `node`/`nginx` 镜像，我们采用本地开发模式运行。此模式功能完整，可直接体验所有特性。
+由于当前环境的 Docker 无法拉取构建镜像，我们采用本地开发模式运行。此模式功能完整，可直接体验所有特性。
 
 ### 已启动的服务
 
 - **后端**：`dotnet run --urls http://localhost:5000`
-- **前端**：`pnpm dev` → http://localhost:5173
+- **前端**：`bun run dev` → http://localhost:5173
 
 ### 如何登录并测试
 
@@ -97,6 +97,14 @@ MINIO_ROOT_PASSWORD=YourStrongMinioPassword
 
 ### 2. 启动全部服务
 
+如果 Docker 拉取镜像需要走本机代理，先在当前终端设置：
+
+```powershell
+$env:HTTP_PROXY='http://127.0.0.1:7897'
+$env:HTTPS_PROXY='http://127.0.0.1:7897'
+$env:ALL_PROXY='http://127.0.0.1:7897'
+```
+
 ```bash
 cd deploy
 docker compose up --build -d
@@ -106,8 +114,7 @@ docker compose up --build -d
 - `postgres:16`
 - `redis:7`
 - `minio/minio`（对象存储）
-- `backend`（.NET 8，端口 8080）
-- `frontend`（Nginx，端口 80）
+- `backend`（.NET 8，端口 80，对外同时提供 API 和 SPA）
 
 ### 3. 验证启动状态
 
@@ -116,7 +123,7 @@ docker compose up --build -d
 docker compose ps
 
 # 测试 API 健康检查
-curl http://localhost:8080/api/health
+curl http://localhost/api/health
 
 # 测试前端
 curl http://localhost/
@@ -126,7 +133,7 @@ curl http://localhost/
 
 ```
 前端首页：http://localhost
-Swagger API 文档：http://localhost:8080/swagger
+Swagger API 文档：http://localhost/swagger
 MinIO 控制台：http://localhost:9001
 ```
 
@@ -145,13 +152,13 @@ dotnet run --urls "http://localhost:5000"
 ### 启动前端
 ```bash
 cd frontend
-pnpm install
-pnpm dev
+bun install
+bun run dev
 ```
 
-浏览器打开 http://localhost:5173 即可。
+浏览器可以打开 http://localhost:5173，也可以打开后端同源入口 http://localhost:5000。
 
-> 由于 `spa.proxy.json` 已配置，也可以只启动后端，`dotnet run` 会自动代理前端请求到 `localhost:5173`（需先启动前端 dev server）。
+> 开发环境下后端会通过 ASP.NET Core SPA proxy 转发到 `localhost:5173`。API 项目已配置 `SpaProxyLaunchCommand=bun run dev`，也可以手动先启动前端 dev server。
 
 ---
 
@@ -182,11 +189,12 @@ curl -H "Authorization: Bearer <accessToken>" http://localhost:5000/api/admin/us
 
 ## 常见问题
 
-### Q: Docker Compose 构建时拉取 node/nginx 失败？
+### Q: Docker Compose 构建时拉取 Bun/.NET 镜像失败？
 A: 说明你当前环境的 Docker Hub 访问受限。可尝试：
-1. 配置 Docker 镜像加速器（如阿里云、DaoCloud）
-2. 或先手动下载镜像：`docker pull node:20-slim` / `docker pull nginx:alpine`
-3. 或改用本地开发模式运行
+1. 在当前终端设置 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` 为 `http://127.0.0.1:7897` 后重新执行 `docker compose up --build -d`
+2. 或配置 Docker 镜像加速器（如阿里云、DaoCloud）
+3. 或先手动下载镜像：`docker pull oven/bun:1` / `docker pull mcr.microsoft.com/dotnet/sdk:8.0` / `docker pull mcr.microsoft.com/dotnet/aspnet:8.0`
+4. 或改用本地开发模式运行
 
 ### Q: 后端启动报错 "Unable to resolve IContainerManager"？
 A: 已在最新代码中修复。`DockerProvider` 和 `DockerManager` 会在 `Program.cs` 中正确注册。
@@ -195,7 +203,7 @@ A: 已在最新代码中修复。`DockerProvider` 和 `DockerManager` 会在 `Pr
 A: 页面右上角（登录页/导航栏）有一个下拉框，可切换 **EN / 中文**。
 
 ### Q: SignalR 实时更新不工作？
-A: 确保后端和前端的域名/端口一致，且浏览器控制台没有 CORS 错误。Docker Compose 模式下 Nginx 已配置 WebSocket 反向代理。
+A: 确保浏览器访问的是同一个后端入口。Docker Compose 模式下 API 和 SPA 都由 ASP.NET Core 在同一 origin 提供。
 
 ---
 

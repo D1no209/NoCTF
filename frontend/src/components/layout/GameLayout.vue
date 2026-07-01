@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
 import { Badge } from '@/components/ui/badge'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
-import { ChevronLeft, Trophy } from 'lucide-vue-next'
+import { ChevronLeft, Users } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -19,44 +19,39 @@ const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-background">
-    <!-- Immersive Header -->
-    <header class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div class="flex h-14 items-center justify-between px-4 gap-4">
+  <div class="min-h-[100dvh] flex flex-col bg-background">
+    <header class="noctf-dark-shell sticky top-0 z-50 w-full border-b border-white/10 text-white">
+      <div class="mx-auto flex h-20 max-w-[1800px] items-center justify-between gap-4 px-4 md:px-6">
         <div class="flex items-center gap-4">
           <RouterLink 
             :to="`/competitions/${competitionId}`" 
-            class="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            class="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
           >
             <ChevronLeft class="size-4" />
             <span class="text-sm font-medium hidden sm:inline">{{ t('nav.back') }}</span>
           </RouterLink>
-          
-          <div class="h-4 w-px bg-border hidden sm:block" />
-          
-          <div class="flex items-center gap-2 font-bold tracking-tight">
-            <Trophy class="size-5 text-primary" />
-            <span>NoCTF <span class="text-muted-foreground font-normal ml-1">Game Shell</span></span>
-          </div>
+        </div>
+
+        <div class="absolute left-1/2 flex -translate-x-1/2 items-center gap-3 text-2xl font-bold tracking-tight">
+          <span class="noctf-logo size-10" />
+          <span>NoCTF <span class="text-slate-400">/ Game Shell</span></span>
         </div>
 
         <div class="flex items-center gap-3">
-          <div v-if="displayName" class="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 border">
-            <span class="text-xs font-medium text-muted-foreground hidden md:inline">{{ displayName }}</span>
-            <Badge variant="secondary" class="font-mono tabular-nums text-[10px] h-5 px-1.5">
+          <div v-if="displayName" class="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+            <Users class="size-4 text-blue-400" />
+            <span class="hidden text-sm font-medium md:inline">{{ displayName }}</span>
+            <Badge variant="default" class="font-mono tabular-nums">
               {{ displayScore }}
             </Badge>
           </div>
-          
-          <div class="h-4 w-px bg-border" />
-          
           <LanguageSwitch />
         </div>
       </div>
     </header>
 
     <!-- Main Game Area -->
-    <main class="flex-1 relative">
+    <main class="relative flex-1">
       <transition
         name="fade"
         mode="out-in"

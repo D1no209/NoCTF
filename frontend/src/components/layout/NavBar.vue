@@ -7,7 +7,7 @@ import { useScoreStore } from '@/stores/score'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
-import { LayoutDashboard, Menu, Trophy } from 'lucide-vue-next'
+import { Bell, LayoutDashboard, Menu } from 'lucide-vue-next'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
 const { t } = useI18n()
@@ -27,28 +27,26 @@ async function handleLogout() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
-    <div class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
+  <header class="sticky top-0 z-50 w-full border-b border-slate-900/5 bg-white/85 backdrop-blur-xl">
+    <div class="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
       <div class="flex items-center gap-6">
         <RouterLink to="/competitions" class="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-80 transition-all active:scale-95">
-          <div class="flex size-7 items-center justify-center rounded bg-primary text-primary-foreground">
-            <Trophy class="size-4" />
-          </div>
+          <span class="noctf-logo size-8" />
           <span>NoCTF</span>
         </RouterLink>
-        <nav class="hidden sm:flex items-center gap-6 text-sm font-medium">
+        <nav class="hidden items-center gap-2 text-sm font-medium sm:flex">
           <RouterLink
             to="/competitions"
-            class="text-muted-foreground hover:text-foreground transition-colors relative py-1"
-            active-class="text-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:rounded-full"
+            class="relative rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
           >
             {{ t('nav.competitions') }}
           </RouterLink>
           <RouterLink
             v-if="canManage"
             to="/admin"
-            class="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 relative py-1"
-            active-class="text-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:rounded-full"
+            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
           >
             <LayoutDashboard class="size-4" />
             {{ t('nav.admin') }}
@@ -60,11 +58,15 @@ async function handleLogout() {
         <div class="hidden sm:block">
           <LanguageSwitch />
         </div>
+
+        <Button variant="ghost" size="icon-sm" class="hidden rounded-lg sm:inline-flex">
+          <Bell class="size-4" />
+        </Button>
         
         <template v-if="auth.isAuthenticated">
-          <div v-if="displayName" class="flex items-center gap-2 text-sm">
+          <div v-if="displayName" class="flex items-center gap-2 rounded-xl border bg-white/80 px-2 py-1.5 text-sm shadow-sm">
             <span class="text-muted-foreground hidden lg:inline">{{ displayName }}</span>
-            <Badge variant="secondary" class="font-mono tabular-nums bg-muted/50 border-border/50">
+            <Badge variant="default" class="font-mono tabular-nums">
               {{ displayScore }} <span class="ml-1 text-[10px] uppercase opacity-60">{{ t('nav.score') }}</span>
             </Badge>
           </div>
@@ -83,7 +85,7 @@ async function handleLogout() {
               <Menu class="size-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" class="w-[280px]">
+          <SheetContent side="right" class="w-[280px] bg-white">
             <SheetHeader class="text-left">
               <SheetTitle>NoCTF</SheetTitle>
             </SheetHeader>

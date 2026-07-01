@@ -135,9 +135,9 @@ function exportCsv() {
     a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success('Audit logs exported.')
+    toast.success(t('admin.auditLogs.exportSuccess'))
   } catch {
-    toast.error('Export failed.')
+    toast.error(t('admin.auditLogs.exportError'))
   }
 }
 

@@ -51,13 +51,13 @@ const onSubmit = form.handleSubmit(async (values) => {
 
 <template>
   <AuthLayout :subtitle="t('auth.loginSubtitle')">
-    <Card class="w-full border-none shadow-lg sm:border">
-      <CardHeader class="space-y-1">
-        <CardTitle class="text-2xl font-bold tracking-tight">{{ t('auth.loginTitle') }}</CardTitle>
-        <CardDescription>{{ t('auth.loginSubtitle') }}</CardDescription>
+    <Card class="noctf-panel w-full rounded-2xl px-2 py-4 sm:px-4">
+      <CardHeader class="space-y-2 text-center">
+        <CardTitle class="text-3xl font-bold tracking-tight">{{ t('auth.loginTitle') }}</CardTitle>
+        <CardDescription class="text-base">{{ t('auth.loginSubtitle') }}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form @submit="onSubmit" class="space-y-4">
+        <form @submit="onSubmit" class="space-y-5">
           <FormField v-slot="{ componentField }" name="email">
             <FormItem>
               <FormLabel>{{ t('auth.email') }}</FormLabel>
@@ -89,7 +89,7 @@ const onSubmit = form.handleSubmit(async (values) => {
             </FormItem>
           </FormField>
 
-          <Button type="submit" class="w-full" :disabled="loading">
+          <Button type="submit" class="h-12 w-full text-base" :disabled="loading">
             <Loader2 v-if="loading" class="mr-2 h-4 w-4 animate-spin" />
             {{ loading ? t('auth.loggingIn') : t('auth.login') }}
           </Button>
@@ -103,7 +103,7 @@ const onSubmit = form.handleSubmit(async (values) => {
             </div>
           </div>
 
-          <Button variant="outline" type="button" class="w-full" as-child :disabled="loading">
+          <Button variant="outline" type="button" class="h-11 w-full" as-child :disabled="loading">
             <RouterLink to="/register">
               {{ t('auth.signUp') }}
             </RouterLink>
