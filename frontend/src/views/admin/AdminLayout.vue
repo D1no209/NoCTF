@@ -106,7 +106,6 @@ async function handleLogout() {
               </div>
             </div>
           </div>
-          <LanguageSwitch />
         </div>
         
         <SidebarMenu>
@@ -141,11 +140,11 @@ async function handleLogout() {
             Admin
           </span>
         </div>
-        <div class="hidden items-center gap-4 md:flex">
-          <RouterLink to="/competitions" class="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+        <div class="flex items-center gap-4">
+          <RouterLink to="/competitions" class="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:inline">
             {{ t('nav.backToApp') }}
           </RouterLink>
-          <div class="h-5 w-px bg-border" />
+          <div class="hidden h-5 w-px bg-border md:block" />
           <LanguageSwitch />
         </div>
       </header>
