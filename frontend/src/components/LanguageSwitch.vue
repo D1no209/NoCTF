@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Select } from '@/components/ui/select'
+import { ChevronDown, Globe2 } from 'lucide-vue-next'
 
 const { locale } = useI18n()
 
@@ -19,12 +19,16 @@ watch(selected, (val) => {
 </script>
 
 <template>
-  <Select
-    v-model="selected"
-    class="h-8 w-auto cursor-pointer px-2"
-  >
-    <option v-for="opt in options" :key="opt.value" :value="opt.value">
-      {{ opt.label }}
-    </option>
-  </Select>
+  <label class="relative inline-flex items-center">
+    <Globe2 class="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
+    <select
+      v-model="selected"
+      class="h-10 cursor-pointer appearance-none rounded-lg border border-input bg-white/85 py-0 pl-9 pr-8 text-sm font-medium text-foreground shadow-sm outline-none transition-all hover:bg-white focus:border-primary focus:ring-4 focus:ring-primary/15"
+    >
+      <option v-for="opt in options" :key="opt.value" :value="opt.value">
+        {{ opt.label }}
+      </option>
+    </select>
+    <ChevronDown class="pointer-events-none absolute right-3 size-3.5 text-muted-foreground" />
+  </label>
 </template>

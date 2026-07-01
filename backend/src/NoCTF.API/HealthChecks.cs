@@ -49,12 +49,15 @@ public class DockerHealthCheck(IConfiguration configuration) : IHealthCheck
     {
         try
         {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
+
             var dockerHost = configuration["Docker:Host"];
             var config = dockerHost is not null
                 ? new DockerClientConfiguration(new Uri(dockerHost))
                 : new DockerClientConfiguration();
             using var client = config.CreateClient();
-            await client.System.GetVersionAsync(ct);
+            await client.System.GetVersionAsync(timeoutCts.Token);
             return HealthCheckResult.Healthy();
         }
         catch (Exception ex)

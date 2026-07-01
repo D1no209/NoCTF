@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSignalR } from '@/composables/useSignalR'
 import { useAuthStore } from '@/stores/auth'
 import { adminApi } from '@/api/noctf'
@@ -25,6 +26,7 @@ interface LogEntryDto {
 
 const SYSTEM_COMPETITION_ID = '00000000-0000-0000-0000-000000000001'
 
+const { t } = useI18n()
 const auth = useAuthStore()
 const logs = ref<LogEntryDto[]>([])
 const paused = ref(false)
@@ -82,13 +84,13 @@ async function fetchHistorical() {
     const history = await adminApi.logs<LogEntryDto[]>()
     logs.value = [...history, ...logs.value].slice(-1500)
   } catch {
-    toast.error('Failed to load historical logs.')
+    toast.error(t('admin.logs.loadHistoryError'))
   }
 }
 
 function clearLogs() {
   logs.value = []
-  toast.success('Local log buffer cleared.')
+  toast.success(t('admin.logs.clearSuccess'))
 }
 
 onMounted(async () => {
@@ -107,14 +109,14 @@ onMounted(async () => {
           <Terminal class="size-5" />
         </div>
         <div>
-          <h2 class="text-lg font-bold tracking-tight leading-none">System Live Logs</h2>
+          <h2 class="text-lg font-bold tracking-tight leading-none">{{ t('admin.logs.subtitle') }}</h2>
           <div class="flex items-center gap-2 mt-1.5">
              <div 
               class="size-2 rounded-full animate-pulse" 
               :class="signalR.isConnected.value ? 'bg-emerald-500' : 'bg-zinc-600'"
             />
             <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              {{ signalR.isConnected.value ? 'Streaming Live' : 'Disconnected' }}
+              {{ signalR.isConnected.value ? t('admin.logs.streaming') : t('common.disconnected') }}
             </span>
           </div>
         </div>
@@ -123,7 +125,7 @@ onMounted(async () => {
       <div class="flex flex-wrap items-center gap-2">
         <div class="relative w-48">
           <Search class="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="searchTerm" placeholder="Filter logs..." class="h-8 pl-8 text-xs bg-muted/50 border-none" />
+          <Input v-model="searchTerm" :placeholder="t('admin.logs.filterPlaceholder')" class="h-8 pl-8 text-xs bg-muted/50 border-none" />
         </div>
 
         <div class="h-4 w-px bg-border mx-1" />
@@ -150,7 +152,7 @@ onMounted(async () => {
           @click="paused = !paused"
         >
           <component :is="paused ? Play : Pause" class="size-3.5" />
-          <span class="text-[10px] font-bold uppercase">{{ paused ? 'Resume' : 'Pause' }}</span>
+          <span class="text-[10px] font-bold uppercase">{{ paused ? t('admin.logs.resume') : t('admin.logs.pause') }}</span>
         </Button>
 
         <Button size="sm" variant="ghost" class="h-8 size-8 p-0 text-muted-foreground hover:text-destructive" @click="clearLogs">
@@ -169,7 +171,7 @@ onMounted(async () => {
           <div class="size-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/40" />
           <span class="ml-2 text-[10px] font-mono text-zinc-500 flex items-center gap-1.5">
             <Activity class="size-3" />
-            stdout.log — {{ filteredLogs.length }} lines
+            stdout.log - {{ filteredLogs.length }} lines
           </span>
         </div>
         <button 
@@ -177,7 +179,7 @@ onMounted(async () => {
           @click="scrollToBottom(true)"
           class="text-[10px] font-bold text-emerald-500 flex items-center gap-1 hover:underline"
         >
-          <ArrowDown class="size-3" /> Jump to End
+          <ArrowDown class="size-3" /> {{ t('admin.logs.jumpToEnd') }}
         </button>
       </div>
 
@@ -187,7 +189,7 @@ onMounted(async () => {
       >
         <div v-if="filteredLogs.length === 0" class="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2 opacity-50">
           <Terminal class="size-8" />
-          <p>Waiting for output...</p>
+          <p>{{ t('admin.logs.waiting') }}</p>
         </div>
         
         <div

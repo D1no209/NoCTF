@@ -7,7 +7,7 @@ This document covers the NoCTF REST API, authentication, and SignalR hubs.
 When the backend is running, Swagger UI is available at:
 
 ```
-http://localhost:8080/swagger
+http://localhost/swagger
 ```
 
 The OpenAPI spec can be downloaded from `/swagger/v1/swagger.json`.

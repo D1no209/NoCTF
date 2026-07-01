@@ -17,6 +17,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar'
 import {
+  BadgeCheck,
   Activity,
   ClipboardList,
   Container,
@@ -64,26 +65,24 @@ async function handleLogout() {
 
 <template>
   <SidebarProvider>
-    <Sidebar collapsible="icon">
-      <SidebarHeader class="border-b h-14 flex items-center px-4 justify-between">
+    <Sidebar collapsible="icon" class="border-r-0">
+      <SidebarHeader class="h-20 flex items-center border-b border-white/10 px-4">
         <div class="flex items-center gap-2 overflow-hidden">
-          <div class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
-            <Trophy class="size-4" />
-          </div>
+          <span class="noctf-logo size-10" />
           <div class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-            <span class="truncate font-semibold">NoCTF Admin</span>
-            <span class="truncate text-xs text-muted-foreground">{{ auth.user?.userName }}</span>
+            <span class="truncate text-xl font-bold tracking-tight text-white">NoCTF</span>
+            <span class="mt-0.5 inline-flex w-fit rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">Admin</span>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent class="py-4">
+      <SidebarContent class="py-5">
         <SidebarMenu>
           <SidebarMenuItem v-for="item in navItems" :key="item.to">
             <SidebarMenuButton 
               as-child 
               :tooltip="item.label"
-              :active="route.path === item.to"
+              :is-active="route.path === item.to"
             >
               <RouterLink :to="item.to" class="flex items-center gap-3">
                 <component :is="item.icon" class="size-4" />
@@ -94,9 +93,20 @@ async function handleLogout() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter class="border-t p-4 space-y-4 group-data-[collapsible=icon]:p-2">
+      <SidebarFooter class="space-y-4 border-t border-white/10 p-4 group-data-[collapsible=icon]:p-2">
         <div class="group-data-[collapsible=icon]:hidden">
-           <LanguageSwitch />
+          <div class="mb-3 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 items-center justify-center rounded-full bg-white text-slate-900 font-semibold">
+                {{ auth.user?.userName?.charAt(0)?.toUpperCase() ?? 'A' }}
+              </div>
+              <div class="min-w-0">
+                <div class="truncate text-sm font-semibold text-white">{{ auth.user?.userName ?? 'Admin' }}</div>
+                <div class="text-xs text-slate-400">{{ auth.userRole }}</div>
+              </div>
+            </div>
+          </div>
+          <LanguageSwitch />
         </div>
         
         <SidebarMenu>
@@ -119,21 +129,36 @@ async function handleLogout() {
     </Sidebar>
 
     <SidebarInset>
-      <header class="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 sticky top-0 z-10">
+      <header class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-white/85 px-4 backdrop-blur-xl">
         <SidebarTrigger class="-ml-1" />
         <div class="h-4 w-px bg-border mx-2" />
-        <h1 class="text-sm font-semibold truncate">
-          {{ navItems.find(i => i.to === route.path)?.label || 'Admin' }}
-        </h1>
+        <div class="flex min-w-0 flex-1 items-center gap-3">
+          <h1 class="truncate text-xl font-bold tracking-tight">
+            {{ navItems.find(i => i.to === route.path)?.label || 'Admin' }}
+          </h1>
+          <span v-if="isAdmin" class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-600">
+            <BadgeCheck class="size-3.5" />
+            Admin
+          </span>
+        </div>
+        <div class="hidden items-center gap-4 md:flex">
+          <RouterLink to="/competitions" class="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            {{ t('nav.backToApp') }}
+          </RouterLink>
+          <div class="h-5 w-px bg-border" />
+          <LanguageSwitch />
+        </div>
       </header>
       
       <main class="flex-1 p-4 md:p-6 lg:p-8">
-        <transition
-          name="fade"
-          mode="out-in"
-        >
-          <RouterView :key="route.fullPath" />
-        </transition>
+        <RouterView v-slot="{ Component }">
+          <transition
+            name="fade"
+            mode="out-in"
+          >
+            <component :is="Component" :key="route.fullPath" />
+          </transition>
+        </RouterView>
       </main>
     </SidebarInset>
   </SidebarProvider>

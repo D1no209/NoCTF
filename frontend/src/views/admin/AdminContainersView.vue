@@ -65,10 +65,10 @@ const destroyMutation = useMutation({
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminContainers })
     destroyDialog.value = false
-    toast.success('Container destroyed.')
+    toast.success(t('admin.containers.destroySuccess'))
   },
   onError: () => {
-    toast.error('Failed to destroy container.')
+    toast.error(t('admin.containers.destroyError'))
   }
 })
 

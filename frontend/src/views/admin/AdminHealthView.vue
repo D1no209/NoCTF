@@ -45,7 +45,7 @@ async function fetchHealth(silent = false) {
     lastUpdated.value = new Date()
   } catch {
     health.value = null
-    toast.error('System health check failed.')
+    toast.error(t('admin.health.checkFailed'))
   } finally {
     if (!silent) loading.value = false
   }

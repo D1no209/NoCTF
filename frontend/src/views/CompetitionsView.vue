@@ -22,7 +22,7 @@ import EmptyState from '@/components/state/EmptyState.vue'
 import ErrorState from '@/components/state/ErrorState.vue'
 import { RouterLink } from 'vue-router'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
-import { Search, RotateCw, Calendar } from 'lucide-vue-next'
+import { ArrowRight, Calendar, RotateCw, Search } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const search = ref('')
@@ -74,7 +74,7 @@ function formatDate(iso: string) {
 
 <template>
   <AppLayout>
-    <div class="mx-auto w-full max-w-7xl space-y-8 px-4 py-8 md:px-6">
+    <div class="mx-auto w-full max-w-[1600px] space-y-8 px-4 py-8 md:px-6">
       <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <PageHeader 
           :title="t('competitions.title')" 
@@ -88,7 +88,7 @@ function formatDate(iso: string) {
       </div>
 
       <!-- Filters -->
-      <div class="grid gap-4 rounded-xl border bg-card/50 backdrop-blur-sm p-4 shadow-sm md:grid-cols-[1fr_200px_200px]">
+      <div class="noctf-panel grid gap-4 rounded-xl p-5 md:grid-cols-[1fr_220px_220px_auto]">
         <div class="relative">
           <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input v-model="search" :placeholder="t('competitions.searchPlaceholder')" class="pl-10" />
@@ -119,11 +119,16 @@ function formatDate(iso: string) {
             <SelectItem value="koh">KoH</SelectItem>
           </SelectContent>
         </Select>
+
+        <Button variant="outline" @click="refetch()" :disabled="isLoading" class="hidden md:inline-flex">
+          <RotateCw class="size-4" :class="{ 'animate-spin': isLoading }" />
+          {{ t('common.refresh') }}
+        </Button>
       </div>
 
       <!-- Content -->
-      <div v-if="isLoading" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <Skeleton v-for="i in 6" :key="i" class="h-56 rounded-xl" />
+      <div v-if="isLoading" class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <Skeleton v-for="i in 6" :key="i" class="h-64 rounded-xl" />
       </div>
       
       <ErrorState
@@ -141,43 +146,43 @@ function formatDate(iso: string) {
         @action="refetch()"
       />
 
-      <div v-else v-auto-animate class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-else v-auto-animate class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         <RouterLink
           v-for="comp in filteredCompetitions"
           :key="comp.id"
           :to="`/competitions/${comp.id}`"
           class="block group"
         >
-          <Card class="h-full overflow-hidden border-border/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-primary/20">
+          <Card class="h-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_24px_70px_rgb(37_99_235/0.14)]">
             <CardHeader class="pb-3">
-              <div class="flex items-start justify-between gap-2">
-                <CardTitle class="text-lg font-bold group-hover:text-primary transition-colors">
-                  {{ comp.title }}
-                </CardTitle>
-                <Badge :variant="statusVariant(comp.status)" class="shrink-0 font-bold uppercase tracking-tighter text-[10px]">
+              <div class="mb-3 flex items-center gap-2">
+                <Badge :variant="statusVariant(comp.status)" class="font-semibold">
                   {{ comp.status }}
                 </Badge>
+                <Badge variant="secondary" class="bg-blue-50 text-blue-700">
+                  {{ comp.gameModeType || 'CTF' }}
+                </Badge>
+              </div>
+              <div class="flex items-start justify-between gap-2">
+                <CardTitle class="text-xl font-bold group-hover:text-primary transition-colors">
+                  {{ comp.title }}
+                </CardTitle>
               </div>
               <CardDescription v-if="comp.description" class="line-clamp-2 mt-2 leading-relaxed">
                 {{ comp.description }}
               </CardDescription>
             </CardHeader>
             <CardContent class="space-y-4 pt-0">
-              <div class="flex items-center gap-2">
-                <Badge variant="secondary" class="bg-primary/5 text-primary border-primary/10">
-                  {{ comp.gameModeType || 'CTF' }}
-                </Badge>
-              </div>
-              
-              <div class="space-y-2 text-xs text-muted-foreground border-t pt-4">
+              <div class="space-y-2 border-t pt-4 text-sm text-muted-foreground">
                 <div class="flex items-center gap-2">
                   <Calendar class="size-3.5" />
-                  <span>{{ formatDate(comp.startTime) }} — {{ formatDate(comp.endTime) }}</span>
+                  <span>{{ formatDate(comp.startTime) }} ~ {{ formatDate(comp.endTime) }}</span>
                 </div>
               </div>
 
-              <Button variant="ghost" class="w-full mt-2 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+              <Button class="mt-2 w-full">
                 {{ t('competitions.enter') }}
+                <ArrowRight class="size-4" />
               </Button>
             </CardContent>
           </Card>

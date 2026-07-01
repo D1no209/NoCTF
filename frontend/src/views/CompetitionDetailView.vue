@@ -125,37 +125,39 @@ const challengeTypes = computed(() => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-[1600px] space-y-8 px-4 py-8 md:px-6">
+  <div class="mx-auto w-full max-w-[1700px] space-y-8 px-4 py-8 md:px-6">
     <!-- Header Section -->
     <div v-if="isLoading" class="space-y-4">
       <Skeleton class="h-10 w-1/3" />
       <Skeleton class="h-6 w-1/2" />
     </div>
-    <div v-else-if="competition" class="flex flex-col md:flex-row md:items-end justify-between gap-6">
-      <PageHeader
-        :title="competition.title"
-        :description="competition.description"
-      >
-        <template #actions>
-          <div class="flex items-center gap-2">
-            <Badge :variant="statusVariant(competition.status)" class="font-bold uppercase tracking-tighter text-[10px]">
-              {{ competition.status }}
-            </Badge>
-            <Badge variant="outline" class="font-mono text-[10px] uppercase tracking-widest bg-muted/30">
-              MODE: CTF
-            </Badge>
-          </div>
-        </template>
-      </PageHeader>
+    <div v-else-if="competition" class="noctf-panel flex flex-col justify-between gap-6 rounded-xl p-6 md:flex-row md:items-center">
+      <div class="flex items-start gap-5">
+        <div class="noctf-logo size-16 rounded-2xl" />
+        <PageHeader
+          :title="competition.title"
+          :description="competition.description"
+        >
+          <template #actions>
+            <div class="flex items-center gap-2">
+              <Badge :variant="statusVariant(competition.status)" class="font-semibold">
+                {{ competition.status }}
+              </Badge>
+              <Badge variant="secondary" class="bg-violet-100 text-violet-700">
+                CTF
+              </Badge>
+            </div>
+          </template>
+        </PageHeader>
+      </div>
 
-      <div class="flex items-center gap-6 text-xs text-muted-foreground bg-card/50 backdrop-blur-sm border rounded-full px-5 py-2.5 shadow-sm">
-        <div class="flex items-center gap-2">
-          <Calendar class="size-3.5 text-primary" />
-          <span>{{ formatDate(competition.startTime) }} — {{ formatDate(competition.endTime) }}</span>
+      <div class="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+        <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
+          <Calendar class="size-4 text-primary" />
+          <span>{{ formatDate(competition.startTime) }} ~ {{ formatDate(competition.endTime) }}</span>
         </div>
-        <div class="h-3 w-px bg-border" />
-        <div class="flex items-center gap-2">
-          <CheckCircle2 class="size-3.5 text-green-500" />
+        <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
+          <CheckCircle2 class="size-4 text-green-500" />
           <span>{{ solvedIds.size }} / {{ challenges?.length || 0 }} {{ t('challenges.solved') }}</span>
         </div>
       </div>
@@ -240,14 +242,14 @@ const challengeTypes = computed(() => {
             </div>
             <ScoreboardView
               :competition-id="competitionId"
-              class="border-none shadow-none bg-transparent"
+              class="border-none bg-transparent shadow-none"
             />
           </aside>
         </div>
       </TabsContent>
 
       <TabsContent value="scoreboard" class="mt-0">
-        <Card class="border-none shadow-md bg-card/50 backdrop-blur-sm">
+        <Card class="noctf-panel">
           <CardHeader>
             <CardTitle>{{ t('leaderboard.fullBoard', 'Full Leaderboard') }}</CardTitle>
           </CardHeader>

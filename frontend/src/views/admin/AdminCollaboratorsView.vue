@@ -103,7 +103,7 @@ const addMutation = useMutation({
     addDialog.value = false
     newUserId.value = ''
     newUserSearch.value = ''
-    toast.success('Collaborator added successfully.')
+    toast.success(t('admin.collaborators.addSuccess'))
   },
   onError: () => { toast.error(t('admin.collaborators.addError')) },
 })
@@ -115,9 +115,9 @@ const removeMutation = useMutation({
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCollaborators(selectedCompetitionId.value) })
     removeDialog.value = false
-    toast.success('Collaborator removed.')
+    toast.success(t('admin.collaborators.removeSuccess'))
   },
-  onError: () => { toast.error('Failed to remove collaborator.') }
+  onError: () => { toast.error(t('admin.collaborators.removeError')) }
 })
 
 function openRemove(collab: CollaboratorDto) {

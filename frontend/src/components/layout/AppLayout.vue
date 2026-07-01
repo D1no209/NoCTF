@@ -6,7 +6,7 @@ const route = useRoute()
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted/20 flex flex-col">
+  <div class="flex min-h-[100dvh] flex-col bg-background">
     <NavBar />
     <main class="flex-1 flex flex-col">
       <router-view v-slot="{ Component }">

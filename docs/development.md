@@ -5,8 +5,7 @@ This guide explains how to set up a local development environment for NoCTF.
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js 20.19+ or 22.12+](https://nodejs.org/) (required by the current Vite toolchain)
-- [pnpm](https://pnpm.io/installation)
+- [Bun](https://bun.sh/) for frontend install, development, and production builds
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL, Redis, and container features)
 
 Optional but recommended:
@@ -39,7 +38,7 @@ export JwtSettings__Secret="change_me_at_least_32_chars_long_secret_key"
 dotnet run --project backend/src/NoCTF.API
 ```
 
-The API will start on `http://localhost:5000` (or the port configured in launchSettings). In development mode, `spa.proxy.json` proxies frontend requests to the Vite dev server at `http://localhost:5173`.
+The API will start on `http://localhost:5000` (or the port configured in launchSettings). In development mode, ASP.NET Core proxies the SPA to the Vite dev server at `http://localhost:5173`.
 
 4. Open the app in your browser:
 
@@ -72,18 +71,20 @@ The frontend is a Vue 3 single-page application built with Vite.
 1. Install dependencies:
 
 ```bash
-cd frontend && pnpm install
+cd frontend && bun install
 ```
 
 2. Start the Vite dev server:
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 The dev server runs at `http://localhost:5173`.
 
-If the backend is running with `dotnet run`, you can also access the frontend through the backend URL (`http://localhost:5000`) because of the SPA proxy.
+If the backend is running with `dotnet run`, you can also access the frontend through the backend URL (`http://localhost:5000`) because of the SPA proxy. The API project is configured with `SpaProxyLaunchCommand=bun run dev`; you can also start `bun run dev` yourself before opening the backend URL.
+
+Production publish uses the checked-in `bun.lock` to build the SPA and copy `frontend/dist` into the API `wwwroot`.
 
 ### Generate the OpenAPI Client
 
@@ -94,13 +95,13 @@ The frontend uses a typed API client generated from the backend OpenAPI spec.
 2. Fetch the backend OpenAPI artifact:
 
 ```bash
-cd frontend && pnpm fetch-openapi
+cd frontend && bun run fetch-openapi
 ```
 
 3. Generate the client:
 
 ```bash
-cd frontend && pnpm generate-api
+cd frontend && bun run generate-api
 ```
 
 This runs `openapi-ts` against `backend/artifacts/openapi/swagger.json` and creates/updates the client code in the frontend source tree.
