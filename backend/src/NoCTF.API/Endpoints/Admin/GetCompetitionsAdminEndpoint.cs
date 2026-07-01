@@ -15,6 +15,8 @@ public class CompetitionSummaryDto
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
     public Guid OwnerId { get; set; }
+    public PointsConfigDto DefaultPointsConfig { get; set; } = new();
+    public double DifficultyCoefficient { get; set; } = 1.0;
 }
 
 public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest, List<CompetitionSummaryDto>>
@@ -38,10 +40,62 @@ public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext) : Endp
                 Status = c.Status.ToString().ToLowerInvariant(),
                 StartTime = c.StartTime,
                 EndTime = c.EndTime,
-                OwnerId = c.OwnerId
+                OwnerId = c.OwnerId,
+                DefaultPointsConfig = new PointsConfigDto
+                {
+                    InitialPoints = c.DefaultInitialPoints,
+                    MinimumPoints = c.DefaultMinimumPoints,
+                    DecayFactor = c.DefaultDecayFactor,
+                    DecayFunction = c.DefaultDecayFunction,
+                },
+                DifficultyCoefficient = c.DifficultyCoefficient,
             })
             .ToListAsync(ct);
 
         await SendAsync(competitions, cancellation: ct);
+    }
+}
+
+public class GetCompetitionAdminEndpoint(ApplicationDbContext dbContext) : EndpointWithoutRequest<CompetitionSummaryDto>
+{
+    public override void Configure()
+    {
+        Get("/api/admin/competitions/{id}");
+        Roles("Admin", "Organizer");
+    }
+
+    public override async Task HandleAsync(CancellationToken ct)
+    {
+        var id = Route<Guid>("id");
+        var competition = await dbContext.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (competition is null)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        await SendAsync(new CompetitionSummaryDto
+        {
+            Id = competition.Id,
+            Title = competition.Title,
+            Description = competition.Description,
+            GameModeType = competition.GameModeType.ToString(),
+            Status = competition.Status.ToString().ToLowerInvariant(),
+            StartTime = competition.StartTime,
+            EndTime = competition.EndTime,
+            OwnerId = competition.OwnerId,
+            DefaultPointsConfig = new PointsConfigDto
+            {
+                InitialPoints = competition.DefaultInitialPoints,
+                MinimumPoints = competition.DefaultMinimumPoints,
+                DecayFactor = competition.DefaultDecayFactor,
+                DecayFunction = competition.DefaultDecayFunction,
+            },
+            DifficultyCoefficient = competition.DifficultyCoefficient,
+        }, cancellation: ct);
     }
 }

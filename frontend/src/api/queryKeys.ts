@@ -9,6 +9,8 @@ export const queryKeys = {
   teams: (competitionId?: string) => competitionId ? ['teams', competitionId] as const : ['teams'] as const,
   patchSubmissions: (competitionId: string) => ['patch-submissions', competitionId] as const,
   adminCompetitions: ['admin-competitions'] as const,
+  adminCompetition: (id: string) => ['admin-competition', id] as const,
+  adminCompetitionChallenges: (id: string) => ['admin-competition-challenges', id] as const,
   adminUsers: ['admin-users'] as const,
   adminTeams: ['admin-teams'] as const,
   adminChallenges: ['admin-challenges'] as const,

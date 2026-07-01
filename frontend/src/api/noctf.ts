@@ -167,6 +167,9 @@ export const adminApi = {
   async competitions<T = unknown[]>() {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions' }), 'Failed to load competitions')
   },
+  async competition<T = unknown>(id: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{id}', path: { id } }), 'Failed to load competition')
+  },
   async createCompetition<T = unknown>(body: unknown) {
     return unwrap(await client.post<{ 201: T }, unknown, false>({ url: '/api/admin/competitions', body }), 'Failed to create competition')
   },
@@ -214,6 +217,32 @@ export const adminApi = {
       url: '/api/admin/challenges/{id}/reveal-secret',
       path: { id },
     }), 'Failed to reveal secret')
+  },
+  async competitionChallenges<T = unknown[]>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges',
+      path: { competitionId },
+    }), 'Failed to load competition challenges')
+  },
+  async bindCompetitionChallenge<T = unknown>(competitionId: string, body: unknown) {
+    return unwrap(await client.post<{ 201: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges',
+      path: { competitionId },
+      body,
+    }), 'Failed to bind challenge')
+  },
+  async updateCompetitionChallenge<T = unknown>(competitionId: string, challengeId: string, body: unknown) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}',
+      path: { competitionId, challengeId },
+      body,
+    }), 'Failed to update competition challenge')
+  },
+  async deleteCompetitionChallenge(competitionId: string, challengeId: string) {
+    await client.delete({
+      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}',
+      path: { competitionId, challengeId },
+    })
   },
   async collaborators<T = unknown[]>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({

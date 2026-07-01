@@ -57,6 +57,13 @@ public class Competition : ITenantEntity
     public DateTime EndTime { get; set; }
     public CompetitionStatus Status { get; set; }
 
+    // CTF scoring defaults used when binding challenge templates into this competition.
+    public int DefaultInitialPoints { get; set; } = 500;
+    public int DefaultMinimumPoints { get; set; } = 100;
+    public int DefaultDecayFactor { get; set; } = 450;
+    public string DefaultDecayFunction { get; set; } = "quadratic";
+    public double DifficultyCoefficient { get; set; } = 1.0;
+
     // AWD-specific configuration (nullable so CTF competitions are unaffected)
     public int? RoundDurationSeconds { get; set; }
     public int? TotalRounds { get; set; }
@@ -91,10 +98,13 @@ public class Challenge : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid CompetitionId { get; set; }
+    public Guid? TemplateId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string DescriptionFormat { get; set; } = "markdown";
     public string TypeId { get; set; } = string.Empty;
     public PointsConfig PointsConfig { get; set; } = new();
+    public double DifficultyCoefficient { get; set; } = 1.0;
     public string? AttachmentUrl { get; set; }
     public string? ContainerImage { get; set; }
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
@@ -103,6 +113,34 @@ public class Challenge : ITenantEntity
     public string? FlagSecret { get; set; }
     public CheckerConfig? CheckerConfig { get; set; }
     public KohAgentConfig? KohAgentConfig { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class ChallengeTemplate
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string TypeId { get; set; } = "ctf";
+    public string? AttachmentUrl { get; set; }
+    public string? ContainerImage { get; set; }
+    public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
+    public string? ComposeYaml { get; set; }
+    public string? ComposeProjectName { get; set; }
+    public string? FlagSecret { get; set; }
+    public CheckerConfig? CheckerConfig { get; set; }
+    public KohAgentConfig? KohAgentConfig { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class ChallengeHint : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public int DisplayOrder { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

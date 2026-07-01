@@ -15,6 +15,8 @@ public class CreateCompetitionAdminRequest
     public string Status { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
+    public PointsConfigDto? DefaultPointsConfig { get; set; }
+    public double DifficultyCoefficient { get; set; } = 1.0;
 }
 
 public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
@@ -50,7 +52,12 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             OwnerId = userId,
             StartTime = req.StartTime,
             EndTime = req.EndTime,
-            Status = status
+            Status = status,
+            DefaultInitialPoints = req.DefaultPointsConfig?.InitialPoints ?? 500,
+            DefaultMinimumPoints = req.DefaultPointsConfig?.MinimumPoints ?? 100,
+            DefaultDecayFactor = req.DefaultPointsConfig?.DecayFactor ?? 450,
+            DefaultDecayFunction = req.DefaultPointsConfig?.DecayFunction ?? "quadratic",
+            DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient
         };
         competition.CompetitionId = competition.Id;
 
@@ -66,7 +73,15 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             Status = competition.Status.ToString().ToLowerInvariant(),
             StartTime = competition.StartTime,
             EndTime = competition.EndTime,
-            OwnerId = competition.OwnerId
+            OwnerId = competition.OwnerId,
+            DefaultPointsConfig = new PointsConfigDto
+            {
+                InitialPoints = competition.DefaultInitialPoints,
+                MinimumPoints = competition.DefaultMinimumPoints,
+                DecayFactor = competition.DefaultDecayFactor,
+                DecayFunction = competition.DefaultDecayFunction,
+            },
+            DifficultyCoefficient = competition.DifficultyCoefficient,
         }, 201, ct);
     }
 }

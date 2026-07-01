@@ -14,10 +14,12 @@ public class ChallengeDto
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string DescriptionFormat { get; set; } = "markdown";
     public string TypeId { get; set; } = string.Empty;
     public int Points { get; set; }
     public int SolveCount { get; set; }
     public string? AttachmentUrl { get; set; }
+    public List<string> Hints { get; set; } = [];
 }
 
 /// <summary>
@@ -42,12 +44,30 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
                 Id = c.Id,
                 Title = c.Title,
                 Description = c.Description,
+                DescriptionFormat = c.DescriptionFormat,
                 TypeId = c.TypeId,
                 Points = c.PointsConfig.InitialPoints,
                 SolveCount = dbContext.Submissions.Count(s => s.CompetitionId == req.Id && s.ChallengeId == c.Id && s.IsCorrect),
                 AttachmentUrl = c.AttachmentUrl
             })
             .ToListAsync(ct);
+
+        var challengeIds = challenges.Select(c => c.Id).ToList();
+        var hints = await dbContext.ChallengeHints
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(h => h.CompetitionId == req.Id && challengeIds.Contains(h.ChallengeId))
+            .OrderBy(h => h.DisplayOrder)
+            .ToListAsync(ct);
+
+        foreach (var challenge in challenges)
+        {
+            challenge.Hints = hints
+                .Where(h => h.ChallengeId == challenge.Id)
+                .OrderBy(h => h.DisplayOrder)
+                .Select(h => h.Content)
+                .ToList();
+        }
 
         await SendAsync(challenges, cancellation: ct);
     }
