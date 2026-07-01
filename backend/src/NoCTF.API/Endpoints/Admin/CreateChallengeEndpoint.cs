@@ -6,7 +6,6 @@ namespace NoCTF.API.Endpoints.Admin;
 
 public class CreateChallengeRequest
 {
-    public Guid CompetitionId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string TypeId { get; set; } = "ctf";
@@ -17,10 +16,9 @@ public class CreateChallengeRequest
     public string? FlagSecret { get; set; }
     public string? AttachmentUrl { get; set; }
     public CheckerConfigDto? CheckerConfig { get; set; }
-    public PointsConfigDto? PointsConfig { get; set; }
 }
 
-public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateChallengeRequest, ChallengeAdminDto>, IAuditableEndpoint
+public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateChallengeRequest, ChallengeTemplateAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -30,53 +28,28 @@ public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateC
 
     public override async Task HandleAsync(CreateChallengeRequest req, CancellationToken ct)
     {
-        var challenge = new Challenge
+        var challenge = new ChallengeTemplate
         {
             Id = Guid.NewGuid(),
-            CompetitionId = req.CompetitionId,
-            Title = req.Title,
+            Title = req.Title.Trim(),
             Description = req.Description,
-            TypeId = req.TypeId,
+            TypeId = string.IsNullOrWhiteSpace(req.TypeId) ? "ctf" : req.TypeId.Trim(),
             ContainerImage = req.ContainerImage,
             ContainerMode = req.ContainerMode,
             ComposeYaml = req.ComposeYaml,
             ComposeProjectName = req.ComposeProjectName,
             FlagSecret = req.FlagSecret,
             AttachmentUrl = req.AttachmentUrl,
-            PointsConfig = req.PointsConfig is not null
-                ? new PointsConfig(req.PointsConfig.InitialPoints, req.PointsConfig.MinimumPoints)
-                : new PointsConfig(),
             CheckerConfig = req.CheckerConfig is not null
                 ? new CheckerConfig { Image = req.CheckerConfig.Image, Command = req.CheckerConfig.Command }
                 : null,
             CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
         };
 
-        db.Challenges.Add(challenge);
+        db.ChallengeTemplates.Add(challenge);
         await db.SaveChangesAsync(ct);
 
-        await SendAsync(new ChallengeAdminDto
-        {
-            Id = challenge.Id,
-            CompetitionId = challenge.CompetitionId,
-            Title = challenge.Title,
-            Description = challenge.Description,
-            TypeId = challenge.TypeId,
-            ContainerImage = challenge.ContainerImage,
-            ContainerMode = challenge.ContainerMode,
-            ComposeYaml = challenge.ComposeYaml,
-            ComposeProjectName = challenge.ComposeProjectName,
-            AttachmentUrl = challenge.AttachmentUrl,
-            CheckerConfig = challenge.CheckerConfig is null ? null : new CheckerConfigDto
-            {
-                Image = challenge.CheckerConfig.Image,
-                Command = challenge.CheckerConfig.Command,
-            },
-            PointsConfig = new PointsConfigDto
-            {
-                InitialPoints = challenge.PointsConfig.InitialPoints,
-                MinimumPoints = challenge.PointsConfig.MinimumPoints,
-            },
-        }, 201, ct);
+        await SendAsync(ChallengeAdminMapping.ToTemplateDto(challenge), 201, ct);
     }
 }

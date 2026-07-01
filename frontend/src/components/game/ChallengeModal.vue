@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -15,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert } from '@/components/ui/alert'
+import { renderMarkdown } from '@/lib/markdown'
 
 interface Challenge {
   id: string
@@ -23,6 +23,8 @@ interface Challenge {
   points: number
   solveCount: number
   description?: string | null
+  descriptionFormat?: string | null
+  hints?: string[]
   attachmentUrl?: string | null
 }
 
@@ -54,6 +56,13 @@ const isOpen = computed({
   get: () => props.open,
   set: (v) => emit('update:open', v),
 })
+
+const renderedDescription = computed(() => {
+  if (!props.challenge?.description) return ''
+  return renderMarkdown(props.challenge.description)
+})
+
+const visibleHints = computed(() => props.challenge?.hints?.filter(Boolean) ?? [])
 
 function onOpenChange(v: boolean) {
   if (!v) {
@@ -111,10 +120,21 @@ async function submitFlag() {
       </DialogHeader>
 
       <div class="space-y-4 py-2">
-        <DialogDescription v-if="challenge?.description" class="text-sm text-foreground leading-relaxed">
-          {{ challenge.description }}
-        </DialogDescription>
+        <div
+          v-if="renderedDescription"
+          class="challenge-markdown text-sm text-foreground"
+          v-html="renderedDescription"
+        />
         <p v-else class="text-sm text-muted-foreground italic">{{ t('challenges.noDescription') }}</p>
+
+        <div v-if="visibleHints.length" class="rounded-md border bg-muted/30 p-3">
+          <div class="mb-2 text-xs font-medium uppercase text-muted-foreground">Hints</div>
+          <ol class="space-y-1 pl-4 text-sm leading-relaxed list-decimal">
+            <li v-for="(hint, index) in visibleHints" :key="`${index}-${hint}`">
+              {{ hint }}
+            </li>
+          </ol>
+        </div>
 
         <div v-if="challenge?.attachmentUrl" class="text-sm">
           <a
@@ -165,3 +185,48 @@ async function submitFlag() {
     </DialogContent>
   </Dialog>
 </template>
+
+<style scoped>
+.challenge-markdown :deep(p) {
+  margin: 0 0 0.75rem;
+  line-height: 1.65;
+}
+
+.challenge-markdown :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.challenge-markdown :deep(h3),
+.challenge-markdown :deep(h4),
+.challenge-markdown :deep(h5) {
+  margin: 0.9rem 0 0.4rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.challenge-markdown :deep(ul) {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.challenge-markdown :deep(li) {
+  margin: 0.25rem 0;
+}
+
+.challenge-markdown :deep(code) {
+  border-radius: 0.25rem;
+  background: hsl(var(--muted));
+  padding: 0.1rem 0.3rem;
+  font-size: 0.85em;
+}
+
+.challenge-markdown :deep(a) {
+  color: hsl(var(--primary));
+  text-underline-offset: 0.2rem;
+}
+
+.challenge-markdown :deep(a:hover) {
+  text-decoration: underline;
+}
+</style>

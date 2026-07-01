@@ -16,6 +16,8 @@ public class UpdateCompetitionAdminRequest
     public string Status { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
+    public PointsConfigDto? DefaultPointsConfig { get; set; }
+    public double DifficultyCoefficient { get; set; } = 1.0;
 }
 
 public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
@@ -40,6 +42,17 @@ public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoin
         competition.Description = req.Description;
         competition.StartTime = req.StartTime;
         competition.EndTime = req.EndTime;
+        competition.DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient;
+
+        if (req.DefaultPointsConfig is not null)
+        {
+            competition.DefaultInitialPoints = req.DefaultPointsConfig.InitialPoints;
+            competition.DefaultMinimumPoints = req.DefaultPointsConfig.MinimumPoints;
+            competition.DefaultDecayFactor = req.DefaultPointsConfig.DecayFactor;
+            competition.DefaultDecayFunction = string.IsNullOrWhiteSpace(req.DefaultPointsConfig.DecayFunction)
+                ? "quadratic"
+                : req.DefaultPointsConfig.DecayFunction;
+        }
 
         if (Enum.TryParse<GameModeType>(req.GameModeType, ignoreCase: true, out var mode))
         {

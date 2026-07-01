@@ -54,7 +54,7 @@ import {
   MoreHorizontal, 
   Plus, 
   Search, 
-  Edit, 
+  Settings, 
   Users2, 
   Trash2, 
   ExternalLink,
@@ -174,20 +174,6 @@ function openCreate() {
   editDialog.value = true
 }
 
-function openEdit(comp: CompetitionAdminDto) {
-  isCreating.value = false
-  selectedComp.value = comp
-  form.value = {
-    title: comp.title,
-    description: comp.description ?? '',
-    gameModeType: comp.gameModeType,
-    startTime: comp.startTime ? comp.startTime.slice(0, 16) : '',
-    endTime: comp.endTime ? comp.endTime.slice(0, 16) : '',
-    status: comp.status,
-  }
-  editDialog.value = true
-}
-
 function openDelete(comp: CompetitionAdminDto) {
   selectedComp.value = comp
   deleteDialog.value = true
@@ -195,6 +181,10 @@ function openDelete(comp: CompetitionAdminDto) {
 
 function goCollaborators(comp: CompetitionAdminDto) {
   router.push({ name: 'admin-collaborators', query: { competitionId: comp.id, competitionTitle: comp.title } })
+}
+
+function goManage(comp: CompetitionAdminDto) {
+  router.push({ name: 'admin-competition-detail', params: { id: comp.id } })
 }
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -326,9 +316,9 @@ const table = useVueTable({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-[160px]">
                   <DropdownMenuLabel>{{ t('common.actions') }}</DropdownMenuLabel>
-                  <DropdownMenuItem @click="openEdit(row.original)">
-                    <Edit class="mr-2 size-4" />
-                    {{ t('common.edit') }}
+                  <DropdownMenuItem @click="goManage(row.original)">
+                    <Settings class="mr-2 size-4" />
+                    Manage
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="goCollaborators(row.original)">
                     <Users2 class="mr-2 size-4" />
