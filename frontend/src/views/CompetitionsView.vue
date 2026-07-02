@@ -44,9 +44,11 @@ const { data: competitions, isLoading, isError, refetch } = useQuery({
   queryFn: () => competitionApi.list<Competition[]>(),
 })
 
+const competitionList = computed(() => Array.isArray(competitions.value) ? competitions.value : [])
+
 const filteredCompetitions = computed(() => {
   const q = search.value.trim().toLowerCase()
-  return (competitions.value ?? []).filter((comp) => {
+  return competitionList.value.filter((comp) => {
     const matchesSearch = !q || comp.title.toLowerCase().includes(q) || (comp.description ?? '').toLowerCase().includes(q)
     const matchesStatus = statusFilter.value === 'all' || comp.status.toLowerCase() === statusFilter.value
     const matchesMode = modeFilter.value === 'all' || (comp.gameModeType ?? '').toLowerCase() === modeFilter.value
@@ -139,11 +141,19 @@ function formatDate(iso: string) {
       />
       
       <EmptyState
-        v-else-if="filteredCompetitions.length === 0"
+        v-else-if="competitionList.length === 0"
         :title="t('competitions.empty')"
         :description="t('competitions.emptyDescription')"
         :action-label="t('common.refresh')"
         @action="refetch()"
+      />
+
+      <EmptyState
+        v-else-if="filteredCompetitions.length === 0"
+        :title="t('common.noResults')"
+        :description="t('competitions.emptyDescription')"
+        :action-label="t('common.reset')"
+        @action="search = ''; statusFilter = 'all'; modeFilter = 'all'"
       />
 
       <div v-else v-auto-animate class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
