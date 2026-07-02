@@ -11,6 +11,7 @@ public class CompetitionListItemDto
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Status { get; set; } = string.Empty;
+    public string GameModeType { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
 }
@@ -40,6 +41,7 @@ public class GetCompetitionsEndpoint(ApplicationDbContext dbContext) : Endpoint<
                 Title = c.Title,
                 Description = c.Description,
                 Status = c.Status.ToString().ToLowerInvariant(),
+                GameModeType = c.GameModeType.ToString().ToLowerInvariant(),
                 StartTime = c.StartTime,
                 EndTime = c.EndTime
             })

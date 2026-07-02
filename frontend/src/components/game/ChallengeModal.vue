@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert } from '@/components/ui/alert'
 import { renderMarkdown } from '@/lib/markdown'
+import { toast } from 'vue-sonner'
+import { CheckCircle2, Download, Loader2, Shield, Server, Upload } from 'lucide-vue-next'
 
 interface Challenge {
   id: string
@@ -33,15 +35,33 @@ interface SubmitResponse {
   message?: string | null
 }
 
+interface PatchSubmissionStatus {
+  id?: string
+  challengeId: string
+  status: string | number
+  submittedAt?: string
+  validatedAt?: string | null
+  validationDetail?: string | null
+}
+
 const props = defineProps<{
   open: boolean
   challenge: Challenge | null
   competitionId: string
   solved: boolean
+  gameModeType?: string
+  isAwdMode?: boolean
+  isAwdpMode?: boolean
+  instanceReady?: boolean
+  defenseEnabled?: boolean
+  patchSubmissions?: PatchSubmissionStatus[]
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
+  'create-instance': []
+  'request-defense': []
+  'patch-uploaded': []
   solved: []
 }>()
 
@@ -51,6 +71,10 @@ const flagInput = ref('')
 const submitting = ref(false)
 const submitResult = ref<'correct' | 'incorrect' | null>(null)
 const submitError = ref<string | null>(null)
+const patchFile = ref<File | null>(null)
+const patchUploading = ref(false)
+const instanceCreating = ref(false)
+const instanceStatus = ref<string | null>(null)
 
 const isOpen = computed({
   get: () => props.open,
@@ -63,14 +87,43 @@ const renderedDescription = computed(() => {
 })
 
 const visibleHints = computed(() => props.challenge?.hints?.filter(Boolean) ?? [])
+const patchStatuses = computed(() => props.patchSubmissions ?? [])
+const canUploadPatch = computed(() => Boolean(props.isAwdMode && props.defenseEnabled && patchFile.value && props.challenge))
 
 function onOpenChange(v: boolean) {
   if (!v) {
     flagInput.value = ''
     submitResult.value = null
     submitError.value = null
+    patchFile.value = null
+    instanceStatus.value = null
   }
   emit('update:open', v)
+}
+
+async function createInstance() {
+  if (!props.challenge) return
+  instanceCreating.value = true
+  instanceStatus.value = null
+  try {
+    const data = await competitionApi.createInstance<{ ports?: Record<string, number>; status?: string }>(
+      props.competitionId,
+      props.challenge.id,
+    )
+    const ports = data.ports ? Object.entries(data.ports).map(([container, host]) => `${container}->${host}`).join(', ') : ''
+    instanceStatus.value = ports ? `${data.status ?? 'running'} ${ports}` : data.status ?? 'running'
+    toast.success(t('challenges.instanceReady'))
+    emit('create-instance')
+  } catch {
+    toast.error(t('challenges.instanceFailed'))
+  } finally {
+    instanceCreating.value = false
+  }
+}
+
+function onPatchFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  patchFile.value = input.files?.[0] ?? null
 }
 
 async function submitFlag() {
@@ -98,11 +151,32 @@ async function submitFlag() {
     submitting.value = false
   }
 }
+
+async function submitPatch() {
+  if (!props.challenge || !patchFile.value || !props.defenseEnabled) return
+  patchUploading.value = true
+
+  try {
+    await competitionApi.submitPatch(props.competitionId, props.challenge.id, patchFile.value)
+    toast.success(t('awd.patchSubmitted'))
+    patchFile.value = null
+    emit('patch-uploaded')
+  } catch {
+    toast.error(t('awd.patchUploadFailed'))
+  } finally {
+    patchUploading.value = false
+  }
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return ''
+  return new Date(value).toLocaleString()
+}
 </script>
 
 <template>
   <Dialog :open="isOpen" @update:open="onOpenChange">
-    <DialogContent class="sm:max-w-lg">
+    <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
       <DialogHeader>
         <div class="flex items-center gap-2">
           <DialogTitle>{{ challenge?.title }}</DialogTitle>
@@ -110,7 +184,7 @@ async function submitFlag() {
             {{ t('challenges.solved') }}
           </Badge>
         </div>
-        <div class="flex items-center gap-2 mt-1">
+        <div class="mt-1 flex items-center gap-2">
           <span class="text-xs text-muted-foreground">{{ challenge?.typeId }}</span>
           <span class="text-xs text-muted-foreground">·</span>
           <span class="text-xs font-medium">{{ challenge?.points }} {{ $t('nav.score') }}</span>
@@ -127,8 +201,29 @@ async function submitFlag() {
         />
         <p v-else class="text-sm text-muted-foreground italic">{{ t('challenges.noDescription') }}</p>
 
+        <div class="grid gap-3 rounded-lg border bg-muted/25 p-3 sm:grid-cols-2">
+          <Button variant="outline" class="justify-start" :disabled="instanceReady || instanceCreating" @click="createInstance">
+            <Loader2 v-if="instanceCreating" class="mr-2 size-4 animate-spin" />
+            <Server v-else class="mr-2 size-4" />
+            {{ instanceReady ? t('challenges.instanceReady') : t('challenges.createInstance') }}
+          </Button>
+          <Button
+            v-if="isAwdMode"
+            variant="outline"
+            class="justify-start"
+            :disabled="defenseEnabled"
+            @click="emit('request-defense')"
+          >
+            <Shield class="mr-2 size-4" />
+            {{ defenseEnabled ? t('challenges.defenseReady') : t('challenges.requestDefense') }}
+          </Button>
+        </div>
+        <div v-if="instanceStatus" class="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          {{ instanceStatus }}
+        </div>
+
         <div v-if="visibleHints.length" class="rounded-md border bg-muted/30 p-3">
-          <div class="mb-2 text-xs font-medium uppercase text-muted-foreground">Hints</div>
+          <div class="mb-2 text-xs font-medium uppercase text-muted-foreground">{{ t('challenges.hints') }}</div>
           <ol class="space-y-1 pl-4 text-sm leading-relaxed list-decimal">
             <li v-for="(hint, index) in visibleHints" :key="`${index}-${hint}`">
               {{ hint }}
@@ -143,8 +238,48 @@ async function submitFlag() {
             rel="noopener noreferrer"
             class="text-primary underline-offset-4 hover:underline"
           >
+            <Download class="mr-1 inline size-4" />
             {{ t('challenges.downloadAttachment') }}
           </a>
+        </div>
+
+        <div v-if="isAwdMode" class="space-y-3 rounded-lg border bg-muted/20 p-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-semibold">{{ t('awd.uploadPatch') }}</div>
+              <p class="text-xs text-muted-foreground">
+                {{ defenseEnabled ? t('challenges.patchUnlocked') : t('challenges.patchLocked') }}
+              </p>
+            </div>
+            <Badge :variant="defenseEnabled ? 'default' : 'outline'">
+              {{ defenseEnabled ? t('challenges.defenseReady') : t('challenges.defenseRequired') }}
+            </Badge>
+          </div>
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <Input type="file" accept=".tar.gz,.tgz" :disabled="!defenseEnabled || patchUploading" @change="onPatchFileChange" />
+            <Button class="shrink-0" :disabled="patchUploading || !canUploadPatch" @click="submitPatch">
+              <Loader2 v-if="patchUploading" class="mr-2 size-4 animate-spin" />
+              <Upload v-else class="mr-2 size-4" />
+              {{ t('awd.submitPatch') }}
+            </Button>
+          </div>
+        </div>
+
+        <div v-if="isAwdpMode" class="space-y-2 rounded-lg border bg-card p-3">
+          <div class="text-sm font-semibold">{{ t('awd.patchStatus') }}</div>
+          <div v-if="patchStatuses.length" class="divide-y">
+            <div v-for="patch in patchStatuses" :key="patch.id ?? `${patch.challengeId}-${patch.submittedAt}`" class="space-y-1 py-2">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-muted-foreground">{{ formatDate(patch.submittedAt) }}</span>
+                <Badge variant="secondary">{{ patch.status }}</Badge>
+              </div>
+              <p v-if="patch.validationDetail" class="text-xs leading-relaxed text-muted-foreground">
+                <CheckCircle2 class="mr-1 inline size-3" />
+                {{ patch.validationDetail }}
+              </p>
+            </div>
+          </div>
+          <p v-else class="text-xs text-muted-foreground">{{ t('challenges.noPatchRecords') }}</p>
         </div>
 
         <div v-if="!solved" class="space-y-2">

@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using System.Text.Json;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -17,6 +18,10 @@ public class CompetitionSummaryDto
     public Guid OwnerId { get; set; }
     public PointsConfigDto DefaultPointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public bool TeamRegistrationAutoApprove { get; set; } = true;
+    public int MaxTeamMembers { get; set; } = 5;
+    public bool TracksEnabled { get; set; }
+    public List<string> TrackNames { get; set; } = [];
 }
 
 public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest, List<CompetitionSummaryDto>>
@@ -31,28 +36,9 @@ public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext) : Endp
     {
         var competitions = await dbContext.Competitions
             .IgnoreQueryFilters()
-            .Select(c => new CompetitionSummaryDto
-            {
-                Id = c.Id,
-                Title = c.Title,
-                Description = c.Description,
-                GameModeType = c.GameModeType.ToString(),
-                Status = c.Status.ToString().ToLowerInvariant(),
-                StartTime = c.StartTime,
-                EndTime = c.EndTime,
-                OwnerId = c.OwnerId,
-                DefaultPointsConfig = new PointsConfigDto
-                {
-                    InitialPoints = c.DefaultInitialPoints,
-                    MinimumPoints = c.DefaultMinimumPoints,
-                    DecayFactor = c.DefaultDecayFactor,
-                    DecayFunction = c.DefaultDecayFunction,
-                },
-                DifficultyCoefficient = c.DifficultyCoefficient,
-            })
             .ToListAsync(ct);
 
-        await SendAsync(competitions, cancellation: ct);
+        await SendAsync(competitions.Select(GetCompetitionAdminEndpoint.ToDto).ToList(), cancellation: ct);
     }
 }
 
@@ -78,24 +64,37 @@ public class GetCompetitionAdminEndpoint(ApplicationDbContext dbContext) : Endpo
             return;
         }
 
-        await SendAsync(new CompetitionSummaryDto
+        await SendAsync(ToDto(competition), cancellation: ct);
+    }
+
+    internal static CompetitionSummaryDto ToDto(Competition competition) => new()
+    {
+        Id = competition.Id,
+        Title = competition.Title,
+        Description = competition.Description,
+        GameModeType = competition.GameModeType.ToString(),
+        Status = competition.Status.ToString().ToLowerInvariant(),
+        StartTime = competition.StartTime,
+        EndTime = competition.EndTime,
+        OwnerId = competition.OwnerId,
+        DefaultPointsConfig = new PointsConfigDto
         {
-            Id = competition.Id,
-            Title = competition.Title,
-            Description = competition.Description,
-            GameModeType = competition.GameModeType.ToString(),
-            Status = competition.Status.ToString().ToLowerInvariant(),
-            StartTime = competition.StartTime,
-            EndTime = competition.EndTime,
-            OwnerId = competition.OwnerId,
-            DefaultPointsConfig = new PointsConfigDto
-            {
-                InitialPoints = competition.DefaultInitialPoints,
-                MinimumPoints = competition.DefaultMinimumPoints,
-                DecayFactor = competition.DefaultDecayFactor,
-                DecayFunction = competition.DefaultDecayFunction,
-            },
-            DifficultyCoefficient = competition.DifficultyCoefficient,
-        }, cancellation: ct);
+            InitialPoints = competition.DefaultInitialPoints,
+            MinimumPoints = competition.DefaultMinimumPoints,
+            DecayFactor = competition.DefaultDecayFactor,
+            DecayFunction = competition.DefaultDecayFunction,
+        },
+        DifficultyCoefficient = competition.DifficultyCoefficient,
+        TeamRegistrationAutoApprove = competition.TeamRegistrationAutoApprove,
+        MaxTeamMembers = competition.MaxTeamMembers,
+        TracksEnabled = competition.TracksEnabled,
+        TrackNames = ParseTracks(competition.TrackNamesJson),
+    };
+
+    internal static List<string> ParseTracks(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        try { return JsonSerializer.Deserialize<List<string>>(value) ?? []; }
+        catch (JsonException) { return []; }
     }
 }

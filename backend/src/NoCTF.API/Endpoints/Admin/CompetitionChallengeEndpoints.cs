@@ -11,6 +11,7 @@ public class BindCompetitionChallengeRequest
     public Guid TemplateId { get; set; }
     public string? Description { get; set; }
     public string DescriptionFormat { get; set; } = "markdown";
+    public string? FlagPrefix { get; set; }
     public PointsConfigDto? PointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
     public List<string> Hints { get; set; } = [];
@@ -22,6 +23,7 @@ public class UpdateCompetitionChallengeRequest
     public Guid ChallengeId { get; set; }
     public string? Description { get; set; }
     public string DescriptionFormat { get; set; } = "markdown";
+    public string? FlagPrefix { get; set; }
     public PointsConfigDto? PointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
     public List<string> Hints { get; set; } = [];
@@ -112,7 +114,13 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db)
             ComposeYaml = template.ComposeYaml,
             ComposeProjectName = template.ComposeProjectName,
             FlagSecret = template.FlagSecret,
+            FlagPrefix = string.IsNullOrWhiteSpace(req.FlagPrefix) ? "flag" : req.FlagPrefix.Trim(),
+            FlagEnvironmentVariable = string.IsNullOrWhiteSpace(template.FlagEnvironmentVariable)
+                ? "NOCTF_FLAG_UUID"
+                : template.FlagEnvironmentVariable,
             AttachmentUrl = template.AttachmentUrl,
+            DeploymentType = template.DeploymentType,
+            ExposedPort = template.ExposedPort,
             PointsConfig = new PointsConfig(points.InitialPoints, points.MinimumPoints, points.DecayFactor, points.DecayFunction),
             DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? competition.DifficultyCoefficient : req.DifficultyCoefficient,
             CheckerConfig = template.CheckerConfig is not null
@@ -176,6 +184,7 @@ public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db)
 
         challenge.Description = req.Description;
         challenge.DescriptionFormat = string.IsNullOrWhiteSpace(req.DescriptionFormat) ? "markdown" : req.DescriptionFormat;
+        challenge.FlagPrefix = string.IsNullOrWhiteSpace(req.FlagPrefix) ? "flag" : req.FlagPrefix.Trim();
         challenge.DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient;
         if (req.PointsConfig is not null)
         {

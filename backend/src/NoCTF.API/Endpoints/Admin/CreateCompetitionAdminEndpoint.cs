@@ -17,6 +17,10 @@ public class CreateCompetitionAdminRequest
     public DateTime EndTime { get; set; }
     public PointsConfigDto? DefaultPointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public bool TeamRegistrationAutoApprove { get; set; } = true;
+    public int MaxTeamMembers { get; set; } = 5;
+    public bool TracksEnabled { get; set; }
+    public List<string> TrackNames { get; set; } = [];
 }
 
 public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
@@ -57,7 +61,11 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             DefaultMinimumPoints = req.DefaultPointsConfig?.MinimumPoints ?? 100,
             DefaultDecayFactor = req.DefaultPointsConfig?.DecayFactor ?? 450,
             DefaultDecayFunction = req.DefaultPointsConfig?.DecayFunction ?? "quadratic",
-            DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient
+            DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient,
+            TeamRegistrationAutoApprove = req.TeamRegistrationAutoApprove,
+            MaxTeamMembers = req.MaxTeamMembers <= 0 ? 5 : req.MaxTeamMembers,
+            TracksEnabled = req.TracksEnabled,
+            TrackNamesJson = System.Text.Json.JsonSerializer.Serialize(NormalizeTracks(req.TrackNames)),
         };
         competition.CompetitionId = competition.Id;
 
@@ -82,6 +90,17 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
                 DecayFunction = competition.DefaultDecayFunction,
             },
             DifficultyCoefficient = competition.DifficultyCoefficient,
+            TeamRegistrationAutoApprove = competition.TeamRegistrationAutoApprove,
+            MaxTeamMembers = competition.MaxTeamMembers,
+            TracksEnabled = competition.TracksEnabled,
+            TrackNames = NormalizeTracks(req.TrackNames),
         }, 201, ct);
     }
+
+    internal static List<string> NormalizeTracks(IEnumerable<string> tracks)
+        => tracks
+            .Select(t => t.Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 }

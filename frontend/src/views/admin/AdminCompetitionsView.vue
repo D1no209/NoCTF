@@ -318,7 +318,7 @@ const table = useVueTable({
                   <DropdownMenuLabel>{{ t('common.actions') }}</DropdownMenuLabel>
                   <DropdownMenuItem @click="goManage(row.original)">
                     <Settings class="mr-2 size-4" />
-                    Manage
+                    {{ t('admin.competitions.manage') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="goCollaborators(row.original)">
                     <Users2 class="mr-2 size-4" />
@@ -372,7 +372,7 @@ const table = useVueTable({
         <DialogHeader>
           <DialogTitle>{{ isCreating ? t('admin.competitions.createDialogTitle') : t('admin.competitions.editDialogTitle') }}</DialogTitle>
           <DialogDescription>
-            {{ isCreating ? 'Set up a new competition.' : 'Update existing competition details.' }}
+            {{ isCreating ? t('admin.competitions.createDialogDescription') : t('admin.competitions.editDialogDescription') }}
           </DialogDescription>
         </DialogHeader>
         <div class="grid gap-4 py-4">
@@ -442,11 +442,11 @@ const table = useVueTable({
         <DialogHeader>
           <DialogTitle>{{ t('admin.competitions.deleteDialogTitle') }}</DialogTitle>
           <DialogDescription>
-            This action cannot be undone. This will permanently delete the competition and all associated data.
+            {{ t('admin.competitions.deleteDialogDescription') }}
           </DialogDescription>
         </DialogHeader>
         <div class="py-4">
-          <p class="text-sm font-medium">Are you sure you want to delete <span class="font-bold text-foreground">"{{ selectedComp?.title }}"</span>?</p>
+          <p class="text-sm font-medium">{{ t('admin.competitions.deleteQuestion') }} <span class="font-bold text-foreground">"{{ selectedComp?.title }}"</span>?</p>
         </div>
         <DialogFooter>
           <Button variant="outline" @click="deleteDialog = false">{{ t('common.cancel') }}</Button>

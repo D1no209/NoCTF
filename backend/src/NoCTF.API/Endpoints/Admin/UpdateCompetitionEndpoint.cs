@@ -18,6 +18,10 @@ public class UpdateCompetitionAdminRequest
     public DateTime EndTime { get; set; }
     public PointsConfigDto? DefaultPointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public bool TeamRegistrationAutoApprove { get; set; } = true;
+    public int MaxTeamMembers { get; set; } = 5;
+    public bool TracksEnabled { get; set; }
+    public List<string> TrackNames { get; set; } = [];
 }
 
 public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
@@ -43,6 +47,11 @@ public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoin
         competition.StartTime = req.StartTime;
         competition.EndTime = req.EndTime;
         competition.DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient;
+        competition.TeamRegistrationAutoApprove = req.TeamRegistrationAutoApprove;
+        competition.MaxTeamMembers = req.MaxTeamMembers <= 0 ? 5 : req.MaxTeamMembers;
+        competition.TracksEnabled = req.TracksEnabled;
+        competition.TrackNamesJson = System.Text.Json.JsonSerializer.Serialize(
+            CreateCompetitionAdminEndpoint.NormalizeTracks(req.TrackNames));
 
         if (req.DefaultPointsConfig is not null)
         {
