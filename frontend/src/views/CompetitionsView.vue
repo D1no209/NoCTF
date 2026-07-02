@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
+import { onMounted, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { competitionApi } from '@/api/noctf'
-import { queryKeys } from '@/api/queryKeys'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,16 +16,11 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import EmptyState from '@/components/state/EmptyState.vue'
-import ErrorState from '@/components/state/ErrorState.vue'
 import { RouterLink } from 'vue-router'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
-import { ArrowRight, Calendar, RotateCw, Search } from 'lucide-vue-next'
+import { AlertCircle, ArrowRight, Calendar, Inbox, RotateCw, Search } from 'lucide-vue-next'
 
 const { t } = useI18n()
-const search = ref('')
-const statusFilter = ref('all')
-const modeFilter = ref('all')
 
 interface Competition {
   id: string
@@ -39,21 +32,67 @@ interface Competition {
   endTime: string
 }
 
-const { data: competitions, isLoading, isError, refetch } = useQuery({
-  queryKey: queryKeys.competitions,
-  queryFn: () => competitionApi.list<Competition[]>(),
+type LoadState = 'loading' | 'error' | 'empty' | 'filtered-empty' | 'ready'
+
+const state = reactive({
+  search: '',
+  statusFilter: 'all',
+  modeFilter: 'all',
+  competitions: [] as Competition[],
+  visibleCompetitions: [] as Competition[],
+  loadState: 'loading' as LoadState,
 })
 
-const competitionList = computed(() => Array.isArray(competitions.value) ? competitions.value : [])
+function resetFilters() {
+  state.search = ''
+  state.statusFilter = 'all'
+  state.modeFilter = 'all'
+}
 
-const filteredCompetitions = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  return competitionList.value.filter((comp) => {
+function isState(loadState: LoadState) {
+  return state.loadState === loadState
+}
+
+async function loadCompetitions() {
+  state.loadState = 'loading'
+
+  try {
+    const response = await competitionApi.list<Competition[]>()
+    state.competitions = Array.isArray(response) ? response : []
+    updateListState()
+  } catch {
+    state.competitions = []
+    state.visibleCompetitions = []
+    state.loadState = 'error'
+  }
+}
+
+onMounted(() => {
+  void loadCompetitions()
+})
+
+function updateListState() {
+  const q = state.search.trim().toLowerCase()
+  state.visibleCompetitions = state.competitions.filter((comp) => {
     const matchesSearch = !q || comp.title.toLowerCase().includes(q) || (comp.description ?? '').toLowerCase().includes(q)
-    const matchesStatus = statusFilter.value === 'all' || comp.status.toLowerCase() === statusFilter.value
-    const matchesMode = modeFilter.value === 'all' || (comp.gameModeType ?? '').toLowerCase() === modeFilter.value
+    const matchesStatus = state.statusFilter === 'all' || comp.status.toLowerCase() === state.statusFilter
+    const matchesMode = state.modeFilter === 'all' || (comp.gameModeType ?? '').toLowerCase() === state.modeFilter
     return matchesSearch && matchesStatus && matchesMode
   })
+
+  if (state.competitions.length === 0) {
+    state.loadState = 'empty'
+  } else if (state.visibleCompetitions.length === 0) {
+    state.loadState = 'filtered-empty'
+  } else {
+    state.loadState = 'ready'
+  }
+}
+
+watch(() => [state.search, state.statusFilter, state.modeFilter], () => {
+  if (state.loadState !== 'loading' && state.loadState !== 'error') {
+    updateListState()
+  }
 })
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -83,8 +122,8 @@ function formatDate(iso: string) {
           :description="t('competitions.subtitle')"
           class="flex-1"
         />
-        <Button variant="outline" size="sm" @click="refetch()" :disabled="isLoading" class="shrink-0">
-          <RotateCw class="mr-2 size-4" :class="{ 'animate-spin': isLoading }" />
+        <Button variant="outline" size="sm" @click="loadCompetitions()" :disabled="isState('loading')" class="shrink-0">
+          <RotateCw class="mr-2 size-4" :class="{ 'animate-spin': isState('loading') }" />
           {{ t('common.refresh') }}
         </Button>
       </div>
@@ -93,10 +132,10 @@ function formatDate(iso: string) {
       <div class="noctf-panel grid gap-4 rounded-xl p-5 md:grid-cols-[1fr_220px_220px_auto]">
         <div class="relative">
           <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="search" :placeholder="t('competitions.searchPlaceholder')" class="pl-10" />
+          <Input v-model="state.search" :placeholder="t('competitions.searchPlaceholder')" class="pl-10" />
         </div>
         
-        <Select v-model="statusFilter">
+        <Select v-model="state.statusFilter">
           <SelectTrigger>
             <SelectValue :placeholder="t('common.status')" />
           </SelectTrigger>
@@ -109,7 +148,7 @@ function formatDate(iso: string) {
           </SelectContent>
         </Select>
 
-        <Select v-model="modeFilter">
+        <Select v-model="state.modeFilter">
           <SelectTrigger>
             <SelectValue :placeholder="t('common.mode')" />
           </SelectTrigger>
@@ -122,87 +161,91 @@ function formatDate(iso: string) {
           </SelectContent>
         </Select>
 
-        <Button variant="outline" @click="refetch()" :disabled="isLoading" class="hidden md:inline-flex">
-          <RotateCw class="size-4" :class="{ 'animate-spin': isLoading }" />
+        <Button variant="outline" @click="loadCompetitions()" :disabled="isState('loading')" class="hidden md:inline-flex">
+          <RotateCw class="size-4" :class="{ 'animate-spin': isState('loading') }" />
           {{ t('common.refresh') }}
         </Button>
       </div>
 
-      <!-- Content -->
-      <div v-if="isLoading" class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        <Skeleton v-for="i in 6" :key="i" class="h-64 rounded-xl" />
-      </div>
-      
-      <ErrorState
-        v-else-if="isError"
-        :title="t('competitions.loadError')"
-        :retry-label="t('common.refresh')"
-        @retry="refetch()"
-      />
-      
-      <EmptyState
-        v-else-if="competitionList.length === 0"
-        :title="t('competitions.empty')"
-        :description="t('competitions.emptyDescription')"
-        :action-label="t('common.refresh')"
-        @action="refetch()"
-      />
+      <div class="min-h-40">
+        <div v-if="isState('loading')" class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <Skeleton v-for="i in 6" :key="i" class="h-64 rounded-xl" />
+        </div>
 
-      <EmptyState
-        v-else-if="filteredCompetitions.length === 0"
-        :title="t('common.noResults')"
-        :description="t('competitions.emptyDescription')"
-        :action-label="t('common.reset')"
-        @action="search = ''; statusFilter = 'all'; modeFilter = 'all'"
-      />
+        <div v-else-if="isState('error')" class="flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center">
+          <AlertCircle class="size-8 text-destructive" />
+          <h3 class="mt-3 text-sm font-medium">{{ t('competitions.loadError') }}</h3>
+          <Button variant="outline" size="sm" class="mt-4" @click="loadCompetitions">
+            {{ t('common.refresh') }}
+          </Button>
+        </div>
 
-      <div v-else v-auto-animate class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        <Card
-          v-for="comp in filteredCompetitions"
-          :key="comp.id"
-          class="group h-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_24px_70px_rgb(37_99_235/0.14)]"
-        >
-          <CardHeader class="pb-3">
-            <div class="mb-3 flex items-center gap-2">
-              <Badge :variant="statusVariant(comp.status)" class="font-semibold">
-                {{ comp.status }}
-              </Badge>
-              <Badge variant="secondary" class="bg-blue-50 text-blue-700">
-                {{ comp.gameModeType || 'CTF' }}
-              </Badge>
-            </div>
-            <div class="flex items-start justify-between gap-2">
-              <CardTitle class="text-xl font-bold transition-colors group-hover:text-primary">
-                {{ comp.title }}
-              </CardTitle>
-            </div>
-            <CardDescription v-if="comp.description" class="line-clamp-2 mt-2 leading-relaxed">
-              {{ comp.description }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-4 pt-0">
-            <div class="space-y-2 border-t pt-4 text-sm text-muted-foreground">
-              <div class="flex items-center gap-2">
-                <Calendar class="size-3.5" />
-                <span>{{ formatDate(comp.startTime) }} ~ {{ formatDate(comp.endTime) }}</span>
+        <div v-else-if="isState('empty')" class="flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center">
+          <Inbox class="size-8 text-muted-foreground" />
+          <h3 class="mt-3 text-sm font-medium">{{ t('competitions.empty') }}</h3>
+          <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('competitions.emptyDescription') }}</p>
+          <Button variant="outline" size="sm" class="mt-4" @click="loadCompetitions">
+            {{ t('common.refresh') }}
+          </Button>
+        </div>
+
+        <div v-else-if="isState('filtered-empty')" class="flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center">
+          <Search class="size-8 text-muted-foreground" />
+          <h3 class="mt-3 text-sm font-medium">{{ t('common.noResults') }}</h3>
+          <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('competitions.emptyDescription') }}</p>
+          <Button variant="outline" size="sm" class="mt-4" @click="resetFilters">
+            {{ t('common.reset') }}
+          </Button>
+        </div>
+
+        <div v-else-if="isState('ready')" v-auto-animate class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <Card
+            v-for="comp in state.visibleCompetitions"
+            :key="comp.id"
+            class="group h-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_24px_70px_rgb(37_99_235/0.14)]"
+          >
+            <CardHeader class="pb-3">
+              <div class="mb-3 flex items-center gap-2">
+                <Badge :variant="statusVariant(comp.status)" class="font-semibold">
+                  {{ comp.status }}
+                </Badge>
+                <Badge variant="secondary" class="bg-blue-50 text-blue-700">
+                  {{ comp.gameModeType || 'CTF' }}
+                </Badge>
               </div>
-            </div>
+              <div class="flex items-start justify-between gap-2">
+                <CardTitle class="text-xl font-bold transition-colors group-hover:text-primary">
+                  {{ comp.title }}
+                </CardTitle>
+              </div>
+              <CardDescription v-if="comp.description" class="line-clamp-2 mt-2 leading-relaxed">
+                {{ comp.description }}
+              </CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4 pt-0">
+              <div class="space-y-2 border-t pt-4 text-sm text-muted-foreground">
+                <div class="flex items-center gap-2">
+                  <Calendar class="size-3.5" />
+                  <span>{{ formatDate(comp.startTime) }} ~ {{ formatDate(comp.endTime) }}</span>
+                </div>
+              </div>
 
-            <div class="grid gap-2 sm:grid-cols-2">
-              <Button variant="outline" as-child>
-                <RouterLink :to="`/competitions/${comp.id}/register`">
-                  {{ t('teams.registerForCompetition') }}
-                </RouterLink>
-              </Button>
-              <Button as-child>
-                <RouterLink :to="`/competitions/${comp.id}`">
-                {{ t('competitions.enter') }}
-                <ArrowRight class="size-4" />
-                </RouterLink>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <Button variant="outline" as-child>
+                  <RouterLink :to="`/competitions/${comp.id}/register`">
+                    {{ t('teams.registerForCompetition') }}
+                  </RouterLink>
+                </Button>
+                <Button as-child>
+                  <RouterLink :to="`/competitions/${comp.id}`">
+                    {{ t('competitions.enter') }}
+                    <ArrowRight class="size-4" />
+                  </RouterLink>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   </AppLayout>
