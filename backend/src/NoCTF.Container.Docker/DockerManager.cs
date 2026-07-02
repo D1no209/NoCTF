@@ -48,12 +48,18 @@ public class DockerManager(DockerProvider provider) : IContainerManager
             HostConfig = DockerHostConfigFactory.Create(config, publishAllPorts: false)
         };
 
-        // Pull image if needed
-        await client.Images.CreateImageAsync(
-            new ImagesCreateParameters { FromImage = config.Image },
-            null,
-            new Progress<JSONMessage>(),
-            cancellationToken);
+        try
+        {
+            await client.Images.InspectImageAsync(config.Image, cancellationToken);
+        }
+        catch (DockerImageNotFoundException)
+        {
+            await client.Images.CreateImageAsync(
+                new ImagesCreateParameters { FromImage = config.Image },
+                null,
+                new Progress<JSONMessage>(),
+                cancellationToken);
+        }
 
         var startedAt = DateTime.UtcNow;
         var createResponse = await client.Containers.CreateContainerAsync(createParams, cancellationToken);

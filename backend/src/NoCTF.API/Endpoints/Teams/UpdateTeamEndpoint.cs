@@ -48,6 +48,12 @@ public class UpdateTeamEndpoint(ApplicationDbContext dbContext, ITeamPermissionS
             return;
         }
 
+        if (team.IsLocked)
+        {
+            await SendStringAsync("team_locked", 409, cancellation: ct);
+            return;
+        }
+
         if (req.Name is not null) team.Name = req.Name;
         if (req.AvatarUrl is not null) team.AvatarUrl = req.AvatarUrl;
 

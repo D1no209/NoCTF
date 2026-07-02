@@ -3,6 +3,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.Security;
+using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 
@@ -62,12 +63,24 @@ public class SubmitPatchEndpoint(
             .Join(dbContext.Teams.IgnoreQueryFilters().Where(t => t.CompetitionId == req.Id),
                   tm => tm.TeamId,
                   t => t.Id,
-                  (tm, t) => new { tm.UserId, TeamId = t.Id })
+                  (tm, t) => new { tm.UserId, TeamId = t.Id, t.RegistrationStatus, t.IsBanned })
             .FirstOrDefaultAsync(x => x.UserId == userId, ct);
 
         if (teamMember is null)
         {
             await SendAsync(new SubmitPatchResponse { Status = "no_team" }, 400, ct);
+            return;
+        }
+
+        if (teamMember.RegistrationStatus != TeamRegistrationStatus.Approved)
+        {
+            await SendAsync(new SubmitPatchResponse { Status = "team_not_approved" }, 403, ct);
+            return;
+        }
+
+        if (teamMember.IsBanned)
+        {
+            await SendAsync(new SubmitPatchResponse { Status = "team_banned" }, 403, ct);
             return;
         }
 

@@ -19,6 +19,8 @@ public class ChallengeDto
     public int Points { get; set; }
     public int SolveCount { get; set; }
     public string? AttachmentUrl { get; set; }
+    public string DeploymentType { get; set; } = string.Empty;
+    public int? ExposedPort { get; set; }
     public List<string> Hints { get; set; } = [];
 }
 
@@ -48,7 +50,9 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
                 TypeId = c.TypeId,
                 Points = c.PointsConfig.InitialPoints,
                 SolveCount = dbContext.Submissions.Count(s => s.CompetitionId == req.Id && s.ChallengeId == c.Id && s.IsCorrect),
-                AttachmentUrl = c.AttachmentUrl
+                AttachmentUrl = c.AttachmentUrl,
+                DeploymentType = c.DeploymentType.ToString(),
+                ExposedPort = c.ExposedPort
             })
             .ToListAsync(ct);
 

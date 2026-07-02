@@ -3,6 +3,7 @@ import { ref, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
+  FlexRender,
   useVueTable,
   getCoreRowModel,
   getPaginationRowModel,
@@ -49,10 +50,14 @@ const qc = useQueryClient()
 
 interface TeamDto {
   id: string
+  competitionId: string
   name: string
   captainName: string
   memberCount: number
   competitionTitle: string
+  inviteToken?: string
+  isLocked?: boolean
+  registrationStatus?: string
 }
 
 interface TeamMemberDto {
@@ -122,6 +127,11 @@ const columns = [
     header: t('admin.teams.members'), 
     enableSorting: true,
     cell: (info) => h(Badge, { variant: 'secondary', class: 'font-mono' }, () => info.getValue().toString())
+  }),
+  columnHelper.accessor('registrationStatus', {
+    header: t('admin.teams.registrationStatus'),
+    enableSorting: true,
+    cell: (info) => h(Badge, { variant: info.getValue() === 'approved' ? 'default' : info.getValue() === 'rejected' ? 'destructive' : 'secondary' }, () => info.getValue() ?? 'pending')
   }),
   columnHelper.accessor('competitionTitle', { 
     header: t('admin.teams.competition'), 
@@ -210,7 +220,7 @@ const table = useVueTable({
             class="group transition-colors hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
-              <component :is="() => cell.renderValue()" />
+              <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
             </TableCell>
             <TableCell class="px-4 py-3 text-right">
               <DropdownMenu>

@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API;
+using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 
@@ -55,7 +57,7 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
             .Join(dbContext.Teams.IgnoreQueryFilters().Where(t => t.CompetitionId == req.Id),
                   tm => tm.TeamId,
                   t => t.Id,
-                  (tm, t) => new { tm.UserId, TeamId = t.Id })
+                  (tm, t) => new { tm.UserId, TeamId = t.Id, t.RegistrationStatus, t.IsBanned })
             .FirstOrDefaultAsync(x => x.UserId == userId, ct);
 
         if (teamMember is null)
@@ -66,6 +68,38 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
                 AlreadySolved = false,
                 Result = "no_team"
             }, 400, ct);
+            return;
+        }
+
+        if (teamMember.RegistrationStatus != TeamRegistrationStatus.Approved)
+        {
+            await SendAsync(new SubmitFlagResponse
+            {
+                Correct = false,
+                AlreadySolved = false,
+                Result = "team_not_approved"
+            }, 403, ct);
+            return;
+        }
+
+        if (teamMember.IsBanned)
+        {
+            CompetitionLogWriter.Add(
+                dbContext,
+                req.Id,
+                "flag.blocked_banned_team",
+                "A banned team attempted to submit a flag.",
+                "warning",
+                teamMember.TeamId,
+                userId,
+                req.ChallengeId);
+            await dbContext.SaveChangesAsync(ct);
+            await SendAsync(new SubmitFlagResponse
+            {
+                Correct = false,
+                AlreadySolved = false,
+                Result = "team_banned"
+            }, 403, ct);
             return;
         }
 

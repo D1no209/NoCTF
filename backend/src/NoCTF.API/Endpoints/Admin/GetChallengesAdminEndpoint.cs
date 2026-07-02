@@ -16,6 +16,9 @@ public class ChallengeTemplateAdminDto
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
     public string? AttachmentUrl { get; set; }
+    public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
+    public int? ExposedPort { get; set; }
+    public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
     public CheckerConfigDto? CheckerConfig { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -35,6 +38,10 @@ public class CompetitionChallengeAdminDto
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
     public string? AttachmentUrl { get; set; }
+    public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
+    public int? ExposedPort { get; set; }
+    public string FlagPrefix { get; set; } = "flag";
+    public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
     public CheckerConfigDto? CheckerConfig { get; set; }
     public PointsConfigDto PointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
@@ -75,6 +82,11 @@ public static class ChallengeAdminMapping
         ComposeYaml = challenge.ComposeYaml,
         ComposeProjectName = challenge.ComposeProjectName,
         AttachmentUrl = challenge.AttachmentUrl,
+        DeploymentType = challenge.DeploymentType,
+        ExposedPort = challenge.ExposedPort,
+        FlagEnvironmentVariable = string.IsNullOrWhiteSpace(challenge.FlagEnvironmentVariable)
+            ? "NOCTF_FLAG_UUID"
+            : challenge.FlagEnvironmentVariable,
         CheckerConfig = challenge.CheckerConfig is null ? null : new CheckerConfigDto
         {
             Image = challenge.CheckerConfig.Image,
@@ -98,6 +110,12 @@ public static class ChallengeAdminMapping
         ComposeYaml = challenge.ComposeYaml,
         ComposeProjectName = challenge.ComposeProjectName,
         AttachmentUrl = challenge.AttachmentUrl,
+        DeploymentType = challenge.DeploymentType,
+        ExposedPort = challenge.ExposedPort,
+        FlagPrefix = string.IsNullOrWhiteSpace(challenge.FlagPrefix) ? "flag" : challenge.FlagPrefix,
+        FlagEnvironmentVariable = string.IsNullOrWhiteSpace(challenge.FlagEnvironmentVariable)
+            ? "NOCTF_FLAG_UUID"
+            : challenge.FlagEnvironmentVariable,
         CheckerConfig = challenge.CheckerConfig is null ? null : new CheckerConfigDto
         {
             Image = challenge.CheckerConfig.Image,

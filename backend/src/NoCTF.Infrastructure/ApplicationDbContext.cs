@@ -15,6 +15,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<ChallengeTemplate> ChallengeTemplates => Set<ChallengeTemplate>();
     public DbSet<ChallengeHint> ChallengeHints => Set<ChallengeHint>();
+    public DbSet<CtfDynamicFlag> CtfDynamicFlags => Set<CtfDynamicFlag>();
+    public DbSet<CompetitionLog> CompetitionLogs => Set<CompetitionLog>();
+    public DbSet<CheatIncident> CheatIncidents => Set<CheatIncident>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<ScoreEvent> ScoreEvents => Set<ScoreEvent>();
     public DbSet<ScoreSignal> ScoreSignals => Set<ScoreSignal>();
@@ -98,9 +101,48 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(h => new { h.CompetitionId, h.ChallengeId, h.DisplayOrder })
             .HasDatabaseName("ix_challengehints_competition_challenge_order");
 
+        modelBuilder.Entity<CtfDynamicFlag>()
+            .HasIndex(f => new { f.CompetitionId, f.TeamId, f.ChallengeId })
+            .IsUnique()
+            .HasDatabaseName("ux_ctfdynamicflags_competition_team_challenge");
+
+        modelBuilder.Entity<CtfDynamicFlag>()
+            .HasIndex(f => new { f.CompetitionId, f.ChallengeId, f.FlagUuid })
+            .IsUnique()
+            .HasDatabaseName("ux_ctfdynamicflags_competition_challenge_uuid");
+
+        modelBuilder.Entity<CompetitionLog>()
+            .HasIndex(l => new { l.CompetitionId, l.CreatedAt })
+            .HasDatabaseName("ix_competitionlogs_competition_created");
+
+        modelBuilder.Entity<CompetitionLog>()
+            .HasIndex(l => new { l.CompetitionId, l.EventType })
+            .HasDatabaseName("ix_competitionlogs_competition_event");
+
+        modelBuilder.Entity<CheatIncident>()
+            .HasIndex(i => new { i.CompetitionId, i.CreatedAt })
+            .HasDatabaseName("ix_cheatincidents_competition_created");
+
+        modelBuilder.Entity<CheatIncident>()
+            .HasIndex(i => new { i.CompetitionId, i.SuspectTeamId })
+            .HasDatabaseName("ix_cheatincidents_competition_suspect");
+
         modelBuilder.Entity<Team>()
             .HasIndex(t => t.CompetitionId)
             .HasDatabaseName("ix_teams_competition");
+
+        modelBuilder.Entity<Team>()
+            .HasIndex(t => t.InviteToken)
+            .IsUnique()
+            .HasDatabaseName("ux_teams_invite_token");
+
+        modelBuilder.Entity<Team>()
+            .HasIndex(t => new { t.CompetitionId, t.RegistrationStatus })
+            .HasDatabaseName("ix_teams_competition_registration_status");
+
+        modelBuilder.Entity<Team>()
+            .HasIndex(t => new { t.CompetitionId, t.IsBanned })
+            .HasDatabaseName("ix_teams_competition_banned");
 
         modelBuilder.Entity<TeamMember>()
             .HasIndex(tm => new { tm.TeamId, tm.UserId })

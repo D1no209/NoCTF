@@ -49,7 +49,26 @@ public class CtfGameMode : IGameMode
         if (challenge is null)
             return SubmissionResult.WrongFlag;
 
-        // Check for duplicate solve by this team
+        // Validate flag using timing-safe comparison. New CTF challenges store only
+        // the flag content; competition bindings provide the flag prefix.
+        var flagSecret = challenge.FlagSecret ?? string.Empty;
+        var isDynamicUuid = string.Equals(flagSecret.Trim(), "[UUID]", StringComparison.OrdinalIgnoreCase);
+        var expectedFlag = await ResolveExpectedFlagAsync(challenge, context.TeamId, isDynamicUuid, cancellationToken);
+        var isCorrect = FlagValidator.IsMatch(context.FlagContent, expectedFlag);
+
+        if (!isCorrect && !isDynamicUuid && LooksLikeLegacyFullFlag(flagSecret))
+        {
+            isCorrect = FlagValidator.IsMatch(context.FlagContent, flagSecret);
+        }
+
+        CtfDynamicFlag? stolenFlag = null;
+        if (!isCorrect && isDynamicUuid)
+        {
+            stolenFlag = await FindStolenDynamicFlagAsync(challenge, context, cancellationToken);
+        }
+
+        // Return duplicate solves normally, but still record suspicious cross-team
+        // dynamic flag submissions even after the team has already solved the task.
         var alreadySolved = await _db.Submissions
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -60,12 +79,8 @@ public class CtfGameMode : IGameMode
                 s.IsCorrect,
                 cancellationToken);
 
-        if (alreadySolved)
+        if (alreadySolved && stolenFlag is null)
             return SubmissionResult.AlreadySolved;
-
-        // Validate flag using timing-safe comparison
-        var flagSecret = challenge.FlagSecret ?? string.Empty;
-        var isCorrect = FlagValidator.IsMatch(context.FlagContent, flagSecret);
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
@@ -84,6 +99,39 @@ public class CtfGameMode : IGameMode
         };
 
         _db.Submissions.Add(submission);
+        _db.CompetitionLogs.Add(new CompetitionLog
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = context.CompetitionId,
+            Level = isCorrect ? "info" : stolenFlag is null ? "warning" : "error",
+            EventType = isCorrect ? "flag.accepted" : stolenFlag is null ? "flag.rejected" : "flag.suspected_cheat",
+            Message = isCorrect
+                ? $"Team submitted a correct flag for challenge {challenge.Title}."
+                : stolenFlag is null
+                    ? $"Team submitted a wrong flag for challenge {challenge.Title}."
+                    : $"Team submitted another team's dynamic flag for challenge {challenge.Title}.",
+            TeamId = context.TeamId,
+            UserId = context.UserId,
+            ChallengeId = context.ChallengeId,
+            MetadataJson = stolenFlag is null ? "{}" : ScoringJson.Serialize(new { victimTeamId = stolenFlag.TeamId }),
+            CreatedAt = submission.SubmittedAt,
+        });
+
+        if (stolenFlag is not null)
+        {
+            _db.CheatIncidents.Add(new CheatIncident
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = context.CompetitionId,
+                SuspectTeamId = context.TeamId,
+                VictimTeamId = stolenFlag.TeamId,
+                ChallengeId = context.ChallengeId,
+                UserId = context.UserId,
+                SubmittedFlag = context.FlagContent,
+                Reason = "submitted_other_team_dynamic_flag",
+                CreatedAt = submission.SubmittedAt,
+            });
+        }
 
         if (!isCorrect)
         {
@@ -172,5 +220,54 @@ public class CtfGameMode : IGameMode
                 s.ChallengeId == context.ChallengeId &&
                 s.IsCorrect,
                 cancellationToken);
+
+    private async Task<string> ResolveExpectedFlagAsync(
+        Challenge challenge,
+        Guid teamId,
+        bool isDynamicUuid,
+        CancellationToken cancellationToken)
+    {
+        if (!isDynamicUuid)
+            return FormatFlag(challenge, challenge.FlagSecret ?? string.Empty);
+
+        var flag = await _db.CtfDynamicFlags
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(f =>
+                f.CompetitionId == challenge.CompetitionId &&
+                f.TeamId == teamId &&
+                f.ChallengeId == challenge.Id,
+                cancellationToken);
+
+        return flag is null ? string.Empty : FormatFlag(challenge, flag.FlagUuid);
+    }
+
+    private async Task<CtfDynamicFlag?> FindStolenDynamicFlagAsync(
+        Challenge challenge,
+        SubmissionContext context,
+        CancellationToken cancellationToken)
+    {
+        var flags = await _db.CtfDynamicFlags
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(f =>
+                f.CompetitionId == context.CompetitionId &&
+                f.ChallengeId == context.ChallengeId &&
+                f.TeamId != context.TeamId)
+            .ToListAsync(cancellationToken);
+
+        return flags.FirstOrDefault(f =>
+            FlagValidator.IsMatch(context.FlagContent, FormatFlag(challenge, f.FlagUuid)) ||
+            FlagValidator.IsMatch(context.FlagContent, f.FlagUuid));
+    }
+
+    private static string FormatFlag(Challenge challenge, string content)
+    {
+        var prefix = string.IsNullOrWhiteSpace(challenge.FlagPrefix) ? "flag" : challenge.FlagPrefix.Trim();
+        return $"{prefix}{{{content}}}";
+    }
+
+    private static bool LooksLikeLegacyFullFlag(string value)
+        => value.Contains('{', StringComparison.Ordinal) && value.EndsWith("}", StringComparison.Ordinal);
 
 }

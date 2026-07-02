@@ -35,12 +35,7 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
                 ) ?? new Dictionary<string, IList<PortBinding>>())
         };
 
-        // Ensure image exists (pull if needed)
-        await _client.Images.CreateImageAsync(
-            new ImagesCreateParameters { FromImage = config.Image },
-            null,
-            new Progress<JSONMessage>(),
-            cancellationToken);
+        await EnsureImageAsync(config.Image, cancellationToken);
 
         var createResponse = await _client.Containers.CreateContainerAsync(createParams, cancellationToken);
         await _client.Containers.StartContainerAsync(createResponse.ID, null, cancellationToken);
@@ -56,6 +51,22 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
                 kvp => int.Parse(kvp.Value?.FirstOrDefault()?.HostPort ?? "0")
             ) ?? new Dictionary<int, int>()
         );
+    }
+
+    private async Task EnsureImageAsync(string image, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _client.Images.InspectImageAsync(image, cancellationToken);
+        }
+        catch (DockerImageNotFoundException)
+        {
+            await _client.Images.CreateImageAsync(
+                new ImagesCreateParameters { FromImage = image },
+                null,
+                new Progress<JSONMessage>(),
+                cancellationToken);
+        }
     }
 
     public async Task DestroyContainerAsync(DockerContainerMetadata metadata, CancellationToken cancellationToken = default)

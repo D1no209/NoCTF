@@ -29,6 +29,17 @@ public class Team : ITenantEntity
     public string Name { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
     public Guid CaptainId { get; set; }
+    public string InviteToken { get; set; } = string.Empty;
+    public bool IsLocked { get; set; }
+    public bool IsBanned { get; set; }
+    public DateTime? BannedAt { get; set; }
+    public Guid? BannedById { get; set; }
+    public string? BannedReason { get; set; }
+    public string? TrackName { get; set; }
+    public TeamRegistrationStatus RegistrationStatus { get; set; } = TeamRegistrationStatus.Pending;
+    public DateTime RegisteredAt { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public Guid? ApprovedById { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -56,6 +67,10 @@ public class Competition : ITenantEntity
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
     public CompetitionStatus Status { get; set; }
+    public bool TeamRegistrationAutoApprove { get; set; } = true;
+    public int MaxTeamMembers { get; set; } = 5;
+    public bool TracksEnabled { get; set; }
+    public string TrackNamesJson { get; set; } = "[]";
 
     // CTF scoring defaults used when binding challenge templates into this competition.
     public int DefaultInitialPoints { get; set; } = 500;
@@ -106,6 +121,10 @@ public class Challenge : ITenantEntity
     public PointsConfig PointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
     public string? AttachmentUrl { get; set; }
+    public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
+    public int? ExposedPort { get; set; }
+    public string FlagPrefix { get; set; } = "flag";
+    public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
     public string? ContainerImage { get; set; }
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
@@ -123,6 +142,9 @@ public class ChallengeTemplate
     public string? Description { get; set; }
     public string TypeId { get; set; } = "ctf";
     public string? AttachmentUrl { get; set; }
+    public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
+    public int? ExposedPort { get; set; }
+    public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
     public string? ContainerImage { get; set; }
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
@@ -144,10 +166,59 @@ public class ChallengeHint : ITenantEntity
     public DateTime CreatedAt { get; set; }
 }
 
+public class CtfDynamicFlag : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public string FlagUuid { get; set; } = string.Empty;
+    public string EnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
+    public DateTime CreatedAt { get; set; }
+    public DateTime? LastSubmittedAt { get; set; }
+}
+
+public class CompetitionLog : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public string Level { get; set; } = "info";
+    public string EventType { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public Guid? TeamId { get; set; }
+    public Guid? UserId { get; set; }
+    public Guid? ChallengeId { get; set; }
+    public string MetadataJson { get; set; } = "{}";
+    public DateTime CreatedAt { get; set; }
+}
+
+public class CheatIncident : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid SuspectTeamId { get; set; }
+    public Guid? VictimTeamId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public Guid UserId { get; set; }
+    public string SubmittedFlag { get; set; } = string.Empty;
+    public string Reason { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public bool Resolved { get; set; }
+    public DateTime? ResolvedAt { get; set; }
+}
+
 public enum ChallengeContainerMode
 {
     SingleImage,
     DockerCompose
+}
+
+public enum ChallengeDeploymentType
+{
+    NoAttachment,
+    StaticAttachment,
+    DynamicContainer,
+    StaticContainer
 }
 
 public class Submission : ITenantEntity
