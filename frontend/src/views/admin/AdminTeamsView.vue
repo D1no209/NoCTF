@@ -74,7 +74,7 @@ const selectedTeam = ref<TeamDto | null>(null)
 const teamMembers = ref<TeamMemberDto[]>([])
 const loadingMembers = ref(false)
 
-const { data: teams, isLoading } = useQuery({
+const { data: teams, isLoading, isError, refetch } = useQuery({
   queryKey: queryKeys.adminTeams,
   queryFn: () => adminApi.teams<TeamDto[]>(),
 })
@@ -205,6 +205,14 @@ const table = useVueTable({
               <div class="flex items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 class="size-4 animate-spin" />
                 <span>{{ t('admin.teams.loading') }}</span>
+              </div>
+            </TableCell>
+          </TableRow>
+          <TableRow v-else-if="isError">
+            <TableCell :colspan="columns.length + 1" class="h-32 text-center">
+              <div class="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                <span>{{ t('admin.teams.loadError', t('errors.loadFailed')) }}</span>
+                <Button variant="outline" size="sm" @click="refetch()">{{ t('common.refresh') }}</Button>
               </div>
             </TableCell>
           </TableRow>

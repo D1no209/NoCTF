@@ -126,7 +126,7 @@ function competitionPayload() {
   }
 }
 
-const { data: competitions, isLoading } = useQuery({
+const { data: competitions, isLoading, isError, refetch } = useQuery({
   queryKey: queryKeys.adminCompetitions,
   queryFn: () => adminApi.competitions<CompetitionAdminDto[]>(),
 })
@@ -289,6 +289,14 @@ const table = useVueTable({
               <div class="flex items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 class="size-4 animate-spin" />
                 <span>{{ t('admin.competitions.loading') }}</span>
+              </div>
+            </TableCell>
+          </TableRow>
+          <TableRow v-else-if="isError">
+            <TableCell :colspan="columns.length + 1" class="h-32 text-center">
+              <div class="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                <span>{{ t('admin.competitions.loadError', t('errors.loadFailed')) }}</span>
+                <Button variant="outline" size="sm" @click="refetch()">{{ t('common.refresh') }}</Button>
               </div>
             </TableCell>
           </TableRow>

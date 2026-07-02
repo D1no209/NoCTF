@@ -130,8 +130,11 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  if (to.meta.requiresAuth && !auth.ensureFreshSession()) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login' }
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresAdminOrOrganizer && !['Admin', 'Organizer'].includes(auth.userRole)) {
     return { name: 'competitions' }

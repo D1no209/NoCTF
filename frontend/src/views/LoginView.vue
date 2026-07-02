@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
@@ -24,6 +24,7 @@ import { Loader2 } from 'lucide-vue-next'
 const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 
 const formSchema = toTypedSchema(z.object({
@@ -40,7 +41,10 @@ const onSubmit = form.handleSubmit(async (values) => {
   try {
     await auth.login(values.email, values.password)
     toast.success(t('auth.loginSuccess'))
-    await router.push('/competitions')
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+      ? route.query.redirect
+      : '/competitions'
+    await router.push(redirect)
   } catch (error: any) {
     toast.error(t('errors.loginFailed'))
   } finally {
