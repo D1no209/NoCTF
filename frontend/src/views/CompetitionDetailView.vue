@@ -350,7 +350,7 @@ const selectedChallengePatchSubmissions = computed(() => {
         </TabsTrigger>
         <TabsTrigger value="scoreboard" class="flex items-center gap-2">
           <Trophy class="size-4" />
-          {{ t('leaderboard.title', 'Leaderboard') }}
+          {{ t('scoreboard.title') }}
         </TabsTrigger>
       </TabsList>
 
@@ -433,7 +433,7 @@ const selectedChallengePatchSubmissions = computed(() => {
       <TabsContent value="scoreboard" class="mt-0">
         <Card class="noctf-panel">
           <CardHeader>
-            <CardTitle>{{ t('leaderboard.fullBoard') }}</CardTitle>
+            <CardTitle>{{ t('scoreboard.fullBoard') }}</CardTitle>
           </CardHeader>
           <CardContent>
             <ScoreboardView :competition-id="competitionId" full />

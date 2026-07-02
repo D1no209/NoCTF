@@ -52,12 +52,14 @@ const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
 
     <!-- Main Game Area -->
     <main class="relative flex-1">
-      <transition
-        name="fade"
-        mode="out-in"
-      >
-        <RouterView :key="route.fullPath" />
-      </transition>
+      <RouterView v-slot="{ Component }">
+        <transition
+          name="fade"
+          mode="out-in"
+        >
+          <component :is="Component" :key="route.fullPath" />
+        </transition>
+      </RouterView>
     </main>
   </div>
 </template>
