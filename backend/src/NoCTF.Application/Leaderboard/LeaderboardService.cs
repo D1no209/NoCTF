@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Scoring;
+using NoCTF.Core;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.Application.Leaderboard;
@@ -46,31 +47,28 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
             })
             .ToListAsync(ct);
 
-        // Load team names
-        var teamIds = scores.Select(s => s.TeamId)
-            .Union(solveStats.Select(s => s.TeamId))
-            .Distinct()
-            .ToList();
-
         var teams = await db.Teams
             .IgnoreQueryFilters()
-            .Where(t => t.CompetitionId == competitionId && teamIds.Contains(t.Id))
-            .Select(t => new { t.Id, t.Name })
+            .Where(t =>
+                t.CompetitionId == competitionId &&
+                t.RegistrationStatus != TeamRegistrationStatus.Rejected)
+            .Select(t => new { t.Id, t.Name, t.TrackName })
             .ToListAsync(ct);
 
-        var teamNameMap = teams.ToDictionary(t => t.Id, t => t.Name);
+        var scoreMap = scores.ToDictionary(s => s.TeamId, s => s.TotalScore);
         var solveMap = solveStats.ToDictionary(s => s.TeamId);
 
         // Build entries
-        var entries = scores.Select(s =>
+        var entries = teams.Select(t =>
         {
-            solveMap.TryGetValue(s.TeamId, out var stats);
-            teamNameMap.TryGetValue(s.TeamId, out var name);
+            scoreMap.TryGetValue(t.Id, out var totalScore);
+            solveMap.TryGetValue(t.Id, out var stats);
             return new
             {
-                TeamId = s.TeamId,
-                TeamName = name ?? s.TeamId.ToString(),
-                TotalScore = s.TotalScore,
+                TeamId = t.Id,
+                TeamName = t.Name,
+                t.TrackName,
+                TotalScore = totalScore,
                 SolvedCount = stats?.SolvedCount ?? 0,
                 FirstSolveAt = stats?.FirstSolveAt
             };
@@ -81,12 +79,14 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
             .OrderByDescending(e => e.TotalScore)
             .ThenByDescending(e => e.SolvedCount)
             .ThenBy(e => e.FirstSolveAt ?? DateTime.MaxValue)
+            .ThenBy(e => e.TeamName)
             .ToList();
 
         return sorted.Select((e, i) => new LeaderboardEntry(
             Rank: i + 1,
             TeamId: e.TeamId,
             TeamName: e.TeamName,
+            TrackName: e.TrackName,
             TotalScore: e.TotalScore,
             SolvedCount: e.SolvedCount,
             FirstSolveAt: e.FirstSolveAt

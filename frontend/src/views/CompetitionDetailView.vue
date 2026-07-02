@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import { useAuthStore } from '@/stores/auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,13 +15,13 @@ import ChallengeCard from '@/components/game/ChallengeCard.vue'
 import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import ScoreboardView from '@/components/game/ScoreboardView.vue'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowRight, Trophy, Puzzle, Calendar, CheckCircle2, EyeOff, Loader2, Lock, UserPlus, Users } from 'lucide-vue-next'
 import { normalizeDirection } from '@/lib/challengeDirections'
 
 const { t } = useI18n()
 const route = useRoute()
 const queryClient = useQueryClient()
+const auth = useAuthStore()
 const competitionId = computed(() => route.params.id as string)
 
 interface Competition {
@@ -43,6 +44,7 @@ interface Challenge {
   typeId: string
   points: number
   solveCount: number
+  deploymentType?: string | null
   description?: string | null
   descriptionFormat?: string | null
   hints?: string[]
@@ -110,6 +112,9 @@ const solvedIds = computed(() => new Set((submissionsResponse.value?.solvedChall
 // UI State
 const modalOpen = ref(false)
 const selectedChallenge = ref<Challenge | null>(null)
+const ui = reactive({
+  activeTab: 'challenges' as 'challenges' | 'scoreboard',
+})
 const activeDirection = ref('ALL')
 const hideSolved = ref(false)
 const instanceChallengeIds = ref(new Set<string>())
@@ -153,9 +158,11 @@ function formatDate(iso: string) {
 const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
 const isAwdMode = computed(() => ['awd', 'awdp'].includes((competition.value?.gameModeType ?? '').toLowerCase()))
 const isAwdpMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awdp')
+const canManageCompetition = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
 const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.registrationStatus === 'approved') ?? null)
 const currentTeam = computed(() => approvedTeam.value ?? myTeams.value?.[0] ?? null)
-const canAccessChallenges = computed(() => Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
+const canUseParticipantActions = computed(() => Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
+const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
 
 const { data: patchSubmissions } = useQuery({
   queryKey: computed(() => queryKeys.patchSubmissions(competitionId.value)),
@@ -308,19 +315,29 @@ const selectedChallengePatchSubmissions = computed(() => {
     </div>
 
     <!-- Main Content Tabs -->
-    <Tabs default-value="challenges" class="w-full">
-      <TabsList class="grid w-full max-w-md grid-cols-2 mb-8">
-        <TabsTrigger value="challenges" class="flex items-center gap-2">
+    <div class="w-full">
+      <div class="mb-8 inline-grid h-9 w-full max-w-md grid-cols-2 items-center rounded-md bg-muted p-1 text-muted-foreground">
+        <button
+          type="button"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all"
+          :class="ui.activeTab === 'challenges' ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground'"
+          @click="ui.activeTab = 'challenges'"
+        >
           <Puzzle class="size-4" />
           {{ t('challenges.title') }}
-        </TabsTrigger>
-        <TabsTrigger value="scoreboard" class="flex items-center gap-2">
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all"
+          :class="ui.activeTab === 'scoreboard' ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground'"
+          @click="ui.activeTab = 'scoreboard'"
+        >
           <Trophy class="size-4" />
           {{ t('scoreboard.title') }}
-        </TabsTrigger>
-      </TabsList>
+        </button>
+      </div>
 
-      <TabsContent value="challenges" class="mt-0">
+      <div v-if="ui.activeTab === 'challenges'" class="mt-0">
         <div v-if="!canAccessChallenges" class="rounded-xl border border-dashed bg-muted/30 p-10 text-center text-muted-foreground">
           {{ t('teams.challengeLocked') }}
         </div>
@@ -394,19 +411,19 @@ const selectedChallengePatchSubmissions = computed(() => {
             </div>
           </div>
         </div>
-      </TabsContent>
+      </div>
 
-      <TabsContent value="scoreboard" class="mt-0">
+      <div v-else class="mt-0">
         <Card class="noctf-panel">
           <CardHeader>
             <CardTitle>{{ t('scoreboard.fullBoard') }}</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScoreboardView :competition-id="competitionId" full />
+            <ScoreboardView :competition-id="competitionId" :team-id="approvedTeam?.id" full />
           </CardContent>
         </Card>
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
 
     <!-- Challenge Modal -->
     <ChallengeModal
@@ -421,6 +438,9 @@ const selectedChallengePatchSubmissions = computed(() => {
       :instance-ready="instanceChallengeIds.has(selectedChallenge.id)"
       :defense-enabled="defenseChallengeIds.has(selectedChallenge.id)"
       :patch-submissions="selectedChallengePatchSubmissions"
+      :can-create-instance="canUseParticipantActions"
+      :can-submit-flag="canUseParticipantActions"
+      :can-request-defense="canUseParticipantActions"
       @create-instance="markInstanceCreated(selectedChallenge.id)"
       @request-defense="markDefenseRequested(selectedChallenge.id)"
       @patch-uploaded="queryClient.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId) })"

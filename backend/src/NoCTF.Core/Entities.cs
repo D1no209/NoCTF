@@ -312,6 +312,9 @@ public class AwdGameBox : ITenantEntity
     public Guid TeamId { get; set; }
     public Guid ChallengeId { get; set; }
     public string? ContainerInstanceId { get; set; }
+    public string PortMappingsJson { get; set; } = "{}";
+    public DateTime? ExpiresAt { get; set; }
+    public DateTime? LastInstanceActionAt { get; set; }
     public DateTime? LastFlagRefreshedAt { get; set; }
     public DateTime CreatedAt { get; set; }
 }

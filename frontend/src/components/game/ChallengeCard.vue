@@ -22,11 +22,17 @@ const pointsLabel = computed(() => `${props.challenge.points} ${t('nav.score')}`
 
 <template>
   <Card
-    class="h-full transition-all hover:shadow-md cursor-pointer"
+    class="relative h-full overflow-hidden transition-all hover:shadow-md cursor-pointer"
     :class="solved ? 'border-green-500/50 bg-green-500/5' : ''"
   >
+    <div
+      v-if="solved"
+      class="pointer-events-none absolute right-3 top-3 rotate-[-10deg] rounded-sm border-2 border-emerald-600/75 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.12em] text-emerald-700/85 shadow-[0_0_0_1px_oklch(0.62_0.16_150_/_0.12),inset_0_0_0_1px_oklch(0.62_0.16_150_/_0.18)]"
+    >
+      {{ t('challenges.attackSolved') }}
+    </div>
     <CardHeader class="pb-2">
-      <CardTitle class="text-sm font-semibold leading-snug">{{ challenge.title }}</CardTitle>
+      <CardTitle class="text-sm font-semibold leading-snug" :class="solved ? 'pr-24' : ''">{{ challenge.title }}</CardTitle>
     </CardHeader>
     <CardContent class="flex items-center justify-between text-xs text-muted-foreground pt-0">
       <span class="font-medium text-foreground">{{ pointsLabel }}</span>

@@ -48,6 +48,20 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
                 $"Existing static container was destroyed before restart for challenge {challenge.Title}.",
                 challengeId: challengeId,
                 metadata: new { box.ContainerInstanceId });
+            AuditLogWriter.Add(
+                dbContext,
+                HttpContext,
+                "container.instance.destroyed",
+                "Container",
+                box.ContainerInstanceId,
+                new
+                {
+                    competitionId,
+                    challengeId,
+                    teamId = Guid.Empty,
+                    containerId = box.ContainerInstanceId,
+                    reason = "static_container_restart"
+                });
             await Competitions.CreateChallengeInstanceEndpoint.DestroyBoxAsync(box, containerManager, ct);
             dbContext.AwdGameBoxes.Remove(box);
         }
@@ -62,6 +76,7 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
             TeamId = Guid.Empty,
             ChallengeId = challengeId,
             ContainerInstanceId = instance.ContainerId,
+            PortMappingsJson = Competitions.ChallengeInstanceRuntime.WritePorts(instance.PortMappings),
             CreatedAt = DateTime.UtcNow,
         });
         CompetitionLogWriter.Add(
@@ -71,12 +86,29 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
             $"Static container was started for challenge {challenge.Title}.",
             challengeId: challengeId,
             metadata: new { instance.ContainerId, instance.PortMappings });
+        AuditLogWriter.Add(
+            dbContext,
+            HttpContext,
+            "container.instance.created",
+            "Container",
+            instance.ContainerId,
+            new
+            {
+                competitionId,
+                challengeId,
+                teamId = Guid.Empty,
+                containerId = instance.ContainerId,
+                ports = instance.PortMappings,
+                status = instance.Status,
+                reason = "static_container_restart"
+            });
         await dbContext.SaveChangesAsync(ct);
 
         await SendAsync(new Competitions.ChallengeInstanceResponse
         {
             ContainerId = instance.ContainerId,
             Ports = instance.PortMappings,
+            Addresses = instance.PortMappings.Values.Where(port => port > 0).Select(port => port.ToString()).ToList(),
             Status = instance.Status,
         }, cancellation: ct);
     }

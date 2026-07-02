@@ -43,6 +43,20 @@ public class DestroyContainerEndpoint(ApplicationDbContext db, IContainerManager
 
         await containerManager.DestroyContainerAsync(instance, ct);
         db.AwdGameBoxes.Remove(box);
+        AuditLogWriter.Add(
+            db,
+            HttpContext,
+            "container.instance.destroyed",
+            "Container",
+            req.Id,
+            new
+            {
+                competitionId = box.CompetitionId,
+                challengeId = box.ChallengeId,
+                teamId = box.TeamId,
+                containerId = req.Id,
+                reason = "admin_destroy"
+            });
         await db.SaveChangesAsync(ct);
         await SendNoContentAsync(ct);
     }

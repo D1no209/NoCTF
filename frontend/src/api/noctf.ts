@@ -28,9 +28,21 @@ type ApiResult<T> = {
 function unwrap<T>(result: ApiResult<T>, fallback = 'Request failed'): T {
   if (result.error) {
     const status = result.response?.status
-    throw new ApiError(fallback, status, result.error)
+    const details = isEmptyObject(result.error) && status
+      ? `HTTP ${status}`
+      : result.error
+    throw new ApiError(fallback, status, details)
   }
   return result.data as T
+}
+
+function isEmptyObject(value: unknown) {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0,
+  )
 }
 
 export function apiUrl(path: string) {
@@ -87,6 +99,18 @@ export const competitionApi = {
       path: { competitionId },
     }), 'Failed to load leaderboard')
   },
+  async leaderboardTrend<T = unknown>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{competitionId}/leaderboard/trend',
+      path: { competitionId },
+    }), 'Failed to load leaderboard trend')
+  },
+  async leaderboardTeam<T = unknown>(competitionId: string, teamId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{competitionId}/leaderboard/teams/{teamId}',
+      path: { competitionId, teamId },
+    }), 'Failed to load leaderboard team detail')
+  },
   async submitFlag<T = unknown>(competitionId: string, challengeId: string, flag: string) {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
       url: '/api/competitions/{id}/challenges/{challengeId}/submit',
@@ -98,7 +122,27 @@ export const competitionApi = {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
       url: '/api/competitions/{id}/challenges/{challengeId}/instance',
       path: { id: competitionId, challengeId },
+      body: {},
     }), 'Failed to create instance')
+  },
+  async getInstance<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/instance',
+      path: { id: competitionId, challengeId },
+    }), 'Failed to load instance')
+  },
+  async destroyInstance<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.delete<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/instance',
+      path: { id: competitionId, challengeId },
+    }), 'Failed to destroy instance')
+  },
+  async extendInstance<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/instance/extend',
+      path: { id: competitionId, challengeId },
+      body: {},
+    }), 'Failed to extend instance')
   },
   async awdDashboard<T = unknown>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({
