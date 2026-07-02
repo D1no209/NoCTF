@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Core;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Competitions;
@@ -49,7 +50,6 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
                 DescriptionFormat = c.DescriptionFormat,
                 TypeId = c.TypeId,
                 Points = c.PointsConfig.InitialPoints,
-                SolveCount = dbContext.Submissions.Count(s => s.CompetitionId == req.Id && s.ChallengeId == c.Id && s.IsCorrect),
                 AttachmentUrl = c.AttachmentUrl,
                 DeploymentType = c.DeploymentType.ToString(),
                 ExposedPort = c.ExposedPort
@@ -57,6 +57,7 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
             .ToListAsync(ct);
 
         var challengeIds = challenges.Select(c => c.Id).ToList();
+        var solveCounts = await ChallengeSolveCounts.GetAsync(dbContext, req.Id, challengeIds, ct);
         var hints = await dbContext.ChallengeHints
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -66,6 +67,7 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
 
         foreach (var challenge in challenges)
         {
+            challenge.SolveCount = solveCounts.GetValueOrDefault(challenge.Id);
             challenge.Hints = hints
                 .Where(h => h.ChallengeId == challenge.Id)
                 .OrderBy(h => h.DisplayOrder)
@@ -74,5 +76,38 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
         }
 
         await SendAsync(challenges, cancellation: ct);
+    }
+}
+
+public static class ChallengeSolveCounts
+{
+    public static async Task<Dictionary<Guid, int>> GetAsync(
+        ApplicationDbContext dbContext,
+        Guid competitionId,
+        IReadOnlyCollection<Guid> challengeIds,
+        CancellationToken ct = default)
+    {
+        if (challengeIds.Count == 0)
+            return [];
+
+        return await dbContext.Submissions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                s.IsCorrect &&
+                challengeIds.Contains(s.ChallengeId))
+            .Join(
+                dbContext.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
+                    t.CompetitionId == competitionId &&
+                    t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                    !t.IsBanned),
+                s => s.TeamId,
+                t => t.Id,
+                (s, _) => new { s.ChallengeId, s.TeamId })
+            .Distinct()
+            .GroupBy(s => s.ChallengeId)
+            .Select(g => new { ChallengeId = g.Key, SolveCount = g.Count() })
+            .ToDictionaryAsync(x => x.ChallengeId, x => x.SolveCount, ct);
     }
 }
