@@ -13,7 +13,6 @@ const route = useRoute()
 const auth = useAuthStore()
 const scoreStore = useScoreStore()
 
-const competitionId = computed(() => route.params.id as string)
 const displayName = computed(() => scoreStore.myTeamName ?? auth.user?.userName ?? '')
 const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
 </script>
@@ -24,7 +23,7 @@ const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
       <div class="mx-auto flex h-20 max-w-[1800px] items-center justify-between gap-4 px-4 md:px-6">
         <div class="flex items-center gap-4">
           <RouterLink 
-            :to="`/competitions/${competitionId}`" 
+            to="/competitions"
             class="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
           >
             <ChevronLeft class="size-4" />
