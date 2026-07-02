@@ -142,6 +142,11 @@ export const competitionApi = {
 }
 
 export const teamApi = {
+  async mine<T = unknown[]>() {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/teams/mine',
+    }), 'Failed to load my teams')
+  },
   async create<T = unknown>(body: { competitionId: string; name: string; avatarUrl?: string; trackName?: string }) {
     return unwrap(await client.post<{ 201: T }, unknown, false>({
       url: '/api/teams',

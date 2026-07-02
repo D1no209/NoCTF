@@ -56,6 +56,76 @@ public class TeamDto
     public string RegistrationStatus { get; set; } = string.Empty;
 }
 
+public class MyTeamDto : TeamDto
+{
+    public string CompetitionTitle { get; set; } = string.Empty;
+    public string CompetitionStatus { get; set; } = string.Empty;
+    public string GameModeType { get; set; } = string.Empty;
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public int MaxTeamMembers { get; set; }
+    public int MemberCount { get; set; }
+    public bool IsCaptain { get; set; }
+    public DateTime RegisteredAt { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+}
+
+public class GetMyTeamsEndpoint(ApplicationDbContext db) : EndpointWithoutRequest<List<MyTeamDto>>
+{
+    public override void Configure()
+    {
+        Get("/api/teams/mine");
+        Claims(ClaimTypes.NameIdentifier);
+    }
+
+    public override async Task HandleAsync(CancellationToken ct)
+    {
+        var userId = CreateTeamEndpoint.GetUserId(User);
+        if (userId is null)
+        {
+            await SendUnauthorizedAsync(ct);
+            return;
+        }
+
+        var teams = await db.TeamMembers
+            .AsNoTracking()
+            .Where(tm => tm.UserId == userId.Value)
+            .Join(db.Teams.IgnoreQueryFilters(),
+                tm => tm.TeamId,
+                t => t.Id,
+                (tm, t) => new { Membership = tm, Team = t })
+            .Join(db.Competitions.IgnoreQueryFilters(),
+                x => x.Team.CompetitionId,
+                c => c.Id,
+                (x, c) => new MyTeamDto
+                {
+                    Id = x.Team.Id,
+                    CompetitionId = x.Team.CompetitionId,
+                    Name = x.Team.Name,
+                    CaptainId = x.Team.CaptainId,
+                    InviteToken = x.Team.InviteToken,
+                    IsLocked = x.Team.IsLocked,
+                    IsBanned = x.Team.IsBanned,
+                    TrackName = x.Team.TrackName,
+                    RegistrationStatus = x.Team.RegistrationStatus.ToString().ToLowerInvariant(),
+                    CompetitionTitle = c.Title,
+                    CompetitionStatus = c.Status.ToString().ToLowerInvariant(),
+                    GameModeType = c.GameModeType.ToString(),
+                    StartTime = c.StartTime,
+                    EndTime = c.EndTime,
+                    MaxTeamMembers = c.MaxTeamMembers,
+                    MemberCount = db.TeamMembers.Count(member => member.TeamId == x.Team.Id),
+                    IsCaptain = x.Team.CaptainId == userId.Value,
+                    RegisteredAt = x.Team.RegisteredAt,
+                    ApprovedAt = x.Team.ApprovedAt,
+                })
+            .OrderByDescending(t => t.RegisteredAt)
+            .ToListAsync(ct);
+
+        await SendAsync(teams, cancellation: ct);
+    }
+}
+
 public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRequest, TeamDto>
 {
     public override void Configure()

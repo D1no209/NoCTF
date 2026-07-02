@@ -7,7 +7,7 @@ import { useScoreStore } from '@/stores/score'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
-import { Bell, LayoutDashboard, Menu } from 'lucide-vue-next'
+import { Bell, Home, LayoutDashboard, Menu, Users } from 'lucide-vue-next'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
 const { t } = useI18n()
@@ -30,17 +30,33 @@ async function handleLogout() {
   <header class="sticky top-0 z-50 w-full border-b border-slate-900/5 bg-white/85 backdrop-blur-xl">
     <div class="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
       <div class="flex items-center gap-6">
-        <RouterLink to="/competitions" class="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-80 transition-all active:scale-95">
+        <RouterLink to="/" class="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-80 transition-all active:scale-95">
           <span class="noctf-logo size-8" />
           <span>NoCTF</span>
         </RouterLink>
         <nav class="hidden items-center gap-2 text-sm font-medium sm:flex">
+          <RouterLink
+            to="/"
+            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
+          >
+            <Home class="size-4" />
+            {{ t('nav.home') }}
+          </RouterLink>
           <RouterLink
             to="/competitions"
             class="relative rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
           >
             {{ t('nav.competitions') }}
+          </RouterLink>
+          <RouterLink
+            to="/teams"
+            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
+          >
+            <Users class="size-4" />
+            {{ t('nav.teams') }}
           </RouterLink>
           <RouterLink
             v-if="canManage"
@@ -90,8 +106,14 @@ async function handleLogout() {
               <SheetTitle>NoCTF</SheetTitle>
             </SheetHeader>
             <div class="flex flex-col gap-4 py-8">
+              <RouterLink to="/" class="text-lg font-medium hover:text-primary transition-colors">
+                {{ t('nav.home') }}
+              </RouterLink>
               <RouterLink to="/competitions" class="text-lg font-medium hover:text-primary transition-colors">
                 {{ t('nav.competitions') }}
+              </RouterLink>
+              <RouterLink to="/teams" class="text-lg font-medium hover:text-primary transition-colors">
+                {{ t('nav.teams') }}
               </RouterLink>
               <RouterLink v-if="canManage" to="/admin" class="text-lg font-medium hover:text-primary transition-colors">
                 {{ t('nav.admin') }}
