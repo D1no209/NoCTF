@@ -147,46 +147,52 @@ function formatDate(iso: string) {
       />
 
       <div v-else v-auto-animate class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        <RouterLink
+        <Card
           v-for="comp in filteredCompetitions"
           :key="comp.id"
-          :to="`/competitions/${comp.id}`"
-          class="block group"
+          class="group h-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_24px_70px_rgb(37_99_235/0.14)]"
         >
-          <Card class="h-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_24px_70px_rgb(37_99_235/0.14)]">
-            <CardHeader class="pb-3">
-              <div class="mb-3 flex items-center gap-2">
-                <Badge :variant="statusVariant(comp.status)" class="font-semibold">
-                  {{ comp.status }}
-                </Badge>
-                <Badge variant="secondary" class="bg-blue-50 text-blue-700">
-                  {{ comp.gameModeType || 'CTF' }}
-                </Badge>
+          <CardHeader class="pb-3">
+            <div class="mb-3 flex items-center gap-2">
+              <Badge :variant="statusVariant(comp.status)" class="font-semibold">
+                {{ comp.status }}
+              </Badge>
+              <Badge variant="secondary" class="bg-blue-50 text-blue-700">
+                {{ comp.gameModeType || 'CTF' }}
+              </Badge>
+            </div>
+            <div class="flex items-start justify-between gap-2">
+              <CardTitle class="text-xl font-bold transition-colors group-hover:text-primary">
+                {{ comp.title }}
+              </CardTitle>
+            </div>
+            <CardDescription v-if="comp.description" class="line-clamp-2 mt-2 leading-relaxed">
+              {{ comp.description }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4 pt-0">
+            <div class="space-y-2 border-t pt-4 text-sm text-muted-foreground">
+              <div class="flex items-center gap-2">
+                <Calendar class="size-3.5" />
+                <span>{{ formatDate(comp.startTime) }} ~ {{ formatDate(comp.endTime) }}</span>
               </div>
-              <div class="flex items-start justify-between gap-2">
-                <CardTitle class="text-xl font-bold group-hover:text-primary transition-colors">
-                  {{ comp.title }}
-                </CardTitle>
-              </div>
-              <CardDescription v-if="comp.description" class="line-clamp-2 mt-2 leading-relaxed">
-                {{ comp.description }}
-              </CardDescription>
-            </CardHeader>
-            <CardContent class="space-y-4 pt-0">
-              <div class="space-y-2 border-t pt-4 text-sm text-muted-foreground">
-                <div class="flex items-center gap-2">
-                  <Calendar class="size-3.5" />
-                  <span>{{ formatDate(comp.startTime) }} ~ {{ formatDate(comp.endTime) }}</span>
-                </div>
-              </div>
+            </div>
 
-              <Button class="mt-2 w-full">
+            <div class="grid gap-2 sm:grid-cols-2">
+              <Button variant="outline" as-child>
+                <RouterLink :to="`/competitions/${comp.id}/register`">
+                  {{ t('teams.registerForCompetition') }}
+                </RouterLink>
+              </Button>
+              <Button as-child>
+                <RouterLink :to="`/competitions/${comp.id}`">
                 {{ t('competitions.enter') }}
                 <ArrowRight class="size-4" />
+                </RouterLink>
               </Button>
-            </CardContent>
-          </Card>
-        </RouterLink>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   </AppLayout>

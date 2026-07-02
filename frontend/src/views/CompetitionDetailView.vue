@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { competitionApi, teamApi } from '@/api/noctf'
+import { RouterLink, useRoute } from 'vue-router'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import ChallengeCard from '@/components/game/ChallengeCard.vue'
@@ -16,9 +15,8 @@ import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import ScoreboardView from '@/components/game/ScoreboardView.vue'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Trophy, Puzzle, Calendar, CheckCircle2, EyeOff, Loader2, Lock, Users } from 'lucide-vue-next'
+import { ArrowRight, Trophy, Puzzle, Calendar, CheckCircle2, EyeOff, Loader2, Lock, UserPlus, Users } from 'lucide-vue-next'
 import { normalizeDirection } from '@/lib/challengeDirections'
-import { toast } from 'vue-sonner'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -114,9 +112,6 @@ const modalOpen = ref(false)
 const selectedChallenge = ref<Challenge | null>(null)
 const activeDirection = ref('ALL')
 const hideSolved = ref(false)
-const newTeamName = ref('')
-const selectedTrackName = ref('')
-const joinToken = ref('')
 const instanceChallengeIds = ref(new Set<string>())
 const defenseChallengeIds = ref(new Set<string>())
 
@@ -161,31 +156,6 @@ const isAwdpMode = computed(() => (competition.value?.gameModeType ?? '').toLowe
 const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.registrationStatus === 'approved') ?? null)
 const currentTeam = computed(() => approvedTeam.value ?? myTeams.value?.[0] ?? null)
 const canAccessChallenges = computed(() => Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
-
-const createTeamMutation = useMutation({
-  mutationFn: () => teamApi.create<MyCompetitionTeam>({
-    competitionId: competitionId.value,
-    name: newTeamName.value.trim(),
-    trackName: competition.value?.tracksEnabled ? selectedTrackName.value : undefined,
-  }),
-  onSuccess: () => {
-    newTeamName.value = ''
-    selectedTrackName.value = ''
-    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(competitionId.value) })
-    toast.success(t('teams.createSuccess'))
-  },
-  onError: () => toast.error(t('teams.actionError')),
-})
-
-const joinByTokenMutation = useMutation({
-  mutationFn: () => teamApi.joinByToken<MyCompetitionTeam>(joinToken.value.trim()),
-  onSuccess: () => {
-    joinToken.value = ''
-    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(competitionId.value) })
-    toast.success(t('teams.joinSuccess'))
-  },
-  onError: () => toast.error(t('teams.actionError')),
-})
 
 const { data: patchSubmissions } = useQuery({
   queryKey: computed(() => queryKeys.patchSubmissions(competitionId.value)),
@@ -275,13 +245,13 @@ const selectedChallengePatchSubmissions = computed(() => {
     </div>
 
     <div class="rounded-xl border bg-card p-5 shadow-sm">
-      <div class="mb-4 flex items-start justify-between gap-4">
+      <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 class="flex items-center gap-2 font-semibold">
             <Users class="size-4 text-primary" />
-            {{ t('teams.registrationTitle') }}
+            {{ t('teams.currentRegistration') }}
           </h3>
-          <p class="text-sm text-muted-foreground">{{ t('teams.registrationDescription') }}</p>
+          <p class="text-sm text-muted-foreground">{{ t('teams.currentRegistrationDescription') }}</p>
         </div>
         <Badge
           v-if="currentTeam"
@@ -309,35 +279,31 @@ const selectedChallengePatchSubmissions = computed(() => {
             <code>{{ currentTeam.inviteToken }}</code>
           </div>
         </div>
-        <div v-if="!canAccessChallenges" class="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-          {{ currentTeam.isBanned ? t('teams.bannedDetail') : t('teams.waitingApproval') }}
+        <div v-if="!canAccessChallenges" class="space-y-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+          <div>{{ currentTeam.isBanned ? t('teams.bannedDetail') : t('teams.waitingApproval') }}</div>
+          <Button variant="outline" size="sm" as-child>
+            <RouterLink :to="`/competitions/${competitionId}/register`">
+              {{ t('teams.manageRegistration') }}
+            </RouterLink>
+          </Button>
         </div>
+        <Button v-else as-child>
+          <RouterLink :to="`/competitions/${competitionId}/register`">
+            {{ t('teams.manageRegistration') }}
+            <ArrowRight class="size-4" />
+          </RouterLink>
+        </Button>
       </div>
-      <div v-else class="grid gap-3 lg:grid-cols-2">
-        <div class="grid gap-2">
-          <Input v-model="newTeamName" :placeholder="t('teams.teamNamePlaceholder')" />
-          <select
-            v-if="competition?.tracksEnabled"
-            v-model="selectedTrackName"
-            class="h-10 rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="">{{ t('teams.selectTrack') }}</option>
-            <option v-for="track in competition.trackNames" :key="track" :value="track">{{ track }}</option>
-          </select>
-          <Button
-            :disabled="!newTeamName.trim() || (competition?.tracksEnabled && !selectedTrackName) || createTeamMutation.isPending.value"
-            @click="createTeamMutation.mutate()"
-          >
-            <Loader2 v-if="createTeamMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-            {{ t('teams.createTeam') }}
-          </Button>
+      <div v-else class="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+        <div class="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+          {{ t('teams.notRegisteredDetail') }}
         </div>
-        <div class="flex gap-2">
-          <Input v-model="joinToken" :placeholder="t('teams.tokenPlaceholder')" />
-          <Button variant="outline" :disabled="!joinToken.trim() || joinByTokenMutation.isPending.value" @click="joinByTokenMutation.mutate()">
-            {{ t('teams.joinByToken') }}
-          </Button>
-        </div>
+        <Button as-child>
+          <RouterLink :to="`/competitions/${competitionId}/register`">
+            <UserPlus class="size-4" />
+            {{ t('teams.registerForCompetition') }}
+          </RouterLink>
+        </Button>
       </div>
     </div>
 

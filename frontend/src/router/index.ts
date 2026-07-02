@@ -6,7 +6,9 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/competitions',
+      name: 'home',
+      component: () => import('@/views/HomeView.vue'),
+      meta: { requiresAuth: true },
     },
     {
       path: '/login',
@@ -24,6 +26,18 @@ const router = createRouter({
       path: '/competitions',
       name: 'competitions',
       component: () => import('@/views/CompetitionsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/teams',
+      name: 'teams',
+      component: () => import('@/views/TeamsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/competitions/:id/register',
+      name: 'competition-register',
+      component: () => import('@/views/CompetitionRegistrationView.vue'),
       meta: { requiresAuth: true },
     },
     {

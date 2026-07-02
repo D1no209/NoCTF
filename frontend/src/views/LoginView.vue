@@ -11,6 +11,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   FormControl,
   FormField,
@@ -19,13 +20,14 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
-import { Loader2 } from 'lucide-vue-next'
+import { AlertCircle, Loader2 } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
+const loginError = ref('')
 
 const formSchema = toTypedSchema(z.object({
   email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
@@ -38,15 +40,17 @@ const form = useForm({
 
 const onSubmit = form.handleSubmit(async (values) => {
   loading.value = true
+  loginError.value = ''
   try {
     await auth.login(values.email, values.password)
     toast.success(t('auth.loginSuccess'))
     const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
       ? route.query.redirect
-      : '/competitions'
+      : '/'
     await router.push(redirect)
   } catch (error: any) {
-    toast.error(t('errors.loginFailed'))
+    loginError.value = t('errors.loginFailed')
+    toast.error(loginError.value)
   } finally {
     loading.value = false
   }
@@ -62,6 +66,11 @@ const onSubmit = form.handleSubmit(async (values) => {
       </CardHeader>
       <CardContent>
         <form @submit="onSubmit" class="space-y-5">
+          <Alert v-if="loginError" variant="destructive">
+            <AlertCircle class="size-4" />
+            <AlertDescription>{{ loginError }}</AlertDescription>
+          </Alert>
+
           <FormField v-slot="{ componentField }" name="email">
             <FormItem>
               <FormLabel>{{ t('auth.email') }}</FormLabel>
