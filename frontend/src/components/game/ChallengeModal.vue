@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { competitionApi } from '@/api/noctf'
+import { ApiError, competitionApi } from '@/api/noctf'
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert } from '@/components/ui/alert'
 import { renderMarkdown } from '@/lib/markdown'
 import { toast } from 'vue-sonner'
-import { CheckCircle2, Download, Loader2, Shield, Server, Upload } from 'lucide-vue-next'
+import { CheckCircle2, Copy, Download, Loader2, Shield, Server, Timer, Trash2, Upload } from 'lucide-vue-next'
 
 interface Challenge {
   id: string
@@ -24,6 +24,7 @@ interface Challenge {
   typeId: string
   points: number
   solveCount: number
+  deploymentType?: string | null
   description?: string | null
   descriptionFormat?: string | null
   hints?: string[]
@@ -44,6 +45,18 @@ interface PatchSubmissionStatus {
   validationDetail?: string | null
 }
 
+interface InstanceResponse {
+  containerId?: string | null
+  ports?: Record<string, number>
+  addresses?: string[]
+  address?: string | null
+  accessHost?: string
+  status?: string
+  expiresAt?: string | null
+  cooldownUntil?: string | null
+  serverTime?: string
+}
+
 const props = defineProps<{
   open: boolean
   challenge: Challenge | null
@@ -55,6 +68,9 @@ const props = defineProps<{
   instanceReady?: boolean
   defenseEnabled?: boolean
   patchSubmissions?: PatchSubmissionStatus[]
+  canCreateInstance?: boolean
+  canSubmitFlag?: boolean
+  canRequestDefense?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -74,7 +90,15 @@ const submitError = ref<string | null>(null)
 const patchFile = ref<File | null>(null)
 const patchUploading = ref(false)
 const instanceCreating = ref(false)
+const instanceDestroying = ref(false)
+const instanceExtending = ref(false)
+const instanceLoading = ref(false)
+const instance = ref<InstanceResponse | null>(null)
 const instanceStatus = ref<string | null>(null)
+const instanceError = ref<string | null>(null)
+const nowMs = ref(Date.now())
+let clockTimer: ReturnType<typeof setInterval> | null = null
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const isOpen = computed({
   get: () => props.open,
@@ -88,7 +112,26 @@ const renderedDescription = computed(() => {
 
 const visibleHints = computed(() => props.challenge?.hints?.filter(Boolean) ?? [])
 const patchStatuses = computed(() => props.patchSubmissions ?? [])
-const canUploadPatch = computed(() => Boolean(props.isAwdMode && props.defenseEnabled && patchFile.value && props.challenge))
+const isDynamicContainer = computed(() => props.challenge?.deploymentType?.toLowerCase() === 'dynamiccontainer')
+const canCreateDynamicInstance = computed(() => Boolean(isDynamicContainer.value && props.canCreateInstance !== false))
+const canSubmitCurrentFlag = computed(() => props.canSubmitFlag !== false)
+const canRequestCurrentDefense = computed(() => props.canRequestDefense !== false)
+const runningInstance = computed(() => instance.value?.status === 'running' && Boolean(instance.value?.containerId))
+const instanceAddress = computed(() => instance.value?.address ?? instance.value?.addresses?.[0] ?? '')
+const expiresAtMs = computed(() => instance.value?.expiresAt ? new Date(instance.value.expiresAt).getTime() : null)
+const cooldownUntilMs = computed(() => instance.value?.cooldownUntil ? new Date(instance.value.cooldownUntil).getTime() : null)
+const expiresInMs = computed(() => expiresAtMs.value ? Math.max(0, expiresAtMs.value - nowMs.value) : 0)
+const cooldownMs = computed(() => cooldownUntilMs.value ? Math.max(0, cooldownUntilMs.value - nowMs.value) : 0)
+const isCoolingDown = computed(() => cooldownMs.value > 0)
+const canOperateInstance = computed(() => Boolean(canCreateDynamicInstance.value && !isCoolingDown.value))
+const hasInstanceOperation = computed(() => instanceCreating.value || instanceDestroying.value || instanceExtending.value || instanceLoading.value)
+const canUploadPatch = computed(() => Boolean(
+  props.isAwdMode &&
+  props.defenseEnabled &&
+  patchFile.value &&
+  props.challenge &&
+  canRequestCurrentDefense.value,
+))
 
 function onOpenChange(v: boolean) {
   if (!v) {
@@ -96,29 +139,104 @@ function onOpenChange(v: boolean) {
     submitResult.value = null
     submitError.value = null
     patchFile.value = null
-    instanceStatus.value = null
+    instanceError.value = null
+    stopInstancePolling()
   }
   emit('update:open', v)
 }
 
+watch(
+  () => [props.open, props.challenge?.id, isDynamicContainer.value, props.canCreateInstance] as const,
+  ([open]) => {
+    if (open && isDynamicContainer.value && props.challenge && props.canCreateInstance !== false) {
+      startClock()
+      void refreshInstance()
+      startInstancePolling()
+    } else {
+      stopInstancePolling()
+    }
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  stopInstancePolling()
+  stopClock()
+})
+
 async function createInstance() {
-  if (!props.challenge) return
+  if (!props.challenge || !canOperateInstance.value) return
   instanceCreating.value = true
-  instanceStatus.value = null
+  instanceError.value = null
   try {
-    const data = await competitionApi.createInstance<{ ports?: Record<string, number>; status?: string }>(
+    const data = await competitionApi.createInstance<InstanceResponse>(
       props.competitionId,
       props.challenge.id,
     )
-    const ports = data.ports ? Object.entries(data.ports).map(([container, host]) => `${container}->${host}`).join(', ') : ''
-    instanceStatus.value = ports ? `${data.status ?? 'running'} ${ports}` : data.status ?? 'running'
+    instance.value = data
+    updateInstanceStatus()
     toast.success(t('challenges.instanceReady'))
     emit('create-instance')
-  } catch {
+  } catch (error) {
+    const detail = getApiErrorDetail(error)
+    instanceError.value = detail ? `${t('challenges.instanceFailed')}: ${detail}` : t('challenges.instanceFailed')
     toast.error(t('challenges.instanceFailed'))
   } finally {
     instanceCreating.value = false
   }
+}
+
+async function refreshInstance() {
+  if (!props.challenge || !isDynamicContainer.value || props.canCreateInstance === false) return
+  instanceLoading.value = true
+  try {
+    instance.value = await competitionApi.getInstance<InstanceResponse>(props.competitionId, props.challenge.id)
+    updateInstanceStatus()
+  } catch {
+    instance.value = null
+  } finally {
+    instanceLoading.value = false
+  }
+}
+
+async function destroyInstance() {
+  if (!props.challenge || !runningInstance.value || !canOperateInstance.value) return
+  instanceDestroying.value = true
+  instanceError.value = null
+  try {
+    instance.value = await competitionApi.destroyInstance<InstanceResponse>(props.competitionId, props.challenge.id)
+    updateInstanceStatus()
+    toast.success(t('challenges.instanceDestroyed'))
+  } catch (error) {
+    const detail = getApiErrorDetail(error)
+    instanceError.value = detail ? `${t('challenges.instanceDestroyFailed')}: ${detail}` : t('challenges.instanceDestroyFailed')
+    toast.error(t('challenges.instanceDestroyFailed'))
+  } finally {
+    instanceDestroying.value = false
+  }
+}
+
+async function extendInstance() {
+  if (!props.challenge || !runningInstance.value || !canOperateInstance.value) return
+  instanceExtending.value = true
+  instanceError.value = null
+  try {
+    instance.value = await competitionApi.extendInstance<InstanceResponse>(props.competitionId, props.challenge.id)
+    updateInstanceStatus()
+    toast.success(t('challenges.instanceExtended'))
+  } catch (error) {
+    const detail = getApiErrorDetail(error)
+    instanceError.value = detail ? `${t('challenges.instanceExtendFailed')}: ${detail}` : t('challenges.instanceExtendFailed')
+    toast.error(t('challenges.instanceExtendFailed'))
+  } finally {
+    instanceExtending.value = false
+  }
+}
+
+async function copyInstanceAddress() {
+  if (!instanceAddress.value) return
+  await navigator.clipboard.writeText(instanceAddress.value)
+  toast.success(t('challenges.addressCopied'))
 }
 
 function onPatchFileChange(e: Event) {
@@ -127,7 +245,7 @@ function onPatchFileChange(e: Event) {
 }
 
 async function submitFlag() {
-  if (!props.challenge || !flagInput.value.trim()) return
+  if (!props.challenge || !canSubmitCurrentFlag.value || !flagInput.value.trim()) return
   submitting.value = true
   submitResult.value = null
   submitError.value = null
@@ -153,7 +271,7 @@ async function submitFlag() {
 }
 
 async function submitPatch() {
-  if (!props.challenge || !patchFile.value || !props.defenseEnabled) return
+  if (!props.challenge || !patchFile.value || !props.defenseEnabled || !canRequestCurrentDefense.value) return
   patchUploading.value = true
 
   try {
@@ -171,6 +289,60 @@ async function submitPatch() {
 function formatDate(value?: string | null) {
   if (!value) return ''
   return new Date(value).toLocaleString()
+}
+
+function updateInstanceStatus() {
+  if (!runningInstance.value) {
+    instanceStatus.value = null
+    return
+  }
+  instanceStatus.value = instanceAddress.value ? `${instance.value?.status ?? 'running'} ${instanceAddress.value}` : instance.value?.status ?? 'running'
+}
+
+function startClock() {
+  if (clockTimer) return
+  nowMs.value = Date.now()
+  clockTimer = setInterval(() => {
+    nowMs.value = Date.now()
+    if (runningInstance.value && expiresInMs.value <= 0) void refreshInstance()
+  }, 1000)
+}
+
+function stopClock() {
+  if (!clockTimer) return
+  clearInterval(clockTimer)
+  clockTimer = null
+}
+
+function startInstancePolling() {
+  if (pollTimer) return
+  pollTimer = setInterval(() => {
+    if (props.open && isDynamicContainer.value) void refreshInstance()
+  }, 10_000)
+}
+
+function stopInstancePolling() {
+  if (!pollTimer) return
+  clearInterval(pollTimer)
+  pollTimer = null
+}
+
+function formatDuration(ms: number) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function getApiErrorDetail(error: unknown) {
+  if (error instanceof ApiError) {
+    if (typeof error.details === 'string') return error.details
+    if (error.details && typeof error.details === 'object') return JSON.stringify(error.details)
+    if (error.status) return `HTTP ${error.status}`
+  }
+  return error instanceof Error ? error.message : ''
 }
 </script>
 
@@ -201,26 +373,85 @@ function formatDate(value?: string | null) {
         />
         <p v-else class="text-sm text-muted-foreground italic">{{ t('challenges.noDescription') }}</p>
 
-        <div class="grid gap-3 rounded-lg border bg-muted/25 p-3 sm:grid-cols-2">
-          <Button variant="outline" class="justify-start" :disabled="instanceReady || instanceCreating" @click="createInstance">
-            <Loader2 v-if="instanceCreating" class="mr-2 size-4 animate-spin" />
-            <Server v-else class="mr-2 size-4" />
-            {{ instanceReady ? t('challenges.instanceReady') : t('challenges.createInstance') }}
-          </Button>
+        <div v-if="isDynamicContainer || isAwdMode" class="grid gap-3 rounded-lg border bg-muted/25 p-3 sm:grid-cols-2">
+          <div v-if="isDynamicContainer" class="space-y-3 sm:col-span-2">
+            <div v-if="runningInstance" class="rounded-lg border bg-background p-3">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0 space-y-1">
+                  <div class="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                    <Server class="size-4 text-primary" />
+                    <span>{{ t('challenges.instanceReady') }}</span>
+                    <Badge variant="secondary" class="font-mono">{{ formatDuration(expiresInMs) }}</Badge>
+                  </div>
+                  <div class="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span class="font-mono text-foreground">{{ instanceAddress }}</span>
+                    <Button type="button" variant="ghost" size="icon-sm" :title="t('challenges.copyAddress')" @click="copyInstanceAddress">
+                      <Copy class="size-4" />
+                    </Button>
+                    <span class="inline-flex items-center gap-1">
+                      <Timer class="size-3" />
+                      {{ t('challenges.expiresIn') }}
+                    </span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    :disabled="hasInstanceOperation || !canOperateInstance"
+                    @click="extendInstance"
+                  >
+                    <Loader2 v-if="instanceExtending" class="size-4 animate-spin" />
+                    <Timer v-else class="size-4" />
+                    {{ isCoolingDown ? t('challenges.cooldownSeconds', { seconds: Math.ceil(cooldownMs / 1000) }) : t('challenges.extendInstance') }}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    :disabled="hasInstanceOperation || !canOperateInstance"
+                    @click="destroyInstance"
+                  >
+                    <Loader2 v-if="instanceDestroying" class="size-4 animate-spin" />
+                    <Trash2 v-else class="size-4" />
+                    {{ t('challenges.destroyInstance') }}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <Button
+              v-else
+              type="button"
+              variant="outline"
+              class="justify-start"
+              :disabled="hasInstanceOperation || !canCreateDynamicInstance || isCoolingDown"
+              @click="createInstance"
+            >
+              <Loader2 v-if="instanceCreating || instanceLoading" class="mr-2 size-4 animate-spin" />
+              <Server v-else class="mr-2 size-4" />
+              {{ isCoolingDown ? t('challenges.cooldownSeconds', { seconds: Math.ceil(cooldownMs / 1000) }) : t('challenges.createInstance') }}
+            </Button>
+          </div>
           <Button
             v-if="isAwdMode"
+            type="button"
             variant="outline"
             class="justify-start"
-            :disabled="defenseEnabled"
+            :disabled="defenseEnabled || !canRequestCurrentDefense"
             @click="emit('request-defense')"
           >
             <Shield class="mr-2 size-4" />
             {{ defenseEnabled ? t('challenges.defenseReady') : t('challenges.requestDefense') }}
           </Button>
         </div>
-        <div v-if="instanceStatus" class="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          {{ instanceStatus }}
-        </div>
+        <Alert v-if="(isDynamicContainer || isAwdMode) && !canSubmitCurrentFlag">
+          {{ t('challenges.participantActionRequiresTeam') }}
+        </Alert>
+        <div v-if="instanceStatus" class="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">{{ instanceStatus }}</div>
+        <Alert v-if="instanceError" variant="destructive">
+          {{ instanceError }}
+        </Alert>
 
         <div v-if="visibleHints.length" class="rounded-md border bg-muted/30 p-3">
           <div class="mb-2 text-xs font-medium uppercase text-muted-foreground">{{ t('challenges.hints') }}</div>
@@ -289,10 +520,10 @@ function formatDate(value?: string | null) {
               id="flag-input"
               v-model="flagInput"
               :placeholder="t('challenges.flagPlaceholder')"
-              :disabled="submitting"
+              :disabled="submitting || !canSubmitCurrentFlag"
               @keydown.enter="submitFlag"
             />
-            <Button :disabled="submitting || !flagInput.trim()" @click="submitFlag">
+            <Button type="button" :disabled="submitting || !canSubmitCurrentFlag || !flagInput.trim()" @click="submitFlag">
               {{ submitting ? t('common.submitting') : t('common.submit') }}
             </Button>
           </div>

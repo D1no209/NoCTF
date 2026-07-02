@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { toast } from 'vue-sonner'
-import { teamApi } from '@/api/noctf'
+import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -12,14 +12,22 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import EmptyState from '@/components/state/EmptyState.vue'
-import ErrorState from '@/components/state/ErrorState.vue'
-import { ArrowRight, Copy, KeyRound, Loader2, Lock, LogOut, ShieldAlert, Users } from 'lucide-vue-next'
+import { AlertCircle, ArrowRight, Copy, Inbox, KeyRound, Loader2, Lock, LogOut, Plus, ShieldAlert, Users } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const queryClient = useQueryClient()
 const joinToken = ref('')
+const newTeamName = ref('')
+const selectedCompetitionId = ref('')
+const selectedTrackName = ref('')
 
 interface MyTeam {
   id: string
@@ -38,13 +46,65 @@ interface MyTeam {
   trackName?: string | null
 }
 
+interface CompetitionListItem {
+  id: string
+  title: string
+  status: string
+  gameModeType: string
+}
+
+interface CompetitionDetail {
+  id: string
+  title: string
+  tracksEnabled: boolean
+  trackNames: string[]
+}
+
 const { data: teams, isLoading, isError, refetch } = useQuery({
   queryKey: queryKeys.myTeams,
   queryFn: () => teamApi.mine<MyTeam[]>(),
 })
 
+const { data: competitions, isLoading: loadingCompetitions } = useQuery({
+  queryKey: queryKeys.competitions,
+  queryFn: () => competitionApi.list<CompetitionListItem[]>(),
+})
+
+const { data: selectedCompetitionDetail, isLoading: loadingSelectedCompetition } = useQuery({
+  queryKey: computed(() => queryKeys.competition(selectedCompetitionId.value)),
+  queryFn: () => competitionApi.get<CompetitionDetail>(selectedCompetitionId.value),
+  enabled: computed(() => !!selectedCompetitionId.value),
+})
+
 const activeTeams = computed(() => (teams.value ?? []).filter(team => !team.isBanned))
 const bannedTeams = computed(() => (teams.value ?? []).filter(team => team.isBanned))
+const availableCompetitions = computed(() => competitions.value ?? [])
+const selectedCompetitionRequiresTrack = computed(() => Boolean(selectedCompetitionDetail.value?.tracksEnabled))
+const canCreateTeam = computed(() => {
+  if (!selectedCompetitionId.value || !newTeamName.value.trim()) return false
+  if (selectedCompetitionRequiresTrack.value && !selectedTrackName.value) return false
+  return true
+})
+
+const createTeamMutation = useMutation({
+  mutationFn: () => teamApi.create<MyTeam>({
+    competitionId: selectedCompetitionId.value,
+    name: newTeamName.value.trim(),
+    trackName: selectedCompetitionRequiresTrack.value ? selectedTrackName.value : undefined,
+  }),
+  onSuccess: (team) => {
+    newTeamName.value = ''
+    selectedTrackName.value = ''
+    queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
+    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(team.competitionId) })
+    toast.success(t('teams.createSuccess'))
+  },
+  onError: () => toast.error(t('teams.actionError')),
+})
+
+watch(selectedCompetitionId, () => {
+  selectedTrackName.value = ''
+})
 
 const joinByTokenMutation = useMutation({
   mutationFn: () => teamApi.joinByToken<MyTeam>(joinToken.value.trim()),
@@ -92,46 +152,107 @@ async function copyToken(token: string) {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle class="flex items-center gap-2 text-base">
-            <KeyRound class="size-4 text-primary" />
-            {{ t('teams.joinExistingTeam') }}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-            <Input v-model="joinToken" :placeholder="t('teams.tokenPlaceholder')" />
-            <Button
-              variant="outline"
-              :disabled="!joinToken.trim() || joinByTokenMutation.isPending.value"
-              @click="joinByTokenMutation.mutate()"
+      <div class="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2 text-base">
+              <Plus class="size-4 text-primary" />
+              {{ t('teams.createTeam') }}
+            </CardTitle>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <Select v-model="selectedCompetitionId" :disabled="loadingCompetitions || availableCompetitions.length === 0">
+              <SelectTrigger>
+                <SelectValue :placeholder="loadingCompetitions ? t('common.loading') : t('teams.selectCompetition')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="competition in availableCompetitions"
+                  :key="competition.id"
+                  :value="competition.id"
+                >
+                  {{ competition.title }} · {{ competition.gameModeType.toUpperCase() }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Input v-model="newTeamName" :placeholder="t('teams.teamNamePlaceholder')" />
+
+            <Select
+              v-if="selectedCompetitionRequiresTrack"
+              v-model="selectedTrackName"
+              :disabled="loadingSelectedCompetition"
             >
-              <Loader2 v-if="joinByTokenMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-              {{ t('teams.joinByToken') }}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <SelectTrigger>
+                <SelectValue :placeholder="loadingSelectedCompetition ? t('common.loading') : t('teams.selectTrack')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="track in selectedCompetitionDetail?.trackNames ?? []"
+                  :key="track"
+                  :value="track"
+                >
+                  {{ track }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-xs text-muted-foreground">
+                {{ availableCompetitions.length === 0 ? t('teams.noCompetitionsToCreate') : t('teams.createTeamDescription') }}
+              </p>
+              <Button
+                class="shrink-0"
+                :disabled="!canCreateTeam || createTeamMutation.isPending.value"
+                @click="createTeamMutation.mutate()"
+              >
+                <Loader2 v-if="createTeamMutation.isPending.value" class="mr-2 size-4 animate-spin" />
+                {{ t('teams.createTeam') }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2 text-base">
+              <KeyRound class="size-4 text-primary" />
+              {{ t('teams.joinExistingTeam') }}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+              <Input v-model="joinToken" :placeholder="t('teams.tokenPlaceholder')" />
+              <Button
+                variant="outline"
+                :disabled="!joinToken.trim() || joinByTokenMutation.isPending.value"
+                @click="joinByTokenMutation.mutate()"
+              >
+                <Loader2 v-if="joinByTokenMutation.isPending.value" class="mr-2 size-4 animate-spin" />
+                {{ t('teams.joinByToken') }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div v-if="isLoading" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Skeleton v-for="i in 6" :key="i" class="h-52 rounded-xl" />
       </div>
 
-      <ErrorState
-        v-else-if="isError"
-        :title="t('teams.loadError')"
-        :retry-label="t('common.refresh')"
-        @retry="refetch()"
-      />
+      <div v-else-if="isError" class="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <AlertCircle class="size-8 text-destructive" />
+        <h3 class="mt-3 text-sm font-medium">{{ t('teams.loadError') }}</h3>
+        <Button variant="outline" size="sm" class="mt-4" @click="refetch()">
+          {{ t('common.refresh') }}
+        </Button>
+      </div>
 
-      <EmptyState
-        v-else-if="!teams?.length"
-        :title="t('teams.emptyMine')"
-        :description="t('teams.emptyMineDescription')"
-        :action-label="t('teams.findCompetition')"
-        @action="$router.push('/competitions')"
-      />
+      <div v-else-if="!teams?.length" class="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <Inbox class="size-8 text-muted-foreground" />
+        <h3 class="mt-3 text-sm font-medium">{{ t('teams.emptyMine') }}</h3>
+        <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('teams.emptyMineDescription') }}</p>
+      </div>
 
       <template v-else>
         <section class="space-y-4">

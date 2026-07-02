@@ -47,6 +47,22 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
         var ctfGameMode = gameModes.FirstOrDefault(g => g.Type == GameModeType.Ctf);
         if (ctfGameMode is null)
         {
+            AuditLogWriter.Add(
+                dbContext,
+                HttpContext,
+                "flag.submitted",
+                "Challenge",
+                req.ChallengeId.ToString(),
+                new
+                {
+                    competitionId = req.Id,
+                    challengeId = req.ChallengeId,
+                    correct = false,
+                    result = "mode_unavailable",
+                    flagLength = req.Flag?.Length ?? 0
+                },
+                exception: "mode_unavailable");
+            await dbContext.SaveChangesAsync(ct);
             await SendAsync(new SubmitFlagResponse { Correct = false, Result = "mode_unavailable" }, 503, ct);
             return;
         }
@@ -62,6 +78,22 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
 
         if (teamMember is null)
         {
+            AuditLogWriter.Add(
+                dbContext,
+                HttpContext,
+                "flag.submitted",
+                "Challenge",
+                req.ChallengeId.ToString(),
+                new
+                {
+                    competitionId = req.Id,
+                    challengeId = req.ChallengeId,
+                    correct = false,
+                    result = "no_team",
+                    flagLength = req.Flag?.Length ?? 0
+                },
+                exception: "no_team");
+            await dbContext.SaveChangesAsync(ct);
             await SendAsync(new SubmitFlagResponse
             {
                 Correct = false,
@@ -73,6 +105,23 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
 
         if (teamMember.RegistrationStatus != TeamRegistrationStatus.Approved)
         {
+            AuditLogWriter.Add(
+                dbContext,
+                HttpContext,
+                "flag.submitted",
+                "Challenge",
+                req.ChallengeId.ToString(),
+                new
+                {
+                    competitionId = req.Id,
+                    challengeId = req.ChallengeId,
+                    teamId = teamMember.TeamId,
+                    correct = false,
+                    result = "team_not_approved",
+                    flagLength = req.Flag?.Length ?? 0
+                },
+                exception: "team_not_approved");
+            await dbContext.SaveChangesAsync(ct);
             await SendAsync(new SubmitFlagResponse
             {
                 Correct = false,
@@ -93,6 +142,22 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
                 teamMember.TeamId,
                 userId,
                 req.ChallengeId);
+            AuditLogWriter.Add(
+                dbContext,
+                HttpContext,
+                "flag.submitted",
+                "Challenge",
+                req.ChallengeId.ToString(),
+                new
+                {
+                    competitionId = req.Id,
+                    challengeId = req.ChallengeId,
+                    teamId = teamMember.TeamId,
+                    correct = false,
+                    result = "team_banned",
+                    flagLength = req.Flag?.Length ?? 0
+                },
+                exception: "team_banned");
             await dbContext.SaveChangesAsync(ct);
             await SendAsync(new SubmitFlagResponse
             {
@@ -123,6 +188,25 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
             SubmissionResult.WrongFlag => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "wrong_flag" },
             _ => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = result.ToString().ToLowerInvariant() }
         };
+
+        AuditLogWriter.Add(
+            dbContext,
+            HttpContext,
+            "flag.submitted",
+            "Challenge",
+            req.ChallengeId.ToString(),
+            new
+            {
+                competitionId = req.Id,
+                challengeId = req.ChallengeId,
+                teamId = teamMember.TeamId,
+                correct = response.Correct,
+                alreadySolved = response.AlreadySolved,
+                result = response.Result,
+                flagLength = req.Flag?.Length ?? 0
+            },
+            exception: response.Correct ? null : response.Result);
+        await dbContext.SaveChangesAsync(ct);
 
         await SendAsync(response, cancellation: ct);
     }

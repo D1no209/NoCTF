@@ -23,7 +23,8 @@ public record ContainerSecurityPolicy(
     bool NoNewPrivileges = true,
     bool ReadonlyRootfs = false,
     bool RunAsNonRoot = true,
-    IReadOnlyList<string>? CapDrop = null
+    IReadOnlyList<string>? CapDrop = null,
+    IReadOnlyList<string>? CapAdd = null
 );
 
 public record ContainerInstance(

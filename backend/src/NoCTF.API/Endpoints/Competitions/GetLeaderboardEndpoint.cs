@@ -8,6 +8,17 @@ public class GetLeaderboardRequest
     public Guid CompetitionId { get; set; }
 }
 
+public class GetLeaderboardTrendRequest
+{
+    public Guid CompetitionId { get; set; }
+}
+
+public class GetLeaderboardTeamDetailRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+}
+
 public class GetLeaderboardResponse
 {
     public Guid CompetitionId { get; set; }
@@ -20,9 +31,63 @@ public class LeaderboardEntryDto
     public int Rank { get; set; }
     public Guid TeamId { get; set; }
     public string TeamName { get; set; } = string.Empty;
+    public string? TrackName { get; set; }
     public long TotalScore { get; set; }
     public int SolvedCount { get; set; }
     public DateTime? FirstSolveAt { get; set; }
+}
+
+public class LeaderboardTrendResponse
+{
+    public Guid CompetitionId { get; set; }
+    public List<LeaderboardTeamSeriesDto> Series { get; set; } = [];
+    public DateTime GeneratedAt { get; set; }
+}
+
+public class LeaderboardTeamSeriesDto
+{
+    public Guid TeamId { get; set; }
+    public string TeamName { get; set; } = string.Empty;
+    public List<LeaderboardTrendPointDto> Points { get; set; } = [];
+}
+
+public class LeaderboardTrendPointDto
+{
+    public DateTime Timestamp { get; set; }
+    public long Score { get; set; }
+}
+
+public class LeaderboardTeamDetailDto
+{
+    public Guid TeamId { get; set; }
+    public string TeamName { get; set; } = string.Empty;
+    public string? TrackName { get; set; }
+    public long TotalScore { get; set; }
+    public int SolvedCount { get; set; }
+    public List<LeaderboardDirectionScoreDto> DirectionScores { get; set; } = [];
+    public List<LeaderboardMemberHistoryDto> Members { get; set; } = [];
+}
+
+public class LeaderboardDirectionScoreDto
+{
+    public string Direction { get; set; } = string.Empty;
+    public long Score { get; set; }
+    public int SolvedCount { get; set; }
+}
+
+public class LeaderboardMemberHistoryDto
+{
+    public Guid UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public List<LeaderboardMemberSolveDto> Solves { get; set; } = [];
+}
+
+public class LeaderboardMemberSolveDto
+{
+    public Guid ChallengeId { get; set; }
+    public string ChallengeTitle { get; set; } = string.Empty;
+    public string Direction { get; set; } = string.Empty;
+    public DateTime SubmittedAt { get; set; }
 }
 
 /// <summary>
@@ -74,8 +139,86 @@ public class GetLeaderboardEndpoint(
         Rank = e.Rank,
         TeamId = e.TeamId,
         TeamName = e.TeamName,
+        TrackName = e.TrackName,
         TotalScore = e.TotalScore,
         SolvedCount = e.SolvedCount,
         FirstSolveAt = e.FirstSolveAt
     };
+}
+
+public class GetLeaderboardTrendEndpoint(ILeaderboardInsightService insightService)
+    : Endpoint<GetLeaderboardTrendRequest, LeaderboardTrendResponse>
+{
+    public override void Configure()
+    {
+        Get("/api/competitions/{competitionId}/leaderboard/trend");
+        AllowAnonymous();
+    }
+
+    public override async Task HandleAsync(GetLeaderboardTrendRequest req, CancellationToken ct)
+    {
+        var result = await insightService.BuildTrendAsync(req.CompetitionId, 10, ct);
+        await SendAsync(new LeaderboardTrendResponse
+        {
+            CompetitionId = result.CompetitionId,
+            GeneratedAt = result.GeneratedAt,
+            Series = result.Series.Select(s => new LeaderboardTeamSeriesDto
+            {
+                TeamId = s.TeamId,
+                TeamName = s.TeamName,
+                Points = s.Points.Select(p => new LeaderboardTrendPointDto
+                {
+                    Timestamp = p.Timestamp,
+                    Score = p.Score
+                }).ToList()
+            }).ToList()
+        }, cancellation: ct);
+    }
+}
+
+public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insightService)
+    : Endpoint<GetLeaderboardTeamDetailRequest, LeaderboardTeamDetailDto>
+{
+    public override void Configure()
+    {
+        Get("/api/competitions/{competitionId}/leaderboard/teams/{teamId}");
+        AllowAnonymous();
+    }
+
+    public override async Task HandleAsync(GetLeaderboardTeamDetailRequest req, CancellationToken ct)
+    {
+        var result = await insightService.BuildTeamDetailAsync(req.CompetitionId, req.TeamId, ct);
+        if (result is null)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        await SendAsync(new LeaderboardTeamDetailDto
+        {
+            TeamId = result.TeamId,
+            TeamName = result.TeamName,
+            TrackName = result.TrackName,
+            TotalScore = result.TotalScore,
+            SolvedCount = result.SolvedCount,
+            DirectionScores = result.DirectionScores.Select(s => new LeaderboardDirectionScoreDto
+            {
+                Direction = s.Direction,
+                Score = s.Score,
+                SolvedCount = s.SolvedCount
+            }).ToList(),
+            Members = result.Members.Select(m => new LeaderboardMemberHistoryDto
+            {
+                UserId = m.UserId,
+                UserName = m.UserName,
+                Solves = m.Solves.Select(s => new LeaderboardMemberSolveDto
+                {
+                    ChallengeId = s.ChallengeId,
+                    ChallengeTitle = s.ChallengeTitle,
+                    Direction = s.Direction,
+                    SubmittedAt = s.SubmittedAt
+                }).ToList()
+            }).ToList()
+        }, cancellation: ct);
+    }
 }

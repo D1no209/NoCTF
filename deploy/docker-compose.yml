@@ -70,6 +70,7 @@ services:
       StorageProvider__Local__BasePath: /app/uploads
       Runner__BaseUrl: http://runner:8080
       Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
     volumes:
       - backend_uploads:/app/uploads
       - /var/run/docker.sock:/var/run/docker.sock
