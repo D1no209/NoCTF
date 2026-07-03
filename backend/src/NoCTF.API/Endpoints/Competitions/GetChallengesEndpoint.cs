@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -38,24 +39,31 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
 
     public override async Task HandleAsync(GetChallengesRequest req, CancellationToken ct)
     {
-        var challenges = await dbContext.Challenges
+        var challengeRows = await dbContext.Challenges
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(c => c.CompetitionId == req.Id)
             .OrderBy(c => c.CreatedAt)
-            .Select(c => new ChallengeDto
+            .Select(c => new
             {
-                Id = c.Id,
-                Title = c.Title,
-                Description = c.Description,
-                DescriptionFormat = c.DescriptionFormat,
-                TypeId = c.TypeId,
-                Points = c.PointsConfig.InitialPoints,
-                AttachmentUrl = c.AttachmentUrl,
-                DeploymentType = c.DeploymentType.ToString(),
-                ExposedPort = c.ExposedPort
+                Challenge = new ChallengeDto
+                {
+                    Id = c.Id,
+                    Title = c.Title,
+                    Description = c.Description,
+                    DescriptionFormat = c.DescriptionFormat,
+                    TypeId = c.TypeId,
+                    Points = c.PointsConfig.InitialPoints,
+                    AttachmentUrl = c.AttachmentUrl,
+                    DeploymentType = c.DeploymentType.ToString(),
+                    ExposedPort = c.ExposedPort
+                },
+                c.PointsConfig,
+                c.DifficultyCoefficient
             })
             .ToListAsync(ct);
 
+        var challenges = challengeRows.Select(row => row.Challenge).ToList();
         var challengeIds = challenges.Select(c => c.Id).ToList();
         var solveCounts = await ChallengeSolveCounts.GetAsync(dbContext, req.Id, challengeIds, ct);
         var hints = await dbContext.ChallengeHints
@@ -68,6 +76,11 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
         foreach (var challenge in challenges)
         {
             challenge.SolveCount = solveCounts.GetValueOrDefault(challenge.Id);
+            var scoring = challengeRows.First(row => row.Challenge.Id == challenge.Id);
+            challenge.Points = CtfScoreCalculator.CalculateChallengePoints(
+                challenge.SolveCount,
+                scoring.PointsConfig,
+                scoring.DifficultyCoefficient);
             challenge.Hints = hints
                 .Where(h => h.ChallengeId == challenge.Id)
                 .OrderBy(h => h.DisplayOrder)

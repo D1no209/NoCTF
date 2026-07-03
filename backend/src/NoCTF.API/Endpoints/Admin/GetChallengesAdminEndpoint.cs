@@ -45,6 +45,7 @@ public class CompetitionChallengeAdminDto
     public CheckerConfigDto? CheckerConfig { get; set; }
     public PointsConfigDto PointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public bool EnableBloodBonus { get; set; }
     public List<ChallengeHintDto> Hints { get; set; } = [];
 }
 
@@ -59,7 +60,7 @@ public class PointsConfigDto
     public int InitialPoints { get; set; } = 500;
     public int MinimumPoints { get; set; } = 100;
     public int DecayFactor { get; set; } = 450;
-    public string DecayFunction { get; set; } = "quadratic";
+    public string DecayFunction { get; set; } = "sigmoid";
 }
 
 public class ChallengeHintDto
@@ -129,6 +130,7 @@ public static class ChallengeAdminMapping
             DecayFunction = challenge.PointsConfig.DecayFunction,
         },
         DifficultyCoefficient = challenge.DifficultyCoefficient,
+        EnableBloodBonus = challenge.EnableBloodBonus,
         Hints = hints
             .OrderBy(h => h.DisplayOrder)
             .Select(h => new ChallengeHintDto

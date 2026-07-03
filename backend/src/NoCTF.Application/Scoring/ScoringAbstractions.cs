@@ -17,6 +17,7 @@ public static class ScoreSignalTypes
 public static class ScoringKeys
 {
     public const string DecaySolve = "decay-solve";
+    public const string BloodBonus = "blood-bonus";
     public const string RoundAccumulation = "round-accumulation";
     public const string OneShotVerification = "one-shot-verification";
     public const string ControlInterval = "control-interval";

@@ -65,7 +65,21 @@ public class LeaderboardTeamDetailDto
     public long TotalScore { get; set; }
     public int SolvedCount { get; set; }
     public List<LeaderboardDirectionScoreDto> DirectionScores { get; set; } = [];
+    public List<LeaderboardChallengeScoreDto> ChallengeScores { get; set; } = [];
     public List<LeaderboardMemberHistoryDto> Members { get; set; } = [];
+}
+
+public class LeaderboardChallengeScoreDto
+{
+    public Guid ChallengeId { get; set; }
+    public string ChallengeTitle { get; set; } = string.Empty;
+    public string Direction { get; set; } = string.Empty;
+    public int CurrentPoints { get; set; }
+    public long BaseScore { get; set; }
+    public long BonusScore { get; set; }
+    public long TotalScore { get; set; }
+    public int? BloodRank { get; set; }
+    public DateTime? SolvedAt { get; set; }
 }
 
 public class LeaderboardDirectionScoreDto
@@ -206,6 +220,18 @@ public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insight
                 Direction = s.Direction,
                 Score = s.Score,
                 SolvedCount = s.SolvedCount
+            }).ToList(),
+            ChallengeScores = result.ChallengeScores.Select(s => new LeaderboardChallengeScoreDto
+            {
+                ChallengeId = s.ChallengeId,
+                ChallengeTitle = s.ChallengeTitle,
+                Direction = s.Direction,
+                CurrentPoints = s.CurrentPoints,
+                BaseScore = s.BaseScore,
+                BonusScore = s.BonusScore,
+                TotalScore = s.TotalScore,
+                BloodRank = s.BloodRank,
+                SolvedAt = s.SolvedAt
             }).ToList(),
             Members = result.Members.Select(m => new LeaderboardMemberHistoryDto
             {

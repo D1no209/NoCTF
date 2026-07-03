@@ -18,6 +18,9 @@ public class CompetitionSummaryDto
     public Guid OwnerId { get; set; }
     public PointsConfigDto DefaultPointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public double FirstBloodBonusPercent { get; set; }
+    public double SecondBloodBonusPercent { get; set; }
+    public double ThirdBloodBonusPercent { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
     public int MaxTeamMembers { get; set; } = 5;
     public bool TracksEnabled { get; set; }
@@ -85,6 +88,9 @@ public class GetCompetitionAdminEndpoint(ApplicationDbContext dbContext) : Endpo
             DecayFunction = competition.DefaultDecayFunction,
         },
         DifficultyCoefficient = competition.DifficultyCoefficient,
+        FirstBloodBonusPercent = competition.FirstBloodBonusPercent,
+        SecondBloodBonusPercent = competition.SecondBloodBonusPercent,
+        ThirdBloodBonusPercent = competition.ThirdBloodBonusPercent,
         TeamRegistrationAutoApprove = competition.TeamRegistrationAutoApprove,
         MaxTeamMembers = competition.MaxTeamMembers,
         TracksEnabled = competition.TracksEnabled,

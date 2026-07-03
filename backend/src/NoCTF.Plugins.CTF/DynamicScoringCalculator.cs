@@ -1,4 +1,5 @@
 using NoCTF.Core;
+using NoCTF.Application.Scoring;
 
 namespace NoCTF.Plugins.CTF;
 
@@ -16,19 +17,6 @@ public class DynamicScoringCalculator
     /// <returns>Current point value, clamped to [MinimumPoints, InitialPoints].</returns>
     public int Calculate(int solveCount, PointsConfig config)
     {
-        if (solveCount <= 0)
-            return config.InitialPoints;
-
-        var initial = (double)config.InitialPoints;
-        var min = (double)config.MinimumPoints;
-        var decay = (double)config.DecayFactor;
-        var solves = (double)solveCount;
-
-        // CTFd formula: value = ((min - initial) / decay^2) * solves^2 + initial
-        var value = ((min - initial) / (decay * decay)) * (solves * solves) + initial;
-
-        // Clamp to [min, initial]
-        var clamped = Math.Max(min, Math.Min(initial, value));
-        return (int)Math.Round(clamped);
+        return CtfScoreCalculator.CalculateChallengePoints(solveCount, config);
     }
 }

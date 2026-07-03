@@ -74,7 +74,20 @@ type TeamDetail = {
   totalScore: number
   solvedCount: number
   directionScores: DirectionScore[]
+  challengeScores: ChallengeScore[]
   members: MemberHistory[]
+}
+
+type ChallengeScore = {
+  challengeId: string
+  challengeTitle: string
+  direction: string
+  currentPoints: number
+  baseScore: number
+  bonusScore: number
+  totalScore: number
+  bloodRank?: number | null
+  solvedAt?: string | null
 }
 
 const props = defineProps<{
@@ -121,12 +134,31 @@ const chartBounds = computed(() => {
 function buildPath(points: TrendPoint[]) {
   if (!points?.length) return ''
   const { minTime, maxTime, maxScore } = chartBounds.value
-  return points.map((point, index) => {
+  const mapped = points.map((point) => {
     const time = Date.parse(point.timestamp)
     const x = 36 + ((time - minTime) / Math.max(1, maxTime - minTime)) * 588
     const y = 212 - ((point.score ?? 0) / Math.max(1, maxScore)) * 176
-    return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
-  }).join(' ')
+    return { x, y }
+  })
+  return mapped.reduce((path, point, index) => {
+    if (index === 0) return `M ${point.x.toFixed(1)} ${point.y.toFixed(1)}`
+    const previous = mapped[index - 1]
+    return `${path} L ${point.x.toFixed(1)} ${previous.y.toFixed(1)} L ${point.x.toFixed(1)} ${point.y.toFixed(1)}`
+  }, '')
+}
+
+function bloodLabel(rank?: number | null) {
+  if (rank === 1) return t('scoreboard.firstBlood')
+  if (rank === 2) return t('scoreboard.secondBlood')
+  if (rank === 3) return t('scoreboard.thirdBlood')
+  return ''
+}
+
+function formatChallengeScore(score: ChallengeScore) {
+  if (!score.solvedAt) return '-'
+  if (score.bonusScore === 0) return `${score.baseScore}`
+  const sign = score.bonusScore > 0 ? '+' : ''
+  return `${score.baseScore} (${sign}${score.bonusScore})`
 }
 
 function formatDate(value?: string | null) {
@@ -360,6 +392,41 @@ onUnmounted(() => {
               </div>
             </div>
             <p v-else class="text-sm text-muted-foreground">{{ t('scoreboard.noDirectionScores') }}</p>
+          </div>
+
+          <div>
+            <h3 class="mb-2 text-sm font-medium">{{ t('scoreboard.challengeScores') }}</h3>
+            <div class="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{{ t('challenges.title') }}</TableHead>
+                    <TableHead>{{ t('admin.challenges.direction') }}</TableHead>
+                    <TableHead class="text-right">{{ t('scoreboard.currentPoints') }}</TableHead>
+                    <TableHead class="text-right">{{ t('scoreboard.teamScore') }}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="score in selectedTeam.challengeScores" :key="score.challengeId">
+                    <TableCell>
+                      <div class="font-medium">{{ score.challengeTitle }}</div>
+                      <Badge
+                        v-if="score.bloodRank"
+                        variant="outline"
+                        class="mt-1 border-amber-500/70 bg-amber-500/10 text-amber-700"
+                      >
+                        {{ bloodLabel(score.bloodRank) }}
+                      </Badge>
+                    </TableCell>
+                    <TableCell class="text-muted-foreground">{{ score.direction }}</TableCell>
+                    <TableCell class="text-right font-mono">{{ score.currentPoints }}</TableCell>
+                    <TableCell class="text-right font-mono" :class="score.solvedAt ? 'font-semibold text-foreground' : 'text-muted-foreground'">
+                      {{ formatChallengeScore(score) }}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           <div>

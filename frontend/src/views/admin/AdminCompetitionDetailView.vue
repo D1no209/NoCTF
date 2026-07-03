@@ -45,6 +45,9 @@ interface CompetitionDto {
   endTime: string
   defaultPointsConfig: PointsConfigDto
   difficultyCoefficient: number
+  firstBloodBonusPercent: number
+  secondBloodBonusPercent: number
+  thirdBloodBonusPercent: number
   teamRegistrationAutoApprove: boolean
   maxTeamMembers: number
   tracksEnabled: boolean
@@ -77,6 +80,7 @@ interface CompetitionChallengeDto {
   flagEnvironmentVariable?: string
   pointsConfig: PointsConfigDto
   difficultyCoefficient: number
+  enableBloodBonus: boolean
   hints: ChallengeHintDto[]
 }
 
@@ -134,8 +138,11 @@ const competitionForm = reactive({
   initialPoints: 500,
   minimumPoints: 100,
   decayFactor: 450,
-  decayFunction: 'quadratic',
+  decayFunction: 'sigmoid',
   difficultyCoefficient: 1,
+  firstBloodBonusPercent: 0,
+  secondBloodBonusPercent: 0,
+  thirdBloodBonusPercent: 0,
   teamRegistrationAutoApprove: true,
   maxTeamMembers: 5,
   tracksEnabled: false,
@@ -148,8 +155,9 @@ const bindForm = reactive({
   initialPoints: 500,
   minimumPoints: 100,
   decayFactor: 450,
-  decayFunction: 'quadratic',
+  decayFunction: 'sigmoid',
   difficultyCoefficient: 1,
+  enableBloodBonus: false,
   flagPrefix: 'flag',
   hints: [''],
 })
@@ -159,8 +167,9 @@ const selectedEdit = reactive({
   initialPoints: 500,
   minimumPoints: 100,
   decayFactor: 450,
-  decayFunction: 'quadratic',
+  decayFunction: 'sigmoid',
   difficultyCoefficient: 1,
+  enableBloodBonus: false,
   flagPrefix: 'flag',
   hints: [''],
 })
@@ -184,9 +193,12 @@ function competitionPayload() {
       initialPoints: Number(competitionForm.initialPoints) || 500,
       minimumPoints: Number(competitionForm.minimumPoints) || 100,
       decayFactor: Number(competitionForm.decayFactor) || 450,
-      decayFunction: competitionForm.decayFunction || 'quadratic',
+      decayFunction: competitionForm.decayFunction || 'sigmoid',
     },
     difficultyCoefficient: Number(competitionForm.difficultyCoefficient) || 1,
+    firstBloodBonusPercent: Number(competitionForm.firstBloodBonusPercent) || 0,
+    secondBloodBonusPercent: Number(competitionForm.secondBloodBonusPercent) || 0,
+    thirdBloodBonusPercent: Number(competitionForm.thirdBloodBonusPercent) || 0,
     teamRegistrationAutoApprove: competitionForm.teamRegistrationAutoApprove,
     maxTeamMembers: Number(competitionForm.maxTeamMembers) || 5,
     tracksEnabled: competitionForm.tracksEnabled,
@@ -235,8 +247,11 @@ watch(competition, (value) => {
   competitionForm.initialPoints = value.defaultPointsConfig?.initialPoints ?? 500
   competitionForm.minimumPoints = value.defaultPointsConfig?.minimumPoints ?? 100
   competitionForm.decayFactor = value.defaultPointsConfig?.decayFactor ?? 450
-  competitionForm.decayFunction = value.defaultPointsConfig?.decayFunction ?? 'quadratic'
+  competitionForm.decayFunction = value.defaultPointsConfig?.decayFunction ?? 'sigmoid'
   competitionForm.difficultyCoefficient = value.difficultyCoefficient ?? 1
+  competitionForm.firstBloodBonusPercent = value.firstBloodBonusPercent ?? 0
+  competitionForm.secondBloodBonusPercent = value.secondBloodBonusPercent ?? 0
+  competitionForm.thirdBloodBonusPercent = value.thirdBloodBonusPercent ?? 0
   competitionForm.teamRegistrationAutoApprove = value.teamRegistrationAutoApprove ?? true
   competitionForm.maxTeamMembers = value.maxTeamMembers ?? 5
   competitionForm.tracksEnabled = value.tracksEnabled ?? false
@@ -261,8 +276,9 @@ watch(selectedChallenge, (challenge) => {
   selectedEdit.initialPoints = challenge.pointsConfig?.initialPoints ?? 500
   selectedEdit.minimumPoints = challenge.pointsConfig?.minimumPoints ?? 100
   selectedEdit.decayFactor = challenge.pointsConfig?.decayFactor ?? 450
-  selectedEdit.decayFunction = challenge.pointsConfig?.decayFunction ?? 'quadratic'
+  selectedEdit.decayFunction = challenge.pointsConfig?.decayFunction ?? 'sigmoid'
   selectedEdit.difficultyCoefficient = challenge.difficultyCoefficient ?? 1
+  selectedEdit.enableBloodBonus = challenge.enableBloodBonus ?? false
   selectedEdit.flagPrefix = challenge.flagPrefix ?? 'flag'
   selectedEdit.hints = challenge.hints?.length ? challenge.hints.map(h => h.content) : ['']
 }, { immediate: true })
@@ -290,9 +306,10 @@ const bindMutation = useMutation({
       initialPoints: Number(bindForm.initialPoints) || 500,
       minimumPoints: Number(bindForm.minimumPoints) || 100,
       decayFactor: Number(bindForm.decayFactor) || 450,
-      decayFunction: bindForm.decayFunction || 'quadratic',
+      decayFunction: bindForm.decayFunction || 'sigmoid',
     },
     difficultyCoefficient: Number(bindForm.difficultyCoefficient) || 1,
+    enableBloodBonus: bindForm.enableBloodBonus,
     flagPrefix: bindForm.flagPrefix.trim() || 'flag',
     hints: cleanHints(bindForm.hints),
   }),
@@ -313,9 +330,10 @@ const updateChallengeMutation = useMutation({
       initialPoints: Number(selectedEdit.initialPoints) || 500,
       minimumPoints: Number(selectedEdit.minimumPoints) || 100,
       decayFactor: Number(selectedEdit.decayFactor) || 450,
-      decayFunction: selectedEdit.decayFunction || 'quadratic',
+      decayFunction: selectedEdit.decayFunction || 'sigmoid',
     },
     difficultyCoefficient: Number(selectedEdit.difficultyCoefficient) || 1,
+    enableBloodBonus: selectedEdit.enableBloodBonus,
     flagPrefix: selectedEdit.flagPrefix.trim() || 'flag',
     hints: cleanHints(selectedEdit.hints),
   }),
@@ -405,6 +423,51 @@ function addBindHint() {
 function addEditHint() {
   selectedEdit.hints.push('')
 }
+
+function scoreForSolves(solves: number, form: { initialPoints: number; minimumPoints: number; decayFactor: number; decayFunction: string; difficultyCoefficient: number }) {
+  const initial = Math.max(Number(form.initialPoints) || 500, Number(form.minimumPoints) || 100)
+  const minimum = Math.min(Number(form.minimumPoints) || 100, initial)
+  const range = initial - minimum
+  if (solves <= 1 || range <= 0) return initial
+  const effectiveDecay = Math.max(1, (Number(form.decayFactor) || 450) * Math.max(0.1, Number(form.difficultyCoefficient) || 1))
+  const progress = Math.max(0, solves / effectiveDecay)
+  const normalized = normalizeDecay(progress, form.decayFunction)
+  return Math.max(minimum, Math.min(initial, Math.floor(initial - range * normalized)))
+}
+
+function normalizeDecay(progress: number, decayFunction: string) {
+  const key = (decayFunction || 'sigmoid').toLowerCase()
+  if (key === 'linear') return Math.min(1, progress)
+  if (key === 'quadratic') return Math.min(1, progress * progress)
+  if (key === 'logarithmic') return progress >= 1 ? 1 : Math.log(1 + progress * 9) / Math.log(10)
+  if (progress >= 1) return 1
+  const logistic = (value: number) => 1 / (1 + Math.exp(-10 * (value - 0.5)))
+  const start = logistic(0)
+  const end = logistic(1)
+  return Math.min(1, Math.max(0, (logistic(progress) - start) / (end - start)))
+}
+
+function buildCurve(form: { initialPoints: number; minimumPoints: number; decayFactor: number; decayFunction: string; difficultyCoefficient: number }) {
+  const effectiveDecay = Math.max(1, (Number(form.decayFactor) || 450) * Math.max(0.1, Number(form.difficultyCoefficient) || 1))
+  const maxSolves = Math.max(10, Math.ceil(effectiveDecay))
+  const samples = 28
+  const scores = Array.from({ length: samples + 1 }, (_, index) => {
+    const solves = Math.round((maxSolves * index) / samples)
+    return { solves, score: scoreForSolves(solves, form) }
+  })
+  const initial = Math.max(...scores.map(point => point.score), 1)
+  const minimum = Math.min(Number(form.minimumPoints) || 100, initial)
+  const path = scores.map((point, index) => {
+    const x = 28 + (point.solves / maxSolves) * 244
+    const y = 104 - ((point.score - minimum) / Math.max(1, initial - minimum)) * 76
+    return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
+  }).join(' ')
+  const minimumAt = scores.find(point => point.score <= minimum)?.solves
+  return { maxSolves, scores, path, minimumAt }
+}
+
+const bindCurve = computed(() => buildCurve(bindForm))
+const editCurve = computed(() => buildCurve(selectedEdit))
 </script>
 
 <template>
@@ -524,11 +587,27 @@ function addEditHint() {
               <Select v-model="competitionForm.decayFunction">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="sigmoid">{{ t('admin.competitionDetail.decaySigmoid') }}</SelectItem>
                   <SelectItem value="quadratic">{{ t('admin.competitionDetail.decayQuadratic') }}</SelectItem>
                   <SelectItem value="logarithmic">{{ t('admin.competitionDetail.decayLogarithmic') }}</SelectItem>
                   <SelectItem value="linear">{{ t('admin.competitionDetail.decayLinear') }}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div class="mt-4 grid gap-4 rounded-lg bg-muted/30 p-4 lg:grid-cols-3">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.firstBloodBonus') }}</Label>
+              <Input v-model.number="competitionForm.firstBloodBonusPercent" type="number" min="0" step="1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.secondBloodBonus') }}</Label>
+              <Input v-model.number="competitionForm.secondBloodBonusPercent" type="number" min="0" step="1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.thirdBloodBonus') }}</Label>
+              <Input v-model.number="competitionForm.thirdBloodBonusPercent" type="number" min="0" step="1" />
             </div>
           </div>
         </div>
@@ -559,6 +638,10 @@ function addEditHint() {
               <Label>{{ t('admin.competitionDetail.flagPrefix') }}</Label>
               <Input v-model="bindForm.flagPrefix" placeholder="flag" />
             </div>
+            <label class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+              <input v-model="bindForm.enableBloodBonus" type="checkbox" class="size-4" />
+              <span>{{ t('admin.competitionDetail.enableBloodBonus') }}</span>
+            </label>
             <div class="grid gap-2 lg:col-span-2">
               <Label>{{ t('admin.competitionDetail.markdownDescription') }}</Label>
               <Textarea v-model="bindForm.description" class="font-mono text-xs" rows="5" :placeholder="t('admin.competitionDetail.descriptionPlaceholder')" />
@@ -583,12 +666,32 @@ function addEditHint() {
               <Select v-model="bindForm.decayFunction">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="sigmoid">{{ t('admin.competitionDetail.decaySigmoid') }}</SelectItem>
                   <SelectItem value="quadratic">{{ t('admin.competitionDetail.decayQuadratic') }}</SelectItem>
                   <SelectItem value="logarithmic">{{ t('admin.competitionDetail.decayLogarithmic') }}</SelectItem>
                   <SelectItem value="linear">{{ t('admin.competitionDetail.decayLinear') }}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div class="mt-4 rounded-lg border bg-background p-3">
+            <div class="mb-2 flex items-center justify-between">
+              <div>
+                <div class="text-sm font-medium">{{ t('admin.competitionDetail.decayPreview') }}</div>
+                <div class="text-xs text-muted-foreground">
+                  {{ bindCurve.minimumAt == null ? t('admin.competitionDetail.minimumNotReached') : t('admin.competitionDetail.minimumReachedAt', { count: bindCurve.minimumAt }) }}
+                </div>
+              </div>
+              <Badge variant="outline">{{ bindCurve.maxSolves }} {{ t('scoreboard.solves') }}</Badge>
+            </div>
+            <svg viewBox="0 0 300 124" class="h-32 w-full">
+              <line x1="28" y1="104" x2="272" y2="104" class="stroke-border" stroke-width="1" />
+              <line x1="28" y1="28" x2="28" y2="104" class="stroke-border" stroke-width="1" />
+              <path :d="bindCurve.path" fill="none" stroke="oklch(0.56 0.23 262)" stroke-width="2.5" stroke-linecap="round" />
+              <text x="30" y="118" class="fill-muted-foreground text-[10px]">{{ t('admin.competitionDetail.solvesAxis') }}</text>
+              <text x="2" y="34" class="fill-muted-foreground text-[10px]">{{ t('admin.competitionDetail.pointsAxis') }}</text>
+            </svg>
           </div>
 
           <div class="mt-4 space-y-2">
@@ -847,11 +950,34 @@ function addEditHint() {
               <Select v-model="selectedEdit.decayFunction">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="sigmoid">{{ t('admin.competitionDetail.decaySigmoid') }}</SelectItem>
                   <SelectItem value="quadratic">{{ t('admin.competitionDetail.decayQuadratic') }}</SelectItem>
                   <SelectItem value="logarithmic">{{ t('admin.competitionDetail.decayLogarithmic') }}</SelectItem>
                   <SelectItem value="linear">{{ t('admin.competitionDetail.decayLinear') }}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <label class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+              <input v-model="selectedEdit.enableBloodBonus" type="checkbox" class="size-4" />
+              <span>{{ t('admin.competitionDetail.enableBloodBonus') }}</span>
+            </label>
+            <div class="rounded-lg border bg-background p-3">
+              <div class="mb-2 flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-medium">{{ t('admin.competitionDetail.decayPreview') }}</div>
+                  <div class="text-xs text-muted-foreground">
+                    {{ editCurve.minimumAt == null ? t('admin.competitionDetail.minimumNotReached') : t('admin.competitionDetail.minimumReachedAt', { count: editCurve.minimumAt }) }}
+                  </div>
+                </div>
+                <Badge variant="outline">{{ editCurve.maxSolves }} {{ t('scoreboard.solves') }}</Badge>
+              </div>
+              <svg viewBox="0 0 300 124" class="h-32 w-full">
+                <line x1="28" y1="104" x2="272" y2="104" class="stroke-border" stroke-width="1" />
+                <line x1="28" y1="28" x2="28" y2="104" class="stroke-border" stroke-width="1" />
+                <path :d="editCurve.path" fill="none" stroke="oklch(0.56 0.23 262)" stroke-width="2.5" stroke-linecap="round" />
+                <text x="30" y="118" class="fill-muted-foreground text-[10px]">{{ t('admin.competitionDetail.solvesAxis') }}</text>
+                <text x="2" y="34" class="fill-muted-foreground text-[10px]">{{ t('admin.competitionDetail.pointsAxis') }}</text>
+              </svg>
             </div>
             <div class="grid gap-2">
               <Label>{{ t('admin.competitionDetail.flagPrefix') }}</Label>
