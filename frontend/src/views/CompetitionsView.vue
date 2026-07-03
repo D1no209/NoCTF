@@ -5,19 +5,18 @@ import { competitionApi } from '@/api/noctf'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { RouterLink } from 'vue-router'
-import { vAutoAnimate } from '@formkit/auto-animate/vue'
-import { AlertCircle, ArrowRight, Calendar, Inbox, RotateCw, Search } from 'lucide-vue-next'
+import { AlertCircle, ArrowRight, Calendar, Inbox, RotateCw, Search, Users } from 'lucide-vue-next'
 
 const { t } = useI18n()
 
@@ -29,6 +28,7 @@ interface Competition {
   gameModeType?: string | null
   startTime: string
   endTime: string
+  registeredTeamCount?: number | null
 }
 
 type LoadState = 'loading' | 'error' | 'empty' | 'filtered-empty' | 'ready'
@@ -86,7 +86,6 @@ function updateListState() {
   } else {
     state.loadState = 'ready'
   }
-
 }
 
 watch(() => [state.search, state.statusFilter, state.modeFilter], () => {
@@ -110,7 +109,7 @@ function statusToneClass(status: string) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -118,28 +117,30 @@ function formatDate(iso: string) {
   })
 }
 
+function modeLabel(mode?: string | null) {
+  return (mode || 'CTF').toUpperCase()
+}
 </script>
 
 <template>
   <AppLayout>
     <div class="mx-auto w-full max-w-[1600px] space-y-8 px-4 py-8 md:px-6">
-      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <PageHeader 
-          :title="t('competitions.title')" 
+      <div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <PageHeader
+          :title="t('competitions.title')"
           :description="t('competitions.subtitle')"
           class="flex-1"
         />
       </div>
 
-      <!-- Filters -->
       <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
         <div class="relative">
           <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="state.search" :placeholder="t('competitions.searchPlaceholder')" class="pl-10" />
+          <Input v-model="state.search" :placeholder="t('competitions.searchPlaceholder')" class="!rounded-none pl-10" />
         </div>
-        
+
         <Select v-model="state.statusFilter">
-          <SelectTrigger>
+          <SelectTrigger class="!rounded-none">
             <SelectValue :placeholder="t('common.status')" />
           </SelectTrigger>
           <SelectContent>
@@ -152,7 +153,7 @@ function formatDate(iso: string) {
         </Select>
 
         <Select v-model="state.modeFilter">
-          <SelectTrigger>
+          <SelectTrigger class="!rounded-none">
             <SelectValue :placeholder="t('common.mode')" />
           </SelectTrigger>
           <SelectContent>
@@ -164,88 +165,101 @@ function formatDate(iso: string) {
           </SelectContent>
         </Select>
 
-        <Button variant="outline" @click="loadCompetitions()" :disabled="isState('loading')">
+        <Button variant="outline" class="!rounded-none" @click="loadCompetitions()" :disabled="isState('loading')">
           <RotateCw class="size-4" :class="{ 'animate-spin': isState('loading') }" />
           {{ t('common.refresh') }}
         </Button>
       </div>
 
       <div class="min-h-40">
-        <div v-if="isState('loading')" class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          <Skeleton v-for="i in 6" :key="i" class="h-64 rounded-xl" />
+        <div v-if="isState('loading')" class="grid gap-4">
+          <Skeleton v-for="i in 4" :key="i" class="h-48 !rounded-none" />
         </div>
 
-        <div v-else-if="isState('error')" class="flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <div v-else-if="isState('error')" class="flex min-h-40 flex-col items-center justify-center border border-dashed bg-muted/20 px-4 py-8 text-center">
           <AlertCircle class="size-8 text-destructive" />
           <h3 class="mt-3 text-sm font-medium">{{ t('competitions.loadError') }}</h3>
-          <Button variant="outline" size="sm" class="mt-4" @click="loadCompetitions">
+          <Button variant="outline" size="sm" class="mt-4 !rounded-none" @click="loadCompetitions">
             {{ t('common.refresh') }}
           </Button>
         </div>
 
-        <div v-else-if="isState('empty')" class="flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <div v-else-if="isState('empty')" class="flex min-h-40 flex-col items-center justify-center border border-dashed bg-muted/20 px-4 py-8 text-center">
           <Inbox class="size-8 text-muted-foreground" />
           <h3 class="mt-3 text-sm font-medium">{{ t('competitions.empty') }}</h3>
           <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('competitions.emptyDescription') }}</p>
-          <Button variant="outline" size="sm" class="mt-4" @click="loadCompetitions">
+          <Button variant="outline" size="sm" class="mt-4 !rounded-none" @click="loadCompetitions">
             {{ t('common.refresh') }}
           </Button>
         </div>
 
-        <div v-else-if="isState('filtered-empty')" class="flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <div v-else-if="isState('filtered-empty')" class="flex min-h-40 flex-col items-center justify-center border border-dashed bg-muted/20 px-4 py-8 text-center">
           <Search class="size-8 text-muted-foreground" />
           <h3 class="mt-3 text-sm font-medium">{{ t('common.noResults') }}</h3>
           <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('competitions.emptyDescription') }}</p>
-          <Button variant="outline" size="sm" class="mt-4" @click="resetFilters">
+          <Button variant="outline" size="sm" class="mt-4 !rounded-none" @click="resetFilters">
             {{ t('common.reset') }}
           </Button>
         </div>
 
-        <div v-else-if="isState('ready')" v-auto-animate class="competition-grid">
+        <div v-else-if="isState('ready')" class="competition-list">
           <article
             v-for="comp in state.visibleCompetitions"
             :key="comp.id"
-            class="competition-card"
+            class="competition-row"
           >
-            <div class="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" :class="statusToneClass(comp.status)">
-                {{ statusLabel(comp.status) }}
-              </Badge>
-              <Badge variant="secondary" class="bg-secondary text-secondary-foreground">
-                {{ comp.gameModeType || 'CTF' }}
-              </Badge>
-            </div>
-
-            <div class="min-w-0 space-y-3">
-              <h2 class="line-clamp-2 text-xl font-bold tracking-normal text-foreground">
-                {{ comp.title }}
-              </h2>
-              <p v-if="comp.description" class="line-clamp-3 text-sm leading-6 text-muted-foreground">
-                {{ comp.description }}
-              </p>
-              <p v-else class="line-clamp-3 text-sm leading-6 text-muted-foreground">
-                {{ t('competitions.emptyDescription') }}
-              </p>
-            </div>
-
-            <div class="competition-card-meta">
-              <div class="flex items-center gap-2">
-                <Calendar class="size-4 text-primary" />
-                <span>{{ t('competitions.startLabel') }}{{ formatDate(comp.startTime) }}</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <Calendar class="size-4 text-primary" />
-                <span>{{ t('competitions.endLabel') }}{{ formatDate(comp.endTime) }}</span>
+            <div class="competition-poster" :data-mode="modeLabel(comp.gameModeType)">
+              <span class="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">{{ t('competitions.posterLabel') }}</span>
+              <div>
+                <p class="text-4xl font-black tracking-normal text-white md:text-5xl">{{ modeLabel(comp.gameModeType) }}</p>
+                <p class="mt-2 line-clamp-2 text-sm font-medium text-white/72">{{ comp.title }}</p>
               </div>
             </div>
 
-            <div class="mt-auto grid gap-2 sm:grid-cols-2">
-              <Button variant="outline" as-child>
+            <div class="competition-row-main">
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" class="!rounded-none" :class="statusToneClass(comp.status)">
+                  {{ statusLabel(comp.status) }}
+                </Badge>
+                <Badge variant="secondary" class="!rounded-none">
+                  {{ modeLabel(comp.gameModeType) }}
+                </Badge>
+              </div>
+
+              <div class="min-w-0">
+                <h2 class="line-clamp-2 text-2xl font-bold leading-tight tracking-normal text-foreground md:text-3xl">
+                  {{ comp.title }}
+                </h2>
+                <p v-if="comp.description" class="mt-3 line-clamp-3 max-w-5xl text-sm leading-6 text-muted-foreground md:text-base">
+                  {{ comp.description }}
+                </p>
+              </div>
+
+              <div class="competition-row-meta">
+                <div class="flex items-center gap-2">
+                  <Calendar class="size-4 text-primary" />
+                  <span>{{ t('competitions.startLabel') }}{{ formatDate(comp.startTime) }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Calendar class="size-4 text-primary" />
+                  <span>{{ t('competitions.endLabel') }}{{ formatDate(comp.endTime) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="competition-row-count">
+              <Users class="size-5 text-primary" />
+              <span class="text-3xl font-bold tracking-normal text-foreground">{{ comp.registeredTeamCount ?? 0 }}</span>
+              <span class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{{ t('competitions.registeredTeams') }}</span>
+            </div>
+
+            <div class="competition-row-actions">
+              <Button variant="outline" class="!rounded-none" as-child>
                 <RouterLink :to="`/competitions/${comp.id}/register`">
                   {{ t('teams.registerForCompetition') }}
                 </RouterLink>
               </Button>
-              <Button as-child>
+              <Button class="!rounded-none" as-child>
                 <RouterLink :to="`/competitions/${comp.id}`">
                   {{ t('competitions.enter') }}
                   <ArrowRight class="size-4" />
@@ -260,40 +274,136 @@ function formatDate(iso: string) {
 </template>
 
 <style scoped>
-.competition-grid {
+.competition-list {
   display: grid;
-  gap: 1.5rem;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
 }
 
-.competition-card {
+.competition-row {
+  display: grid;
+  grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr) minmax(8.5rem, 10rem) minmax(10rem, 12rem);
+  min-height: 13rem;
+  overflow: hidden;
+  border: 1px solid oklch(0.87 0.025 255);
+  background: oklch(1 0 0);
+  box-shadow: 0 18px 45px rgb(15 23 42 / 0.06);
+}
+
+.competition-poster {
+  position: relative;
+  isolation: isolate;
   display: flex;
-  min-height: 19rem;
+  min-height: 13rem;
   flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  border-right: 1px solid oklch(0.87 0.025 255);
+  background:
+    linear-gradient(135deg, oklch(0.24 0.08 255), oklch(0.16 0.045 255)),
+    oklch(0.19 0.05 255);
+  padding: 1.35rem;
+}
+
+.competition-poster::before {
+  position: absolute;
+  inset: -35% auto auto 38%;
+  z-index: -1;
+  width: 14rem;
+  height: 14rem;
+  content: "";
+  background: oklch(0.62 0.2 262 / 0.34);
+  transform: rotate(24deg);
+}
+
+.competition-poster::after {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.5rem;
+  z-index: -1;
+  content: attr(data-mode);
+  color: oklch(1 0 0 / 0.07);
+  font-size: 5.5rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.competition-row-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
   gap: 1.25rem;
-  border-radius: 1rem;
-  border: 1px solid oklch(0.89 0.028 252);
-  background: oklch(0.995 0.004 255 / 0.94);
-  padding: 1.5rem;
-  box-shadow: 0 18px 54px rgb(15 23 42 / 0.055);
-  transition:
-    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 1.35rem 1.5rem;
 }
 
-.competition-card:hover {
-  transform: translateY(-0.125rem);
-  border-color: oklch(0.68 0.12 262 / 0.45);
-  box-shadow: 0 24px 70px rgb(37 99 235 / 0.11);
+.competition-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+  color: oklch(0.42 0.02 255);
+  font-size: 0.9rem;
 }
 
-.competition-card-meta {
-  display: grid;
+.competition-row-count {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
+  border-left: 1px solid oklch(0.9 0.018 255);
+  background: oklch(0.98 0.007 255);
+  padding: 1.25rem;
+}
+
+.competition-row-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   gap: 0.75rem;
-  border-block: 1px solid oklch(0.9 0.023 252);
-  padding-block: 1rem;
-  color: oklch(0.49 0.05 260);
-  font-size: 0.875rem;
+  border-left: 1px solid oklch(0.9 0.018 255);
+  padding: 1.25rem;
+}
+
+@media (max-width: 1120px) {
+  .competition-row {
+    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr) minmax(9rem, 11rem);
+  }
+
+  .competition-row-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+    border-top: 1px solid oklch(0.9 0.018 255);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .competition-row {
+    grid-template-columns: 1fr;
+  }
+
+  .competition-poster,
+  .competition-row-count,
+  .competition-row-actions {
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .competition-poster,
+  .competition-row-count {
+    border-bottom: 1px solid oklch(0.9 0.018 255);
+  }
+
+  .competition-row-count {
+    min-height: 7rem;
+  }
+
+  .competition-row-actions {
+    justify-content: stretch;
+  }
+
+  .competition-row-actions > * {
+    flex: 1 1 0;
+  }
 }
 </style>

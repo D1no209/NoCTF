@@ -14,6 +14,7 @@ public class CompetitionListItemDto
     public string GameModeType { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
+    public int RegisteredTeamCount { get; set; }
 }
 
 /// <summary>
@@ -43,7 +44,12 @@ public class GetCompetitionsEndpoint(ApplicationDbContext dbContext) : Endpoint<
                 Status = c.Status.ToString().ToLowerInvariant(),
                 GameModeType = c.GameModeType.ToString().ToLowerInvariant(),
                 StartTime = c.StartTime,
-                EndTime = c.EndTime
+                EndTime = c.EndTime,
+                RegisteredTeamCount = dbContext.Teams
+                    .IgnoreQueryFilters()
+                    .Count(t => t.CompetitionId == c.Id
+                             && t.RegistrationStatus == TeamRegistrationStatus.Approved
+                             && !t.IsBanned)
             })
             .ToListAsync(ct);
 

@@ -143,6 +143,8 @@
     "empty": "No competitions available.",
     "startLabel": "Start:",
     "endLabel": "End:",
+    "registeredTeams": "Participating teams",
+    "posterLabel": "Event poster",
     "status": {
       "active": "Active",
       "running": "Running",

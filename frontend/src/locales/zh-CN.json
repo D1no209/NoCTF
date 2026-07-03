@@ -143,6 +143,8 @@
     "empty": "暂无比赛",
     "startLabel": "开始：",
     "endLabel": "结束：",
+    "registeredTeams": "已参赛队伍",
+    "posterLabel": "赛事海报",
     "status": {
       "active": "进行中",
       "running": "运行中",
