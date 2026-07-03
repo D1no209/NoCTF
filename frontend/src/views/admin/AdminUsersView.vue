@@ -3,6 +3,7 @@ import { ref, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
+  FlexRender,
   useVueTable,
   getCoreRowModel,
   getPaginationRowModel,
@@ -80,7 +81,7 @@ const selectedUser = ref<UserDto | null>(null)
 const newRole = ref('user')
 const newPassword = ref('')
 
-const { data: users, isLoading } = useQuery({
+const { data: users, isLoading, isError, refetch } = useQuery({
   queryKey: queryKeys.adminUsers,
   queryFn: () => adminApi.users<UserDto[]>(),
 })
@@ -219,6 +220,14 @@ const table = useVueTable({
               </div>
             </TableCell>
           </TableRow>
+          <TableRow v-else-if="isError">
+            <TableCell :colspan="columns.length + 1" class="h-32 text-center">
+              <div class="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                <span>{{ t('admin.users.loadError', t('errors.loadFailed')) }}</span>
+                <Button variant="outline" size="sm" @click="refetch()">{{ t('common.refresh') }}</Button>
+              </div>
+            </TableCell>
+          </TableRow>
           <TableRow v-else-if="table.getRowModel().rows.length === 0">
             <TableCell :colspan="columns.length + 1" class="h-24 text-center text-muted-foreground">
               {{ t('admin.users.empty') }}
@@ -231,7 +240,7 @@ const table = useVueTable({
             class="group transition-colors hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
-              <component :is="() => cell.renderValue()" />
+              <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
             </TableCell>
             <TableCell class="px-4 py-3 text-right">
               <DropdownMenu>

@@ -3,6 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 
+const apiTarget = process.env.NOCTF_API_TARGET ?? 'http://127.0.0.1'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -19,12 +21,12 @@ export default defineConfig({
     cors: true,
     proxy: {
       '/hubs': {
-        target: 'http://localhost:5000',
+        target: apiTarget,
         ws: true,
         changeOrigin: true,
       },
       '/api': {
-        target: 'http://localhost:5000',
+        target: apiTarget,
         changeOrigin: true,
       },
     },

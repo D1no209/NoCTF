@@ -3,6 +3,7 @@ import { ref, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
+  FlexRender,
   useVueTable,
   getCoreRowModel,
   getPaginationRowModel,
@@ -49,10 +50,14 @@ const qc = useQueryClient()
 
 interface TeamDto {
   id: string
+  competitionId: string
   name: string
   captainName: string
   memberCount: number
   competitionTitle: string
+  inviteToken?: string
+  isLocked?: boolean
+  registrationStatus?: string
 }
 
 interface TeamMemberDto {
@@ -69,7 +74,7 @@ const selectedTeam = ref<TeamDto | null>(null)
 const teamMembers = ref<TeamMemberDto[]>([])
 const loadingMembers = ref(false)
 
-const { data: teams, isLoading } = useQuery({
+const { data: teams, isLoading, isError, refetch } = useQuery({
   queryKey: queryKeys.adminTeams,
   queryFn: () => adminApi.teams<TeamDto[]>(),
 })
@@ -122,6 +127,11 @@ const columns = [
     header: t('admin.teams.members'), 
     enableSorting: true,
     cell: (info) => h(Badge, { variant: 'secondary', class: 'font-mono' }, () => info.getValue().toString())
+  }),
+  columnHelper.accessor('registrationStatus', {
+    header: t('admin.teams.registrationStatus'),
+    enableSorting: true,
+    cell: (info) => h(Badge, { variant: info.getValue() === 'approved' ? 'default' : info.getValue() === 'rejected' ? 'destructive' : 'secondary' }, () => info.getValue() ?? 'pending')
   }),
   columnHelper.accessor('competitionTitle', { 
     header: t('admin.teams.competition'), 
@@ -198,6 +208,14 @@ const table = useVueTable({
               </div>
             </TableCell>
           </TableRow>
+          <TableRow v-else-if="isError">
+            <TableCell :colspan="columns.length + 1" class="h-32 text-center">
+              <div class="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                <span>{{ t('admin.teams.loadError', t('errors.loadFailed')) }}</span>
+                <Button variant="outline" size="sm" @click="refetch()">{{ t('common.refresh') }}</Button>
+              </div>
+            </TableCell>
+          </TableRow>
           <TableRow v-else-if="table.getRowModel().rows.length === 0">
             <TableCell :colspan="columns.length + 1" class="h-24 text-center text-muted-foreground">
               {{ t('admin.teams.empty') }}
@@ -210,7 +228,7 @@ const table = useVueTable({
             class="group transition-colors hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
-              <component :is="() => cell.renderValue()" />
+              <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
             </TableCell>
             <TableCell class="px-4 py-3 text-right">
               <DropdownMenu>

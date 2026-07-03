@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute, RouterView, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -16,6 +16,16 @@ const scoreStore = useScoreStore()
 const competitionId = computed(() => route.params.id as string)
 const displayName = computed(() => scoreStore.myTeamName ?? auth.user?.userName ?? '')
 const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
+
+watch(
+  competitionId,
+  (id) => {
+    if (scoreStore.competitionId !== id) {
+      scoreStore.setCurrentTeamScore(id, null, null, null)
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -24,7 +34,7 @@ const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
       <div class="mx-auto flex h-20 max-w-[1800px] items-center justify-between gap-4 px-4 md:px-6">
         <div class="flex items-center gap-4">
           <RouterLink 
-            :to="`/competitions/${competitionId}`" 
+            to="/competitions"
             class="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
           >
             <ChevronLeft class="size-4" />
@@ -52,12 +62,14 @@ const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
 
     <!-- Main Game Area -->
     <main class="relative flex-1">
-      <transition
-        name="fade"
-        mode="out-in"
-      >
-        <RouterView :key="route.fullPath" />
-      </transition>
+      <RouterView v-slot="{ Component }">
+        <transition
+          name="fade"
+          mode="out-in"
+        >
+          <component :is="Component" :key="route.fullPath" />
+        </transition>
+      </RouterView>
     </main>
   </div>
 </template>

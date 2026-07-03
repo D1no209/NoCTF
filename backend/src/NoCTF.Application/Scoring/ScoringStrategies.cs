@@ -19,21 +19,16 @@ public class DecaySolveScoringStrategy(ApplicationDbContext db, IScoreEventWrite
             .AsNoTracking()
             .FirstAsync(c => c.Id == challengeId && c.CompetitionId == signal.CompetitionId, ct);
 
-        var solves = await db.Submissions
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(s =>
-                s.CompetitionId == signal.CompetitionId &&
-                s.ChallengeId == challengeId &&
-                s.IsCorrect)
-            .OrderBy(s => s.SubmittedAt)
-            .Select(s => new { s.TeamId, s.SubmittedAt })
-            .ToListAsync(ct);
+        var solves = await CtfSolveRanking.GetRankedSolvesAsync(db, signal.CompetitionId, challengeId, ct);
 
         if (solves.Count == 0)
             return;
 
-        var currentPoints = CalculateDynamicPoints(solves.Count, challenge.PointsConfig);
+        var currentPoints = CtfScoreCalculator.CalculateChallengePoints(
+            solves.Count,
+            challenge.PointsConfig,
+            challenge.DifficultyCoefficient);
+
         foreach (var solve in solves)
         {
             var currentTotal = await db.ScoreEvents
@@ -48,7 +43,9 @@ public class DecaySolveScoringStrategy(ApplicationDbContext db, IScoreEventWrite
 
             var delta = currentPoints - (int)currentTotal;
             var eventType = currentTotal == 0 ? "ctf.solve" : "ctf.score-adjustment";
-            var suffix = currentTotal == 0 ? "solve" : $"correction:{solves.Count}";
+            var suffix = currentTotal == 0
+                ? $"solve:{currentPoints}"
+                : $"correction:{solves.Count}:{currentPoints}";
 
             await writer.WriteAsync(new ScoreEventCreate(
                 CompetitionId: signal.CompetitionId,
@@ -62,22 +59,125 @@ public class DecaySolveScoringStrategy(ApplicationDbContext db, IScoreEventWrite
                 Reason: currentTotal == 0
                     ? $"Solved challenge '{challenge.Title}'"
                     : $"Dynamic score adjustment for challenge '{challenge.Title}'",
-                MetadataJson: ScoringJson.Serialize(new { solveCount = solves.Count, currentPoints }),
+                MetadataJson: ScoringJson.Serialize(new
+                {
+                    solveCount = solves.Count,
+                    currentPoints,
+                    solveRank = solve.Rank,
+                    decayFunction = challenge.PointsConfig.DecayFunction,
+                    difficultyCoefficient = challenge.DifficultyCoefficient
+                }),
                 Timestamp: signal.OccurredAt), ct);
         }
     }
+}
 
-    private static int CalculateDynamicPoints(int solveCount, PointsConfig config)
+public class BloodBonusScoringStrategy(ApplicationDbContext db, IScoreEventWriter writer) : IScoringStrategy
+{
+    public string ScoringKey => ScoringKeys.BloodBonus;
+
+    public bool CanHandle(ScoreSignal signal)
+        => signal.SignalType == ScoreSignalTypes.SolveAccepted && signal.SubjectId.HasValue;
+
+    public async Task HandleAsync(ScoreSignal signal, CancellationToken ct = default)
     {
-        if (solveCount <= 0)
-            return config.InitialPoints;
+        var challengeId = signal.SubjectId!.Value;
+        var challenge = await db.Challenges
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstAsync(c => c.Id == challengeId && c.CompetitionId == signal.CompetitionId, ct);
 
-        var initial = (double)config.InitialPoints;
-        var min = (double)config.MinimumPoints;
-        var decay = (double)config.DecayFactor;
-        var solves = (double)solveCount;
-        var value = ((min - initial) / (decay * decay)) * (solves * solves) + initial;
-        return (int)Math.Round(Math.Max(min, Math.Min(initial, value)));
+        var competition = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstAsync(c => c.Id == signal.CompetitionId, ct);
+
+        var solves = await CtfSolveRanking.GetRankedSolvesAsync(db, signal.CompetitionId, challengeId, ct);
+        if (solves.Count == 0)
+            return;
+
+        var currentPoints = CtfScoreCalculator.CalculateChallengePoints(
+            solves.Count,
+            challenge.PointsConfig,
+            challenge.DifficultyCoefficient);
+
+        foreach (var solve in solves.Where(s => s.Rank <= 3))
+        {
+            var expectedBonus = CtfScoreCalculator.CalculateBloodBonus(
+                solve.Rank,
+                currentPoints,
+                competition,
+                challenge.EnableBloodBonus);
+
+            var currentTotal = await db.ScoreEvents
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(e =>
+                    e.CompetitionId == signal.CompetitionId &&
+                    e.TeamId == solve.TeamId &&
+                    e.ChallengeId == challengeId &&
+                    e.ScoringKey == ScoringKey)
+                .SumAsync(e => (long)e.PointsDelta, ct);
+
+            var delta = expectedBonus - (int)currentTotal;
+            await writer.WriteAsync(new ScoreEventCreate(
+                CompetitionId: signal.CompetitionId,
+                TeamId: solve.TeamId,
+                ScoringKey: ScoringKey,
+                EventType: currentTotal == 0 ? "ctf.blood-bonus" : "ctf.blood-bonus-adjustment",
+                PointsDelta: delta,
+                IdempotencyKey: $"ctf-blood:{solve.TeamId:N}:{challengeId:N}:correction:{solves.Count}:{expectedBonus}",
+                ChallengeId: challengeId,
+                SourceSignalId: signal.Id,
+                Reason: solve.Rank switch
+                {
+                    1 => $"First blood bonus for challenge '{challenge.Title}'",
+                    2 => $"Second blood bonus for challenge '{challenge.Title}'",
+                    _ => $"Third blood bonus for challenge '{challenge.Title}'"
+                },
+                MetadataJson: ScoringJson.Serialize(new
+                {
+                    solveCount = solves.Count,
+                    solveRank = solve.Rank,
+                    currentPoints,
+                    bonusPoints = expectedBonus
+                }),
+                Timestamp: signal.OccurredAt), ct);
+        }
+    }
+}
+
+file sealed record RankedSolve(Guid TeamId, DateTime SubmittedAt, int Rank);
+
+file static class CtfSolveRanking
+{
+    public static async Task<List<RankedSolve>> GetRankedSolvesAsync(
+        ApplicationDbContext db,
+        Guid competitionId,
+        Guid challengeId,
+        CancellationToken ct)
+    {
+        var solves = await db.Submissions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                s.ChallengeId == challengeId &&
+                s.IsCorrect)
+            .Join(
+                db.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
+                    t.CompetitionId == competitionId &&
+                    t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                    !t.IsBanned),
+                s => s.TeamId,
+                t => t.Id,
+                (s, _) => new { s.TeamId, s.SubmittedAt })
+            .GroupBy(s => s.TeamId)
+            .Select(g => new { TeamId = g.Key, SubmittedAt = g.Min(s => s.SubmittedAt) })
+            .OrderBy(s => s.SubmittedAt)
+            .ToListAsync(ct);
+
+        return solves.Select((solve, index) => new RankedSolve(solve.TeamId, solve.SubmittedAt, index + 1)).ToList();
     }
 }
 

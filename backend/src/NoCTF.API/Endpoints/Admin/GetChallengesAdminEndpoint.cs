@@ -5,10 +5,9 @@ using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
 
-public class ChallengeAdminDto
+public class ChallengeTemplateAdminDto
 {
     public Guid Id { get; set; }
-    public Guid CompetitionId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string TypeId { get; set; } = string.Empty;
@@ -17,8 +16,37 @@ public class ChallengeAdminDto
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
     public string? AttachmentUrl { get; set; }
+    public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
+    public int? ExposedPort { get; set; }
+    public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
+    public CheckerConfigDto? CheckerConfig { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class CompetitionChallengeAdminDto
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid? TemplateId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string DescriptionFormat { get; set; } = "markdown";
+    public string TypeId { get; set; } = string.Empty;
+    public string? ContainerImage { get; set; }
+    public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
+    public string? ComposeYaml { get; set; }
+    public string? ComposeProjectName { get; set; }
+    public string? AttachmentUrl { get; set; }
+    public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
+    public int? ExposedPort { get; set; }
+    public string FlagPrefix { get; set; } = "flag";
+    public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
     public CheckerConfigDto? CheckerConfig { get; set; }
     public PointsConfigDto PointsConfig { get; set; } = new();
+    public double DifficultyCoefficient { get; set; } = 1.0;
+    public bool EnableBloodBonus { get; set; }
+    public List<ChallengeHintDto> Hints { get; set; } = [];
 }
 
 public class CheckerConfigDto
@@ -31,9 +59,91 @@ public class PointsConfigDto
 {
     public int InitialPoints { get; set; } = 500;
     public int MinimumPoints { get; set; } = 100;
+    public int DecayFactor { get; set; } = 450;
+    public string DecayFunction { get; set; } = "sigmoid";
 }
 
-public class GetChallengesAdminEndpoint(ApplicationDbContext db) : Endpoint<EmptyRequest, List<ChallengeAdminDto>>
+public class ChallengeHintDto
+{
+    public Guid Id { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public int DisplayOrder { get; set; }
+}
+
+public static class ChallengeAdminMapping
+{
+    public static ChallengeTemplateAdminDto ToTemplateDto(ChallengeTemplate challenge) => new()
+    {
+        Id = challenge.Id,
+        Title = challenge.Title,
+        Description = challenge.Description,
+        TypeId = challenge.TypeId,
+        ContainerImage = challenge.ContainerImage,
+        ContainerMode = challenge.ContainerMode,
+        ComposeYaml = challenge.ComposeYaml,
+        ComposeProjectName = challenge.ComposeProjectName,
+        AttachmentUrl = challenge.AttachmentUrl,
+        DeploymentType = challenge.DeploymentType,
+        ExposedPort = challenge.ExposedPort,
+        FlagEnvironmentVariable = string.IsNullOrWhiteSpace(challenge.FlagEnvironmentVariable)
+            ? "NOCTF_FLAG_UUID"
+            : challenge.FlagEnvironmentVariable,
+        CheckerConfig = challenge.CheckerConfig is null ? null : new CheckerConfigDto
+        {
+            Image = challenge.CheckerConfig.Image,
+            Command = challenge.CheckerConfig.Command,
+        },
+        CreatedAt = challenge.CreatedAt,
+        UpdatedAt = challenge.UpdatedAt,
+    };
+
+    public static CompetitionChallengeAdminDto ToCompetitionDto(Challenge challenge, IEnumerable<ChallengeHint> hints) => new()
+    {
+        Id = challenge.Id,
+        CompetitionId = challenge.CompetitionId,
+        TemplateId = challenge.TemplateId,
+        Title = challenge.Title,
+        Description = challenge.Description,
+        DescriptionFormat = string.IsNullOrWhiteSpace(challenge.DescriptionFormat) ? "markdown" : challenge.DescriptionFormat,
+        TypeId = challenge.TypeId,
+        ContainerImage = challenge.ContainerImage,
+        ContainerMode = challenge.ContainerMode,
+        ComposeYaml = challenge.ComposeYaml,
+        ComposeProjectName = challenge.ComposeProjectName,
+        AttachmentUrl = challenge.AttachmentUrl,
+        DeploymentType = challenge.DeploymentType,
+        ExposedPort = challenge.ExposedPort,
+        FlagPrefix = string.IsNullOrWhiteSpace(challenge.FlagPrefix) ? "flag" : challenge.FlagPrefix,
+        FlagEnvironmentVariable = string.IsNullOrWhiteSpace(challenge.FlagEnvironmentVariable)
+            ? "NOCTF_FLAG_UUID"
+            : challenge.FlagEnvironmentVariable,
+        CheckerConfig = challenge.CheckerConfig is null ? null : new CheckerConfigDto
+        {
+            Image = challenge.CheckerConfig.Image,
+            Command = challenge.CheckerConfig.Command,
+        },
+        PointsConfig = new PointsConfigDto
+        {
+            InitialPoints = challenge.PointsConfig.InitialPoints,
+            MinimumPoints = challenge.PointsConfig.MinimumPoints,
+            DecayFactor = challenge.PointsConfig.DecayFactor,
+            DecayFunction = challenge.PointsConfig.DecayFunction,
+        },
+        DifficultyCoefficient = challenge.DifficultyCoefficient,
+        EnableBloodBonus = challenge.EnableBloodBonus,
+        Hints = hints
+            .OrderBy(h => h.DisplayOrder)
+            .Select(h => new ChallengeHintDto
+            {
+                Id = h.Id,
+                Content = h.Content,
+                DisplayOrder = h.DisplayOrder,
+            })
+            .ToList(),
+    };
+}
+
+public class GetChallengesAdminEndpoint(ApplicationDbContext db) : Endpoint<EmptyRequest, List<ChallengeTemplateAdminDto>>
 {
     public override void Configure()
     {
@@ -43,33 +153,11 @@ public class GetChallengesAdminEndpoint(ApplicationDbContext db) : Endpoint<Empt
 
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)
     {
-        var challenges = await db.Challenges
-            .IgnoreQueryFilters()
-            .Select(c => new ChallengeAdminDto
-            {
-                Id = c.Id,
-                CompetitionId = c.CompetitionId,
-                Title = c.Title,
-                Description = c.Description,
-                TypeId = c.TypeId,
-                ContainerImage = c.ContainerImage,
-                ContainerMode = c.ContainerMode,
-                ComposeYaml = c.ComposeYaml,
-                ComposeProjectName = c.ComposeProjectName,
-                AttachmentUrl = c.AttachmentUrl,
-                CheckerConfig = c.CheckerConfig == null ? null : new CheckerConfigDto
-                {
-                    Image = c.CheckerConfig.Image,
-                    Command = c.CheckerConfig.Command,
-                },
-                PointsConfig = new PointsConfigDto
-                {
-                    InitialPoints = c.PointsConfig.InitialPoints,
-                    MinimumPoints = c.PointsConfig.MinimumPoints,
-                },
-            })
+        var challenges = await db.ChallengeTemplates
+            .AsNoTracking()
+            .OrderBy(c => c.Title)
             .ToListAsync(ct);
 
-        await SendAsync(challenges, cancellation: ct);
+        await SendAsync(challenges.Select(ChallengeAdminMapping.ToTemplateDto).ToList(), cancellation: ct);
     }
 }

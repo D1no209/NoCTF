@@ -15,6 +15,15 @@ public class CreateCompetitionAdminRequest
     public string Status { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
+    public PointsConfigDto? DefaultPointsConfig { get; set; }
+    public double DifficultyCoefficient { get; set; } = 1.0;
+    public double FirstBloodBonusPercent { get; set; }
+    public double SecondBloodBonusPercent { get; set; }
+    public double ThirdBloodBonusPercent { get; set; }
+    public bool TeamRegistrationAutoApprove { get; set; } = true;
+    public int MaxTeamMembers { get; set; } = 5;
+    public bool TracksEnabled { get; set; }
+    public List<string> TrackNames { get; set; } = [];
 }
 
 public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
@@ -50,7 +59,19 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             OwnerId = userId,
             StartTime = req.StartTime,
             EndTime = req.EndTime,
-            Status = status
+            Status = status,
+            DefaultInitialPoints = req.DefaultPointsConfig?.InitialPoints ?? 500,
+            DefaultMinimumPoints = req.DefaultPointsConfig?.MinimumPoints ?? 100,
+            DefaultDecayFactor = req.DefaultPointsConfig?.DecayFactor ?? 450,
+            DefaultDecayFunction = req.DefaultPointsConfig?.DecayFunction ?? "sigmoid",
+            DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient,
+            FirstBloodBonusPercent = NormalizeBonusPercent(req.FirstBloodBonusPercent),
+            SecondBloodBonusPercent = NormalizeBonusPercent(req.SecondBloodBonusPercent),
+            ThirdBloodBonusPercent = NormalizeBonusPercent(req.ThirdBloodBonusPercent),
+            TeamRegistrationAutoApprove = req.TeamRegistrationAutoApprove,
+            MaxTeamMembers = req.MaxTeamMembers <= 0 ? 5 : req.MaxTeamMembers,
+            TracksEnabled = req.TracksEnabled,
+            TrackNamesJson = System.Text.Json.JsonSerializer.Serialize(NormalizeTracks(req.TrackNames)),
         };
         competition.CompetitionId = competition.Id;
 
@@ -66,7 +87,32 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             Status = competition.Status.ToString().ToLowerInvariant(),
             StartTime = competition.StartTime,
             EndTime = competition.EndTime,
-            OwnerId = competition.OwnerId
+            OwnerId = competition.OwnerId,
+            DefaultPointsConfig = new PointsConfigDto
+            {
+                InitialPoints = competition.DefaultInitialPoints,
+                MinimumPoints = competition.DefaultMinimumPoints,
+                DecayFactor = competition.DefaultDecayFactor,
+                DecayFunction = competition.DefaultDecayFunction,
+            },
+            DifficultyCoefficient = competition.DifficultyCoefficient,
+            FirstBloodBonusPercent = competition.FirstBloodBonusPercent,
+            SecondBloodBonusPercent = competition.SecondBloodBonusPercent,
+            ThirdBloodBonusPercent = competition.ThirdBloodBonusPercent,
+            TeamRegistrationAutoApprove = competition.TeamRegistrationAutoApprove,
+            MaxTeamMembers = competition.MaxTeamMembers,
+            TracksEnabled = competition.TracksEnabled,
+            TrackNames = NormalizeTracks(req.TrackNames),
         }, 201, ct);
     }
+
+    internal static List<string> NormalizeTracks(IEnumerable<string> tracks)
+        => tracks
+            .Select(t => t.Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    internal static double NormalizeBonusPercent(double value)
+        => double.IsFinite(value) && value > 0 ? Math.Min(1000, value) : 0;
 }

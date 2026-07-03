@@ -9,14 +9,16 @@ const route = useRoute()
   <div class="flex min-h-[100dvh] flex-col bg-background">
     <NavBar />
     <main class="flex-1 flex flex-col">
-      <router-view v-slot="{ Component }">
-        <transition
-          name="fade"
-          mode="out-in"
-        >
-          <component :is="Component" :key="route.fullPath" />
-        </transition>
-      </router-view>
+      <slot>
+        <router-view v-slot="{ Component }">
+          <transition
+            name="fade"
+            mode="out-in"
+          >
+            <component :is="Component" :key="route.fullPath" />
+          </transition>
+        </router-view>
+      </slot>
     </main>
   </div>
 </template>

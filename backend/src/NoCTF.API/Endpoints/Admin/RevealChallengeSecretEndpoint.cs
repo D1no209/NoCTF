@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -17,9 +16,7 @@ public class RevealChallengeSecretResponse
     public string? FlagSecret { get; set; }
 }
 
-public class RevealChallengeSecretEndpoint(
-    ApplicationDbContext db,
-    ICompetitionPermissionService permissionService) : Endpoint<RevealChallengeSecretRequest, RevealChallengeSecretResponse>
+public class RevealChallengeSecretEndpoint(ApplicationDbContext db) : Endpoint<RevealChallengeSecretRequest, RevealChallengeSecretResponse>
 {
     public override void Configure()
     {
@@ -29,8 +26,7 @@ public class RevealChallengeSecretEndpoint(
 
     public override async Task HandleAsync(RevealChallengeSecretRequest req, CancellationToken ct)
     {
-        var challenge = await db.Challenges
-            .IgnoreQueryFilters()
+        var challenge = await db.ChallengeTemplates
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == req.Id, ct);
 
@@ -47,7 +43,7 @@ public class RevealChallengeSecretEndpoint(
             return;
         }
 
-        if (!await permissionService.CanManageCompetitionAsync(userId, challenge.CompetitionId, ct))
+        if (!User.IsInRole("Admin") && !User.IsInRole("Organizer"))
         {
             await SendForbiddenAsync(ct);
             return;

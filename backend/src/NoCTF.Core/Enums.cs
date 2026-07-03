@@ -13,6 +13,13 @@ public enum TeamMemberRole
     Member
 }
 
+public enum TeamRegistrationStatus
+{
+    Pending,
+    Approved,
+    Rejected
+}
+
 public enum CollaboratorRole
 {
     Manager,

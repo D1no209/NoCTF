@@ -5,9 +5,9 @@ namespace NoCTF.Tests;
 public class SensitiveDtoTests
 {
     [Fact]
-    public void ChallengeAdminDto_DoesNotExposeFlagSecret()
+    public void ChallengeTemplateAdminDto_DoesNotExposeFlagSecret()
     {
-        var property = typeof(ChallengeAdminDto).GetProperty("FlagSecret");
+        var property = typeof(ChallengeTemplateAdminDto).GetProperty("FlagSecret");
 
         Assert.Null(property);
     }

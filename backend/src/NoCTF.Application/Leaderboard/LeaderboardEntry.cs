@@ -5,6 +5,7 @@ public record LeaderboardEntry(
     int Rank,
     Guid TeamId,
     string TeamName,
+    string? TrackName,
     long TotalScore,
     int SolvedCount,
     DateTime? FirstSolveAt);

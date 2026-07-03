@@ -18,6 +18,10 @@ public class CompetitionDetailDto
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
     public string GameModeType { get; set; } = string.Empty;
+    public bool TeamRegistrationAutoApprove { get; set; }
+    public int MaxTeamMembers { get; set; }
+    public bool TracksEnabled { get; set; }
+    public List<string> TrackNames { get; set; } = [];
 }
 
 /// <summary>
@@ -36,16 +40,6 @@ public class GetCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<G
         var competition = await dbContext.Competitions
             .IgnoreQueryFilters()
             .Where(c => c.Id == req.Id)
-            .Select(c => new CompetitionDetailDto
-            {
-                Id = c.Id,
-                Title = c.Title,
-                Description = c.Description,
-                Status = c.Status.ToString().ToLowerInvariant(),
-                StartTime = c.StartTime,
-                EndTime = c.EndTime,
-                GameModeType = c.GameModeType.ToString().ToLowerInvariant()
-            })
             .FirstOrDefaultAsync(ct);
 
         if (competition is null)
@@ -54,6 +48,19 @@ public class GetCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<G
             return;
         }
 
-        await SendAsync(competition, cancellation: ct);
+        await SendAsync(new CompetitionDetailDto
+        {
+            Id = competition.Id,
+            Title = competition.Title,
+            Description = competition.Description,
+            Status = competition.Status.ToString().ToLowerInvariant(),
+            StartTime = competition.StartTime,
+            EndTime = competition.EndTime,
+            GameModeType = competition.GameModeType.ToString().ToLowerInvariant(),
+            TeamRegistrationAutoApprove = competition.TeamRegistrationAutoApprove,
+            MaxTeamMembers = competition.MaxTeamMembers,
+            TracksEnabled = competition.TracksEnabled,
+            TrackNames = Admin.GetCompetitionAdminEndpoint.ParseTracks(competition.TrackNamesJson),
+        }, cancellation: ct);
     }
 }

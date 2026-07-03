@@ -68,13 +68,19 @@ services:
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
       SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:-Admin@123456}
       StorageProvider__Local__BasePath: /app/uploads
+      Runner__BaseUrl: http://runner:8080
+      Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
     volumes:
       - backend_uploads:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      runner:
+        condition: service_started
     ports:
       - "80:8080"
 
@@ -94,8 +100,10 @@ services:
       ConnectionStrings__Redis: redis:6379
       StorageProvider__Local__BasePath: /app/uploads
       Runner__BaseUrl: http://runner:8080
+      Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
     volumes:
       - backend_uploads:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
