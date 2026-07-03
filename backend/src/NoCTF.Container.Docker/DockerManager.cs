@@ -42,7 +42,12 @@ public class DockerManager(DockerProvider provider) : IContainerManager
         var createParams = new CreateContainerParameters
         {
             Image = config.Image,
-            Cmd = config.Command?.Split(' ') ?? null,
+            Cmd = string.IsNullOrWhiteSpace(config.Command)
+                ? null
+                : config.Entrypoint is { Count: > 0 }
+                    ? [config.Command]
+                    : ["/bin/sh", "-c", config.Command],
+            Entrypoint = config.Entrypoint?.ToList(),
             Env = config.EnvironmentVariables?.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList() ?? [],
             Labels = config.Labels ?? new Dictionary<string, string>(),
             HostConfig = DockerHostConfigFactory.Create(config, publishAllPorts: false)

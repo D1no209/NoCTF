@@ -67,9 +67,59 @@ interface PatchSubmissionStatus {
   id?: string
   challengeId: string
   status: string | number
+  fixStatus?: string | number
+  attemptNumber?: number
+  fileName?: string
+  fixEntry?: string
   submittedAt?: string
   validatedAt?: string | null
   validationDetail?: string | null
+}
+
+interface CompetitionViewResult<T> {
+  viewKey: string
+  data: T
+}
+
+interface AwdpRoundState {
+  roundNumber: number
+  status: string
+  startTime: string
+  endTime?: string | null
+}
+
+interface AwdpChallengeState {
+  challengeId: string
+  instanceStatus: string
+  breakStatus: string
+  fixStatus: string
+  serviceStatus: string
+  currentRoundAttackScore: number
+  currentRoundDefenseScore: number
+  attackScorePerRound: number
+  defenseScorePerRound: number
+  attackAttempts: number
+  defenseAttempts: number
+  maxAttackAttempts: number
+  maxDefenseAttempts: number
+  remainingAttackAttempts: number
+  remainingDefenseAttempts: number
+  canSubmitFlag: boolean
+  canRequestDefense: boolean
+  allowAttackAfterBreakSuccess: boolean
+  allowDefenseAfterFixSuccess: boolean
+  fixEntry: string
+  lastValidationDetail?: string | null
+  cooldownUntil?: string | null
+}
+
+interface AwdpStateData {
+  code: string
+  competitionId: string
+  teamId?: string
+  currentRound?: AwdpRoundState | null
+  serverTime: string
+  challenges: AwdpChallengeState[]
 }
 
 interface MyCompetitionTeam {
@@ -141,6 +191,7 @@ function openChallenge(challenge: Challenge) {
 function onChallengeSolved() {
   refetchSubmissions()
   queryClient.invalidateQueries({ queryKey: queryKeys.submissions(competitionId.value) })
+  queryClient.invalidateQueries({ queryKey: queryKeys.awdpState(competitionId.value) })
 }
 
 function markInstanceCreated(challengeId: string) {
@@ -169,7 +220,7 @@ function formatDate(iso: string) {
 }
 
 const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
-const isAwdMode = computed(() => ['awd', 'awdp'].includes((competition.value?.gameModeType ?? '').toLowerCase()))
+const isAwdMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awd')
 const isAwdpMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awdp')
 const canManageCompetition = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
 const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.registrationStatus === 'approved') ?? null)
@@ -221,6 +272,15 @@ const { data: patchSubmissions } = useQuery({
   refetchInterval: computed(() => isAwdpMode.value ? 10_000 : false),
 })
 
+const { data: awdpStateView } = useQuery({
+  queryKey: computed(() => queryKeys.awdpState(competitionId.value)),
+  queryFn: () => competitionApi.view<CompetitionViewResult<AwdpStateData>>(competitionId.value, 'challenge-state'),
+  enabled: computed(() => !!competitionId.value && isAwdpMode.value && !!approvedTeam.value?.id),
+  refetchInterval: computed(() => isAwdpMode.value ? 5_000 : false),
+})
+
+const awdpStateData = computed(() => awdpStateView.value?.data ?? null)
+
 const filteredChallenges = computed(() => {
   return (challenges.value ?? []).filter((challenge) => {
     const solved = solvedIds.value.has(challenge.id)
@@ -260,10 +320,25 @@ const selectedChallengePatchSubmissions = computed(() => {
   if (!selectedChallenge.value) return []
   return (patchSubmissions.value ?? []).filter(item => item.challengeId === selectedChallenge.value?.id)
 })
+
+const selectedChallengeAwdpState = computed(() => {
+  if (!selectedChallenge.value) return null
+  return awdpStateData.value?.challenges.find(item => item.challengeId === selectedChallenge.value?.id) ?? null
+})
+
+function handleInstanceCreated(challengeId: string) {
+  markInstanceCreated(challengeId)
+  queryClient.invalidateQueries({ queryKey: queryKeys.awdpState(competitionId.value) })
+}
+
+function handlePatchUploaded() {
+  queryClient.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId.value) })
+  queryClient.invalidateQueries({ queryKey: queryKeys.awdpState(competitionId.value) })
+}
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-[1700px] space-y-8 px-4 py-8 md:px-6">
+  <div class="noctf-page-wide">
     <!-- Header Section -->
     <div v-if="isLoading" class="space-y-4">
       <Skeleton class="h-10 w-1/3" />
@@ -282,7 +357,7 @@ const selectedChallengePatchSubmissions = computed(() => {
                 {{ competition.status }}
               </Badge>
               <Badge variant="secondary" class="bg-violet-100 text-violet-700">
-                CTF
+                {{ competition.gameModeType }}
               </Badge>
             </div>
           </template>
@@ -301,7 +376,7 @@ const selectedChallengePatchSubmissions = computed(() => {
       </div>
     </div>
 
-    <div class="rounded-xl border bg-card p-5 shadow-sm">
+    <div class="noctf-section">
       <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 class="flex items-center gap-2 font-semibold">
@@ -336,7 +411,7 @@ const selectedChallengePatchSubmissions = computed(() => {
             <code>{{ currentTeam.inviteToken }}</code>
           </div>
         </div>
-        <div v-if="!canAccessChallenges" class="space-y-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+        <div v-if="!canAccessChallenges" class="space-y-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
           <div>{{ currentTeam.isBanned ? t('teams.bannedDetail') : t('teams.waitingApproval') }}</div>
           <Button variant="outline" size="sm" as-child>
             <RouterLink :to="`/competitions/${competitionId}/register`">
@@ -352,7 +427,7 @@ const selectedChallengePatchSubmissions = computed(() => {
         </Button>
       </div>
       <div v-else class="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-        <div class="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+        <div class="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
           {{ t('teams.notRegisteredDetail') }}
         </div>
         <Button as-child>
@@ -366,11 +441,11 @@ const selectedChallengePatchSubmissions = computed(() => {
 
     <!-- Main Content Tabs -->
     <div class="w-full">
-      <div class="mb-8 inline-grid h-9 w-full max-w-md grid-cols-2 items-center rounded-md bg-muted p-1 text-muted-foreground">
+      <div class="noctf-segmented mb-8 w-full max-w-md grid-cols-2">
         <button
           type="button"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all"
-          :class="ui.activeTab === 'challenges' ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground'"
+          class="noctf-segmented-button"
+          :class="ui.activeTab === 'challenges' ? 'noctf-segmented-button-active' : ''"
           @click="ui.activeTab = 'challenges'"
         >
           <Puzzle class="size-4" />
@@ -378,8 +453,8 @@ const selectedChallengePatchSubmissions = computed(() => {
         </button>
         <button
           type="button"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all"
-          :class="ui.activeTab === 'scoreboard' ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground'"
+          class="noctf-segmented-button"
+          :class="ui.activeTab === 'scoreboard' ? 'noctf-segmented-button-active' : ''"
           @click="ui.activeTab = 'scoreboard'"
         >
           <Trophy class="size-4" />
@@ -388,11 +463,11 @@ const selectedChallengePatchSubmissions = computed(() => {
       </div>
 
       <div v-if="ui.activeTab === 'challenges'" class="mt-0">
-        <div v-if="!canAccessChallenges" class="rounded-xl border border-dashed bg-muted/30 p-10 text-center text-muted-foreground">
+        <div v-if="!canAccessChallenges" class="noctf-state-box text-muted-foreground">
           {{ t('teams.challengeLocked') }}
         </div>
         <div v-else class="grid grid-cols-1 gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <aside class="rounded-xl border bg-card p-3 shadow-sm lg:sticky lg:top-24 lg:self-start">
+          <aside class="noctf-surface-plain p-3 lg:sticky lg:top-24 lg:self-start">
             <div class="mb-3 px-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               {{ t('challenges.directions') }}
             </div>
@@ -452,7 +527,7 @@ const selectedChallengePatchSubmissions = computed(() => {
               </div>
             </div>
 
-            <div v-if="!isLoading && filteredChallenges.length === 0" class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-xl">
+            <div v-if="!isLoading && filteredChallenges.length === 0" class="noctf-state-box py-20">
               <div class="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
                 <Puzzle class="size-6" />
               </div>
@@ -488,12 +563,14 @@ const selectedChallengePatchSubmissions = computed(() => {
       :instance-ready="instanceChallengeIds.has(selectedChallenge.id)"
       :defense-enabled="defenseChallengeIds.has(selectedChallenge.id)"
       :patch-submissions="selectedChallengePatchSubmissions"
+      :awdp-state="selectedChallengeAwdpState"
+      :awdp-current-round="awdpStateData?.currentRound ?? null"
       :can-create-instance="canUseParticipantActions"
-      :can-submit-flag="canUseParticipantActions"
-      :can-request-defense="canUseParticipantActions"
-      @create-instance="markInstanceCreated(selectedChallenge.id)"
+      :can-submit-flag="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canSubmitFlag !== false)"
+      :can-request-defense="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canRequestDefense !== false)"
+      @create-instance="handleInstanceCreated(selectedChallenge.id)"
       @request-defense="markDefenseRequested(selectedChallenge.id)"
-      @patch-uploaded="queryClient.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId) })"
+      @patch-uploaded="handlePatchUploaded"
       @solved="onChallengeSolved"
     />
   </div>

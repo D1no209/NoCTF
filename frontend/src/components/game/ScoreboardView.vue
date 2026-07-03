@@ -384,7 +384,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="trend.length" class="rounded-md border p-3">
+    <div v-if="trend.length" class="rounded-xl border bg-background/55 p-3">
       <div class="mb-2 flex items-center justify-between gap-3">
         <h3 class="text-sm font-medium">{{ t('scoreboard.topTrend') }}</h3>
         <span class="text-xs text-muted-foreground">{{ t('scoreboard.topTrendHint') }}</span>
@@ -517,11 +517,11 @@ onUnmounted(() => {
 
     <div v-if="loading" class="text-sm text-muted-foreground">{{ t('scoreboard.loading') }}</div>
 
-    <div v-else-if="sortedEntries.length === 0" class="text-sm text-muted-foreground">
+    <div v-else-if="sortedEntries.length === 0" class="noctf-state-box text-sm text-muted-foreground">
       {{ t('scoreboard.empty') }}
     </div>
 
-    <div v-else class="rounded-md border">
+    <div v-else class="noctf-table-shell">
       <Table>
         <TableHeader>
           <TableRow>
@@ -555,7 +555,7 @@ onUnmounted(() => {
     </div>
 
     <Dialog :open="Boolean(selectedTeamId)" @update:open="(open) => { if (!open) selectedTeamId = null }">
-      <DialogContent class="max-w-3xl">
+      <DialogContent class="noctf-scrollbar max-h-[85vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ selectedTeam?.teamName ?? t('scoreboard.teamDetail') }}</DialogTitle>
         </DialogHeader>
@@ -566,15 +566,15 @@ onUnmounted(() => {
 
         <div v-else-if="selectedTeam" class="space-y-5">
           <div class="grid gap-3 sm:grid-cols-3">
-            <div class="rounded-md border p-3">
+            <div class="noctf-kpi">
               <div class="text-xs text-muted-foreground">{{ t('scoreboard.score') }}</div>
               <div class="mt-1 font-mono text-2xl font-semibold">{{ selectedTeam.totalScore }}</div>
             </div>
-            <div class="rounded-md border p-3">
+            <div class="noctf-kpi">
               <div class="text-xs text-muted-foreground">{{ t('scoreboard.solves') }}</div>
               <div class="mt-1 font-mono text-2xl font-semibold">{{ selectedTeam.solvedCount }}</div>
             </div>
-            <div class="rounded-md border p-3">
+            <div class="noctf-kpi">
               <div class="text-xs text-muted-foreground">{{ t('scoreboard.track') }}</div>
               <div class="mt-1 text-lg font-semibold">{{ selectedTeam.trackName || '-' }}</div>
             </div>
@@ -586,7 +586,7 @@ onUnmounted(() => {
               <div
                 v-for="direction in selectedTeam.directionScores"
                 :key="direction.direction"
-                class="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                class="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2 text-sm"
               >
                 <span class="font-medium">{{ direction.direction }}</span>
                 <span class="font-mono">{{ direction.score }} / {{ direction.solvedCount }}</span>
@@ -597,7 +597,7 @@ onUnmounted(() => {
 
           <div>
             <h3 class="mb-2 text-sm font-medium">{{ t('scoreboard.challengeScores') }}</h3>
-            <div class="rounded-md border">
+            <div class="noctf-table-shell">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -636,7 +636,7 @@ onUnmounted(() => {
               <div
                 v-for="member in selectedTeam.members"
                 :key="member.userId"
-                class="rounded-md border p-3"
+                class="rounded-lg border bg-background/60 p-3"
               >
                 <div class="mb-2 flex items-center justify-between">
                   <span class="font-medium">{{ member.userName }}</span>

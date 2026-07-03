@@ -125,9 +125,11 @@
   body {
     @apply bg-background text-foreground antialiased;
     background:
-      radial-gradient(circle at 82% 3%, rgb(37 99 235 / 0.1), transparent 32rem),
-      radial-gradient(circle at 5% 12%, rgb(14 165 233 / 0.08), transparent 28rem),
-      linear-gradient(180deg, #f8fbff 0%, #f4f7fb 48%, #f8fafc 100%);
+      linear-gradient(90deg, rgb(15 23 42 / 0.025) 1px, transparent 1px),
+      linear-gradient(180deg, rgb(15 23 42 / 0.025) 1px, transparent 1px),
+      radial-gradient(circle at 88% 4%, rgb(37 99 235 / 0.075), transparent 28rem),
+      linear-gradient(180deg, #f8fbff 0%, #f3f7fb 52%, #f8fafc 100%);
+    background-size: 48px 48px, 48px 48px, auto, auto;
   }
 }
 
@@ -149,12 +151,12 @@
   }
 
   .noctf-panel {
-    @apply border bg-white/90 shadow-[0_22px_80px_rgb(15_23_42/0.08)] backdrop-blur-xl;
+    @apply border border-slate-900/10 bg-white/[0.92] shadow-[0_18px_55px_rgb(15_23_42/0.06)] backdrop-blur-xl;
   }
 
   .noctf-dark-shell {
     background:
-      radial-gradient(circle at 28% 12%, rgb(37 99 235 / 0.24), transparent 20rem),
+      linear-gradient(135deg, rgb(59 130 246 / 0.16), transparent 36%),
       linear-gradient(180deg, #06142a 0%, #020817 100%);
   }
 
@@ -164,5 +166,111 @@
       linear-gradient(90deg, rgb(59 130 246 / 0.1) 1px, transparent 1px);
     background-size: 48px 48px;
     mask-image: radial-gradient(circle at center, black, transparent 72%);
+  }
+
+  .noctf-page {
+    @apply mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 md:px-6 lg:px-8;
+  }
+
+  .noctf-page-wide {
+    @apply mx-auto w-full max-w-[1700px] space-y-6 px-4 py-6 md:px-6 lg:px-8;
+  }
+
+  .noctf-admin-page {
+    @apply space-y-6;
+  }
+
+  .noctf-surface {
+    @apply overflow-hidden rounded-xl border border-slate-900/10 bg-card/95 shadow-[0_14px_45px_rgb(15_23_42/0.055)] backdrop-blur-sm;
+  }
+
+  .noctf-surface-plain {
+    @apply rounded-xl border border-slate-900/10 bg-card/95;
+  }
+
+  .noctf-section {
+    @apply rounded-xl border border-slate-900/10 bg-card/95 p-5 shadow-[0_14px_45px_rgb(15_23_42/0.05)];
+  }
+
+  .noctf-toolbar {
+    @apply flex flex-col gap-3 rounded-xl border border-slate-900/10 bg-white/80 p-3 shadow-[0_10px_35px_rgb(15_23_42/0.045)] backdrop-blur md:flex-row md:items-center md:justify-between;
+  }
+
+  .noctf-filter-bar {
+    @apply grid gap-3 rounded-xl border border-slate-900/10 bg-white/[0.78] p-3 shadow-[0_10px_35px_rgb(15_23_42/0.04)] backdrop-blur;
+  }
+
+  .noctf-table-shell {
+    @apply overflow-hidden rounded-xl border border-slate-900/10 bg-card/95 shadow-[0_14px_45px_rgb(15_23_42/0.055)];
+  }
+
+  .noctf-table-footer {
+    @apply flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .noctf-kpi {
+    @apply rounded-lg border border-slate-900/10 bg-background/75 p-4;
+  }
+
+  .noctf-field-grid {
+    @apply grid gap-4 lg:grid-cols-2;
+  }
+
+  .noctf-fieldset {
+    @apply rounded-lg border border-slate-900/10 bg-muted/30 p-4;
+  }
+
+  .noctf-label {
+    @apply text-xs font-semibold uppercase tracking-wide text-muted-foreground;
+  }
+
+  .noctf-muted-box {
+    @apply rounded-lg border border-slate-900/10 bg-background/75 px-3 py-2;
+  }
+
+  .noctf-state-box {
+    @apply flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-slate-900/15 bg-muted/25 px-4 py-8 text-center;
+  }
+
+  .noctf-segmented {
+    @apply inline-grid items-center rounded-lg border border-slate-900/10 bg-muted/70 p-1 text-muted-foreground;
+  }
+
+  .noctf-segmented-button {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-all hover:text-foreground;
+  }
+
+  .noctf-segmented-button-active {
+    @apply bg-background text-foreground shadow-sm;
+  }
+
+  .noctf-status-dot {
+    @apply size-2 rounded-full;
+  }
+
+  .noctf-terminal {
+    @apply rounded-xl border border-slate-950/80 bg-zinc-950 text-zinc-200 shadow-[0_18px_65px_rgb(2_6_23/0.26)];
+  }
+
+  .noctf-live-card {
+    @apply rounded-xl border border-slate-900/10 bg-card/95 shadow-[0_14px_45px_rgb(15_23_42/0.055)];
+  }
+
+  .noctf-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .noctf-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .noctf-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgb(100 116 139 / 0.24);
+  }
+
+  .noctf-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgb(100 116 139 / 0.36);
   }
 }

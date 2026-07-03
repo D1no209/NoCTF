@@ -26,6 +26,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AwdFlag> AwdFlags => Set<AwdFlag>();
     public DbSet<AwdGameBox> AwdGameBoxes => Set<AwdGameBox>();
     public DbSet<AwdCheckResult> AwdCheckResults => Set<AwdCheckResult>();
+    public DbSet<AwdpRound> AwdpRounds => Set<AwdpRound>();
+    public DbSet<AwdpTeamChallengeState> AwdpTeamChallengeStates => Set<AwdpTeamChallengeState>();
+    public DbSet<AwdpRoundScore> AwdpRoundScores => Set<AwdpRoundScore>();
     public DbSet<AwdpPatchSubmission> AwdpPatchSubmissions => Set<AwdpPatchSubmission>();
     public DbSet<KohControlRecord> KohControlRecords => Set<KohControlRecord>();
     public DbSet<BackgroundTaskItem> BackgroundTasks => Set<BackgroundTaskItem>();
@@ -210,6 +213,33 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<AwdCheckResult>()
             .HasIndex(r => new { r.CompetitionId, r.TeamId, r.ChallengeId, r.RoundNumber })
             .HasDatabaseName("ix_awdcheckresults_competition_team_challenge_round");
+
+        modelBuilder.Entity<AwdpRound>()
+            .HasIndex(r => r.CompetitionId)
+            .HasDatabaseName("ix_awdprounds_competition");
+
+        modelBuilder.Entity<AwdpRound>()
+            .HasIndex(r => new { r.CompetitionId, r.RoundNumber })
+            .IsUnique()
+            .HasDatabaseName("ux_awdprounds_competition_round");
+
+        modelBuilder.Entity<AwdpTeamChallengeState>()
+            .HasIndex(s => s.CompetitionId)
+            .HasDatabaseName("ix_awdpteamchallengestates_competition");
+
+        modelBuilder.Entity<AwdpTeamChallengeState>()
+            .HasIndex(s => new { s.CompetitionId, s.TeamId, s.ChallengeId })
+            .IsUnique()
+            .HasDatabaseName("ux_awdpteamchallengestates_competition_team_challenge");
+
+        modelBuilder.Entity<AwdpRoundScore>()
+            .HasIndex(s => s.CompetitionId)
+            .HasDatabaseName("ix_awdproundscores_competition");
+
+        modelBuilder.Entity<AwdpRoundScore>()
+            .HasIndex(s => new { s.CompetitionId, s.RoundNumber, s.TeamId, s.ChallengeId })
+            .IsUnique()
+            .HasDatabaseName("ux_awdproundscores_competition_round_team_challenge");
 
         modelBuilder.Entity<AwdpPatchSubmission>()
             .HasIndex(p => p.CompetitionId)

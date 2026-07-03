@@ -45,7 +45,7 @@ function formatTime(iso: string) {
 </script>
 
 <template>
-  <Card class="flex flex-col">
+  <Card class="noctf-live-card flex flex-col">
     <CardHeader class="pb-2">
       <div class="flex items-center justify-between gap-2">
         <CardTitle class="text-sm font-semibold truncate">{{ status.challengeName }}</CardTitle>
@@ -59,7 +59,7 @@ function formatTime(iso: string) {
     </CardHeader>
     <CardContent class="space-y-3 flex-1">
       <!-- Current controller -->
-      <div class="rounded-md bg-muted/50 px-3 py-2 space-y-0.5">
+      <div class="space-y-0.5 rounded-md border bg-muted/30 px-3 py-2">
         <p class="text-xs text-muted-foreground">{{ t('koh.controller') }}</p>
         <p class="font-medium text-sm">{{ controllerLabel }}</p>
         <p class="text-xs text-muted-foreground font-mono">{{ durationLabel }}</p>
@@ -68,7 +68,7 @@ function formatTime(iso: string) {
       <!-- History -->
       <div v-if="status.history.length > 0">
         <p class="text-xs font-medium text-muted-foreground mb-1.5">{{ t('koh.history') }}</p>
-        <ul class="space-y-1 max-h-32 overflow-y-auto">
+        <ul class="noctf-scrollbar max-h-32 space-y-1 overflow-y-auto">
           <li
             v-for="(entry, i) in status.history"
             :key="i"

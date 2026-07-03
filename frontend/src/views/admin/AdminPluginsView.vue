@@ -47,24 +47,24 @@ function getPluginIcon(type: string) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="noctf-admin-page">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.plugins.title') }}</h2>
-        <p class="text-sm text-muted-foreground">Manage and review installed game modes and system extensions.</p>
+        <p class="text-sm text-muted-foreground">{{ t('admin.plugins.subtitle') }}</p>
       </div>
     </div>
 
     <!-- Stats Summary -->
-    <div v-if="plugins" class="flex items-center gap-6 p-4 rounded-xl border bg-muted/30">
+    <div v-if="plugins" class="flex flex-wrap items-center gap-6 rounded-xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_10px_35px_rgb(15_23_42/0.04)] backdrop-blur">
       <div class="flex items-center gap-2">
-        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Total Plugins</span>
+        <span class="noctf-label">{{ t('admin.plugins.totalPlugins') }}</span>
         <Badge variant="secondary" class="font-mono">{{ plugins.length }}</Badge>
       </div>
       <div class="h-4 w-px bg-border" />
       <div class="flex items-center gap-2">
         <ShieldCheck class="size-4 text-emerald-500" />
-        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Core Engine</span>
+        <span class="noctf-label">{{ t('admin.plugins.coreEngine') }}</span>
         <span class="text-xs font-mono opacity-60">v1.0.0-stable</span>
       </div>
     </div>
@@ -79,7 +79,7 @@ function getPluginIcon(type: string) {
       <Card 
         v-for="plugin in plugins" 
         :key="plugin.name"
-        class="group transition-all duration-300 hover:shadow-lg hover:border-primary/20 overflow-hidden flex flex-col"
+        class="group flex flex-col overflow-hidden transition-all duration-200 hover:border-primary/20 hover:shadow-[0_18px_50px_rgb(79_70_229/0.12)]"
       >
         <CardHeader class="pb-3 space-y-4">
           <div class="flex items-center justify-between">
@@ -102,21 +102,21 @@ function getPluginIcon(type: string) {
         <CardContent class="mt-auto pt-0">
           <div class="flex items-center justify-between border-t pt-4 mt-2">
             <Badge :variant="typeVariant(plugin.type)" class="text-[9px] px-1.5 h-4 uppercase tracking-tighter">
-              Active
+              {{ t('admin.plugins.active') }}
             </Badge>
             <div class="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
               <CheckCircle2 class="size-3 text-emerald-500" />
-              Verified
+              {{ t('admin.plugins.verified') }}
             </div>
           </div>
         </CardContent>
       </Card>
     </div>
 
-    <div v-if="!isLoading && plugins?.length === 0" class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-xl">
+    <div v-if="!isLoading && plugins?.length === 0" class="noctf-state-box py-20">
       <Plug class="size-12 text-muted-foreground mb-4 opacity-20" />
       <h3 class="text-lg font-medium">{{ t('admin.plugins.empty') }}</h3>
-      <p class="text-sm text-muted-foreground mt-1">No external plugins are currently loaded into the system.</p>
+      <p class="text-sm text-muted-foreground mt-1">{{ t('admin.plugins.emptyDescription') }}</p>
     </div>
   </div>
 </template>

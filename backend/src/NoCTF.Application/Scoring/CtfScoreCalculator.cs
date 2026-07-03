@@ -76,3 +76,28 @@ public static class CtfScoreCalculator
         static double Logistic(double value) => 1.0 / (1.0 + Math.Exp(-10.0 * (value - 0.5)));
     }
 }
+
+public static class ScoreDecayCalculator
+{
+    public static int CalculatePerRoundPoints(
+        int successCount,
+        int basePoints,
+        PointsConfig decayConfig,
+        double difficultyCoefficient = 1.0)
+    {
+        if (basePoints <= 0)
+            return 0;
+
+        if (successCount <= 1)
+            return basePoints;
+
+        var minimum = Math.Clamp(decayConfig.MinimumPoints, 0, basePoints);
+        var config = new PointsConfig(
+            basePoints,
+            minimum,
+            decayConfig.DecayFactor,
+            decayConfig.DecayFunction);
+
+        return CtfScoreCalculator.CalculateChallengePoints(successCount, config, difficultyCoefficient);
+    }
+}

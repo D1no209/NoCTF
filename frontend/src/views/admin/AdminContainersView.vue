@@ -118,7 +118,7 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="noctf-admin-page">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.containers.title') }}</h2>
@@ -170,7 +170,7 @@ const table = useVueTable({
       </div>
     </div>
 
-    <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div class="noctf-table-shell">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">

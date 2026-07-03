@@ -24,6 +24,10 @@ public class PatchSubmissionDto
     public Guid TeamId { get; set; }
     public Guid ChallengeId { get; set; }
     public AwdpPatchStatus Status { get; set; }
+    public AwdpFixStatus FixStatus { get; set; }
+    public int AttemptNumber { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string FixEntry { get; set; } = string.Empty;
     public DateTime SubmittedAt { get; set; }
     public DateTime? ValidatedAt { get; set; }
     public string? ValidationDetail { get; set; }
@@ -58,6 +62,10 @@ public class GetPatchSubmissionsEndpoint(ApplicationDbContext db)
                 TeamId = s.TeamId,
                 ChallengeId = s.ChallengeId,
                 Status = s.Status,
+                FixStatus = s.FixStatus,
+                AttemptNumber = s.AttemptNumber,
+                FileName = s.FileName,
+                FixEntry = s.FixEntry,
                 SubmittedAt = s.SubmittedAt,
                 ValidatedAt = s.ValidatedAt,
                 ValidationDetail = s.ValidationDetail
@@ -117,6 +125,10 @@ public class GetPatchSubmissionEndpoint(ApplicationDbContext db)
                 TeamId = s.TeamId,
                 ChallengeId = s.ChallengeId,
                 Status = s.Status,
+                FixStatus = s.FixStatus,
+                AttemptNumber = s.AttemptNumber,
+                FileName = s.FileName,
+                FixEntry = s.FixEntry,
                 SubmittedAt = s.SubmittedAt,
                 ValidatedAt = s.ValidatedAt,
                 ValidationDetail = s.ValidationDetail

@@ -13,7 +13,7 @@ public static class CompetitionModeDefaults
         {
             GameModeType.Ctf => [ScoringKeys.DecaySolve, ScoringKeys.BloodBonus],
             GameModeType.Awd => [ScoringKeys.RoundAccumulation],
-            GameModeType.Awdp => [ScoringKeys.RoundAccumulation, ScoringKeys.OneShotVerification],
+            GameModeType.Awdp => [ScoringKeys.AwdpRound],
             GameModeType.Koh => [ScoringKeys.ControlInterval],
             _ => []
         };

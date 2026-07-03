@@ -79,16 +79,16 @@ function getServiceIcon(name: string) {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="noctf-admin-page">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.health.title') }}</h2>
-        <p class="text-sm text-muted-foreground">Real-time status monitoring for core system components.</p>
+        <p class="text-sm text-muted-foreground">{{ t('admin.health.subtitle') }}</p>
       </div>
       <div class="flex items-center gap-3">
-        <div v-if="lastUpdated" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 border text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div v-if="lastUpdated" class="flex items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           <Clock class="size-3" />
-          Updated: {{ lastUpdated.toLocaleTimeString() }}
+          {{ t('common.lastUpdated') }} {{ lastUpdated.toLocaleTimeString() }}
         </div>
         <Button variant="outline" size="sm" :disabled="loading" @click="fetchHealth()">
           <RotateCw class="mr-2 size-4" :class="{ 'animate-spin': loading }" />
@@ -100,28 +100,28 @@ function getServiceIcon(name: string) {
     <!-- Overall Status Banner -->
     <div v-if="health" v-auto-animate>
       <div 
-        class="relative overflow-hidden rounded-2xl border p-6 flex flex-col sm:flex-row items-center gap-6 transition-all duration-500"
+        class="relative flex flex-col items-center gap-6 overflow-hidden rounded-xl border p-6 transition-all duration-300 sm:flex-row"
         :class="overallHealthy ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-destructive/5 border-destructive/20'"
       >
         <div 
-          class="flex size-16 items-center justify-center rounded-2xl shadow-lg transition-transform hover:scale-110"
+          class="flex size-16 items-center justify-center rounded-xl shadow-lg transition-transform hover:scale-105"
           :class="overallHealthy ? 'bg-emerald-500 text-white' : 'bg-destructive text-white'"
         >
           <HeartPulse class="size-8" :class="{ 'animate-pulse': overallHealthy }" />
         </div>
         
         <div class="flex-1 text-center sm:text-left space-y-1">
-          <h3 class="text-2xl font-black uppercase tracking-tight">
-            System Status: <span :class="overallHealthy ? 'text-emerald-500' : 'text-destructive'">{{ health.status }}</span>
+          <h3 class="text-2xl font-black uppercase tracking-normal">
+            {{ t('admin.health.overallStatus') }}: <span :class="overallHealthy ? 'text-emerald-500' : 'text-destructive'">{{ health.status }}</span>
           </h3>
           <p class="text-sm text-muted-foreground max-w-lg">
-            {{ overallHealthy ? 'All systems are operational and performing within normal parameters.' : 'One or more system components are experiencing issues.' }}
+            {{ overallHealthy ? t('admin.health.operationalDescription') : t('admin.health.degradedDescription') }}
           </p>
         </div>
 
         <div class="hidden lg:flex items-center gap-2">
-           <Badge v-for="i in 3" :key="i" variant="outline" class="bg-background/50 border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-             <CheckCircle2 class="size-3 mr-1" /> ONLINE
+           <Badge variant="outline" class="bg-background/50 border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+             <CheckCircle2 class="size-3 mr-1" /> {{ health.checks.length }} {{ t('admin.health.components') }}
            </Badge>
         </div>
       </div>
@@ -137,7 +137,7 @@ function getServiceIcon(name: string) {
       <Card 
         v-for="check in health.checks" 
         :key="check.name"
-        class="group transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 overflow-hidden"
+        class="group overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgb(79_70_229/0.10)]"
       >
         <CardHeader class="pb-3 border-b bg-muted/20">
           <div class="flex items-center justify-between">
@@ -162,7 +162,7 @@ function getServiceIcon(name: string) {
             <div class="flex items-center gap-1.5 mt-2">
               <div class="size-1.5 rounded-full" :class="check.status === 'Healthy' ? 'bg-emerald-500' : 'bg-destructive'" />
               <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
-                {{ check.status === 'Healthy' ? 'Operational' : 'Action Required' }}
+                {{ check.status === 'Healthy' ? t('admin.health.operational') : t('admin.health.actionRequired') }}
               </span>
             </div>
           </div>
@@ -170,18 +170,18 @@ function getServiceIcon(name: string) {
       </Card>
     </div>
 
-    <div v-if="!loading && !health" class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-2xl bg-muted/10">
+    <div v-if="!loading && !health" class="noctf-state-box py-20">
       <div class="size-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4">
         <AlertTriangle class="size-8" />
       </div>
-      <h3 class="text-xl font-bold">Health Check Unavailable</h3>
-      <p class="text-sm text-muted-foreground mt-2 max-w-xs">Could not reach the system health API. Please check server logs.</p>
-      <Button variant="outline" class="mt-6" @click="fetchHealth()">Try Again</Button>
+      <h3 class="text-xl font-bold">{{ t('admin.health.unavailableTitle') }}</h3>
+      <p class="text-sm text-muted-foreground mt-2 max-w-xs">{{ t('admin.health.unavailableDescription') }}</p>
+      <Button variant="outline" class="mt-6" @click="fetchHealth()">{{ t('common.refresh') }}</Button>
     </div>
 
     <div class="flex items-center gap-2 px-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-50">
       <RotateCw class="size-3 animate-spin" />
-      Auto-refreshing every 15 seconds
+      {{ t('common.autoRefresh', { seconds: 15 }) }}
     </div>
   </div>
 </template>

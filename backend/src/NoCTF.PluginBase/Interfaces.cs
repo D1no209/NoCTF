@@ -47,9 +47,3 @@ public interface IPluginModule
     string Version { get; }
     void ConfigureServices(IServiceCollection services);
 }
-
-public interface IAwdpPatchService
-{
-    Task<Guid> SubmitPatchAsync(Guid competitionId, Guid teamId, Guid challengeId, Stream patchArchive, string fileName, CancellationToken ct = default);
-    Task ValidatePatchAsync(Guid submissionId, CancellationToken ct = default);
-}

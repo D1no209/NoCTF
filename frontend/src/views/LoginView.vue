@@ -59,7 +59,7 @@ const onSubmit = form.handleSubmit(async (values) => {
 
 <template>
   <AuthLayout :subtitle="t('auth.loginSubtitle')">
-    <Card class="noctf-panel w-full rounded-2xl px-2 py-4 sm:px-4">
+    <Card class="noctf-panel w-full rounded-xl px-2 py-4 sm:px-4">
       <CardHeader class="space-y-2 text-center">
         <CardTitle class="text-3xl font-bold tracking-tight">{{ t('auth.loginTitle') }}</CardTitle>
         <CardDescription class="text-base">{{ t('auth.loginSubtitle') }}</CardDescription>

@@ -26,9 +26,8 @@ const mode = computed(() => competition.value?.gameModeType?.toLowerCase())
 </script>
 
 <template>
-  <CompetitionDetailView v-if="mode === 'ctf'" />
+  <CompetitionDetailView v-if="mode === 'ctf' || mode === 'awdp'" />
   <AwdDashboardView v-else-if="mode === 'awd'" />
-  <AwdDashboardView v-else-if="mode === 'awdp'" game-mode-type="Awdp" />
   <KohDashboardView v-else-if="mode === 'koh'" />
   <div v-else class="flex items-center justify-center min-h-screen text-muted-foreground">
     {{ $t('common.loading') }}

@@ -5,13 +5,6 @@ using NoCTF.Infrastructure;
 
 namespace NoCTF.Application.BackgroundTasks;
 
-public static class BackgroundTaskTypes
-{
-    public const string AwdpPatchValidation = "awdp.patch.validation";
-}
-
-public record AwdpPatchValidationPayload(Guid SubmissionId);
-
 public interface IBackgroundTaskQueue
 {
     Task<Guid> EnqueueAsync<TPayload>(

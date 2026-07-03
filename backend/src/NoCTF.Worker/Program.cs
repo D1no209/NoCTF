@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application;
 using NoCTF.Application.BackgroundTasks;
+using NoCTF.Application.Security;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 using NoCTF.Plugins.AWDP;
@@ -24,6 +25,9 @@ builder.Services.AddHttpClient<IRunnerClient, HttpRunnerClient>(client =>
 builder.Services.AddScoped<IContainerManager, RunnerBackedContainerManager>();
 builder.Services.AddNoCtfApplicationCore();
 builder.Services.AddScoped<IBackgroundTaskQueue, BackgroundTaskQueue>();
+builder.Services.AddScoped<IPatchArchiveValidator, PatchArchiveValidator>();
+builder.Services.AddScoped<AwdpConfigResolver>();
+builder.Services.AddScoped<AwdpStateService>();
 builder.Services.AddScoped<IAwdpPatchService, AwdpPatchService>();
 builder.Services.AddScoped<ICompetitionJobHandler, AwdpPatchValidationJobHandler>();
 builder.Services.AddHostedService<Worker>();

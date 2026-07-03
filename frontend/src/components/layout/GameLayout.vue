@@ -31,26 +31,26 @@ watch(
 <template>
   <div class="min-h-[100dvh] flex flex-col bg-background">
     <header class="noctf-dark-shell sticky top-0 z-50 w-full border-b border-white/10 text-white">
-      <div class="mx-auto flex h-20 max-w-[1800px] items-center justify-between gap-4 px-4 md:px-6">
-        <div class="flex items-center gap-4">
+      <div class="mx-auto flex min-h-[4.5rem] max-w-[1800px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:flex-nowrap md:px-6">
+        <div class="flex min-w-0 items-center gap-4">
           <RouterLink 
             to="/competitions"
-            class="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            class="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
           >
             <ChevronLeft class="size-4" />
             <span class="text-sm font-medium hidden sm:inline">{{ t('nav.back') }}</span>
           </RouterLink>
+
+          <div class="flex min-w-0 items-center gap-3 text-lg font-bold tracking-tight md:text-2xl">
+            <span class="noctf-logo size-9 md:size-10" />
+            <span class="truncate">NoCTF <span class="text-slate-400">/ {{ t('common.live') }}</span></span>
+          </div>
         </div>
 
-        <div class="absolute left-1/2 flex -translate-x-1/2 items-center gap-3 text-2xl font-bold tracking-tight">
-          <span class="noctf-logo size-10" />
-          <span>NoCTF <span class="text-slate-400">/ Game Shell</span></span>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <div v-if="displayName" class="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+        <div class="flex min-w-0 items-center gap-3">
+          <div v-if="displayName" class="flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
             <Users class="size-4 text-blue-400" />
-            <span class="hidden text-sm font-medium md:inline">{{ displayName }}</span>
+            <span class="hidden truncate text-sm font-medium md:inline">{{ displayName }}</span>
             <Badge variant="default" class="font-mono tabular-nums">
               {{ displayScore }}
             </Badge>

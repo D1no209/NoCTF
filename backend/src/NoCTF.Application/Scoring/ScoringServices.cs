@@ -20,6 +20,9 @@ public class CompetitionScoringProfileResolver(ApplicationDbContext db) : ICompe
             var configured = ScoringJson.Deserialize<string[]>(competition.ScoringProfileJson);
             if (configured is { Length: > 0 })
             {
+                if (competition.GameModeType == GameModeType.Awdp || string.Equals(competition.ModeKey, "awdp", StringComparison.OrdinalIgnoreCase))
+                    return new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.AwdpRound };
+
                 var profile = configured.ToHashSet(StringComparer.OrdinalIgnoreCase);
                 if (competition.GameModeType == GameModeType.Ctf || string.Equals(competition.ModeKey, "ctf", StringComparison.OrdinalIgnoreCase))
                     profile.Add(ScoringKeys.BloodBonus);
@@ -37,8 +40,7 @@ public class CompetitionScoringProfileResolver(ApplicationDbContext db) : ICompe
             "awd" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.RoundAccumulation },
             "awdp" => new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                ScoringKeys.RoundAccumulation,
-                ScoringKeys.OneShotVerification
+                ScoringKeys.AwdpRound
             },
             "koh" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.ControlInterval },
             _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase)

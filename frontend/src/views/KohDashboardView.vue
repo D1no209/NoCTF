@@ -66,20 +66,20 @@ onUnmounted(() => signalR.stop())
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-[1600px] space-y-8 px-4 py-8 md:px-6">
+  <div class="noctf-page">
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <PageHeader
         :title="t('koh.kingOfTheHill')"
-        :description="t('koh.subtitle', 'Control the hill and earn points over time')"
+        :description="t('koh.subtitle')"
       >
         <template #actions>
           <div class="flex items-center gap-2">
             <Badge variant="secondary" class="animate-pulse bg-amber-500/10 text-amber-500 border-amber-500/20 px-3">
               <Trophy class="mr-1.5 size-3.5" />
-              LIVE
+              {{ t('common.live') }}
             </Badge>
             <Badge variant="outline" class="font-mono text-[10px] uppercase tracking-widest bg-muted/30">
-              MODE: KOH
+              {{ t('common.mode') }}: KOH
             </Badge>
           </div>
         </template>
@@ -91,21 +91,21 @@ onUnmounted(() => signalR.stop())
       <Skeleton v-for="i in 4" :key="i" class="h-64 rounded-xl" />
     </div>
 
-    <div v-else-if="isError" class="flex flex-col items-center justify-center py-20 text-center">
+    <div v-else-if="isError" class="noctf-state-box py-20">
       <div class="size-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4">
         <ShieldAlert class="size-8" />
       </div>
       <h3 class="text-xl font-bold">{{ t('koh.loadError') }}</h3>
       <p class="text-muted-foreground mt-2 max-w-xs">{{ t('koh.loadErrorDetail') }}</p>
-      <Button variant="outline" class="mt-6" @click="refetch">{{ t('common.retry') }}</Button>
+      <Button variant="outline" class="mt-6" @click="refetch">{{ t('common.refresh') }}</Button>
     </div>
 
-    <div v-else-if="challenges.length === 0" class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-xl">
+    <div v-else-if="challenges.length === 0" class="noctf-state-box py-20">
       <div class="size-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
         <Trophy class="size-8" />
       </div>
       <h3 class="text-xl font-bold">{{ t('koh.empty') }}</h3>
-      <p class="text-muted-foreground mt-2 max-w-xs">{{ t('koh.emptyDetail', 'No hills have been defined for this competition.') }}</p>
+      <p class="text-muted-foreground mt-2 max-w-xs">{{ t('koh.emptyDetail') }}</p>
     </div>
 
     <div 
@@ -122,7 +122,7 @@ onUnmounted(() => signalR.stop())
         v-for="ch in challenges"
         :key="ch.challengeId"
         :status="ch"
-        class="transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+        class="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgb(79_70_229/0.12)]"
       />
     </div>
   </div>

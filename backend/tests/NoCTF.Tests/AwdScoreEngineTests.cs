@@ -78,7 +78,10 @@ public class AwdScoreEngineTests
         return id;
     }
 
-    private static Guid SeedChallenge(ApplicationDbContext db, Guid competitionId)
+    private static Guid SeedChallenge(
+        ApplicationDbContext db,
+        Guid competitionId,
+        PointsConfig? pointsConfig = null)
     {
         var id = Guid.NewGuid();
         db.Challenges.Add(new Challenge
@@ -87,7 +90,7 @@ public class AwdScoreEngineTests
             CompetitionId = competitionId,
             Title = "Challenge",
             TypeId = "ctf",
-            PointsConfig = new PointsConfig(),
+            PointsConfig = pointsConfig ?? new PointsConfig(),
             CreatedAt = DateTime.UtcNow
         });
         return id;
@@ -238,6 +241,31 @@ public class AwdScoreEngineTests
 
         var events = await db.ScoreEvents.IgnoreQueryFilters().ToListAsync();
         Assert.Empty(events);
+    }
+
+    [Fact]
+    public async Task CalculateRoundScoreAsync_HealthyService_UsesSolveDecay()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+
+        SeedCompetition(db, competitionId, serviceOnlinePoints: 100);
+        var firstTeamId = SeedTeam(db, competitionId, "First");
+        var secondTeamId = SeedTeam(db, competitionId, "Second");
+        var challengeId = SeedChallenge(
+            db,
+            competitionId,
+            new PointsConfig(InitialPoints: 500, MinimumPoints: 25, DecayFactor: 1, DecayFunction: "linear"));
+        SeedCheckResult(db, competitionId, firstTeamId, challengeId, round: 1, AwdCheckStatus.Healthy);
+        SeedCheckResult(db, competitionId, secondTeamId, challengeId, round: 1, AwdCheckStatus.Healthy);
+        await db.SaveChangesAsync();
+
+        var engine = CreateScoreEngine(db);
+        await engine.CalculateRoundScoreAsync(competitionId, roundNumber: 1);
+
+        var events = await db.ScoreEvents.IgnoreQueryFilters().ToListAsync();
+        Assert.Equal(2, events.Count);
+        Assert.All(events, scoreEvent => Assert.Equal(25, scoreEvent.PointsDelta));
     }
 
     // ── ProcessSubmissionAsync tests ──────────────────────────────────────────

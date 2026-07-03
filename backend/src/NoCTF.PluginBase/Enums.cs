@@ -10,6 +10,9 @@ public enum SubmissionResult
     InvalidFormat,
     CompetitionNotStarted,
     CompetitionEnded,
+    InstanceRequired,
+    InstanceExpired,
+    AttemptsExhausted,
     NotImplemented
 }
 

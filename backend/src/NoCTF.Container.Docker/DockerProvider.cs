@@ -23,7 +23,12 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
         var createParams = new CreateContainerParameters
         {
             Image = config.Image,
-            Cmd = config.Command?.Split(' ') ?? null,
+            Cmd = string.IsNullOrWhiteSpace(config.Command)
+                ? null
+                : config.Entrypoint is { Count: > 0 }
+                    ? [config.Command]
+                    : config.Command.Split(' '),
+            Entrypoint = config.Entrypoint?.ToList(),
             Env = config.EnvironmentVariables?.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList() ?? [],
             Labels = config.Labels ?? new Dictionary<string, string>(),
             ExposedPorts = BuildExposedPorts(config),

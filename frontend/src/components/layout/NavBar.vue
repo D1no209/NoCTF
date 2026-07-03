@@ -25,7 +25,7 @@ async function handleLogout() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 w-full border-b border-slate-900/5 bg-white/85 backdrop-blur-xl">
+  <header class="sticky top-0 z-50 w-full border-b border-slate-900/10 bg-white/[0.88] backdrop-blur-xl">
     <div class="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
       <div class="flex items-center gap-6">
         <RouterLink to="/" class="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-80 transition-all active:scale-95">
@@ -36,7 +36,7 @@ async function handleLogout() {
           <RouterLink
             to="/"
             class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
+            active-class="bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(79_70_229/0.22)] hover:bg-primary hover:text-primary-foreground"
           >
             <Home class="size-4" />
             {{ t('nav.home') }}
@@ -44,14 +44,14 @@ async function handleLogout() {
           <RouterLink
             to="/competitions"
             class="relative rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
+            active-class="bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(79_70_229/0.22)] hover:bg-primary hover:text-primary-foreground"
           >
             {{ t('nav.competitions') }}
           </RouterLink>
           <RouterLink
             to="/teams"
             class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
+            active-class="bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(79_70_229/0.22)] hover:bg-primary hover:text-primary-foreground"
           >
             <Users class="size-4" />
             {{ t('nav.teams') }}
@@ -60,7 +60,7 @@ async function handleLogout() {
             v-if="canManage"
             to="/admin"
             class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary hover:text-primary-foreground"
+            active-class="bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(79_70_229/0.22)] hover:bg-primary hover:text-primary-foreground"
           >
             <LayoutDashboard class="size-4" />
             {{ t('nav.admin') }}
@@ -78,7 +78,7 @@ async function handleLogout() {
         </Button>
         
         <template v-if="auth.isAuthenticated">
-          <div v-if="displayName" class="flex items-center gap-2 rounded-xl border bg-white/80 px-2 py-1.5 text-sm shadow-sm">
+          <div v-if="displayName" class="flex items-center gap-2 rounded-lg border bg-white/[0.82] px-2 py-1.5 text-sm shadow-sm">
             <span class="text-muted-foreground hidden lg:inline">{{ displayName }}</span>
           </div>
           <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="handleLogout">{{ t('auth.logout') }}</Button>

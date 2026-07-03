@@ -124,7 +124,7 @@ function modeLabel(mode?: string | null) {
 
 <template>
   <AppLayout>
-    <div class="mx-auto w-full max-w-[1600px] space-y-8 px-4 py-8 md:px-6">
+    <div class="noctf-page">
       <div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <PageHeader
           :title="t('competitions.title')"
@@ -133,14 +133,14 @@ function modeLabel(mode?: string | null) {
         />
       </div>
 
-      <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
+      <div class="noctf-filter-bar md:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
         <div class="relative">
           <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="state.search" :placeholder="t('competitions.searchPlaceholder')" class="!rounded-none pl-10" />
+          <Input v-model="state.search" :placeholder="t('competitions.searchPlaceholder')" class="pl-10" />
         </div>
 
         <Select v-model="state.statusFilter">
-          <SelectTrigger class="!rounded-none">
+          <SelectTrigger>
             <SelectValue :placeholder="t('common.status')" />
           </SelectTrigger>
           <SelectContent>
@@ -153,7 +153,7 @@ function modeLabel(mode?: string | null) {
         </Select>
 
         <Select v-model="state.modeFilter">
-          <SelectTrigger class="!rounded-none">
+          <SelectTrigger>
             <SelectValue :placeholder="t('common.mode')" />
           </SelectTrigger>
           <SelectContent>
@@ -165,7 +165,7 @@ function modeLabel(mode?: string | null) {
           </SelectContent>
         </Select>
 
-        <Button variant="outline" class="!rounded-none" @click="loadCompetitions()" :disabled="isState('loading')">
+        <Button variant="outline" @click="loadCompetitions()" :disabled="isState('loading')">
           <RotateCw class="size-4" :class="{ 'animate-spin': isState('loading') }" />
           {{ t('common.refresh') }}
         </Button>
@@ -173,31 +173,31 @@ function modeLabel(mode?: string | null) {
 
       <div class="min-h-40">
         <div v-if="isState('loading')" class="grid gap-4">
-          <Skeleton v-for="i in 4" :key="i" class="h-48 !rounded-none" />
+          <Skeleton v-for="i in 4" :key="i" class="h-48 rounded-xl" />
         </div>
 
-        <div v-else-if="isState('error')" class="flex min-h-40 flex-col items-center justify-center border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <div v-else-if="isState('error')" class="noctf-state-box">
           <AlertCircle class="size-8 text-destructive" />
           <h3 class="mt-3 text-sm font-medium">{{ t('competitions.loadError') }}</h3>
-          <Button variant="outline" size="sm" class="mt-4 !rounded-none" @click="loadCompetitions">
+          <Button variant="outline" size="sm" class="mt-4" @click="loadCompetitions">
             {{ t('common.refresh') }}
           </Button>
         </div>
 
-        <div v-else-if="isState('empty')" class="flex min-h-40 flex-col items-center justify-center border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <div v-else-if="isState('empty')" class="noctf-state-box">
           <Inbox class="size-8 text-muted-foreground" />
           <h3 class="mt-3 text-sm font-medium">{{ t('competitions.empty') }}</h3>
           <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('competitions.emptyDescription') }}</p>
-          <Button variant="outline" size="sm" class="mt-4 !rounded-none" @click="loadCompetitions">
+          <Button variant="outline" size="sm" class="mt-4" @click="loadCompetitions">
             {{ t('common.refresh') }}
           </Button>
         </div>
 
-        <div v-else-if="isState('filtered-empty')" class="flex min-h-40 flex-col items-center justify-center border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <div v-else-if="isState('filtered-empty')" class="noctf-state-box">
           <Search class="size-8 text-muted-foreground" />
           <h3 class="mt-3 text-sm font-medium">{{ t('common.noResults') }}</h3>
           <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('competitions.emptyDescription') }}</p>
-          <Button variant="outline" size="sm" class="mt-4 !rounded-none" @click="resetFilters">
+          <Button variant="outline" size="sm" class="mt-4" @click="resetFilters">
             {{ t('common.reset') }}
           </Button>
         </div>
@@ -218,10 +218,10 @@ function modeLabel(mode?: string | null) {
 
             <div class="competition-row-main">
               <div class="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" class="!rounded-none" :class="statusToneClass(comp.status)">
+                <Badge variant="outline" :class="statusToneClass(comp.status)">
                   {{ statusLabel(comp.status) }}
                 </Badge>
-                <Badge variant="secondary" class="!rounded-none">
+                <Badge variant="secondary">
                   {{ modeLabel(comp.gameModeType) }}
                 </Badge>
               </div>
@@ -254,12 +254,12 @@ function modeLabel(mode?: string | null) {
             </div>
 
             <div class="competition-row-actions">
-              <Button variant="outline" class="!rounded-none" as-child>
+              <Button variant="outline" as-child>
                 <RouterLink :to="`/competitions/${comp.id}/register`">
                   {{ t('teams.registerForCompetition') }}
                 </RouterLink>
               </Button>
-              <Button class="!rounded-none" as-child>
+              <Button as-child>
                 <RouterLink :to="`/competitions/${comp.id}`">
                   {{ t('competitions.enter') }}
                   <ArrowRight class="size-4" />
@@ -286,7 +286,18 @@ function modeLabel(mode?: string | null) {
   overflow: hidden;
   border: 1px solid oklch(0.87 0.025 255);
   background: oklch(1 0 0);
-  box-shadow: 0 18px 45px rgb(15 23 42 / 0.06);
+  border-radius: 0.85rem;
+  box-shadow: 0 16px 45px rgb(15 23 42 / 0.055);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.competition-row:hover {
+  border-color: oklch(0.78 0.075 262);
+  box-shadow: 0 22px 55px rgb(79 70 229 / 0.11);
+  transform: translateY(-1px);
 }
 
 .competition-poster {

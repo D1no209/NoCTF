@@ -17,8 +17,8 @@ withDefaults(defineProps<{
   <Card class="py-4">
     <CardContent class="flex items-center justify-between gap-3 px-4">
       <div class="min-w-0">
-        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ label }}</p>
-        <p class="mt-1 truncate text-2xl font-semibold tabular-nums">{{ value }}</p>
+        <p class="noctf-label">{{ label }}</p>
+        <p class="mt-1 truncate text-2xl font-bold tabular-nums">{{ value }}</p>
         <p v-if="description" class="mt-1 truncate text-xs text-muted-foreground">{{ description }}</p>
       </div>
       <component

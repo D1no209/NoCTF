@@ -169,7 +169,7 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="noctf-admin-page">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <div class="flex items-center gap-2">
@@ -178,18 +178,18 @@ const table = useVueTable({
             {{ t('admin.users.adminOnly') }}
           </Badge>
         </div>
-        <p class="text-sm text-muted-foreground">Manage user accounts and global permissions.</p>
+        <p class="text-sm text-muted-foreground">{{ t('admin.users.subtitle') }}</p>
       </div>
     </div>
 
-    <div class="flex items-center gap-2">
+    <div class="noctf-filter-bar md:grid-cols-[minmax(0,24rem)]">
       <div class="relative w-full max-w-sm">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input v-model="globalFilter" :placeholder="t('admin.users.searchPlaceholder')" class="pl-10" />
       </div>
     </div>
 
-    <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div class="noctf-table-shell">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -267,7 +267,7 @@ const table = useVueTable({
       </Table>
     </div>
 
-    <div class="flex items-center justify-between">
+    <div class="noctf-table-footer">
       <p class="text-xs text-muted-foreground">
         {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
       </p>
@@ -286,7 +286,7 @@ const table = useVueTable({
       <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>{{ t('admin.users.dialogChangeRole', { name: selectedUser?.userName }) }}</DialogTitle>
-          <DialogDescription>Update the system permissions for this user.</DialogDescription>
+          <DialogDescription>{{ t('admin.users.roleDialogDescription') }}</DialogDescription>
         </DialogHeader>
         <div class="py-4 space-y-4">
           <div class="space-y-2">
@@ -306,7 +306,7 @@ const table = useVueTable({
           <div v-if="newRole === 'admin'" class="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex gap-3">
             <ShieldAlert class="size-5 text-destructive shrink-0" />
             <p class="text-xs text-destructive font-medium leading-tight">
-              Giving administrative access provides full control over all competitions and system settings.
+              {{ t('admin.users.adminRoleWarning') }}
             </p>
           </div>
         </div>
@@ -328,7 +328,7 @@ const table = useVueTable({
       <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>{{ t('admin.users.dialogResetPassword', { name: selectedUser?.userName }) }}</DialogTitle>
-          <DialogDescription>Set a new temporary password for the user.</DialogDescription>
+          <DialogDescription>{{ t('admin.users.passwordDialogDescription') }}</DialogDescription>
         </DialogHeader>
         <div class="py-4 space-y-4">
           <div class="space-y-2">
@@ -339,7 +339,7 @@ const table = useVueTable({
                 v-model="newPassword" 
                 type="password" 
                 class="pl-10"
-                placeholder="Minimum 8 characters" 
+                :placeholder="t('validation.passwordMin')"
               />
             </div>
           </div>

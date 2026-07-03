@@ -94,7 +94,7 @@ function formatDate(iso: string) {
 
 <template>
   <AppLayout>
-    <div class="mx-auto w-full max-w-[1600px] space-y-8 px-4 py-8 md:px-6">
+    <div class="noctf-page">
       <section class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div class="noctf-panel overflow-hidden rounded-xl p-6 md:p-8">
           <div class="max-w-3xl space-y-5">
@@ -139,16 +139,16 @@ function formatDate(iso: string) {
           </CardHeader>
           <CardContent class="grid gap-3">
             <div class="grid grid-cols-2 gap-3">
-              <div class="rounded-lg border bg-background/70 p-4">
+              <div class="noctf-kpi">
                 <div class="text-2xl font-bold tabular-nums">{{ teams?.length ?? 0 }}</div>
                 <div class="text-xs text-muted-foreground">{{ t('home.joinedTeams') }}</div>
               </div>
-              <div class="rounded-lg border bg-background/70 p-4">
+              <div class="noctf-kpi">
                 <div class="text-2xl font-bold tabular-nums">{{ approvedTeams }}</div>
                 <div class="text-xs text-muted-foreground">{{ t('home.readyTeams') }}</div>
               </div>
             </div>
-            <div class="rounded-lg border bg-background/70 p-4">
+            <div class="noctf-kpi">
               <div class="flex items-center justify-between gap-3">
                 <span class="text-sm text-muted-foreground">{{ t('home.pendingReview') }}</span>
                 <Badge :variant="pendingTeams ? 'secondary' : 'outline'">{{ pendingTeams }}</Badge>
@@ -159,7 +159,7 @@ function formatDate(iso: string) {
       </section>
 
       <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card>
+        <Card class="noctf-surface">
           <CardHeader class="flex flex-row items-center justify-between gap-4">
             <div>
               <CardTitle>{{ t('home.competitionTitle') }}</CardTitle>
@@ -180,7 +180,7 @@ function formatDate(iso: string) {
               <div
                 v-for="competition in activeCompetitions"
                 :key="competition.id"
-                class="grid gap-3 rounded-lg border bg-background/70 p-4 md:grid-cols-[1fr_auto] md:items-center"
+                class="grid gap-3 rounded-lg border border-slate-900/10 bg-background/75 p-4 transition-colors hover:border-primary/30 hover:bg-primary/5 md:grid-cols-[1fr_auto] md:items-center"
               >
                 <div class="min-w-0 space-y-2">
                   <div class="flex flex-wrap items-center gap-2">
@@ -209,7 +209,7 @@ function formatDate(iso: string) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card class="noctf-surface">
           <CardHeader class="flex flex-row items-center justify-between gap-4">
             <div>
               <CardTitle>{{ t('home.teamTitle') }}</CardTitle>
@@ -231,7 +231,7 @@ function formatDate(iso: string) {
                 v-for="team in recentTeams"
                 :key="team.id"
                 :to="`/competitions/${team.competitionId}/register`"
-                class="rounded-lg border bg-background/70 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                class="rounded-lg border border-slate-900/10 bg-background/75 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -247,17 +247,17 @@ function formatDate(iso: string) {
       </section>
 
       <section class="grid gap-4 md:grid-cols-3">
-        <div class="rounded-xl border bg-card p-5">
+        <div class="noctf-section">
           <ListChecks class="mb-3 size-5 text-primary" />
           <h3 class="font-semibold">{{ t('home.stepRegisterTitle') }}</h3>
           <p class="mt-1 text-sm text-muted-foreground">{{ t('home.stepRegisterText') }}</p>
         </div>
-        <div class="rounded-xl border bg-card p-5">
+        <div class="noctf-section">
           <Users class="mb-3 size-5 text-primary" />
           <h3 class="font-semibold">{{ t('home.stepTeamTitle') }}</h3>
           <p class="mt-1 text-sm text-muted-foreground">{{ t('home.stepTeamText') }}</p>
         </div>
-        <div class="rounded-xl border bg-card p-5">
+        <div class="noctf-section">
           <Trophy class="mb-3 size-5 text-primary" />
           <h3 class="font-semibold">{{ t('home.stepCompeteTitle') }}</h3>
           <p class="mt-1 text-sm text-muted-foreground">{{ t('home.stepCompeteText') }}</p>

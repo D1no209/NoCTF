@@ -12,8 +12,8 @@ const props = withDefaults(defineProps<{
 </script>
 
 <template>
-  <div :class="cn('overflow-hidden rounded-md border bg-card', props.class)">
-    <div class="w-full overflow-x-auto">
+  <div :class="cn('noctf-table-shell', props.class)">
+    <div class="noctf-scrollbar w-full overflow-x-auto">
       <div :style="{ minWidth }" :class="dense ? 'text-sm' : ''">
         <slot />
       </div>

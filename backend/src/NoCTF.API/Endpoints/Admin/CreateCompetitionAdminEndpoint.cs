@@ -24,6 +24,27 @@ public class CreateCompetitionAdminRequest
     public int MaxTeamMembers { get; set; } = 5;
     public bool TracksEnabled { get; set; }
     public List<string> TrackNames { get; set; } = [];
+    public int? RoundDurationSeconds { get; set; }
+    public int? TotalRounds { get; set; }
+    public string? FlagFormat { get; set; }
+    public string? FlagPath { get; set; }
+    public int? AttackPoints { get; set; }
+    public int? ServiceOnlinePoints { get; set; }
+    public int? ServiceDownPenalty { get; set; }
+    public int? BeenAttackedPenalty { get; set; }
+    public int? FlagValidityRounds { get; set; }
+    public int? AwdpAttackScorePerRound { get; set; }
+    public int? AwdpDefenseScorePerRound { get; set; }
+    public int? AwdpMaxAttackAttempts { get; set; }
+    public int? AwdpMaxDefenseAttempts { get; set; }
+    public bool? AwdpAllowAttackAfterBreakSuccess { get; set; }
+    public bool? AwdpAllowDefenseAfterFixSuccess { get; set; }
+    public bool? AwdpServicePenaltyEnabled { get; set; }
+    public int? AwdpServicePenaltyPerRound { get; set; }
+    public bool? AwdpViolationPenaltyEnabled { get; set; }
+    public int? AwdpViolationPenalty { get; set; }
+    public string? AwdpFixEntry { get; set; }
+    public int? AwdpFixTimeoutSeconds { get; set; }
 }
 
 public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
@@ -72,6 +93,27 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             MaxTeamMembers = req.MaxTeamMembers <= 0 ? 5 : req.MaxTeamMembers,
             TracksEnabled = req.TracksEnabled,
             TrackNamesJson = System.Text.Json.JsonSerializer.Serialize(NormalizeTracks(req.TrackNames)),
+            RoundDurationSeconds = NormalizePositive(req.RoundDurationSeconds),
+            TotalRounds = NormalizePositive(req.TotalRounds),
+            FlagFormat = string.IsNullOrWhiteSpace(req.FlagFormat) ? null : req.FlagFormat.Trim(),
+            FlagPath = string.IsNullOrWhiteSpace(req.FlagPath) ? null : req.FlagPath.Trim(),
+            AttackPoints = NormalizeNonNegative(req.AttackPoints),
+            ServiceOnlinePoints = NormalizeNonNegative(req.ServiceOnlinePoints),
+            ServiceDownPenalty = NormalizeNonNegative(req.ServiceDownPenalty),
+            BeenAttackedPenalty = NormalizeNonNegative(req.BeenAttackedPenalty),
+            FlagValidityRounds = NormalizePositive(req.FlagValidityRounds),
+            AwdpAttackScorePerRound = req.AwdpAttackScorePerRound,
+            AwdpDefenseScorePerRound = req.AwdpDefenseScorePerRound,
+            AwdpMaxAttackAttempts = req.AwdpMaxAttackAttempts,
+            AwdpMaxDefenseAttempts = req.AwdpMaxDefenseAttempts,
+            AwdpAllowAttackAfterBreakSuccess = req.AwdpAllowAttackAfterBreakSuccess,
+            AwdpAllowDefenseAfterFixSuccess = req.AwdpAllowDefenseAfterFixSuccess,
+            AwdpServicePenaltyEnabled = req.AwdpServicePenaltyEnabled,
+            AwdpServicePenaltyPerRound = req.AwdpServicePenaltyPerRound,
+            AwdpViolationPenaltyEnabled = req.AwdpViolationPenaltyEnabled,
+            AwdpViolationPenalty = req.AwdpViolationPenalty,
+            AwdpFixEntry = string.IsNullOrWhiteSpace(req.AwdpFixEntry) ? null : req.AwdpFixEntry.Trim(),
+            AwdpFixTimeoutSeconds = req.AwdpFixTimeoutSeconds,
         };
         competition.CompetitionId = competition.Id;
 
@@ -103,6 +145,27 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             MaxTeamMembers = competition.MaxTeamMembers,
             TracksEnabled = competition.TracksEnabled,
             TrackNames = NormalizeTracks(req.TrackNames),
+            RoundDurationSeconds = competition.RoundDurationSeconds,
+            TotalRounds = competition.TotalRounds,
+            FlagFormat = competition.FlagFormat,
+            FlagPath = competition.FlagPath,
+            AttackPoints = competition.AttackPoints,
+            ServiceOnlinePoints = competition.ServiceOnlinePoints,
+            ServiceDownPenalty = competition.ServiceDownPenalty,
+            BeenAttackedPenalty = competition.BeenAttackedPenalty,
+            FlagValidityRounds = competition.FlagValidityRounds,
+            AwdpAttackScorePerRound = competition.AwdpAttackScorePerRound,
+            AwdpDefenseScorePerRound = competition.AwdpDefenseScorePerRound,
+            AwdpMaxAttackAttempts = competition.AwdpMaxAttackAttempts,
+            AwdpMaxDefenseAttempts = competition.AwdpMaxDefenseAttempts,
+            AwdpAllowAttackAfterBreakSuccess = competition.AwdpAllowAttackAfterBreakSuccess,
+            AwdpAllowDefenseAfterFixSuccess = competition.AwdpAllowDefenseAfterFixSuccess,
+            AwdpServicePenaltyEnabled = competition.AwdpServicePenaltyEnabled,
+            AwdpServicePenaltyPerRound = competition.AwdpServicePenaltyPerRound,
+            AwdpViolationPenaltyEnabled = competition.AwdpViolationPenaltyEnabled,
+            AwdpViolationPenalty = competition.AwdpViolationPenalty,
+            AwdpFixEntry = competition.AwdpFixEntry,
+            AwdpFixTimeoutSeconds = competition.AwdpFixTimeoutSeconds,
         }, 201, ct);
     }
 
@@ -115,4 +178,10 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
 
     internal static double NormalizeBonusPercent(double value)
         => double.IsFinite(value) && value > 0 ? Math.Min(1000, value) : 0;
+
+    internal static int? NormalizePositive(int? value)
+        => value is > 0 ? value : null;
+
+    internal static int? NormalizeNonNegative(int? value)
+        => value is >= 0 ? value : null;
 }

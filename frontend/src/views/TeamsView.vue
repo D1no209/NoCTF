@@ -141,7 +141,7 @@ async function copyToken(token: string) {
 
 <template>
   <AppLayout>
-    <div class="mx-auto w-full max-w-[1500px] space-y-8 px-4 py-8 md:px-6">
+    <div class="noctf-page">
       <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <PageHeader :title="t('teams.pageTitle')" :description="t('teams.pageDescription')" />
         <Button as-child>
@@ -153,7 +153,7 @@ async function copyToken(token: string) {
       </div>
 
       <div class="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card class="noctf-surface">
           <CardHeader>
             <CardTitle class="flex items-center gap-2 text-base">
               <Plus class="size-4 text-primary" />
@@ -213,7 +213,7 @@ async function copyToken(token: string) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card class="noctf-surface">
           <CardHeader>
             <CardTitle class="flex items-center gap-2 text-base">
               <KeyRound class="size-4 text-primary" />
@@ -240,7 +240,7 @@ async function copyToken(token: string) {
         <Skeleton v-for="i in 6" :key="i" class="h-52 rounded-xl" />
       </div>
 
-      <div v-else-if="isError" class="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center">
+      <div v-else-if="isError" class="noctf-state-box">
         <AlertCircle class="size-8 text-destructive" />
         <h3 class="mt-3 text-sm font-medium">{{ t('teams.loadError') }}</h3>
         <Button variant="outline" size="sm" class="mt-4" @click="refetch()">
@@ -248,7 +248,7 @@ async function copyToken(token: string) {
         </Button>
       </div>
 
-      <div v-else-if="!teams?.length" class="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center">
+      <div v-else-if="!teams?.length" class="noctf-state-box">
         <Inbox class="size-8 text-muted-foreground" />
         <h3 class="mt-3 text-sm font-medium">{{ t('teams.emptyMine') }}</h3>
         <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('teams.emptyMineDescription') }}</p>
@@ -261,12 +261,12 @@ async function copyToken(token: string) {
             <Badge variant="secondary">{{ activeTeams.length }}</Badge>
           </div>
 
-          <div v-if="activeTeams.length === 0" class="rounded-xl border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
+          <div v-if="activeTeams.length === 0" class="noctf-state-box text-sm text-muted-foreground">
             {{ t('teams.noActiveTeams') }}
           </div>
 
           <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Card v-for="team in activeTeams" :key="team.id" class="overflow-hidden">
+            <Card v-for="team in activeTeams" :key="team.id" class="overflow-hidden transition-colors hover:border-primary/30">
               <CardHeader class="space-y-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -282,7 +282,7 @@ async function copyToken(token: string) {
                 </div>
               </CardHeader>
               <CardContent class="space-y-4">
-                <div class="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                <div class="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
                   <code class="truncate text-xs">{{ team.inviteToken }}</code>
                   <Button variant="ghost" size="icon-sm" @click="copyToken(team.inviteToken)">
                     <Copy class="size-4" />
@@ -327,7 +327,7 @@ async function copyToken(token: string) {
             <div
               v-for="team in bannedTeams"
               :key="team.id"
-              class="flex flex-col gap-2 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+              class="flex flex-col gap-2 rounded-xl border bg-card/95 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
                 <div class="font-medium">{{ team.name }}</div>
