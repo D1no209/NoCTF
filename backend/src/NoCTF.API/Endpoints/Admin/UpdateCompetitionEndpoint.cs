@@ -18,6 +18,9 @@ public class UpdateCompetitionAdminRequest
     public DateTime EndTime { get; set; }
     public PointsConfigDto? DefaultPointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public double FirstBloodBonusPercent { get; set; }
+    public double SecondBloodBonusPercent { get; set; }
+    public double ThirdBloodBonusPercent { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
     public int MaxTeamMembers { get; set; } = 5;
     public bool TracksEnabled { get; set; }
@@ -47,6 +50,9 @@ public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoin
         competition.StartTime = req.StartTime;
         competition.EndTime = req.EndTime;
         competition.DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient;
+        competition.FirstBloodBonusPercent = NormalizeBonusPercent(req.FirstBloodBonusPercent);
+        competition.SecondBloodBonusPercent = NormalizeBonusPercent(req.SecondBloodBonusPercent);
+        competition.ThirdBloodBonusPercent = NormalizeBonusPercent(req.ThirdBloodBonusPercent);
         competition.TeamRegistrationAutoApprove = req.TeamRegistrationAutoApprove;
         competition.MaxTeamMembers = req.MaxTeamMembers <= 0 ? 5 : req.MaxTeamMembers;
         competition.TracksEnabled = req.TracksEnabled;
@@ -59,7 +65,7 @@ public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoin
             competition.DefaultMinimumPoints = req.DefaultPointsConfig.MinimumPoints;
             competition.DefaultDecayFactor = req.DefaultPointsConfig.DecayFactor;
             competition.DefaultDecayFunction = string.IsNullOrWhiteSpace(req.DefaultPointsConfig.DecayFunction)
-                ? "quadratic"
+                ? "sigmoid"
                 : req.DefaultPointsConfig.DecayFunction;
         }
 
@@ -76,4 +82,7 @@ public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoin
         await dbContext.SaveChangesAsync(ct);
         await SendOkAsync(ct);
     }
+
+    private static double NormalizeBonusPercent(double value)
+        => double.IsFinite(value) && value > 0 ? Math.Min(1000, value) : 0;
 }

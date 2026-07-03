@@ -11,7 +11,7 @@ public static class CompetitionModeDefaults
     public static string[] GetScoringProfile(GameModeType mode)
         => mode switch
         {
-            GameModeType.Ctf => [ScoringKeys.DecaySolve],
+            GameModeType.Ctf => [ScoringKeys.DecaySolve, ScoringKeys.BloodBonus],
             GameModeType.Awd => [ScoringKeys.RoundAccumulation],
             GameModeType.Awdp => [ScoringKeys.RoundAccumulation, ScoringKeys.OneShotVerification],
             GameModeType.Koh => [ScoringKeys.ControlInterval],

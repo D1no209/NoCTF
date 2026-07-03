@@ -19,7 +19,12 @@ public class CompetitionScoringProfileResolver(ApplicationDbContext db) : ICompe
         {
             var configured = ScoringJson.Deserialize<string[]>(competition.ScoringProfileJson);
             if (configured is { Length: > 0 })
-                return configured.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            {
+                var profile = configured.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (competition.GameModeType == GameModeType.Ctf || string.Equals(competition.ModeKey, "ctf", StringComparison.OrdinalIgnoreCase))
+                    profile.Add(ScoringKeys.BloodBonus);
+                return profile;
+            }
         }
 
         var modeKey = string.IsNullOrWhiteSpace(competition.ModeKey)
@@ -28,7 +33,7 @@ public class CompetitionScoringProfileResolver(ApplicationDbContext db) : ICompe
 
         return modeKey switch
         {
-            "ctf" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.DecaySolve },
+            "ctf" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.DecaySolve, ScoringKeys.BloodBonus },
             "awd" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.RoundAccumulation },
             "awdp" => new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {

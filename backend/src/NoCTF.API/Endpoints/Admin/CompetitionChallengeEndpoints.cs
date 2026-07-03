@@ -14,6 +14,7 @@ public class BindCompetitionChallengeRequest
     public string? FlagPrefix { get; set; }
     public PointsConfigDto? PointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public bool EnableBloodBonus { get; set; }
     public List<string> Hints { get; set; } = [];
 }
 
@@ -26,6 +27,7 @@ public class UpdateCompetitionChallengeRequest
     public string? FlagPrefix { get; set; }
     public PointsConfigDto? PointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public bool EnableBloodBonus { get; set; }
     public List<string> Hints { get; set; } = [];
 }
 
@@ -123,6 +125,7 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db)
             ExposedPort = template.ExposedPort,
             PointsConfig = new PointsConfig(points.InitialPoints, points.MinimumPoints, points.DecayFactor, points.DecayFunction),
             DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? competition.DifficultyCoefficient : req.DifficultyCoefficient,
+            EnableBloodBonus = req.EnableBloodBonus,
             CheckerConfig = template.CheckerConfig is not null
                 ? new CheckerConfig
                 {
@@ -186,6 +189,7 @@ public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db)
         challenge.DescriptionFormat = string.IsNullOrWhiteSpace(req.DescriptionFormat) ? "markdown" : req.DescriptionFormat;
         challenge.FlagPrefix = string.IsNullOrWhiteSpace(req.FlagPrefix) ? "flag" : req.FlagPrefix.Trim();
         challenge.DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient;
+        challenge.EnableBloodBonus = req.EnableBloodBonus;
         if (req.PointsConfig is not null)
         {
             challenge.PointsConfig = new PointsConfig(

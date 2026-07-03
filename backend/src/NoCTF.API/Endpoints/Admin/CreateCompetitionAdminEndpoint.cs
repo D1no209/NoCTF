@@ -17,6 +17,9 @@ public class CreateCompetitionAdminRequest
     public DateTime EndTime { get; set; }
     public PointsConfigDto? DefaultPointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public double FirstBloodBonusPercent { get; set; }
+    public double SecondBloodBonusPercent { get; set; }
+    public double ThirdBloodBonusPercent { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
     public int MaxTeamMembers { get; set; } = 5;
     public bool TracksEnabled { get; set; }
@@ -60,8 +63,11 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             DefaultInitialPoints = req.DefaultPointsConfig?.InitialPoints ?? 500,
             DefaultMinimumPoints = req.DefaultPointsConfig?.MinimumPoints ?? 100,
             DefaultDecayFactor = req.DefaultPointsConfig?.DecayFactor ?? 450,
-            DefaultDecayFunction = req.DefaultPointsConfig?.DecayFunction ?? "quadratic",
+            DefaultDecayFunction = req.DefaultPointsConfig?.DecayFunction ?? "sigmoid",
             DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient,
+            FirstBloodBonusPercent = NormalizeBonusPercent(req.FirstBloodBonusPercent),
+            SecondBloodBonusPercent = NormalizeBonusPercent(req.SecondBloodBonusPercent),
+            ThirdBloodBonusPercent = NormalizeBonusPercent(req.ThirdBloodBonusPercent),
             TeamRegistrationAutoApprove = req.TeamRegistrationAutoApprove,
             MaxTeamMembers = req.MaxTeamMembers <= 0 ? 5 : req.MaxTeamMembers,
             TracksEnabled = req.TracksEnabled,
@@ -90,6 +96,9 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
                 DecayFunction = competition.DefaultDecayFunction,
             },
             DifficultyCoefficient = competition.DifficultyCoefficient,
+            FirstBloodBonusPercent = competition.FirstBloodBonusPercent,
+            SecondBloodBonusPercent = competition.SecondBloodBonusPercent,
+            ThirdBloodBonusPercent = competition.ThirdBloodBonusPercent,
             TeamRegistrationAutoApprove = competition.TeamRegistrationAutoApprove,
             MaxTeamMembers = competition.MaxTeamMembers,
             TracksEnabled = competition.TracksEnabled,
@@ -103,4 +112,7 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
             .Where(t => !string.IsNullOrWhiteSpace(t))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    internal static double NormalizeBonusPercent(double value)
+        => double.IsFinite(value) && value > 0 ? Math.Min(1000, value) : 0;
 }

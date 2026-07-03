@@ -76,8 +76,11 @@ public class Competition : ITenantEntity
     public int DefaultInitialPoints { get; set; } = 500;
     public int DefaultMinimumPoints { get; set; } = 100;
     public int DefaultDecayFactor { get; set; } = 450;
-    public string DefaultDecayFunction { get; set; } = "quadratic";
+    public string DefaultDecayFunction { get; set; } = "sigmoid";
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public double FirstBloodBonusPercent { get; set; }
+    public double SecondBloodBonusPercent { get; set; }
+    public double ThirdBloodBonusPercent { get; set; }
 
     // AWD-specific configuration (nullable so CTF competitions are unaffected)
     public int? RoundDurationSeconds { get; set; }
@@ -120,6 +123,7 @@ public class Challenge : ITenantEntity
     public string TypeId { get; set; } = string.Empty;
     public PointsConfig PointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
+    public bool EnableBloodBonus { get; set; }
     public string? AttachmentUrl { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
