@@ -138,8 +138,6 @@
     "searchPlaceholder": "搜索比赛...",
     "emptyDescription": "当前筛选条件下没有匹配的比赛。",
     "enter": "进入",
-    "deckTitle": "赛事队列",
-    "visibleCount": "{count} 场比赛",
     "loading": "正在加载比赛...",
     "loadError": "加载比赛失败",
     "empty": "暂无比赛",

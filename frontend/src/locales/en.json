@@ -138,8 +138,6 @@
     "searchPlaceholder": "Search competitions...",
     "emptyDescription": "There are no competitions matching the current filters.",
     "enter": "Enter",
-    "deckTitle": "Event queue",
-    "visibleCount": "{count} competitions",
     "loading": "Loading competitions...",
     "loadError": "Failed to load competitions.",
     "empty": "No competitions available.",
