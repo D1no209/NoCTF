@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute, RouterView, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -13,8 +13,19 @@ const route = useRoute()
 const auth = useAuthStore()
 const scoreStore = useScoreStore()
 
+const competitionId = computed(() => route.params.id as string)
 const displayName = computed(() => scoreStore.myTeamName ?? auth.user?.userName ?? '')
 const displayScore = computed(() => scoreStore.myTeamScore ?? 0)
+
+watch(
+  competitionId,
+  (id) => {
+    if (scoreStore.competitionId !== id) {
+      scoreStore.setCurrentTeamScore(id, null, null, null)
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>

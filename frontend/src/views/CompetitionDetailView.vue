@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { useAuthStore } from '@/stores/auth'
+import { useScoreStore } from '@/stores/score'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +23,7 @@ const { t } = useI18n()
 const route = useRoute()
 const queryClient = useQueryClient()
 const auth = useAuthStore()
+const scoreStore = useScoreStore()
 const competitionId = computed(() => route.params.id as string)
 
 interface Competition {
@@ -81,6 +83,17 @@ interface MyCompetitionTeam {
   trackName?: string | null
   registrationStatus: string
   isCaptain: boolean
+}
+
+interface LeaderboardEntry {
+  teamId?: string | null
+  teamName?: string | null
+  totalScore?: number | null
+  score?: number | null
+}
+
+interface LeaderboardResponse {
+  entries?: LeaderboardEntry[]
 }
 
 const { data: competition, isLoading: loadingComp } = useQuery({
@@ -163,6 +176,43 @@ const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.regi
 const currentTeam = computed(() => approvedTeam.value ?? myTeams.value?.[0] ?? null)
 const canUseParticipantActions = computed(() => Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
 const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
+
+const { data: headerLeaderboard } = useQuery({
+  queryKey: computed(() => [...queryKeys.leaderboard(competitionId.value), 'header-score']),
+  queryFn: () => competitionApi.leaderboard(competitionId.value) as Promise<LeaderboardResponse>,
+  enabled: computed(() => !!competitionId.value && !!approvedTeam.value?.id),
+  refetchInterval: computed(() => approvedTeam.value?.id ? 10_000 : false),
+})
+
+watch(
+  () => [competitionId.value, approvedTeam.value?.id, currentTeam.value?.id, headerLeaderboard.value?.entries],
+  () => {
+    if (!competitionId.value) {
+      scoreStore.reset()
+      return
+    }
+
+    if (!approvedTeam.value) {
+      scoreStore.setCurrentTeamScore(
+        competitionId.value,
+        currentTeam.value?.id ?? null,
+        currentTeam.value?.name ?? auth.user?.userName ?? null,
+        null,
+      )
+      return
+    }
+
+    const entries = headerLeaderboard.value?.entries ?? []
+    const currentEntry = entries.find(entry => entry.teamId === approvedTeam.value?.id)
+    if (!currentEntry) {
+      scoreStore.setCurrentTeamScore(competitionId.value, approvedTeam.value.id, approvedTeam.value.name, 0)
+      return
+    }
+
+    scoreStore.updateFromLeaderboard(entries as never, approvedTeam.value.id, competitionId.value)
+  },
+  { immediate: true },
+)
 
 const { data: patchSubmissions } = useQuery({
   queryKey: computed(() => queryKeys.patchSubmissions(competitionId.value)),
