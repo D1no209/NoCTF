@@ -14,4 +14,8 @@
     <ProjectReference Include="../NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Templates\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

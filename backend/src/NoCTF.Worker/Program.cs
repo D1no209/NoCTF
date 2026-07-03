@@ -27,6 +27,7 @@ builder.Services.AddScoped<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddScoped<IAwdpPatchService, AwdpPatchService>();
 builder.Services.AddScoped<ICompetitionJobHandler, AwdpPatchValidationJobHandler>();
 builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<ExpiredInstanceCleanupService>();
 
 var app = builder.Build();
 await app.RunAsync();

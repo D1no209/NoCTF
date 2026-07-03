@@ -28,9 +28,27 @@ type ApiResult<T> = {
 function unwrap<T>(result: ApiResult<T>, fallback = 'Request failed'): T {
   if (result.error) {
     const status = result.response?.status
-    throw new ApiError(fallback, status, result.error)
+    const details = isEmptyObject(result.error) && status
+      ? `HTTP ${status}`
+      : result.error
+    throw new ApiError(fallback, status, details)
   }
   return result.data as T
+}
+
+function isEmptyObject(value: unknown) {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0,
+  )
+}
+
+export function apiUrl(path: string) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
+  if (!baseUrl || /^https?:\/\//i.test(path)) return path
+  return new URL(path, baseUrl).toString()
 }
 
 export function setAuthToken(token: string | null) {
@@ -81,12 +99,50 @@ export const competitionApi = {
       path: { competitionId },
     }), 'Failed to load leaderboard')
   },
+  async leaderboardTrend<T = unknown>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{competitionId}/leaderboard/trend',
+      path: { competitionId },
+    }), 'Failed to load leaderboard trend')
+  },
+  async leaderboardTeam<T = unknown>(competitionId: string, teamId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{competitionId}/leaderboard/teams/{teamId}',
+      path: { competitionId, teamId },
+    }), 'Failed to load leaderboard team detail')
+  },
   async submitFlag<T = unknown>(competitionId: string, challengeId: string, flag: string) {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
       url: '/api/competitions/{id}/challenges/{challengeId}/submit',
       path: { id: competitionId, challengeId },
       body: { flag },
     }), 'Failed to submit flag')
+  },
+  async createInstance<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/instance',
+      path: { id: competitionId, challengeId },
+      body: {},
+    }), 'Failed to create instance')
+  },
+  async getInstance<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/instance',
+      path: { id: competitionId, challengeId },
+    }), 'Failed to load instance')
+  },
+  async destroyInstance<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.delete<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/instance',
+      path: { id: competitionId, challengeId },
+    }), 'Failed to destroy instance')
+  },
+  async extendInstance<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/instance/extend',
+      path: { id: competitionId, challengeId },
+      body: {},
+    }), 'Failed to extend instance')
   },
   async awdDashboard<T = unknown>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({
@@ -106,6 +162,12 @@ export const competitionApi = {
       path: { id: competitionId },
     }), 'Failed to load teams')
   },
+  async myTeams<T = unknown[]>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/teams/mine',
+      path: { id: competitionId },
+    }), 'Failed to load my teams')
+  },
   async submitPatch<T = unknown>(competitionId: string, challengeId: string, file: File) {
     const body = new FormData()
     body.append('file', file)
@@ -124,7 +186,12 @@ export const competitionApi = {
 }
 
 export const teamApi = {
-  async create<T = unknown>(body: { competitionId: string; name: string; avatarUrl?: string }) {
+  async mine<T = unknown[]>() {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/teams/mine',
+    }), 'Failed to load my teams')
+  },
+  async create<T = unknown>(body: { competitionId: string; name: string; avatarUrl?: string; trackName?: string }) {
     return unwrap(await client.post<{ 201: T }, unknown, false>({
       url: '/api/teams',
       body,
@@ -134,6 +201,12 @@ export const teamApi = {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
       url: '/api/teams/{teamId}/join',
       path: { teamId },
+    }), 'Failed to join team')
+  },
+  async joinByToken<T = unknown>(token: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/teams/join-by-token',
+      body: { token },
     }), 'Failed to join team')
   },
   async leave(teamId: string) {
@@ -160,6 +233,9 @@ export const teamApi = {
 export const adminApi = {
   async competitions<T = unknown[]>() {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions' }), 'Failed to load competitions')
+  },
+  async competition<T = unknown>(id: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{id}', path: { id } }), 'Failed to load competition')
   },
   async createCompetition<T = unknown>(body: unknown) {
     return unwrap(await client.post<{ 201: T }, unknown, false>({ url: '/api/admin/competitions', body }), 'Failed to create competition')
@@ -197,6 +273,15 @@ export const adminApi = {
   async createChallenge<T = unknown>(body: unknown) {
     return unwrap(await client.post<{ 201: T }, unknown, false>({ url: '/api/admin/challenges', body }), 'Failed to create challenge')
   },
+  async uploadChallengeAttachment<T = unknown>(id: string, file: File) {
+    const body = new FormData()
+    body.append('file', file)
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/admin/challenges/{id}/attachment',
+      path: { id },
+      body,
+    }), 'Failed to upload attachment')
+  },
   async updateChallenge<T = unknown>(id: string, body: unknown) {
     return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/challenges/{id}', path: { id }, body }), 'Failed to update challenge')
   },
@@ -208,6 +293,88 @@ export const adminApi = {
       url: '/api/admin/challenges/{id}/reveal-secret',
       path: { id },
     }), 'Failed to reveal secret')
+  },
+  async competitionChallenges<T = unknown[]>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges',
+      path: { competitionId },
+    }), 'Failed to load competition challenges')
+  },
+  async bindCompetitionChallenge<T = unknown>(competitionId: string, body: unknown) {
+    return unwrap(await client.post<{ 201: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges',
+      path: { competitionId },
+      body,
+    }), 'Failed to bind challenge')
+  },
+  async updateCompetitionChallenge<T = unknown>(competitionId: string, challengeId: string, body: unknown) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}',
+      path: { competitionId, challengeId },
+      body,
+    }), 'Failed to update competition challenge')
+  },
+  async deleteCompetitionChallenge(competitionId: string, challengeId: string) {
+    await client.delete({
+      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}',
+      path: { competitionId, challengeId },
+    })
+  },
+  async restartCompetitionChallengeContainer<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}/container/restart',
+      path: { competitionId, challengeId },
+    }), 'Failed to restart challenge container')
+  },
+  async competitionTeams<T = unknown[]>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/teams',
+      path: { competitionId },
+    }), 'Failed to load competition teams')
+  },
+  async approveCompetitionTeam<T = unknown>(competitionId: string, teamId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/teams/{teamId}/approve',
+      path: { competitionId, teamId },
+    }), 'Failed to approve team')
+  },
+  async rejectCompetitionTeam<T = unknown>(competitionId: string, teamId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/teams/{teamId}/reject',
+      path: { competitionId, teamId },
+    }), 'Failed to reject team')
+  },
+  async setCompetitionTeamLock<T = unknown>(competitionId: string, teamId: string, isLocked: boolean) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/teams/{teamId}/lock',
+      path: { competitionId, teamId },
+      body: { isLocked },
+    }), 'Failed to update team lock')
+  },
+  async banCompetitionTeam<T = unknown>(competitionId: string, teamId: string, reason?: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/teams/{teamId}/ban',
+      path: { competitionId, teamId },
+      body: { reason },
+    }), 'Failed to ban team')
+  },
+  async unbanCompetitionTeam<T = unknown>(competitionId: string, teamId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/teams/{teamId}/unban',
+      path: { competitionId, teamId },
+    }), 'Failed to unban team')
+  },
+  async competitionLogs<T = unknown[]>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/logs',
+      path: { competitionId },
+    }), 'Failed to load competition logs')
+  },
+  async competitionCheatIncidents<T = unknown[]>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/cheat-incidents',
+      path: { competitionId },
+    }), 'Failed to load cheat incidents')
   },
   async collaborators<T = unknown[]>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({
@@ -237,6 +404,11 @@ export const adminApi = {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/audit-logs', query }), 'Failed to load audit logs')
   },
   async health<T = unknown>() {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/health' }), 'Failed to load health')
+    const response = await fetch(apiUrl('/api/health'))
+    const data = await response.json().catch(() => undefined)
+    if (!response.ok && !data) {
+      throw new ApiError('Failed to load health', response.status)
+    }
+    return data as T
   },
 }

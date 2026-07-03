@@ -46,6 +46,11 @@ public class RedisLeaderboardCache(IConnectionMultiplexer redis) : IRedisLeaderb
             hashEntries[i] = new HashEntry(entry.TeamId.ToString(), JsonSerializer.Serialize(entry));
         }
 
+        await db.KeyDeleteAsync([ssKey, dataKey]);
+
+        if (entries.Count == 0)
+            return;
+
         var batch = db.CreateBatch();
         var ssTask = batch.SortedSetAddAsync(ssKey, sortedSetEntries, CommandFlags.None);
         var hashTask = batch.HashSetAsync(dataKey, hashEntries);

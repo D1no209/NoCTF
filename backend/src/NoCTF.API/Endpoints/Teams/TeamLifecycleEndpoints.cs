@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API;
 using NoCTF.API.Permissions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -12,11 +13,17 @@ public class CreateTeamRequest
     public Guid CompetitionId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public string? TrackName { get; set; }
 }
 
 public class JoinTeamRequest
 {
     public Guid TeamId { get; set; }
+}
+
+public class JoinTeamByTokenRequest
+{
+    public string Token { get; set; } = string.Empty;
 }
 
 public class LeaveTeamRequest
@@ -42,6 +49,81 @@ public class TeamDto
     public Guid CompetitionId { get; set; }
     public string Name { get; set; } = string.Empty;
     public Guid CaptainId { get; set; }
+    public string InviteToken { get; set; } = string.Empty;
+    public bool IsLocked { get; set; }
+    public bool IsBanned { get; set; }
+    public string? TrackName { get; set; }
+    public string RegistrationStatus { get; set; } = string.Empty;
+}
+
+public class MyTeamDto : TeamDto
+{
+    public string CompetitionTitle { get; set; } = string.Empty;
+    public string CompetitionStatus { get; set; } = string.Empty;
+    public string GameModeType { get; set; } = string.Empty;
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public int MaxTeamMembers { get; set; }
+    public int MemberCount { get; set; }
+    public bool IsCaptain { get; set; }
+    public DateTime RegisteredAt { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+}
+
+public class GetMyTeamsEndpoint(ApplicationDbContext db) : EndpointWithoutRequest<List<MyTeamDto>>
+{
+    public override void Configure()
+    {
+        Get("/api/teams/mine");
+        Claims(ClaimTypes.NameIdentifier);
+    }
+
+    public override async Task HandleAsync(CancellationToken ct)
+    {
+        var userId = CreateTeamEndpoint.GetUserId(User);
+        if (userId is null)
+        {
+            await SendUnauthorizedAsync(ct);
+            return;
+        }
+
+        var teams = await db.TeamMembers
+            .AsNoTracking()
+            .Where(tm => tm.UserId == userId.Value)
+            .Join(db.Teams.IgnoreQueryFilters(),
+                tm => tm.TeamId,
+                t => t.Id,
+                (tm, t) => new { Membership = tm, Team = t })
+            .Join(db.Competitions.IgnoreQueryFilters(),
+                x => x.Team.CompetitionId,
+                c => c.Id,
+                (x, c) => new MyTeamDto
+                {
+                    Id = x.Team.Id,
+                    CompetitionId = x.Team.CompetitionId,
+                    Name = x.Team.Name,
+                    CaptainId = x.Team.CaptainId,
+                    InviteToken = x.Team.InviteToken,
+                    IsLocked = x.Team.IsLocked,
+                    IsBanned = x.Team.IsBanned,
+                    TrackName = x.Team.TrackName,
+                    RegistrationStatus = x.Team.RegistrationStatus.ToString().ToLowerInvariant(),
+                    CompetitionTitle = c.Title,
+                    CompetitionStatus = c.Status.ToString().ToLowerInvariant(),
+                    GameModeType = c.GameModeType.ToString(),
+                    StartTime = c.StartTime,
+                    EndTime = c.EndTime,
+                    MaxTeamMembers = c.MaxTeamMembers,
+                    MemberCount = db.TeamMembers.Count(member => member.TeamId == x.Team.Id),
+                    IsCaptain = x.Team.CaptainId == userId.Value,
+                    RegisteredAt = x.Team.RegisteredAt,
+                    ApprovedAt = x.Team.ApprovedAt,
+                })
+            .OrderByDescending(t => t.RegisteredAt)
+            .ToListAsync(ct);
+
+        await SendAsync(teams, cancellation: ct);
+    }
 }
 
 public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRequest, TeamDto>
@@ -61,6 +143,16 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
             return;
         }
 
+        var competition = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == req.CompetitionId, ct);
+        if (competition is null)
+        {
+            await SendStringAsync("competition_not_found", 404, cancellation: ct);
+            return;
+        }
+
         var alreadyInTeam = await db.TeamMembers
             .AnyAsync(tm => tm.CompetitionId == req.CompetitionId && tm.UserId == userId.Value, ct);
         if (alreadyInTeam)
@@ -69,13 +161,35 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
             return;
         }
 
+        var trackName = req.TrackName?.Trim();
+        var trackNames = Admin.GetCompetitionAdminEndpoint.ParseTracks(competition.TrackNamesJson);
+        if (competition.TracksEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(trackName) ||
+                !trackNames.Any(t => string.Equals(t, trackName, StringComparison.OrdinalIgnoreCase)))
+            {
+                await SendStringAsync("invalid_track", 400, cancellation: ct);
+                return;
+            }
+
+            trackName = trackNames.First(t => string.Equals(t, trackName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var approved = competition.TeamRegistrationAutoApprove;
         var team = new Team
         {
             Id = Guid.NewGuid(),
             CompetitionId = req.CompetitionId,
             Name = req.Name.Trim(),
             AvatarUrl = req.AvatarUrl,
+            TrackName = competition.TracksEnabled ? trackName : null,
             CaptainId = userId.Value,
+            InviteToken = NewInviteToken(),
+            RegistrationStatus = approved ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending,
+            RegisteredAt = DateTime.UtcNow,
+            ApprovedAt = approved ? DateTime.UtcNow : null,
+            ApprovedById = approved ? userId.Value : null,
+            IsLocked = approved,
             CreatedAt = DateTime.UtcNow
         };
         db.Teams.Add(team);
@@ -88,6 +202,14 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
             Role = TeamMemberRole.Captain,
             JoinedAt = DateTime.UtcNow
         });
+        CompetitionLogWriter.Add(
+            db,
+            req.CompetitionId,
+            "team.registered",
+            approved ? $"Team {team.Name} registered and was auto-approved." : $"Team {team.Name} registered and is pending review.",
+            teamId: team.Id,
+            userId: userId.Value,
+            metadata: new { team.Name, team.TrackName, approved });
         await db.SaveChangesAsync(ct);
 
         await SendAsync(ToDto(team), 201, ct);
@@ -96,12 +218,19 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
     internal static Guid? GetUserId(ClaimsPrincipal user)
         => Guid.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
 
+    internal static string NewInviteToken() => Convert.ToHexString(Guid.NewGuid().ToByteArray()).ToLowerInvariant();
+
     internal static TeamDto ToDto(Team team) => new()
     {
         Id = team.Id,
         CompetitionId = team.CompetitionId,
         Name = team.Name,
-        CaptainId = team.CaptainId
+        CaptainId = team.CaptainId,
+        InviteToken = team.InviteToken,
+        IsLocked = team.IsLocked,
+        IsBanned = team.IsBanned,
+        TrackName = team.TrackName,
+        RegistrationStatus = team.RegistrationStatus.ToString().ToLowerInvariant()
     };
 }
 
@@ -129,11 +258,107 @@ public class JoinTeamEndpoint(ApplicationDbContext db) : Endpoint<JoinTeamReques
             return;
         }
 
+        if (team.IsLocked)
+        {
+            await SendStringAsync("team_locked", 409, cancellation: ct);
+            return;
+        }
+
+        if (team.IsBanned)
+        {
+            await SendStringAsync("team_banned", 403, cancellation: ct);
+            return;
+        }
+
         var alreadyInCompetition = await db.TeamMembers
             .AnyAsync(tm => tm.CompetitionId == team.CompetitionId && tm.UserId == userId.Value, ct);
         if (alreadyInCompetition)
         {
             await SendAsync(new TeamDto(), 409, ct);
+            return;
+        }
+
+        var maxMembers = await db.Competitions
+            .IgnoreQueryFilters()
+            .Where(c => c.Id == team.CompetitionId)
+            .Select(c => c.MaxTeamMembers)
+            .FirstOrDefaultAsync(ct);
+        var memberCount = await db.TeamMembers.CountAsync(tm => tm.TeamId == team.Id, ct);
+        if (maxMembers > 0 && memberCount >= maxMembers)
+        {
+            await SendStringAsync("team_full", 409, cancellation: ct);
+            return;
+        }
+
+        db.TeamMembers.Add(new TeamMember
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = team.CompetitionId,
+            TeamId = team.Id,
+            UserId = userId.Value,
+            Role = TeamMemberRole.Member,
+            JoinedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(ct);
+
+        await SendAsync(CreateTeamEndpoint.ToDto(team), cancellation: ct);
+    }
+}
+
+public class JoinTeamByTokenEndpoint(ApplicationDbContext db) : Endpoint<JoinTeamByTokenRequest, TeamDto>
+{
+    public override void Configure()
+    {
+        Post("/api/teams/join-by-token");
+        Claims(ClaimTypes.NameIdentifier);
+    }
+
+    public override async Task HandleAsync(JoinTeamByTokenRequest req, CancellationToken ct)
+    {
+        var userId = CreateTeamEndpoint.GetUserId(User);
+        if (userId is null)
+        {
+            await SendUnauthorizedAsync(ct);
+            return;
+        }
+
+        var token = req.Token.Trim();
+        var team = await db.Teams.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.InviteToken == token, ct);
+        if (team is null)
+        {
+            await SendStringAsync("invalid_team_token", 404, cancellation: ct);
+            return;
+        }
+
+        if (team.IsLocked)
+        {
+            await SendStringAsync("team_locked", 409, cancellation: ct);
+            return;
+        }
+
+        if (team.IsBanned)
+        {
+            await SendStringAsync("team_banned", 403, cancellation: ct);
+            return;
+        }
+
+        var alreadyInCompetition = await db.TeamMembers
+            .AnyAsync(tm => tm.CompetitionId == team.CompetitionId && tm.UserId == userId.Value, ct);
+        if (alreadyInCompetition)
+        {
+            await SendStringAsync("already_registered", 409, cancellation: ct);
+            return;
+        }
+
+        var maxMembers = await db.Competitions
+            .IgnoreQueryFilters()
+            .Where(c => c.Id == team.CompetitionId)
+            .Select(c => c.MaxTeamMembers)
+            .FirstOrDefaultAsync(ct);
+        var memberCount = await db.TeamMembers.CountAsync(tm => tm.TeamId == team.Id, ct);
+        if (maxMembers > 0 && memberCount >= maxMembers)
+        {
+            await SendStringAsync("team_full", 409, cancellation: ct);
             return;
         }
 
@@ -173,6 +398,13 @@ public class LeaveTeamEndpoint(ApplicationDbContext db) : Endpoint<LeaveTeamRequ
         if (member is null)
         {
             await SendNotFoundAsync(ct);
+            return;
+        }
+
+        var team = await db.Teams.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == req.TeamId, ct);
+        if (team?.IsLocked == true)
+        {
+            await SendStringAsync("team_locked", 409, cancellation: ct);
             return;
         }
 
@@ -224,6 +456,11 @@ public class TransferCaptainEndpoint(ApplicationDbContext db, ITeamPermissionSer
         currentCaptain.Role = TeamMemberRole.Member;
         newCaptain.Role = TeamMemberRole.Captain;
         var team = await db.Teams.IgnoreQueryFilters().FirstAsync(t => t.Id == req.TeamId, ct);
+        if (team.IsLocked)
+        {
+            await SendStringAsync("team_locked", 409, cancellation: ct);
+            return;
+        }
         team.CaptainId = req.NewCaptainUserId;
         await db.SaveChangesAsync(ct);
         await SendNoContentAsync(ct);
@@ -258,6 +495,13 @@ public class RemoveTeamMemberEndpoint(ApplicationDbContext db, ITeamPermissionSe
         if (member is null)
         {
             await SendNotFoundAsync(ct);
+            return;
+        }
+
+        var team = await db.Teams.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == req.TeamId, ct);
+        if (team?.IsLocked == true)
+        {
+            await SendStringAsync("team_locked", 409, cancellation: ct);
             return;
         }
 

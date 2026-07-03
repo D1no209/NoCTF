@@ -6,7 +6,9 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/competitions',
+      name: 'home',
+      component: () => import('@/views/HomeView.vue'),
+      meta: { requiresAuth: true },
     },
     {
       path: '/login',
@@ -24,6 +26,18 @@ const router = createRouter({
       path: '/competitions',
       name: 'competitions',
       component: () => import('@/views/CompetitionsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/teams',
+      name: 'teams',
+      component: () => import('@/views/TeamsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/competitions/:id/register',
+      name: 'competition-register',
+      component: () => import('@/views/CompetitionRegistrationView.vue'),
       meta: { requiresAuth: true },
     },
     {
@@ -76,6 +90,12 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
+          path: 'competitions/:id',
+          name: 'admin-competition-detail',
+          component: () => import('@/views/admin/AdminCompetitionDetailView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
+        },
+        {
           path: 'collaborators',
           name: 'admin-collaborators',
           component: () => import('@/views/admin/AdminCollaboratorsView.vue'),
@@ -124,8 +144,11 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  if (to.meta.requiresAuth && !auth.ensureFreshSession()) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login' }
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresAdminOrOrganizer && !['Admin', 'Organizer'].includes(auth.userRole)) {
     return { name: 'competitions' }

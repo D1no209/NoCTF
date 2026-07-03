@@ -156,9 +156,39 @@ public class LeaderboardServiceTests
         Assert.Empty(result);
     }
 
+    [Fact]
+    public async Task CalculateLeaderboard_RegisteredTeamsWithoutScores_AreIncluded()
+    {
+        var competitionId = Guid.NewGuid();
+        var scoringTeam = Guid.NewGuid();
+        var zeroTeam = Guid.NewGuid();
+        var rejectedTeam = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+
+        SeedTeam(db, competitionId, scoringTeam, "Alpha");
+        SeedTeam(db, competitionId, zeroTeam, "Beta");
+        SeedTeam(db, competitionId, rejectedTeam, "Rejected", TeamRegistrationStatus.Rejected);
+        SeedScoreEvent(db, competitionId, scoringTeam, 300);
+        await db.SaveChangesAsync();
+
+        var service = new LeaderboardService(db);
+        var result = await service.CalculateLeaderboardAsync(competitionId);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(scoringTeam, result[0].TeamId);
+        Assert.Equal(zeroTeam, result[1].TeamId);
+        Assert.Equal(0, result[1].TotalScore);
+        Assert.DoesNotContain(result, e => e.TeamId == rejectedTeam);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static void SeedTeam(ApplicationDbContext db, Guid competitionId, Guid teamId, string name)
+    private static void SeedTeam(
+        ApplicationDbContext db,
+        Guid competitionId,
+        Guid teamId,
+        string name,
+        TeamRegistrationStatus status = TeamRegistrationStatus.Approved)
     {
         db.Teams.Add(new Team
         {
@@ -166,6 +196,7 @@ public class LeaderboardServiceTests
             CompetitionId = competitionId,
             Name = name,
             CaptainId = Guid.NewGuid(),
+            RegistrationStatus = status,
             CreatedAt = DateTime.UtcNow
         });
     }
