@@ -111,6 +111,7 @@ flowchart LR
 
 ## Documentation
 
+- [Collaborator Handoff](docs/handoff.md)
 - [Architecture](docs/architecture.md)
 - [Deployment Guide](docs/deployment.md)
 - [Development Guide](docs/development.md)
