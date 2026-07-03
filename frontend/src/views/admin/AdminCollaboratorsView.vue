@@ -159,17 +159,17 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="noctf-admin-page">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.collaborators.title') }}</h2>
-        <p class="text-sm text-muted-foreground">Assign organizers and observers to specific competitions.</p>
+        <p class="text-sm text-muted-foreground">{{ t('admin.collaborators.subtitle') }}</p>
       </div>
     </div>
 
     <!-- Competition selector -->
-    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-muted/30 p-4 rounded-xl border">
-      <div class="flex items-center gap-3 w-full max-w-md">
+    <div class="noctf-filter-bar sm:grid-cols-[minmax(0,28rem)_auto] sm:items-center">
+      <div class="flex w-full max-w-md items-center gap-3">
         <Trophy class="size-4 text-muted-foreground shrink-0" />
         <Select v-model="selectedCompetitionId">
           <SelectTrigger>
@@ -187,7 +187,7 @@ const table = useVueTable({
     </div>
 
     <template v-if="selectedCompetitionId">
-      <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div class="noctf-table-shell">
         <Table>
           <TableHeader>
             <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -227,7 +227,7 @@ const table = useVueTable({
         </Table>
       </div>
 
-      <div class="flex items-center justify-between">
+      <div class="noctf-table-footer">
         <p class="text-xs text-muted-foreground">
           {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
         </p>
@@ -238,11 +238,11 @@ const table = useVueTable({
       </div>
     </template>
 
-    <div v-else class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-xl">
+    <div v-else class="noctf-state-box py-20">
       <div class="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
         <Users class="size-6" />
       </div>
-      <h3 class="text-lg font-medium">No Competition Selected</h3>
+      <h3 class="text-lg font-medium">{{ t('admin.collaborators.noCompetitionSelected') }}</h3>
       <p class="text-sm text-muted-foreground mt-1">{{ t('admin.collaborators.selectPrompt') }}</p>
     </div>
 
@@ -251,7 +251,7 @@ const table = useVueTable({
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{{ t('admin.collaborators.addDialogTitle') }}</DialogTitle>
-          <DialogDescription>Grant administrative or observation access to a user.</DialogDescription>
+          <DialogDescription>{{ t('admin.collaborators.addDialogDescription') }}</DialogDescription>
         </DialogHeader>
         <div class="py-4 space-y-4">
           <div class="space-y-2">
@@ -263,7 +263,7 @@ const table = useVueTable({
             
             <div v-if="newUserSearch.length >= 2" v-auto-animate class="mt-2 border rounded-lg overflow-hidden bg-muted/20">
               <div v-if="!userSearchResults || userSearchResults.length === 0" class="p-3 text-center text-xs text-muted-foreground">
-                No users found.
+                {{ t('admin.collaborators.noUsersFound') }}
               </div>
               <div
                 v-for="u in userSearchResults"
@@ -309,10 +309,10 @@ const table = useVueTable({
       <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle class="text-destructive">{{ t('admin.collaborators.removeDialogTitle') }}</DialogTitle>
-          <DialogDescription>Are you sure you want to remove this collaborator?</DialogDescription>
+          <DialogDescription>{{ t('admin.collaborators.removeDialogDescription') }}</DialogDescription>
         </DialogHeader>
         <div class="py-4">
-          <p class="text-sm font-medium">Remove <span class="font-bold underline">{{ selectedCollab?.userName }}</span> from this competition?</p>
+          <p class="text-sm font-medium">{{ t('admin.collaborators.removeQuestion') }} <span class="font-bold underline">{{ selectedCollab?.userName }}</span>?</p>
         </div>
         <DialogFooter>
           <Button variant="outline" @click="removeDialog = false">{{ t('common.cancel') }}</Button>

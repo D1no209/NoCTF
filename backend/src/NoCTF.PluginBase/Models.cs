@@ -10,7 +10,8 @@ public record ContainerConfig(
     string? RegistryAuth = null,
     TimeSpan? Ttl = null,
     ContainerResourceLimits? ResourceLimits = null,
-    ContainerSecurityPolicy? SecurityPolicy = null
+    ContainerSecurityPolicy? SecurityPolicy = null,
+    IReadOnlyList<string>? Entrypoint = null
 );
 
 public record ContainerResourceLimits(

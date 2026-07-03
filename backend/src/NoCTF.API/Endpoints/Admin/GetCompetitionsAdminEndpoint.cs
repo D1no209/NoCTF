@@ -25,6 +25,27 @@ public class CompetitionSummaryDto
     public int MaxTeamMembers { get; set; } = 5;
     public bool TracksEnabled { get; set; }
     public List<string> TrackNames { get; set; } = [];
+    public int? RoundDurationSeconds { get; set; }
+    public int? TotalRounds { get; set; }
+    public string? FlagFormat { get; set; }
+    public string? FlagPath { get; set; }
+    public int? AttackPoints { get; set; }
+    public int? ServiceOnlinePoints { get; set; }
+    public int? ServiceDownPenalty { get; set; }
+    public int? BeenAttackedPenalty { get; set; }
+    public int? FlagValidityRounds { get; set; }
+    public int? AwdpAttackScorePerRound { get; set; }
+    public int? AwdpDefenseScorePerRound { get; set; }
+    public int? AwdpMaxAttackAttempts { get; set; }
+    public int? AwdpMaxDefenseAttempts { get; set; }
+    public bool? AwdpAllowAttackAfterBreakSuccess { get; set; }
+    public bool? AwdpAllowDefenseAfterFixSuccess { get; set; }
+    public bool? AwdpServicePenaltyEnabled { get; set; }
+    public int? AwdpServicePenaltyPerRound { get; set; }
+    public bool? AwdpViolationPenaltyEnabled { get; set; }
+    public int? AwdpViolationPenalty { get; set; }
+    public string? AwdpFixEntry { get; set; }
+    public int? AwdpFixTimeoutSeconds { get; set; }
 }
 
 public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest, List<CompetitionSummaryDto>>
@@ -95,6 +116,27 @@ public class GetCompetitionAdminEndpoint(ApplicationDbContext dbContext) : Endpo
         MaxTeamMembers = competition.MaxTeamMembers,
         TracksEnabled = competition.TracksEnabled,
         TrackNames = ParseTracks(competition.TrackNamesJson),
+        RoundDurationSeconds = competition.RoundDurationSeconds,
+        TotalRounds = competition.TotalRounds,
+        FlagFormat = competition.FlagFormat,
+        FlagPath = competition.FlagPath,
+        AttackPoints = competition.AttackPoints,
+        ServiceOnlinePoints = competition.ServiceOnlinePoints,
+        ServiceDownPenalty = competition.ServiceDownPenalty,
+        BeenAttackedPenalty = competition.BeenAttackedPenalty,
+        FlagValidityRounds = competition.FlagValidityRounds,
+        AwdpAttackScorePerRound = competition.AwdpAttackScorePerRound,
+        AwdpDefenseScorePerRound = competition.AwdpDefenseScorePerRound,
+        AwdpMaxAttackAttempts = competition.AwdpMaxAttackAttempts,
+        AwdpMaxDefenseAttempts = competition.AwdpMaxDefenseAttempts,
+        AwdpAllowAttackAfterBreakSuccess = competition.AwdpAllowAttackAfterBreakSuccess,
+        AwdpAllowDefenseAfterFixSuccess = competition.AwdpAllowDefenseAfterFixSuccess,
+        AwdpServicePenaltyEnabled = competition.AwdpServicePenaltyEnabled,
+        AwdpServicePenaltyPerRound = competition.AwdpServicePenaltyPerRound,
+        AwdpViolationPenaltyEnabled = competition.AwdpViolationPenaltyEnabled,
+        AwdpViolationPenalty = competition.AwdpViolationPenalty,
+        AwdpFixEntry = competition.AwdpFixEntry,
+        AwdpFixTimeoutSeconds = competition.AwdpFixTimeoutSeconds,
     };
 
     internal static List<string> ParseTracks(string? value)

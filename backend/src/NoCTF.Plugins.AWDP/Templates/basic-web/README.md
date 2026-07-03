@@ -12,13 +12,13 @@ Use these values when creating the challenge template in the admin challenge ban
 
 | Field | Value |
 | --- | --- |
-| Deployment type | Static container |
+| Deployment type | Dynamic container |
 | Container image | Your built `awdp-basic-web-target` image |
 | Exposed port | `80` |
 | Checker image | Your built `awdp-basic-web-checker` image |
 | Checker command | `python /checker/check.py` |
 
-The current AWDP patch validator also supports EXP containers through `CheckerConfig.ExpImage` and `CheckerConfig.ExpCommand` in code. The admin UI currently exposes the checker image and command fields; this template keeps the check container focused on service availability.
+The AWDP validator also supports EXP containers through `CheckerConfig.ExpImage` and `CheckerConfig.ExpCommand`. This template keeps the checker focused on service availability; add an EXP image and command when you want the template to prove that the vulnerability is still exploitable before a FixScript is accepted.
 
 ## Build
 
@@ -27,9 +27,9 @@ docker build -t awdp-basic-web-target:latest ./challenge
 docker build -t awdp-basic-web-checker:latest ./checker
 ```
 
-## Patch Archive Contract
+## FixScript Archive Contract
 
-Participants upload a `.tar.gz` archive. The archive root must contain `patch.sh`.
+Participants upload a `.tar.gz`, `.tgz`, or `.zip` archive. The archive root must contain the configured FixScript entry. The recommended default is `fix.sh`.
 
 For this template, a valid patch can replace `/app/service.py` or edit it in place. The patch script runs from `/app` inside the challenge container:
 
@@ -45,4 +45,4 @@ path.write_text(text)
 PY
 ```
 
-Keep `patch.sh` executable-friendly and POSIX shell compatible.
+Keep the configured FixScript entry executable-friendly and POSIX shell compatible.

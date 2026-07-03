@@ -52,6 +52,27 @@ interface CompetitionDto {
   maxTeamMembers: number
   tracksEnabled: boolean
   trackNames: string[]
+  roundDurationSeconds?: number | null
+  totalRounds?: number | null
+  flagFormat?: string | null
+  flagPath?: string | null
+  attackPoints?: number | null
+  serviceOnlinePoints?: number | null
+  serviceDownPenalty?: number | null
+  beenAttackedPenalty?: number | null
+  flagValidityRounds?: number | null
+  awdpAttackScorePerRound?: number | null
+  awdpDefenseScorePerRound?: number | null
+  awdpMaxAttackAttempts?: number | null
+  awdpMaxDefenseAttempts?: number | null
+  awdpAllowAttackAfterBreakSuccess?: boolean | null
+  awdpAllowDefenseAfterFixSuccess?: boolean | null
+  awdpServicePenaltyEnabled?: boolean | null
+  awdpServicePenaltyPerRound?: number | null
+  awdpViolationPenaltyEnabled?: boolean | null
+  awdpViolationPenalty?: number | null
+  awdpFixEntry?: string | null
+  awdpFixTimeoutSeconds?: number | null
 }
 
 interface ChallengeTemplateDto {
@@ -81,6 +102,12 @@ interface CompetitionChallengeDto {
   pointsConfig: PointsConfigDto
   difficultyCoefficient: number
   enableBloodBonus: boolean
+  awdpAttackScorePerRound?: number | null
+  awdpDefenseScorePerRound?: number | null
+  awdpMaxAttackAttempts?: number | null
+  awdpMaxDefenseAttempts?: number | null
+  awdpFixEntry?: string | null
+  awdpFixTimeoutSeconds?: number | null
   hints: ChallengeHintDto[]
 }
 
@@ -147,6 +174,27 @@ const competitionForm = reactive({
   maxTeamMembers: 5,
   tracksEnabled: false,
   trackNamesText: '',
+  roundDurationSeconds: undefined as number | undefined,
+  totalRounds: undefined as number | undefined,
+  flagFormat: '',
+  flagPath: '',
+  attackPoints: undefined as number | undefined,
+  serviceOnlinePoints: undefined as number | undefined,
+  serviceDownPenalty: undefined as number | undefined,
+  beenAttackedPenalty: undefined as number | undefined,
+  flagValidityRounds: undefined as number | undefined,
+  awdpAttackScorePerRound: undefined as number | undefined,
+  awdpDefenseScorePerRound: undefined as number | undefined,
+  awdpMaxAttackAttempts: undefined as number | undefined,
+  awdpMaxDefenseAttempts: undefined as number | undefined,
+  awdpAllowAttackAfterBreakSuccess: false,
+  awdpAllowDefenseAfterFixSuccess: false,
+  awdpServicePenaltyEnabled: false,
+  awdpServicePenaltyPerRound: undefined as number | undefined,
+  awdpViolationPenaltyEnabled: false,
+  awdpViolationPenalty: undefined as number | undefined,
+  awdpFixEntry: 'fix.sh',
+  awdpFixTimeoutSeconds: undefined as number | undefined,
 })
 
 const bindForm = reactive({
@@ -159,6 +207,12 @@ const bindForm = reactive({
   difficultyCoefficient: 1,
   enableBloodBonus: false,
   flagPrefix: 'flag',
+  awdpAttackScorePerRound: undefined as number | undefined,
+  awdpDefenseScorePerRound: undefined as number | undefined,
+  awdpMaxAttackAttempts: undefined as number | undefined,
+  awdpMaxDefenseAttempts: undefined as number | undefined,
+  awdpFixEntry: '',
+  awdpFixTimeoutSeconds: undefined as number | undefined,
   hints: [''],
 })
 
@@ -171,6 +225,12 @@ const selectedEdit = reactive({
   difficultyCoefficient: 1,
   enableBloodBonus: false,
   flagPrefix: 'flag',
+  awdpAttackScorePerRound: undefined as number | undefined,
+  awdpDefenseScorePerRound: undefined as number | undefined,
+  awdpMaxAttackAttempts: undefined as number | undefined,
+  awdpMaxDefenseAttempts: undefined as number | undefined,
+  awdpFixEntry: '',
+  awdpFixTimeoutSeconds: undefined as number | undefined,
   hints: [''],
 })
 
@@ -179,6 +239,17 @@ function toDateTimeLocal(value: string) {
   const date = new Date(value)
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
   return local.toISOString().slice(0, 16)
+}
+
+function optionalNumber(value: number | string | undefined | null) {
+  if (value === undefined || value === null || value === '') return undefined
+  return Number(value)
+}
+
+function numberOrDefault(value: number | string | undefined | null, fallback: number) {
+  if (value === undefined || value === null || value === '') return fallback
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
 }
 
 function competitionPayload() {
@@ -190,19 +261,40 @@ function competitionPayload() {
     startTime: new Date(competitionForm.startTime).toISOString(),
     endTime: new Date(competitionForm.endTime).toISOString(),
     defaultPointsConfig: {
-      initialPoints: Number(competitionForm.initialPoints) || 500,
-      minimumPoints: Number(competitionForm.minimumPoints) || 100,
-      decayFactor: Number(competitionForm.decayFactor) || 450,
+      initialPoints: numberOrDefault(competitionForm.initialPoints, 500),
+      minimumPoints: numberOrDefault(competitionForm.minimumPoints, 100),
+      decayFactor: numberOrDefault(competitionForm.decayFactor, 450),
       decayFunction: competitionForm.decayFunction || 'sigmoid',
     },
-    difficultyCoefficient: Number(competitionForm.difficultyCoefficient) || 1,
-    firstBloodBonusPercent: Number(competitionForm.firstBloodBonusPercent) || 0,
-    secondBloodBonusPercent: Number(competitionForm.secondBloodBonusPercent) || 0,
-    thirdBloodBonusPercent: Number(competitionForm.thirdBloodBonusPercent) || 0,
+    difficultyCoefficient: numberOrDefault(competitionForm.difficultyCoefficient, 1),
+    firstBloodBonusPercent: numberOrDefault(competitionForm.firstBloodBonusPercent, 0),
+    secondBloodBonusPercent: numberOrDefault(competitionForm.secondBloodBonusPercent, 0),
+    thirdBloodBonusPercent: numberOrDefault(competitionForm.thirdBloodBonusPercent, 0),
     teamRegistrationAutoApprove: competitionForm.teamRegistrationAutoApprove,
-    maxTeamMembers: Number(competitionForm.maxTeamMembers) || 5,
+    maxTeamMembers: numberOrDefault(competitionForm.maxTeamMembers, 5),
     tracksEnabled: competitionForm.tracksEnabled,
     trackNames: competitionForm.trackNamesText.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean),
+    roundDurationSeconds: optionalNumber(competitionForm.roundDurationSeconds),
+    totalRounds: optionalNumber(competitionForm.totalRounds),
+    flagFormat: competitionForm.flagFormat.trim() || undefined,
+    flagPath: competitionForm.flagPath.trim() || undefined,
+    attackPoints: optionalNumber(competitionForm.attackPoints),
+    serviceOnlinePoints: optionalNumber(competitionForm.serviceOnlinePoints),
+    serviceDownPenalty: optionalNumber(competitionForm.serviceDownPenalty),
+    beenAttackedPenalty: optionalNumber(competitionForm.beenAttackedPenalty),
+    flagValidityRounds: optionalNumber(competitionForm.flagValidityRounds),
+    awdpAttackScorePerRound: optionalNumber(competitionForm.awdpAttackScorePerRound),
+    awdpDefenseScorePerRound: optionalNumber(competitionForm.awdpDefenseScorePerRound),
+    awdpMaxAttackAttempts: optionalNumber(competitionForm.awdpMaxAttackAttempts),
+    awdpMaxDefenseAttempts: optionalNumber(competitionForm.awdpMaxDefenseAttempts),
+    awdpAllowAttackAfterBreakSuccess: competitionForm.awdpAllowAttackAfterBreakSuccess,
+    awdpAllowDefenseAfterFixSuccess: competitionForm.awdpAllowDefenseAfterFixSuccess,
+    awdpServicePenaltyEnabled: competitionForm.awdpServicePenaltyEnabled,
+    awdpServicePenaltyPerRound: optionalNumber(competitionForm.awdpServicePenaltyPerRound),
+    awdpViolationPenaltyEnabled: competitionForm.awdpViolationPenaltyEnabled,
+    awdpViolationPenalty: optionalNumber(competitionForm.awdpViolationPenalty),
+    awdpFixEntry: competitionForm.awdpFixEntry.trim() || undefined,
+    awdpFixTimeoutSeconds: optionalNumber(competitionForm.awdpFixTimeoutSeconds),
   }
 }
 
@@ -256,6 +348,27 @@ watch(competition, (value) => {
   competitionForm.maxTeamMembers = value.maxTeamMembers ?? 5
   competitionForm.tracksEnabled = value.tracksEnabled ?? false
   competitionForm.trackNamesText = (value.trackNames ?? []).join('\n')
+  competitionForm.roundDurationSeconds = value.roundDurationSeconds ?? undefined
+  competitionForm.totalRounds = value.totalRounds ?? undefined
+  competitionForm.flagFormat = value.flagFormat ?? ''
+  competitionForm.flagPath = value.flagPath ?? ''
+  competitionForm.attackPoints = value.attackPoints ?? undefined
+  competitionForm.serviceOnlinePoints = value.serviceOnlinePoints ?? undefined
+  competitionForm.serviceDownPenalty = value.serviceDownPenalty ?? undefined
+  competitionForm.beenAttackedPenalty = value.beenAttackedPenalty ?? undefined
+  competitionForm.flagValidityRounds = value.flagValidityRounds ?? undefined
+  competitionForm.awdpAttackScorePerRound = value.awdpAttackScorePerRound ?? undefined
+  competitionForm.awdpDefenseScorePerRound = value.awdpDefenseScorePerRound ?? undefined
+  competitionForm.awdpMaxAttackAttempts = value.awdpMaxAttackAttempts ?? undefined
+  competitionForm.awdpMaxDefenseAttempts = value.awdpMaxDefenseAttempts ?? undefined
+  competitionForm.awdpAllowAttackAfterBreakSuccess = value.awdpAllowAttackAfterBreakSuccess ?? false
+  competitionForm.awdpAllowDefenseAfterFixSuccess = value.awdpAllowDefenseAfterFixSuccess ?? false
+  competitionForm.awdpServicePenaltyEnabled = value.awdpServicePenaltyEnabled ?? false
+  competitionForm.awdpServicePenaltyPerRound = value.awdpServicePenaltyPerRound ?? undefined
+  competitionForm.awdpViolationPenaltyEnabled = value.awdpViolationPenaltyEnabled ?? false
+  competitionForm.awdpViolationPenalty = value.awdpViolationPenalty ?? undefined
+  competitionForm.awdpFixEntry = value.awdpFixEntry ?? 'fix.sh'
+  competitionForm.awdpFixTimeoutSeconds = value.awdpFixTimeoutSeconds ?? undefined
   bindForm.initialPoints = competitionForm.initialPoints
   bindForm.minimumPoints = competitionForm.minimumPoints
   bindForm.decayFactor = competitionForm.decayFactor
@@ -280,6 +393,12 @@ watch(selectedChallenge, (challenge) => {
   selectedEdit.difficultyCoefficient = challenge.difficultyCoefficient ?? 1
   selectedEdit.enableBloodBonus = challenge.enableBloodBonus ?? false
   selectedEdit.flagPrefix = challenge.flagPrefix ?? 'flag'
+  selectedEdit.awdpAttackScorePerRound = challenge.awdpAttackScorePerRound ?? undefined
+  selectedEdit.awdpDefenseScorePerRound = challenge.awdpDefenseScorePerRound ?? undefined
+  selectedEdit.awdpMaxAttackAttempts = challenge.awdpMaxAttackAttempts ?? undefined
+  selectedEdit.awdpMaxDefenseAttempts = challenge.awdpMaxDefenseAttempts ?? undefined
+  selectedEdit.awdpFixEntry = challenge.awdpFixEntry ?? ''
+  selectedEdit.awdpFixTimeoutSeconds = challenge.awdpFixTimeoutSeconds ?? undefined
   selectedEdit.hints = challenge.hints?.length ? challenge.hints.map(h => h.content) : ['']
 }, { immediate: true })
 
@@ -303,14 +422,20 @@ const bindMutation = useMutation({
     description: bindForm.description.trim() || undefined,
     descriptionFormat: 'markdown',
     pointsConfig: {
-      initialPoints: Number(bindForm.initialPoints) || 500,
-      minimumPoints: Number(bindForm.minimumPoints) || 100,
-      decayFactor: Number(bindForm.decayFactor) || 450,
+      initialPoints: numberOrDefault(bindForm.initialPoints, 500),
+      minimumPoints: numberOrDefault(bindForm.minimumPoints, 100),
+      decayFactor: numberOrDefault(bindForm.decayFactor, 450),
       decayFunction: bindForm.decayFunction || 'sigmoid',
     },
-    difficultyCoefficient: Number(bindForm.difficultyCoefficient) || 1,
+    difficultyCoefficient: numberOrDefault(bindForm.difficultyCoefficient, 1),
     enableBloodBonus: bindForm.enableBloodBonus,
     flagPrefix: bindForm.flagPrefix.trim() || 'flag',
+    awdpAttackScorePerRound: optionalNumber(bindForm.awdpAttackScorePerRound),
+    awdpDefenseScorePerRound: optionalNumber(bindForm.awdpDefenseScorePerRound),
+    awdpMaxAttackAttempts: optionalNumber(bindForm.awdpMaxAttackAttempts),
+    awdpMaxDefenseAttempts: optionalNumber(bindForm.awdpMaxDefenseAttempts),
+    awdpFixEntry: bindForm.awdpFixEntry.trim() || undefined,
+    awdpFixTimeoutSeconds: optionalNumber(bindForm.awdpFixTimeoutSeconds),
     hints: cleanHints(bindForm.hints),
   }),
   onSuccess: () => {
@@ -327,14 +452,20 @@ const updateChallengeMutation = useMutation({
     description: selectedEdit.description.trim() || undefined,
     descriptionFormat: 'markdown',
     pointsConfig: {
-      initialPoints: Number(selectedEdit.initialPoints) || 500,
-      minimumPoints: Number(selectedEdit.minimumPoints) || 100,
-      decayFactor: Number(selectedEdit.decayFactor) || 450,
+      initialPoints: numberOrDefault(selectedEdit.initialPoints, 500),
+      minimumPoints: numberOrDefault(selectedEdit.minimumPoints, 100),
+      decayFactor: numberOrDefault(selectedEdit.decayFactor, 450),
       decayFunction: selectedEdit.decayFunction || 'sigmoid',
     },
-    difficultyCoefficient: Number(selectedEdit.difficultyCoefficient) || 1,
+    difficultyCoefficient: numberOrDefault(selectedEdit.difficultyCoefficient, 1),
     enableBloodBonus: selectedEdit.enableBloodBonus,
     flagPrefix: selectedEdit.flagPrefix.trim() || 'flag',
+    awdpAttackScorePerRound: optionalNumber(selectedEdit.awdpAttackScorePerRound),
+    awdpDefenseScorePerRound: optionalNumber(selectedEdit.awdpDefenseScorePerRound),
+    awdpMaxAttackAttempts: optionalNumber(selectedEdit.awdpMaxAttackAttempts),
+    awdpMaxDefenseAttempts: optionalNumber(selectedEdit.awdpMaxDefenseAttempts),
+    awdpFixEntry: selectedEdit.awdpFixEntry.trim() || undefined,
+    awdpFixTimeoutSeconds: optionalNumber(selectedEdit.awdpFixTimeoutSeconds),
     hints: cleanHints(selectedEdit.hints),
   }),
   onSuccess: () => {
@@ -425,11 +556,11 @@ function addEditHint() {
 }
 
 function scoreForSolves(solves: number, form: { initialPoints: number; minimumPoints: number; decayFactor: number; decayFunction: string; difficultyCoefficient: number }) {
-  const initial = Math.max(Number(form.initialPoints) || 500, Number(form.minimumPoints) || 100)
-  const minimum = Math.min(Number(form.minimumPoints) || 100, initial)
+  const initial = Math.max(numberOrDefault(form.initialPoints, 500), numberOrDefault(form.minimumPoints, 100))
+  const minimum = Math.min(numberOrDefault(form.minimumPoints, 100), initial)
   const range = initial - minimum
   if (solves <= 1 || range <= 0) return initial
-  const effectiveDecay = Math.max(1, (Number(form.decayFactor) || 450) * Math.max(0.1, Number(form.difficultyCoefficient) || 1))
+  const effectiveDecay = Math.max(1, numberOrDefault(form.decayFactor, 450) * Math.max(0.1, numberOrDefault(form.difficultyCoefficient, 1)))
   const progress = Math.max(0, solves / effectiveDecay)
   const normalized = normalizeDecay(progress, form.decayFunction)
   return Math.max(minimum, Math.min(initial, Math.floor(initial - range * normalized)))
@@ -448,7 +579,7 @@ function normalizeDecay(progress: number, decayFunction: string) {
 }
 
 function buildCurve(form: { initialPoints: number; minimumPoints: number; decayFactor: number; decayFunction: string; difficultyCoefficient: number }) {
-  const effectiveDecay = Math.max(1, (Number(form.decayFactor) || 450) * Math.max(0.1, Number(form.difficultyCoefficient) || 1))
+  const effectiveDecay = Math.max(1, numberOrDefault(form.decayFactor, 450) * Math.max(0.1, numberOrDefault(form.difficultyCoefficient, 1)))
   const maxSolves = Math.max(10, Math.ceil(effectiveDecay))
   const samples = 28
   const scores = Array.from({ length: samples + 1 }, (_, index) => {
@@ -456,7 +587,7 @@ function buildCurve(form: { initialPoints: number; minimumPoints: number; decayF
     return { solves, score: scoreForSolves(solves, form) }
   })
   const initial = Math.max(...scores.map(point => point.score), 1)
-  const minimum = Math.min(Number(form.minimumPoints) || 100, initial)
+  const minimum = Math.min(numberOrDefault(form.minimumPoints, 100), initial)
   const path = scores.map((point, index) => {
     const x = 28 + (point.solves / maxSolves) * 244
     const y = 104 - ((point.score - minimum) / Math.max(1, initial - minimum)) * 76
@@ -471,7 +602,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="noctf-admin-page">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div class="space-y-2">
         <Button variant="ghost" size="sm" class="-ml-2" @click="router.push({ name: 'admin-competitions' })">
@@ -486,14 +617,14 @@ const editCurve = computed(() => buildCurve(selectedEdit))
       <Badge v-if="competition?.status" variant="outline" class="capitalize">{{ competition.status }}</Badge>
     </div>
 
-    <div v-if="loadingCompetition" class="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+    <div v-if="loadingCompetition" class="noctf-state-box text-muted-foreground">
       <Loader2 class="mr-2 inline size-4 animate-spin" />
       {{ t('admin.competitionDetail.loadingCompetition') }}
     </div>
 
     <div v-else class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <section class="space-y-6">
-        <div class="rounded-xl border bg-card p-5 shadow-sm">
+        <div class="noctf-section">
           <div class="mb-5 flex items-center justify-between gap-4">
             <div>
               <h3 class="font-semibold">{{ t('admin.competitionDetail.settingsTitle') }}</h3>
@@ -569,7 +700,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
             </div>
           </div>
 
-          <div class="mt-6 grid gap-4 rounded-lg bg-muted/30 p-4 lg:grid-cols-4">
+          <div class="noctf-fieldset mt-6 grid gap-4 lg:grid-cols-4">
             <div class="grid gap-2">
               <Label>{{ t('admin.competitionDetail.initialPoints') }}</Label>
               <Input v-model.number="competitionForm.initialPoints" type="number" />
@@ -596,7 +727,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
             </div>
           </div>
 
-          <div class="mt-4 grid gap-4 rounded-lg bg-muted/30 p-4 lg:grid-cols-3">
+          <div v-if="competitionForm.gameModeType === 'Ctf'" class="noctf-fieldset mt-4 grid gap-4 lg:grid-cols-3">
             <div class="grid gap-2">
               <Label>{{ t('admin.competitionDetail.firstBloodBonus') }}</Label>
               <Input v-model.number="competitionForm.firstBloodBonusPercent" type="number" min="0" step="1" />
@@ -610,9 +741,101 @@ const editCurve = computed(() => buildCurve(selectedEdit))
               <Input v-model.number="competitionForm.thirdBloodBonusPercent" type="number" min="0" step="1" />
             </div>
           </div>
+
+          <div v-if="competitionForm.gameModeType === 'Awd' || competitionForm.gameModeType === 'Awdp'" class="noctf-fieldset mt-4 grid gap-4 lg:grid-cols-4">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.roundDurationSeconds') }}</Label>
+              <Input v-model.number="competitionForm.roundDurationSeconds" type="number" min="1" placeholder="300" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.totalRounds') }}</Label>
+              <Input v-model.number="competitionForm.totalRounds" type="number" min="1" placeholder="10" />
+            </div>
+            <template v-if="competitionForm.gameModeType === 'Awd'">
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdAttackPoints') }}</Label>
+                <Input v-model.number="competitionForm.attackPoints" type="number" min="0" placeholder="50" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdDefensePoints') }}</Label>
+                <Input v-model.number="competitionForm.serviceOnlinePoints" type="number" min="0" placeholder="100" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdServiceDownPenalty') }}</Label>
+                <Input v-model.number="competitionForm.serviceDownPenalty" type="number" min="0" placeholder="50" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdBeenAttackedPenalty') }}</Label>
+                <Input v-model.number="competitionForm.beenAttackedPenalty" type="number" min="0" placeholder="50" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.flagValidityRounds') }}</Label>
+                <Input v-model.number="competitionForm.flagValidityRounds" type="number" min="1" placeholder="2" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.flagFormat') }}</Label>
+                <Input v-model="competitionForm.flagFormat" placeholder="flag{{{0}}}" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.flagPath') }}</Label>
+                <Input v-model="competitionForm.flagPath" placeholder="/flag/flag.txt" />
+              </div>
+            </template>
+          </div>
+
+          <div v-if="competitionForm.gameModeType === 'Awdp'" class="noctf-fieldset mt-4 grid gap-4 lg:grid-cols-4">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpAttackScore') }}</Label>
+              <Input v-model.number="competitionForm.awdpAttackScorePerRound" type="number" min="0" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpDefenseScore') }}</Label>
+              <Input v-model.number="competitionForm.awdpDefenseScorePerRound" type="number" min="0" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpMaxAttackAttempts') }}</Label>
+              <Input v-model.number="competitionForm.awdpMaxAttackAttempts" type="number" min="1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpMaxDefenseAttempts') }}</Label>
+              <Input v-model.number="competitionForm.awdpMaxDefenseAttempts" type="number" min="1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpFixEntry') }}</Label>
+              <Input v-model="competitionForm.awdpFixEntry" placeholder="fix.sh" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpFixTimeout') }}</Label>
+              <Input v-model.number="competitionForm.awdpFixTimeoutSeconds" type="number" min="1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpServicePenalty') }}</Label>
+              <Input v-model.number="competitionForm.awdpServicePenaltyPerRound" type="number" min="0" :disabled="!competitionForm.awdpServicePenaltyEnabled" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpViolationPenalty') }}</Label>
+              <Input v-model.number="competitionForm.awdpViolationPenalty" type="number" min="0" :disabled="!competitionForm.awdpViolationPenaltyEnabled" />
+            </div>
+            <label class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+              <input v-model="competitionForm.awdpAllowAttackAfterBreakSuccess" type="checkbox" class="size-4" />
+              <span>{{ t('admin.competitionDetail.awdpAllowAttackRepeat') }}</span>
+            </label>
+            <label class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+              <input v-model="competitionForm.awdpAllowDefenseAfterFixSuccess" type="checkbox" class="size-4" />
+              <span>{{ t('admin.competitionDetail.awdpAllowDefenseRepeat') }}</span>
+            </label>
+            <label class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+              <input v-model="competitionForm.awdpServicePenaltyEnabled" type="checkbox" class="size-4" />
+              <span>{{ t('admin.competitionDetail.awdpEnableServicePenalty') }}</span>
+            </label>
+            <label class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+              <input v-model="competitionForm.awdpViolationPenaltyEnabled" type="checkbox" class="size-4" />
+              <span>{{ t('admin.competitionDetail.awdpEnableViolationPenalty') }}</span>
+            </label>
+          </div>
         </div>
 
-        <div class="rounded-xl border bg-card p-5 shadow-sm">
+        <div class="noctf-section">
           <div class="mb-5">
             <h3 class="font-semibold">{{ t('admin.competitionDetail.deployTitle') }}</h3>
             <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.deployDescription') }}</p>
@@ -638,7 +861,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
               <Label>{{ t('admin.competitionDetail.flagPrefix') }}</Label>
               <Input v-model="bindForm.flagPrefix" placeholder="flag" />
             </div>
-            <label class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+            <label v-if="competitionForm.gameModeType === 'Ctf'" class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
               <input v-model="bindForm.enableBloodBonus" type="checkbox" class="size-4" />
               <span>{{ t('admin.competitionDetail.enableBloodBonus') }}</span>
             </label>
@@ -648,7 +871,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
             </div>
           </div>
 
-          <div class="mt-4 grid gap-4 rounded-lg bg-muted/30 p-4 lg:grid-cols-4">
+          <div class="noctf-fieldset mt-4 grid gap-4 lg:grid-cols-4">
             <div class="grid gap-2">
               <Label>{{ t('admin.competitionDetail.initial') }}</Label>
               <Input v-model.number="bindForm.initialPoints" type="number" />
@@ -675,7 +898,34 @@ const editCurve = computed(() => buildCurve(selectedEdit))
             </div>
           </div>
 
-          <div class="mt-4 rounded-lg border bg-background p-3">
+          <div v-if="competitionForm.gameModeType === 'Awdp'" class="noctf-fieldset mt-4 grid gap-4 lg:grid-cols-3">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpAttackScore') }}</Label>
+              <Input v-model.number="bindForm.awdpAttackScorePerRound" type="number" min="0" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpDefenseScore') }}</Label>
+              <Input v-model.number="bindForm.awdpDefenseScorePerRound" type="number" min="0" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpFixTimeout') }}</Label>
+              <Input v-model.number="bindForm.awdpFixTimeoutSeconds" type="number" min="1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpMaxAttackAttempts') }}</Label>
+              <Input v-model.number="bindForm.awdpMaxAttackAttempts" type="number" min="1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpMaxDefenseAttempts') }}</Label>
+              <Input v-model.number="bindForm.awdpMaxDefenseAttempts" type="number" min="1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.awdpFixEntry') }}</Label>
+              <Input v-model="bindForm.awdpFixEntry" placeholder="fix.sh" />
+            </div>
+          </div>
+
+          <div class="mt-4 rounded-lg border bg-background/75 p-3">
             <div class="mb-2 flex items-center justify-between">
               <div>
                 <div class="text-sm font-medium">{{ t('admin.competitionDetail.decayPreview') }}</div>
@@ -713,7 +963,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
           </div>
         </div>
 
-        <div class="rounded-xl border bg-card p-5 shadow-sm">
+        <div class="noctf-section">
           <div class="mb-5">
             <h3 class="font-semibold">{{ t('admin.competitionDetail.teamReviewTitle') }}</h3>
             <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.teamReviewDescription') }}</p>
@@ -793,7 +1043,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
           </Table>
         </div>
 
-        <div class="rounded-xl border bg-card p-5 shadow-sm">
+        <div class="noctf-section">
           <div class="mb-5">
             <h3 class="font-semibold">{{ t('admin.competitionDetail.cheatTitle') }}</h3>
             <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.cheatDescription') }}</p>
@@ -802,11 +1052,11 @@ const editCurve = computed(() => buildCurve(selectedEdit))
             <Loader2 class="mr-2 inline size-4 animate-spin" />
             {{ t('common.loading') }}
           </div>
-          <div v-else-if="!cheatIncidents?.length" class="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <div v-else-if="!cheatIncidents?.length" class="noctf-state-box min-h-0 p-6 text-sm text-muted-foreground">
             {{ t('admin.competitionDetail.noCheatIncidents') }}
           </div>
           <div v-else class="space-y-3">
-            <div v-for="incident in cheatIncidents" :key="incident.id" class="rounded-lg border bg-muted/20 p-3">
+            <div v-for="incident in cheatIncidents" :key="incident.id" class="rounded-lg border bg-muted/25 p-3">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div class="font-medium">{{ incident.suspectTeamName }} → {{ incident.victimTeamName || '-' }}</div>
@@ -821,7 +1071,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
           </div>
         </div>
 
-        <div class="rounded-xl border bg-card p-5 shadow-sm">
+        <div class="noctf-section">
           <div class="mb-5">
             <h3 class="font-semibold">{{ t('admin.competitionDetail.logsTitle') }}</h3>
             <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.logsDescription') }}</p>
@@ -830,8 +1080,8 @@ const editCurve = computed(() => buildCurve(selectedEdit))
             <Loader2 class="mr-2 inline size-4 animate-spin" />
             {{ t('common.loading') }}
           </div>
-          <div v-else class="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-            <div v-for="log in competitionLogs ?? []" :key="log.id" class="rounded-lg border bg-muted/20 p-3 text-sm">
+          <div v-else class="noctf-scrollbar max-h-[360px] space-y-2 overflow-y-auto pr-1">
+            <div v-for="log in competitionLogs ?? []" :key="log.id" class="rounded-lg border bg-muted/25 p-3 text-sm">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <Badge :variant="log.level === 'error' ? 'destructive' : log.level === 'warning' ? 'secondary' : 'outline'">
                   {{ log.eventType }}
@@ -843,7 +1093,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
                 {{ log.teamName || '-' }} · {{ log.challengeTitle || '-' }}
               </p>
             </div>
-            <div v-if="!competitionLogs?.length" class="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div v-if="!competitionLogs?.length" class="noctf-state-box min-h-0 p-6 text-sm text-muted-foreground">
               {{ t('admin.competitionDetail.noLogs') }}
             </div>
           </div>
@@ -851,7 +1101,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
       </section>
 
       <aside class="space-y-6">
-        <div class="rounded-xl border bg-card shadow-sm">
+        <div class="noctf-surface">
           <div class="border-b p-4">
             <h3 class="font-semibold">{{ t('admin.competitionDetail.competitionChallenges') }}</h3>
             <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.competitionChallengesDescription') }}</p>
@@ -916,7 +1166,7 @@ const editCurve = computed(() => buildCurve(selectedEdit))
           </Table>
         </div>
 
-        <div v-if="selectedChallenge" class="rounded-xl border bg-card p-5 shadow-sm">
+        <div v-if="selectedChallenge" class="noctf-section">
           <div class="mb-4">
             <h3 class="font-semibold">{{ selectedChallenge.title }}</h3>
             <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.editChallengeDescription') }}</p>
@@ -957,11 +1207,11 @@ const editCurve = computed(() => buildCurve(selectedEdit))
                 </SelectContent>
               </Select>
             </div>
-            <label class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+            <label v-if="competitionForm.gameModeType === 'Ctf'" class="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
               <input v-model="selectedEdit.enableBloodBonus" type="checkbox" class="size-4" />
               <span>{{ t('admin.competitionDetail.enableBloodBonus') }}</span>
             </label>
-            <div class="rounded-lg border bg-background p-3">
+            <div class="rounded-lg border bg-background/75 p-3">
               <div class="mb-2 flex items-center justify-between">
                 <div>
                   <div class="text-sm font-medium">{{ t('admin.competitionDetail.decayPreview') }}</div>
@@ -982,6 +1232,32 @@ const editCurve = computed(() => buildCurve(selectedEdit))
             <div class="grid gap-2">
               <Label>{{ t('admin.competitionDetail.flagPrefix') }}</Label>
               <Input v-model="selectedEdit.flagPrefix" placeholder="flag" />
+            </div>
+            <div v-if="competitionForm.gameModeType === 'Awdp'" class="grid gap-3 rounded-lg border bg-muted/25 p-3 sm:grid-cols-2">
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdpAttackScore') }}</Label>
+                <Input v-model.number="selectedEdit.awdpAttackScorePerRound" type="number" min="0" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdpDefenseScore') }}</Label>
+                <Input v-model.number="selectedEdit.awdpDefenseScorePerRound" type="number" min="0" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdpMaxAttackAttempts') }}</Label>
+                <Input v-model.number="selectedEdit.awdpMaxAttackAttempts" type="number" min="1" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdpMaxDefenseAttempts') }}</Label>
+                <Input v-model.number="selectedEdit.awdpMaxDefenseAttempts" type="number" min="1" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdpFixEntry') }}</Label>
+                <Input v-model="selectedEdit.awdpFixEntry" placeholder="fix.sh" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('admin.competitionDetail.awdpFixTimeout') }}</Label>
+                <Input v-model.number="selectedEdit.awdpFixTimeoutSeconds" type="number" min="1" />
+              </div>
             </div>
             <div class="space-y-2">
               <div class="flex items-center justify-between">

@@ -5,6 +5,7 @@ export const queryKeys = {
   submissions: (competitionId: string) => ['submissions', competitionId] as const,
   leaderboard: (competitionId: string) => ['leaderboard', competitionId] as const,
   awdDashboard: (competitionId: string) => ['awd-dashboard', competitionId] as const,
+  awdpState: (competitionId: string) => ['awdp-state', competitionId] as const,
   kohDashboard: (competitionId: string) => ['koh-dashboard', competitionId] as const,
   teams: (competitionId?: string) => competitionId ? ['teams', competitionId] as const : ['teams'] as const,
   myTeams: ['my-teams'] as const,

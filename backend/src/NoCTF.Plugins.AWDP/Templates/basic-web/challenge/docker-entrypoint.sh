@@ -5,15 +5,21 @@ if [ -n "${PATCH_URL:-}" ]; then
   echo "[awdp-template] applying patch from PATCH_URL"
   rm -rf /tmp/noctf-patch
   mkdir -p /tmp/noctf-patch
-  curl -fsSL "$PATCH_URL" -o /tmp/noctf-patch/patch.tar.gz
-  tar -xzf /tmp/noctf-patch/patch.tar.gz -C /tmp/noctf-patch
-  if [ ! -f /tmp/noctf-patch/patch.sh ]; then
-    echo "[awdp-template] patch.sh missing" >&2
+  archive=/tmp/noctf-patch/fix.archive
+  entry="${FIX_ENTRY:-fix.sh}"
+  file_name="${PATCH_FILE_NAME:-fix.tar.gz}"
+  curl -fsSL "$PATCH_URL" -o "$archive"
+  case "$file_name" in
+    *.zip|*.ZIP) unzip -q "$archive" -d /tmp/noctf-patch ;;
+    *.tar.gz|*.tgz|*.TGZ) tar -xzf "$archive" -C /tmp/noctf-patch ;;
+    *) echo "[awdp-template] unsupported patch archive: $file_name" >&2; exit 41 ;;
+  esac
+  if [ ! -f "/tmp/noctf-patch/$entry" ]; then
+    echo "[awdp-template] $entry missing" >&2
     exit 42
   fi
-  cp /tmp/noctf-patch/patch.sh /app/patch.sh
   cd /app
-  sh /app/patch.sh
+  sh "/tmp/noctf-patch/$entry"
 fi
 
 exec python /app/service.py

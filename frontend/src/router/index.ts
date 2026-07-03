@@ -108,6 +108,12 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
+          path: 'challenges/new',
+          name: 'admin-challenge-create',
+          component: () => import('@/views/admin/AdminChallengeCreateView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
+        },
+        {
           path: 'containers',
           name: 'admin-containers',
           component: () => import('@/views/admin/AdminContainersView.vue'),

@@ -49,15 +49,13 @@ Future versions may load plugins dynamically via `AssemblyLoadContext` so new ga
 
 ### AWDP (Attack with Defense and Patch)
 
-- Extends AWD with a patch-defense phase
-- Teams upload patch archives via `AwdpPatchService`
-- Each patch is validated in a sandbox container:
-  1. Run `patch.sh` in a disposable container
-  2. Recreate the team game box with `PATCH_URL` set
-  3. Run the checker on the patched container
-  4. Run the EXP container on the patched container
-  5. **Verified** if `checker passes` AND `EXP fails` — the patch fixes the vulnerability
-  6. **Rejected** on any failure; the game box rolls back to the original image
+- **Independent plugin**: AWDP registers its own `AwdpGameMode`, `AwdpRoundEngine`, `AwdpScoreEngine`, `AwdpPatchService`, and `AwdpModeProvider`; it is not an AWD sub-mode
+- **Break + Fix state model**: Break flag submissions and FixScript submissions update AWDP team/challenge state, but do not award full challenge points immediately
+- **Attempt limits**: `AwdpGameMode` enforces maximum Break attempts, and `AwdpPatchService` enforces maximum Fix attempts
+- **Round settlement**: `AwdpRoundEngine` advances AWDP rounds, then `AwdpScoreEngine` writes per-team, per-challenge `AwdpRoundScore` rows and `awdp-round` score events
+- **No starting score**: AWDP totals are the sum of round score deltas; there is no initial score pool
+- **FixScript validation**: Teams upload `.zip`, `.tar.gz`, or `.tgz` archives. The configured entry script, for example `fix.sh`, runs in an isolated side container before checker and EXP validation
+- **Outcome separation**: `FixFailed`, `FixServiceError`, `FixScriptError`, `FixTimeout`, and `AuditFailed` are tracked separately. `FixFailed` does not create a penalty by default; service and violation penalties are controlled by AWDP configuration
 
 ### KoH (King of the Hill)
 

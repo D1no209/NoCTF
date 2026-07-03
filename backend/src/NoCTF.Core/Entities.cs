@@ -98,6 +98,20 @@ public class Competition : ITenantEntity
     // AWDP defense scoring
     public int? DefensePoints { get; set; } = 100;
 
+    // AWDP-specific round scoring and attempt configuration.
+    public int? AwdpAttackScorePerRound { get; set; }
+    public int? AwdpDefenseScorePerRound { get; set; }
+    public int? AwdpMaxAttackAttempts { get; set; }
+    public int? AwdpMaxDefenseAttempts { get; set; }
+    public bool? AwdpAllowAttackAfterBreakSuccess { get; set; }
+    public bool? AwdpAllowDefenseAfterFixSuccess { get; set; }
+    public bool? AwdpServicePenaltyEnabled { get; set; }
+    public int? AwdpServicePenaltyPerRound { get; set; }
+    public bool? AwdpViolationPenaltyEnabled { get; set; }
+    public int? AwdpViolationPenalty { get; set; }
+    public string? AwdpFixEntry { get; set; }
+    public int? AwdpFixTimeoutSeconds { get; set; }
+
     // KoH scoring configuration
     public int? ControlPointsPerInterval { get; set; } = 10;
     public int? PollIntervalSeconds { get; set; } = 30;
@@ -136,6 +150,12 @@ public class Challenge : ITenantEntity
     public string? FlagSecret { get; set; }
     public CheckerConfig? CheckerConfig { get; set; }
     public KohAgentConfig? KohAgentConfig { get; set; }
+    public int? AwdpAttackScorePerRound { get; set; }
+    public int? AwdpDefenseScorePerRound { get; set; }
+    public int? AwdpMaxAttackAttempts { get; set; }
+    public int? AwdpMaxDefenseAttempts { get; set; }
+    public string? AwdpFixEntry { get; set; }
+    public int? AwdpFixTimeoutSeconds { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -367,6 +387,102 @@ public enum AwdpPatchStatus
     Rejected
 }
 
+public enum AwdpInstanceStatus
+{
+    InstanceNotCreated,
+    InstanceCreating,
+    InstanceRunning,
+    InstanceExpired,
+    InstanceResetting
+}
+
+public enum AwdpBreakStatus
+{
+    BreakNotStarted,
+    BreakSubmitted,
+    BreakSuccess,
+    BreakFailed,
+    AttackAttemptsExhausted
+}
+
+public enum AwdpFixStatus
+{
+    FixNotStarted,
+    FixUploading,
+    FixAuditing,
+    FixRunning,
+    FixChecking,
+    FixSuccess,
+    FixFailed,
+    FixServiceError,
+    FixScriptError,
+    FixTimeout,
+    AuditFailed,
+    DefenseAttemptsExhausted
+}
+
+public enum AwdpServiceStatus
+{
+    ServiceUnknown,
+    ServiceOk,
+    ServiceError
+}
+
+public enum AwdpRoundStatus
+{
+    RoundPending,
+    RoundRunning,
+    RoundScoring,
+    RoundFinished
+}
+
+public class AwdpRound : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public int RoundNumber { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public AwdpRoundStatus Status { get; set; }
+}
+
+public class AwdpTeamChallengeState : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public AwdpInstanceStatus InstanceStatus { get; set; } = AwdpInstanceStatus.InstanceNotCreated;
+    public AwdpBreakStatus BreakStatus { get; set; } = AwdpBreakStatus.BreakNotStarted;
+    public AwdpFixStatus FixStatus { get; set; } = AwdpFixStatus.FixNotStarted;
+    public AwdpServiceStatus ServiceStatus { get; set; } = AwdpServiceStatus.ServiceUnknown;
+    public int AttackAttempts { get; set; }
+    public int DefenseAttempts { get; set; }
+    public DateTime? BreakSucceededAt { get; set; }
+    public DateTime? FixSucceededAt { get; set; }
+    public DateTime? LastBreakSubmittedAt { get; set; }
+    public DateTime? DefenseRequestedAt { get; set; }
+    public DateTime? LastFixSubmittedAt { get; set; }
+    public string? LastValidationDetail { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class AwdpRoundScore : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public int RoundNumber { get; set; }
+    public int AttackScoreDelta { get; set; }
+    public int DefenseScoreDelta { get; set; }
+    public int PenaltyDelta { get; set; }
+    public int RoundScoreDelta { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
 /// <summary>Records a patch submission in an AWDP competition.</summary>
 public class AwdpPatchSubmission : ITenantEntity
 {
@@ -376,6 +492,10 @@ public class AwdpPatchSubmission : ITenantEntity
     public Guid ChallengeId { get; set; }
     public string PatchArchiveUrl { get; set; } = string.Empty;
     public AwdpPatchStatus Status { get; set; }
+    public AwdpFixStatus FixStatus { get; set; } = AwdpFixStatus.FixUploading;
+    public int AttemptNumber { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string FixEntry { get; set; } = "fix.sh";
     public DateTime SubmittedAt { get; set; }
     public DateTime? ValidatedAt { get; set; }
     public string? ValidationDetail { get; set; }

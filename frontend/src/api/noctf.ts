@@ -156,6 +156,12 @@ export const competitionApi = {
       path: { id: competitionId },
     }), 'Failed to load KoH dashboard')
   },
+  async view<T = unknown>(competitionId: string, viewKey: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/views/{viewKey}',
+      path: { id: competitionId, viewKey },
+    }), 'Failed to load competition view')
+  },
   async teams<T = unknown[]>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({
       url: '/api/competitions/{id}/teams',

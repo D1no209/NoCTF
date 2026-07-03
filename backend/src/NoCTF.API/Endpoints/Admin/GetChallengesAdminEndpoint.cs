@@ -46,6 +46,12 @@ public class CompetitionChallengeAdminDto
     public PointsConfigDto PointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
     public bool EnableBloodBonus { get; set; }
+    public int? AwdpAttackScorePerRound { get; set; }
+    public int? AwdpDefenseScorePerRound { get; set; }
+    public int? AwdpMaxAttackAttempts { get; set; }
+    public int? AwdpMaxDefenseAttempts { get; set; }
+    public string? AwdpFixEntry { get; set; }
+    public int? AwdpFixTimeoutSeconds { get; set; }
     public List<ChallengeHintDto> Hints { get; set; } = [];
 }
 
@@ -53,6 +59,9 @@ public class CheckerConfigDto
 {
     public string? Image { get; set; }
     public string? Command { get; set; }
+    public int? TimeoutSeconds { get; set; }
+    public string? ExpImage { get; set; }
+    public string? ExpCommand { get; set; }
 }
 
 public class PointsConfigDto
@@ -92,6 +101,9 @@ public static class ChallengeAdminMapping
         {
             Image = challenge.CheckerConfig.Image,
             Command = challenge.CheckerConfig.Command,
+            TimeoutSeconds = challenge.CheckerConfig.TimeoutSeconds,
+            ExpImage = challenge.CheckerConfig.ExpImage,
+            ExpCommand = challenge.CheckerConfig.ExpCommand,
         },
         CreatedAt = challenge.CreatedAt,
         UpdatedAt = challenge.UpdatedAt,
@@ -121,6 +133,9 @@ public static class ChallengeAdminMapping
         {
             Image = challenge.CheckerConfig.Image,
             Command = challenge.CheckerConfig.Command,
+            TimeoutSeconds = challenge.CheckerConfig.TimeoutSeconds,
+            ExpImage = challenge.CheckerConfig.ExpImage,
+            ExpCommand = challenge.CheckerConfig.ExpCommand,
         },
         PointsConfig = new PointsConfigDto
         {
@@ -131,6 +146,12 @@ public static class ChallengeAdminMapping
         },
         DifficultyCoefficient = challenge.DifficultyCoefficient,
         EnableBloodBonus = challenge.EnableBloodBonus,
+        AwdpAttackScorePerRound = challenge.AwdpAttackScorePerRound,
+        AwdpDefenseScorePerRound = challenge.AwdpDefenseScorePerRound,
+        AwdpMaxAttackAttempts = challenge.AwdpMaxAttackAttempts,
+        AwdpMaxDefenseAttempts = challenge.AwdpMaxDefenseAttempts,
+        AwdpFixEntry = challenge.AwdpFixEntry,
+        AwdpFixTimeoutSeconds = challenge.AwdpFixTimeoutSeconds,
         Hints = hints
             .OrderBy(h => h.DisplayOrder)
             .Select(h => new ChallengeHintDto

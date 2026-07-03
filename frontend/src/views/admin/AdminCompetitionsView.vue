@@ -242,11 +242,11 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="noctf-admin-page">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.competitions.title') }}</h2>
-        <p class="text-sm text-muted-foreground">{{ t('admin.competitions.subtitle', 'Manage and monitor all competitions.') }}</p>
+        <p class="text-sm text-muted-foreground">{{ t('admin.competitions.subtitle') }}</p>
       </div>
       <Button @click="openCreate" class="shrink-0">
         <Plus class="mr-2 size-4" />
@@ -254,14 +254,14 @@ const table = useVueTable({
       </Button>
     </div>
 
-    <div class="flex items-center gap-2">
+    <div class="noctf-filter-bar md:grid-cols-[minmax(0,24rem)]">
       <div class="relative w-full max-w-sm">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input v-model="globalFilter" :placeholder="t('admin.competitions.searchPlaceholder')" class="pl-10" />
       </div>
     </div>
 
-    <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div class="noctf-table-shell">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -318,7 +318,7 @@ const table = useVueTable({
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
                   <Button variant="ghost" size="icon" class="size-8 h-8 w-8 p-0">
-                    <span class="sr-only">Open menu</span>
+                    <span class="sr-only">{{ t('common.actions') }}</span>
                     <MoreHorizontal class="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -350,7 +350,7 @@ const table = useVueTable({
       </Table>
     </div>
 
-    <div class="flex items-center justify-between">
+    <div class="noctf-table-footer">
       <p class="text-xs text-muted-foreground">
         {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
       </p>

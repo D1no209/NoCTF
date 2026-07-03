@@ -1,11 +1,9 @@
 using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Application.BackgroundTasks;
-using NoCTF.Application.Security;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
-using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -17,20 +15,19 @@ public class SubmitPatchRequest
 
 public class SubmitPatchResponse
 {
-    public Guid SubmissionId { get; set; }
+    public Guid? SubmissionId { get; set; }
     public string Status { get; set; } = string.Empty;
+    public int DefenseAttempts { get; set; }
+    public int MaxDefenseAttempts { get; set; }
 }
 
 /// <summary>
 /// POST /api/competitions/{id}/challenges/{challengeId}/patch
-/// Accepts multipart/form-data with a fix.tar.gz file.
-/// Creates a Pending patch submission and triggers async validation.
+/// Accepts multipart/form-data and delegates the patch-like file action to the active competition mode.
 /// </summary>
 public class SubmitPatchEndpoint(
     ApplicationDbContext dbContext,
-    IAwdpPatchService patchService,
-    IBackgroundTaskQueue backgroundTaskQueue,
-    IPatchArchiveValidator patchArchiveValidator,
+    IEnumerable<ICompetitionFileActionProvider> fileActionProviders,
     IConfiguration configuration)
     : Endpoint<SubmitPatchRequest, SubmitPatchResponse>
 {
@@ -38,6 +35,8 @@ public class SubmitPatchEndpoint(
     {
         "application/gzip",
         "application/x-gzip",
+        "application/zip",
+        "application/x-zip-compressed",
         "application/octet-stream"
     };
 
@@ -84,6 +83,28 @@ public class SubmitPatchEndpoint(
             return;
         }
 
+        var competition = await dbContext.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == req.Id, ct);
+        if (competition is null)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        var modeKey = string.IsNullOrWhiteSpace(competition.ModeKey)
+            ? competition.GameModeType.ToString()
+            : competition.ModeKey;
+        var provider = fileActionProviders.FirstOrDefault(p =>
+            string.Equals(p.ModeKey, modeKey, StringComparison.OrdinalIgnoreCase) &&
+            p.CanHandleFileAction("submit-patch"));
+        if (provider is null)
+        {
+            await SendAsync(new SubmitPatchResponse { Status = "unsupported_patch_action" }, 404, ct);
+            return;
+        }
+
         // Expect a single file upload named "file" or the first file
         var file = Files.FirstOrDefault();
         if (file is null)
@@ -100,7 +121,8 @@ public class SubmitPatchEndpoint(
         }
 
         if (!file.FileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) &&
-            !file.FileName.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase))
+            !file.FileName.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase) &&
+            !file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
         {
             await SendAsync(new SubmitPatchResponse { Status = "invalid_extension" }, 400, ct);
             return;
@@ -115,32 +137,58 @@ public class SubmitPatchEndpoint(
         await using var stream = new MemoryStream();
         await file.CopyToAsync(stream, ct);
         stream.Position = 0;
-        var validation = await patchArchiveValidator.ValidateAsync(stream, ct);
-        if (!validation.IsValid)
+        var result = await provider.HandleFileActionAsync(
+            new CompetitionFileActionContext(
+                req.Id,
+                teamMember.TeamId,
+                userId,
+                req.ChallengeId,
+                "submit-patch",
+                stream,
+                file.FileName,
+                file.ContentType,
+                HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+            ct);
+
+        if (!result.Success)
         {
-            await SendAsync(new SubmitPatchResponse { Status = validation.Error ?? "invalid_archive" }, 400, ct);
+            await SendAsync(new SubmitPatchResponse
+            {
+                SubmissionId = GetGuidDataValue(result.Data, "SubmissionId"),
+                Status = result.Code,
+                DefenseAttempts = GetIntDataValue(result.Data, "DefenseAttempts"),
+                MaxDefenseAttempts = GetIntDataValue(result.Data, "MaxDefenseAttempts")
+            }, 400, ct);
             return;
         }
 
-        stream.Position = 0;
-        var submissionId = await patchService.SubmitPatchAsync(
-            req.Id,
-            teamMember.TeamId,
-            req.ChallengeId,
-            stream,
-            file.FileName,
-            ct);
-
-        await backgroundTaskQueue.EnqueueAsync(
-            req.Id,
-            BackgroundTaskTypes.AwdpPatchValidation,
-            new AwdpPatchValidationPayload(submissionId),
-            ct);
-
         await SendAsync(new SubmitPatchResponse
         {
-            SubmissionId = submissionId,
-            Status = "pending"
+            SubmissionId = GetGuidDataValue(result.Data, "SubmissionId"),
+            Status = result.Code,
+            DefenseAttempts = GetIntDataValue(result.Data, "DefenseAttempts"),
+            MaxDefenseAttempts = GetIntDataValue(result.Data, "MaxDefenseAttempts")
         }, 202, ct);
     }
+
+    private static Guid? GetGuidDataValue(object? data, string propertyName)
+    {
+        var value = GetDataProperty(data, propertyName);
+        if (value is Guid guid)
+            return guid;
+
+        return Guid.TryParse(value?.ToString(), out var parsed) ? parsed : null;
+    }
+
+    private static int GetIntDataValue(object? data, string propertyName)
+    {
+        var value = GetDataProperty(data, propertyName);
+        if (value is int number)
+            return number;
+
+        return int.TryParse(value?.ToString(), out var parsed) ? parsed : 0;
+    }
+
+    private static object? GetDataProperty(object? data, string propertyName)
+        => data?.GetType().GetProperty(propertyName)?.GetValue(data);
 }

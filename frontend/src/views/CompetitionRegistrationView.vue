@@ -120,7 +120,7 @@ async function copyToken(token: string) {
 
 <template>
   <AppLayout>
-    <div class="mx-auto w-full max-w-[1300px] space-y-8 px-4 py-8 md:px-6">
+    <div class="noctf-page">
       <Button variant="ghost" size="sm" as-child class="-ml-2">
         <RouterLink to="/competitions">
           <ArrowLeft class="size-4" />
@@ -153,11 +153,11 @@ async function copyToken(token: string) {
               </template>
             </PageHeader>
             <div class="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 lg:min-w-[420px]">
-              <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
+              <div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2">
                 <Calendar class="size-4 text-primary" />
                 <span>{{ formatDate(competition.startTime) }}</span>
               </div>
-              <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
+              <div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2">
                 <CheckCircle2 class="size-4 text-primary" />
                 <span>{{ competition.teamRegistrationAutoApprove ? t('teams.autoApprove') : t('teams.requiresReview') }}</span>
               </div>
@@ -166,7 +166,7 @@ async function copyToken(token: string) {
         </section>
 
         <section class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <Card>
+          <Card class="noctf-surface">
             <CardHeader>
               <CardTitle class="flex items-center gap-2">
                 <Users class="size-5 text-primary" />
@@ -181,7 +181,7 @@ async function copyToken(token: string) {
               </div>
 
               <div v-else-if="currentTeam" class="space-y-5">
-                <div class="rounded-xl border bg-background/70 p-5">
+                <div class="rounded-xl border border-slate-900/10 bg-background/75 p-5">
                   <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div class="space-y-2">
                       <div class="flex flex-wrap items-center gap-2">
@@ -207,7 +207,7 @@ async function copyToken(token: string) {
                       </RouterLink>
                     </Button>
                   </div>
-                  <div class="mt-4 flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                  <div class="mt-4 flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
                     <code class="truncate text-xs">{{ currentTeam.inviteToken }}</code>
                     <Button variant="ghost" size="icon-sm" @click="copyToken(currentTeam.inviteToken)">
                       <Copy class="size-4" />
@@ -218,13 +218,13 @@ async function copyToken(token: string) {
                 <div v-if="currentTeam.isBanned" class="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
                   {{ t('teams.bannedDetail') }}
                 </div>
-                <div v-else-if="currentTeam.registrationStatus !== 'approved'" class="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+                <div v-else-if="currentTeam.registrationStatus !== 'approved'" class="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
                   {{ currentTeam.registrationStatus === 'rejected' ? t('teams.rejectedDetail') : t('teams.waitingApproval') }}
                 </div>
               </div>
 
               <div v-else class="grid gap-6 xl:grid-cols-2">
-                <div class="space-y-3 rounded-xl border bg-background/70 p-4">
+                <div class="space-y-3 rounded-xl border border-slate-900/10 bg-background/75 p-4">
                   <div class="flex items-center gap-2 font-semibold">
                     <UserPlus class="size-4 text-primary" />
                     {{ t('teams.createForCompetition') }}
@@ -248,7 +248,7 @@ async function copyToken(token: string) {
                   </Button>
                 </div>
 
-                <div class="space-y-3 rounded-xl border bg-background/70 p-4">
+                <div class="space-y-3 rounded-xl border border-slate-900/10 bg-background/75 p-4">
                   <div class="flex items-center gap-2 font-semibold">
                     <KeyRound class="size-4 text-primary" />
                     {{ t('teams.joinExistingTeam') }}
@@ -268,18 +268,18 @@ async function copyToken(token: string) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card class="noctf-surface">
             <CardHeader>
               <CardTitle class="text-base">{{ t('teams.registrationRules') }}</CardTitle>
             </CardHeader>
             <CardContent class="space-y-4 text-sm text-muted-foreground">
-              <div class="rounded-lg border bg-background/70 p-4">
+              <div class="rounded-lg border bg-background/75 p-4">
                 {{ t('teams.ruleOneTeam') }}
               </div>
-              <div class="rounded-lg border bg-background/70 p-4">
+              <div class="rounded-lg border bg-background/75 p-4">
                 {{ competition.teamRegistrationAutoApprove ? t('teams.ruleAutoApprove') : t('teams.ruleManualReview') }}
               </div>
-              <div class="rounded-lg border bg-background/70 p-4">
+              <div class="rounded-lg border bg-background/75 p-4">
                 {{ competition.tracksEnabled ? t('teams.ruleTrackRequired') : t('teams.ruleNoTrack') }}
               </div>
             </CardContent>

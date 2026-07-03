@@ -187,7 +187,7 @@ async function submitFlag() {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-4 py-6 md:px-6">
+  <div class="noctf-page-wide">
     <div class="noctf-panel rounded-xl p-5">
       <RoundTimer
         :round="round"
@@ -200,7 +200,7 @@ async function submitFlag() {
     <div class="grid w-full grid-cols-12 gap-6">
       <!-- Left: Service Status -->
       <div class="col-span-12 lg:col-span-3 space-y-4">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground px-1">
+        <h2 class="noctf-label px-1">
           {{ t('awd.serviceStatus') }}
         </h2>
         <ServiceStatusGrid :services="services" />
@@ -219,7 +219,7 @@ async function submitFlag() {
           <CardContent class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="space-y-2">
-                <label class="text-xs font-bold uppercase text-muted-foreground">{{ t('awd.victimTeam') }}</label>
+                <label class="noctf-label">{{ t('awd.victimTeam') }}</label>
                 <Select v-model="selectedVictim">
                   <SelectTrigger>
                     <SelectValue :placeholder="t('awd.selectTeam')" />
@@ -235,7 +235,7 @@ async function submitFlag() {
               </div>
 
               <div class="space-y-2">
-                <label class="text-xs font-bold uppercase text-muted-foreground">{{ t('common.challenge') }}</label>
+                <label class="noctf-label">{{ t('common.challenge') }}</label>
                 <Select v-model="selectedChallenge">
                   <SelectTrigger>
                     <SelectValue :placeholder="t('awd.selectChallenge')" />
@@ -252,7 +252,7 @@ async function submitFlag() {
             </div>
 
             <div class="space-y-2">
-              <label class="text-xs font-bold uppercase text-muted-foreground">{{ t('awd.flag') }}</label>
+              <label class="noctf-label">{{ t('awd.flag') }}</label>
               <div class="flex gap-2">
                 <Input
                   v-model="flagInput"
@@ -301,9 +301,9 @@ async function submitFlag() {
               </div>
 
               <div
-                class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 transition-all hover:bg-muted/50"
+                class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 transition-all hover:bg-muted/50"
                 :class="[
-                  isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/20',
+                  isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25',
                   patchFile ? 'bg-muted/30' : ''
                 ]"
                 @dragover.prevent="isDragOver = true"
@@ -369,7 +369,7 @@ async function submitFlag() {
 
       <!-- Right: Attack Log -->
       <div class="col-span-12 lg:col-span-3 space-y-4">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground px-1">
+        <h2 class="noctf-label px-1">
           {{ t('awd.realtimeActivity') }}
         </h2>
         <AttackLogFeed :logs="attackLogs" />
@@ -386,9 +386,4 @@ async function submitFlag() {
 .slide-up-enter-from { opacity: 0; transform: translateY(20px); }
 .slide-up-leave-to { opacity: 0; transform: translateY(-20px); }
 
-/* Custom scrollbar for better UX in logs if applicable */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
 </style>

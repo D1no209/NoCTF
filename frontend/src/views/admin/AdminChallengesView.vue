@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
   FlexRender,
@@ -14,18 +15,10 @@ import {
 } from '@tanstack/vue-table'
 import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import ChallengeTemplateForm from '@/components/admin/ChallengeTemplateForm.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -50,13 +43,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Box, Edit, Key, Loader2, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-vue-next'
+import { Edit, Key, Loader2, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { challengeDirections, normalizeDirection } from '@/lib/challengeDirections'
 
 interface CheckerConfigDto {
   image?: string
   command?: string
+  timeoutSeconds?: number | null
+  expImage?: string | null
+  expCommand?: string | null
 }
 
 interface ChallengeTemplateDto {
@@ -76,6 +71,7 @@ interface ChallengeTemplateDto {
 }
 
 const qc = useQueryClient()
+const router = useRouter()
 const { t } = useI18n()
 const globalFilter = ref('')
 const sorting = ref<SortingState>([])
@@ -83,38 +79,30 @@ const editDialog = ref(false)
 const deleteDialog = ref(false)
 const revealDialog = ref(false)
 const selectedTemplate = ref<ChallengeTemplateDto | null>(null)
-const isCreating = ref(false)
 const revealedSecret = ref('')
-const attachmentFile = ref<File | null>(null)
-
-const defaultForm = () => ({
-  title: '',
-  description: '',
-  typeId: 'WEB',
-  attachmentUrl: '',
-  deploymentType: 'NoAttachment',
-  exposedPort: undefined as number | undefined,
-  flagSecret: '',
-  flagEnvironmentVariable: 'NOCTF_FLAG_UUID',
-  containerImage: '',
-  containerMode: 'SingleImage',
-  composeYaml: '',
-  composeProjectName: '',
-  checkerImage: '',
-  checkerCommand: '',
-})
-
-const form = ref(defaultForm())
-const canSave = computed(() => Boolean(form.value.title.trim()))
 const deploymentTypeKeys = ['NoAttachment', 'StaticAttachment', 'DynamicContainer', 'StaticContainer'] as const
-type DeploymentTypeKey = typeof deploymentTypeKeys[number]
+const challengeTypeOptions = [
+  { value: 'Ctf', label: 'CTF' },
+  { value: 'Awd', label: 'AWD' },
+  { value: 'Awdp', label: 'AWDP' },
+  { value: 'Koh', label: 'KoH' },
+] as const
+type ChallengeTypeKey = typeof challengeTypeOptions[number]['value']
 
 function deploymentTypeKey(value: ChallengeTemplateDto['deploymentType']) {
   return typeof value === 'number' ? deploymentTypeKeys[value] ?? 'NoAttachment' : value
 }
+function normalizeChallengeType(value?: string | null): ChallengeTypeKey {
+  const key = (value ?? 'Ctf').trim().toLowerCase()
+  if (key === 'awd') return 'Awd'
+  if (key === 'awdp') return 'Awdp'
+  if (key === 'koh') return 'Koh'
+  return 'Ctf'
+}
 
-function deploymentTypeValue(value: DeploymentTypeKey) {
-  return deploymentTypeKeys.indexOf(value)
+function challengeTypeLabel(value?: string | null) {
+  const normalized = normalizeChallengeType(value)
+  return challengeTypeOptions.find(option => option.value === normalized)?.label ?? 'CTF'
 }
 
 const { data: templates, isLoading } = useQuery({
@@ -122,44 +110,17 @@ const { data: templates, isLoading } = useQuery({
   queryFn: () => adminApi.challenges<ChallengeTemplateDto[]>(),
 })
 
-function templatePayload() {
-  return {
-    title: form.value.title.trim(),
-    description: form.value.description.trim() || undefined,
-    typeId: normalizeDirection(form.value.typeId),
-    attachmentUrl: form.value.attachmentUrl.trim() || undefined,
-    deploymentType: deploymentTypeValue(form.value.deploymentType as DeploymentTypeKey),
-    exposedPort: form.value.exposedPort ? Number(form.value.exposedPort) : undefined,
-    flagSecret: form.value.flagSecret.trim() || undefined,
-    flagEnvironmentVariable: form.value.flagEnvironmentVariable.trim() || undefined,
-    containerImage: form.value.containerImage.trim() || undefined,
-    containerMode: form.value.containerMode === 'DockerCompose' ? 1 : 0,
-    composeYaml: form.value.composeYaml.trim() || undefined,
-    composeProjectName: form.value.composeProjectName.trim() || undefined,
-    checkerConfig: (form.value.checkerImage.trim() || form.value.checkerCommand.trim())
-      ? { image: form.value.checkerImage.trim() || undefined, command: form.value.checkerCommand.trim() || undefined }
-      : undefined,
-  }
-}
-
 const saveMutation = useMutation({
-  mutationFn: async () => {
-    if (!canSave.value) throw new Error('invalid_template')
-    let saved: ChallengeTemplateDto
-    if (isCreating.value) {
-      saved = await adminApi.createChallenge<ChallengeTemplateDto>(templatePayload())
-    } else {
-      saved = await adminApi.updateChallenge<ChallengeTemplateDto>(selectedTemplate.value!.id, templatePayload())
-    }
-    if (attachmentFile.value) {
-      await adminApi.uploadChallengeAttachment(saved.id, attachmentFile.value)
+  mutationFn: async ({ payload, attachmentFile }: { payload: Record<string, unknown>; attachmentFile: File | null }) => {
+    const saved = await adminApi.updateChallenge<ChallengeTemplateDto>(selectedTemplate.value!.id, payload)
+    if (attachmentFile) {
+      await adminApi.uploadChallengeAttachment(saved.id, attachmentFile)
     }
   },
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminChallenges })
     editDialog.value = false
-    attachmentFile.value = null
-    toast.success(isCreating.value ? t('admin.challenges.createSuccess') : t('admin.challenges.updateSuccess'))
+    toast.success(t('admin.challenges.updateSuccess'))
   },
   onError: () => toast.error(t('admin.challenges.saveError')),
 })
@@ -181,33 +142,11 @@ const revealMutation = useMutation({
 })
 
 function openCreate() {
-  isCreating.value = true
-  selectedTemplate.value = null
-  form.value = defaultForm()
-  attachmentFile.value = null
-  editDialog.value = true
+  router.push({ name: 'admin-challenge-create' })
 }
 
 function openEdit(template: ChallengeTemplateDto) {
-  isCreating.value = false
   selectedTemplate.value = template
-  form.value = {
-    title: template.title,
-    description: template.description ?? '',
-    typeId: normalizeDirection(template.typeId),
-    attachmentUrl: template.attachmentUrl ?? '',
-    deploymentType: deploymentTypeKey(template.deploymentType),
-    exposedPort: template.exposedPort ?? undefined,
-    flagSecret: '',
-    flagEnvironmentVariable: template.flagEnvironmentVariable ?? 'NOCTF_FLAG_UUID',
-    containerImage: template.containerImage ?? '',
-    containerMode: template.containerMode === 1 || template.containerMode === 'DockerCompose' ? 'DockerCompose' : 'SingleImage',
-    composeYaml: template.composeYaml ?? '',
-    composeProjectName: template.composeProjectName ?? '',
-    checkerImage: template.checkerConfig?.image ?? '',
-    checkerCommand: template.checkerConfig?.command ?? '',
-  }
-  attachmentFile.value = null
   editDialog.value = true
 }
 
@@ -226,9 +165,9 @@ const columnHelper = createColumnHelper<ChallengeTemplateDto>()
 const columns = [
   columnHelper.accessor('title', { header: () => t('admin.challenges.titleColumn'), enableSorting: true }),
   columnHelper.accessor('typeId', {
-    header: () => t('admin.challenges.direction'),
+    header: () => t('admin.challenges.challengeMode'),
     enableSorting: true,
-    cell: (info) => h(Badge, { variant: 'secondary', class: 'uppercase font-bold text-[10px]' }, () => info.getValue()),
+    cell: (info) => h(Badge, { variant: 'secondary', class: 'font-bold text-[10px]' }, () => challengeTypeLabel(info.getValue())),
   }),
   columnHelper.accessor('attachmentUrl', {
     header: () => t('admin.challenges.attachment'),
@@ -267,7 +206,7 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="noctf-admin-page">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.challenges.title') }}</h2>
@@ -279,12 +218,14 @@ const table = useVueTable({
       </Button>
     </div>
 
-    <div class="relative w-full max-w-sm">
+    <div class="noctf-filter-bar md:grid-cols-[minmax(0,24rem)]">
+      <div class="relative w-full max-w-sm">
       <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input v-model="globalFilter" :placeholder="t('admin.challenges.searchPlaceholder')" class="pl-10" />
+      </div>
     </div>
 
-    <div class="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <div class="noctf-table-shell">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -355,120 +296,18 @@ const table = useVueTable({
     <Dialog v-model:open="editDialog">
       <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-[680px]">
         <DialogHeader>
-          <DialogTitle>{{ isCreating ? t('admin.challenges.createDialogTitle') : t('admin.challenges.editDialogTitle') }}</DialogTitle>
+          <DialogTitle>{{ t('admin.challenges.editDialogTitle') }}</DialogTitle>
           <DialogDescription>{{ t('admin.challenges.dialogDescription') }}</DialogDescription>
         </DialogHeader>
-
-        <div class="grid gap-5 py-4">
-          <div class="grid gap-2">
-            <Label>{{ t('admin.challenges.titleColumn') }}</Label>
-            <Input v-model="form.title" />
-          </div>
-          <div class="grid gap-2">
-            <Label>{{ t('admin.challenges.description') }}</Label>
-            <Textarea v-model="form.description" rows="4" />
-          </div>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="grid gap-2">
-              <Label>{{ t('admin.challenges.direction') }}</Label>
-              <Select v-model="form.typeId">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="direction in challengeDirections" :key="direction" :value="direction">
-                    {{ direction }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="grid gap-2">
-              <Label>{{ t('admin.challenges.attachmentUrl') }}</Label>
-              <Input v-model="form.attachmentUrl" placeholder="/api/files/challenge.zip" />
-            </div>
-            <div class="grid gap-2 sm:col-span-2">
-              <Label>{{ t('admin.challenges.attachmentUpload') }}</Label>
-              <Input type="file" @change="attachmentFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
-            </div>
-          </div>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="grid gap-2">
-              <Label>{{ t('admin.challenges.deploymentType') }}</Label>
-              <Select v-model="form.deploymentType">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NoAttachment">{{ t('admin.challenges.deploymentTypes.NoAttachment') }}</SelectItem>
-                  <SelectItem value="StaticAttachment">{{ t('admin.challenges.deploymentTypes.StaticAttachment') }}</SelectItem>
-                  <SelectItem value="DynamicContainer">{{ t('admin.challenges.deploymentTypes.DynamicContainer') }}</SelectItem>
-                  <SelectItem value="StaticContainer">{{ t('admin.challenges.deploymentTypes.StaticContainer') }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="grid gap-2">
-              <Label>{{ t('admin.challenges.exposedPort') }}</Label>
-              <Input v-model.number="form.exposedPort" type="number" min="1" max="65535" :placeholder="t('admin.challenges.exposedPortPlaceholder')" />
-            </div>
-          </div>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="grid gap-2">
-              <Label>{{ t('admin.challenges.flagSecret') }}</Label>
-              <Input v-model="form.flagSecret" :placeholder="t('admin.challenges.flagSecretPlaceholder')" />
-            </div>
-            <div class="grid gap-2">
-              <Label>{{ t('admin.challenges.flagEnvironmentVariable') }}</Label>
-              <Input v-model="form.flagEnvironmentVariable" placeholder="NOCTF_FLAG_UUID" />
-            </div>
-          </div>
-
-          <div class="space-y-4 rounded-lg border bg-muted/30 p-4">
-            <div class="flex items-center gap-2 text-sm font-bold uppercase tracking-wider">
-              <Box class="size-4" />
-              {{ t('admin.challenges.runtimeContainers') }}
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="grid gap-2">
-                <Label>{{ t('admin.challenges.challengeContainerMode') }}</Label>
-                <Select v-model="form.containerMode">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SingleImage">{{ t('admin.challenges.singleImage') }}</SelectItem>
-                    <SelectItem value="DockerCompose">{{ t('admin.challenges.dockerCompose') }}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div v-if="form.containerMode === 'SingleImage'" class="grid gap-2">
-                <Label>{{ t('admin.challenges.challengeImage') }}</Label>
-                <Input v-model="form.containerImage" placeholder="noctf/pwn-baby:latest" />
-              </div>
-              <div v-else class="grid gap-2">
-                <Label>{{ t('admin.challenges.composeProjectName') }}</Label>
-                <Input v-model="form.composeProjectName" />
-              </div>
-            </div>
-            <div v-if="form.containerMode === 'DockerCompose'" class="grid gap-2">
-              <Label>{{ t('admin.challenges.composeYaml') }}</Label>
-              <Textarea v-model="form.composeYaml" class="font-mono text-xs" rows="7" />
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="grid gap-2">
-                <Label>{{ t('admin.challenges.checkerImage') }}</Label>
-                <Input v-model="form.checkerImage" :placeholder="t('admin.challenges.optional')" />
-              </div>
-              <div class="grid gap-2">
-                <Label>{{ t('admin.challenges.checkerCommand') }}</Label>
-                <Input v-model="form.checkerCommand" :placeholder="t('admin.challenges.optional')" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" :disabled="saveMutation.isPending.value" @click="editDialog = false">{{ t('common.cancel') }}</Button>
-          <Button :disabled="saveMutation.isPending.value || !canSave" @click="saveMutation.mutate()">
-            <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-            {{ isCreating ? t('common.create') : t('common.save') }}
-          </Button>
-        </DialogFooter>
+        <ChallengeTemplateForm
+          class="py-4"
+          :template="selectedTemplate"
+          :saving="saveMutation.isPending.value"
+          :submit-text="t('common.save')"
+          :cancel-text="t('common.cancel')"
+          @submit="saveMutation.mutate($event)"
+          @cancel="editDialog = false"
+        />
       </DialogContent>
     </Dialog>
 

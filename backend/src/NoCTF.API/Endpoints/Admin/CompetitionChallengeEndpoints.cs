@@ -15,6 +15,12 @@ public class BindCompetitionChallengeRequest
     public PointsConfigDto? PointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
     public bool EnableBloodBonus { get; set; }
+    public int? AwdpAttackScorePerRound { get; set; }
+    public int? AwdpDefenseScorePerRound { get; set; }
+    public int? AwdpMaxAttackAttempts { get; set; }
+    public int? AwdpMaxDefenseAttempts { get; set; }
+    public string? AwdpFixEntry { get; set; }
+    public int? AwdpFixTimeoutSeconds { get; set; }
     public List<string> Hints { get; set; } = [];
 }
 
@@ -28,6 +34,12 @@ public class UpdateCompetitionChallengeRequest
     public PointsConfigDto? PointsConfig { get; set; }
     public double DifficultyCoefficient { get; set; } = 1.0;
     public bool EnableBloodBonus { get; set; }
+    public int? AwdpAttackScorePerRound { get; set; }
+    public int? AwdpDefenseScorePerRound { get; set; }
+    public int? AwdpMaxAttackAttempts { get; set; }
+    public int? AwdpMaxDefenseAttempts { get; set; }
+    public string? AwdpFixEntry { get; set; }
+    public int? AwdpFixTimeoutSeconds { get; set; }
     public List<string> Hints { get; set; } = [];
 }
 
@@ -126,6 +138,12 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db)
             PointsConfig = new PointsConfig(points.InitialPoints, points.MinimumPoints, points.DecayFactor, points.DecayFunction),
             DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? competition.DifficultyCoefficient : req.DifficultyCoefficient,
             EnableBloodBonus = req.EnableBloodBonus,
+            AwdpAttackScorePerRound = req.AwdpAttackScorePerRound,
+            AwdpDefenseScorePerRound = req.AwdpDefenseScorePerRound,
+            AwdpMaxAttackAttempts = req.AwdpMaxAttackAttempts,
+            AwdpMaxDefenseAttempts = req.AwdpMaxDefenseAttempts,
+            AwdpFixEntry = string.IsNullOrWhiteSpace(req.AwdpFixEntry) ? null : req.AwdpFixEntry.Trim(),
+            AwdpFixTimeoutSeconds = req.AwdpFixTimeoutSeconds,
             CheckerConfig = template.CheckerConfig is not null
                 ? new CheckerConfig
                 {
@@ -190,6 +208,12 @@ public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db)
         challenge.FlagPrefix = string.IsNullOrWhiteSpace(req.FlagPrefix) ? "flag" : req.FlagPrefix.Trim();
         challenge.DifficultyCoefficient = req.DifficultyCoefficient <= 0 ? 1.0 : req.DifficultyCoefficient;
         challenge.EnableBloodBonus = req.EnableBloodBonus;
+        challenge.AwdpAttackScorePerRound = req.AwdpAttackScorePerRound;
+        challenge.AwdpDefenseScorePerRound = req.AwdpDefenseScorePerRound;
+        challenge.AwdpMaxAttackAttempts = req.AwdpMaxAttackAttempts;
+        challenge.AwdpMaxDefenseAttempts = req.AwdpMaxDefenseAttempts;
+        challenge.AwdpFixEntry = string.IsNullOrWhiteSpace(req.AwdpFixEntry) ? null : req.AwdpFixEntry.Trim();
+        challenge.AwdpFixTimeoutSeconds = req.AwdpFixTimeoutSeconds;
         if (req.PointsConfig is not null)
         {
             challenge.PointsConfig = new PointsConfig(

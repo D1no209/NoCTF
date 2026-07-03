@@ -83,36 +83,74 @@ Successful attacks award `AttackPoints` (default 50) immediately.
 
 ## AWDP (Attack with Defense and Patch)
 
-AWDP extends AWD with a patch phase. Teams can upload patches to fix vulnerabilities in their game boxes and earn defense points.
+AWDP is an independent plugin model based on Break, Fix, round settlement, and attempt limits. It is not an AWD sub-mode and it does not use an initial score pool.
 
-### Fix Phase and Break Phase
+### Core Flow
 
-A typical AWDP competition has alternating phases, but the exact timing is configured per competition. The core mechanic is:
+For each AWDP challenge, a team works through the plugin operation card:
 
-- Teams develop and upload a patch archive
-- The platform validates the patch automatically
-- If the patch passes, the team's game box is updated and defense points are awarded
+1. Create a challenge instance
+2. Break: submit the challenge flag
+3. Fix: request defense and upload a FixScript archive
+4. The platform validates the FixScript in an isolated runner
+5. Future round settlement awards attack and defense score deltas from the recorded Break/Fix state
 
-### Patch Validation Sandbox
+Break success and Fix success are state changes. They do not grant the whole challenge score immediately.
 
-`AwdpPatchService` validates every patch in a sandbox:
+### Attempt Limits
 
-1. **Sandbox run**: A temporary container runs `patch.sh` with the patch archive
-2. **Recreate game box**: The team's container is recreated with `PATCH_URL` set so the patch applies on startup
-3. **Checker run**: The challenge checker is executed against the patched container
-4. **EXP run**: The challenge exploit container is executed against the patched container
-5. **Outcome**:
-   - `checker passed` AND `EXP failed` → patch is **Verified**, defense points awarded
-   - Any other result → patch is **Rejected**
+AWDP tracks attempts per team and challenge:
 
-### Rollback
+- `maxAttackAttempts` limits Break flag submissions
+- `maxDefenseAttempts` limits FixScript submissions
+- By default, a team cannot keep submitting Break attempts after `BreakSuccess`
+- By default, a team cannot keep submitting Fix attempts after `FixSuccess`
 
-If a patch is rejected, the platform automatically destroys the patched container and restores the original challenge image so the team's service stays online.
+When attempts are exhausted, the backend rejects the request and the frontend disables the corresponding operation.
 
-### Scoring
+### FixScript Validation
 
-- Attack points are awarded the same way as AWD
-- Defense points are awarded when a patch is verified (default 100 points)
+`AwdpPatchService` validates every FixScript archive:
+
+1. **Archive audit**: The archive must be `.zip`, `.tar.gz`, or `.tgz`, must use safe paths, and must contain the configured entry script, such as `fix.sh`
+2. **Side runner**: A temporary container downloads and extracts the archive, then runs the configured FixScript entry
+3. **Recreate game box**: The team's container is recreated with the accepted FixScript environment
+4. **Checker run**: The challenge checker is executed against the patched container
+5. **EXP run**: The challenge exploit container is executed against the patched container
+
+The validation result is classified precisely:
+
+- Checker failed: `FixServiceError`, meaning the service is unavailable or business behavior is broken
+- Checker passed and EXP passed: `FixFailed`, meaning the service works but the vulnerability still exists
+- Checker passed and EXP failed: `FixSuccess`, meaning the service works and the vulnerability is fixed
+- FixScript execution failed: `FixScriptError`
+- FixScript timed out: `FixTimeout`
+- Archive audit failed: `AuditFailed`
+
+If validation rejects a patched container, the platform destroys it and restores the original challenge image so the team's service can continue.
+
+### Round Scoring
+
+`AwdpRoundEngine` drives AWDP rounds, and `AwdpScoreEngine` calculates score deltas for every team and challenge at settlement time:
+
+- `BreakSuccess` earns the configured attack score for that round
+- `FixSuccess` earns the configured defense score for that round
+- `FixFailed` does not earn defense points and does not create a penalty by default
+- `ServiceError` creates a penalty only when AWDP service penalties are enabled
+- `AuditFailed`, `FixScriptError`, and `FixTimeout` create violation penalties only when AWDP violation penalties are enabled
+
+Total score is the sum of round deltas:
+
+```
+totalScore = sum(roundScoreDelta)
+```
+
+AWDP does not use:
+
+- Initial team scores
+- One-shot full challenge scoring for Break or Fix
+- AWD-style live mutual attacks
+- Default penalties for failed Fix attempts or exhausted attempts
 
 ## KoH (King of the Hill)
 

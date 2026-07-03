@@ -1,7 +1,6 @@
 using System.Text.Json;
 using NoCTF.Application.BackgroundTasks;
 using NoCTF.Core;
-using NoCTF.PluginBase;
 
 namespace NoCTF.Plugins.AWDP;
 
@@ -9,7 +8,7 @@ public class AwdpPatchValidationJobHandler(IAwdpPatchService patchService) : ICo
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public string JobKey => BackgroundTaskTypes.AwdpPatchValidation;
+    public string JobKey => AwdpBackgroundTaskTypes.PatchValidation;
 
     public async Task ExecuteAsync(BackgroundTaskItem task, CancellationToken ct = default)
     {

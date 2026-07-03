@@ -22,12 +22,12 @@ const pointsLabel = computed(() => `${props.challenge.points} ${t('nav.score')}`
 
 <template>
   <Card
-    class="relative h-full overflow-hidden transition-all hover:shadow-md cursor-pointer"
+    class="relative h-full cursor-pointer overflow-hidden transition-all hover:border-primary/30 hover:shadow-[0_16px_45px_rgb(79_70_229/0.12)]"
     :class="solved ? 'border-green-500/50 bg-green-500/5' : ''"
   >
     <div
       v-if="solved"
-      class="pointer-events-none absolute right-3 top-3 rotate-[-10deg] rounded-sm border-2 border-emerald-600/75 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.12em] text-emerald-700/85 shadow-[0_0_0_1px_oklch(0.62_0.16_150_/_0.12),inset_0_0_0_1px_oklch(0.62_0.16_150_/_0.18)]"
+      class="pointer-events-none absolute right-3 top-3 rounded-md border border-emerald-600/45 bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.08em] text-emerald-700"
     >
       {{ t('challenges.attackSolved') }}
     </div>

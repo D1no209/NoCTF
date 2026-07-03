@@ -55,7 +55,7 @@ function statusLabel(status: 'healthy' | 'down' | 'unknown') {
 </script>
 
 <template>
-  <Card>
+  <Card class="noctf-live-card">
     <CardHeader>
       <CardTitle class="text-base">{{ t('awd.serviceStatus') }}</CardTitle>
     </CardHeader>
@@ -63,7 +63,7 @@ function statusLabel(status: 'healthy' | 'down' | 'unknown') {
       <div v-if="services.length === 0" class="text-sm text-muted-foreground">
         {{ t('awd.noServices') }}
       </div>
-      <div v-else class="overflow-x-auto">
+      <div v-else class="noctf-scrollbar overflow-x-auto">
         <table class="w-full text-xs">
           <thead>
             <tr>
@@ -89,7 +89,7 @@ function statusLabel(status: 'healthy' | 'down' | 'unknown') {
                 class="py-1.5 px-1 text-center"
               >
                 <span
-                  class="inline-flex items-center justify-center w-10 h-5 rounded text-[10px] font-bold text-white"
+                  class="inline-flex h-5 w-10 items-center justify-center rounded text-[10px] font-bold text-white"
                   :class="statusClass(getStatus(team.id, ch.id))"
                   :title="getStatus(team.id, ch.id)"
                 >

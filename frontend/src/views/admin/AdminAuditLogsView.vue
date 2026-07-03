@@ -200,11 +200,11 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="noctf-admin-page">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.auditLogs.title') }}</h2>
-        <p class="text-sm text-muted-foreground">Track all administrative actions and security events.</p>
+        <p class="text-sm text-muted-foreground">{{ t('admin.auditLogs.subtitle') }}</p>
       </div>
       <div class="flex items-center gap-2">
         <Button variant="outline" size="sm" @click="refetch()" :disabled="isFetching">
@@ -219,27 +219,27 @@ const table = useVueTable({
     </div>
 
     <!-- Filters -->
-    <div class="grid gap-4 p-4 rounded-xl border bg-muted/30 md:grid-cols-4 items-end">
+    <div class="noctf-filter-bar md:grid-cols-4 md:items-end">
       <div class="space-y-2">
-        <label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Username</label>
+        <label class="noctf-label ml-1">{{ t('admin.auditLogs.user') }}</label>
         <div class="relative">
           <Search class="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input v-model="filterUserName" :placeholder="t('admin.auditLogs.filterUser')" class="pl-9 h-9" @keyup.enter="page = 1; refetch()" />
         </div>
       </div>
       <div class="space-y-2">
-        <label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Action</label>
+        <label class="noctf-label ml-1">{{ t('admin.auditLogs.action') }}</label>
         <Input v-model="filterAction" :placeholder="t('admin.auditLogs.filterAction')" class="h-9" @keyup.enter="page = 1; refetch()" />
       </div>
       <div class="space-y-2">
-        <label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Entity Type</label>
+        <label class="noctf-label ml-1">{{ t('admin.auditLogs.entityType') }}</label>
         <Input v-model="filterEntityType" :placeholder="t('admin.auditLogs.filterEntity')" class="h-9" @keyup.enter="page = 1; refetch()" />
       </div>
       <Button class="h-9" @click="page = 1; refetch()">{{ t('common.search') }}</Button>
     </div>
 
     <!-- Table -->
-    <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div class="noctf-table-shell">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -292,7 +292,7 @@ const table = useVueTable({
     </div>
 
     <!-- Pagination -->
-    <div class="flex items-center justify-between">
+    <div class="noctf-table-footer">
       <p class="text-xs text-muted-foreground">
         {{ t('admin.auditLogs.pageTotal', { page, totalPages, total }) }}
       </p>
@@ -310,22 +310,22 @@ const table = useVueTable({
             <FileJson class="size-5 text-primary" />
             {{ t('admin.auditLogs.detailDialogTitle') }}
           </DialogTitle>
-          <DialogDescription>Full structural breakdown of the audit event.</DialogDescription>
+          <DialogDescription>{{ t('admin.auditLogs.detailDialogDescription') }}</DialogDescription>
         </DialogHeader>
         
         <div v-if="selectedLog" class="flex-1 overflow-y-auto p-6 pt-4 space-y-6">
           <!-- Metadata Cards -->
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
-              <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">User</span>
+              <span class="noctf-label block">{{ t('admin.auditLogs.user') }}</span>
               <p class="text-sm font-medium">{{ selectedLog.userName || 'Anonymous' }}</p>
             </div>
             <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
-              <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">Action</span>
+              <span class="noctf-label block">{{ t('admin.auditLogs.action') }}</span>
               <Badge variant="outline" class="mt-0.5 font-mono">{{ selectedLog.action }}</Badge>
             </div>
             <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
-              <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">IP Address</span>
+              <span class="noctf-label block">{{ t('admin.auditLogs.ip') }}</span>
               <div class="flex items-center gap-1.5 mt-0.5">
                 <Globe class="size-3 text-muted-foreground" />
                 <p class="text-sm font-mono">{{ selectedLog.ipAddress || '-' }}</p>
@@ -336,7 +336,7 @@ const table = useVueTable({
           <!-- HTTP Detail -->
           <div class="rounded-lg border overflow-hidden">
             <div class="bg-muted/50 px-4 py-2 border-b flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider">Endpoint Details</span>
+              <span class="text-xs font-bold uppercase tracking-wider">{{ t('admin.auditLogs.endpointDetails') }}</span>
               <Badge :variant="selectedLog.httpMethod === 'POST' || selectedLog.httpMethod === 'PUT' ? 'default' : 'secondary'">
                 {{ selectedLog.httpMethod }}
               </Badge>
@@ -350,7 +350,7 @@ const table = useVueTable({
           <div v-if="selectedLog.exception" class="p-4 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
             <div class="flex items-center gap-2 text-destructive">
               <ShieldAlert class="size-4" />
-              <span class="text-xs font-bold uppercase tracking-wider">Exception Logged</span>
+              <span class="text-xs font-bold uppercase tracking-wider">{{ t('admin.auditLogs.exceptionLogged') }}</span>
             </div>
             <pre class="text-[10px] font-mono whitespace-pre-wrap break-all opacity-80">{{ selectedLog.exception }}</pre>
           </div>
@@ -359,18 +359,18 @@ const table = useVueTable({
           <div class="space-y-4">
             <div v-if="selectedLog.diff" class="space-y-2">
               <div class="flex items-center justify-between px-1">
-                <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">Changes (Diff)</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">{{ t('admin.auditLogs.diff') }}</span>
               </div>
               <pre class="bg-zinc-950 text-emerald-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.diff) }}</pre>
             </div>
 
             <div v-if="selectedLog.newValues" class="space-y-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">New Values</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">{{ t('admin.auditLogs.newValues') }}</span>
               <pre class="bg-zinc-950 text-blue-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.newValues) }}</pre>
             </div>
 
             <div v-if="selectedLog.oldValues" class="space-y-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Old Values</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">{{ t('admin.auditLogs.oldValues') }}</span>
               <pre class="bg-zinc-950 text-rose-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.oldValues) }}</pre>
             </div>
           </div>

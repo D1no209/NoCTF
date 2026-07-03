@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace NoCTF.Application.CompetitionModes;
 
 public sealed record CompetitionCapabilityDescriptor(
@@ -19,6 +21,17 @@ public sealed record CompetitionActionResult(
     string Code,
     object? Data = null);
 
+public sealed record CompetitionFileActionContext(
+    Guid CompetitionId,
+    Guid TeamId,
+    Guid UserId,
+    Guid ChallengeId,
+    string ActionKey,
+    Stream File,
+    string FileName,
+    string ContentType,
+    string IpAddress);
+
 public sealed record CompetitionViewContext(
     Guid CompetitionId,
     Guid? TeamId,
@@ -37,6 +50,13 @@ public interface ICompetitionModeProvider
     Task<CompetitionActionResult> HandleActionAsync(CompetitionActionContext context, CancellationToken ct = default);
     bool CanProvideView(string viewKey);
     Task<CompetitionViewResult> GetViewAsync(CompetitionViewContext context, CancellationToken ct = default);
+}
+
+public interface ICompetitionFileActionProvider
+{
+    string ModeKey { get; }
+    bool CanHandleFileAction(string actionKey);
+    Task<CompetitionActionResult> HandleFileActionAsync(CompetitionFileActionContext context, CancellationToken ct = default);
 }
 
 public interface ICompetitionModeRegistry

@@ -41,23 +41,40 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
             return;
         }
 
+        var attachmentUrl = ChallengeTemplateRequestRules.CleanOptional(req.AttachmentUrl);
+        var deploymentType = ChallengeTemplateRequestRules.ResolveDeploymentType(req.DeploymentType, attachmentUrl);
+        var usesRuntimeContainer = ChallengeTemplateRequestRules.UsesRuntimeContainer(deploymentType);
+        var containerImage = ChallengeTemplateRequestRules.CleanOptional(req.ContainerImage);
+        if (usesRuntimeContainer && string.IsNullOrWhiteSpace(containerImage))
+        {
+            await SendStringAsync("container_image_required", 400, cancellation: ct);
+            return;
+        }
+
         challenge.Title = req.Title.Trim();
-        challenge.Description = req.Description;
+        challenge.Description = ChallengeTemplateRequestRules.CleanOptional(req.Description);
         challenge.TypeId = string.IsNullOrWhiteSpace(req.TypeId) ? "ctf" : req.TypeId.Trim();
-        challenge.ContainerImage = req.ContainerImage;
-        challenge.ContainerMode = req.ContainerMode;
-        challenge.ComposeYaml = req.ComposeYaml;
-        challenge.ComposeProjectName = req.ComposeProjectName;
+        challenge.ContainerImage = usesRuntimeContainer ? containerImage : null;
+        challenge.ContainerMode = usesRuntimeContainer ? req.ContainerMode : ChallengeContainerMode.SingleImage;
+        challenge.ComposeYaml = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeYaml) : null;
+        challenge.ComposeProjectName = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeProjectName) : null;
         challenge.FlagSecret = req.FlagSecret;
         challenge.FlagEnvironmentVariable = string.IsNullOrWhiteSpace(req.FlagEnvironmentVariable)
             ? "NOCTF_FLAG_UUID"
             : req.FlagEnvironmentVariable.Trim();
-        challenge.AttachmentUrl = req.AttachmentUrl;
-        challenge.DeploymentType = req.DeploymentType;
-        challenge.ExposedPort = req.ExposedPort;
+        challenge.AttachmentUrl = attachmentUrl;
+        challenge.DeploymentType = deploymentType;
+        challenge.ExposedPort = usesRuntimeContainer ? req.ExposedPort : null;
         challenge.UpdatedAt = DateTime.UtcNow;
-        challenge.CheckerConfig = req.CheckerConfig is not null
-            ? new CheckerConfig { Image = req.CheckerConfig.Image, Command = req.CheckerConfig.Command }
+        challenge.CheckerConfig = usesRuntimeContainer && req.CheckerConfig is not null
+            ? new CheckerConfig
+            {
+                Image = ChallengeTemplateRequestRules.CleanOptional(req.CheckerConfig.Image),
+                Command = ChallengeTemplateRequestRules.CleanOptional(req.CheckerConfig.Command),
+                TimeoutSeconds = req.CheckerConfig.TimeoutSeconds,
+                ExpImage = ChallengeTemplateRequestRules.CleanOptional(req.CheckerConfig.ExpImage),
+                ExpCommand = ChallengeTemplateRequestRules.CleanOptional(req.CheckerConfig.ExpCommand),
+            }
             : null;
 
         await db.SaveChangesAsync(ct);

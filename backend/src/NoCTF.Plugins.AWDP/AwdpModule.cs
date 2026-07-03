@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.PluginBase;
-using NoCTF.Plugins.AWD;
 
 namespace NoCTF.Plugins.AWDP;
 
@@ -16,15 +16,16 @@ public class AwdpModule : IPluginModule
 
     public void ConfigureServices(IServiceCollection services)
     {
-        // AWD base services (AwdpGameMode delegates to AwdGameMode)
-        services.AddScoped<AwdGameMode>();
-
-        // AWDP game mode
+        services.AddScoped<AwdpConfigResolver>();
+        services.AddScoped<AwdpStateService>();
+        services.AddScoped<AwdpScoreEngine>();
         services.AddScoped<AwdpGameMode>();
         services.AddScoped<IGameMode>(sp => sp.GetRequiredService<AwdpGameMode>());
         services.AddScoped<ICompetitionModeProvider, AwdpModeProvider>();
+        services.AddScoped<ICompetitionFileActionProvider, AwdpModeProvider>();
+        services.AddSingleton<AwdpRoundEngine>();
+        services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<AwdpRoundEngine>());
 
-        // Patch service
         services.AddScoped<AwdpPatchService>();
         services.AddScoped<IAwdpPatchService>(sp => sp.GetRequiredService<AwdpPatchService>());
         services.AddScoped<ICompetitionJobHandler, AwdpPatchValidationJobHandler>();

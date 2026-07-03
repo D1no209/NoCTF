@@ -39,18 +39,18 @@ function formatTime(seconds: number) {
 </script>
 
 <template>
-  <div class="flex items-center gap-6">
-    <div :key="fadeKey" class="round-fade">
-      <span class="text-sm text-muted-foreground uppercase tracking-widest">{{ t('common.round') }}</span>
-      <span class="text-4xl font-bold tabular-nums ml-2">{{ round }}</span>
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+    <div :key="fadeKey" class="round-fade min-w-[9rem]">
+      <span class="noctf-label">{{ t('common.round') }}</span>
+      <span class="ml-2 text-4xl font-bold tabular-nums">{{ round }}</span>
     </div>
 
-    <div class="flex-1 max-w-xs">
-      <div class="flex justify-between text-sm text-muted-foreground mb-1">
+    <div class="w-full max-w-xl flex-1">
+      <div class="mb-1 flex justify-between text-sm text-muted-foreground">
         <span>{{ t('common.timeRemaining') }}</span>
         <span class="font-mono tabular-nums">{{ formatTime(remainingSeconds) }}</span>
       </div>
-      <div class="h-2 bg-muted rounded-full overflow-hidden">
+      <div class="h-2 overflow-hidden rounded-full bg-muted">
         <div
           class="h-full rounded-full transition-all duration-1000"
           :class="progressColor"

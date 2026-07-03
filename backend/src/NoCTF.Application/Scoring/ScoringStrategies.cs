@@ -198,6 +198,17 @@ public class RoundAccumulationScoringStrategy(ApplicationDbContext db, IScoreEve
             .AsNoTracking()
             .FirstAsync(c => c.Id == signal.CompetitionId, ct);
 
+        var challengeId = signal.SubjectType == "challenge" ? signal.SubjectId : null;
+        var challenge = challengeId.HasValue
+            ? await db.Challenges
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == challengeId.Value && c.CompetitionId == signal.CompetitionId, ct)
+            : null;
+        var successCount = challenge is null
+            ? 0
+            : await GetRoundSuccessCountAsync(signal, challenge.Id, ct);
+
         var points = signal.SignalType switch
         {
             ScoreSignalTypes.AttackAccepted => competition.AttackPoints ?? 50,
@@ -207,7 +218,15 @@ public class RoundAccumulationScoringStrategy(ApplicationDbContext db, IScoreEve
             _ => 0
         };
 
-        var challengeId = signal.SubjectType == "challenge" ? signal.SubjectId : null;
+        if (points > 0 && challenge is not null)
+        {
+            points = ScoreDecayCalculator.CalculatePerRoundPoints(
+                successCount,
+                points,
+                challenge.PointsConfig,
+                challenge.DifficultyCoefficient);
+        }
+
         await writer.WriteAsync(new ScoreEventCreate(
             CompetitionId: signal.CompetitionId,
             TeamId: signal.TeamId,
@@ -227,6 +246,42 @@ public class RoundAccumulationScoringStrategy(ApplicationDbContext db, IScoreEve
             Reason: signal.SignalType,
             RoundNumber: signal.RoundNumber,
             Timestamp: signal.OccurredAt), ct);
+    }
+
+    private async Task<int> GetRoundSuccessCountAsync(
+        ScoreSignal signal,
+        Guid challengeId,
+        CancellationToken ct)
+    {
+        if (signal.SignalType == ScoreSignalTypes.AttackAccepted)
+        {
+            return await db.AwdAttackRecords
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(a =>
+                    a.CompetitionId == signal.CompetitionId &&
+                    a.ChallengeId == challengeId)
+                .Select(a => a.AttackerTeamId)
+                .Distinct()
+                .CountAsync(ct);
+        }
+
+        if (signal.SignalType == ScoreSignalTypes.ServiceCheckPassed && signal.RoundNumber.HasValue)
+        {
+            return await db.AwdCheckResults
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(r =>
+                    r.CompetitionId == signal.CompetitionId &&
+                    r.ChallengeId == challengeId &&
+                    r.RoundNumber == signal.RoundNumber.Value &&
+                    r.Status == AwdCheckStatus.Healthy)
+                .Select(r => r.TeamId)
+                .Distinct()
+                .CountAsync(ct);
+        }
+
+        return 0;
     }
 }
 

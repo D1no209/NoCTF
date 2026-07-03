@@ -103,9 +103,9 @@ onMounted(async () => {
 <template>
   <div class="flex h-[calc(100vh-8rem)] flex-col gap-4">
     <!-- Toolbar -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-sm">
+    <div class="noctf-toolbar">
       <div class="flex items-center gap-4">
-        <div class="flex size-10 items-center justify-center rounded-lg bg-zinc-950 text-emerald-500 shadow-inner border border-white/5">
+        <div class="flex size-10 items-center justify-center rounded-lg border border-white/5 bg-zinc-950 text-emerald-500 shadow-inner">
           <Terminal class="size-5" />
         </div>
         <div>
@@ -162,16 +162,16 @@ onMounted(async () => {
     </div>
 
     <!-- Terminal Window -->
-    <div class="flex-1 min-h-0 rounded-xl border bg-zinc-950 shadow-2xl overflow-hidden flex flex-col relative group">
+    <div class="noctf-terminal group relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <!-- Window Controls Style Header -->
       <div class="h-8 bg-zinc-900 border-b border-white/5 flex items-center px-4 justify-between shrink-0">
         <div class="flex items-center gap-1.5">
           <div class="size-2.5 rounded-full bg-rose-500/20 border border-rose-500/40" />
           <div class="size-2.5 rounded-full bg-amber-500/20 border border-amber-500/40" />
           <div class="size-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/40" />
-          <span class="ml-2 text-[10px] font-mono text-zinc-500 flex items-center gap-1.5">
+          <span class="ml-2 flex items-center gap-1.5 font-mono text-[10px] text-zinc-500">
             <Activity class="size-3" />
-            stdout.log - {{ filteredLogs.length }} lines
+            stdout.log - {{ t('admin.logs.lineCount', { count: filteredLogs.length }) }}
           </span>
         </div>
         <button 
@@ -185,9 +185,9 @@ onMounted(async () => {
 
       <div
         ref="logContainer"
-        class="flex-1 overflow-y-auto p-4 font-mono text-[11px] selection:bg-emerald-500/30 custom-scrollbar"
+        class="noctf-scrollbar flex-1 overflow-y-auto p-4 font-mono text-[11px] selection:bg-emerald-500/30"
       >
-        <div v-if="filteredLogs.length === 0" class="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2 opacity-50">
+      <div v-if="filteredLogs.length === 0" class="flex h-full flex-col items-center justify-center space-y-2 text-zinc-600 opacity-50">
           <Terminal class="size-8" />
           <p>{{ t('admin.logs.waiting') }}</p>
         </div>
@@ -207,19 +207,3 @@ onMounted(async () => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-</style>

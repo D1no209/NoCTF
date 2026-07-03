@@ -24,7 +24,7 @@ public class SubmitFlagResponse
 
 /// <summary>
 /// POST /api/competitions/{id}/challenges/{challengeId}/submit
-/// Delegates to the CTF IGameMode plugin.
+/// Delegates flag-like submissions to the competition's registered game mode.
 /// </summary>
 public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGameMode> gameModes)
     : Endpoint<SubmitFlagRequest, SubmitFlagResponse>
@@ -44,8 +44,19 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
             return;
         }
 
-        var ctfGameMode = gameModes.FirstOrDefault(g => g.Type == GameModeType.Ctf);
-        if (ctfGameMode is null)
+        var competition = await dbContext.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == req.Id, ct);
+
+        if (competition is null)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        var gameMode = gameModes.FirstOrDefault(g => g.Type == competition.GameModeType);
+        if (gameMode is null)
         {
             AuditLogWriter.Add(
                 dbContext,
@@ -179,13 +190,16 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
             IpAddress: ipAddress
         );
 
-        var result = await ctfGameMode.ProcessSubmissionAsync(context, ct);
+        var result = await gameMode.ProcessSubmissionAsync(context, ct);
 
         var response = result switch
         {
             SubmissionResult.Accepted => new SubmitFlagResponse { Correct = true, AlreadySolved = false, Result = "accepted" },
             SubmissionResult.AlreadySolved => new SubmitFlagResponse { Correct = true, AlreadySolved = true, Result = "already_solved" },
             SubmissionResult.WrongFlag => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "wrong_flag" },
+            SubmissionResult.InstanceRequired => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "instance_required" },
+            SubmissionResult.InstanceExpired => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "instance_expired" },
+            SubmissionResult.AttemptsExhausted => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "attempts_exhausted" },
             _ => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = result.ToString().ToLowerInvariant() }
         };
 
