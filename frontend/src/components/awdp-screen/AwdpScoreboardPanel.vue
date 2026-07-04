@@ -42,10 +42,10 @@ function trendIcon(trend: AwdpTeamScore['trend']) {
 
 function trendClass(trend: AwdpTeamScore['trend']) {
   if (trend === 'up')
-    return 'text-emerald-200'
+    return 'trend-up'
   if (trend === 'down')
-    return 'text-rose-200'
-  return 'text-slate-400'
+    return 'trend-down'
+  return 'trend-stable'
 }
 
 function isActive(lastActiveAt?: string) {
@@ -63,23 +63,23 @@ function formatTime(value?: string) {
 </script>
 
 <template>
-  <section class="awdp-panel flex min-h-0 flex-col">
-    <div class="flex items-center justify-between border-b border-slate-200/10 px-4 py-3">
+  <section class="awdp-panel scoreboard-panel">
+    <div class="scoreboard-head">
       <div>
-        <h2 class="text-sm font-semibold text-slate-100">
-          Realtime scoreboard
+        <h2>
+          Scoreboard
         </h2>
-        <p class="text-xs text-slate-500">
-          Round-settled attack and defense totals
+        <p>
+          Round-settled break and fix ledger
         </p>
       </div>
-      <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-        <RotateCw v-if="pageCount > 1" class="size-3.5 text-slate-300" />
+      <div class="scoreboard-page">
+        <RotateCw v-if="pageCount > 1" class="size-3.5" />
         <span>{{ pageLabel }}</span>
       </div>
     </div>
 
-    <div v-if="visibleTeams.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-500">
+    <div v-if="visibleTeams.length === 0" class="scoreboard-empty">
       No teams are available for this screen.
     </div>
 
@@ -87,45 +87,40 @@ function formatTime(value?: string) {
       v-else
       name="score-row"
       tag="div"
-      class="min-h-0 flex-1 px-2.5 py-2.5"
+      class="score-list"
     >
       <div
         v-for="team in visibleTeams"
         :key="team.teamId"
-        class="score-row mb-1.5 grid min-h-[3.45rem] grid-cols-[2.35rem_minmax(0,1fr)_4.8rem] items-center gap-2 rounded-md border px-2.5 py-1.5"
-        :class="team.rank <= 3 ? 'border-slate-400/22 bg-slate-900/62' : 'border-slate-300/10 bg-slate-950/26'"
+        class="score-row"
+        :data-podium="team.rank <= 3"
       >
-        <div class="flex items-center gap-2">
-          <div
-            class="flex size-7 items-center justify-center rounded border font-mono text-xs font-semibold"
-            :class="team.rank <= 3 ? 'border-slate-300/30 text-slate-50' : 'border-slate-300/15 text-slate-300'"
-          >
-            {{ team.rank }}
-          </div>
+        <div class="score-rank">
+          {{ team.rank }}
         </div>
 
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="truncate text-sm font-semibold text-slate-100">{{ team.teamName }}</span>
+        <div class="score-team">
+          <div class="score-team-name">
+            <span>{{ team.teamName }}</span>
             <Circle
-              class="size-2.5 shrink-0"
-              :class="isActive(team.lastActiveAt) ? 'fill-emerald-300 text-emerald-300' : 'fill-slate-600 text-slate-600'"
+              class="score-active-dot"
+              :class="isActive(team.lastActiveAt) ? 'is-active' : ''"
             />
           </div>
-          <div class="mt-0.5 grid grid-cols-3 gap-1 text-[10px] text-slate-500">
-            <span>A {{ team.attackScore }}</span>
-            <span>D {{ team.defenseScore }}</span>
+          <div class="score-breakdown">
+            <span>B {{ team.attackScore }}</span>
+            <span>F {{ team.defenseScore }}</span>
             <span>R {{ team.currentRoundScore }}</span>
           </div>
         </div>
 
-        <div class="text-right">
-          <div class="font-mono text-lg font-semibold tabular-nums text-slate-50">
+        <div class="score-total">
+          <div>
             {{ team.totalScore }}
           </div>
-          <div class="mt-1 flex items-center justify-end gap-2 text-[11px]">
+          <div class="score-trend">
             <component :is="trendIcon(team.trend)" class="size-3.5" :class="trendClass(team.trend)" />
-            <span class="font-mono text-slate-500">{{ formatTime(team.lastActiveAt) }}</span>
+            <span>{{ formatTime(team.lastActiveAt) }}</span>
           </div>
         </div>
       </div>
@@ -134,11 +129,175 @@ function formatTime(value?: string) {
 </template>
 
 <style scoped>
+.scoreboard-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scoreboard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--awdp-screen-border);
+  padding: 0.78rem 0.9rem 0.68rem;
+}
+
+.scoreboard-head h2 {
+  margin: 0;
+  color: var(--sidebar-foreground);
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.scoreboard-head p {
+  margin: 0.16rem 0 0;
+  color: color-mix(in oklch, var(--sidebar-foreground) 44%, transparent);
+  font-size: 0.68rem;
+}
+
+.scoreboard-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: color-mix(in oklch, var(--sidebar-foreground) 48%, transparent);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.scoreboard-empty {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 1.5rem;
+  color: color-mix(in oklch, var(--sidebar-foreground) 45%, transparent);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.score-list {
+  min-height: 0;
+  flex: 1;
+  padding: 0.48rem;
+}
+
 .score-row {
+  display: grid;
+  grid-template-columns: 2.35rem minmax(0, 1fr) 5.2rem;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: calc((100% - 0.5rem * 7) / 8);
+  margin-bottom: 0.5rem;
+  border: 1px solid color-mix(in oklch, var(--sidebar-foreground) 10%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--awdp-screen-panel-raised) 48%, var(--awdp-screen-bg));
+  padding: 0.42rem 0.52rem;
   transition:
     transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
     background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
     border-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.score-row:last-child {
+  margin-bottom: 0;
+}
+
+.score-row[data-podium="true"] {
+  border-color: color-mix(in oklch, var(--awdp-warn) 30%, var(--awdp-screen-border));
+  background: color-mix(in oklch, var(--awdp-warn) 10%, var(--awdp-screen-panel-raised));
+}
+
+.score-rank {
+  display: grid;
+  width: 1.95rem;
+  height: 1.95rem;
+  place-items: center;
+  border: 1px solid color-mix(in oklch, var(--sidebar-foreground) 16%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-foreground);
+  font-size: 0.78rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-team {
+  min-width: 0;
+}
+
+.score-team-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.score-team-name span {
+  overflow: hidden;
+  color: var(--sidebar-foreground);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-active-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  fill: color-mix(in oklch, var(--sidebar-foreground) 26%, transparent);
+  color: color-mix(in oklch, var(--sidebar-foreground) 26%, transparent);
+}
+
+.score-active-dot.is-active {
+  fill: var(--awdp-fix);
+  color: var(--awdp-fix);
+}
+
+.score-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin-top: 0.18rem;
+  color: color-mix(in oklch, var(--sidebar-foreground) 42%, transparent);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-total {
+  text-align: right;
+}
+
+.score-total > div:first-child {
+  color: var(--sidebar-foreground);
+  font-size: 1.08rem;
+  font-weight: 850;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-trend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.28rem;
+  margin-top: 0.28rem;
+  color: color-mix(in oklch, var(--sidebar-foreground) 42%, transparent);
+  font-size: 0.62rem;
+}
+
+.trend-up {
+  color: var(--awdp-fix);
+}
+
+.trend-down {
+  color: var(--awdp-error);
+}
+
+.trend-stable {
+  color: color-mix(in oklch, var(--sidebar-foreground) 46%, transparent);
 }
 
 .score-row-move,

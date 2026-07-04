@@ -36,24 +36,24 @@ const timeText = computed(() => {
 </script>
 
 <template>
-  <header class="awdp-panel awdp-header-grid px-3 py-2.5">
-    <div class="flex min-w-0 items-center gap-3">
-      <div class="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-600/60 bg-slate-900 text-slate-200">
+  <header class="awdp-panel awdp-header-grid">
+    <div class="header-identity">
+      <div class="header-mark">
         <Activity class="size-5" />
       </div>
       <div class="min-w-0">
-        <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-400">
-          <span>AWDP command screen</span>
-          <span class="rounded border border-slate-500/30 px-2 py-0.5 text-slate-200">{{ statusLabel }}</span>
-          <span class="rounded border border-slate-300/15 px-2 py-0.5 text-slate-200">{{ phaseLabel }}</span>
+        <div class="header-kicker">
+          <span>AWDP LIVE COMMAND</span>
+          <span>{{ statusLabel }}</span>
+          <span>{{ phaseLabel }}</span>
         </div>
-        <h1 class="mt-1 truncate text-xl font-semibold text-slate-50">
+        <h1 class="header-title">
           {{ game.title }}
         </h1>
       </div>
     </div>
 
-    <div class="grid grid-cols-4 gap-2">
+    <div class="header-metrics">
       <div class="awdp-header-metric">
         <Clock3 class="size-4 text-slate-300" />
         <span>Round</span>
@@ -71,18 +71,18 @@ const timeText = computed(() => {
       </div>
       <div class="awdp-header-metric">
         <Swords class="size-4 text-slate-300" />
-        <span>Attack</span>
+        <span>Break</span>
         <strong>{{ stats.totalAttackCount }}</strong>
       </div>
     </div>
 
-    <div class="flex items-center justify-end gap-3">
-      <div class="rounded-md border border-slate-500/25 bg-slate-950/45 px-3 py-1.5 text-right">
-        <div class="flex items-center justify-end gap-2 text-[11px] font-semibold text-slate-400">
+    <div class="header-live">
+      <div class="round-clock">
+        <div class="round-clock-label">
           <Shield class="size-3.5" />
           Round timer
         </div>
-        <div class="font-mono text-2xl font-semibold tabular-nums text-slate-50">
+        <div class="round-clock-value">
           {{ timeText }}
         </div>
       </div>
@@ -99,9 +99,79 @@ const timeText = computed(() => {
 <style scoped>
 .awdp-header-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(34rem, 0.85fr) auto;
-  gap: 0.65rem;
+  grid-template-columns: minmax(0, 1.2fr) minmax(31rem, 0.86fr) auto;
+  gap: clamp(0.5rem, 0.7vw, 0.8rem);
   align-items: center;
+  min-height: 5.4rem;
+  padding: 0.72rem 0.85rem;
+}
+
+.header-identity,
+.header-live {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.header-identity {
+  gap: 0.85rem;
+}
+
+.header-live {
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.header-mark {
+  display: grid;
+  width: 2.85rem;
+  height: 2.85rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--awdp-screen-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--awdp-screen-panel-raised);
+  color: var(--awdp-break);
+}
+
+.header-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  color: color-mix(in oklch, var(--sidebar-foreground) 58%, transparent);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.header-kicker span {
+  border: 1px solid var(--awdp-screen-border);
+  border-radius: var(--radius-sm);
+  padding: 0.18rem 0.42rem;
+}
+
+.header-kicker span:first-child {
+  border-color: color-mix(in oklch, var(--awdp-break) 44%, transparent);
+  color: var(--awdp-break);
+}
+
+.header-title {
+  margin-top: 0.4rem;
+  overflow: hidden;
+  color: var(--sidebar-foreground);
+  font-size: clamp(1.15rem, 1.35vw, 1.55rem);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
 }
 
 .awdp-header-metric {
@@ -112,10 +182,10 @@ const timeText = computed(() => {
     "icon value";
   align-items: center;
   column-gap: 0.5rem;
-  min-height: 3rem;
-  border: 1px solid color-mix(in oklch, var(--sidebar-foreground) 14%, transparent);
+  min-height: 3.15rem;
+  border: 1px solid var(--awdp-screen-border);
   border-radius: var(--radius-md);
-  background: color-mix(in oklch, var(--sidebar) 72%, transparent);
+  background: color-mix(in oklch, var(--awdp-screen-panel-raised) 76%, var(--awdp-screen-bg));
   padding: 0.42rem 0.65rem;
 }
 
@@ -127,13 +197,42 @@ const timeText = computed(() => {
   grid-area: label;
   font-size: 0.68rem;
   font-weight: 700;
-  color: color-mix(in oklch, var(--sidebar-foreground) 66%, transparent);
+  color: color-mix(in oklch, var(--sidebar-foreground) 60%, transparent);
 }
 
 .awdp-header-metric strong {
   grid-area: value;
   color: var(--sidebar-foreground);
   font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.round-clock {
+  min-width: 8.6rem;
+  border: 1px solid color-mix(in oklch, var(--awdp-fix) 36%, var(--awdp-screen-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--awdp-screen-panel-raised) 82%, var(--awdp-screen-bg));
+  padding: 0.5rem 0.7rem;
+  text-align: right;
+}
+
+.round-clock-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  color: color-mix(in oklch, var(--sidebar-foreground) 62%, transparent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.round-clock-value {
+  margin-top: 0.12rem;
+  color: var(--sidebar-foreground);
+  font-size: clamp(1.45rem, 1.85vw, 2.2rem);
+  font-weight: 800;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 

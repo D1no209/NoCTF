@@ -10,7 +10,7 @@ const props = defineProps<{
   currentRound: number
 }>()
 
-type SenseMode = 'attack' | 'defense' | 'service'
+type SenseMode = 'break' | 'fix' | 'service'
 type SenseResult = 'success' | 'failed' | 'error'
 
 interface SenseEvent {
@@ -35,7 +35,7 @@ interface NodePoint {
   active: boolean
 }
 
-const ROTATE_MS = 3_400
+const ROTATE_MS = 3_600
 const activeIndex = ref(0)
 let rotateTimer: ReturnType<typeof setInterval> | null = null
 
@@ -49,7 +49,7 @@ const currentRoundLabel = computed(() => currentEvent.value?.round || props.curr
 const panelClass = computed(() => currentEvent.value ? `sense-${currentEvent.value.mode}-${currentEvent.value.result}` : 'sense-idle')
 
 const teamNodes = computed<NodePoint[]>(() => {
-  const teams = props.teams.slice(0, 8)
+  const teams = props.teams.slice(0, 9)
   const step = teams.length > 1 ? 300 / (teams.length - 1) : 0
   return teams.map((team, index) => ({
     id: team.teamId,
@@ -62,7 +62,7 @@ const teamNodes = computed<NodePoint[]>(() => {
 })
 
 const challengeNodes = computed<NodePoint[]>(() => {
-  const challenges = props.challenges.slice(0, 7)
+  const challenges = props.challenges.slice(0, 8)
   const step = challenges.length > 1 ? 292 / (challenges.length - 1) : 0
   return challenges.map((challenge, index) => ({
     id: challenge.challengeId,
@@ -96,16 +96,16 @@ onUnmounted(() => {
 
 function toSenseEvent(event: AwdpScreenEvent): SenseEvent | null {
   if (event.type === 'ATTACK_ACCEPTED') {
-    return buildSenseEvent(event, 'attack', 'success', 'ATTACK SUCCESS')
+    return buildSenseEvent(event, 'break', 'success', 'BREAK SUCCESS')
   }
   if (event.type === 'ATTACK_REJECTED') {
-    return buildSenseEvent(event, 'attack', 'failed', 'ATTACK FAILED')
+    return buildSenseEvent(event, 'break', 'failed', 'BREAK FAILED')
   }
   if (event.type === 'DEFENSE_CHECK_PASSED') {
-    return buildSenseEvent(event, 'defense', 'success', 'DEFENSE SUCCESS')
+    return buildSenseEvent(event, 'fix', 'success', 'FIX SUCCESS')
   }
   if (event.type === 'DEFENSE_CHECK_FAILED') {
-    return buildSenseEvent(event, 'defense', 'failed', 'DEFENSE FAILED')
+    return buildSenseEvent(event, 'fix', 'failed', 'FIX FAILED')
   }
   if (event.type === 'SERVICE_ERROR') {
     return buildSenseEvent(event, 'service', 'error', 'SERVICE ERROR')
@@ -134,9 +134,9 @@ function buildSenseEvent(
 }
 
 function modeIcon(mode?: SenseMode) {
-  if (mode === 'attack')
+  if (mode === 'break')
     return Swords
-  if (mode === 'defense')
+  if (mode === 'fix')
     return Shield
   if (mode === 'service')
     return TriangleAlert
@@ -149,10 +149,10 @@ function modeIcon(mode?: SenseMode) {
     <div class="sense-header">
       <div>
         <h2 class="text-sm font-semibold text-slate-100">
-          Center realtime awareness
+          Center realtime sensing
         </h2>
         <p class="text-xs text-slate-500">
-          Event result only, scores settle by round
+          Break, fix, and service results only
         </p>
       </div>
       <div class="sense-header-state">
@@ -169,11 +169,11 @@ function modeIcon(mode?: SenseMode) {
           <line x1="482" y1="210" x2="698" y2="210" />
         </g>
 
-        <g v-if="currentEvent?.mode === 'attack'" class="attack-path">
-          <path class="attack-beam attack-beam-in" d="M105 210 C175 172 245 172 330 210" />
+        <g v-if="currentEvent?.mode === 'break'" class="break-path">
+          <path class="break-beam break-beam-in" d="M105 210 C175 172 245 172 330 210" />
           <path
             v-if="currentEvent.result === 'success'"
-            class="attack-beam attack-beam-out beam-success"
+            class="break-beam break-beam-out beam-success"
             d="M470 210 C560 172 625 172 704 210"
           />
           <g v-else class="beam-fragments">
@@ -182,10 +182,10 @@ function modeIcon(mode?: SenseMode) {
           </g>
         </g>
 
-        <g v-if="currentEvent?.mode === 'defense'" class="defense-path">
-          <path class="defense-wave" d="M110 210 C202 244 254 244 338 210" />
+        <g v-if="currentEvent?.mode === 'fix'" class="fix-path">
+          <path class="fix-wave" d="M110 210 C202 244 254 244 338 210" />
           <path
-            class="defense-wave"
+            class="fix-wave"
             :class="currentEvent.result === 'success' ? 'wave-complete' : 'wave-broken'"
             d="M462 210 C548 244 612 244 694 210"
           />
@@ -238,7 +238,7 @@ function modeIcon(mode?: SenseMode) {
       </div>
 
       <div v-if="!currentEvent" class="sense-empty">
-        Waiting for real attack, defense, or service events.
+        Waiting for real break, fix, or service events.
       </div>
     </div>
 
@@ -257,18 +257,18 @@ function modeIcon(mode?: SenseMode) {
 
 <style scoped>
 .sense-panel {
-  --sense-border: color-mix(in oklch, var(--sidebar-foreground) 14%, transparent);
-  --sense-border-strong: color-mix(in oklch, var(--sidebar-foreground) 24%, transparent);
+  --sense-border: var(--awdp-screen-border);
+  --sense-border-strong: var(--awdp-screen-border-strong);
   --sense-muted: color-mix(in oklch, var(--sidebar-foreground) 56%, transparent);
   --sense-muted-soft: color-mix(in oklch, var(--sidebar-foreground) 38%, transparent);
   --sense-text: var(--sidebar-foreground);
-  --sense-panel-bg: color-mix(in oklch, var(--sidebar) 88%, black);
-  --sense-panel-bg-soft: color-mix(in oklch, var(--sidebar) 72%, transparent);
-  --sense-node: color-mix(in oklch, var(--sidebar-foreground) 22%, var(--sidebar));
-  --sense-attack: var(--chart-2);
-  --sense-defense: var(--chart-2);
-  --sense-failed: var(--chart-1);
-  --sense-error: var(--destructive);
+  --sense-panel-bg: color-mix(in oklch, var(--awdp-screen-panel-raised) 86%, var(--awdp-screen-bg));
+  --sense-panel-bg-soft: color-mix(in oklch, var(--awdp-screen-panel-raised) 62%, var(--awdp-screen-bg));
+  --sense-node: color-mix(in oklch, var(--sidebar-foreground) 18%, var(--awdp-screen-bg));
+  --sense-break: var(--awdp-break);
+  --sense-fix: var(--awdp-fix);
+  --sense-failed: var(--awdp-warn);
+  --sense-error: var(--awdp-error);
   display: flex;
   min-height: 0;
   flex-direction: column;
@@ -335,8 +335,8 @@ function modeIcon(mode?: SenseMode) {
   opacity: 0.7;
 }
 
-.attack-beam,
-.defense-wave,
+.break-beam,
+.fix-wave,
 .service-alert-line,
 .beam-fragments path {
   fill: none;
@@ -344,13 +344,13 @@ function modeIcon(mode?: SenseMode) {
   stroke-width: 4;
 }
 
-.attack-beam {
-  stroke: var(--sense-attack);
+.break-beam {
+  stroke: var(--sense-break);
   stroke-dasharray: 34 420;
   animation: beam-run 1500ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
-.attack-beam-out {
+.break-beam-out {
   animation-delay: 180ms;
 }
 
@@ -364,10 +364,10 @@ function modeIcon(mode?: SenseMode) {
   animation: beam-break 1200ms ease-out infinite;
 }
 
-.defense-wave {
-  stroke: var(--sense-defense);
+.fix-wave {
+  stroke: var(--sense-fix);
   stroke-dasharray: 22 14;
-  animation: defense-wave 1700ms ease-out infinite;
+  animation: fix-wave 1700ms ease-out infinite;
 }
 
 .wave-complete {
@@ -402,23 +402,23 @@ function modeIcon(mode?: SenseMode) {
 }
 
 .sense-node.active circle:first-child {
-  fill: var(--sense-attack);
+  fill: var(--sense-break);
   stroke: var(--sense-text);
 }
 
 .sense-node.active .node-ring {
-  stroke: var(--sense-attack);
+  stroke: var(--sense-break);
   animation: node-pulse 1200ms ease-out infinite;
 }
 
-.sense-defense-success .sense-node.active circle:first-child,
-.sense-defense-failed .sense-node.active circle:first-child {
-  fill: var(--sense-defense);
+.sense-fix-success .sense-node.active circle:first-child,
+.sense-fix-failed .sense-node.active circle:first-child {
+  fill: var(--sense-fix);
 }
 
-.sense-defense-success .sense-node.active .node-ring,
-.sense-defense-failed .sense-node.active .node-ring {
-  stroke: var(--sense-defense);
+.sense-fix-success .sense-node.active .node-ring,
+.sense-fix-failed .sense-node.active .node-ring {
+  stroke: var(--sense-fix);
 }
 
 .sense-service-error .sense-node.active circle:first-child {
@@ -452,17 +452,17 @@ function modeIcon(mode?: SenseMode) {
   animation: impact-ring 1400ms ease-out infinite;
 }
 
-.sense-attack-success .impact-zone circle {
-  stroke: var(--sense-attack);
+.sense-break-success .impact-zone circle {
+  stroke: var(--sense-break);
 }
 
-.sense-attack-failed .impact-zone circle,
-.sense-defense-failed .impact-zone circle {
+.sense-break-failed .impact-zone circle,
+.sense-fix-failed .impact-zone circle {
   stroke: var(--sense-failed);
 }
 
-.sense-defense-success .impact-zone circle {
-  stroke: var(--sense-defense);
+.sense-fix-success .impact-zone circle {
+  stroke: var(--sense-fix);
 }
 
 .sense-service-error .impact-zone circle {
@@ -485,9 +485,9 @@ function modeIcon(mode?: SenseMode) {
   border-radius: 50%;
 }
 
-.sense-defense-success .core-orbit,
-.sense-defense-failed .core-orbit {
-  border-color: var(--sense-defense);
+.sense-fix-success .core-orbit,
+.sense-fix-failed .core-orbit {
+  border-color: var(--sense-fix);
 }
 
 .sense-service-error .core-orbit {
@@ -496,7 +496,7 @@ function modeIcon(mode?: SenseMode) {
 
 .core-card {
   position: relative;
-  border: 1px solid var(--sense-attack);
+  border: 1px solid var(--sense-break);
   border-radius: var(--radius-md);
   background: var(--sense-panel-bg);
   padding: 1rem;
@@ -504,9 +504,9 @@ function modeIcon(mode?: SenseMode) {
   box-shadow: none;
 }
 
-.sense-defense-success .core-card,
-.sense-defense-failed .core-card {
-  border-color: var(--sense-defense);
+.sense-fix-success .core-card,
+.sense-fix-failed .core-card {
+  border-color: var(--sense-fix);
   box-shadow: none;
 }
 
@@ -530,12 +530,12 @@ function modeIcon(mode?: SenseMode) {
   letter-spacing: 0.02em;
 }
 
-.sense-defense-success .core-result {
-  color: var(--sense-defense);
+.sense-fix-success .core-result {
+  color: var(--sense-fix);
 }
 
-.sense-defense-failed .core-result,
-.sense-attack-failed .core-result {
+.sense-fix-failed .core-result,
+.sense-break-failed .core-result {
   color: var(--sense-failed);
 }
 
@@ -603,7 +603,7 @@ function modeIcon(mode?: SenseMode) {
   }
 }
 
-@keyframes defense-wave {
+@keyframes fix-wave {
   0% {
     opacity: 0;
     stroke-dashoffset: 70;
@@ -652,8 +652,8 @@ function modeIcon(mode?: SenseMode) {
 
 @media (prefers-reduced-motion: reduce) {
   .core-rings circle,
-  .attack-beam,
-  .defense-wave,
+  .break-beam,
+  .fix-wave,
   .service-alert-line,
   .beam-fragments path,
   .sense-node.active .node-ring,
