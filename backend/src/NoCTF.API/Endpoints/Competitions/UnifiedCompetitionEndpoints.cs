@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Application.Scoring;
+using NoCTF.Core;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Competitions;
@@ -44,6 +45,12 @@ public class GetCompetitionCapabilitiesEndpoint(
             .FirstOrDefaultAsync(c => c.Id == req.Id, ct);
 
         if (competition is null)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (!PublicCompetitionGuard.IsPublic(competition.Status))
         {
             await SendNotFoundAsync(ct);
             return;
@@ -107,11 +114,50 @@ public class PostCompetitionActionEndpoint(ApplicationDbContext db, ICompetition
             return;
         }
 
-        var teamId = await db.TeamMembers
+        if (!PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (PublicCompetitionGuard.ResolvePlayBlockReason(competition, DateTime.UtcNow) is { } blockReason)
+        {
+            await SendAsync(new CompetitionActionResponse
+            {
+                Success = false,
+                Code = blockReason
+            }, 403, ct);
+            return;
+        }
+
+        var team = await db.TeamMembers
             .IgnoreQueryFilters()
             .Where(tm => tm.CompetitionId == competitionId && tm.UserId == userId)
-            .Select(tm => (Guid?)tm.TeamId)
+            .Join(db.Teams.IgnoreQueryFilters().Where(t => t.CompetitionId == competitionId),
+                tm => tm.TeamId,
+                t => t.Id,
+                (_, t) => new { TeamId = t.Id, t.RegistrationStatus, t.IsBanned })
             .FirstOrDefaultAsync(ct);
+
+        if (team is { RegistrationStatus: not TeamRegistrationStatus.Approved })
+        {
+            await SendAsync(new CompetitionActionResponse
+            {
+                Success = false,
+                Code = "team_not_approved"
+            }, 403, ct);
+            return;
+        }
+
+        if (team is { IsBanned: true })
+        {
+            await SendAsync(new CompetitionActionResponse
+            {
+                Success = false,
+                Code = "team_banned"
+            }, 403, ct);
+            return;
+        }
 
         using var document = await JsonDocument.ParseAsync(HttpContext.Request.Body, cancellationToken: ct);
         var payloadJson = document.RootElement.GetRawText();
@@ -132,7 +178,7 @@ public class PostCompetitionActionEndpoint(ApplicationDbContext db, ICompetition
 
         var result = await provider.HandleActionAsync(new CompetitionActionContext(
             competitionId,
-            teamId,
+            team?.TeamId,
             userId,
             actionKey,
             payloadJson,
@@ -176,6 +222,18 @@ public class GetCompetitionViewEndpoint(ApplicationDbContext db, ICompetitionMod
             return;
         }
 
+        if (!PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendAsync(new CompetitionViewResult(viewKey, new { code = "competition_not_started" }), 403, ct);
+            return;
+        }
+
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         Guid? userId = Guid.TryParse(userIdClaim, out var parsedUserId) ? parsedUserId : null;
         Guid? teamId = null;
@@ -209,7 +267,7 @@ public class GetCompetitionViewEndpoint(ApplicationDbContext db, ICompetitionMod
     }
 }
 
-public class GetCompetitionScoreboardEndpoint(ILeaderboardProjectionBuilder projectionBuilder)
+public class GetCompetitionScoreboardEndpoint(ILeaderboardProjectionBuilder projectionBuilder, ApplicationDbContext db)
     : Endpoint<GetCompetitionScoreboardRequest, IReadOnlyList<ScoreboardRow>>
 {
     public override void Configure()
@@ -220,6 +278,24 @@ public class GetCompetitionScoreboardEndpoint(ILeaderboardProjectionBuilder proj
 
     public override async Task HandleAsync(GetCompetitionScoreboardRequest req, CancellationToken ct)
     {
+        var competition = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Id == req.Id)
+            .Select(c => new { c.Status, c.StartTime })
+            .FirstOrDefaultAsync(ct);
+        if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendAsync([], cancellation: ct);
+            return;
+        }
+
         var rows = await projectionBuilder.BuildAsync(req.Id, ct);
         await SendAsync(rows, cancellation: ct);
     }

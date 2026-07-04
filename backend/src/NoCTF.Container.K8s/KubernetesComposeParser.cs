@@ -31,7 +31,6 @@ public static class KubernetesComposeParser
         "restart",
         "security_opt",
         "cap_drop",
-        "cap_add",
         "read_only",
         "user",
         "deploy",
@@ -92,6 +91,7 @@ public static class KubernetesComposeParser
             var volumes = ReadVolumes(GetValue(service, "volumes"));
             if (volumes.Count > 0)
                 spec.Kubernetes.Volumes = volumes;
+            NormalizeAndValidateKubernetesSpec(spec.Kubernetes);
 
             result.Add(new KubernetesComposeService(
                 serviceName,
@@ -221,9 +221,8 @@ public static class KubernetesComposeParser
         if (capDrop.Count > 0)
             security.CapabilitiesDrop = capDrop;
 
-        var capAdd = ScalarList(GetValue(service, "cap_add"));
-        if (capAdd.Count > 0)
-            security.CapabilitiesAdd = capAdd;
+        if (GetValue(service, "cap_add") is not null)
+            throw new InvalidOperationException("Kubernetes runner does not allow adding Linux capabilities.");
 
         if (ReadBool(GetValue(service, "read_only")) is { } readOnly)
             security.ReadOnlyRootFilesystem = readOnly;
@@ -286,6 +285,8 @@ public static class KubernetesComposeParser
             throw new InvalidOperationException("Kubernetes runner compose volumes must target an absolute container path.");
 
         var source = parts.Length == 1 ? string.Empty : parts[0];
+        if (!string.IsNullOrWhiteSpace(source))
+            ValidateVolumeName(source);
         var readOnly = parts.Length > 2 && parts[2].Split(',').Any(p => p.Equals("ro", StringComparison.OrdinalIgnoreCase));
         return new KubernetesVolumeSpec
         {
@@ -305,13 +306,21 @@ public static class KubernetesComposeParser
             throw new InvalidOperationException("Kubernetes runner compose volumes must target an absolute container path.");
 
         var canonicalType = CanonicalVolumeType(type);
+        var name = string.IsNullOrWhiteSpace(source) ? VolumeNameFromPath(target) : source;
+        ValidateVolumeName(name);
+        var data = ReadStringMap(GetValue(map, "data"));
+        if ((canonicalType.Equals("secret", StringComparison.OrdinalIgnoreCase) ||
+             canonicalType.Equals("configMap", StringComparison.OrdinalIgnoreCase)) &&
+            data.Count == 0)
+            throw new InvalidOperationException("Kubernetes runner data volumes must declare inline data.");
+
         return new KubernetesVolumeSpec
         {
-            Name = string.IsNullOrWhiteSpace(source) ? VolumeNameFromPath(target) : source,
+            Name = name,
             MountPath = target,
             Type = canonicalType,
             ReadOnly = ReadBool(GetValue(map, "read_only")) ?? ReadBool(GetValue(map, "readOnly")) ?? canonicalType != "emptyDir",
-            Data = ReadStringMap(GetValue(map, "data"))
+            Data = data
         };
     }
 
@@ -427,6 +436,45 @@ public static class KubernetesComposeParser
         if (HasProperty(source, "annotations")) target.Annotations = overrides.Annotations;
         if (HasProperty(source, "labels")) target.Labels = overrides.Labels;
         if (HasProperty(source, "volumes")) target.Volumes = overrides.Volumes;
+    }
+
+    private static void NormalizeAndValidateKubernetesSpec(KubernetesOrchestrationSpec spec)
+    {
+        var security = spec.Security;
+        if (security.AllowPrivilegeEscalation)
+            throw new InvalidOperationException("Kubernetes runner does not allow privilege escalation.");
+        if (security.RunAsNonRoot == false)
+            throw new InvalidOperationException("Kubernetes runner requires runAsNonRoot.");
+        if (security.RunAsUser is 0 || security.RunAsGroup is 0)
+            throw new InvalidOperationException("Kubernetes runner cannot run workloads as root.");
+        if (security.CapabilitiesAdd.Count > 0)
+            throw new InvalidOperationException("Kubernetes runner does not allow adding Linux capabilities.");
+
+        security.RunAsNonRoot ??= true;
+        security.RunAsUser ??= 1000;
+        security.RunAsGroup ??= 1000;
+        if (security.CapabilitiesDrop.Count == 0)
+            security.CapabilitiesDrop = ["ALL"];
+
+        foreach (var volume in spec.Volumes)
+        {
+            ValidateVolumeName(volume.Name);
+            if ((volume.Type.Equals("secret", StringComparison.OrdinalIgnoreCase) ||
+                 volume.Type.Equals("configMap", StringComparison.OrdinalIgnoreCase)) &&
+                volume.Data.Count == 0)
+                throw new InvalidOperationException("Kubernetes runner data volumes must declare inline data.");
+        }
+    }
+
+    private static void ValidateVolumeName(string name)
+    {
+        var safe = KubernetesNames.SafeName(name);
+        if (string.IsNullOrWhiteSpace(safe))
+            throw new InvalidOperationException("Kubernetes volume name cannot be empty.");
+        if (safe.StartsWith("registry-", StringComparison.OrdinalIgnoreCase) ||
+            safe.StartsWith("noctf-", StringComparison.OrdinalIgnoreCase) ||
+            safe.StartsWith("default-token", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Kubernetes volume name is reserved: {name}");
     }
 
     private static bool HasProperty(JsonElement element, string name)

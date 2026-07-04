@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Infrastructure;
+using NoCTF.Core;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -17,18 +18,19 @@ public class GetUsersEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRe
     public override void Configure()
     {
         Get("/api/admin/users");
-        Roles("Admin");
+        Roles("Admin", "Organizer");
     }
 
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)
     {
+        var isAdmin = User.IsInRole(UserRole.Admin.ToString());
         var users = await dbContext.Users
             .Select(u => new UserDto
             {
                 Id = u.Id,
                 UserName = u.UserName,
-                Email = u.Email,
-                Role = u.Role.ToString().ToLowerInvariant()
+                Email = isAdmin ? u.Email : string.Empty,
+                Role = isAdmin ? u.Role.ToString().ToLowerInvariant() : string.Empty
             })
             .ToListAsync(ct);
 

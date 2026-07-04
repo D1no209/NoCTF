@@ -42,11 +42,14 @@ public class AwdpPatchService(
         if (competition is null || competition.GameModeType != GameModeType.Awdp)
             return new AwdpPatchSubmitResult(false, "mode_unavailable");
 
-        if (now < competition.StartTime)
+        if (now < competition.StartTime || competition.Status == CompetitionStatus.Draft)
             return new AwdpPatchSubmitResult(false, "competition_not_started");
 
-        if (now > competition.EndTime)
+        if (now > competition.EndTime || competition.Status == CompetitionStatus.Finished)
             return new AwdpPatchSubmitResult(false, "competition_ended");
+
+        if (competition.Status == CompetitionStatus.Paused)
+            return new AwdpPatchSubmitResult(false, "competition_paused");
 
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
@@ -280,7 +283,7 @@ public class AwdpPatchService(
         if (oldInstance is not null)
             await DestroyContainerInstanceAsync(oldInstance, ct);
 
-        var checkResult = await RunCheckAsync(challenge, submission, ct);
+        var checkResult = await RunCheckAsync(challenge, submission, gameBox, ct);
         if (checkResult.FixStatus != AwdpFixStatus.FixSuccess)
         {
             await RollbackAsync(challenge, gameBox, patchedContainer, ct);
@@ -360,7 +363,8 @@ public class AwdpPatchService(
             EnvironmentVariables: BuildPatchEnvironment(submission),
             Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
             PortMappings: BuildPortMappings(challenge),
-            OrchestrationJson: challenge.OrchestrationJson);
+            OrchestrationJson: challenge.OrchestrationJson,
+            NetworkAliases: [BuildGameBoxAlias(submission.TeamId, submission.ChallengeId)]);
 
         return await containerManager.CreateContainerAsync(patchedContainerConfig, ct);
     }
@@ -368,6 +372,7 @@ public class AwdpPatchService(
     private async Task<CheckOutcome> RunCheckAsync(
         Challenge challenge,
         AwdpPatchSubmission submission,
+        AwdGameBox gameBox,
         CancellationToken ct)
     {
         if (challenge.CheckerConfig?.Image is null)
@@ -383,6 +388,7 @@ public class AwdpPatchService(
             Image: challenge.CheckerConfig.Image,
             Command: challenge.CheckerConfig.Command,
             EnvironmentVariables: BuildCheckEnvironment(submission),
+            NetworkName: gameBox.OrchestrationNamespace,
             Ttl: timeout);
 
         try
@@ -433,7 +439,8 @@ public class AwdpPatchService(
             Image: challenge.ContainerImage!,
             Labels: BuildLabels(gameBox.CompetitionId, gameBox.TeamId, gameBox.ChallengeId),
             PortMappings: BuildPortMappings(challenge),
-            OrchestrationJson: challenge.OrchestrationJson);
+            OrchestrationJson: challenge.OrchestrationJson,
+            NetworkAliases: [BuildGameBoxAlias(gameBox.TeamId, gameBox.ChallengeId)]);
 
         try
         {
@@ -548,10 +555,16 @@ public class AwdpPatchService(
     private static Dictionary<string, string> BuildProbeEnvironment(AwdpPatchSubmission submission)
         => new()
         {
-            ["TARGET_HOST"] = $"gamebox-{submission.TeamId:N}-{submission.ChallengeId:N}",
+            ["TARGET_HOST"] = BuildGameBoxAlias(submission.TeamId, submission.ChallengeId),
             ["TARGET_PORT"] = "80",
             ["TEAM_ID"] = submission.TeamId.ToString()
         };
+
+    private static string BuildGameBoxAlias(Guid teamId, Guid challengeId)
+        => $"gamebox-{ShortId(teamId)}-{ShortId(challengeId)}";
+
+    private static string ShortId(Guid id)
+        => id.ToString("N")[..8];
 
     private static Dictionary<string, string> BuildCheckEnvironment(AwdpPatchSubmission submission)
     {

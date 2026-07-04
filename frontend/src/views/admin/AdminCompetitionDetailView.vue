@@ -199,6 +199,10 @@ const qc = useQueryClient()
 const { t } = useI18n()
 const competitionId = computed(() => String(route.params.id))
 const selectedChallengeId = ref<string | null>(null)
+const challengeListSearch = ref('')
+const challengeDirectionFilter = ref('all')
+const challengeListPage = ref(1)
+const challengeListPageSize = 12
 const competitionDetailSections = [
   { key: 'overview', labelKey: 'admin.competitionDetail.navOverview' },
   { key: 'settings', labelKey: 'admin.competitionDetail.navSettings' },
@@ -452,6 +456,36 @@ const showInstanceOperations = computed(
     penetrationInstances.value.length > 0,
 )
 const deployedChallengeCount = computed(() => competitionChallenges.value?.length ?? 0)
+const challengeDirections = computed(() =>
+  Array.from(
+    new Set(
+      (competitionChallenges.value ?? [])
+        .map((challenge) => challenge.typeId?.trim())
+        .filter((direction): direction is string => Boolean(direction)),
+    ),
+  ).sort((first, second) => first.localeCompare(second)),
+)
+const filteredCompetitionChallenges = computed(() => {
+  const keyword = challengeListSearch.value.trim().toLowerCase()
+  const direction = challengeDirectionFilter.value.toLowerCase()
+
+  return (competitionChallenges.value ?? []).filter((challenge) => {
+    const matchesDirection =
+      direction === 'all' || challenge.typeId?.toLowerCase() === direction
+    const matchesKeyword =
+      !keyword ||
+      challenge.title.toLowerCase().includes(keyword) ||
+      challenge.typeId?.toLowerCase().includes(keyword)
+    return matchesDirection && matchesKeyword
+  })
+})
+const challengeListPageCount = computed(() =>
+  Math.max(1, Math.ceil(filteredCompetitionChallenges.value.length / challengeListPageSize)),
+)
+const paginatedCompetitionChallenges = computed(() => {
+  const start = (challengeListPage.value - 1) * challengeListPageSize
+  return filteredCompetitionChallenges.value.slice(start, start + challengeListPageSize)
+})
 const teamCount = computed(() => competitionTeams.value?.length ?? 0)
 const pendingTeamCount = computed(
   () =>
@@ -466,6 +500,14 @@ const unresolvedCheatCount = computed(
   () => (cheatIncidents.value ?? []).filter((incident) => !incident.resolved).length,
 )
 const latestCompetitionLog = computed(() => competitionLogs.value?.[0] ?? null)
+
+watch([challengeListSearch, challengeDirectionFilter], () => {
+  challengeListPage.value = 1
+})
+
+watch(challengeListPageCount, (pageCount) => {
+  if (challengeListPage.value > pageCount) challengeListPage.value = pageCount
+})
 
 watch(
   competition,
@@ -2376,6 +2418,29 @@ function sectionRoute(section: CompetitionDetailSection) {
               {{ t('admin.competitionDetail.competitionChallengesDescription') }}
             </p>
           </div>
+          <div class="grid gap-3 border-b p-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
+            <Input
+              v-model="challengeListSearch"
+              :placeholder="t('admin.competitionDetail.challengeSearchPlaceholder')"
+            />
+            <Select v-model="challengeDirectionFilter">
+              <SelectTrigger>
+                <SelectValue :placeholder="t('admin.competitionDetail.directionFilter')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  {{ t('admin.competitionDetail.allDirections') }}
+                </SelectItem>
+                <SelectItem
+                  v-for="direction in challengeDirections"
+                  :key="direction"
+                  :value="direction.toLowerCase()"
+                >
+                  {{ direction }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -2396,8 +2461,13 @@ function sectionRoute(section: CompetitionDetailSection) {
                   {{ t('admin.competitionDetail.noDeployedChallenges') }}
                 </TableCell>
               </TableRow>
+              <TableRow v-else-if="!filteredCompetitionChallenges.length">
+                <TableCell colspan="3" class="h-20 text-center text-muted-foreground">
+                  {{ t('common.noResults') }}
+                </TableCell>
+              </TableRow>
               <TableRow
-                v-for="challenge in competitionChallenges"
+                v-for="challenge in paginatedCompetitionChallenges"
                 v-else
                 :key="challenge.id"
                 class="cursor-pointer hover:bg-muted/50"
@@ -2442,6 +2512,45 @@ function sectionRoute(section: CompetitionDetailSection) {
               </TableRow>
             </TableBody>
           </Table>
+          <div
+            v-if="filteredCompetitionChallenges.length"
+            class="flex flex-col gap-3 border-t p-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>
+              {{
+                t('admin.competitionDetail.challengeListCount', {
+                  shown: paginatedCompetitionChallenges.length,
+                  total: filteredCompetitionChallenges.length,
+                })
+              }}
+            </span>
+            <div class="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                :disabled="challengeListPage <= 1"
+                @click="challengeListPage -= 1"
+              >
+                {{ t('common.previous') }}
+              </Button>
+              <span class="min-w-16 text-center">
+                {{
+                  t('common.pageOf', {
+                    page: challengeListPage,
+                    total: challengeListPageCount,
+                  })
+                }}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                :disabled="challengeListPage >= challengeListPageCount"
+                @click="challengeListPage += 1"
+              >
+                {{ t('common.next') }}
+              </Button>
+            </div>
+          </div>
         </div>
       </aside>
     </div>

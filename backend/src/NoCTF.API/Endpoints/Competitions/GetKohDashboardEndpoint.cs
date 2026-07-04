@@ -53,9 +53,19 @@ public class GetKohDashboardEndpoint(ApplicationDbContext dbContext)
             .Where(c => c.Id == req.Id)
             .FirstOrDefaultAsync(ct);
 
-        if (competition is null)
+        if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
         {
             await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendAsync(new KohDashboardDto
+            {
+                CompetitionId = req.Id,
+                Challenges = []
+            }, cancellation: ct);
             return;
         }
 
@@ -66,7 +76,10 @@ public class GetKohDashboardEndpoint(ApplicationDbContext dbContext)
 
         var teamIds = await dbContext.Teams
             .IgnoreQueryFilters()
-            .Where(t => t.CompetitionId == req.Id)
+            .Where(t =>
+                t.CompetitionId == req.Id &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned)
             .ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
         var controlRecords = await dbContext.KohControlRecords

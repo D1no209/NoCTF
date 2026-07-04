@@ -358,7 +358,13 @@ export const teamApi = {
     )
   },
   async leave(teamId: string) {
-    await client.post({ url: '/api/teams/{teamId}/leave', path: { teamId } })
+    return unwrap(
+      await client.post<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/teams/{teamId}/leave',
+        path: { teamId },
+      }),
+      'Failed to leave team',
+    )
   },
   async update(
     id: string,
@@ -370,17 +376,23 @@ export const teamApi = {
     )
   },
   async transferCaptain(teamId: string, newCaptainUserId: string) {
-    await client.post({
-      url: '/api/teams/{teamId}/transfer-captain',
-      path: { teamId },
-      body: { newCaptainUserId },
-    })
+    return unwrap(
+      await client.post<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/teams/{teamId}/transfer-captain',
+        path: { teamId },
+        body: { newCaptainUserId },
+      }),
+      'Failed to transfer captain',
+    )
   },
   async removeMember(teamId: string, userId: string) {
-    await client.delete({
-      url: '/api/teams/{teamId}/members/{userId}',
-      path: { teamId, userId },
-    })
+    return unwrap(
+      await client.delete<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/teams/{teamId}/members/{userId}',
+        path: { teamId, userId },
+      }),
+      'Failed to remove team member',
+    )
   },
 }
 
@@ -417,7 +429,13 @@ export const adminApi = {
     )
   },
   async deleteCompetition(id: string) {
-    await client.delete({ url: '/api/admin/competitions/{id}', path: { id } })
+    return unwrap(
+      await client.delete<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/admin/competitions/{id}',
+        path: { id },
+      }),
+      'Failed to delete competition',
+    )
   },
   async users<T = unknown[]>() {
     return unwrap(
@@ -426,14 +444,24 @@ export const adminApi = {
     )
   },
   async updateUserRole(id: string, role: string) {
-    await client.post({ url: '/api/admin/users/{id}/role', path: { id }, body: { role } })
+    return unwrap(
+      await client.post<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/admin/users/{id}/role',
+        path: { id },
+        body: { role },
+      }),
+      'Failed to update user role',
+    )
   },
   async resetUserPassword(id: string, newPassword: string) {
-    await client.post({
-      url: '/api/admin/users/{id}/reset-password',
-      path: { id },
-      body: { newPassword },
-    })
+    return unwrap(
+      await client.post<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/admin/users/{id}/reset-password',
+        path: { id },
+        body: { newPassword },
+      }),
+      'Failed to reset user password',
+    )
   },
   async teams<T = unknown[]>() {
     return unwrap(
@@ -442,7 +470,13 @@ export const adminApi = {
     )
   },
   async deleteTeam(id: string) {
-    await client.delete({ url: '/api/admin/teams/{id}', path: { id } })
+    return unwrap(
+      await client.delete<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/admin/teams/{id}',
+        path: { id },
+      }),
+      'Failed to delete team',
+    )
   },
   async teamMembers<T = unknown[]>(teamId: string) {
     return unwrap(
@@ -574,7 +608,13 @@ export const adminApi = {
     )
   },
   async deleteChallenge(id: string) {
-    await client.delete({ url: '/api/admin/challenges/{id}', path: { id } })
+    return unwrap(
+      await client.delete<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/admin/challenges/{id}',
+        path: { id },
+      }),
+      'Failed to delete challenge',
+    )
   },
   async revealChallengeSecret<T = unknown>(id: string) {
     return unwrap(
@@ -619,10 +659,13 @@ export const adminApi = {
     )
   },
   async deleteCompetitionChallenge(competitionId: string, challengeId: string) {
-    await client.delete({
-      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}',
-      path: { competitionId, challengeId },
-    })
+    return unwrap(
+      await client.delete<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}',
+        path: { competitionId, challengeId },
+      }),
+      'Failed to delete competition challenge',
+    )
   },
   async restartCompetitionChallengeContainer<T = unknown>(
     competitionId: string,
@@ -724,17 +767,23 @@ export const adminApi = {
     )
   },
   async addCollaborator(competitionId: string, body: unknown) {
-    await client.post({
-      url: '/api/competitions/{competitionId}/collaborators',
-      path: { competitionId },
-      body,
-    })
+    return unwrap(
+      await client.post<{ 200: unknown; 201: unknown; 204: unknown }, unknown, false>({
+        url: '/api/competitions/{competitionId}/collaborators',
+        path: { competitionId },
+        body,
+      }),
+      'Failed to add collaborator',
+    )
   },
   async removeCollaborator(competitionId: string, userId: string) {
-    await client.delete({
-      url: '/api/competitions/{competitionId}/collaborators/{userId}',
-      path: { competitionId, userId },
-    })
+    return unwrap(
+      await client.delete<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/competitions/{competitionId}/collaborators/{userId}',
+        path: { competitionId, userId },
+      }),
+      'Failed to remove collaborator',
+    )
   },
   async containers<T = unknown[]>() {
     return unwrap(
@@ -743,7 +792,13 @@ export const adminApi = {
     )
   },
   async destroyContainer(containerId: string) {
-    await client.delete({ url: '/api/admin/containers/{containerId}', path: { containerId } })
+    return unwrap(
+      await client.delete<{ 200: unknown; 204: unknown }, unknown, false>({
+        url: '/api/admin/containers/{containerId}',
+        path: { containerId },
+      }),
+      'Failed to destroy container',
+    )
   },
   async plugins<T = unknown[]>() {
     return unwrap(

@@ -10,7 +10,7 @@ internal static class DockerHostConfigFactory
         var limits = config.ResourceLimits ?? new ContainerResourceLimits();
         var policy = config.SecurityPolicy ?? new ContainerSecurityPolicy();
         var capDrop = policy.CapDrop?.ToList() ?? ["ALL"];
-        var capAdd = policy.CapAdd?.ToList() ?? ["SYS_CHROOT", "SETUID", "SETGID"];
+        var capAdd = policy.CapAdd?.ToList() ?? [];
         var securityOpt = policy.NoNewPrivileges ? ["no-new-privileges:true"] : new List<string>();
 
         return new HostConfig
@@ -27,5 +27,11 @@ internal static class DockerHostConfigFactory
             ReadonlyRootfs = policy.ReadonlyRootfs,
             AutoRemove = false
         };
+    }
+
+    public static string? ResolveUser(ContainerConfig config)
+    {
+        var policy = config.SecurityPolicy ?? new ContainerSecurityPolicy();
+        return policy.RunAsNonRoot ? "1000:1000" : null;
     }
 }

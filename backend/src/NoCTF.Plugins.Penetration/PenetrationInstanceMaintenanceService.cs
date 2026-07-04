@@ -278,7 +278,10 @@ public class PenetrationInstanceMaintenanceService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Best-effort compose down failed for penetration instance {InstanceId}.", instance.Id);
+            logger.LogWarning(ex, "Compose down failed for penetration instance {InstanceId}. Runtime state is preserved for retry.", instance.Id);
+            instance.LastError = ex.Message;
+            instance.UpdatedAt = DateTime.UtcNow;
+            throw;
         }
     }
 

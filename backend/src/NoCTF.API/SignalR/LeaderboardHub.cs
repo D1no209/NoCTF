@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using NoCTF.API.Permissions;
+using NoCTF.Infrastructure;
 
 namespace NoCTF.API.SignalR;
 
@@ -8,7 +10,9 @@ namespace NoCTF.API.SignalR;
 /// Clients connect with ?competitionId=xxx query string.
 /// </summary>
 [Authorize]
-public class LeaderboardHub : Hub<ILeaderboardClient>
+public class LeaderboardHub(
+    ApplicationDbContext db,
+    ICompetitionPermissionService permissions) : Hub<ILeaderboardClient>
 {
     private const string GroupPrefix = "Competition_";
 
@@ -16,7 +20,13 @@ public class LeaderboardHub : Hub<ILeaderboardClient>
     {
         var competitionId = Context.GetHttpContext()?.Request.Query["competitionId"].ToString();
 
-        if (string.IsNullOrWhiteSpace(competitionId) || !Guid.TryParse(competitionId, out _))
+        if (string.IsNullOrWhiteSpace(competitionId) || !Guid.TryParse(competitionId, out var parsedCompetitionId))
+        {
+            Context.Abort();
+            return;
+        }
+
+        if (!await CompetitionRealtimeAccess.CanJoinCompetitionGroupAsync(Context, db, permissions, parsedCompetitionId))
         {
             Context.Abort();
             return;

@@ -39,11 +39,14 @@ public class AwdpGameMode(
         if (competition is null || competition.GameModeType != GameModeType.Awdp)
             return SubmissionResult.NotImplemented;
 
-        if (now < competition.StartTime)
+        if (now < competition.StartTime || competition.Status == CompetitionStatus.Draft)
             return SubmissionResult.CompetitionNotStarted;
 
-        if (now > competition.EndTime)
+        if (now > competition.EndTime || competition.Status == CompetitionStatus.Finished)
             return SubmissionResult.CompetitionEnded;
+
+        if (competition.Status == CompetitionStatus.Paused)
+            return SubmissionResult.CompetitionPaused;
 
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
@@ -117,7 +120,7 @@ public class AwdpGameMode(
             TeamId = context.TeamId,
             ChallengeId = context.ChallengeId,
             UserId = context.UserId,
-            FlagContent = context.FlagContent,
+            FlagContent = RedactSubmittedFlag(context.FlagContent),
             IsCorrect = isCorrect && !hasPriorCorrectBreak,
             SubmittedAt = now,
             IpAddress = context.IpAddress
@@ -224,5 +227,11 @@ public class AwdpGameMode(
         var expectedBytes = Encoding.UTF8.GetBytes(expected.Trim());
         return submittedBytes.Length == expectedBytes.Length &&
                CryptographicOperations.FixedTimeEquals(submittedBytes, expectedBytes);
+    }
+
+    private static string RedactSubmittedFlag(string submittedFlag)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(submittedFlag));
+        return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()};len:{submittedFlag.Length}";
     }
 }

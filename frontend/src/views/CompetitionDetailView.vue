@@ -580,7 +580,12 @@ function withChallengeProgress(challenge: Challenge): Challenge {
             <CardTitle>{{ t('scoreboard.fullBoard') }}</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScoreboardView :competition-id="competitionId" :team-id="approvedTeam?.id" full />
+            <ScoreboardView
+              :key="competitionId"
+              :competition-id="competitionId"
+              :team-id="approvedTeam?.id"
+              full
+            />
           </CardContent>
         </Card>
       </div>

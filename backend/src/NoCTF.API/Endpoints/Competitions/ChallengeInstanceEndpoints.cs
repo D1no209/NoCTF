@@ -152,6 +152,26 @@ public class GetChallengeInstanceEndpoint(ApplicationDbContext dbContext, IConfi
         }
 
         var now = DateTime.UtcNow;
+        if (PublicCompetitionGuard.ResolvePlayBlockReason(context.Competition!, now) is { } blockReason)
+        {
+            if (context.Box is not null && context.Box.ContainerInstanceId is not null)
+            {
+                await CreateChallengeInstanceEndpoint.DestroyTrackedBoxAsync(
+                    dbContext,
+                    containerManager,
+                    context.Box,
+                    HttpContext,
+                    blockReason,
+                    userId,
+                    updateCooldown: false,
+                    ct);
+                await dbContext.SaveChangesAsync(ct);
+            }
+
+            await SendStringAsync(blockReason, 403, cancellation: ct);
+            return;
+        }
+
         if (context.Box is not null && context.Box.ContainerInstanceId is not null && !ChallengeInstanceRuntime.IsActive(context.Box, now))
         {
             await CreateChallengeInstanceEndpoint.DestroyTrackedBoxAsync(
@@ -195,6 +215,26 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         }
 
         var now = DateTime.UtcNow;
+        if (PublicCompetitionGuard.ResolvePlayBlockReason(context.Competition!, now) is { } blockReason)
+        {
+            if (context.Box is not null && context.Box.ContainerInstanceId is not null)
+            {
+                await DestroyTrackedBoxAsync(
+                    dbContext,
+                    containerManager,
+                    context.Box,
+                    HttpContext,
+                    blockReason,
+                    userId,
+                    updateCooldown: false,
+                    ct);
+                await dbContext.SaveChangesAsync(ct);
+            }
+
+            await SendStringAsync(blockReason, 403, cancellation: ct);
+            return;
+        }
+
         if (ChallengeInstanceRuntime.IsActive(context.Box, now))
         {
             await SendAsync(ChallengeInstanceRuntime.BuildResponse(context.Box, configuration, HttpContext, now), cancellation: ct);
@@ -290,6 +330,12 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         if (team.RegistrationStatus != TeamRegistrationStatus.Approved) return ChallengeInstanceContext.Fail("team_not_approved", 403);
         if (team.IsBanned) return ChallengeInstanceContext.Fail("team_banned", 403);
 
+        var competition = await dbContext.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == req.Id, ct);
+        if (competition is null) return ChallengeInstanceContext.Fail("competition_not_found", 404);
+
         var challenge = await dbContext.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -304,7 +350,7 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(g => g.CompetitionId == req.Id && g.TeamId == team.Id && g.ChallengeId == req.ChallengeId, ct);
 
-        return new ChallengeInstanceContext(team, challenge, box, null);
+        return new ChallengeInstanceContext(team, competition, challenge, box, null);
     }
 
     private async Task<CtfDynamicFlag> UpsertDynamicFlagAsync(Challenge challenge, Guid teamId, CancellationToken ct)
@@ -368,8 +414,15 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             PortMappings: ports,
             Entrypoint: spec.Entrypoint.Count > 0 ? spec.Entrypoint : null,
             OrchestrationJson: challenge.OrchestrationJson,
-            Ttl: ChallengeInstanceRuntime.InstanceTtl);
+            Ttl: ChallengeInstanceRuntime.InstanceTtl,
+            NetworkAliases: teamId.HasValue ? [BuildGameBoxAlias(teamId.Value, challenge.Id)] : null);
     }
+
+    internal static string BuildGameBoxAlias(Guid teamId, Guid challengeId)
+        => $"gamebox-{ShortId(teamId)}-{ShortId(challengeId)}";
+
+    private static string ShortId(Guid id)
+        => id.ToString("N")[..8];
 
     private static string FormatFlag(Challenge challenge, string content)
     {
@@ -543,6 +596,12 @@ public class ExtendChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         }
 
         var now = DateTime.UtcNow;
+        if (PublicCompetitionGuard.ResolvePlayBlockReason(context.Competition!, now) is { } blockReason)
+        {
+            await SendStringAsync(blockReason, 403, cancellation: ct);
+            return;
+        }
+
         if (!ChallengeInstanceRuntime.IsActive(context.Box, now))
         {
             await SendStringAsync("instance_not_running", 404, cancellation: ct);
@@ -591,10 +650,11 @@ internal readonly record struct ChallengeInstanceError(string Message, int Statu
 
 internal sealed record ChallengeInstanceContext(
     Team? Team,
+    Competition? Competition,
     Challenge? Challenge,
     AwdGameBox? Box,
     ChallengeInstanceError? Error)
 {
     public static ChallengeInstanceContext Fail(string message, int statusCode)
-        => new(null, null, null, new ChallengeInstanceError(message, statusCode));
+        => new(null, null, null, null, new ChallengeInstanceError(message, statusCode));
 }

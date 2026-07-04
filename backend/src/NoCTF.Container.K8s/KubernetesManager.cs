@@ -21,8 +21,10 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
         spec.ExposedPort ??= config.PortMappings?.Keys.FirstOrDefault(port => port > 0);
         config = ApplyOrchestrationConfig(config, spec);
 
-        var name = KubernetesNames.SafeName($"ctf-{Path.GetFileNameWithoutExtension(spec.Image).Split(':')[0]}-{Guid.NewGuid():N}");
-        var namespaceName = KubernetesNames.InstanceNamespace(_options.NamespacePrefix, name);
+        var nameSeed = config.NetworkAliases?.FirstOrDefault(alias => !string.IsNullOrWhiteSpace(alias))
+            ?? $"ctf-{Path.GetFileNameWithoutExtension(spec.Image).Split(':')[0]}-{Guid.NewGuid():N}";
+        var name = KubernetesNames.SafeName(nameSeed);
+        var namespaceName = KubernetesNames.InstanceNamespace(_options.NamespacePrefix, $"{name}-{Guid.NewGuid():N}");
         await PrepareNamespaceAsync(namespaceName, spec, config.Labels, cancellationToken);
 
         try
@@ -83,8 +85,14 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
         config = ApplyOrchestrationConfig(config, spec);
 
         var name = KubernetesNames.SafeName($"job-{Guid.NewGuid():N}");
-        var namespaceName = KubernetesNames.InstanceNamespace(_options.NamespacePrefix, name);
-        await PrepareNamespaceAsync(namespaceName, spec, config.Labels, cancellationToken);
+        var ownsNamespace = string.IsNullOrWhiteSpace(config.NetworkName);
+        var namespaceName = ownsNamespace
+            ? KubernetesNames.InstanceNamespace(_options.NamespacePrefix, name)
+            : config.NetworkName!;
+        if (ownsNamespace)
+            await PrepareNamespaceAsync(namespaceName, spec, config.Labels, cancellationToken);
+        else
+            await EnsureManagedNamespaceAsync(namespaceName, cancellationToken);
         var started = DateTime.UtcNow;
 
         try
@@ -125,7 +133,10 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
         }
         finally
         {
-            await DeleteNamespaceBestEffortAsync(namespaceName);
+            if (ownsNamespace)
+                await DeleteNamespaceBestEffortAsync(namespaceName);
+            else
+                await DeleteJobBestEffortAsync(namespaceName, name);
         }
     }
 
@@ -517,6 +528,26 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to delete Kubernetes namespace {Namespace}.", namespaceName);
+        }
+    }
+
+    private async Task DeleteJobBestEffortAsync(string namespaceName, string jobName)
+    {
+        try
+        {
+            using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await _client.BatchV1.DeleteNamespacedJobAsync(
+                jobName,
+                namespaceName,
+                body: new V1DeleteOptions { PropagationPolicy = "Background" },
+                cancellationToken: cleanupCts.Token);
+        }
+        catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
+        {
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to delete Kubernetes job {Namespace}/{Job}.", namespaceName, jobName);
         }
     }
 

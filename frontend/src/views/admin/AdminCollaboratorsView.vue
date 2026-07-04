@@ -3,6 +3,7 @@ import { computed, ref, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
+  FlexRender,
   useVueTable,
   getCoreRowModel,
   getPaginationRowModel,
@@ -226,7 +227,7 @@ const table = useVueTable({
               <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody v-auto-animate>
+          <TableBody>
             <TableRow v-if="isLoading">
               <TableCell :colspan="columns.length + 1" class="h-24 text-center">
                 <Loader2 class="size-4 animate-spin mx-auto text-muted-foreground" />
@@ -255,7 +256,7 @@ const table = useVueTable({
             </TableRow>
             <TableRow v-else v-for="row in table.getRowModel().rows" :key="row.id">
               <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
-                <component :is="() => cell.renderValue()" />
+                <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
               </TableCell>
               <TableCell class="px-4 py-3 text-right">
                 <Button

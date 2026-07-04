@@ -29,9 +29,12 @@ public class PenetrationSubmissionHandler(
         if (competition is null) return new ChallengeSubmissionResult(SubmissionResult.WrongFlag);
 
         var now = DateTime.UtcNow;
-        if (now < competition.StartTime) return new ChallengeSubmissionResult(SubmissionResult.CompetitionNotStarted);
+        if (now < competition.StartTime || competition.Status == CompetitionStatus.Draft)
+            return new ChallengeSubmissionResult(SubmissionResult.CompetitionNotStarted);
         if (now > competition.EndTime || competition.Status == CompetitionStatus.Finished)
             return new ChallengeSubmissionResult(SubmissionResult.CompetitionEnded);
+        if (competition.Status == CompetitionStatus.Paused)
+            return new ChallengeSubmissionResult(SubmissionResult.CompetitionPaused);
 
         var instance = await db.TeamChallengeInstances
             .IgnoreQueryFilters()

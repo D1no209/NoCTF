@@ -47,13 +47,25 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
             .Where(c => c.Id == req.Id)
             .FirstOrDefaultAsync(ct);
 
-        if (competition is null)
+        if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
         {
             await SendNotFoundAsync(ct);
             return;
         }
 
         int roundDuration = competition.RoundDurationSeconds ?? 300;
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendAsync(new AwdDashboardDto
+            {
+                CompetitionId = req.Id,
+                CurrentRound = 0,
+                RoundDurationSeconds = roundDuration,
+                RemainingSeconds = 0,
+                Services = []
+            }, cancellation: ct);
+            return;
+        }
 
         // Current running round
         var currentRound = await dbContext.AwdRounds
@@ -82,7 +94,10 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
 
         var teams = await dbContext.Teams
             .IgnoreQueryFilters()
-            .Where(t => teamIds.Contains(t.Id))
+            .Where(t =>
+                teamIds.Contains(t.Id) &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned)
             .ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
         var challenges = await dbContext.Challenges

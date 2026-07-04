@@ -1,5 +1,8 @@
 using FastEndpoints;
+using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Core;
+using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -110,7 +113,8 @@ public class LeaderboardMemberSolveDto
 /// </summary>
 public class GetLeaderboardEndpoint(
     IRedisLeaderboardCache leaderboardCache,
-    ILeaderboardService leaderboardService)
+    ILeaderboardService leaderboardService,
+    ApplicationDbContext db)
     : Endpoint<GetLeaderboardRequest, GetLeaderboardResponse>
 {
     public override void Configure()
@@ -121,6 +125,29 @@ public class GetLeaderboardEndpoint(
 
     public override async Task HandleAsync(GetLeaderboardRequest req, CancellationToken ct)
     {
+        var competition = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Id == req.CompetitionId)
+            .Select(c => new { c.Status, c.StartTime })
+            .FirstOrDefaultAsync(ct);
+        if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendAsync(new GetLeaderboardResponse
+            {
+                CompetitionId = req.CompetitionId,
+                Entries = [],
+                FromCache = false
+            }, cancellation: ct);
+            return;
+        }
+
         // Try Redis cache first
         var cached = await leaderboardCache.GetAsync(req.CompetitionId, ct);
         if (cached is not null)
@@ -160,7 +187,7 @@ public class GetLeaderboardEndpoint(
     };
 }
 
-public class GetLeaderboardTrendEndpoint(ILeaderboardInsightService insightService)
+public class GetLeaderboardTrendEndpoint(ILeaderboardInsightService insightService, ApplicationDbContext db)
     : Endpoint<GetLeaderboardTrendRequest, LeaderboardTrendResponse>
 {
     public override void Configure()
@@ -171,6 +198,29 @@ public class GetLeaderboardTrendEndpoint(ILeaderboardInsightService insightServi
 
     public override async Task HandleAsync(GetLeaderboardTrendRequest req, CancellationToken ct)
     {
+        var competition = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Id == req.CompetitionId)
+            .Select(c => new { c.Status, c.StartTime })
+            .FirstOrDefaultAsync(ct);
+        if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendAsync(new LeaderboardTrendResponse
+            {
+                CompetitionId = req.CompetitionId,
+                GeneratedAt = DateTime.UtcNow,
+                Series = []
+            }, cancellation: ct);
+            return;
+        }
+
         var result = await insightService.BuildTrendAsync(req.CompetitionId, 10, ct);
         await SendAsync(new LeaderboardTrendResponse
         {
@@ -190,7 +240,7 @@ public class GetLeaderboardTrendEndpoint(ILeaderboardInsightService insightServi
     }
 }
 
-public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insightService)
+public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insightService, ApplicationDbContext db)
     : Endpoint<GetLeaderboardTeamDetailRequest, LeaderboardTeamDetailDto>
 {
     public override void Configure()
@@ -201,6 +251,24 @@ public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insight
 
     public override async Task HandleAsync(GetLeaderboardTeamDetailRequest req, CancellationToken ct)
     {
+        var competition = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Id == req.CompetitionId)
+            .Select(c => new { c.Status, c.StartTime })
+            .FirstOrDefaultAsync(ct);
+        if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
         var result = await insightService.BuildTeamDetailAsync(req.CompetitionId, req.TeamId, ct);
         if (result is null)
         {

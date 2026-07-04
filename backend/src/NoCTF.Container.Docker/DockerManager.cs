@@ -20,7 +20,8 @@ public class DockerManager(DockerProvider provider) : IContainerManager
             PortMappings: metadata.Ports,
             Status: metadata.Status,
             StartedAt: DateTime.UtcNow,
-            ExpectedStopAt: config.Ttl.HasValue ? DateTime.UtcNow.Add(config.Ttl.Value) : null
+            ExpectedStopAt: config.Ttl.HasValue ? DateTime.UtcNow.Add(config.Ttl.Value) : null,
+            OrchestrationNamespace: metadata.NetworkName
         );
     }
 
@@ -30,7 +31,8 @@ public class DockerManager(DockerProvider provider) : IContainerManager
             container.ContainerId,
             "",
             container.Status,
-            container.PortMappings
+            container.PortMappings,
+            container.OrchestrationNamespace
         );
         await provider.DestroyContainerAsync(metadata, cancellationToken);
     }
@@ -50,7 +52,9 @@ public class DockerManager(DockerProvider provider) : IContainerManager
             Entrypoint = config.Entrypoint?.ToList(),
             Env = config.EnvironmentVariables?.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList() ?? [],
             Labels = config.Labels ?? new Dictionary<string, string>(),
-            HostConfig = DockerHostConfigFactory.Create(config, publishAllPorts: false)
+            User = DockerHostConfigFactory.ResolveUser(config),
+            HostConfig = DockerHostConfigFactory.Create(config, publishAllPorts: false),
+            NetworkingConfig = BuildNetworkingConfig(config)
         };
 
         try
@@ -67,56 +71,85 @@ public class DockerManager(DockerProvider provider) : IContainerManager
         }
 
         var startedAt = DateTime.UtcNow;
-        var createResponse = await client.Containers.CreateContainerAsync(createParams, cancellationToken);
-        var containerId = createResponse.ID;
-
-        await client.Containers.StartContainerAsync(containerId, null, cancellationToken);
-
-        // Wait for container to exit
-        var waitResponse = await client.Containers.WaitContainerAsync(containerId, cancellationToken);
-
-        var finishedAt = DateTime.UtcNow;
-
-        // Collect logs
-        string? stdOut = null;
-        string? stdErr = null;
+        string? containerId = null;
         try
         {
-            var logsParams = new ContainerLogsParameters
+            var createResponse = await client.Containers.CreateContainerAsync(createParams, cancellationToken);
+            containerId = createResponse.ID;
+
+            await client.Containers.StartContainerAsync(containerId, null, cancellationToken);
+
+            var waitResponse = await client.Containers.WaitContainerAsync(containerId, cancellationToken);
+            var finishedAt = DateTime.UtcNow;
+
+            string? stdOut = null;
+            string? stdErr = null;
+            try
             {
-                ShowStdout = true,
-                ShowStderr = true,
-                Tail = "100"
-            };
-            using var logStream = await client.Containers.GetContainerLogsAsync(containerId, false, logsParams, cancellationToken);
-            (stdOut, stdErr) = await logStream.ReadOutputToEndAsync(cancellationToken);
-        }
-        catch
-        {
-            // Log collection is best-effort
-        }
+                var logsParams = new ContainerLogsParameters
+                {
+                    ShowStdout = true,
+                    ShowStderr = true,
+                    Tail = "100"
+                };
+                using var logStream = await client.Containers.GetContainerLogsAsync(containerId, false, logsParams, cancellationToken);
+                (stdOut, stdErr) = await logStream.ReadOutputToEndAsync(cancellationToken);
+            }
+            catch
+            {
+                // Log collection is best-effort.
+            }
 
-        // Remove container
+            return new ContainerRunResult(
+                ContainerId: containerId,
+                ExitCode: (int)waitResponse.StatusCode,
+                StdOut: stdOut,
+                StdErr: stdErr,
+                StartedAt: startedAt,
+                FinishedAt: finishedAt
+            );
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(containerId))
+                await RemoveContainerBestEffortAsync(client, containerId);
+        }
+    }
+
+    private static NetworkingConfig? BuildNetworkingConfig(ContainerConfig config)
+    {
+        if (string.IsNullOrWhiteSpace(config.NetworkName))
+            return null;
+
+        return new NetworkingConfig
+        {
+            EndpointsConfig = new Dictionary<string, EndpointSettings>
+            {
+                [config.NetworkName] = new()
+                {
+                    Aliases = config.NetworkAliases?
+                        .Where(alias => !string.IsNullOrWhiteSpace(alias))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList()
+                }
+            }
+        };
+    }
+
+    private static async Task RemoveContainerBestEffortAsync(DockerClient client, string containerId)
+    {
         try
         {
+            using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             await client.Containers.RemoveContainerAsync(
                 containerId,
                 new ContainerRemoveParameters { Force = true },
-                cancellationToken);
+                cleanupCts.Token);
         }
         catch
         {
-            // Removal is best-effort
+            // Removal is best-effort.
         }
-
-        return new ContainerRunResult(
-            ContainerId: containerId,
-            ExitCode: (int)waitResponse.StatusCode,
-            StdOut: stdOut,
-            StdErr: stdErr,
-            StartedAt: startedAt,
-            FinishedAt: finishedAt
-        );
     }
 
     public async Task<ComposeDeployment> ComposeUpAsync(ComposeConfig config, CancellationToken cancellationToken = default)

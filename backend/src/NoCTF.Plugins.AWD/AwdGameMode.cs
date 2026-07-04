@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 using NoCTF.Application;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
@@ -51,10 +53,25 @@ public class AwdGameMode : IGameMode
         SubmissionContext context,
         CancellationToken cancellationToken = default)
     {
+        var now = DateTime.UtcNow;
+        var competition = await _db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == context.CompetitionId, cancellationToken);
+        if (competition is null)
+            return SubmissionResult.WrongFlag;
+        if (now < competition.StartTime || competition.Status == CompetitionStatus.Draft)
+            return SubmissionResult.CompetitionNotStarted;
+        if (now > competition.EndTime || competition.Status == CompetitionStatus.Finished)
+            return SubmissionResult.CompetitionEnded;
+        if (competition.Status == CompetitionStatus.Paused)
+            return SubmissionResult.CompetitionPaused;
+
         // Find the AwdFlag matching the submitted content for this competition
         var flag = await _db.AwdFlags
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(f => f.CompetitionId == context.CompetitionId
+                                   && f.ChallengeId == context.ChallengeId
                                    && f.FlagContent == context.FlagContent, cancellationToken);
 
         if (flag is null)
@@ -77,10 +94,6 @@ public class AwdGameMode : IGameMode
         int currentRound = latestRound.RoundNumber;
 
         // Flag validity window check
-        var competition = await _db.Competitions
-            .IgnoreQueryFilters()
-            .FirstAsync(c => c.Id == context.CompetitionId, cancellationToken);
-
         int validityRounds = competition.FlagValidityRounds ?? 2;
         int minValidRound = currentRound - validityRounds + 1;
 
@@ -108,7 +121,7 @@ public class AwdGameMode : IGameMode
             VictimTeamId = flag.TeamId,
             ChallengeId = flag.ChallengeId,
             RoundNumber = flag.RoundNumber,
-            FlagContent = context.FlagContent,
+            FlagContent = RedactSubmittedFlag(context.FlagContent),
             Timestamp = DateTime.UtcNow
         });
 
@@ -154,5 +167,11 @@ public class AwdGameMode : IGameMode
             cancellationToken);
 
         return SubmissionResult.Accepted;
+    }
+
+    private static string RedactSubmittedFlag(string submittedFlag)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(submittedFlag));
+        return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()};len:{submittedFlag.Length}";
     }
 }

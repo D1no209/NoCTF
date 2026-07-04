@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.API.Permissions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -49,18 +50,26 @@ public class CompetitionSummaryDto
     public int? AwdpFixTimeoutSeconds { get; set; }
 }
 
-public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest, List<CompetitionSummaryDto>>
+public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<EmptyRequest, List<CompetitionSummaryDto>>
 {
     public override void Configure()
     {
         Get("/api/admin/competitions");
-        Roles("Admin");
+        Roles("Admin", "Organizer");
     }
 
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)
     {
+        if (!Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId))
+        {
+            await SendUnauthorizedAsync(ct);
+            return;
+        }
+
+        var manageableIds = await permissions.GetManageableCompetitionIdsAsync(userId, ct);
         var competitions = await dbContext.Competitions
             .IgnoreQueryFilters()
+            .Where(c => manageableIds.Contains(c.Id))
             .ToListAsync(ct);
 
         await SendAsync(competitions.Select(GetCompetitionAdminEndpoint.ToDto).ToList(), cancellation: ct);

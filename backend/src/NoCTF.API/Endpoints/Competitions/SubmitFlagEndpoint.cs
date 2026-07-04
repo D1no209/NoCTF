@@ -55,6 +55,45 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
             return;
         }
 
+        var challengeExists = await dbContext.Challenges
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(c => c.Id == req.ChallengeId && c.CompetitionId == req.Id, ct);
+        if (!challengeExists)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        var timingResult = ResolveTimingResult(competition, now);
+        if (timingResult is not null)
+        {
+            AuditLogWriter.Add(
+                dbContext,
+                HttpContext,
+                "flag.submitted",
+                "Challenge",
+                req.ChallengeId.ToString(),
+                new
+                {
+                    competitionId = req.Id,
+                    challengeId = req.ChallengeId,
+                    correct = false,
+                    result = timingResult,
+                    flagLength = req.Flag?.Length ?? 0
+                },
+                exception: timingResult);
+            await dbContext.SaveChangesAsync(ct);
+            await SendAsync(new SubmitFlagResponse
+            {
+                Correct = false,
+                AlreadySolved = false,
+                Result = timingResult
+            }, cancellation: ct);
+            return;
+        }
+
         var gameMode = gameModes.FirstOrDefault(g => g.Type == competition.GameModeType);
         if (gameMode is null)
         {
@@ -203,6 +242,7 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
             SubmissionResult.FlagRateLimited => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "flag_rate_limited" },
             SubmissionResult.CompetitionNotStarted => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "competition_not_started" },
             SubmissionResult.CompetitionEnded => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "competition_ended" },
+            SubmissionResult.CompetitionPaused => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "competition_paused" },
             _ => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = result.ToString().ToLowerInvariant() }
         };
 
@@ -227,4 +267,7 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
 
         await SendAsync(response, cancellation: ct);
     }
+
+    private static string? ResolveTimingResult(Competition competition, DateTime now)
+        => PublicCompetitionGuard.ResolvePlayBlockReason(competition, now);
 }

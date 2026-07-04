@@ -1,12 +1,14 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Permissions;
 using NoCTF.Application;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -326,7 +328,8 @@ public class DeleteCompetitionChallengeEndpoint(
     ICompetitionPermissionService permissions,
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
-    IHubNotifierService hubNotifier)
+    IHubNotifierService hubNotifier,
+    IContainerManager containerManager)
     : EndpointWithoutRequest, IAuditableEndpoint
 {
     public override void Configure()
@@ -354,39 +357,186 @@ public class DeleteCompetitionChallengeEndpoint(
             return;
         }
 
+        Guid? userId = null;
+        if (Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var parsedUserId))
+            userId = parsedUserId;
+
+        await DeleteChallengeArtifactsAsync(db, containerManager, challenge, HttpContext, userId, ct);
+
+        db.Challenges.Remove(challenge);
+        await db.SaveChangesAsync(ct);
+        await RefreshLeaderboardAsync(competitionId, ct);
+        await SendNoContentAsync(ct);
+    }
+
+    public static async Task DeleteChallengeArtifactsAsync(
+        ApplicationDbContext db,
+        IContainerManager containerManager,
+        Challenge challenge,
+        HttpContext? httpContext,
+        Guid? userId,
+        CancellationToken ct)
+    {
+        var competitionId = challenge.CompetitionId;
+        var challengeId = challenge.Id;
+
+        var boxes = await db.AwdGameBoxes
+            .IgnoreQueryFilters()
+            .Where(g => g.CompetitionId == competitionId && g.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        foreach (var box in boxes.Where(box => !string.IsNullOrWhiteSpace(box.ContainerInstanceId)))
+        {
+            await CreateChallengeInstanceEndpoint.DestroyTrackedBoxAsync(
+                db,
+                containerManager,
+                box,
+                httpContext,
+                "challenge_deleted",
+                userId,
+                updateCooldown: false,
+                ct);
+        }
+        db.AwdGameBoxes.RemoveRange(boxes);
+
+        var teamInstances = await db.TeamChallengeInstances
+            .IgnoreQueryFilters()
+            .Where(i => i.CompetitionId == competitionId && i.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        foreach (var instance in teamInstances.Where(i => !string.IsNullOrWhiteSpace(i.ComposeProjectName)))
+        {
+            await containerManager.ComposeDownAsync(new ComposeDeployment(
+                Id: Guid.NewGuid(),
+                CompetitionId: instance.CompetitionId,
+                TeamId: instance.TeamId,
+                ChallengeId: instance.ChallengeId,
+                ProviderType: "compose",
+                ProjectName: instance.ComposeProjectName!,
+                ComposeYaml: string.IsNullOrWhiteSpace(instance.RenderedComposeYaml)
+                    ? "services:\n  cleanup:\n    image: scratch\n"
+                    : instance.RenderedComposeYaml,
+                Status: instance.Status.ToString().ToLowerInvariant(),
+                StartedAt: instance.CreatedAt,
+                ExpectedStopAt: instance.ExpiresAt), ct);
+            CompetitionLogWriter.Add(
+                db,
+                competitionId,
+                "penetration.instance.destroyed",
+                "Penetration range instance was destroyed because the challenge was deleted.",
+                teamId: instance.TeamId,
+                userId: userId,
+                challengeId: challengeId,
+                metadata: new { instanceId = instance.Id, reason = "challenge_deleted" });
+        }
+        db.TeamChallengeInstances.RemoveRange(teamInstances);
+
         var hints = await db.ChallengeHints
             .IgnoreQueryFilters()
             .Where(h => h.CompetitionId == competitionId && h.ChallengeId == challengeId)
             .ToListAsync(ct);
         db.ChallengeHints.RemoveRange(hints);
-        await db.Submissions
+
+        var penetrationTopologies = await db.PenetrationTopologies
+            .IgnoreQueryFilters()
+            .Where(t => t.CompetitionId == competitionId && t.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        var penetrationTopologyIds = penetrationTopologies.Select(t => t.Id).ToList();
+
+        var penetrationFlags = await db.PenetrationFlags
+            .IgnoreQueryFilters()
+            .Where(f =>
+                f.CompetitionId == competitionId &&
+                (f.ChallengeId == challengeId || penetrationTopologyIds.Contains(f.TopologyId)))
+            .ToListAsync(ct);
+        var penetrationFlagIds = penetrationFlags.Select(f => f.Id).ToList();
+
+        var submissions = await db.Submissions
             .IgnoreQueryFilters()
             .Where(s => s.CompetitionId == competitionId && s.ChallengeId == challengeId)
-            .ExecuteDeleteAsync(ct);
-        await db.ScoreEvents
+            .ToListAsync(ct);
+        db.Submissions.RemoveRange(submissions);
+
+        var scoreEvents = await db.ScoreEvents
             .IgnoreQueryFilters()
             .Where(s => s.CompetitionId == competitionId && s.ChallengeId == challengeId)
-            .ExecuteDeleteAsync(ct);
-        await db.ScoreSignals
+            .ToListAsync(ct);
+        db.ScoreEvents.RemoveRange(scoreEvents);
+
+        var scoreSignals = await db.ScoreSignals
             .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == competitionId && s.SubjectId == challengeId)
-            .ExecuteDeleteAsync(ct);
-        await db.CtfDynamicFlags
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                (s.SubjectId == challengeId ||
+                 (s.SubjectId.HasValue && penetrationFlagIds.Contains(s.SubjectId.Value))))
+            .ToListAsync(ct);
+        db.ScoreSignals.RemoveRange(scoreSignals);
+
+        var dynamicFlags = await db.CtfDynamicFlags
             .IgnoreQueryFilters()
             .Where(f => f.CompetitionId == competitionId && f.ChallengeId == challengeId)
-            .ExecuteDeleteAsync(ct);
-        await db.DynamicFlagInstances
+            .ToListAsync(ct);
+        db.CtfDynamicFlags.RemoveRange(dynamicFlags);
+
+        var dynamicFlagInstances = await db.DynamicFlagInstances
             .IgnoreQueryFilters()
             .Where(f => f.CompetitionId == competitionId && f.ChallengeId == challengeId)
-            .ExecuteDeleteAsync(ct);
-        await db.CheatIncidents
+            .ToListAsync(ct);
+        db.DynamicFlagInstances.RemoveRange(dynamicFlagInstances);
+
+        var cheatIncidents = await db.CheatIncidents
             .IgnoreQueryFilters()
             .Where(i => i.CompetitionId == competitionId && i.ChallengeId == challengeId)
-            .ExecuteDeleteAsync(ct);
-        db.Challenges.Remove(challenge);
-        await db.SaveChangesAsync(ct);
-        await RefreshLeaderboardAsync(competitionId, ct);
-        await SendNoContentAsync(ct);
+            .ToListAsync(ct);
+        db.CheatIncidents.RemoveRange(cheatIncidents);
+
+        var awdFlags = await db.AwdFlags
+            .IgnoreQueryFilters()
+            .Where(f => f.CompetitionId == competitionId && f.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        db.AwdFlags.RemoveRange(awdFlags);
+
+        var awdAttackRecords = await db.AwdAttackRecords
+            .IgnoreQueryFilters()
+            .Where(r => r.CompetitionId == competitionId && r.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        db.AwdAttackRecords.RemoveRange(awdAttackRecords);
+
+        var awdCheckResults = await db.AwdCheckResults
+            .IgnoreQueryFilters()
+            .Where(r => r.CompetitionId == competitionId && r.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        db.AwdCheckResults.RemoveRange(awdCheckResults);
+
+        var awdpStates = await db.AwdpTeamChallengeStates
+            .IgnoreQueryFilters()
+            .Where(s => s.CompetitionId == competitionId && s.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        db.AwdpTeamChallengeStates.RemoveRange(awdpStates);
+
+        var awdpRoundScores = await db.AwdpRoundScores
+            .IgnoreQueryFilters()
+            .Where(s => s.CompetitionId == competitionId && s.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        db.AwdpRoundScores.RemoveRange(awdpRoundScores);
+
+        var awdpPatchSubmissions = await db.AwdpPatchSubmissions
+            .IgnoreQueryFilters()
+            .Where(s => s.CompetitionId == competitionId && s.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        db.AwdpPatchSubmissions.RemoveRange(awdpPatchSubmissions);
+
+        var penetrationNodes = await db.PenetrationNodes
+            .IgnoreQueryFilters()
+            .Where(n => n.CompetitionId == competitionId && penetrationTopologyIds.Contains(n.TopologyId))
+            .ToListAsync(ct);
+        db.PenetrationNodes.RemoveRange(penetrationNodes);
+        db.PenetrationFlags.RemoveRange(penetrationFlags);
+        db.PenetrationTopologies.RemoveRange(penetrationTopologies);
+
+        var kohControlRecords = await db.KohControlRecords
+            .IgnoreQueryFilters()
+            .Where(r => r.CompetitionId == competitionId && r.ChallengeId == challengeId)
+            .ToListAsync(ct);
+        db.KohControlRecords.RemoveRange(kohControlRecords);
     }
 
     private async Task RefreshLeaderboardAsync(Guid competitionId, CancellationToken ct)

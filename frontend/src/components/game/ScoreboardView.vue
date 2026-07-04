@@ -16,6 +16,7 @@ import {
 import { useSignalR } from '@/composables/useSignalR'
 import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
+import { toast } from 'vue-sonner'
 
 interface LeaderboardEntry {
   rank?: number
@@ -115,6 +116,7 @@ const usingFallback = ref(false)
 const selectedTeamId = ref<string | null>(null)
 const selectedTeam = ref<TeamDetail | null>(null)
 const detailLoading = ref(false)
+const detailError = ref('')
 const hoveredTeamId = ref<string | null>(null)
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
@@ -435,11 +437,15 @@ async function openTeamDetail(teamId?: string) {
   selectedTeamId.value = teamId
   detailLoading.value = true
   selectedTeam.value = null
+  detailError.value = ''
   try {
     selectedTeam.value = await competitionApi.leaderboardTeam<TeamDetail>(
       props.competitionId,
       teamId,
     )
+  } catch {
+    detailError.value = t('scoreboard.teamDetailLoadError')
+    toast.error(detailError.value)
   } finally {
     detailLoading.value = false
   }
@@ -459,7 +465,7 @@ function stopPolling() {
   usingFallback.value = false
 }
 
-const { connection, isConnected, start } = useSignalR({
+const { connection, isConnected, start, stop } = useSignalR({
   hubUrl: `/hubs/leaderboard?competitionId=${props.competitionId}`,
   accessToken: () => auth.accessToken,
   onConnected: () => {
@@ -512,6 +518,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopPolling()
+  stop()
 })
 </script>
 
@@ -783,7 +790,10 @@ onUnmounted(() => {
       :open="Boolean(selectedTeamId)"
       @update:open="
         (open) => {
-          if (!open) selectedTeamId = null
+          if (!open) {
+            selectedTeamId = null
+            detailError = ''
+          }
         }
       "
     >
@@ -794,6 +804,17 @@ onUnmounted(() => {
 
         <div v-if="detailLoading" class="text-sm text-muted-foreground">
           {{ t('common.loading') }}
+        </div>
+
+        <div v-else-if="detailError" class="space-y-4">
+          <p class="text-sm text-muted-foreground">
+            {{ detailError }}
+          </p>
+          <div class="flex justify-end">
+            <Button variant="outline" @click="selectedTeamId = null">
+              {{ t('common.close') }}
+            </Button>
+          </div>
         </div>
 
         <div v-else-if="selectedTeam" class="space-y-5">
