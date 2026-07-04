@@ -270,16 +270,15 @@ public class AwdpPatchService(
         state.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        var oldContainerId = gameBox.ContainerInstanceId;
+        var oldInstance = ToContainerInstance(gameBox, gameBox.ContainerInstanceId);
         var patchedContainer = await CreatePatchedContainerAsync(challenge, submission, ct);
-        gameBox.ContainerInstanceId = patchedContainer.ContainerId;
-        gameBox.PortMappingsJson = JsonSerializer.Serialize(patchedContainer.PortMappings, JsonOptions);
+        ApplyContainerMetadata(gameBox, patchedContainer);
         gameBox.ExpiresAt ??= DateTime.UtcNow.AddHours(2);
         gameBox.LastInstanceActionAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        if (!string.IsNullOrWhiteSpace(oldContainerId))
-            await DestroyContainerIdAsync(gameBox, oldContainerId, ct);
+        if (oldInstance is not null)
+            await DestroyContainerInstanceAsync(oldInstance, ct);
 
         var checkResult = await RunCheckAsync(challenge, submission, ct);
         if (checkResult.FixStatus != AwdpFixStatus.FixSuccess)
@@ -360,7 +359,8 @@ public class AwdpPatchService(
             Image: challenge.ContainerImage!,
             EnvironmentVariables: BuildPatchEnvironment(submission),
             Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
-            PortMappings: BuildPortMappings(challenge));
+            PortMappings: BuildPortMappings(challenge),
+            OrchestrationJson: challenge.OrchestrationJson);
 
         return await containerManager.CreateContainerAsync(patchedContainerConfig, ct);
     }
@@ -432,13 +432,13 @@ public class AwdpPatchService(
         var originalConfig = new ContainerConfig(
             Image: challenge.ContainerImage!,
             Labels: BuildLabels(gameBox.CompetitionId, gameBox.TeamId, gameBox.ChallengeId),
-            PortMappings: BuildPortMappings(challenge));
+            PortMappings: BuildPortMappings(challenge),
+            OrchestrationJson: challenge.OrchestrationJson);
 
         try
         {
             var restored = await containerManager.CreateContainerAsync(originalConfig, ct);
-            gameBox.ContainerInstanceId = restored.ContainerId;
-            gameBox.PortMappingsJson = JsonSerializer.Serialize(restored.PortMappings, JsonOptions);
+            ApplyContainerMetadata(gameBox, restored);
             gameBox.LastInstanceActionAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
         }
@@ -448,26 +448,43 @@ public class AwdpPatchService(
         }
     }
 
-    private async Task DestroyContainerIdAsync(AwdGameBox gameBox, string containerId, CancellationToken ct)
+    private async Task DestroyContainerInstanceAsync(ContainerInstance instance, CancellationToken ct)
     {
         try
         {
-            var instance = new ContainerInstance(
-                Guid.NewGuid(),
-                gameBox.CompetitionId,
-                gameBox.TeamId,
-                gameBox.ChallengeId,
-                "docker",
-                containerId,
-                ReadPorts(gameBox.PortMappingsJson),
-                "running",
-                DateTime.UtcNow);
             await containerManager.DestroyContainerAsync(instance, ct);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to destroy previous AWDP container {ContainerId}.", containerId);
+            logger.LogWarning(ex, "Failed to destroy previous AWDP container {ContainerId}.", instance.ContainerId);
         }
+    }
+
+    private static ContainerInstance? ToContainerInstance(AwdGameBox gameBox, string? containerId)
+        => string.IsNullOrWhiteSpace(containerId)
+            ? null
+            : new ContainerInstance(
+                Guid.NewGuid(),
+                gameBox.CompetitionId,
+                gameBox.TeamId,
+                gameBox.ChallengeId,
+                gameBox.ProviderType,
+                containerId,
+                ReadPorts(gameBox.PortMappingsJson),
+                "running",
+                DateTime.UtcNow,
+                PublicHost: gameBox.PublicHost,
+                EntryUrl: gameBox.EntryUrl,
+                OrchestrationNamespace: gameBox.OrchestrationNamespace);
+
+    private static void ApplyContainerMetadata(AwdGameBox gameBox, ContainerInstance container)
+    {
+        gameBox.ContainerInstanceId = container.ContainerId;
+        gameBox.ProviderType = container.ProviderType;
+        gameBox.PublicHost = container.PublicHost;
+        gameBox.EntryUrl = container.EntryUrl;
+        gameBox.OrchestrationNamespace = container.OrchestrationNamespace;
+        gameBox.PortMappingsJson = JsonSerializer.Serialize(container.PortMappings, JsonOptions);
     }
 
     private async Task CompleteValidationAsync(
@@ -615,9 +632,13 @@ public class AwdpPatchService(
     }
 
     private static Dictionary<int, int>? BuildPortMappings(Challenge challenge)
-        => challenge.ExposedPort is > 0
-            ? new Dictionary<int, int> { [challenge.ExposedPort.Value] = 0 }
+    {
+        var spec = OrchestrationSpecSerializer.Read(challenge.OrchestrationJson);
+        var exposedPort = spec.ExposedPort is > 0 ? spec.ExposedPort : challenge.ExposedPort;
+        return exposedPort is > 0
+            ? new Dictionary<int, int> { [exposedPort.Value] = 0 }
             : null;
+    }
 
     private static Dictionary<int, int> ReadPorts(string? portsJson)
     {

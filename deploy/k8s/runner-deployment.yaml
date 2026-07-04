@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runner
+  namespace: noctf
+  labels:
+    app: runner
+    app.kubernetes.io/part-of: noctf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: runner
+  template:
+    metadata:
+      labels:
+        app: runner
+    spec:
+      serviceAccountName: noctf-runner
+      containers:
+        - name: runner
+          image: noctf-runner:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: noctf-config
+          env:
+            - name: Runner__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: runner-api-key
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /runner/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /runner/health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20

@@ -185,6 +185,45 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
+    public async Task ValidatePatchAsync_StoresRunnerMetadataAndDestroysOriginalInstance()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(
+            db,
+            competitionId,
+            teamId,
+            challengeId,
+            providerType: "kubernetes",
+            publicHost: "old-host.test",
+            entryUrl: "http://old-host.test",
+            orchestrationNamespace: "old-ns",
+            portsJson: """{"80":30080}""");
+        await db.SaveChangesAsync();
+
+        var containerManager = new SequencedContainerManager([0, 0]);
+        var service = CreateService(db, containerManager);
+        var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+        await service.ValidatePatchAsync(submissionId);
+
+        var gameBox = await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync(g => g.TeamId == teamId);
+        Assert.Equal("container-1", gameBox.ContainerInstanceId);
+        Assert.Equal("kubernetes", gameBox.ProviderType);
+        Assert.Equal("host-1.test", gameBox.PublicHost);
+        Assert.Equal("http://host-1.test", gameBox.EntryUrl);
+        Assert.Equal("ns-1", gameBox.OrchestrationNamespace);
+        Assert.Equal("""{"80":30001}""", gameBox.PortMappingsJson);
+        var destroyed = Assert.Single(containerManager.DestroyedContainers);
+        Assert.Equal("container-123", destroyed.ContainerId);
+        Assert.Equal("old-ns", destroyed.OrchestrationNamespace);
+        Assert.Equal("kubernetes", destroyed.ProviderType);
+    }
+
+    [Fact]
     public async Task ValidatePatchAsync_CheckExit1_RecordsExploitSuccessAsFixFailedWithoutPenaltyEvent()
     {
         var (db, service, competitionId, teamId, challengeId, containerManager) =
@@ -393,7 +432,12 @@ public class AwdpPatchServiceTests
         Guid competitionId,
         Guid teamId,
         Guid challengeId,
-        string containerId = "container-123")
+        string containerId = "container-123",
+        string providerType = "docker",
+        string? publicHost = null,
+        string? entryUrl = null,
+        string? orchestrationNamespace = null,
+        string portsJson = "{}")
     {
         db.AwdGameBoxes.Add(new AwdGameBox
         {
@@ -402,7 +446,11 @@ public class AwdpPatchServiceTests
             TeamId = teamId,
             ChallengeId = challengeId,
             ContainerInstanceId = containerId,
-            PortMappingsJson = "{}",
+            ProviderType = providerType,
+            PublicHost = publicHost,
+            EntryUrl = entryUrl,
+            OrchestrationNamespace = orchestrationNamespace,
+            PortMappingsJson = portsJson,
             ExpiresAt = DateTime.UtcNow.AddHours(1),
             CreatedAt = DateTime.UtcNow
         });
@@ -474,18 +522,33 @@ public class AwdpPatchServiceTests
         private int _runIndex;
         public int CreateCount { get; private set; }
         public int DestroyCount { get; private set; }
+        public List<ContainerConfig> CreateConfigs { get; } = [];
         public List<ContainerConfig> RunConfigs { get; } = [];
+        public List<ContainerInstance> DestroyedContainers { get; } = [];
 
         public Task<ContainerInstance> CreateContainerAsync(ContainerConfig config, CancellationToken ct = default)
         {
             CreateCount++;
+            CreateConfigs.Add(config);
             return Task.FromResult(new ContainerInstance(
-                Guid.NewGuid(), Guid.Empty, null, null, "null", $"container-{CreateCount}", [], "running", DateTime.UtcNow));
+                Guid.NewGuid(),
+                Guid.Empty,
+                null,
+                null,
+                "kubernetes",
+                $"container-{CreateCount}",
+                new Dictionary<int, int> { [80] = 30000 + CreateCount },
+                "running",
+                DateTime.UtcNow,
+                PublicHost: $"host-{CreateCount}.test",
+                EntryUrl: $"http://host-{CreateCount}.test",
+                OrchestrationNamespace: $"ns-{CreateCount}"));
         }
 
         public Task DestroyContainerAsync(ContainerInstance container, CancellationToken ct = default)
         {
             DestroyCount++;
+            DestroyedContainers.Add(container);
             return Task.CompletedTask;
         }
 

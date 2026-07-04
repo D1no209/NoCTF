@@ -70,11 +70,11 @@ services:
       StorageProvider__Local__BasePath: /app/uploads
       StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
       Runner__BaseUrl: http://runner:8080
-      Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      Runner__Provider: ${RUNNER_PROVIDER:-Docker}
+      Runner__ApiKey: ${RUNNER_API_KEY:-dev-runner-token-change-me}
       InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
     volumes:
       - backend_uploads:/app/uploads
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,10 +102,10 @@ services:
       StorageProvider__Local__BasePath: /app/uploads
       StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
       Runner__BaseUrl: http://runner:8080
-      Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      Runner__Provider: ${RUNNER_PROVIDER:-Docker}
+      Runner__ApiKey: ${RUNNER_API_KEY:-dev-runner-token-change-me}
     volumes:
       - backend_uploads:/app/uploads
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -126,7 +126,11 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
+      Runner__Provider: ${RUNNER_PROVIDER:-Docker}
+      Runner__ApiKey: ${RUNNER_API_KEY:-dev-runner-token-change-me}
       Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      K8s__PublicEntry: ${K8S_PUBLIC_ENTRY:-}
+      K8s__IngressBaseDomain: ${K8S_INGRESS_BASE_DOMAIN:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     expose:

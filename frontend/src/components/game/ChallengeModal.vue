@@ -90,6 +90,7 @@ interface InstanceResponse {
   ports?: Record<string, number>
   addresses?: string[]
   address?: string | null
+  entryUrl?: string | null
   accessHost?: string
   status?: string
   expiresAt?: string | null
@@ -160,7 +161,7 @@ const canCreateDynamicInstance = computed(() => Boolean(isDynamicContainer.value
 const canSubmitCurrentFlag = computed(() => props.canSubmitFlag !== false)
 const canRequestCurrentDefense = computed(() => props.canRequestDefense !== false)
 const runningInstance = computed(() => instance.value?.status === 'running' && Boolean(instance.value?.containerId))
-const instanceAddress = computed(() => instance.value?.address ?? instance.value?.addresses?.[0] ?? '')
+const instanceAddress = computed(() => instance.value?.entryUrl ?? instance.value?.address ?? instance.value?.addresses?.[0] ?? '')
 const expiresAtMs = computed(() => instance.value?.expiresAt ? new Date(instance.value.expiresAt).getTime() : null)
 const cooldownUntilMs = computed(() => instance.value?.cooldownUntil ? new Date(instance.value.cooldownUntil).getTime() : null)
 const expiresInMs = computed(() => expiresAtMs.value ? Math.max(0, expiresAtMs.value - nowMs.value) : 0)
@@ -219,6 +220,7 @@ function onOpenChange(v: boolean) {
     patchFile.value = null
     instanceError.value = null
     stopInstancePolling()
+    stopClock()
   }
   emit('update:open', v)
 }
@@ -232,6 +234,7 @@ watch(
       startInstancePolling()
     } else {
       stopInstancePolling()
+      stopClock()
     }
   },
   { immediate: true },
@@ -390,6 +393,10 @@ function updateInstanceStatus() {
   instanceStatus.value = instanceAddress.value ? `${instance.value?.status ?? 'running'} ${instanceAddress.value}` : instance.value?.status ?? 'running'
 }
 
+function isHttpUrl(value?: string | null) {
+  return Boolean(value && /^https?:\/\//i.test(value))
+}
+
 function startClock() {
   if (clockTimer) return
   nowMs.value = Date.now()
@@ -506,7 +513,16 @@ function getApiErrorDetail(error: unknown) {
                     <Badge variant="secondary" class="font-mono">{{ formatDuration(expiresInMs) }}</Badge>
                   </div>
                   <div class="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span class="font-mono text-foreground">{{ instanceAddress }}</span>
+                    <a
+                      v-if="isHttpUrl(instanceAddress)"
+                      :href="instanceAddress"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="font-mono text-primary underline-offset-4 hover:underline"
+                    >
+                      {{ instanceAddress }}
+                    </a>
+                    <span v-else class="font-mono text-foreground">{{ instanceAddress }}</span>
                     <Button type="button" variant="ghost" size="icon-sm" :title="t('challenges.copyAddress')" @click="copyInstanceAddress">
                       <Copy class="size-4" />
                     </Button>

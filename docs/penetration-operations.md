@@ -4,14 +4,14 @@ This page covers operations and troubleshooting for Penetration Challenge instan
 
 ## Runtime Boundary
 
-Penetration Challenge uses Docker Compose as the MVP runtime. The plugin builds a Compose file from the saved topology and starts it through the platform container manager. Kubernetes orchestration for this challenge type is not implemented.
+Penetration Challenge builds a Compose document from the saved topology and starts it through the platform container manager. With `Runner__Provider=Docker`, the Runner executes Docker Compose. With `Runner__Provider=Kubernetes`, the Runner translates the supported Compose subset into per-instance Kubernetes namespaces, Deployments, Services, NetworkPolicies, and optional Ingresses.
 
 Recommended production posture:
 
 - keep Docker access inside the runner boundary
 - avoid mounting the Docker socket into the API process
 - use a dedicated runner host or node pool for challenge workloads
-- set `NOCTF_PUBLIC_HOST` / `InstanceAccess:PublicHost` to the host name players can actually reach
+- set `NOCTF_PUBLIC_HOST` / `InstanceAccess:PublicHost` for Docker/NodePort entries, or `K8s__IngressBaseDomain` for wildcard Ingress entries
 - use private registries or allow-listed image sources for challenge images
 
 ## Instance Lifecycle
@@ -59,7 +59,7 @@ Checks:
 - at least one node has `isEntry: true`
 - the entry node has a container port in `ports`, or the challenge has an exposed port
 - `NOCTF_PUBLIC_HOST` / `InstanceAccess:PublicHost` is configured for remote players
-- Docker Compose published the entry service port successfully
+- Docker Compose published the entry service port, or the Kubernetes Runner reported a NodePort/Ingress entry
 
 ### Old Flag Still Appears In A Container
 
@@ -74,13 +74,14 @@ Reset regenerates dynamic flags and starts a new Compose project. If a container
 
 Submissions and competition logs store hash/length metadata for wrong Penetration flags. Do not copy raw container logs containing flags into public incident notes or support tickets.
 
-### Compose Down Leaves Networks Or Containers
+### Compose Down Leaves Networks, Containers, Or Namespaces
 
 Checks:
 
 - `ComposeProjectName` in the instance record
-- runner Docker daemon availability
+- runner Docker daemon availability, or Kubernetes Runner RBAC for namespace deletion
 - manual `docker compose -p <project> ps` and `docker compose -p <project> down --remove-orphans` on the runner host
+- for Kubernetes, confirm the instance namespace uses the configured `K8s__NamespacePrefix` and `app.kubernetes.io/managed-by=noctf-runner`
 
 ## Admin Monitoring
 
@@ -96,8 +97,7 @@ The competition detail page includes a dedicated Range instances section. It can
 
 ## Current Limits
 
-- Docker Compose only for Penetration Challenge
+- Penetration ranges use the safe Compose subset; unsupported directives are rejected by the Kubernetes Runner
 - environment-variable dynamic flag injection only
-- no Kubernetes provider
 - no node-level log streaming UI yet
-- no resource quota enforcement beyond Compose safety validation and runner isolation
+- Kubernetes quotas, limit ranges, and default network isolation are applied only when `Runner__Provider=Kubernetes`

@@ -122,6 +122,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 IsInternal = node.IsEntry ? node.IsInternal : true,
                 ResourceLimitJson = JsonOrDefault(node.ResourceLimit, "{}"),
                 HealthcheckJson = JsonOrDefault(node.Healthcheck, "{}"),
+                OrchestrationJson = JsonOrDefault(node.Orchestration, "{}"),
                 DisplayOrder = node.DisplayOrder == 0 ? index + 1 : node.DisplayOrder,
                 CreatedAt = now,
                 UpdatedAt = now,
@@ -229,6 +230,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 IsInternal = node.IsInternal,
                 ResourceLimitJson = node.ResourceLimitJson,
                 HealthcheckJson = node.HealthcheckJson,
+                OrchestrationJson = node.OrchestrationJson,
                 DisplayOrder = node.DisplayOrder,
                 CreatedAt = now,
                 UpdatedAt = now,
@@ -385,6 +387,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 IsInternal = node.IsEntry ? node.IsInternal : true,
                 ResourceLimitJson = JsonOrDefault(node.ResourceLimit, "{}"),
                 HealthcheckJson = JsonOrDefault(node.Healthcheck, "{}"),
+                OrchestrationJson = JsonOrDefault(node.Orchestration, "{}"),
                 DisplayOrder = node.DisplayOrder == 0 ? index + 1 : node.DisplayOrder,
                 CreatedAt = now,
                 UpdatedAt = now,
@@ -560,6 +563,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
         IsInternal = node.IsInternal,
         ResourceLimit = ParseJson(node.ResourceLimitJson),
         Healthcheck = ParseJson(node.HealthcheckJson),
+        Orchestration = ParseJson(node.OrchestrationJson),
         DisplayOrder = node.DisplayOrder,
     };
 
@@ -580,6 +584,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
         IsInternal = node.IsInternal,
         ResourceLimit = ParseJson(node.ResourceLimitJson),
         Healthcheck = ParseJson(node.HealthcheckJson),
+        Orchestration = ParseJson(node.OrchestrationJson),
         DisplayOrder = node.DisplayOrder,
     };
 

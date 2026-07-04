@@ -149,6 +149,7 @@ public class Challenge : ITenantEntity
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
+    public string OrchestrationJson { get; set; } = "{}";
     public string? FlagSecret { get; set; }
     public CheckerConfig? CheckerConfig { get; set; }
     public KohAgentConfig? KohAgentConfig { get; set; }
@@ -177,6 +178,7 @@ public class ChallengeTemplate
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
+    public string OrchestrationJson { get; set; } = "{}";
     public string? FlagSecret { get; set; }
     public CheckerConfig? CheckerConfig { get; set; }
     public KohAgentConfig? KohAgentConfig { get; set; }
@@ -315,6 +317,7 @@ public class PenetrationNodeTemplate
     public bool IsInternal { get; set; } = true;
     public string ResourceLimitJson { get; set; } = "{}";
     public string HealthcheckJson { get; set; } = "{}";
+    public string OrchestrationJson { get; set; } = "{}";
     public int DisplayOrder { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -373,6 +376,7 @@ public class PenetrationNode : ITenantEntity
     public bool IsInternal { get; set; } = true;
     public string ResourceLimitJson { get; set; } = "{}";
     public string HealthcheckJson { get; set; } = "{}";
+    public string OrchestrationJson { get; set; } = "{}";
     public int DisplayOrder { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -518,6 +522,10 @@ public class AwdGameBox : ITenantEntity
     public Guid TeamId { get; set; }
     public Guid ChallengeId { get; set; }
     public string? ContainerInstanceId { get; set; }
+    public string ProviderType { get; set; } = "docker";
+    public string? PublicHost { get; set; }
+    public string? EntryUrl { get; set; }
+    public string? OrchestrationNamespace { get; set; }
     public string PortMappingsJson { get; set; } = "{}";
     public DateTime? ExpiresAt { get; set; }
     public DateTime? LastInstanceActionAt { get; set; }

@@ -266,7 +266,7 @@ Player flow:
 4. Submit stage flags; each visible stage is scored independently.
 5. Reset or destroy the range as allowed by the challenge config.
 
-Kubernetes orchestration for Penetration ranges is not implemented. The MVP path is Docker Compose via the container manager/runner.
+Penetration ranges are rendered as Compose and run through the configured Runner. Docker Runner executes Compose directly; Kubernetes Runner translates the supported Compose subset into per-instance Kubernetes resources.
 
 ## Dynamic Containers And Flags
 

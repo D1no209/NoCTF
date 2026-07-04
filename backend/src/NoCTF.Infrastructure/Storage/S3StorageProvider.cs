@@ -10,7 +10,8 @@ public class S3StorageProvider(
     string bucketName,
     string accessKey,
     string secretKey,
-    string? region = null) : IStorageProvider
+    string? region = null,
+    string? publicBaseUrl = null) : IStorageProvider
 {
     private readonly AmazonS3Client _client = new(
         accessKey,
@@ -42,7 +43,19 @@ public class S3StorageProvider(
             Expires = DateTime.UtcNow.AddHours(1),
             Verb = HttpVerb.GET
         };
-        return await _client.GetPreSignedURLAsync(request);
+        if (string.IsNullOrWhiteSpace(publicBaseUrl))
+            return await _client.GetPreSignedURLAsync(request);
+
+        using var publicClient = new AmazonS3Client(
+            accessKey,
+            secretKey,
+            new AmazonS3Config
+            {
+                ServiceURL = publicBaseUrl,
+                ForcePathStyle = true,
+                RegionEndpoint = region is null ? RegionEndpoint.USEast1 : RegionEndpoint.GetBySystemName(region)
+            });
+        return await publicClient.GetPreSignedURLAsync(request);
     }
 
     public async Task<string> UploadAsync(string fileName, Stream content, string contentType, CancellationToken cancellationToken = default)

@@ -12,7 +12,7 @@ It is not AWD, AWDP, or KoH:
 
 ## Current Support
 
-The MVP uses Docker Compose through the existing Docker runner/container abstraction. Kubernetes orchestration for Penetration Challenge is not implemented yet, even though the repository contains general Kubernetes deployment manifests.
+Penetration ranges are authored as topology JSON and rendered into a Compose document. Docker Runner executes that Compose document directly. Kubernetes Runner accepts the safe Compose subset and creates equivalent Kubernetes resources in a per-instance namespace.
 
 ## Authoring Flow
 
@@ -50,7 +50,7 @@ The topology document has four main sections:
 
 ### Nodes
 
-Each node becomes a Docker Compose service. Exactly one or more nodes can be marked as entry, but the first entry node is used as the player-facing address.
+Each node becomes a Compose service. Exactly one or more nodes can be marked as entry, but the first entry node is used as the player-facing address.
 
 ```json
 {
@@ -68,9 +68,9 @@ Each node becomes a Docker Compose service. Exactly one or more nodes can be mar
 }
 ```
 
-Internal nodes can expose container ports for in-range communication, but they must not publish host ports such as `"5432:5432"`. The Compose builder only publishes the entry service to a random host port.
+Internal nodes can expose container ports for in-range communication, but they must not publish host ports such as `"5432:5432"`. The Compose builder only publishes the entry service. Under Kubernetes, the Runner converts that service to ClusterIP, NodePort, or Ingress according to the challenge orchestration settings.
 
-Forbidden directives include privileged mode, host networking, Docker socket mounts, devices, extra hosts, and host namespace options.
+Forbidden directives include privileged mode, host networking, Docker socket mounts, devices, extra hosts, and host namespace options. Node-level `orchestration` JSON can be used for Kubernetes exposure, resource, security, scheduling, ingress, image pull, env, and volume options.
 
 ### Stage Flags
 

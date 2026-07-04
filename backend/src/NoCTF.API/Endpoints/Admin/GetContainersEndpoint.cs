@@ -11,6 +11,9 @@ public class ContainerDto
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
     public Guid ChallengeId { get; set; }
+    public string ProviderType { get; set; } = "docker";
+    public string? PublicHost { get; set; }
+    public string? EntryUrl { get; set; }
     public string Status { get; set; } = "running";
 }
 
@@ -40,6 +43,9 @@ public class GetContainersEndpoint(ApplicationDbContext db, ICompetitionPermissi
                 CompetitionId = g.CompetitionId,
                 TeamId = g.TeamId,
                 ChallengeId = g.ChallengeId,
+                ProviderType = g.ProviderType,
+                PublicHost = g.PublicHost,
+                EntryUrl = g.EntryUrl,
                 Status = "running",
             })
             .ToListAsync(ct);

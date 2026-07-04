@@ -555,6 +555,9 @@
       "composeYaml": "Compose YAML",
       "composeYamlPlaceholder": "services:\n  web:\n    image: registry/challenge:latest",
       "composeYamlHelp": "仅作为开发环境支持。privileged、host 网络、devices、Docker socket 挂载等危险指令会被拒绝。",
+      "orchestration": "编排配置",
+      "orchestrationHint": "高级 Docker/Kubernetes 运行时 JSON，可配置 provider、暴露方式、资源、安全上下文、调度、网络、Ingress、卷、标签和注解。",
+      "invalidOrchestration": "编排 JSON 格式不正确。",
       "checkerImage": "检查器镜像",
       "awdpCheckImage": "check 容器",
       "optional": "可选",
@@ -761,6 +764,16 @@
       "type": "类型",
       "version": "版本 / 程序集"
     },
+    "infrastructure": {
+      "title": "基础设施",
+      "subtitle": "只读查看 Runner 与 Kubernetes 运行时配置。",
+      "runner": "Runner",
+      "provider": "提供方",
+      "status": "状态",
+      "reachable": "可达",
+      "unreachable": "不可达",
+      "policy": "策略"
+    },
     "auditLogs": {
       "title": "审计日志",
       "subtitle": "跟踪所有管理操作和安全事件",
@@ -831,6 +844,7 @@
       "challenges": "题目",
       "containers": "容器",
       "plugins": "插件",
+      "infrastructure": "基础设施",
       "auditLogs": "审计日志",
       "health": "健康状态",
       "liveLogs": "实时日志",

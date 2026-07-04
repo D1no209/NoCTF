@@ -15,6 +15,7 @@ public class ChallengeTemplateAdminDto
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
+    public string OrchestrationJson { get; set; } = "{}";
     public string? AttachmentUrl { get; set; }
     public string? PatchTemplateUrl { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
@@ -39,6 +40,7 @@ public class CompetitionChallengeAdminDto
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
+    public string OrchestrationJson { get; set; } = "{}";
     public string? AttachmentUrl { get; set; }
     public string? PatchTemplateUrl { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
@@ -95,6 +97,9 @@ public static class ChallengeAdminMapping
         ContainerMode = challenge.ContainerMode,
         ComposeYaml = challenge.ComposeYaml,
         ComposeProjectName = challenge.ComposeProjectName,
+        OrchestrationJson = string.IsNullOrWhiteSpace(challenge.OrchestrationJson)
+            ? "{}"
+            : challenge.OrchestrationJson,
         AttachmentUrl = challenge.AttachmentUrl,
         PatchTemplateUrl = challenge.PatchTemplateUrl,
         DeploymentType = challenge.DeploymentType,
@@ -130,6 +135,9 @@ public static class ChallengeAdminMapping
         ContainerMode = challenge.ContainerMode,
         ComposeYaml = challenge.ComposeYaml,
         ComposeProjectName = challenge.ComposeProjectName,
+        OrchestrationJson = string.IsNullOrWhiteSpace(challenge.OrchestrationJson)
+            ? "{}"
+            : challenge.OrchestrationJson,
         AttachmentUrl = challenge.AttachmentUrl,
         PatchTemplateUrl = challenge.PatchTemplateUrl,
         DeploymentType = challenge.DeploymentType,

@@ -498,6 +498,9 @@ export const adminApi = {
   async plugins<T = unknown[]>() {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/plugins' }), 'Failed to load plugins')
   },
+  async infrastructure<T = unknown>() {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/infrastructure' }), 'Failed to load infrastructure')
+  },
   async logs<T = unknown[]>() {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/logs' }), 'Failed to load logs')
   },

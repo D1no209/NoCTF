@@ -11,7 +11,8 @@ public record ContainerConfig(
     TimeSpan? Ttl = null,
     ContainerResourceLimits? ResourceLimits = null,
     ContainerSecurityPolicy? SecurityPolicy = null,
-    IReadOnlyList<string>? Entrypoint = null
+    IReadOnlyList<string>? Entrypoint = null,
+    string? OrchestrationJson = null
 );
 
 public record ContainerResourceLimits(
@@ -38,7 +39,10 @@ public record ContainerInstance(
     Dictionary<int, int> PortMappings,
     string Status,
     DateTime StartedAt,
-    DateTime? ExpectedStopAt = null
+    DateTime? ExpectedStopAt = null,
+    string? PublicHost = null,
+    string? EntryUrl = null,
+    string? OrchestrationNamespace = null
 );
 
 public record ContainerRunResult(
@@ -55,7 +59,8 @@ public record ComposeConfig(
     string ComposeYaml,
     Dictionary<string, string>? EnvironmentVariables = null,
     Dictionary<string, string>? Labels = null,
-    TimeSpan? Ttl = null
+    TimeSpan? Ttl = null,
+    string? OrchestrationJson = null
 );
 
 public record ComposeDeployment(
@@ -68,7 +73,10 @@ public record ComposeDeployment(
     string ComposeYaml,
     string Status,
     DateTime StartedAt,
-    DateTime? ExpectedStopAt = null
+    DateTime? ExpectedStopAt = null,
+    string? PublicHost = null,
+    string? EntryUrl = null,
+    string? OrchestrationNamespace = null
 );
 
 public record ComposeServiceInstance(
@@ -76,7 +84,9 @@ public record ComposeServiceInstance(
     string ContainerId,
     string Status,
     Guid? NodeId,
-    Dictionary<int, int> PublishedPorts
+    Dictionary<int, int> PublishedPorts,
+    string? PublicHost = null,
+    string? EntryUrl = null
 );
 
 public record ComposeStatus(

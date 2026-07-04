@@ -25,6 +25,7 @@ using NoCTF.Application.Leaderboard;
 using NoCTF.Application.Security;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
+using NoCTF.Runner.Client;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -173,10 +174,25 @@ builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<ICompetitionPermissionService, CompetitionPermissionService>();
 builder.Services.AddScoped<ITeamPermissionService, TeamPermissionService>();
 
-// Container manager (Docker provider)
-builder.Services.AddSingleton(
-    _ => new NoCTF.Container.Docker.DockerProvider(builder.Configuration["Docker:Host"]));
-builder.Services.AddScoped<IContainerManager, NoCTF.Container.Docker.DockerManager>();
+// Container manager. Production deployments should use the Runner boundary; direct Docker remains a local fallback.
+var runnerBaseUrl = builder.Configuration["Runner:BaseUrl"];
+if (!string.IsNullOrWhiteSpace(runnerBaseUrl))
+{
+    builder.Services.AddHttpClient<IRunnerClient, HttpRunnerClient>(client =>
+    {
+        client.BaseAddress = new Uri(runnerBaseUrl);
+        var runnerApiKey = builder.Configuration["Runner:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(runnerApiKey))
+            client.DefaultRequestHeaders.Add("X-Runner-Token", runnerApiKey);
+    });
+    builder.Services.AddScoped<IContainerManager, RunnerBackedContainerManager>();
+}
+else
+{
+    builder.Services.AddSingleton(
+        _ => new NoCTF.Container.Docker.DockerProvider(builder.Configuration["Docker:Host"]));
+    builder.Services.AddScoped<IContainerManager, NoCTF.Container.Docker.DockerManager>();
+}
 
 // Cold-load plugins from plugins/ directory
 PluginLoader.LoadAndRegisterAll(builder.Services, builder.Configuration);

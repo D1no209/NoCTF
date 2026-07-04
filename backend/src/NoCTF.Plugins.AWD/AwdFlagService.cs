@@ -205,11 +205,12 @@ public class AwdFlagService
                         CompetitionId: competitionId,
                         TeamId: flag.TeamId,
                         ChallengeId: flag.ChallengeId,
-                        ProviderType: "docker",
+                        ProviderType: gameBox.ProviderType,
                         ContainerId: gameBox.ContainerInstanceId,
                         PortMappings: new Dictionary<int, int>(),
                         Status: "running",
-                        StartedAt: DateTime.UtcNow);
+                        StartedAt: DateTime.UtcNow,
+                        OrchestrationNamespace: gameBox.OrchestrationNamespace);
 
                     await _containerManager.DestroyContainerAsync(oldInstance, ct);
                 }
@@ -226,6 +227,10 @@ public class AwdFlagService
             {
                 var newInstance = await _containerManager.CreateContainerAsync(newConfig, ct);
                 gameBox.ContainerInstanceId = newInstance.ContainerId;
+                gameBox.ProviderType = newInstance.ProviderType;
+                gameBox.PublicHost = newInstance.PublicHost;
+                gameBox.EntryUrl = newInstance.EntryUrl;
+                gameBox.OrchestrationNamespace = newInstance.OrchestrationNamespace;
                 gameBox.LastFlagRefreshedAt = DateTime.UtcNow;
 
                 _logger.LogInformation(

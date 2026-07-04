@@ -28,6 +28,7 @@ export const queryKeys = {
   adminCollaborators: (competitionId?: string) => ['admin-collaborators', competitionId ?? 'all'] as const,
   adminContainers: ['admin-containers'] as const,
   adminPlugins: ['admin-plugins'] as const,
+  adminInfrastructure: ['admin-infrastructure'] as const,
   adminHealth: ['admin-health'] as const,
   adminLogs: ['admin-logs'] as const,
   adminAuditLogs: (page: number, filters: unknown) => ['admin-audit-logs', page, filters] as const,

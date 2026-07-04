@@ -41,11 +41,12 @@ public class DestroyContainerEndpoint(ApplicationDbContext db, IContainerManager
             box.CompetitionId,
             box.TeamId,
             box.ChallengeId,
-            "docker",
+            box.ProviderType,
             req.Id,
             new Dictionary<int, int>(),
             "running",
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            OrchestrationNamespace: box.OrchestrationNamespace);
 
         await containerManager.DestroyContainerAsync(instance, ct);
         db.AwdGameBoxes.Remove(box);

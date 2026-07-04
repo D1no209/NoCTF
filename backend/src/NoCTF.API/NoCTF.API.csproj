@@ -26,6 +26,7 @@
     <ProjectReference Include="../NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
     <ProjectReference Include="../NoCTF.Container.Docker/NoCTF.Container.Docker.csproj" />
     <ProjectReference Include="../NoCTF.Container.K8s/NoCTF.Container.K8s.csproj" />
+    <ProjectReference Include="../NoCTF.Runner.Client/NoCTF.Runner.Client.csproj" />
   </ItemGroup>
 
   <Target Name="CopyPlugins" AfterTargets="Build">

@@ -83,6 +83,10 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
             TeamId = Guid.Empty,
             ChallengeId = challengeId,
             ContainerInstanceId = instance.ContainerId,
+            ProviderType = instance.ProviderType,
+            PublicHost = instance.PublicHost,
+            EntryUrl = instance.EntryUrl,
+            OrchestrationNamespace = instance.OrchestrationNamespace,
             PortMappingsJson = Competitions.ChallengeInstanceRuntime.WritePorts(instance.PortMappings),
             CreatedAt = DateTime.UtcNow,
         });
@@ -111,12 +115,27 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
             });
         await dbContext.SaveChangesAsync(ct);
 
+        var publicHost = ChallengeTemplateRequestRules.CleanOptional(instance.PublicHost);
+        var addressHost = string.IsNullOrWhiteSpace(publicHost) ? null : FormatHost(publicHost);
+        var portAddresses = instance.PortMappings.Values
+            .Where(port => port > 0)
+            .Select(port => addressHost is null ? port.ToString() : $"{addressHost}:{port}")
+            .ToList();
+        var firstPortAddress = portAddresses.FirstOrDefault();
         await SendAsync(new Competitions.ChallengeInstanceResponse
         {
             ContainerId = instance.ContainerId,
             Ports = instance.PortMappings,
-            Addresses = instance.PortMappings.Values.Where(port => port > 0).Select(port => port.ToString()).ToList(),
+            AccessHost = publicHost ?? string.Empty,
+            EntryUrl = instance.EntryUrl,
+            Address = instance.EntryUrl ?? firstPortAddress,
+            Addresses = !string.IsNullOrWhiteSpace(instance.EntryUrl)
+                ? [instance.EntryUrl]
+                : portAddresses,
             Status = instance.Status,
         }, cancellation: ct);
     }
+
+    private static string FormatHost(string host)
+        => host.Contains(':', StringComparison.Ordinal) && !host.StartsWith('[') ? $"[{host}]" : host;
 }

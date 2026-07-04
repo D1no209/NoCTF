@@ -18,12 +18,24 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 });
 
 builder.Services.AddSingleton<IStorageProvider>(StorageProviderFactory.Create(builder.Configuration));
-builder.Services.AddHttpClient<IRunnerClient, HttpRunnerClient>(client =>
+var runnerBaseUrl = builder.Configuration["Runner:BaseUrl"];
+if (!string.IsNullOrWhiteSpace(runnerBaseUrl))
 {
-    var baseUrl = builder.Configuration["Runner:BaseUrl"] ?? "http://runner:8080";
-    client.BaseAddress = new Uri(baseUrl);
-});
-builder.Services.AddScoped<IContainerManager, RunnerBackedContainerManager>();
+    builder.Services.AddHttpClient<IRunnerClient, HttpRunnerClient>(client =>
+    {
+        client.BaseAddress = new Uri(runnerBaseUrl);
+        var runnerApiKey = builder.Configuration["Runner:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(runnerApiKey))
+            client.DefaultRequestHeaders.Add("X-Runner-Token", runnerApiKey);
+    });
+    builder.Services.AddScoped<IContainerManager, RunnerBackedContainerManager>();
+}
+else
+{
+    builder.Services.AddSingleton(
+        _ => new NoCTF.Container.Docker.DockerProvider(builder.Configuration["Docker:Host"]));
+    builder.Services.AddScoped<IContainerManager, NoCTF.Container.Docker.DockerManager>();
+}
 builder.Services.AddNoCtfApplicationCore();
 builder.Services.AddScoped<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddScoped<IPatchArchiveValidator, PatchArchiveValidator>();

@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: noctf
+  labels:
+    app: worker
+    app.kubernetes.io/part-of: noctf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: worker
+          image: noctf-worker:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: noctf-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: db-password
+            - name: ConnectionStrings__DefaultConnection
+              value: "Host=postgres;Port=5432;Database=noctf;Username=postgres;Password=$(DB_PASSWORD)"
+            - name: Runner__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: runner-api-key
+            - name: StorageProvider__S3__AccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: minio-access-key
+            - name: StorageProvider__S3__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: minio-secret-key
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"

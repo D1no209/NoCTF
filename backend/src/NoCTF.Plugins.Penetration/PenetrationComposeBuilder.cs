@@ -44,6 +44,12 @@ public class PenetrationComposeBuilder
             AppendBoth($"    image: {Quote(node.Image)}");
             if (!string.IsNullOrWhiteSpace(node.Command))
                 AppendBoth($"    command: {Quote(node.Command)}");
+            if (!string.IsNullOrWhiteSpace(node.OrchestrationJson) && node.OrchestrationJson.Trim() != "{}")
+            {
+                AppendBoth("    x-noctf-orchestration: |-");
+                foreach (var line in node.OrchestrationJson.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+                    AppendBoth($"      {line}");
+            }
 
             var dependsOn = ReadStringArray(node.DependsOnJson).Where(name => !string.IsNullOrWhiteSpace(name)).ToList();
             if (dependsOn.Count > 0)

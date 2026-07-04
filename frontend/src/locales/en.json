@@ -555,6 +555,9 @@
       "composeYaml": "Compose YAML",
       "composeYamlPlaceholder": "services:\n  web:\n    image: registry/challenge:latest",
       "composeYamlHelp": "Development support only. Dangerous directives such as privileged, host networking, devices, and Docker socket mounts are rejected.",
+      "orchestration": "Orchestration",
+      "orchestrationHint": "Advanced Docker/Kubernetes runtime JSON for provider, exposure, resources, security context, scheduling, network, ingress, volumes, labels, and annotations.",
+      "invalidOrchestration": "Orchestration JSON is invalid.",
       "checkerImage": "Checker Image",
       "awdpCheckImage": "check container",
       "optional": "Optional",
@@ -761,6 +764,16 @@
       "type": "Type",
       "version": "Version / Assembly"
     },
+    "infrastructure": {
+      "title": "Infrastructure",
+      "subtitle": "Read-only Runner and Kubernetes runtime configuration.",
+      "runner": "Runner",
+      "provider": "Provider",
+      "status": "Status",
+      "reachable": "Reachable",
+      "unreachable": "Unreachable",
+      "policy": "Policy"
+    },
     "auditLogs": {
       "title": "Audit Logs",
       "subtitle": "Track all administrative actions and security events.",
@@ -831,6 +844,7 @@
       "challenges": "Challenges",
       "containers": "Containers",
       "plugins": "Plugins",
+      "infrastructure": "Infrastructure",
       "auditLogs": "Audit Logs",
       "health": "Health",
       "liveLogs": "Live Logs",
