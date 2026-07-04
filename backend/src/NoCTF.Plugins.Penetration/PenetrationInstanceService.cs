@@ -115,7 +115,7 @@ public class PenetrationInstanceService(
         {
             var dynamicFlags = await flagService.RegenerateDynamicFlagsAsync(challenge, instance, flags, ct);
             var build = composeBuilder.Build(challenge, instance, nodes, flags, dynamicFlags);
-            instance.RenderedComposeYaml = build.ComposeYaml;
+            instance.RenderedComposeYaml = build.RedactedComposeYaml;
 
             await containerManager.ComposeUpAsync(new ComposeConfig(
                 ProjectName: instance.ComposeProjectName!,

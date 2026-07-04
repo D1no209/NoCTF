@@ -66,7 +66,8 @@ public class PenetrationComposeBuilderTests
             TeamId = teamId,
             FlagId = flagId,
             InstanceId = instanceId,
-            ValueSecret = "abc-123",
+            ValueSecret = "[REDACTED]",
+            PlainValue = "abc-123",
             ValueHash = PenetrationFlagService.Hash("abc-123"),
             IsActive = true,
             GeneratedAt = DateTime.UtcNow
@@ -77,7 +78,10 @@ public class PenetrationComposeBuilderTests
         Assert.Equal(node, result.EntryNode);
         Assert.Equal(8080, result.EntryContainerPort);
         Assert.Contains("NOCTF_STAGE1: \"flag{abc-123}\"", result.ComposeYaml);
+        Assert.DoesNotContain("abc-123", result.RedactedComposeYaml);
+        Assert.Contains("NOCTF_STAGE1: \"[REDACTED]\"", result.RedactedComposeYaml);
         Assert.Contains("APP_ENV: \"prod\"", result.ComposeYaml);
+        Assert.Contains("APP_ENV: \"[REDACTED]\"", result.RedactedComposeYaml);
         Assert.Contains("- \"8080\"", result.ComposeYaml);
         Assert.DoesNotContain("0:8080", result.ComposeYaml);
         Assert.Contains("no-new-privileges:true", result.ComposeYaml);

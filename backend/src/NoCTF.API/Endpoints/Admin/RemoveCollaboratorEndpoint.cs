@@ -1,10 +1,11 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
 
-public class RemoveCollaboratorEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest>, IAuditableEndpoint
+public class RemoveCollaboratorEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<EmptyRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -16,6 +17,11 @@ public class RemoveCollaboratorEndpoint(ApplicationDbContext dbContext) : Endpoi
     {
         var competitionId = Route<Guid>("id");
         var userId = Route<Guid>("userId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
 
         var collaborator = await dbContext.CompetitionCollaborators
             .FirstOrDefaultAsync(cc => cc.CompetitionId == competitionId && cc.UserId == userId, ct);

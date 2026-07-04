@@ -21,7 +21,7 @@ public class RevealChallengeSecretEndpoint(ApplicationDbContext db) : Endpoint<R
     public override void Configure()
     {
         Post("/api/admin/challenges/{id}/reveal-secret");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
     }
 
     public override async Task HandleAsync(RevealChallengeSecretRequest req, CancellationToken ct)
@@ -40,12 +40,6 @@ public class RevealChallengeSecretEndpoint(ApplicationDbContext db) : Endpoint<R
         if (!Guid.TryParse(userIdClaim, out var userId))
         {
             await SendUnauthorizedAsync(ct);
-            return;
-        }
-
-        if (!User.IsInRole("Admin") && !User.IsInRole("Organizer"))
-        {
-            await SendForbiddenAsync(ct);
             return;
         }
 

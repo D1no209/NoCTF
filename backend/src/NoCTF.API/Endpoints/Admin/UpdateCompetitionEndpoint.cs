@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
@@ -48,7 +49,7 @@ public class UpdateCompetitionAdminRequest
     public int? AwdpFixTimeoutSeconds { get; set; }
 }
 
-public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
+public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -59,6 +60,12 @@ public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoin
     public override async Task HandleAsync(UpdateCompetitionAdminRequest req, CancellationToken ct)
     {
         var id = Route<Guid>("id");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, id, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var competition = await dbContext.Competitions.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, ct);
         if (competition is null)
         {

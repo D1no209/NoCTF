@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API;
+using NoCTF.API.Permissions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -12,7 +13,7 @@ public class CompetitionTeamLockRequest
     public bool IsLocked { get; set; }
 }
 
-public class GetCompetitionTeamsAdminEndpoint(ApplicationDbContext dbContext)
+public class GetCompetitionTeamsAdminEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest<List<TeamAdminDto>>
 {
     public override void Configure()
@@ -24,6 +25,12 @@ public class GetCompetitionTeamsAdminEndpoint(ApplicationDbContext dbContext)
     public override async Task HandleAsync(CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var teams = await dbContext.Teams
             .IgnoreQueryFilters()
             .Where(t => t.CompetitionId == competitionId)
@@ -58,7 +65,7 @@ public class GetCompetitionTeamsAdminEndpoint(ApplicationDbContext dbContext)
     }
 }
 
-public class ApproveCompetitionTeamEndpoint(ApplicationDbContext dbContext)
+public class ApproveCompetitionTeamEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -71,6 +78,12 @@ public class ApproveCompetitionTeamEndpoint(ApplicationDbContext dbContext)
     {
         var competitionId = Route<Guid>("competitionId");
         var teamId = Route<Guid>("teamId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var team = await dbContext.Teams
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.Id == teamId && t.CompetitionId == competitionId, ct);
@@ -121,7 +134,7 @@ public class ApproveCompetitionTeamEndpoint(ApplicationDbContext dbContext)
             .FirstAsync(ct);
 }
 
-public class RejectCompetitionTeamEndpoint(ApplicationDbContext dbContext)
+public class RejectCompetitionTeamEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -134,6 +147,12 @@ public class RejectCompetitionTeamEndpoint(ApplicationDbContext dbContext)
     {
         var competitionId = Route<Guid>("competitionId");
         var teamId = Route<Guid>("teamId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var team = await dbContext.Teams
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.Id == teamId && t.CompetitionId == competitionId, ct);
@@ -159,7 +178,7 @@ public class RejectCompetitionTeamEndpoint(ApplicationDbContext dbContext)
     }
 }
 
-public class SetCompetitionTeamLockEndpoint(ApplicationDbContext dbContext)
+public class SetCompetitionTeamLockEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions)
     : Endpoint<CompetitionTeamLockRequest, TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -172,6 +191,12 @@ public class SetCompetitionTeamLockEndpoint(ApplicationDbContext dbContext)
     {
         var competitionId = Route<Guid>("competitionId");
         var teamId = Route<Guid>("teamId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var team = await dbContext.Teams
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.Id == teamId && t.CompetitionId == competitionId, ct);

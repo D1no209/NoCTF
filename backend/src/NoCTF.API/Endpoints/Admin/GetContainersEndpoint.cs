@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -13,7 +14,7 @@ public class ContainerDto
     public string Status { get; set; } = "running";
 }
 
-public class GetContainersEndpoint(ApplicationDbContext db) : Endpoint<EmptyRequest, List<ContainerDto>>
+public class GetContainersEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions) : Endpoint<EmptyRequest, List<ContainerDto>>
 {
     public override void Configure()
     {
@@ -23,9 +24,16 @@ public class GetContainersEndpoint(ApplicationDbContext db) : Endpoint<EmptyRequ
 
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)
     {
+        if (!AdminCompetitionAuthorization.TryGetUserId(HttpContext, out var userId))
+        {
+            await SendUnauthorizedAsync(ct);
+            return;
+        }
+
+        var manageableCompetitionIds = await permissions.GetManageableCompetitionIdsAsync(userId, ct);
         var containers = await db.AwdGameBoxes
             .IgnoreQueryFilters()
-            .Where(g => g.ContainerInstanceId != null)
+            .Where(g => g.ContainerInstanceId != null && manageableCompetitionIds.Contains(g.CompetitionId))
             .Select(g => new ContainerDto
             {
                 ContainerId = g.ContainerInstanceId ?? "unknown",

@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 
@@ -10,7 +11,7 @@ public class DestroyContainerRequest
     public string Id { get; set; } = string.Empty;
 }
 
-public class DestroyContainerEndpoint(ApplicationDbContext db, IContainerManager containerManager) : Endpoint<DestroyContainerRequest>, IAuditableEndpoint
+public class DestroyContainerEndpoint(ApplicationDbContext db, IContainerManager containerManager, ICompetitionPermissionService permissions) : Endpoint<DestroyContainerRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -27,6 +28,11 @@ public class DestroyContainerEndpoint(ApplicationDbContext db, IContainerManager
         if (box is null)
         {
             await SendNotFoundAsync(ct);
+            return;
+        }
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, box.CompetitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
             return;
         }
 

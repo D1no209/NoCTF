@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API;
+using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -42,7 +43,7 @@ public class TeamBanRequest
     public string? Reason { get; set; }
 }
 
-public class GetCompetitionLogsAdminEndpoint(ApplicationDbContext db)
+public class GetCompetitionLogsAdminEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest<List<CompetitionLogDto>>
 {
     public override void Configure()
@@ -54,6 +55,12 @@ public class GetCompetitionLogsAdminEndpoint(ApplicationDbContext db)
     public override async Task HandleAsync(CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var logs = await db.CompetitionLogs
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -80,7 +87,7 @@ public class GetCompetitionLogsAdminEndpoint(ApplicationDbContext db)
     }
 }
 
-public class GetCompetitionCheatIncidentsEndpoint(ApplicationDbContext db)
+public class GetCompetitionCheatIncidentsEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest<List<CheatIncidentDto>>
 {
     public override void Configure()
@@ -92,6 +99,12 @@ public class GetCompetitionCheatIncidentsEndpoint(ApplicationDbContext db)
     public override async Task HandleAsync(CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var incidents = await db.CheatIncidents
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -120,7 +133,7 @@ public class GetCompetitionCheatIncidentsEndpoint(ApplicationDbContext db)
     }
 }
 
-public class BanCompetitionTeamEndpoint(ApplicationDbContext db)
+public class BanCompetitionTeamEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
     : Endpoint<TeamBanRequest, TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -133,6 +146,12 @@ public class BanCompetitionTeamEndpoint(ApplicationDbContext db)
     {
         var competitionId = Route<Guid>("competitionId");
         var teamId = Route<Guid>("teamId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var team = await db.Teams.IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.CompetitionId == competitionId && t.Id == teamId, ct);
         if (team is null)
@@ -161,7 +180,7 @@ public class BanCompetitionTeamEndpoint(ApplicationDbContext db)
     }
 }
 
-public class UnbanCompetitionTeamEndpoint(ApplicationDbContext db)
+public class UnbanCompetitionTeamEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -174,6 +193,12 @@ public class UnbanCompetitionTeamEndpoint(ApplicationDbContext db)
     {
         var competitionId = Route<Guid>("competitionId");
         var teamId = Route<Guid>("teamId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var team = await db.Teams.IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.CompetitionId == competitionId && t.Id == teamId, ct);
         if (team is null)

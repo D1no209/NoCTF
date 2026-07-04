@@ -6,6 +6,7 @@ namespace NoCTF.Plugins.Penetration;
 
 public sealed record PenetrationComposeBuildResult(
     string ComposeYaml,
+    string RedactedComposeYaml,
     PenetrationNode EntryNode,
     int EntryContainerPort);
 
@@ -27,25 +28,33 @@ public class PenetrationComposeBuilder
 
         var dynamicByFlagId = dynamicFlags.ToDictionary(f => f.FlagId);
         var builder = new StringBuilder();
-        builder.AppendLine("services:");
+        var redactedBuilder = new StringBuilder();
+        void AppendBoth(string line)
+        {
+            builder.AppendLine(line);
+            redactedBuilder.AppendLine(line);
+        }
+
+        AppendBoth("services:");
 
         foreach (var node in nodes.OrderBy(n => n.DisplayOrder).ThenBy(n => n.Name))
         {
             var serviceName = node.Name.Trim();
-            builder.AppendLine($"  {serviceName}:");
-            builder.AppendLine($"    image: {Quote(node.Image)}");
+            AppendBoth($"  {serviceName}:");
+            AppendBoth($"    image: {Quote(node.Image)}");
             if (!string.IsNullOrWhiteSpace(node.Command))
-                builder.AppendLine($"    command: {Quote(node.Command)}");
+                AppendBoth($"    command: {Quote(node.Command)}");
 
             var dependsOn = ReadStringArray(node.DependsOnJson).Where(name => !string.IsNullOrWhiteSpace(name)).ToList();
             if (dependsOn.Count > 0)
             {
-                builder.AppendLine("    depends_on:");
+                AppendBoth("    depends_on:");
                 foreach (var item in dependsOn)
-                    builder.AppendLine($"      - {Quote(item)}");
+                    AppendBoth($"      - {Quote(item)}");
             }
 
             var environment = ReadStringDictionary(node.EnvironmentJson);
+            var redactedEnvironment = environment.Keys.ToDictionary(key => key, _ => "[REDACTED]", StringComparer.Ordinal);
             foreach (var flag in flags.Where(f => f.IsDynamic && f.NodeId == node.Id))
             {
                 if (flag.InjectionType == PenetrationFlagInjectionType.File)
@@ -53,7 +62,10 @@ public class PenetrationComposeBuilder
                 if (string.IsNullOrWhiteSpace(flag.InjectionKey))
                     throw new InvalidOperationException("dynamic_flag_injection_key_required");
                 if (dynamicByFlagId.TryGetValue(flag.Id, out var dynamicFlag))
-                    environment[flag.InjectionKey] = PenetrationFlagService.FormatFlag(challenge, dynamicFlag.ValueSecret);
+                {
+                    environment[flag.InjectionKey] = PenetrationFlagService.FormatFlag(challenge, ResolveDynamicFlagValue(dynamicFlag));
+                    redactedEnvironment[flag.InjectionKey] = "[REDACTED]";
+                }
             }
 
             if (environment.Count > 0)
@@ -61,32 +73,37 @@ public class PenetrationComposeBuilder
                 builder.AppendLine("    environment:");
                 foreach (var (key, value) in environment.OrderBy(kvp => kvp.Key, StringComparer.Ordinal))
                     builder.AppendLine($"      {key}: {Quote(value)}");
+
+                redactedBuilder.AppendLine("    environment:");
+                foreach (var (key, value) in redactedEnvironment.OrderBy(kvp => kvp.Key, StringComparer.Ordinal))
+                    redactedBuilder.AppendLine($"      {key}: {Quote(value)}");
             }
 
             var entryPort = GetPrimaryContainerPort(node, challenge.ExposedPort);
             if (node.IsEntry && entryPort > 0)
             {
-                builder.AppendLine("    ports:");
-                builder.AppendLine($"      - \"{entryPort}\"");
+                AppendBoth("    ports:");
+                AppendBoth($"      - \"{entryPort}\"");
             }
 
-            builder.AppendLine("    labels:");
+            AppendBoth("    labels:");
             foreach (var (key, value) in BuildLabels(challenge, instance, node))
-                builder.AppendLine($"      {key}: {Quote(value)}");
+                AppendBoth($"      {key}: {Quote(value)}");
 
-            builder.AppendLine("    security_opt:");
-            builder.AppendLine("      - no-new-privileges:true");
-            builder.AppendLine("    cap_drop:");
-            builder.AppendLine("      - ALL");
-            builder.AppendLine("    restart: unless-stopped");
+            AppendBoth("    security_opt:");
+            AppendBoth("      - no-new-privileges:true");
+            AppendBoth("    cap_drop:");
+            AppendBoth("      - ALL");
+            AppendBoth("    restart: unless-stopped");
         }
 
-        builder.AppendLine("networks:");
-        builder.AppendLine("  default:");
-        builder.AppendLine($"    name: {Quote($"{instance.ComposeProjectName}_default")}");
+        AppendBoth("networks:");
+        AppendBoth("  default:");
+        AppendBoth($"    name: {Quote($"{instance.ComposeProjectName}_default")}");
 
         return new PenetrationComposeBuildResult(
             ComposeYaml: builder.ToString(),
+            RedactedComposeYaml: redactedBuilder.ToString(),
             EntryNode: entry,
             EntryContainerPort: GetPrimaryContainerPort(entry, challenge.ExposedPort));
     }
@@ -111,6 +128,11 @@ public class PenetrationComposeBuilder
             ["instanceId"] = instance.Id.ToString(),
             ["nodeId"] = node.Id.ToString(),
         };
+
+    private static string ResolveDynamicFlagValue(DynamicFlagInstance dynamicFlag)
+        => !string.IsNullOrWhiteSpace(dynamicFlag.PlainValue)
+            ? dynamicFlag.PlainValue
+            : dynamicFlag.ValueSecret;
 
     private static List<int> ReadPortNumbers(string json)
     {

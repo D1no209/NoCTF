@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using System.Text.Json;
@@ -66,7 +67,7 @@ public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext) : Endp
     }
 }
 
-public class GetCompetitionAdminEndpoint(ApplicationDbContext dbContext) : EndpointWithoutRequest<CompetitionSummaryDto>
+public class GetCompetitionAdminEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : EndpointWithoutRequest<CompetitionSummaryDto>
 {
     public override void Configure()
     {
@@ -77,6 +78,12 @@ public class GetCompetitionAdminEndpoint(ApplicationDbContext dbContext) : Endpo
     public override async Task HandleAsync(CancellationToken ct)
     {
         var id = Route<Guid>("id");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, id, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var competition = await dbContext.Competitions
             .IgnoreQueryFilters()
             .AsNoTracking()

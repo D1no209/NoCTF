@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using NoCTF.PluginBase;
 
 namespace NoCTF.Core;
@@ -435,6 +436,8 @@ public class DynamicFlagInstance : ITenantEntity
     public bool IsActive { get; set; } = true;
     public DateTime GeneratedAt { get; set; }
     public DateTime? SolvedAt { get; set; }
+    [NotMapped]
+    public string? PlainValue { get; set; }
 }
 
 public class ScoreEvent : ITenantEntity

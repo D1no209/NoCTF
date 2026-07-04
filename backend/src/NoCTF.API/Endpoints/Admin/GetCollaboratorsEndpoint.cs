@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -11,7 +12,7 @@ public class CollaboratorDto
     public string Role { get; set; } = string.Empty;
 }
 
-public class GetCollaboratorsEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest, List<CollaboratorDto>>
+public class GetCollaboratorsEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<EmptyRequest, List<CollaboratorDto>>
 {
     public override void Configure()
     {
@@ -22,6 +23,12 @@ public class GetCollaboratorsEndpoint(ApplicationDbContext dbContext) : Endpoint
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)
     {
         var id = Route<Guid>("id");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, id, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var collaborators = await dbContext.CompetitionCollaborators
             .Where(cc => cc.CompetitionId == id)
             .Select(cc => new CollaboratorDto

@@ -40,6 +40,7 @@ public class PenetrationTopologyServiceTests
         Assert.Equal(2, flags.Count);
         Assert.Contains(flags, f => f.Stage == 1 && f.IsDynamic && f.InjectionKey == "NOCTF_STAGE1");
         Assert.Contains(flags, f => f.Stage == 2 && !f.IsDynamic && f.ValueHash == PenetrationTopologyService.HashSecret("rooted"));
+        Assert.DoesNotContain(flags, f => f.ValueSecret == "rooted");
     }
 
     [Fact]

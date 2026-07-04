@@ -47,8 +47,9 @@ public class PenetrationFlagService(ApplicationDbContext db)
                     TeamId = instance.TeamId,
                     FlagId = flag.Id,
                     InstanceId = instance.Id,
-                    ValueSecret = rawValue,
-                    ValueHash = Hash(rawValue),
+                    ValueSecret = "[REDACTED]",
+                    PlainValue = rawValue,
+                    ValueHash = HashCandidates(rawValue, FormatFlag(challenge, rawValue)),
                     IsActive = true,
                     GeneratedAt = now,
                 };
@@ -90,11 +91,10 @@ public class PenetrationFlagService(ApplicationDbContext db)
                     f.TeamId == instance.TeamId &&
                     f.InstanceId == instance.Id &&
                     f.FlagId == flag.Id);
-                if (dynamicFlag is not null && MatchesSubmitted(challenge, submittedFlag, dynamicFlag.ValueSecret))
+                if (dynamicFlag is not null && MatchesSubmittedHash(challenge, submittedFlag, dynamicFlag.ValueHash))
                     return new PenetrationFlagMatch(flag, dynamicFlag, null, true, false);
             }
-            else if (!string.IsNullOrWhiteSpace(flag.ValueSecret) &&
-                     MatchesSubmitted(challenge, submittedFlag, flag.ValueSecret))
+            else if (MatchesStoredStaticFlag(challenge, submittedFlag, flag))
             {
                 return new PenetrationFlagMatch(flag, null, null, true, false);
             }
@@ -102,7 +102,7 @@ public class PenetrationFlagService(ApplicationDbContext db)
 
         foreach (var dynamicFlag in dynamicFlags.Where(f => f.TeamId != instance.TeamId))
         {
-            if (!MatchesSubmitted(challenge, submittedFlag, dynamicFlag.ValueSecret)) continue;
+            if (!MatchesSubmittedHash(challenge, submittedFlag, dynamicFlag.ValueHash)) continue;
             var flag = flags.FirstOrDefault(f => f.Id == dynamicFlag.FlagId);
             return new PenetrationFlagMatch(flag, dynamicFlag, dynamicFlag.TeamId, false, true);
         }
@@ -172,6 +172,83 @@ public class PenetrationFlagService(ApplicationDbContext db)
     private static bool MatchesSubmitted(Challenge challenge, string submittedFlag, string content)
         => TimingSafeEquals(submittedFlag, content) ||
            TimingSafeEquals(submittedFlag, FormatFlag(challenge, content));
+
+    private static bool MatchesStoredStaticFlag(Challenge challenge, string submittedFlag, PenetrationFlag flag)
+    {
+        if (!string.IsNullOrWhiteSpace(flag.ValueHash) &&
+            MatchesSubmittedHash(challenge, submittedFlag, flag.ValueHash))
+            return true;
+
+        return !string.IsNullOrWhiteSpace(flag.ValueSecret) &&
+               MatchesSubmitted(challenge, submittedFlag, flag.ValueSecret);
+    }
+
+    private static bool MatchesSubmittedHash(Challenge challenge, string submittedFlag, string? storedHash)
+    {
+        if (string.IsNullOrWhiteSpace(storedHash))
+            return false;
+
+        var hashes = storedHash
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var candidate in SubmittedFlagCandidates(challenge, submittedFlag))
+        {
+            var candidateHash = Hash(candidate);
+            if (hashes.Any(hash => TimingSafeEquals(candidateHash, hash)))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> SubmittedFlagCandidates(Challenge challenge, string submittedFlag)
+    {
+        yield return submittedFlag;
+
+        var configuredPrefix = string.IsNullOrWhiteSpace(challenge.FlagPrefix) ? "flag" : challenge.FlagPrefix.Trim();
+        if (configuredPrefix.Contains("{0}", StringComparison.Ordinal))
+        {
+            var parts = configuredPrefix.Split("{0}", StringSplitOptions.None);
+            if (parts.Length == 2 &&
+                submittedFlag.StartsWith(parts[0], StringComparison.Ordinal) &&
+                submittedFlag.EndsWith(parts[1], StringComparison.Ordinal) &&
+                submittedFlag.Length >= parts[0].Length + parts[1].Length)
+            {
+                yield return submittedFlag[parts[0].Length..^parts[1].Length];
+            }
+        }
+
+        if (configuredPrefix.Contains("{}", StringComparison.Ordinal))
+        {
+            var parts = configuredPrefix.Split("{}", StringSplitOptions.None);
+            if (parts.Length == 2)
+            {
+                var before = $"{parts[0]}{{";
+                var after = $"}}{parts[1]}";
+                if (submittedFlag.StartsWith(before, StringComparison.Ordinal) &&
+                    submittedFlag.EndsWith(after, StringComparison.Ordinal) &&
+                    submittedFlag.Length >= before.Length + after.Length)
+                {
+                    yield return submittedFlag[before.Length..^after.Length];
+                }
+            }
+        }
+
+        var prefix = configuredPrefix;
+        var braceIndex = prefix.IndexOf('{', StringComparison.Ordinal);
+        if (braceIndex >= 0)
+            prefix = prefix[..braceIndex].Trim();
+
+        var wrappedPrefix = $"{prefix}{{";
+        if (submittedFlag.StartsWith(wrappedPrefix, StringComparison.Ordinal) &&
+            submittedFlag.EndsWith("}", StringComparison.Ordinal) &&
+            submittedFlag.Length > wrappedPrefix.Length + 1)
+        {
+            yield return submittedFlag[wrappedPrefix.Length..^1];
+        }
+    }
+
+    private static string HashCandidates(params string[] values)
+        => string.Join(';', values.Select(Hash).Distinct(StringComparer.Ordinal));
 
     private static string GenerateRandomValue()
     {

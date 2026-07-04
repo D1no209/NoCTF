@@ -1,13 +1,14 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API;
+using NoCTF.API.Permissions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Admin;
 
-public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbContext, IContainerManager containerManager)
+public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbContext, IContainerManager containerManager, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest<Competitions.ChallengeInstanceResponse>, IAuditableEndpoint
 {
     public override void Configure()
@@ -20,6 +21,12 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
     {
         var competitionId = Route<Guid>("competitionId");
         var challengeId = Route<Guid>("challengeId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var challenge = await dbContext.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()

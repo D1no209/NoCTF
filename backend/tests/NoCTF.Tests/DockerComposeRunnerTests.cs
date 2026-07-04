@@ -63,4 +63,51 @@ services:
 
         Assert.Throws<InvalidOperationException>(() => DockerComposeRunner.ValidateComposeYaml(yaml));
     }
+
+    [Fact]
+    public void ValidateComposeYaml_RejectsNestedHostNetworkMode()
+    {
+        var yaml = """
+services:
+  web:
+    image: registry/challenge:latest
+    network_mode:
+      host
+""";
+
+        Assert.Throws<InvalidOperationException>(() => DockerComposeRunner.ValidateComposeYaml(yaml));
+    }
+
+    [Theory]
+    [InlineData("/etc/passwd:/tmp/passwd:ro")]
+    [InlineData("./data:/data")]
+    [InlineData("C:\\\\ctf\\\\data:/data")]
+    public void ValidateComposeYaml_RejectsHostPathVolumeMounts(string volume)
+    {
+        var yaml = $"""
+services:
+  web:
+    image: registry/challenge:latest
+    volumes:
+      - "{volume}"
+""";
+
+        Assert.Throws<InvalidOperationException>(() => DockerComposeRunner.ValidateComposeYaml(yaml));
+    }
+
+    [Fact]
+    public void ValidateComposeYaml_AllowsNamedVolumes()
+    {
+        var yaml = """
+services:
+  web:
+    image: registry/challenge:latest
+    volumes:
+      - challenge-data:/data
+volumes:
+  challenge-data:
+""";
+
+        DockerComposeRunner.ValidateComposeYaml(yaml);
+    }
 }

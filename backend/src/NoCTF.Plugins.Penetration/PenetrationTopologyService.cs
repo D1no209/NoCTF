@@ -133,6 +133,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
             var nodeId = ResolveNodeId(flag.NodeId, flag.NodeName, nodeMap);
             existingFlags.TryGetValue(flag.Id ?? Guid.Empty, out var oldFlag);
             var secret = flag.IsDynamic ? null : Clean(flag.ValueSecret) ?? oldFlag?.ValueSecret;
+            var previousHash = oldFlag?.ValueHash ?? (oldFlag?.ValueSecret is null ? null : HashSecret(oldFlag.ValueSecret));
             return new PenetrationFlagTemplate
             {
                 Id = Guid.NewGuid(),
@@ -140,8 +141,8 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 NodeTemplateId = nodeId,
                 Name = string.IsNullOrWhiteSpace(flag.Name) ? $"Stage {flag.Stage}" : flag.Name.Trim(),
                 Stage = flag.Stage,
-                ValueSecret = secret,
-                ValueHash = secret is null ? oldFlag?.ValueHash : HashSecret(secret),
+                ValueSecret = null,
+                ValueHash = secret is null ? previousHash : HashSecret(secret),
                 Score = flag.Score,
                 IsDynamic = flag.IsDynamic,
                 Visible = flag.Visible,
@@ -243,8 +244,8 @@ public class PenetrationTopologyService(ApplicationDbContext db)
             NodeId = flag.NodeTemplateId.HasValue && nodeIdMap.TryGetValue(flag.NodeTemplateId.Value, out var nodeId) ? nodeId : null,
             Name = flag.Name,
             Stage = flag.Stage,
-            ValueSecret = flag.ValueSecret,
-            ValueHash = flag.ValueHash,
+            ValueSecret = null,
+            ValueHash = flag.ValueHash ?? (flag.ValueSecret is null ? null : HashSecret(flag.ValueSecret)),
             Score = flag.Score,
             IsDynamic = flag.IsDynamic,
             Visible = flag.Visible,
@@ -395,6 +396,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
             var nodeId = ResolveNodeId(flag.NodeId, flag.NodeName, nodeMap);
             existingFlags.TryGetValue(flag.Id ?? Guid.Empty, out var oldFlag);
             var secret = flag.IsDynamic ? null : Clean(flag.ValueSecret) ?? oldFlag?.ValueSecret;
+            var previousHash = oldFlag?.ValueHash ?? (oldFlag?.ValueSecret is null ? null : HashSecret(oldFlag.ValueSecret));
             return new PenetrationFlag
             {
                 Id = Guid.NewGuid(),
@@ -404,8 +406,8 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 NodeId = nodeId,
                 Name = string.IsNullOrWhiteSpace(flag.Name) ? $"Stage {flag.Stage}" : flag.Name.Trim(),
                 Stage = flag.Stage,
-                ValueSecret = secret,
-                ValueHash = secret is null ? oldFlag?.ValueHash : HashSecret(secret),
+                ValueSecret = null,
+                ValueHash = secret is null ? previousHash : HashSecret(secret),
                 Score = flag.Score,
                 IsDynamic = flag.IsDynamic,
                 Visible = flag.Visible,
