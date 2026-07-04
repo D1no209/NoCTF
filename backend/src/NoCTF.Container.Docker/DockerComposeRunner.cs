@@ -45,7 +45,6 @@ public static class DockerComposeRunner
             "cgroup_parent:",
             "devices:",
             "cap_add:",
-            "security_opt:",
             "extra_hosts:",
             "/var/run/docker.sock",
         };
@@ -54,6 +53,20 @@ public static class DockerComposeRunner
         {
             if (composeYaml.Contains(token, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Compose YAML contains forbidden directive: {token}");
+        }
+
+        var forbiddenSecurityOptions = new[]
+        {
+            "no-new-privileges:false",
+            "seccomp=unconfined",
+            "apparmor=unconfined",
+            "label:disable",
+        };
+
+        foreach (var token in forbiddenSecurityOptions)
+        {
+            if (composeYaml.Contains(token, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Compose YAML contains forbidden security option: {token}");
         }
     }
 

@@ -60,10 +60,13 @@ curl http://localhost/api/health
 - The backend does not mount `/var/run/docker.sock`. Container access is isolated in the `runner` service; the worker calls runner over the internal Compose network.
 - The Docker Compose API image builds the Vue SPA with Bun and serves the built `dist` from ASP.NET Core `wwwroot`, so no separate Nginx frontend container is required.
 - Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
+- Penetration Challenge ranges currently use Docker Compose only. Set `NOCTF_PUBLIC_HOST` or `InstanceAccess:PublicHost` to a player-reachable host when entry ports are published by the runner.
 
 ## Kubernetes
 
 NoCTF includes a full set of K8s manifests under `deploy/k8s/`.
+
+These manifests deploy the platform services. Penetration Challenge orchestration is not implemented for Kubernetes yet; use Docker Compose/Runner for Penetration ranges until a Kubernetes provider is added.
 
 ### Prerequisites
 

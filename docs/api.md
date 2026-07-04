@@ -134,3 +134,65 @@ NoCTF uses standard HTTP status codes:
 - `500` — Internal server error
 
 Validation error responses include a list of failed fields and messages.
+
+## Penetration Challenge Endpoints
+
+Penetration Challenge is a CTF challenge type. These endpoints are thin API adapters over the challenge-type plugin registry; the API project does not reference the Penetration plugin directly.
+
+### Player
+
+All player endpoints require an authenticated user with an approved, unbanned team in the competition.
+
+```http
+GET /api/competitions/{id}/challenges/{challengeId}/penetration
+```
+
+Returns the player's authorized scope, topology metadata, stage solve state, and team instance state. It does not return plaintext flags.
+
+```http
+GET    /api/competitions/{id}/challenges/{challengeId}/penetration/instance
+POST   /api/competitions/{id}/challenges/{challengeId}/penetration/instance/start
+POST   /api/competitions/{id}/challenges/{challengeId}/penetration/instance/stop
+POST   /api/competitions/{id}/challenges/{challengeId}/penetration/instance/reset
+DELETE /api/competitions/{id}/challenges/{challengeId}/penetration/instance
+```
+
+Manages only the caller's own team instance.
+
+```http
+POST /api/competitions/{id}/challenges/{challengeId}/penetration/flags/submit
+Content-Type: application/json
+
+{
+  "flag": "flag{...}"
+}
+```
+
+Correct responses include `result = "accepted"` or `result = "already_solved"`. Wrong, expired-instance, missing-instance, and rate-limited submissions return a response body with `correct = false` and a result code. Submitted flag plaintext is not persisted in submissions or logs.
+
+### Admin
+
+Competition-scoped admin endpoints require `Admin` or `Organizer` plus `CanManageCompetitionAsync` for the competition.
+
+```http
+GET /api/admin/challenges/{templateId}/penetration-topology
+PUT /api/admin/challenges/{templateId}/penetration-topology
+```
+
+Reads and updates the reusable challenge-bank topology for a Penetration template.
+
+```http
+GET /api/admin/competitions/{competitionId}/challenges/{challengeId}/penetration/topology
+PUT /api/admin/competitions/{competitionId}/challenges/{challengeId}/penetration/topology
+```
+
+Reads and updates the competition-specific deployed topology. Updates are rejected while active instances exist.
+
+```http
+GET    /api/admin/competitions/{competitionId}/penetration/instances
+GET    /api/admin/competitions/{competitionId}/penetration/instances/{instanceId}
+POST   /api/admin/competitions/{competitionId}/penetration/instances/{instanceId}/reset
+DELETE /api/admin/competitions/{competitionId}/penetration/instances/{instanceId}
+```
+
+Lists and manages team instances for a competition without exposing plaintext dynamic flags.

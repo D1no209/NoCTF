@@ -52,16 +52,25 @@ interface Challenge {
   hints?: string[]
   attachmentUrl?: string | null
   patchTemplateUrl?: string | null
+  totalStageCount?: number | null
+  solvedStageCount?: number | null
+  totalScore?: number | null
 }
 
 interface SubmissionItem {
   challengeId: string
 }
 
+interface SolvedFlagItem {
+  challengeId: string
+  flagId: string
+}
+
 interface SubmissionsResponse {
   competitionId: string
   teamId: string
   solvedChallenges: SubmissionItem[]
+  solvedFlags?: SolvedFlagItem[]
 }
 
 interface PatchSubmissionStatus {
@@ -172,6 +181,13 @@ const { data: myTeams, isLoading: loadingMyTeams } = useQuery({
 })
 
 const solvedIds = computed(() => new Set((submissionsResponse.value?.solvedChallenges ?? []).map(s => s.challengeId)))
+const solvedFlagCounts = computed(() => {
+  const counts = new Map<string, number>()
+  for (const flag of submissionsResponse.value?.solvedFlags ?? []) {
+    counts.set(flag.challengeId, (counts.get(flag.challengeId) ?? 0) + 1)
+  }
+  return counts
+})
 
 // UI State
 const modalOpen = ref(false)
@@ -341,6 +357,14 @@ function handleInstanceCreated(challengeId: string) {
 function handlePatchUploaded() {
   queryClient.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId.value) })
   queryClient.invalidateQueries({ queryKey: queryKeys.awdpState(competitionId.value) })
+}
+
+function withChallengeProgress(challenge: Challenge): Challenge {
+  if (challenge.typeId.toLowerCase() !== 'penetration') return challenge
+  return {
+    ...challenge,
+    solvedStageCount: solvedFlagCounts.value.get(challenge.id) ?? 0,
+  }
 }
 </script>
 
@@ -539,7 +563,7 @@ function handlePatchUploaded() {
                 @click="openChallenge(challenge)"
               >
                 <ChallengeCard
-                  :challenge="challenge"
+                  :challenge="withChallengeProgress(challenge)"
                   :solved="solvedIds.has(challenge.id)"
                   class="transition-all duration-300 group-hover:shadow-lg group-hover:-translate-y-1 group-hover:border-primary/20"
                 />

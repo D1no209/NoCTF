@@ -9,7 +9,7 @@ NoCTF is a multi-mode competition platform for CTF, AWD, AWDP, and KoH events.
 - Backend: .NET 8, FastEndpoints, SignalR, EF Core, PostgreSQL, Redis.
 - Frontend: Vue 3, TypeScript, Vite, Bun, Tailwind CSS, shadcn-vue style components.
 - Runtime: Docker Compose for PostgreSQL, Redis, MinIO, API, worker, and runner.
-- Architecture rule: keep game-mode behavior plugin-oriented. Put shared contracts in `NoCTF.PluginBase`, shared domain in `NoCTF.Core`, application services in `NoCTF.Application`, and mode-specific behavior in `NoCTF.Plugins.*`.
+- Architecture rule: keep game-mode and challenge-type behavior plugin-oriented. Put shared contracts in `NoCTF.PluginBase`, shared domain in `NoCTF.Core`, application services in `NoCTF.Application`, and mode-specific behavior in `NoCTF.Plugins.*`.
 
 Current maintainer expectation: after code changes, rebuild both frontend and backend, then verify the relevant browser flow before handing work back.
 
@@ -76,6 +76,9 @@ backend/src/NoCTF.Plugins.AWD
 backend/src/NoCTF.Plugins.AWDP
 backend/src/NoCTF.Plugins.KoH
   Game-mode-specific logic.
+
+backend/src/NoCTF.Plugins.Penetration
+  CTF/Jeopardy Penetration challenge type: per-team Docker Compose ranges, staged flags, dynamic flag injection, and stage scoring.
 
 frontend/src
   Vue application, routes, layouts, admin/player pages, API wrappers.
@@ -243,6 +246,28 @@ backend/src/NoCTF.Plugins.AWDP/Templates/standard-web
 8. For dynamic containers, create an instance, copy the displayed `host:port`, extend/destroy as needed.
 9. For AWDP/AWD flows, request defense and upload patches only after defense is enabled.
 
+### Penetration Challenge Flow
+
+Penetration Challenge is a CTF challenge type, not AWD/AWDP/KoH.
+
+Admin flow:
+
+1. Create a challenge-bank template with `TypeId = Penetration`.
+2. Configure the topology JSON on the template.
+3. Bind it to a CTF competition.
+4. Optionally edit the competition-specific topology from the competition challenge panel.
+5. Monitor team instances through the Penetration admin APIs.
+
+Player flow:
+
+1. Open the Penetration challenge modal.
+2. Start the team's own instance.
+3. Use only the displayed entry address and in-range services.
+4. Submit stage flags; each visible stage is scored independently.
+5. Reset or destroy the range as allowed by the challenge config.
+
+Kubernetes orchestration for Penetration ranges is not implemented. The MVP path is Docker Compose via the container manager/runner.
+
 ## Dynamic Containers And Flags
 
 Dynamic challenge instances are managed through:
@@ -390,6 +415,7 @@ git@github.com: Permission denied (publickey).
 
 Recent completed focus areas:
 
+- Penetration Challenge MVP in progress: data model, EF migration, plugin registry, Penetration plugin services, player/admin APIs, staged scoring, dynamic flags, Compose generation, Worker cleanup/status sync, challenge-bank topology editor, competition topology editor, admin instance monitor, and player challenge panel
 - AWDP round scoring and admin challenge workflow
 - AWDP single check-container validation flow
 - AWDP patch-template upload/download support
@@ -401,10 +427,13 @@ Recent completed focus areas:
 
 Most recent verification:
 
-- `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore` passed with 93 tests
+- `dotnet build backend/NoCTF.slnx --no-restore` passed after Penetration changes
+- `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore` passed with 111 tests
+- `bun run build` passed after Penetration frontend changes
+- `bun run fetch-openapi` and `bun run generate-api` passed after Penetration API additions
 - `bunx eslint <changed frontend files>` passed for the frontend UI cleanup
-- `bun run build` passed
 - In-app browser loaded `http://127.0.0.1:5173/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f` at desktop and narrow widths with no console errors
+- In-app browser loaded `http://127.0.0.1:5173/admin/competitions/792a8e46-920a-4a2c-8d74-c82008a41a6c?section=instances`; the Penetration instance monitor rendered at desktop and 390px width with no console errors
 - Full `bun run lint` still reports pre-existing lint issues in generated/config/unrelated admin files
 
 ## Common Pitfalls
@@ -426,5 +455,7 @@ Most recent verification:
 - [Development Guide](development.md)
 - [Deployment Guide](deployment.md)
 - [Game Modes](game-modes.md)
+- [Penetration Challenges](penetration-challenges.md)
+- [Penetration Operations](penetration-operations.md)
 - [API Reference](api.md)
 - [Quickstart Test Guide](quickstart-test.md)

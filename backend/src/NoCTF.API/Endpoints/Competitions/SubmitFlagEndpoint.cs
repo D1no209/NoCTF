@@ -200,6 +200,9 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
             SubmissionResult.InstanceRequired => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "instance_required" },
             SubmissionResult.InstanceExpired => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "instance_expired" },
             SubmissionResult.AttemptsExhausted => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "attempts_exhausted" },
+            SubmissionResult.FlagRateLimited => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "flag_rate_limited" },
+            SubmissionResult.CompetitionNotStarted => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "competition_not_started" },
+            SubmissionResult.CompetitionEnded => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = "competition_ended" },
             _ => new SubmitFlagResponse { Correct = false, AlreadySolved = false, Result = result.ToString().ToLowerInvariant() }
         };
 

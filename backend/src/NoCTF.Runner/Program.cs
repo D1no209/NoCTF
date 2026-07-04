@@ -62,6 +62,20 @@ app.MapPost("/runner/compose/down", async (
     return Results.NoContent();
 });
 
+app.MapGet("/runner/compose/{projectName}/status", async (
+    string projectName,
+    HttpRequest request,
+    IContainerManager manager,
+    CancellationToken ct) =>
+{
+    var labels = request.Query["label"]
+        .Select(value => value?.Split('=', 2))
+        .Where(parts => parts is { Length: 2 } && !string.IsNullOrWhiteSpace(parts[0]))
+        .ToDictionary(parts => parts![0], parts => parts![1], StringComparer.Ordinal);
+
+    return Results.Ok(await manager.GetComposeStatusAsync(projectName, labels, ct));
+});
+
 await app.RunAsync();
 
 static bool ImageAllowed(string image, IReadOnlyCollection<string> allowedRegistries)

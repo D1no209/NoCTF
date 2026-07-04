@@ -18,13 +18,16 @@ const router = useRouter()
 const qc = useQueryClient()
 
 const createMutation = useMutation({
-  mutationFn: async ({ payload, attachmentFile, patchTemplateFile }: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null }) => {
+  mutationFn: async ({ payload, attachmentFile, patchTemplateFile, penetrationTopology }: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null; penetrationTopology: Record<string, unknown> | null }) => {
     const saved = await adminApi.createChallenge<ChallengeTemplateDto>(payload)
     if (attachmentFile) {
       await adminApi.uploadChallengeAttachment(saved.id, attachmentFile)
     }
     if (patchTemplateFile) {
       await adminApi.uploadChallengePatchTemplate(saved.id, patchTemplateFile)
+    }
+    if (penetrationTopology) {
+      await adminApi.updatePenetrationTemplateTopology(saved.id, penetrationTopology)
     }
   },
   onSuccess: () => {

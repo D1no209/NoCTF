@@ -16,6 +16,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ChallengeTemplate> ChallengeTemplates => Set<ChallengeTemplate>();
     public DbSet<ChallengeHint> ChallengeHints => Set<ChallengeHint>();
     public DbSet<CtfDynamicFlag> CtfDynamicFlags => Set<CtfDynamicFlag>();
+    public DbSet<PenetrationTopologyTemplate> PenetrationTopologyTemplates => Set<PenetrationTopologyTemplate>();
+    public DbSet<PenetrationNodeTemplate> PenetrationNodeTemplates => Set<PenetrationNodeTemplate>();
+    public DbSet<PenetrationFlagTemplate> PenetrationFlagTemplates => Set<PenetrationFlagTemplate>();
+    public DbSet<PenetrationTopology> PenetrationTopologies => Set<PenetrationTopology>();
+    public DbSet<PenetrationNode> PenetrationNodes => Set<PenetrationNode>();
+    public DbSet<PenetrationFlag> PenetrationFlags => Set<PenetrationFlag>();
+    public DbSet<TeamChallengeInstance> TeamChallengeInstances => Set<TeamChallengeInstance>();
+    public DbSet<DynamicFlagInstance> DynamicFlagInstances => Set<DynamicFlagInstance>();
     public DbSet<CompetitionLog> CompetitionLogs => Set<CompetitionLog>();
     public DbSet<CheatIncident> CheatIncidents => Set<CheatIncident>();
     public DbSet<Submission> Submissions => Set<Submission>();
@@ -66,8 +74,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<Submission>()
             .HasIndex(s => new { s.CompetitionId, s.TeamId, s.ChallengeId })
             .IsUnique()
-            .HasFilter("\"IsCorrect\" = true")
+            .HasFilter("\"IsCorrect\" = true AND \"PenetrationFlagId\" IS NULL")
             .HasDatabaseName("ux_submissions_correct_once");
+
+        modelBuilder.Entity<Submission>()
+            .HasIndex(s => new { s.CompetitionId, s.TeamId, s.ChallengeId, s.PenetrationFlagId })
+            .IsUnique()
+            .HasFilter("\"IsCorrect\" = true AND \"PenetrationFlagId\" IS NOT NULL")
+            .HasDatabaseName("ux_submissions_penetration_flag_correct_once");
 
         modelBuilder.Entity<ScoreEvent>()
             .HasIndex(se => new { se.CompetitionId, se.TeamId })
@@ -113,6 +127,67 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(f => new { f.CompetitionId, f.ChallengeId, f.FlagUuid })
             .IsUnique()
             .HasDatabaseName("ux_ctfdynamicflags_competition_challenge_uuid");
+
+        modelBuilder.Entity<PenetrationTopologyTemplate>()
+            .HasIndex(t => t.ChallengeTemplateId)
+            .IsUnique()
+            .HasDatabaseName("ux_pentopologytemplates_challenge_template");
+
+        modelBuilder.Entity<PenetrationNodeTemplate>()
+            .HasIndex(n => new { n.TopologyTemplateId, n.Name })
+            .IsUnique()
+            .HasDatabaseName("ux_pennodetemplates_topology_name");
+
+        modelBuilder.Entity<PenetrationFlagTemplate>()
+            .HasIndex(f => new { f.TopologyTemplateId, f.Stage })
+            .IsUnique()
+            .HasDatabaseName("ux_penflagtemplates_topology_stage");
+
+        modelBuilder.Entity<PenetrationTopology>()
+            .HasIndex(t => new { t.CompetitionId, t.ChallengeId })
+            .IsUnique()
+            .HasDatabaseName("ux_pentopologies_competition_challenge");
+
+        modelBuilder.Entity<PenetrationNode>()
+            .HasIndex(n => new { n.CompetitionId, n.TopologyId })
+            .HasDatabaseName("ix_pennodes_competition_topology");
+
+        modelBuilder.Entity<PenetrationNode>()
+            .HasIndex(n => new { n.CompetitionId, n.TopologyId, n.Name })
+            .IsUnique()
+            .HasDatabaseName("ux_pennodes_competition_topology_name");
+
+        modelBuilder.Entity<PenetrationFlag>()
+            .HasIndex(f => new { f.CompetitionId, f.ChallengeId, f.Stage })
+            .IsUnique()
+            .HasDatabaseName("ux_penflags_competition_challenge_stage");
+
+        modelBuilder.Entity<PenetrationFlag>()
+            .HasIndex(f => new { f.CompetitionId, f.TopologyId })
+            .HasDatabaseName("ix_penflags_competition_topology");
+
+        modelBuilder.Entity<TeamChallengeInstance>()
+            .HasIndex(i => new { i.CompetitionId, i.TeamId, i.ChallengeId })
+            .IsUnique()
+            .HasDatabaseName("ux_teamchallengeinstances_competition_team_challenge");
+
+        modelBuilder.Entity<TeamChallengeInstance>()
+            .HasIndex(i => new { i.CompetitionId, i.Status })
+            .HasDatabaseName("ix_teamchallengeinstances_competition_status");
+
+        modelBuilder.Entity<DynamicFlagInstance>()
+            .HasIndex(f => new { f.CompetitionId, f.TeamId, f.FlagId, f.IsActive })
+            .HasDatabaseName("ix_dynamicflaginstances_competition_team_flag_active");
+
+        modelBuilder.Entity<DynamicFlagInstance>()
+            .HasIndex(f => new { f.CompetitionId, f.TeamId, f.FlagId })
+            .IsUnique()
+            .HasFilter("\"IsActive\" = true")
+            .HasDatabaseName("ux_dynamicflaginstances_active_team_flag");
+
+        modelBuilder.Entity<DynamicFlagInstance>()
+            .HasIndex(f => new { f.CompetitionId, f.ChallengeId, f.FlagId })
+            .HasDatabaseName("ix_dynamicflaginstances_competition_challenge_flag");
 
         modelBuilder.Entity<CompetitionLog>()
             .HasIndex(l => new { l.CompetitionId, l.CreatedAt })

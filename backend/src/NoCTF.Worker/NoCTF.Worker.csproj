@@ -12,6 +12,7 @@
     <ProjectReference Include="../NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
     <ProjectReference Include="../NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
     <ProjectReference Include="../NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
+    <ProjectReference Include="../NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
     <ProjectReference Include="../NoCTF.Runner.Client/NoCTF.Runner.Client.csproj" />
   </ItemGroup>
 

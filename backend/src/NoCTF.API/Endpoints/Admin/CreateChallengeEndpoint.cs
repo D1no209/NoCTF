@@ -20,6 +20,7 @@ public class CreateChallengeRequest
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public CheckerConfigDto? CheckerConfig { get; set; }
+    public string? PenetrationConfigJson { get; set; }
 }
 
 public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateChallengeRequest, ChallengeTemplateAdminDto>, IAuditableEndpoint
@@ -33,10 +34,13 @@ public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateC
     public override async Task HandleAsync(CreateChallengeRequest req, CancellationToken ct)
     {
         var attachmentUrl = ChallengeTemplateRequestRules.CleanOptional(req.AttachmentUrl);
-        var deploymentType = ChallengeTemplateRequestRules.ResolveDeploymentType(req.DeploymentType, attachmentUrl);
+        var isPenetration = string.Equals(req.TypeId?.Trim(), "Penetration", StringComparison.OrdinalIgnoreCase);
+        var deploymentType = isPenetration
+            ? ChallengeDeploymentType.DynamicContainer
+            : ChallengeTemplateRequestRules.ResolveDeploymentType(req.DeploymentType, attachmentUrl);
         var usesRuntimeContainer = ChallengeTemplateRequestRules.UsesRuntimeContainer(deploymentType);
         var containerImage = ChallengeTemplateRequestRules.CleanOptional(req.ContainerImage);
-        if (usesRuntimeContainer && string.IsNullOrWhiteSpace(containerImage))
+        if (usesRuntimeContainer && !isPenetration && string.IsNullOrWhiteSpace(containerImage))
         {
             await SendStringAsync("container_image_required", 400, cancellation: ct);
             return;
@@ -48,8 +52,8 @@ public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateC
             Title = req.Title.Trim(),
             Description = ChallengeTemplateRequestRules.CleanOptional(req.Description),
             TypeId = string.IsNullOrWhiteSpace(req.TypeId) ? "ctf" : req.TypeId.Trim(),
-            ContainerImage = usesRuntimeContainer ? containerImage : null,
-            ContainerMode = usesRuntimeContainer ? req.ContainerMode : ChallengeContainerMode.SingleImage,
+            ContainerImage = usesRuntimeContainer && !isPenetration ? containerImage : null,
+            ContainerMode = isPenetration ? ChallengeContainerMode.DockerCompose : usesRuntimeContainer ? req.ContainerMode : ChallengeContainerMode.SingleImage,
             ComposeYaml = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeYaml) : null,
             ComposeProjectName = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeProjectName) : null,
             FlagSecret = req.FlagSecret,
@@ -70,6 +74,9 @@ public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateC
                     ExpCommand = ChallengeTemplateRequestRules.CleanOptional(req.CheckerConfig.ExpCommand),
                 }
                 : null,
+            PenetrationConfigJson = isPenetration && !string.IsNullOrWhiteSpace(req.PenetrationConfigJson)
+                ? req.PenetrationConfigJson
+                : "{}",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };

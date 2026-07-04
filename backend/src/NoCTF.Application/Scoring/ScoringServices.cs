@@ -6,7 +6,9 @@ using NoCTF.PluginBase;
 
 namespace NoCTF.Application.Scoring;
 
-public class CompetitionScoringProfileResolver(ApplicationDbContext db) : ICompetitionScoringProfileResolver
+public class CompetitionScoringProfileResolver(
+    ApplicationDbContext db,
+    IEnumerable<IScoringProfileContributor>? contributors = null) : ICompetitionScoringProfileResolver
 {
     public async Task<IReadOnlySet<string>> ResolveAsync(Guid competitionId, CancellationToken ct = default)
     {
@@ -15,18 +17,23 @@ public class CompetitionScoringProfileResolver(ApplicationDbContext db) : ICompe
             .AsNoTracking()
             .FirstAsync(c => c.Id == competitionId, ct);
 
+        HashSet<string> profile;
+
         if (!string.IsNullOrWhiteSpace(competition.ScoringProfileJson))
         {
             var configured = ScoringJson.Deserialize<string[]>(competition.ScoringProfileJson);
             if (configured is { Length: > 0 })
             {
                 if (competition.GameModeType == GameModeType.Awdp || string.Equals(competition.ModeKey, "awdp", StringComparison.OrdinalIgnoreCase))
-                    return new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.AwdpRound };
+                {
+                    profile = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.AwdpRound };
+                    return await AddContributorKeysAsync(profile, competition, ct);
+                }
 
-                var profile = configured.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                profile = configured.ToHashSet(StringComparer.OrdinalIgnoreCase);
                 if (competition.GameModeType == GameModeType.Ctf || string.Equals(competition.ModeKey, "ctf", StringComparison.OrdinalIgnoreCase))
                     profile.Add(ScoringKeys.BloodBonus);
-                return profile;
+                return await AddContributorKeysAsync(profile, competition, ct);
             }
         }
 
@@ -34,7 +41,7 @@ public class CompetitionScoringProfileResolver(ApplicationDbContext db) : ICompe
             ? competition.GameModeType.ToString().ToLowerInvariant()
             : competition.ModeKey.Trim().ToLowerInvariant();
 
-        return modeKey switch
+        profile = modeKey switch
         {
             "ctf" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.DecaySolve, ScoringKeys.BloodBonus },
             "awd" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.RoundAccumulation },
@@ -45,6 +52,22 @@ public class CompetitionScoringProfileResolver(ApplicationDbContext db) : ICompe
             "koh" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ScoringKeys.ControlInterval },
             _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         };
+
+        return await AddContributorKeysAsync(profile, competition, ct);
+    }
+
+    private async Task<IReadOnlySet<string>> AddContributorKeysAsync(
+        HashSet<string> profile,
+        Competition competition,
+        CancellationToken ct)
+    {
+        foreach (var contributor in contributors ?? [])
+        {
+            foreach (var key in await contributor.GetAdditionalScoringKeysAsync(competition, ct))
+                profile.Add(key);
+        }
+
+        return profile;
     }
 }
 

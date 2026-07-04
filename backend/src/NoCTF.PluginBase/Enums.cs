@@ -13,6 +13,7 @@ public enum SubmissionResult
     InstanceRequired,
     InstanceExpired,
     AttemptsExhausted,
+    FlagRateLimited,
     NotImplemented
 }
 

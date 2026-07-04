@@ -37,6 +37,22 @@ When a team submits a flag:
 
 The leaderboard ranks teams by total score. Ties are broken by solve time.
 
+### Penetration Challenge Type
+
+Penetration Challenge is available inside CTF/Jeopardy competitions as `TypeId = Penetration`. It is not AWD, AWDP, KoH, or a team-to-team mode.
+
+For each Penetration challenge:
+
+- each approved team starts its own authorized Docker Compose range
+- the range can contain multiple services and internal nodes
+- the first entry node is published to a random host port
+- dynamic flags are generated per team, per instance, and per stage
+- each stage flag has its own score
+- submitting one stage does not automatically solve the whole challenge
+- the challenge is considered fully solved only after all visible stages are solved
+
+Players may attack only their own displayed entry service and services reachable inside their assigned range. See [Penetration Challenges](penetration-challenges.md) for authoring and operations details.
+
 ## AWD (Attack with Defense)
 
 Teams run identical vulnerable services (game boxes) and must attack opponents while defending their own.

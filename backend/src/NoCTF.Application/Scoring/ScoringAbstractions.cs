@@ -6,6 +6,7 @@ namespace NoCTF.Application.Scoring;
 public static class ScoreSignalTypes
 {
     public const string SolveAccepted = "solve.accepted";
+    public const string PenetrationFlagAccepted = "penetration.flag.accepted";
     public const string AttackAccepted = "attack.accepted";
     public const string ServiceCheckPassed = "service.check.passed";
     public const string ServiceCheckFailed = "service.check.failed";
@@ -18,6 +19,8 @@ public static class ScoringKeys
 {
     public const string DecaySolve = "decay-solve";
     public const string BloodBonus = "blood-bonus";
+    public const string PenetrationStage = "penetration-stage";
+    public const string PenetrationBloodBonus = "penetration-blood-bonus";
     public const string RoundAccumulation = "round-accumulation";
     public const string AwdpRound = "awdp-round";
     public const string OneShotVerification = "one-shot-verification";
@@ -78,6 +81,11 @@ public interface IScoringStrategy
 public interface ICompetitionScoringProfileResolver
 {
     Task<IReadOnlySet<string>> ResolveAsync(Guid competitionId, CancellationToken ct = default);
+}
+
+public interface IScoringProfileContributor
+{
+    Task<IReadOnlyCollection<string>> GetAdditionalScoringKeysAsync(Competition competition, CancellationToken ct = default);
 }
 
 public static class ScoringJson
