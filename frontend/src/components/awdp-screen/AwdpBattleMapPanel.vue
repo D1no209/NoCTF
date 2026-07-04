@@ -257,6 +257,18 @@ function modeIcon(mode?: SenseMode) {
 
 <style scoped>
 .sense-panel {
+  --sense-border: color-mix(in oklch, var(--sidebar-foreground) 14%, transparent);
+  --sense-border-strong: color-mix(in oklch, var(--sidebar-foreground) 24%, transparent);
+  --sense-muted: color-mix(in oklch, var(--sidebar-foreground) 56%, transparent);
+  --sense-muted-soft: color-mix(in oklch, var(--sidebar-foreground) 38%, transparent);
+  --sense-text: var(--sidebar-foreground);
+  --sense-panel-bg: color-mix(in oklch, var(--sidebar) 88%, black);
+  --sense-panel-bg-soft: color-mix(in oklch, var(--sidebar) 72%, transparent);
+  --sense-node: color-mix(in oklch, var(--sidebar-foreground) 22%, var(--sidebar));
+  --sense-attack: var(--chart-2);
+  --sense-defense: var(--chart-2);
+  --sense-failed: var(--chart-1);
+  --sense-error: var(--destructive);
   display: flex;
   min-height: 0;
   flex-direction: column;
@@ -268,7 +280,7 @@ function modeIcon(mode?: SenseMode) {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border-bottom: 1px solid rgb(226 232 240 / 0.1);
+  border-bottom: 1px solid var(--sense-border);
   padding: 0.7rem 0.85rem;
 }
 
@@ -276,11 +288,11 @@ function modeIcon(mode?: SenseMode) {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  border: 1px solid rgb(148 163 184 / 0.16);
-  border-radius: 0.4rem;
-  background: rgb(2 6 23 / 0.35);
+  border: 1px solid var(--sense-border);
+  border-radius: var(--radius-md);
+  background: var(--sense-panel-bg-soft);
   padding: 0.35rem 0.55rem;
-  color: rgb(203 213 225);
+  color: var(--sense-muted);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -297,8 +309,8 @@ function modeIcon(mode?: SenseMode) {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgb(148 163 184 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(148 163 184 / 0.035) 1px, transparent 1px);
+    linear-gradient(var(--sense-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sense-border) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -313,7 +325,7 @@ function modeIcon(mode?: SenseMode) {
 .sense-lanes line,
 .core-rings circle {
   fill: none;
-  stroke: rgb(148 163 184 / 0.12);
+  stroke: var(--sense-border);
   stroke-width: 1;
   stroke-dasharray: 5 9;
 }
@@ -333,7 +345,7 @@ function modeIcon(mode?: SenseMode) {
 }
 
 .attack-beam {
-  stroke: rgb(103 232 249);
+  stroke: var(--sense-attack);
   stroke-dasharray: 34 420;
   animation: beam-run 1500ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
@@ -347,13 +359,13 @@ function modeIcon(mode?: SenseMode) {
 }
 
 .beam-fragments path {
-  stroke: rgb(251 191 36);
+  stroke: var(--sense-failed);
   stroke-dasharray: 20 18;
   animation: beam-break 1200ms ease-out infinite;
 }
 
 .defense-wave {
-  stroke: rgb(134 239 172);
+  stroke: var(--sense-defense);
   stroke-dasharray: 22 14;
   animation: defense-wave 1700ms ease-out infinite;
 }
@@ -363,12 +375,12 @@ function modeIcon(mode?: SenseMode) {
 }
 
 .wave-broken {
-  stroke: rgb(253 186 116);
+  stroke: var(--sense-failed);
   stroke-dasharray: 16 18;
 }
 
 .service-alert-line {
-  stroke: rgb(251 113 133);
+  stroke: var(--sense-error);
   stroke-dasharray: 14 14;
   animation: service-flicker 900ms steps(2, end) infinite;
 }
@@ -378,54 +390,54 @@ function modeIcon(mode?: SenseMode) {
 }
 
 .sense-node circle:first-child {
-  fill: rgb(51 65 85);
-  stroke: rgb(148 163 184 / 0.24);
+  fill: var(--sense-node);
+  stroke: var(--sense-border-strong);
   stroke-width: 1.5;
 }
 
 .sense-node .node-ring {
   fill: none;
-  stroke: rgb(148 163 184 / 0.16);
+  stroke: var(--sense-border);
   stroke-width: 1;
 }
 
 .sense-node.active circle:first-child {
-  fill: rgb(103 232 249);
-  stroke: rgb(224 242 254);
+  fill: var(--sense-attack);
+  stroke: var(--sense-text);
 }
 
 .sense-node.active .node-ring {
-  stroke: rgb(103 232 249 / 0.5);
+  stroke: var(--sense-attack);
   animation: node-pulse 1200ms ease-out infinite;
 }
 
 .sense-defense-success .sense-node.active circle:first-child,
 .sense-defense-failed .sense-node.active circle:first-child {
-  fill: rgb(134 239 172);
+  fill: var(--sense-defense);
 }
 
 .sense-defense-success .sense-node.active .node-ring,
 .sense-defense-failed .sense-node.active .node-ring {
-  stroke: rgb(134 239 172 / 0.5);
+  stroke: var(--sense-defense);
 }
 
 .sense-service-error .sense-node.active circle:first-child {
-  fill: rgb(251 113 133);
+  fill: var(--sense-error);
 }
 
 .sense-service-error .sense-node.active .node-ring {
-  stroke: rgb(251 113 133 / 0.55);
+  stroke: var(--sense-error);
   animation: service-flicker 850ms steps(2, end) infinite;
 }
 
 .node-label {
-  fill: rgb(226 232 240);
+  fill: var(--sense-text);
   font-size: 12px;
   font-weight: 700;
 }
 
 .node-sub {
-  fill: rgb(100 116 139);
+  fill: var(--sense-muted-soft);
   font-size: 10px;
   font-weight: 700;
 }
@@ -441,20 +453,20 @@ function modeIcon(mode?: SenseMode) {
 }
 
 .sense-attack-success .impact-zone circle {
-  stroke: rgb(103 232 249);
+  stroke: var(--sense-attack);
 }
 
 .sense-attack-failed .impact-zone circle,
 .sense-defense-failed .impact-zone circle {
-  stroke: rgb(253 186 116);
+  stroke: var(--sense-failed);
 }
 
 .sense-defense-success .impact-zone circle {
-  stroke: rgb(134 239 172);
+  stroke: var(--sense-defense);
 }
 
 .sense-service-error .impact-zone circle {
-  stroke: rgb(251 113 133);
+  stroke: var(--sense-error);
 }
 
 .sense-core {
@@ -469,42 +481,42 @@ function modeIcon(mode?: SenseMode) {
 .core-orbit {
   position: absolute;
   inset: -1.15rem;
-  border: 1px solid rgb(148 163 184 / 0.18);
-  border-radius: 999px;
+  border: 1px solid var(--sense-border);
+  border-radius: 50%;
 }
 
 .sense-defense-success .core-orbit,
 .sense-defense-failed .core-orbit {
-  border-color: rgb(134 239 172 / 0.28);
+  border-color: var(--sense-defense);
 }
 
 .sense-service-error .core-orbit {
-  border-color: rgb(251 113 133 / 0.32);
+  border-color: var(--sense-error);
 }
 
 .core-card {
   position: relative;
-  border: 1px solid rgb(103 232 249 / 0.26);
-  border-radius: 0.55rem;
-  background: rgb(2 6 23 / 0.92);
+  border: 1px solid var(--sense-attack);
+  border-radius: var(--radius-md);
+  background: var(--sense-panel-bg);
   padding: 1rem;
   text-align: center;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  box-shadow: none;
 }
 
 .sense-defense-success .core-card,
 .sense-defense-failed .core-card {
-  border-color: rgb(134 239 172 / 0.26);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  border-color: var(--sense-defense);
+  box-shadow: none;
 }
 
 .sense-service-error .core-card {
-  border-color: rgb(251 113 133 / 0.36);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  border-color: var(--sense-error);
+  box-shadow: none;
 }
 
 .core-round {
-  color: rgb(148 163 184);
+  color: var(--sense-muted-soft);
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -512,29 +524,29 @@ function modeIcon(mode?: SenseMode) {
 
 .core-result {
   margin-top: 0.45rem;
-  color: rgb(240 249 255);
+  color: var(--sense-text);
   font-size: 1.35rem;
   font-weight: 900;
   letter-spacing: 0.02em;
 }
 
 .sense-defense-success .core-result {
-  color: rgb(187 247 208);
+  color: var(--sense-defense);
 }
 
 .sense-defense-failed .core-result,
 .sense-attack-failed .core-result {
-  color: rgb(254 215 170);
+  color: var(--sense-failed);
 }
 
 .sense-service-error .core-result {
-  color: rgb(254 205 211);
+  color: var(--sense-error);
 }
 
 .core-route {
   margin-top: 0.55rem;
   overflow: hidden;
-  color: rgb(203 213 225);
+  color: var(--sense-muted);
   font-size: 0.8rem;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -547,11 +559,11 @@ function modeIcon(mode?: SenseMode) {
   right: 1rem;
   bottom: 1rem;
   max-width: 17rem;
-  border: 1px solid rgb(148 163 184 / 0.14);
-  border-radius: 0.55rem;
-  background: rgb(2 6 23 / 0.72);
+  border: 1px solid var(--sense-border);
+  border-radius: var(--radius-md);
+  background: var(--sense-panel-bg-soft);
   padding: 0.75rem;
-  color: rgb(148 163 184);
+  color: var(--sense-muted-soft);
   font-size: 0.75rem;
 }
 
@@ -559,9 +571,9 @@ function modeIcon(mode?: SenseMode) {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  border-top: 1px solid rgb(226 232 240 / 0.08);
+  border-top: 1px solid var(--sense-border);
   padding: 0.55rem 0.85rem;
-  color: rgb(100 116 139);
+  color: var(--sense-muted-soft);
   font-size: 0.68rem;
   font-weight: 800;
 }

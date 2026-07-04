@@ -113,9 +113,9 @@ const timeText = computed(() => {
   align-items: center;
   column-gap: 0.5rem;
   min-height: 3rem;
-  border: 1px solid rgb(148 163 184 / 0.14);
-  border-radius: 0.45rem;
-  background: rgb(2 6 23 / 0.32);
+  border: 1px solid color-mix(in oklch, var(--sidebar-foreground) 14%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--sidebar) 72%, transparent);
   padding: 0.42rem 0.65rem;
 }
 
@@ -127,14 +127,14 @@ const timeText = computed(() => {
   grid-area: label;
   font-size: 0.68rem;
   font-weight: 700;
-  color: rgb(203 213 225 / 0.66);
+  color: color-mix(in oklch, var(--sidebar-foreground) 66%, transparent);
 }
 
 .awdp-header-metric strong {
   grid-area: value;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  color: rgb(248 250 252);
+  color: var(--sidebar-foreground);
   font-size: 1rem;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 1280px) {

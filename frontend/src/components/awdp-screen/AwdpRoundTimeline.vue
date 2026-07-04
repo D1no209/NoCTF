@@ -76,22 +76,21 @@ const maxEvents = computed(() => Math.max(1, ...visibleRounds.value.map(round =>
 <style scoped>
 .timeline-cell {
   min-width: 0;
-  border: 1px solid rgb(148 163 184 / 0.12);
-  border-radius: 0.42rem;
-  background: rgb(2 6 23 / 0.28);
+  border: 1px solid color-mix(in oklch, var(--sidebar-foreground) 12%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--sidebar) 70%, transparent);
   padding: 0.45rem;
 }
 
 .timeline-cell-current {
-  border-color: rgb(203 213 225 / 0.34);
-  background: rgb(15 23 42 / 0.72);
+  border-color: color-mix(in oklch, var(--sidebar-foreground) 34%, transparent);
+  background: color-mix(in oklch, var(--sidebar) 88%, black);
 }
 
 .timeline-bar {
   width: 100%;
   min-height: 0.5rem;
-  border-radius: 999px 999px 0.2rem 0.2rem;
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-sm) var(--radius-sm);
   opacity: 0.9;
-  transition: height 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 </style>

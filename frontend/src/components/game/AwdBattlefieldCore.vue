@@ -680,13 +680,27 @@ function serviceHealthLabel(node: ServiceNode) {
 
 <style scoped>
 .awd-battlefield-core {
+  --awd-bg: color-mix(in oklch, var(--sidebar) 88%, black);
+  --awd-bg-soft: color-mix(in oklch, var(--sidebar) 72%, transparent);
+  --awd-bg-raised: color-mix(in oklch, var(--sidebar) 78%, black);
+  --awd-border: color-mix(in oklch, var(--sidebar-foreground) 13%, transparent);
+  --awd-border-strong: color-mix(in oklch, var(--sidebar-primary) 42%, transparent);
+  --awd-grid: color-mix(in oklch, var(--sidebar-foreground) 4%, transparent);
+  --awd-text: var(--sidebar-foreground);
+  --awd-muted: color-mix(in oklch, var(--sidebar-foreground) 58%, transparent);
+  --awd-muted-strong: color-mix(in oklch, var(--sidebar-foreground) 74%, transparent);
+  --awd-attack: var(--chart-1);
+  --awd-defense: var(--chart-2);
+  --awd-system: var(--chart-2);
+  --awd-error: var(--destructive);
+  --awd-checker: var(--primary);
   position: relative;
   overflow: hidden;
-  border: 1px solid oklch(0.38 0.07 252 / 0.58);
-  border-radius: 0.75rem;
-  background: oklch(0.15 0.035 252);
-  color: oklch(0.94 0.018 230);
-  box-shadow: 0 18px 54px rgb(7 14 32 / 0.22);
+  border: 1px solid var(--awd-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--awd-bg);
+  color: var(--awd-text);
+  box-shadow: none;
 }
 
 .awd-battlefield-core::before {
@@ -694,8 +708,8 @@ function serviceHealthLabel(node: ServiceNode) {
   inset: 0;
   content: "";
   background:
-    linear-gradient(rgb(148 163 184 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(148 163 184 / 0.035) 1px, transparent 1px);
+    linear-gradient(var(--awd-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--awd-grid) 1px, transparent 1px);
   background-size: 36px 36px;
   pointer-events: none;
 }
@@ -725,7 +739,7 @@ function serviceHealthLabel(node: ServiceNode) {
 
 .battlefield-kicker {
   margin: 0 0 0.2rem;
-  color: oklch(0.75 0.08 220);
+  color: var(--awd-muted-strong);
   font-size: 0.67rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -733,7 +747,7 @@ function serviceHealthLabel(node: ServiceNode) {
 
 .battlefield-heading h2 {
   margin: 0;
-  color: oklch(0.97 0.012 230);
+  color: var(--awd-text);
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -744,7 +758,7 @@ function serviceHealthLabel(node: ServiceNode) {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.45rem;
-  color: oklch(0.75 0.035 230);
+  color: var(--awd-muted-strong);
   font-size: 0.72rem;
 }
 
@@ -753,14 +767,14 @@ function serviceHealthLabel(node: ServiceNode) {
   align-items: center;
   gap: 0.35rem;
   min-height: 1.7rem;
-  border: 1px solid rgb(149 196 255 / 0.16);
-  border-radius: 999px;
-  background: rgb(9 18 38 / 0.52);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--radius-lg);
+  background: var(--awd-bg-soft);
   padding: 0 0.65rem;
 }
 
 .battlefield-metrics strong {
-  color: oklch(0.93 0.08 210);
+  color: var(--awd-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -774,26 +788,26 @@ function serviceHealthLabel(node: ServiceNode) {
 
 .node-rail {
   overflow: hidden;
-  border: 1px solid rgb(149 196 255 / 0.14);
-  border-radius: 0.75rem;
-  background: rgb(7 16 34 / 0.54);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--radius-lg);
+  background: var(--awd-bg-soft);
+  box-shadow: none;
 }
 
 .rail-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgb(149 196 255 / 0.12);
+  border-bottom: 1px solid var(--awd-border);
   padding: 0.75rem 0.8rem 0.6rem;
-  color: oklch(0.74 0.04 230);
+  color: var(--awd-muted);
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0;
 }
 
 .rail-title strong {
-  color: oklch(0.91 0.06 212);
+  color: var(--awd-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -810,8 +824,8 @@ function serviceHealthLabel(node: ServiceNode) {
 }
 
 .node-list::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgb(149 196 255 / 0.22);
+  border-radius: var(--radius-lg);
+  background: var(--awd-border-strong);
 }
 
 .battle-node {
@@ -819,9 +833,9 @@ function serviceHealthLabel(node: ServiceNode) {
   display: grid;
   gap: 0.25rem;
   min-height: 3.25rem;
-  border: 1px solid rgb(149 196 255 / 0.12);
-  border-radius: 0.6rem;
-  background: rgb(13 26 54 / 0.48);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--radius-md);
+  background: var(--awd-bg-soft);
   padding: 0.55rem 0.6rem;
   transition:
     border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -831,8 +845,8 @@ function serviceHealthLabel(node: ServiceNode) {
 }
 
 .battle-node.has-fault {
-  border-color: rgb(248 113 113 / 0.34);
-  background: rgb(67 19 32 / 0.38);
+  border-color: var(--awd-error);
+  background: color-mix(in oklch, var(--awd-error) 18%, var(--awd-bg));
 }
 
 .battle-node.is-active-node {
@@ -841,38 +855,38 @@ function serviceHealthLabel(node: ServiceNode) {
 }
 
 .battle-node.attacker {
-  border-color: rgb(251 146 60 / 0.72);
-  background: rgb(91 47 18 / 0.6);
-  box-shadow: 0 0 24px rgb(251 146 60 / 0.16);
+  border-color: var(--awd-attack);
+  background: color-mix(in oklch, var(--awd-attack) 22%, var(--awd-bg));
+  box-shadow: none;
 }
 
 .battle-node.victim {
-  border-color: rgb(248 113 113 / 0.68);
-  background: rgb(77 24 31 / 0.58);
+  border-color: var(--awd-error);
+  background: color-mix(in oklch, var(--awd-error) 20%, var(--awd-bg));
 }
 
 .battle-node.subject,
 .service-node.is-active-node {
-  border-color: rgb(45 212 191 / 0.66);
-  background: rgb(14 68 76 / 0.5);
+  border-color: var(--awd-defense);
+  background: color-mix(in oklch, var(--awd-defense) 20%, var(--awd-bg));
 }
 
 .is-service-down .battle-node.subject,
 .is-service-down .service-node.is-active-node {
-  border-color: rgb(244 63 94 / 0.82);
-  background: rgb(88 20 40 / 0.58);
+  border-color: var(--awd-error);
+  background: color-mix(in oklch, var(--awd-error) 22%, var(--awd-bg));
   animation: node-alert 760ms steps(2, end) infinite;
 }
 
 .is-checker-error .service-node.is-active-node {
-  border-color: rgb(192 132 252 / 0.72);
-  background: rgb(48 32 82 / 0.62);
+  border-color: var(--awd-checker);
+  background: color-mix(in oklch, var(--awd-checker) 18%, var(--awd-bg));
 }
 
 .is-service-recovered .battle-node.subject,
 .is-service-recovered .service-node.is-active-node {
-  border-color: rgb(52 211 153 / 0.74);
-  background: rgb(11 72 54 / 0.52);
+  border-color: var(--awd-defense);
+  background: color-mix(in oklch, var(--awd-defense) 20%, var(--awd-bg));
 }
 
 .node-main {
@@ -886,20 +900,20 @@ function serviceHealthLabel(node: ServiceNode) {
   width: 0.45rem;
   height: 0.45rem;
   flex: 0 0 auto;
-  border-radius: 999px;
-  background: oklch(0.63 0.11 210);
-  box-shadow: 0 0 12px rgb(56 189 248 / 0.5);
+  border-radius: 50%;
+  background: var(--awd-defense);
+  box-shadow: none;
 }
 
 .has-fault .node-dot {
-  background: oklch(0.65 0.21 25);
+  background: var(--awd-error);
   box-shadow: none;
 }
 
 .node-name {
   min-width: 0;
   overflow: hidden;
-  color: oklch(0.93 0.012 230);
+  color: var(--awd-text);
   font-size: 0.78rem;
   font-weight: 750;
   letter-spacing: 0;
@@ -908,14 +922,14 @@ function serviceHealthLabel(node: ServiceNode) {
 }
 
 .node-sub {
-  color: oklch(0.68 0.03 230);
+  color: var(--awd-muted);
   font-size: 0.68rem;
   font-weight: 650;
 }
 
 .empty-rail {
   padding: 1rem 0.8rem;
-  color: oklch(0.66 0.025 230);
+  color: var(--awd-muted);
   font-size: 0.78rem;
 }
 
@@ -925,17 +939,17 @@ function serviceHealthLabel(node: ServiceNode) {
   place-items: center;
   min-height: 26rem;
   overflow: hidden;
-  border: 1px solid rgb(149 196 255 / 0.16);
-  border-radius: 0.65rem;
-  background: rgb(7 15 32 / 0.72);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--radius-md);
+  background: var(--awd-bg-soft);
 }
 
 .stage-grid {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, transparent 49.7%, rgb(148 163 184 / 0.08) 50%, transparent 50.3%),
-    linear-gradient(0deg, transparent 49.7%, rgb(148 163 184 / 0.08) 50%, transparent 50.3%);
+    linear-gradient(90deg, transparent 49.7%, var(--awd-grid) 50%, transparent 50.3%),
+    linear-gradient(0deg, transparent 49.7%, var(--awd-grid) 50%, transparent 50.3%);
   opacity: 0.45;
   pointer-events: none;
 }
@@ -952,8 +966,8 @@ function serviceHealthLabel(node: ServiceNode) {
   position: absolute;
   width: 13rem;
   height: 13rem;
-  border: 1px dashed rgb(125 211 252 / 0.18);
-  border-radius: 999px;
+  border: 1px dashed var(--awd-border);
+  border-radius: 50%;
 }
 
 .idle-pulse-field span:nth-child(2) {
@@ -979,7 +993,7 @@ function serviceHealthLabel(node: ServiceNode) {
   position: absolute;
   top: calc(50% - 1px);
   height: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius-lg);
   opacity: 0;
   transform-origin: left center;
 }
@@ -987,19 +1001,19 @@ function serviceHealthLabel(node: ServiceNode) {
 .beam-in {
   left: 6%;
   width: 42%;
-  background: linear-gradient(90deg, transparent, rgb(251 146 60 / 0.95));
+  background: linear-gradient(90deg, transparent, var(--awd-attack));
 }
 
 .beam-out {
   left: 50%;
   width: 42%;
-  background: linear-gradient(90deg, rgb(251 146 60 / 0.96), transparent);
+  background: linear-gradient(90deg, var(--awd-attack), transparent);
 }
 
 .beam-break {
   left: 70%;
   width: 13%;
-  border-top: 2px dashed rgb(251 146 60 / 0.72);
+  border-top: 2px dashed var(--awd-attack);
 }
 
 .impact-ring,
@@ -1010,29 +1024,29 @@ function serviceHealthLabel(node: ServiceNode) {
   inset: 50% auto auto 50%;
   width: 8rem;
   height: 8rem;
-  border-radius: 999px;
+  border-radius: 50%;
   opacity: 0;
   transform: translate(-50%, -50%);
 }
 
 .impact-ring {
   left: 87%;
-  border: 1px solid rgb(251 146 60 / 0.86);
+  border: 1px solid var(--awd-attack);
 }
 
 .service-wave {
-  border: 1px solid rgb(244 63 94 / 0.72);
+  border: 1px solid var(--awd-error);
 }
 
 .system-wave {
-  border: 1px solid rgb(125 211 252 / 0.58);
+  border: 1px solid var(--awd-system);
 }
 
 .diagnostic-scan {
   width: 62%;
   height: 55%;
-  border: 1px dashed rgb(148 163 184 / 0.58);
-  border-radius: 1rem;
+  border: 1px dashed var(--awd-muted);
+  border-radius: var(--radius-xl);
 }
 
 .event-attack-success .beam-in {
@@ -1048,13 +1062,13 @@ function serviceHealthLabel(node: ServiceNode) {
 }
 
 .event-attack-failed .beam-in {
-  background: linear-gradient(90deg, transparent, rgb(251 146 60 / 0.72));
+  background: linear-gradient(90deg, transparent, var(--awd-attack));
   animation: beam-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .event-attack-failed .beam-out {
   width: 28%;
-  background: linear-gradient(90deg, rgb(251 146 60 / 0.68), transparent);
+  background: linear-gradient(90deg, var(--awd-attack), transparent);
   animation: beam-failed 950ms cubic-bezier(0.16, 1, 0.3, 1) 460ms both;
 }
 
@@ -1064,7 +1078,7 @@ function serviceHealthLabel(node: ServiceNode) {
 
 .event-attack-failed .impact-ring {
   left: 78%;
-  border-color: rgb(251 146 60 / 0.42);
+  border-color: var(--awd-attack);
   animation: intercept-pulse 700ms cubic-bezier(0.16, 1, 0.3, 1) 980ms both;
 }
 
@@ -1073,7 +1087,7 @@ function serviceHealthLabel(node: ServiceNode) {
 }
 
 .event-service-recovered .service-wave {
-  border-color: rgb(52 211 153 / 0.72);
+  border-color: var(--awd-defense);
   animation: service-recovered 1.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -1089,7 +1103,7 @@ function serviceHealthLabel(node: ServiceNode) {
 .core-orbit,
 .battle-core {
   position: absolute;
-  border-radius: 999px;
+  border-radius: 50%;
 }
 
 .core-orbit {
@@ -1099,13 +1113,13 @@ function serviceHealthLabel(node: ServiceNode) {
 .outer-orbit {
   width: 16.5rem;
   height: 16.5rem;
-  border: 1px dashed rgb(148 163 184 / 0.24);
+  border: 1px dashed var(--awd-border-strong);
 }
 
 .inner-orbit {
   width: 12.2rem;
   height: 12.2rem;
-  border: 1px solid rgb(148 163 184 / 0.18);
+  border: 1px solid var(--awd-border);
 }
 
 .battle-core {
@@ -1113,14 +1127,14 @@ function serviceHealthLabel(node: ServiceNode) {
   place-items: center;
   width: 10.6rem;
   height: 10.6rem;
-  background: rgb(8 19 39);
-  box-shadow: inset 0 0 0 1px rgb(148 163 184 / 0.08);
+  background: var(--awd-bg-raised);
+  box-shadow: none;
 }
 
 .core-ring {
   position: absolute;
   inset: 0.38rem;
-  border: 1px solid rgb(125 211 252 / 0.32);
+  border: 1px solid var(--awd-system);
   border-radius: inherit;
 }
 
@@ -1136,14 +1150,14 @@ function serviceHealthLabel(node: ServiceNode) {
 
 .core-round-label,
 .core-mode {
-  color: oklch(0.72 0.06 220);
+  color: var(--awd-muted-strong);
   font-size: 0.64rem;
   font-weight: 850;
   letter-spacing: 0.13em;
 }
 
 .core-round-value {
-  color: oklch(0.97 0.018 220);
+  color: var(--awd-text);
   font-size: 2.65rem;
   font-weight: 850;
   line-height: 0.96;
@@ -1151,7 +1165,7 @@ function serviceHealthLabel(node: ServiceNode) {
 }
 
 .core-result {
-  color: oklch(0.95 0.03 220);
+  color: var(--awd-text);
   font-size: 0.78rem;
   font-weight: 850;
   letter-spacing: 0.05em;
@@ -1160,7 +1174,7 @@ function serviceHealthLabel(node: ServiceNode) {
 .core-summary {
   max-width: 8.2rem;
   overflow: hidden;
-  color: oklch(0.71 0.035 230);
+  color: var(--awd-muted);
   font-size: 0.64rem;
   font-weight: 650;
   line-height: 1.25;
@@ -1169,52 +1183,52 @@ function serviceHealthLabel(node: ServiceNode) {
 
 .is-attack-success .battle-core {
   box-shadow:
-    inset 0 0 34px rgb(251 146 60 / 0.2),
-    0 0 46px rgb(251 146 60 / 0.18);
+    inset 0 0 0 transparent,
+    0 0 0 transparent;
 }
 
 .is-attack-success .core-ring,
 .is-attack-failed .core-ring {
-  border-color: rgb(251 146 60 / 0.6);
+  border-color: var(--awd-attack);
 }
 
 .is-service-down .battle-core {
   animation: core-jitter 180ms steps(2, end) 6;
   box-shadow:
-    inset 0 0 34px rgb(244 63 94 / 0.24),
-    0 0 42px rgb(244 63 94 / 0.2);
+    inset 0 0 0 transparent,
+    0 0 0 transparent;
 }
 
 .is-service-down .core-ring {
-  border-color: rgb(244 63 94 / 0.68);
+  border-color: var(--awd-error);
 }
 
 .is-service-recovered .core-ring {
-  border-color: rgb(52 211 153 / 0.64);
+  border-color: var(--awd-defense);
 }
 
 .is-checker-error .core-ring {
-  border-color: rgb(192 132 252 / 0.68);
+  border-color: var(--awd-checker);
 }
 
 .is-system .core-ring,
 .is-gamebox-restart .core-ring {
-  border-color: rgb(125 211 252 / 0.58);
+  border-color: var(--awd-system);
 }
 
 .battlefield-footer {
   display: grid;
   grid-template-columns: minmax(14rem, 0.8fr) minmax(0, 1.2fr);
   gap: 0.75rem;
-  border-top: 1px solid rgb(149 196 255 / 0.12);
+  border-top: 1px solid var(--awd-border);
   padding: 0.75rem 1rem 1rem;
 }
 
 .state-strip,
 .event-log {
-  border: 1px solid rgb(149 196 255 / 0.13);
-  border-radius: 0.7rem;
-  background: rgb(7 16 34 / 0.42);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--radius-lg);
+  background: var(--awd-bg-soft);
 }
 
 .state-strip {
@@ -1223,14 +1237,14 @@ function serviceHealthLabel(node: ServiceNode) {
   align-items: center;
   gap: 0.75rem;
   padding: 0.65rem 0.75rem;
-  color: oklch(0.74 0.035 230);
+  color: var(--awd-muted-strong);
   font-size: 0.75rem;
   font-weight: 700;
 }
 
 .state-strip span:first-child {
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--radius-lg);
   padding: 0.25rem 0.55rem;
   font-size: 0.66rem;
   letter-spacing: 0.08em;
@@ -1244,35 +1258,35 @@ function serviceHealthLabel(node: ServiceNode) {
 }
 
 .tone-idle {
-  background: rgb(56 189 248 / 0.12);
-  color: oklch(0.8 0.1 215);
+  background: color-mix(in oklch, var(--awd-system) 14%, transparent);
+  color: var(--awd-system);
 }
 
 .tone-attack-success,
 .tone-attack-failed {
-  background: rgb(251 146 60 / 0.14);
-  color: oklch(0.8 0.17 55);
+  background: color-mix(in oklch, var(--awd-attack) 14%, transparent);
+  color: var(--awd-attack);
 }
 
 .tone-service-down {
-  background: rgb(244 63 94 / 0.16);
-  color: oklch(0.78 0.17 20);
+  background: color-mix(in oklch, var(--awd-error) 16%, transparent);
+  color: var(--awd-error);
 }
 
 .tone-service-recovered {
-  background: rgb(52 211 153 / 0.14);
-  color: oklch(0.79 0.12 165);
+  background: color-mix(in oklch, var(--awd-defense) 14%, transparent);
+  color: var(--awd-defense);
 }
 
 .tone-checker-error {
-  background: rgb(192 132 252 / 0.14);
-  color: oklch(0.78 0.13 305);
+  background: color-mix(in oklch, var(--awd-checker) 14%, transparent);
+  color: var(--awd-checker);
 }
 
 .tone-system,
 .tone-gamebox-restart {
-  background: rgb(125 211 252 / 0.12);
-  color: oklch(0.8 0.09 220);
+  background: color-mix(in oklch, var(--awd-system) 12%, transparent);
+  color: var(--awd-system);
 }
 
 .event-log {
@@ -1284,7 +1298,7 @@ function serviceHealthLabel(node: ServiceNode) {
 .event-log p {
   margin: 0;
   overflow: hidden;
-  color: oklch(0.72 0.032 230);
+  color: var(--awd-muted);
   font-size: 0.72rem;
   font-weight: 650;
   line-height: 1.25;
