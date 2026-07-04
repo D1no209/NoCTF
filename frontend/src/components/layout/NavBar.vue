@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import { Bell, Home, LayoutDashboard, Menu, Users } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRouter } from 'vue-router'
+import LanguageSwitch from '@/components/LanguageSwitch.vue'
+import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
-import { Button } from '@/components/ui/button'
-import LanguageSwitch from '@/components/LanguageSwitch.vue'
-import { Bell, Home, LayoutDashboard, Menu, Users } from 'lucide-vue-next'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -25,7 +25,7 @@ async function handleLogout() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 w-full border-b border-slate-900/10 bg-white/[0.88] backdrop-blur-xl">
+  <header class="sticky top-0 z-50 w-full border-b border-slate-900/10 bg-white/95">
     <div class="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
       <div class="flex items-center gap-6">
         <RouterLink to="/" class="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-80 transition-all active:scale-95">
@@ -36,7 +36,7 @@ async function handleLogout() {
           <RouterLink
             to="/"
             class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(79_70_229/0.22)] hover:bg-primary hover:text-primary-foreground"
+            active-class="bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           >
             <Home class="size-4" />
             {{ t('nav.home') }}
@@ -44,14 +44,14 @@ async function handleLogout() {
           <RouterLink
             to="/competitions"
             class="relative rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(79_70_229/0.22)] hover:bg-primary hover:text-primary-foreground"
+            active-class="bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           >
             {{ t('nav.competitions') }}
           </RouterLink>
           <RouterLink
             to="/teams"
             class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(79_70_229/0.22)] hover:bg-primary hover:text-primary-foreground"
+            active-class="bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           >
             <Users class="size-4" />
             {{ t('nav.teams') }}
@@ -60,7 +60,7 @@ async function handleLogout() {
             v-if="canManage"
             to="/admin"
             class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(79_70_229/0.22)] hover:bg-primary hover:text-primary-foreground"
+            active-class="bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           >
             <LayoutDashboard class="size-4" />
             {{ t('nav.admin') }}
@@ -76,16 +76,20 @@ async function handleLogout() {
         <Button variant="ghost" size="icon-sm" class="hidden rounded-lg sm:inline-flex">
           <Bell class="size-4" />
         </Button>
-        
+
         <template v-if="auth.isAuthenticated">
-          <div v-if="displayName" class="flex items-center gap-2 rounded-lg border bg-white/[0.82] px-2 py-1.5 text-sm shadow-sm">
+          <div v-if="displayName" class="flex items-center gap-2 rounded-lg border bg-white px-2 py-1.5 text-sm">
             <span class="text-muted-foreground hidden lg:inline">{{ displayName }}</span>
           </div>
-          <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="handleLogout">{{ t('auth.logout') }}</Button>
+          <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="handleLogout">
+            {{ t('auth.logout') }}
+          </Button>
         </template>
         <template v-else>
           <RouterLink to="/login" class="hidden sm:block">
-            <Button variant="outline" size="sm">{{ t('auth.login') }}</Button>
+            <Button variant="outline" size="sm">
+              {{ t('auth.login') }}
+            </Button>
           </RouterLink>
         </template>
 
@@ -113,17 +117,21 @@ async function handleLogout() {
               <RouterLink v-if="canManage" to="/admin" class="text-lg font-medium hover:text-primary transition-colors">
                 {{ t('nav.admin') }}
               </RouterLink>
-              
+
               <template v-if="auth.isAuthenticated">
                 <div class="flex flex-col gap-1 py-2">
                   <span class="text-xs text-muted-foreground">{{ t('common.user') }}</span>
                   <span class="font-medium">{{ displayName }}</span>
                 </div>
-                <Button variant="outline" class="w-full mt-4" @click="handleLogout">{{ t('auth.logout') }}</Button>
+                <Button variant="outline" class="w-full mt-4" @click="handleLogout">
+                  {{ t('auth.logout') }}
+                </Button>
               </template>
               <template v-else>
                 <RouterLink to="/login">
-                  <Button class="w-full">{{ t('auth.login') }}</Button>
+                  <Button class="w-full">
+                    {{ t('auth.login') }}
+                  </Button>
                 </RouterLink>
               </template>
             </div>

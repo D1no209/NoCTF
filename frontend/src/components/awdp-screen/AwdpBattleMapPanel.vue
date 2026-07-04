@@ -148,11 +148,11 @@ function modeIcon(mode?: SenseMode) {
   <section class="awdp-panel sense-panel" :class="panelClass">
     <div class="sense-header">
       <div>
-        <h2 class="text-sm font-semibold uppercase text-slate-100">
+        <h2 class="text-sm font-semibold text-slate-100">
           Center realtime awareness
         </h2>
         <p class="text-xs text-slate-500">
-          Attack, defense, and service events
+          Event result only, scores settle by round
         </p>
       </div>
       <div class="sense-header-state">
@@ -277,8 +277,8 @@ function modeIcon(mode?: SenseMode) {
   align-items: center;
   gap: 0.45rem;
   border: 1px solid rgb(148 163 184 / 0.16);
-  border-radius: 0.45rem;
-  background: rgb(15 23 42 / 0.52);
+  border-radius: 0.4rem;
+  background: rgb(2 6 23 / 0.35);
   padding: 0.35rem 0.55rem;
   color: rgb(203 213 225);
   font-size: 0.68rem;
@@ -297,10 +297,9 @@ function modeIcon(mode?: SenseMode) {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgb(148 163 184 / 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(148 163 184 / 0.06) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: radial-gradient(circle at center, black 0%, transparent 78%);
+    linear-gradient(rgb(148 163 184 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(148 163 184 / 0.035) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
 .sense-canvas {
@@ -321,15 +320,7 @@ function modeIcon(mode?: SenseMode) {
 
 .core-rings circle {
   transform-origin: 400px 210px;
-  animation: core-ring 2400ms ease-out infinite;
-}
-
-.core-rings circle:nth-child(2) {
-  animation-delay: 260ms;
-}
-
-.core-rings circle:nth-child(3) {
-  animation-delay: 520ms;
+  opacity: 0.7;
 }
 
 .attack-beam,
@@ -352,7 +343,7 @@ function modeIcon(mode?: SenseMode) {
 }
 
 .beam-success {
-  filter: drop-shadow(0 0 12px rgb(103 232 249 / 0.7));
+  stroke-width: 4.5;
 }
 
 .beam-fragments path {
@@ -368,7 +359,7 @@ function modeIcon(mode?: SenseMode) {
 }
 
 .wave-complete {
-  filter: drop-shadow(0 0 12px rgb(134 239 172 / 0.55));
+  stroke-width: 4.5;
 }
 
 .wave-broken {
@@ -478,9 +469,8 @@ function modeIcon(mode?: SenseMode) {
 .core-orbit {
   position: absolute;
   inset: -1.15rem;
-  border: 1px solid rgb(103 232 249 / 0.2);
+  border: 1px solid rgb(148 163 184 / 0.18);
   border-radius: 999px;
-  animation: core-orbit 2600ms linear infinite;
 }
 
 .sense-defense-success .core-orbit,
@@ -490,34 +480,27 @@ function modeIcon(mode?: SenseMode) {
 
 .sense-service-error .core-orbit {
   border-color: rgb(251 113 133 / 0.32);
-  animation: service-flicker 850ms steps(2, end) infinite;
 }
 
 .core-card {
   position: relative;
   border: 1px solid rgb(103 232 249 / 0.26);
-  border-radius: 0.75rem;
-  background: rgb(2 6 23 / 0.88);
+  border-radius: 0.55rem;
+  background: rgb(2 6 23 / 0.92);
   padding: 1rem;
   text-align: center;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 0 38px rgb(8 145 178 / 0.2);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
 .sense-defense-success .core-card,
 .sense-defense-failed .core-card {
   border-color: rgb(134 239 172 / 0.26);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 0 38px rgb(34 197 94 / 0.16);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
 .sense-service-error .core-card {
   border-color: rgb(251 113 133 / 0.36);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 0 38px rgb(244 63 94 / 0.18);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
 .core-round {
@@ -581,7 +564,6 @@ function modeIcon(mode?: SenseMode) {
   color: rgb(100 116 139);
   font-size: 0.68rem;
   font-weight: 800;
-  text-transform: uppercase;
 }
 
 @keyframes beam-run {
@@ -653,26 +635,6 @@ function modeIcon(mode?: SenseMode) {
     opacity: 0;
     transform: scale(1.25);
     transform-origin: 706px 210px;
-  }
-}
-
-@keyframes core-ring {
-  0% {
-    opacity: 0.55;
-    transform: scale(0.94);
-  }
-  100% {
-    opacity: 0.05;
-    transform: scale(1.08);
-  }
-}
-
-@keyframes core-orbit {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
   }
 }
 

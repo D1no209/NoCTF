@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AwdpTeamScore } from '@/types/awdpScreen'
-import { ArrowDown, ArrowUp, Circle, Minus, RotateCw, Trophy } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Circle, Minus, RotateCw } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -66,17 +66,16 @@ function formatTime(value?: string) {
   <section class="awdp-panel flex min-h-0 flex-col">
     <div class="flex items-center justify-between border-b border-slate-200/10 px-4 py-3">
       <div>
-        <h2 class="text-sm font-semibold uppercase text-slate-100">
+        <h2 class="text-sm font-semibold text-slate-100">
           Realtime scoreboard
         </h2>
         <p class="text-xs text-slate-500">
-          Total score is attack, defense, and rule bonuses
+          Round-settled attack and defense totals
         </p>
       </div>
-      <div class="flex items-center gap-2 text-[11px] font-semibold uppercase text-slate-500">
-        <RotateCw v-if="pageCount > 1" class="size-3.5 text-cyan-200" />
+      <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+        <RotateCw v-if="pageCount > 1" class="size-3.5 text-slate-300" />
         <span>{{ pageLabel }}</span>
-        <Trophy class="size-5 text-orange-100" />
       </div>
     </div>
 
@@ -93,13 +92,13 @@ function formatTime(value?: string) {
       <div
         v-for="team in visibleTeams"
         :key="team.teamId"
-        class="score-row mb-1.5 grid min-h-[3.55rem] grid-cols-[2.35rem_minmax(0,1fr)_4.8rem] items-center gap-2 rounded-lg border px-2.5 py-1.5"
-        :class="team.rank <= 3 ? 'border-orange-200/30 bg-orange-200/[0.06]' : 'border-slate-300/10 bg-slate-900/42'"
+        class="score-row mb-1.5 grid min-h-[3.45rem] grid-cols-[2.35rem_minmax(0,1fr)_4.8rem] items-center gap-2 rounded-md border px-2.5 py-1.5"
+        :class="team.rank <= 3 ? 'border-slate-400/22 bg-slate-900/62' : 'border-slate-300/10 bg-slate-950/26'"
       >
         <div class="flex items-center gap-2">
           <div
-            class="flex size-7 items-center justify-center rounded-md border font-mono text-xs font-semibold"
-            :class="team.rank <= 3 ? 'border-orange-200/35 text-orange-100' : 'border-slate-300/15 text-slate-200'"
+            class="flex size-7 items-center justify-center rounded border font-mono text-xs font-semibold"
+            :class="team.rank <= 3 ? 'border-slate-300/30 text-slate-50' : 'border-slate-300/15 text-slate-300'"
           >
             {{ team.rank }}
           </div>

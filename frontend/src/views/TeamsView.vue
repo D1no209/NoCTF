@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { AlertCircle, ArrowRight, Copy, Inbox, KeyRound, Loader2, Lock, LogOut, Plus, ShieldAlert, Users } from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
@@ -20,7 +21,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertCircle, ArrowRight, Copy, Inbox, KeyRound, Loader2, Lock, LogOut, Plus, ShieldAlert, Users } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const queryClient = useQueryClient()
@@ -81,8 +81,10 @@ const bannedTeams = computed(() => (teams.value ?? []).filter(team => team.isBan
 const availableCompetitions = computed(() => competitions.value ?? [])
 const selectedCompetitionRequiresTrack = computed(() => Boolean(selectedCompetitionDetail.value?.tracksEnabled))
 const canCreateTeam = computed(() => {
-  if (!selectedCompetitionId.value || !newTeamName.value.trim()) return false
-  if (selectedCompetitionRequiresTrack.value && !selectedTrackName.value) return false
+  if (!selectedCompetitionId.value || !newTeamName.value.trim())
+    return false
+  if (selectedCompetitionRequiresTrack.value && !selectedTrackName.value)
+    return false
   return true
 })
 
@@ -128,8 +130,10 @@ const leaveTeamMutation = useMutation({
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const s = status.toLowerCase()
-  if (s === 'approved') return 'default'
-  if (s === 'rejected') return 'destructive'
+  if (s === 'approved')
+    return 'default'
+  if (s === 'rejected')
+    return 'destructive'
   return 'secondary'
 }
 
@@ -171,7 +175,7 @@ async function copyToken(token: string) {
                   :key="competition.id"
                   :value="competition.id"
                 >
-                  {{ competition.title }} · {{ competition.gameModeType.toUpperCase() }}
+                  {{ competition.title }} / {{ competition.gameModeType.toUpperCase() }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -242,7 +246,9 @@ async function copyToken(token: string) {
 
       <div v-else-if="isError" class="noctf-state-box">
         <AlertCircle class="size-8 text-destructive" />
-        <h3 class="mt-3 text-sm font-medium">{{ t('teams.loadError') }}</h3>
+        <h3 class="mt-3 text-sm font-medium">
+          {{ t('teams.loadError') }}
+        </h3>
         <Button variant="outline" size="sm" class="mt-4" @click="refetch()">
           {{ t('common.refresh') }}
         </Button>
@@ -250,15 +256,23 @@ async function copyToken(token: string) {
 
       <div v-else-if="!teams?.length" class="noctf-state-box">
         <Inbox class="size-8 text-muted-foreground" />
-        <h3 class="mt-3 text-sm font-medium">{{ t('teams.emptyMine') }}</h3>
-        <p class="mt-1 max-w-sm text-sm text-muted-foreground">{{ t('teams.emptyMineDescription') }}</p>
+        <h3 class="mt-3 text-sm font-medium">
+          {{ t('teams.emptyMine') }}
+        </h3>
+        <p class="mt-1 max-w-sm text-sm text-muted-foreground">
+          {{ t('teams.emptyMineDescription') }}
+        </p>
       </div>
 
       <template v-else>
         <section class="space-y-4">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold">{{ t('teams.activeTeams') }}</h2>
-            <Badge variant="secondary">{{ activeTeams.length }}</Badge>
+            <h2 class="text-lg font-semibold">
+              {{ t('teams.activeTeams') }}
+            </h2>
+            <Badge variant="secondary">
+              {{ activeTeams.length }}
+            </Badge>
           </div>
 
           <div v-if="activeTeams.length === 0" class="noctf-state-box text-sm text-muted-foreground">
@@ -270,15 +284,27 @@ async function copyToken(token: string) {
               <CardHeader class="space-y-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <CardTitle class="truncate text-lg">{{ team.name }}</CardTitle>
-                    <p class="mt-1 truncate text-sm text-muted-foreground">{{ team.competitionTitle }}</p>
+                    <CardTitle class="truncate text-lg">
+                      {{ team.name }}
+                    </CardTitle>
+                    <p class="mt-1 truncate text-sm text-muted-foreground">
+                      {{ team.competitionTitle }}
+                    </p>
                   </div>
-                  <Badge :variant="statusVariant(team.registrationStatus)">{{ team.registrationStatus }}</Badge>
+                  <Badge :variant="statusVariant(team.registrationStatus)">
+                    {{ team.registrationStatus }}
+                  </Badge>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{{ team.gameModeType }}</Badge>
-                  <Badge v-if="team.trackName" variant="outline">{{ team.trackName }}</Badge>
-                  <Badge variant="outline">{{ team.memberCount }} / {{ team.maxTeamMembers }}</Badge>
+                  <Badge variant="secondary">
+                    {{ team.gameModeType }}
+                  </Badge>
+                  <Badge v-if="team.trackName" variant="outline">
+                    {{ team.trackName }}
+                  </Badge>
+                  <Badge variant="outline">
+                    {{ team.memberCount }} / {{ team.maxTeamMembers }}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent class="space-y-4">
@@ -321,19 +347,27 @@ async function copyToken(token: string) {
         <section v-if="bannedTeams.length" class="space-y-4">
           <div class="flex items-center gap-2">
             <ShieldAlert class="size-5 text-destructive" />
-            <h2 class="text-lg font-semibold">{{ t('teams.bannedTeams') }}</h2>
+            <h2 class="text-lg font-semibold">
+              {{ t('teams.bannedTeams') }}
+            </h2>
           </div>
           <div class="grid gap-3">
             <div
               v-for="team in bannedTeams"
               :key="team.id"
-              class="flex flex-col gap-2 rounded-xl border bg-card/95 p-4 sm:flex-row sm:items-center sm:justify-between"
+              class="flex flex-col gap-2 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <div class="font-medium">{{ team.name }}</div>
-                <div class="text-sm text-muted-foreground">{{ team.competitionTitle }}</div>
+                <div class="font-medium">
+                  {{ team.name }}
+                </div>
+                <div class="text-sm text-muted-foreground">
+                  {{ team.competitionTitle }}
+                </div>
               </div>
-              <Badge variant="destructive">{{ t('teams.banned') }}</Badge>
+              <Badge variant="destructive">
+                {{ t('teams.banned') }}
+              </Badge>
             </div>
           </div>
         </section>

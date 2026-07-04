@@ -869,7 +869,7 @@ onUnmounted(() => {
                     :key="`${member.userId}-${solve.challengeId}-${solve.submittedAt}`"
                     class="flex flex-wrap items-center justify-between gap-2 text-muted-foreground"
                   >
-                    <span>{{ solve.challengeTitle }} · {{ solve.direction }}</span>
+                    <span>{{ solve.challengeTitle }} / {{ solve.direction }}</span>
                     <span class="font-mono text-xs">{{ formatDate(solve.submittedAt) }}</span>
                   </div>
                 </div>

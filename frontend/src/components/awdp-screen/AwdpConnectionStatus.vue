@@ -15,7 +15,7 @@ const statusView = computed(() => {
     return {
       label: 'Mock feed',
       detail: 'central mock data',
-      tone: 'text-amber-200 bg-amber-300/10 border-amber-300/25',
+      tone: 'text-amber-200 bg-amber-400/8 border-amber-300/22',
       icon: Radio,
     }
   }
@@ -23,7 +23,7 @@ const statusView = computed(() => {
     return {
       label: 'Live',
       detail: formatTime(props.lastSyncAt),
-      tone: 'text-cyan-100 bg-cyan-300/10 border-cyan-300/25',
+      tone: 'text-slate-100 bg-slate-300/8 border-slate-300/20',
       icon: Wifi,
     }
   }
@@ -31,7 +31,7 @@ const statusView = computed(() => {
     return {
       label: 'Reconnecting',
       detail: `attempt ${Math.max(1, props.reconnectAttempts)}`,
-      tone: 'text-orange-100 bg-orange-300/10 border-orange-300/25',
+      tone: 'text-amber-100 bg-amber-400/8 border-amber-300/22',
       icon: RefreshCw,
     }
   }
@@ -39,14 +39,14 @@ const statusView = computed(() => {
     return {
       label: 'Connecting',
       detail: 'opening stream',
-      tone: 'text-slate-200 bg-slate-300/10 border-slate-300/20',
+      tone: 'text-slate-200 bg-slate-300/8 border-slate-300/18',
       icon: RefreshCw,
     }
   }
   return {
     label: 'Offline',
     detail: 'snapshot only',
-    tone: 'text-rose-100 bg-rose-300/10 border-rose-300/25',
+    tone: 'text-rose-100 bg-rose-400/8 border-rose-300/22',
     icon: WifiOff,
   }
 })
@@ -64,7 +64,7 @@ function formatTime(value?: string | null) {
 
 <template>
   <div
-    class="inline-flex min-w-[11rem] items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs"
+    class="inline-flex min-w-[11rem] items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"
     :class="statusView.tone"
   >
     <div class="flex min-w-0 items-center gap-2">

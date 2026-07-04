@@ -1,20 +1,20 @@
 <script setup lang="ts">
+import type { KohChallengeStatus } from '@/components/game/KohStatusCard.vue'
+import { vAutoAnimate } from '@formkit/auto-animate/vue'
+import { useQuery } from '@tanstack/vue-query'
+import { ShieldAlert, Trophy } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { useQuery } from '@tanstack/vue-query'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
-import { useAuthStore } from '@/stores/auth'
-import PageHeader from '@/components/layout/PageHeader.vue'
 import KohStatusCard from '@/components/game/KohStatusCard.vue'
-import type { KohChallengeStatus } from '@/components/game/KohStatusCard.vue'
-import { useSignalR } from '@/composables/useSignalR'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { vAutoAnimate } from '@formkit/auto-animate/vue'
-import { Trophy, ShieldAlert } from 'lucide-vue-next'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useSignalR } from '@/composables/useSignalR'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -41,7 +41,7 @@ const signalR = useSignalR({
 })
 
 signalR.onKohUpdate((dto) => {
-  const ch = challenges.value.find((c) => c.challengeId === dto.challengeId)
+  const ch = challenges.value.find(c => c.challengeId === dto.challengeId)
   if (ch) {
     ch.controllerTeamId = dto.controllerTeamId
     ch.controllerTeamName = dto.controllerTeamName
@@ -54,9 +54,11 @@ signalR.onKohUpdate((dto) => {
         startTime: dto.timestamp,
         endTime: null,
       })
-      if (ch.history.length > 50) ch.history.pop()
+      if (ch.history.length > 50)
+        ch.history.pop()
     }
-  } else {
+  }
+  else {
     refetch()
   }
 })
@@ -95,34 +97,44 @@ onUnmounted(() => signalR.stop())
       <div class="size-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4">
         <ShieldAlert class="size-8" />
       </div>
-      <h3 class="text-xl font-bold">{{ t('koh.loadError') }}</h3>
-      <p class="text-muted-foreground mt-2 max-w-xs">{{ t('koh.loadErrorDetail') }}</p>
-      <Button variant="outline" class="mt-6" @click="refetch">{{ t('common.refresh') }}</Button>
+      <h3 class="text-xl font-bold">
+        {{ t('koh.loadError') }}
+      </h3>
+      <p class="text-muted-foreground mt-2 max-w-xs">
+        {{ t('koh.loadErrorDetail') }}
+      </p>
+      <Button variant="outline" class="mt-6" @click="refetch">
+        {{ t('common.refresh') }}
+      </Button>
     </div>
 
     <div v-else-if="challenges.length === 0" class="noctf-state-box py-20">
       <div class="size-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
         <Trophy class="size-8" />
       </div>
-      <h3 class="text-xl font-bold">{{ t('koh.empty') }}</h3>
-      <p class="text-muted-foreground mt-2 max-w-xs">{{ t('koh.emptyDetail') }}</p>
+      <h3 class="text-xl font-bold">
+        {{ t('koh.empty') }}
+      </h3>
+      <p class="text-muted-foreground mt-2 max-w-xs">
+        {{ t('koh.emptyDetail') }}
+      </p>
     </div>
 
-    <div 
-      v-else 
+    <div
+      v-else
       v-auto-animate
       class="grid gap-6"
       :class="[
-        challenges.length === 1 ? 'grid-cols-1 max-w-xl mx-auto' :
-        challenges.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto' :
-        'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+        challenges.length === 1 ? 'grid-cols-1 max-w-xl mx-auto'
+        : challenges.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'
+          : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
       ]"
     >
       <KohStatusCard
         v-for="ch in challenges"
         :key="ch.challengeId"
         :status="ch"
-        class="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgb(79_70_229/0.12)]"
+        class="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_34px_rgb(15_23_42/0.08)]"
       />
     </div>
   </div>
