@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -39,6 +40,7 @@ public class ExpiredInstanceCleanupService(
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var containerManager = scope.ServiceProvider.GetRequiredService<IContainerManager>();
+        var maintenanceServices = scope.ServiceProvider.GetServices<IInstanceMaintenanceService>();
         var now = DateTime.UtcNow;
 
         var expiredBoxes = await db.AwdGameBoxes
@@ -111,6 +113,27 @@ public class ExpiredInstanceCleanupService(
 
         if (expiredBoxes.Count > 0)
             await db.SaveChangesAsync(ct);
+
+        foreach (var service in maintenanceServices)
+        {
+            try
+            {
+                var result = await service.MaintainAsync(ct);
+                if (result.ExpiredInstances > 0 || result.SyncedInstances > 0 || result.FailedInstances > 0)
+                {
+                    logger.LogInformation(
+                        "Instance maintenance {Name} completed. Expired={Expired}, Synced={Synced}, Failed={Failed}.",
+                        service.Name,
+                        result.ExpiredInstances,
+                        result.SyncedInstances,
+                        result.FailedInstances);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Instance maintenance service {Name} failed.", service.Name);
+            }
+        }
     }
 
     private static Dictionary<int, int> ReadPorts(string? portMappingsJson)

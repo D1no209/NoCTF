@@ -278,6 +278,8 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == req.ChallengeId && c.CompetitionId == req.Id, ct);
         if (challenge is null) return ChallengeInstanceContext.Fail("challenge_not_found", 404);
+        if (string.Equals(challenge.TypeId, "Penetration", StringComparison.OrdinalIgnoreCase))
+            return ChallengeInstanceContext.Fail("use_penetration_instance_api", 400);
         if (challenge.DeploymentType != ChallengeDeploymentType.DynamicContainer)
             return ChallengeInstanceContext.Fail("not_dynamic_container", 400);
 

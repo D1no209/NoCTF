@@ -151,6 +151,7 @@ public class Challenge : ITenantEntity
     public string? FlagSecret { get; set; }
     public CheckerConfig? CheckerConfig { get; set; }
     public KohAgentConfig? KohAgentConfig { get; set; }
+    public string PenetrationConfigJson { get; set; } = "{}";
     public int? AwdpAttackScorePerRound { get; set; }
     public int? AwdpDefenseScorePerRound { get; set; }
     public int? AwdpMaxAttackAttempts { get; set; }
@@ -178,6 +179,7 @@ public class ChallengeTemplate
     public string? FlagSecret { get; set; }
     public CheckerConfig? CheckerConfig { get; set; }
     public KohAgentConfig? KohAgentConfig { get; set; }
+    public string PenetrationConfigJson { get; set; } = "{}";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
@@ -253,11 +255,186 @@ public class Submission : ITenantEntity
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
     public Guid ChallengeId { get; set; }
+    public Guid? PenetrationFlagId { get; set; }
     public Guid UserId { get; set; }
     public string FlagContent { get; set; } = string.Empty;
     public bool IsCorrect { get; set; }
     public DateTime SubmittedAt { get; set; }
     public string IpAddress { get; set; } = string.Empty;
+}
+
+public enum PenetrationInstanceStatus
+{
+    None,
+    Starting,
+    Running,
+    Stopping,
+    Stopped,
+    Resetting,
+    Failed,
+    Destroying,
+    Destroyed,
+    Expired
+}
+
+public enum PenetrationFlagInjectionType
+{
+    EnvironmentVariable,
+    File
+}
+
+public class PenetrationTopologyTemplate
+{
+    public Guid Id { get; set; }
+    public Guid ChallengeTemplateId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string NetworkConfigJson { get; set; } = "{}";
+    public string EntryConfigJson { get; set; } = "{}";
+    public string HealthcheckConfigJson { get; set; } = "{}";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class PenetrationNodeTemplate
+{
+    public Guid Id { get; set; }
+    public Guid TopologyTemplateId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public string Image { get; set; } = string.Empty;
+    public string? Command { get; set; }
+    public string EntrypointJson { get; set; } = "[]";
+    public string EnvironmentJson { get; set; } = "{}";
+    public string PortsJson { get; set; } = "[]";
+    public string VolumesJson { get; set; } = "[]";
+    public string NetworksJson { get; set; } = "[]";
+    public string DependsOnJson { get; set; } = "[]";
+    public bool IsEntry { get; set; }
+    public bool IsInternal { get; set; } = true;
+    public string ResourceLimitJson { get; set; } = "{}";
+    public string HealthcheckJson { get; set; } = "{}";
+    public int DisplayOrder { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class PenetrationFlagTemplate
+{
+    public Guid Id { get; set; }
+    public Guid TopologyTemplateId { get; set; }
+    public Guid? NodeTemplateId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int Stage { get; set; }
+    public string? ValueSecret { get; set; }
+    public string? ValueHash { get; set; }
+    public int Score { get; set; }
+    public bool IsDynamic { get; set; }
+    public bool Visible { get; set; } = true;
+    public PenetrationFlagInjectionType InjectionType { get; set; } = PenetrationFlagInjectionType.EnvironmentVariable;
+    public string? InjectionKey { get; set; }
+    public string? HintAfterSolved { get; set; }
+    public int SolvedCount { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class PenetrationTopology : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string NetworkConfigJson { get; set; } = "{}";
+    public string EntryConfigJson { get; set; } = "{}";
+    public string HealthcheckConfigJson { get; set; } = "{}";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class PenetrationNode : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid TopologyId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public string Image { get; set; } = string.Empty;
+    public string? Command { get; set; }
+    public string EntrypointJson { get; set; } = "[]";
+    public string EnvironmentJson { get; set; } = "{}";
+    public string PortsJson { get; set; } = "[]";
+    public string VolumesJson { get; set; } = "[]";
+    public string NetworksJson { get; set; } = "[]";
+    public string DependsOnJson { get; set; } = "[]";
+    public bool IsEntry { get; set; }
+    public bool IsInternal { get; set; } = true;
+    public string ResourceLimitJson { get; set; } = "{}";
+    public string HealthcheckJson { get; set; } = "{}";
+    public int DisplayOrder { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class PenetrationFlag : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public Guid TopologyId { get; set; }
+    public Guid? NodeId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int Stage { get; set; }
+    public string? ValueSecret { get; set; }
+    public string? ValueHash { get; set; }
+    public int Score { get; set; }
+    public bool IsDynamic { get; set; }
+    public bool Visible { get; set; } = true;
+    public PenetrationFlagInjectionType InjectionType { get; set; } = PenetrationFlagInjectionType.EnvironmentVariable;
+    public string? InjectionKey { get; set; }
+    public string? HintAfterSolved { get; set; }
+    public int SolvedCount { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class TeamChallengeInstance : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public Guid? TopologyId { get; set; }
+    public PenetrationInstanceStatus Status { get; set; } = PenetrationInstanceStatus.None;
+    public string? ComposeProjectName { get; set; }
+    public string RenderedComposeYaml { get; set; } = string.Empty;
+    public string ContainerIdsJson { get; set; } = "[]";
+    public string PortMappingsJson { get; set; } = "{}";
+    public string? EntryHost { get; set; }
+    public int? EntryPort { get; set; }
+    public string? EntryUrl { get; set; }
+    public int ResetCount { get; set; }
+    public DateTime? ExpiresAt { get; set; }
+    public DateTime? LastActionAt { get; set; }
+    public string? LastError { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class DynamicFlagInstance : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid FlagId { get; set; }
+    public Guid InstanceId { get; set; }
+    public string ValueSecret { get; set; } = string.Empty;
+    public string ValueHash { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public DateTime GeneratedAt { get; set; }
+    public DateTime? SolvedAt { get; set; }
 }
 
 public class ScoreEvent : ITenantEntity

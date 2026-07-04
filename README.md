@@ -5,6 +5,7 @@ A modern, extensible CTF/AWD/AWDP/KoH competition platform built with .NET 8 and
 ## Features
 
 - **Multi-mode support**: CTF (Jeopardy), AWD (Attack with Defense), AWDP (Patch Defense), and KoH (King of the Hill)
+- **Penetration challenges**: CTF/Jeopardy challenge type for per-team Docker Compose ranges with staged flags
 - **Plugin-based architecture**: Game modes and challenge types load as plugins via `AssemblyLoadContext`
 - **Real-time experience**: SignalR hubs power live leaderboards, game notifications, and monitor streams
 - **Container-native challenge orchestration**: Docker-based containers for dynamic challenges and checkers
@@ -62,7 +63,8 @@ NoCTF/
 │   │   ├── NoCTF.Plugins.CTF/      # CTF game mode plugin
 │   │   ├── NoCTF.Plugins.AWD/      # AWD game mode plugin
 │   │   ├── NoCTF.Plugins.AWDP/     # AWDP game mode plugin
-│   │   └── NoCTF.Plugins.KoH/      # KoH game mode plugin
+│   │   ├── NoCTF.Plugins.KoH/      # KoH game mode plugin
+│   │   └── NoCTF.Plugins.Penetration/ # Penetration challenge type plugin
 │   └── tests/NoCTF.Tests/          # Unit and integration tests
 ├── frontend/                       # Vue 3 SPA
 ├── deploy/
@@ -118,6 +120,8 @@ flowchart LR
 - [Deployment Guide](docs/deployment.md)
 - [Development Guide](docs/development.md)
 - [Game Modes](docs/game-modes.md)
+- [Penetration Challenges](docs/penetration-challenges.md)
+- [Penetration Operations](docs/penetration-operations.md)
 - [API Reference](docs/api.md)
 - [Quickstart Test Guide](docs/quickstart-test.md)
 

@@ -153,4 +153,59 @@ public class DockerManager(DockerProvider provider) : IContainerManager
             null,
             cancellationToken);
     }
+
+    public async Task<ComposeStatus> GetComposeStatusAsync(
+        string projectName,
+        Dictionary<string, string>? labels = null,
+        CancellationToken cancellationToken = default)
+    {
+        var client = provider.CreateClient();
+        var labelFilters = new Dictionary<string, bool>
+        {
+            [$"com.docker.compose.project={projectName}"] = true
+        };
+
+        if (labels is not null)
+        {
+            foreach (var (key, value) in labels)
+                labelFilters[$"{key}={value}"] = true;
+        }
+
+        var containers = await client.Containers.ListContainersAsync(
+            new ContainersListParameters
+            {
+                All = true,
+                Filters = new Dictionary<string, IDictionary<string, bool>>
+                {
+                    ["label"] = labelFilters
+                }
+            },
+            cancellationToken);
+
+        var services = containers.Select(container =>
+        {
+            container.Labels.TryGetValue("com.docker.compose.service", out var serviceName);
+            container.Labels.TryGetValue("nodeId", out var nodeIdValue);
+            Guid? nodeId = Guid.TryParse(nodeIdValue, out var parsedNodeId) ? parsedNodeId : null;
+            var ports = container.Ports
+                .Where(p => p.PublicPort > 0 && p.PrivatePort > 0)
+                .GroupBy(p => (int)p.PrivatePort)
+                .ToDictionary(g => g.Key, g => (int)g.First().PublicPort);
+
+            return new ComposeServiceInstance(
+                ServiceName: serviceName ?? string.Empty,
+                ContainerId: container.ID,
+                Status: container.State,
+                NodeId: nodeId,
+                PublishedPorts: ports);
+        }).ToList();
+
+        var status = services.Count == 0
+            ? "not_found"
+            : services.Any(s => string.Equals(s.Status, "running", StringComparison.OrdinalIgnoreCase))
+                ? "running"
+                : "stopped";
+
+        return new ComposeStatus(projectName, status, services);
+    }
 }

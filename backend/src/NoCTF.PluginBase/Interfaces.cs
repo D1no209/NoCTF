@@ -24,6 +24,11 @@ public interface IContainerManager
     Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default);
     Task<ComposeDeployment> ComposeUpAsync(ComposeConfig config, CancellationToken cancellationToken = default);
     Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken cancellationToken = default);
+    Task<ComposeStatus> GetComposeStatusAsync(
+        string projectName,
+        Dictionary<string, string>? labels = null,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Compose status is not supported by this container manager.");
 }
 
 public interface IContainerProvider<TClient, TMetadata>

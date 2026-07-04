@@ -71,6 +71,20 @@ public record ComposeDeployment(
     DateTime? ExpectedStopAt = null
 );
 
+public record ComposeServiceInstance(
+    string ServiceName,
+    string ContainerId,
+    string Status,
+    Guid? NodeId,
+    Dictionary<int, int> PublishedPorts
+);
+
+public record ComposeStatus(
+    string ProjectName,
+    string Status,
+    IReadOnlyList<ComposeServiceInstance> Services
+);
+
 public record GameContext(
     Guid CompetitionId,
     GameModeType GameMode,

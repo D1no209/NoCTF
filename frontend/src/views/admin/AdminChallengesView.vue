@@ -69,6 +69,7 @@ interface ChallengeTemplateDto {
   deploymentType: 'NoAttachment' | 'StaticAttachment' | 'DynamicContainer' | 'StaticContainer' | number
   exposedPort?: number | null
   checkerConfig?: CheckerConfigDto
+  penetrationConfigJson?: string
 }
 
 const qc = useQueryClient()
@@ -87,6 +88,7 @@ const challengeTypeOptions = [
   { value: 'Awd', label: 'AWD' },
   { value: 'Awdp', label: 'AWDP' },
   { value: 'Koh', label: 'KoH' },
+  { value: 'Penetration', label: 'Penetration' },
 ] as const
 type ChallengeTypeKey = typeof challengeTypeOptions[number]['value']
 
@@ -98,6 +100,7 @@ function normalizeChallengeType(value?: string | null): ChallengeTypeKey {
   if (key === 'awd') return 'Awd'
   if (key === 'awdp') return 'Awdp'
   if (key === 'koh') return 'Koh'
+  if (key === 'penetration') return 'Penetration'
   return 'Ctf'
 }
 
@@ -112,13 +115,16 @@ const { data: templates, isLoading } = useQuery({
 })
 
 const saveMutation = useMutation({
-  mutationFn: async ({ payload, attachmentFile, patchTemplateFile }: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null }) => {
+  mutationFn: async ({ payload, attachmentFile, patchTemplateFile, penetrationTopology }: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null; penetrationTopology: Record<string, unknown> | null }) => {
     const saved = await adminApi.updateChallenge<ChallengeTemplateDto>(selectedTemplate.value!.id, payload)
     if (attachmentFile) {
       await adminApi.uploadChallengeAttachment(saved.id, attachmentFile)
     }
     if (patchTemplateFile) {
       await adminApi.uploadChallengePatchTemplate(saved.id, patchTemplateFile)
+    }
+    if (penetrationTopology) {
+      await adminApi.updatePenetrationTemplateTopology(saved.id, penetrationTopology)
     }
   },
   onSuccess: () => {

@@ -10,6 +10,7 @@ public interface IRunnerClient
     Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, CancellationToken ct = default);
     Task<ComposeDeployment> ComposeUpAsync(ComposeConfig config, CancellationToken ct = default);
     Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken ct = default);
+    Task<ComposeStatus> GetComposeStatusAsync(string projectName, Dictionary<string, string>? labels = null, CancellationToken ct = default);
 }
 
 public class HttpRunnerClient(HttpClient httpClient) : IRunnerClient
@@ -49,6 +50,18 @@ public class HttpRunnerClient(HttpClient httpClient) : IRunnerClient
         var response = await httpClient.PostAsJsonAsync("/runner/compose/down", deployment, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<ComposeStatus> GetComposeStatusAsync(string projectName, Dictionary<string, string>? labels = null, CancellationToken ct = default)
+    {
+        var query = labels is null || labels.Count == 0
+            ? string.Empty
+            : "?" + string.Join("&", labels.Select(kvp =>
+                $"label={Uri.EscapeDataString($"{kvp.Key}={kvp.Value}")}"));
+        var response = await httpClient.GetAsync($"/runner/compose/{Uri.EscapeDataString(projectName)}/status{query}", ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ComposeStatus>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("Runner returned an empty compose status response.");
+    }
 }
 
 public class RunnerBackedContainerManager(IRunnerClient runnerClient) : IContainerManager
@@ -67,4 +80,10 @@ public class RunnerBackedContainerManager(IRunnerClient runnerClient) : IContain
 
     public Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken cancellationToken = default)
         => runnerClient.ComposeDownAsync(deployment, cancellationToken);
+
+    public Task<ComposeStatus> GetComposeStatusAsync(
+        string projectName,
+        Dictionary<string, string>? labels = null,
+        CancellationToken cancellationToken = default)
+        => runnerClient.GetComposeStatusAsync(projectName, labels, cancellationToken);
 }

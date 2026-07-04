@@ -31,6 +31,7 @@
     <ProjectReference Include="../../src/NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
     <ProjectReference Include="../../src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
     <ProjectReference Include="../../src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
   </ItemGroup>
 
 </Project>

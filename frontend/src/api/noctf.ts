@@ -118,6 +118,46 @@ export const competitionApi = {
       body: { flag },
     }), 'Failed to submit flag')
   },
+  async penetrationDetail<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/penetration',
+      path: { id: competitionId, challengeId },
+    }), 'Failed to load penetration challenge')
+  },
+  async penetrationStart<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/penetration/instance/start',
+      path: { id: competitionId, challengeId },
+      body: {},
+    }), 'Failed to start penetration instance')
+  },
+  async penetrationStop<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/penetration/instance/stop',
+      path: { id: competitionId, challengeId },
+      body: {},
+    }), 'Failed to stop penetration instance')
+  },
+  async penetrationReset<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/penetration/instance/reset',
+      path: { id: competitionId, challengeId },
+      body: {},
+    }), 'Failed to reset penetration instance')
+  },
+  async penetrationDestroy<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.delete<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/penetration/instance',
+      path: { id: competitionId, challengeId },
+    }), 'Failed to destroy penetration instance')
+  },
+  async submitPenetrationFlag<T = unknown>(competitionId: string, challengeId: string, flag: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/competitions/{id}/challenges/{challengeId}/penetration/flags/submit',
+      path: { id: competitionId, challengeId },
+      body: { flag },
+    }), 'Failed to submit penetration flag')
+  },
   async createInstance<T = unknown>(competitionId: string, challengeId: string) {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
       url: '/api/competitions/{id}/challenges/{challengeId}/instance',
@@ -299,6 +339,52 @@ export const adminApi = {
   },
   async updateChallenge<T = unknown>(id: string, body: unknown) {
     return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/challenges/{id}', path: { id }, body }), 'Failed to update challenge')
+  },
+  async penetrationTemplateTopology<T = unknown>(id: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/admin/challenges/{templateId}/penetration-topology',
+      path: { templateId: id },
+    }), 'Failed to load penetration topology')
+  },
+  async updatePenetrationTemplateTopology<T = unknown>(id: string, body: unknown) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({
+      url: '/api/admin/challenges/{templateId}/penetration-topology',
+      path: { templateId: id },
+      body,
+    }), 'Failed to update penetration topology')
+  },
+  async competitionPenetrationTopology<T = unknown>(competitionId: string, challengeId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}/penetration/topology',
+      path: { competitionId, challengeId },
+    }), 'Failed to load penetration topology')
+  },
+  async updateCompetitionPenetrationTopology<T = unknown>(competitionId: string, challengeId: string, body: unknown) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}/penetration/topology',
+      path: { competitionId, challengeId },
+      body,
+    }), 'Failed to update penetration topology')
+  },
+  async penetrationInstances<T = unknown>(competitionId: string, query: Record<string, unknown> = {}) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/penetration/instances',
+      path: { competitionId },
+      query,
+    }), 'Failed to load penetration instances')
+  },
+  async resetPenetrationInstance<T = unknown>(competitionId: string, instanceId: string) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/penetration/instances/{instanceId}/reset',
+      path: { competitionId, instanceId },
+      body: {},
+    }), 'Failed to reset penetration instance')
+  },
+  async destroyPenetrationInstance<T = unknown>(competitionId: string, instanceId: string) {
+    return unwrap(await client.delete<{ 200: T }, unknown, false>({
+      url: '/api/admin/competitions/{competitionId}/penetration/instances/{instanceId}',
+      path: { competitionId, instanceId },
+    }), 'Failed to destroy penetration instance')
   },
   async deleteChallenge(id: string) {
     await client.delete({ url: '/api/admin/challenges/{id}', path: { id } })

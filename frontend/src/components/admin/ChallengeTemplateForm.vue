@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Box, Loader2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { adminApi } from '@/api/noctf'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -23,6 +24,7 @@ interface CheckerConfigDto {
 }
 
 interface ChallengeTemplateDto {
+  id?: string
   title?: string
   description?: string
   typeId?: string
@@ -51,13 +53,14 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  submit: [value: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null }]
+  submit: [value: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null; penetrationTopology: Record<string, unknown> | null }]
   cancel: []
 }>()
 
 const { t } = useI18n()
 const attachmentFile = ref<File | null>(null)
 const patchTemplateFile = ref<File | null>(null)
+const topologyError = ref('')
 
 const defaultForm = () => ({
   title: '',
@@ -78,6 +81,40 @@ const defaultForm = () => ({
   checkerTimeoutSeconds: undefined as number | undefined,
   expImage: '',
   expCommand: '',
+  penetrationTopologyJson: JSON.stringify({
+    name: 'Penetration Range',
+    description: '',
+    entryConfig: { scheme: 'http' },
+    config: {
+      allowReset: true,
+      instanceMode: 'team',
+      maxResetCount: 3,
+      visibleEntryAfterStart: true,
+      instanceTtlSeconds: 7200,
+      actionCooldownSeconds: 5,
+    },
+    nodes: [
+      {
+        name: 'web',
+        role: 'entry',
+        image: 'nginx:alpine',
+        ports: [80],
+        isEntry: true,
+        isInternal: false,
+      },
+    ],
+    flags: [
+      {
+        stage: 1,
+        name: 'Initial Access',
+        score: 100,
+        isDynamic: true,
+        nodeName: 'web',
+        injectionKey: 'NOCTF_FLAG_STAGE1',
+        visible: true,
+      },
+    ],
+  }, null, 2),
 })
 
 const form = ref(defaultForm())
@@ -90,6 +127,7 @@ const challengeTypeOptions = [
   { value: 'Awd', label: 'AWD' },
   { value: 'Awdp', label: 'AWDP' },
   { value: 'Koh', label: 'KoH' },
+  { value: 'Penetration', label: 'Penetration' },
 ] as const
 type ChallengeTypeKey = typeof challengeTypeOptions[number]['value']
 
@@ -107,6 +145,7 @@ function normalizeChallengeType(value?: string | null): ChallengeTypeKey {
   if (key === 'awd') return 'Awd'
   if (key === 'awdp') return 'Awdp'
   if (key === 'koh') return 'Koh'
+  if (key === 'penetration') return 'Penetration'
   return 'Ctf'
 }
 
@@ -120,6 +159,7 @@ const usesRuntimeContainer = computed(() =>
   selectedChallengeType.value !== 'Ctf' || isContainerDeployment.value)
 const usesExpConfig = computed(() => selectedChallengeType.value === 'Awd')
 const usesPatchTemplate = computed(() => selectedChallengeType.value === 'Awdp')
+const usesPenetrationTopology = computed(() => selectedChallengeType.value === 'Penetration')
 const checkerImageLabel = computed(() => selectedChallengeType.value === 'Awdp'
   ? t('admin.challenges.awdpCheckImage')
   : t('admin.challenges.checkerImage'))
@@ -129,7 +169,7 @@ const checkerCommandLabel = computed(() => selectedChallengeType.value === 'Awdp
 const checkerTimeoutLabel = computed(() => selectedChallengeType.value === 'Awdp'
   ? t('admin.challenges.awdpCheckTimeout')
   : t('admin.challenges.checkerTimeout'))
-const isContainerImageMissing = computed(() => usesRuntimeContainer.value && !form.value.containerImage.trim())
+const isContainerImageMissing = computed(() => usesRuntimeContainer.value && !usesPenetrationTopology.value && !form.value.containerImage.trim())
 const canSave = computed(() => Boolean(form.value.title.trim()) && !isContainerImageMissing.value)
 
 watch(() => props.template, (template) => {
@@ -159,12 +199,20 @@ watch(() => props.template, (template) => {
     checkerTimeoutSeconds: template.checkerConfig?.timeoutSeconds ?? undefined,
     expImage: template.checkerConfig?.expImage ?? '',
     expCommand: template.checkerConfig?.expCommand ?? '',
+    penetrationTopologyJson: form.value.penetrationTopologyJson,
+  }
+  if (normalizeChallengeType(template.typeId) === 'Penetration' && template.id) {
+    void loadPenetrationTopology(template.id)
   }
 }, { immediate: true })
 
 watch(selectedChallengeType, (mode) => {
   if (mode !== 'Ctf' && !containerDeploymentTypes.includes(form.value.deploymentType as typeof containerDeploymentTypes[number])) {
     form.value.deploymentType = 'DynamicContainer'
+  }
+  if (mode === 'Penetration') {
+    form.value.deploymentType = 'DynamicContainer'
+    form.value.containerMode = 'DockerCompose'
   }
   if (mode === 'Ctf' && !ctfDeploymentTypes.includes(form.value.deploymentType as typeof ctfDeploymentTypes[number])) {
     form.value.deploymentType = 'StaticAttachment'
@@ -197,12 +245,12 @@ function buildPayload() {
     typeId: normalizeChallengeType(form.value.typeId),
     attachmentUrl: form.value.attachmentUrl.trim() || undefined,
     patchTemplateUrl: usesPatchTemplate.value ? form.value.patchTemplateUrl.trim() || undefined : undefined,
-    deploymentType: deploymentTypeValue(effectiveDeploymentType),
+    deploymentType: deploymentTypeValue(usesPenetrationTopology.value ? 'DynamicContainer' : effectiveDeploymentType),
     exposedPort: runtimeEnabled ? optionalPositiveNumber(form.value.exposedPort) : undefined,
     flagSecret: selectedChallengeType.value === 'Ctf' ? form.value.flagSecret.trim() || undefined : undefined,
     flagEnvironmentVariable: form.value.flagEnvironmentVariable.trim() || undefined,
-    containerImage: runtimeEnabled ? form.value.containerImage.trim() || undefined : undefined,
-    containerMode: form.value.containerMode === 'DockerCompose' ? 1 : 0,
+    containerImage: runtimeEnabled && !usesPenetrationTopology.value ? form.value.containerImage.trim() || undefined : undefined,
+    containerMode: usesPenetrationTopology.value ? 1 : form.value.containerMode === 'DockerCompose' ? 1 : 0,
     composeYaml: runtimeEnabled ? form.value.composeYaml.trim() || undefined : undefined,
     composeProjectName: runtimeEnabled ? form.value.composeProjectName.trim() || undefined : undefined,
     checkerConfig: hasCheckerConfig
@@ -217,9 +265,38 @@ function buildPayload() {
   }
 }
 
+function parsePenetrationTopology() {
+  if (!usesPenetrationTopology.value) return null
+  topologyError.value = ''
+  try {
+    return JSON.parse(form.value.penetrationTopologyJson) as Record<string, unknown>
+  } catch {
+    topologyError.value = t('penetration.invalidTopology')
+    return null
+  }
+}
+
+async function loadPenetrationTopology(templateId: string) {
+  try {
+    const topology = await adminApi.penetrationTemplateTopology<Record<string, unknown>>(templateId)
+    if ((topology as { code?: string }).code !== 'not_configured') {
+      form.value.penetrationTopologyJson = JSON.stringify(topology, null, 2)
+    }
+  } catch {
+    // Topology loading is non-blocking; save will surface backend validation errors.
+  }
+}
+
 function submit() {
   if (!canSave.value || props.saving) return
-  emit('submit', { payload: buildPayload(), attachmentFile: attachmentFile.value, patchTemplateFile: patchTemplateFile.value })
+  const penetrationTopology = parsePenetrationTopology()
+  if (usesPenetrationTopology.value && !penetrationTopology) return
+  emit('submit', {
+    payload: buildPayload(),
+    attachmentFile: attachmentFile.value,
+    patchTemplateFile: patchTemplateFile.value,
+    penetrationTopology,
+  })
 }
 </script>
 
@@ -278,13 +355,22 @@ function submit() {
           </SelectContent>
         </Select>
       </div>
-      <div v-if="usesRuntimeContainer" class="grid gap-2">
+      <div v-if="usesRuntimeContainer && !usesPenetrationTopology" class="grid gap-2">
         <Label>{{ t('admin.challenges.exposedPort') }}</Label>
         <Input v-model.number="form.exposedPort" type="number" min="1" max="65535" :placeholder="t('admin.challenges.exposedPortPlaceholder')" />
       </div>
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2">
+    <div v-if="usesPenetrationTopology" class="space-y-3 rounded-lg border bg-muted/20 p-4">
+      <div>
+        <div class="text-sm font-semibold">{{ t('penetration.topology') }}</div>
+        <p class="text-xs text-muted-foreground">{{ t('penetration.topologyHint') }}</p>
+      </div>
+      <Textarea v-model="form.penetrationTopologyJson" class="min-h-80 font-mono text-xs" />
+      <p v-if="topologyError" class="text-xs text-destructive">{{ topologyError }}</p>
+    </div>
+
+    <div v-if="!usesPenetrationTopology" class="grid gap-4 sm:grid-cols-2">
       <div class="grid gap-2">
         <Label>{{ t('admin.challenges.flagSecret') }}</Label>
         <Input
@@ -299,7 +385,7 @@ function submit() {
       </div>
     </div>
 
-    <div v-if="usesRuntimeContainer" class="space-y-4 rounded-lg border bg-muted/30 p-4">
+    <div v-if="usesRuntimeContainer && !usesPenetrationTopology" class="space-y-4 rounded-lg border bg-muted/30 p-4">
       <div class="flex items-center gap-2 text-sm font-bold uppercase tracking-wider">
         <Box class="size-4" />
         {{ t('admin.challenges.runtimeContainers') }}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowLeft, Check, Loader2, Lock, Plus, Save, ShieldAlert, Trash2, Unlock, X } from 'lucide-vue-next'
+import { ArrowLeft, Check, Loader2, Lock, Plus, RefreshCw, RotateCw, Save, ShieldAlert, Trash2, Unlock, X } from 'lucide-vue-next'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -149,6 +149,25 @@ interface CheatIncidentDto {
   createdAt: string
 }
 
+interface PenetrationAdminInstanceDto {
+  id: string
+  teamId: string
+  teamName: string
+  challengeId: string
+  challengeTitle: string
+  status: string
+  entryUrl?: string | null
+  resetCount: number
+  expiresAt?: string | null
+  lastError?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface PenetrationAdminInstanceListDto {
+  items: PenetrationAdminInstanceDto[]
+}
+
 const route = useRoute()
 const router = useRouter()
 const qc = useQueryClient()
@@ -159,6 +178,7 @@ const competitionDetailSections = [
   { key: 'settings', labelKey: 'admin.competitionDetail.navSettings' },
   { key: 'challenges', labelKey: 'admin.competitionDetail.navChallenges' },
   { key: 'teams', labelKey: 'admin.competitionDetail.navTeams' },
+  { key: 'instances', labelKey: 'admin.competitionDetail.navInstances' },
   { key: 'cheats', labelKey: 'admin.competitionDetail.navCheats' },
   { key: 'logs', labelKey: 'admin.competitionDetail.navLogs' },
 ] as const
@@ -243,6 +263,14 @@ const selectedEdit = reactive({
   awdpFixTimeoutSeconds: 60 as number | undefined,
   hints: [''],
 })
+const selectedPenetrationTopologyJson = ref('')
+const selectedPenetrationTopologyError = ref('')
+const loadingSelectedPenetrationTopology = ref(false)
+const penetrationInstanceFilters = reactive({
+  challengeId: 'all',
+  teamId: 'all',
+})
+let selectedPenetrationTopologyLoadId = 0
 
 function toDateTimeLocal(value: string) {
   if (!value)
@@ -341,6 +369,24 @@ const { data: cheatIncidents, isLoading: loadingCheatIncidents } = useQuery({
   queryFn: () => adminApi.competitionCheatIncidents<CheatIncidentDto[]>(competitionId.value),
 })
 
+const penetrationInstanceQuery = computed(() => {
+  const query: Record<string, string> = {}
+  if (penetrationInstanceFilters.challengeId !== 'all')
+    query.challengeId = penetrationInstanceFilters.challengeId
+  if (penetrationInstanceFilters.teamId !== 'all')
+    query.teamId = penetrationInstanceFilters.teamId
+  return query
+})
+
+const { data: penetrationInstancesResponse, isLoading: loadingPenetrationInstances, refetch: refetchPenetrationInstances } = useQuery({
+  queryKey: computed(() => queryKeys.adminPenetrationInstances(competitionId.value, penetrationInstanceQuery.value)),
+  queryFn: () => adminApi.penetrationInstances<PenetrationAdminInstanceListDto>(competitionId.value, penetrationInstanceQuery.value),
+})
+
+const penetrationInstances = computed(() => penetrationInstancesResponse.value?.items ?? [])
+const penetrationChallenges = computed(() =>
+  (competitionChallenges.value ?? []).filter(challenge => challenge.typeId?.toLowerCase() === 'penetration'))
+
 watch(competition, (value) => {
   if (!value)
     return
@@ -403,10 +449,33 @@ watch(templates, (items) => {
 }, { immediate: true })
 
 const selectedChallenge = computed(() => competitionChallenges.value?.find(c => c.id === selectedChallengeId.value) ?? null)
+const selectedIsPenetration = computed(() =>
+  selectedChallenge.value?.typeId?.toLowerCase() === 'penetration')
+
+async function loadSelectedPenetrationTopology(challengeId: string) {
+  const loadId = ++selectedPenetrationTopologyLoadId
+  selectedPenetrationTopologyError.value = ''
+  loadingSelectedPenetrationTopology.value = true
+  try {
+    const topology = await adminApi.competitionPenetrationTopology<Record<string, unknown>>(competitionId.value, challengeId)
+    if (loadId !== selectedPenetrationTopologyLoadId) return
+    selectedPenetrationTopologyJson.value = JSON.stringify(topology, null, 2)
+  } catch {
+    if (loadId !== selectedPenetrationTopologyLoadId) return
+    selectedPenetrationTopologyJson.value = ''
+    selectedPenetrationTopologyError.value = t('errors.loadFailed')
+  } finally {
+    if (loadId === selectedPenetrationTopologyLoadId)
+      loadingSelectedPenetrationTopology.value = false
+  }
+}
 
 watch(selectedChallenge, (challenge) => {
-  if (!challenge)
+  if (!challenge) {
+    selectedPenetrationTopologyJson.value = ''
+    selectedPenetrationTopologyError.value = ''
     return
+  }
   selectedEdit.description = challenge.description ?? ''
   selectedEdit.initialPoints = challenge.pointsConfig?.initialPoints ?? 500
   selectedEdit.minimumPoints = challenge.pointsConfig?.minimumPoints ?? 100
@@ -422,6 +491,10 @@ watch(selectedChallenge, (challenge) => {
   selectedEdit.awdpFixEntry = challenge.awdpFixEntry ?? competitionForm.awdpFixEntry ?? 'fix.sh'
   selectedEdit.awdpFixTimeoutSeconds = challenge.awdpFixTimeoutSeconds ?? competitionForm.awdpFixTimeoutSeconds ?? 60
   selectedEdit.hints = challenge.hints?.length ? challenge.hints.map(h => h.content) : ['']
+  selectedPenetrationTopologyJson.value = ''
+  selectedPenetrationTopologyError.value = ''
+  if (challenge.typeId?.toLowerCase() === 'penetration')
+    void loadSelectedPenetrationTopology(challenge.id)
 }, { immediate: true })
 
 function cleanHints(hints: string[]) {
@@ -497,6 +570,30 @@ const updateChallengeMutation = useMutation({
   onError: () => toast.error(t('admin.competitionDetail.updateChallengeError')),
 })
 
+const updatePenetrationTopologyMutation = useMutation({
+  mutationFn: async () => {
+    if (!selectedChallenge.value) return
+    selectedPenetrationTopologyError.value = ''
+    let payload: Record<string, unknown>
+    try {
+      payload = JSON.parse(selectedPenetrationTopologyJson.value) as Record<string, unknown>
+    } catch {
+      selectedPenetrationTopologyError.value = t('penetration.invalidTopology')
+      throw new Error('invalid_topology_json')
+    }
+    await adminApi.updateCompetitionPenetrationTopology(competitionId.value, selectedChallenge.value.id, payload)
+  },
+  onSuccess: () => {
+    if (selectedChallenge.value)
+      void loadSelectedPenetrationTopology(selectedChallenge.value.id)
+    toast.success(t('admin.competitionDetail.updateChallengeSuccess'))
+  },
+  onError: (error) => {
+    if (error instanceof Error && error.message === 'invalid_topology_json') return
+    toast.error(t('admin.competitionDetail.updateChallengeError'))
+  },
+})
+
 const deleteChallengeMutation = useMutation({
   mutationFn: (challengeId: string) => adminApi.deleteCompetitionChallenge(competitionId.value, challengeId),
   onSuccess: () => {
@@ -561,8 +658,40 @@ const restartContainerMutation = useMutation({
   onError: () => toast.error(t('admin.competitionDetail.containerRestartError')),
 })
 
+const resetPenetrationInstanceMutation = useMutation({
+  mutationFn: (instanceId: string) => adminApi.resetPenetrationInstance(competitionId.value, instanceId),
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: ['admin-penetration-instances', competitionId.value] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminCompetitionLogs(competitionId.value) })
+    toast.success(t('admin.competitionDetail.penetrationInstanceResetSuccess'))
+  },
+  onError: () => toast.error(t('admin.competitionDetail.penetrationInstanceActionError')),
+})
+
+const destroyPenetrationInstanceMutation = useMutation({
+  mutationFn: (instanceId: string) => adminApi.destroyPenetrationInstance(competitionId.value, instanceId),
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: ['admin-penetration-instances', competitionId.value] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminCompetitionLogs(competitionId.value) })
+    toast.success(t('admin.competitionDetail.penetrationInstanceDestroyed'))
+  },
+  onError: () => toast.error(t('admin.competitionDetail.penetrationInstanceActionError')),
+})
+
 function isStaticContainer(challenge: CompetitionChallengeDto) {
   return challenge.deploymentType === 'StaticContainer' || challenge.deploymentType === 3
+}
+
+function penetrationStatusVariant(status: string) {
+  const normalized = status.toLowerCase()
+  if (normalized === 'running') return 'default'
+  if (normalized === 'failed' || normalized === 'expired') return 'destructive'
+  if (normalized === 'stopped' || normalized === 'destroyed') return 'secondary'
+  return 'outline'
+}
+
+function formatDate(value?: string | null) {
+  return value ? new Date(value).toLocaleString() : '-'
 }
 
 function selectChallenge(challenge: CompetitionChallengeDto) {
@@ -648,7 +777,7 @@ function sectionRoute(section: CompetitionDetailSection) {
       class="grid gap-6"
       :class="activeSection === 'challenges' ? 'xl:grid-cols-[minmax(0,1fr)_420px]' : ''"
     >
-      <section class="space-y-6">
+      <section class="min-w-0 space-y-6">
         <div v-if="activeSection === 'settings'" class="noctf-section">
           <div class="mb-5 flex items-center justify-between gap-4">
             <div>
@@ -1081,6 +1210,134 @@ function sectionRoute(section: CompetitionDetailSection) {
           </Table>
         </div>
 
+        <div v-if="activeSection === 'instances'" class="noctf-section">
+          <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h3 class="font-semibold">
+                {{ t('admin.competitionDetail.penetrationInstancesTitle') }}
+              </h3>
+              <p class="text-sm text-muted-foreground">
+                {{ t('admin.competitionDetail.penetrationInstancesDescription') }}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" :disabled="loadingPenetrationInstances" @click="refetchPenetrationInstances()">
+              <RefreshCw class="mr-2 size-4" :class="loadingPenetrationInstances ? 'animate-spin' : ''" />
+              {{ t('common.refresh') }}
+            </Button>
+          </div>
+
+          <div class="mb-4 grid gap-3 md:grid-cols-2">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.challengeFilter') }}</Label>
+              <Select v-model="penetrationInstanceFilters.challengeId">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {{ t('common.all') }}
+                  </SelectItem>
+                  <SelectItem v-for="challenge in penetrationChallenges" :key="challenge.id" :value="challenge.id">
+                    {{ challenge.title }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.teamFilter') }}</Label>
+              <Select v-model="penetrationInstanceFilters.teamId">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {{ t('common.all') }}
+                  </SelectItem>
+                  <SelectItem v-for="team in competitionTeams ?? []" :key="team.id" :value="team.id">
+                    {{ team.name }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div class="w-full max-w-full overflow-x-auto">
+            <Table class="min-w-[920px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{{ t('admin.teams.name') }}</TableHead>
+                  <TableHead>{{ t('admin.challenges.titleColumn') }}</TableHead>
+                  <TableHead>{{ t('common.status') }}</TableHead>
+                  <TableHead>{{ t('admin.competitionDetail.entry') }}</TableHead>
+                  <TableHead>{{ t('admin.competitionDetail.resetCount') }}</TableHead>
+                  <TableHead>{{ t('admin.competitionDetail.expiresAt') }}</TableHead>
+                  <TableHead>{{ t('admin.competitionDetail.lastUpdated') }}</TableHead>
+                  <TableHead class="text-right">
+                    {{ t('common.actions') }}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-if="loadingPenetrationInstances">
+                  <TableCell colspan="8" class="h-20 text-center text-muted-foreground">
+                    <Loader2 class="mr-2 inline size-4 animate-spin" />
+                    {{ t('common.loading') }}
+                  </TableCell>
+                </TableRow>
+                <TableRow v-else-if="!penetrationInstances.length">
+                  <TableCell colspan="8" class="h-20 text-center text-muted-foreground">
+                    {{ t('admin.competitionDetail.noPenetrationInstances') }}
+                  </TableCell>
+                </TableRow>
+                <TableRow v-for="instance in penetrationInstances" v-else :key="instance.id">
+                  <TableCell>
+                    <div class="font-medium">
+                      {{ instance.teamName }}
+                    </div>
+                    <div class="text-xs text-muted-foreground">
+                      {{ instance.teamId.slice(0, 8) }}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div class="font-medium">
+                      {{ instance.challengeTitle }}
+                    </div>
+                    <div v-if="instance.lastError" class="mt-1 max-w-64 truncate text-xs text-destructive" :title="instance.lastError">
+                      {{ instance.lastError }}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge :variant="penetrationStatusVariant(instance.status)">
+                      {{ instance.status }}
+                    </Badge>
+                  </TableCell>
+                  <TableCell class="text-xs">
+                    <a v-if="instance.entryUrl" :href="instance.entryUrl" target="_blank" rel="noreferrer" class="text-primary underline-offset-4 hover:underline">
+                      {{ instance.entryUrl }}
+                    </a>
+                    <span v-else class="text-muted-foreground">-</span>
+                  </TableCell>
+                  <TableCell>{{ instance.resetCount }}</TableCell>
+                  <TableCell class="text-xs text-muted-foreground">
+                    {{ formatDate(instance.expiresAt) }}
+                  </TableCell>
+                  <TableCell class="text-xs text-muted-foreground">
+                    {{ formatDate(instance.updatedAt) }}
+                  </TableCell>
+                  <TableCell class="text-right">
+                    <div class="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" class="size-8" :disabled="resetPenetrationInstanceMutation.isPending.value" @click="resetPenetrationInstanceMutation.mutate(instance.id)">
+                        <Loader2 v-if="resetPenetrationInstanceMutation.isPending.value" class="size-4 animate-spin" />
+                        <RotateCw v-else class="size-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" class="size-8 text-destructive" :disabled="destroyPenetrationInstanceMutation.isPending.value" @click="destroyPenetrationInstanceMutation.mutate(instance.id)">
+                        <Loader2 v-if="destroyPenetrationInstanceMutation.isPending.value" class="size-4 animate-spin" />
+                        <Trash2 v-else class="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
         <div v-if="activeSection === 'cheats'" class="noctf-section">
           <div class="mb-5">
             <h3 class="font-semibold">
@@ -1287,6 +1544,30 @@ function sectionRoute(section: CompetitionDetailSection) {
             <div class="grid gap-2">
               <Label>{{ t('admin.competitionDetail.flagPrefix') }}</Label>
               <Input v-model="selectedEdit.flagPrefix" placeholder="flag" />
+            </div>
+            <div v-if="selectedIsPenetration" class="grid gap-3 rounded-lg border bg-muted/30 p-3">
+              <div>
+                <div class="text-sm font-semibold">{{ t('penetration.topology') }}</div>
+                <p class="text-xs text-muted-foreground">{{ t('penetration.topologyHint') }}</p>
+              </div>
+              <div v-if="loadingSelectedPenetrationTopology" class="py-4 text-sm text-muted-foreground">
+                <Loader2 class="mr-2 inline size-4 animate-spin" />
+                {{ t('common.loading') }}
+              </div>
+              <template v-else>
+                <Textarea v-model="selectedPenetrationTopologyJson" class="min-h-80 font-mono text-xs" />
+                <p v-if="selectedPenetrationTopologyError" class="text-xs text-destructive">
+                  {{ selectedPenetrationTopologyError }}
+                </p>
+                <Button
+                  variant="outline"
+                  :disabled="updatePenetrationTopologyMutation.isPending.value || !selectedPenetrationTopologyJson.trim()"
+                  @click="updatePenetrationTopologyMutation.mutate()"
+                >
+                  <Loader2 v-if="updatePenetrationTopologyMutation.isPending.value" class="mr-2 size-4 animate-spin" />
+                  {{ t('common.save') }}
+                </Button>
+              </template>
             </div>
             <div v-if="competitionForm.gameModeType === 'Awdp'" class="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
               <div class="grid gap-2">

@@ -17,6 +17,7 @@ import { Alert } from '@/components/ui/alert'
 import { renderMarkdown } from '@/lib/markdown'
 import { toast } from 'vue-sonner'
 import { Activity, CheckCircle2, Copy, Crosshair, Download, FileArchive, Loader2, Shield, ShieldCheck, Server, Timer, Trash2, Upload } from 'lucide-vue-next'
+import PenetrationChallengePanel from './PenetrationChallengePanel.vue'
 
 interface Challenge {
   id: string
@@ -154,6 +155,7 @@ const renderedDescription = computed(() => {
 const visibleHints = computed(() => props.challenge?.hints?.filter(Boolean) ?? [])
 const patchStatuses = computed(() => props.patchSubmissions ?? [])
 const isDynamicContainer = computed(() => props.challenge?.deploymentType?.toLowerCase() === 'dynamiccontainer')
+const isPenetrationChallenge = computed(() => props.challenge?.typeId?.toLowerCase() === 'penetration')
 const canCreateDynamicInstance = computed(() => Boolean(isDynamicContainer.value && props.canCreateInstance !== false))
 const canSubmitCurrentFlag = computed(() => props.canSubmitFlag !== false)
 const canRequestCurrentDefense = computed(() => props.canRequestDefense !== false)
@@ -224,7 +226,7 @@ function onOpenChange(v: boolean) {
 watch(
   () => [props.open, props.challenge?.id, isDynamicContainer.value, props.canCreateInstance] as const,
   ([open]) => {
-    if (open && isDynamicContainer.value && props.challenge && props.canCreateInstance !== false) {
+    if (open && isDynamicContainer.value && !isPenetrationChallenge.value && props.challenge && props.canCreateInstance !== false) {
       startClock()
       void refreshInstance()
       startInstancePolling()
@@ -263,7 +265,7 @@ async function createInstance() {
 }
 
 async function refreshInstance() {
-  if (!props.challenge || !isDynamicContainer.value || props.canCreateInstance === false) return
+  if (!props.challenge || !isDynamicContainer.value || isPenetrationChallenge.value || props.canCreateInstance === false) return
   instanceLoading.value = true
   try {
     instance.value = await competitionApi.getInstance<InstanceResponse>(props.competitionId, props.challenge.id)
@@ -406,7 +408,7 @@ function stopClock() {
 function startInstancePolling() {
   if (pollTimer) return
   pollTimer = setInterval(() => {
-    if (props.open && isDynamicContainer.value) void refreshInstance()
+    if (props.open && isDynamicContainer.value && !isPenetrationChallenge.value) void refreshInstance()
   }, 10_000)
 }
 
@@ -485,7 +487,15 @@ function getApiErrorDetail(error: unknown) {
         />
         <p v-else class="text-sm text-muted-foreground italic">{{ t('challenges.noDescription') }}</p>
 
-        <div v-if="(isDynamicContainer && !isAwdpMode) || isAwdMode" class="grid gap-3 rounded-xl border bg-muted/25 p-3 sm:grid-cols-2">
+        <PenetrationChallengePanel
+          v-if="isPenetrationChallenge && challenge"
+          :competition-id="competitionId"
+          :challenge="challenge"
+          :can-submit-flag="canSubmitCurrentFlag"
+          @solved="emit('solved')"
+        />
+
+        <div v-if="!isPenetrationChallenge && ((isDynamicContainer && !isAwdpMode) || isAwdMode)" class="grid gap-3 rounded-xl border bg-muted/25 p-3 sm:grid-cols-2">
           <div v-if="isDynamicContainer" class="space-y-3 sm:col-span-2">
             <div v-if="runningInstance" class="rounded-lg border bg-background/80 p-3">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -557,7 +567,7 @@ function getApiErrorDetail(error: unknown) {
             {{ defenseEnabled ? t('challenges.defenseReady') : t('challenges.requestDefense') }}
           </Button>
         </div>
-        <Alert v-if="((isDynamicContainer && !isAwdpMode) || isAwdMode) && !canSubmitCurrentFlag">
+        <Alert v-if="!isPenetrationChallenge && ((isDynamicContainer && !isAwdpMode) || isAwdMode) && !canSubmitCurrentFlag">
           {{ t('challenges.participantActionRequiresTeam') }}
         </Alert>
         <div v-if="instanceStatus" class="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">{{ instanceStatus }}</div>
@@ -565,7 +575,7 @@ function getApiErrorDetail(error: unknown) {
           {{ instanceError }}
         </Alert>
 
-        <div v-if="isAwdpMode" class="space-y-4 rounded-xl border bg-card p-4 shadow-sm">
+        <div v-if="!isPenetrationChallenge && isAwdpMode" class="space-y-4 rounded-xl border bg-card p-4 shadow-sm">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="space-y-1">
               <div class="flex items-center gap-2 text-sm font-semibold">
@@ -777,7 +787,7 @@ function getApiErrorDetail(error: unknown) {
           </div>
         </div>
 
-        <div v-if="!solved && !isAwdpMode" class="space-y-2">
+        <div v-if="!solved && !isAwdpMode && !isPenetrationChallenge" class="space-y-2">
           <Label for="flag-input">{{ t('awd.flag') }}</Label>
           <div class="flex gap-2">
             <Input
@@ -804,7 +814,7 @@ function getApiErrorDetail(error: unknown) {
           {{ submitError }}
         </Alert>
 
-        <div v-if="solved && submitResult !== 'correct'" class="text-sm text-muted-foreground italic">
+        <div v-if="solved && submitResult !== 'correct' && !isPenetrationChallenge" class="text-sm text-muted-foreground italic">
           {{ t('challenges.alreadySolved') }}
         </div>
       </div>

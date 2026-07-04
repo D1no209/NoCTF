@@ -16,6 +16,20 @@ services:
         DockerComposeRunner.ValidateComposeYaml(yaml);
     }
 
+    [Fact]
+    public void ValidateComposeYaml_AllowsNoNewPrivilegesSecurityOpt()
+    {
+        var yaml = """
+services:
+  web:
+    image: registry/challenge:latest
+    security_opt:
+      - no-new-privileges:true
+""";
+
+        DockerComposeRunner.ValidateComposeYaml(yaml);
+    }
+
     [Theory]
     [InlineData("privileged:")]
     [InlineData("network_mode: host")]
@@ -28,6 +42,23 @@ services:
   web:
     image: registry/challenge:latest
     {directive} true
+""";
+
+        Assert.Throws<InvalidOperationException>(() => DockerComposeRunner.ValidateComposeYaml(yaml));
+    }
+
+    [Theory]
+    [InlineData("seccomp=unconfined")]
+    [InlineData("apparmor=unconfined")]
+    [InlineData("no-new-privileges:false")]
+    public void ValidateComposeYaml_RejectsUnsafeSecurityOptions(string option)
+    {
+        var yaml = $"""
+services:
+  web:
+    image: registry/challenge:latest
+    security_opt:
+      - {option}
 """;
 
         Assert.Throws<InvalidOperationException>(() => DockerComposeRunner.ValidateComposeYaml(yaml));

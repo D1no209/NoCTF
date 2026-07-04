@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using NoCTF.Application;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Events;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
@@ -18,17 +19,20 @@ public class CtfGameMode : IGameMode
     private readonly ApplicationDbContext _db;
     private readonly ISubmissionEventHandler _submissionEventHandler;
     private readonly IScoreSignalEmitter _scoreSignalEmitter;
+    private readonly IChallengeSubmissionHandlerRegistry _challengeSubmissionHandlers;
 
     public GameModeType Type => GameModeType.Ctf;
 
     public CtfGameMode(
         ApplicationDbContext db,
         ISubmissionEventHandler submissionEventHandler,
-        IScoreSignalEmitter scoreSignalEmitter)
+        IScoreSignalEmitter scoreSignalEmitter,
+        IChallengeSubmissionHandlerRegistry challengeSubmissionHandlers)
     {
         _db = db;
         _submissionEventHandler = submissionEventHandler;
         _scoreSignalEmitter = scoreSignalEmitter;
+        _challengeSubmissionHandlers = challengeSubmissionHandlers;
     }
 
     public Task InitializeAsync(GameContext context, CancellationToken cancellationToken = default)
@@ -49,6 +53,10 @@ public class CtfGameMode : IGameMode
 
         if (challenge is null)
             return SubmissionResult.WrongFlag;
+
+        var handler = _challengeSubmissionHandlers.FindHandler(challenge.TypeId);
+        if (handler is not null)
+            return (await handler.ProcessSubmissionAsync(context, challenge, cancellationToken)).Result;
 
         // Validate flag using timing-safe comparison. New CTF challenges store only
         // the flag content; competition bindings provide the flag prefix.

@@ -22,6 +22,7 @@ public class UpdateChallengeRequest
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public CheckerConfigDto? CheckerConfig { get; set; }
+    public string? PenetrationConfigJson { get; set; }
 }
 
 public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateChallengeRequest, ChallengeTemplateAdminDto>, IAuditableEndpoint
@@ -43,10 +44,13 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
         }
 
         var attachmentUrl = ChallengeTemplateRequestRules.CleanOptional(req.AttachmentUrl);
-        var deploymentType = ChallengeTemplateRequestRules.ResolveDeploymentType(req.DeploymentType, attachmentUrl);
+        var isPenetration = string.Equals(req.TypeId?.Trim(), "Penetration", StringComparison.OrdinalIgnoreCase);
+        var deploymentType = isPenetration
+            ? ChallengeDeploymentType.DynamicContainer
+            : ChallengeTemplateRequestRules.ResolveDeploymentType(req.DeploymentType, attachmentUrl);
         var usesRuntimeContainer = ChallengeTemplateRequestRules.UsesRuntimeContainer(deploymentType);
         var containerImage = ChallengeTemplateRequestRules.CleanOptional(req.ContainerImage);
-        if (usesRuntimeContainer && string.IsNullOrWhiteSpace(containerImage))
+        if (usesRuntimeContainer && !isPenetration && string.IsNullOrWhiteSpace(containerImage))
         {
             await SendStringAsync("container_image_required", 400, cancellation: ct);
             return;
@@ -55,8 +59,8 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
         challenge.Title = req.Title.Trim();
         challenge.Description = ChallengeTemplateRequestRules.CleanOptional(req.Description);
         challenge.TypeId = string.IsNullOrWhiteSpace(req.TypeId) ? "ctf" : req.TypeId.Trim();
-        challenge.ContainerImage = usesRuntimeContainer ? containerImage : null;
-        challenge.ContainerMode = usesRuntimeContainer ? req.ContainerMode : ChallengeContainerMode.SingleImage;
+        challenge.ContainerImage = usesRuntimeContainer && !isPenetration ? containerImage : null;
+        challenge.ContainerMode = isPenetration ? ChallengeContainerMode.DockerCompose : usesRuntimeContainer ? req.ContainerMode : ChallengeContainerMode.SingleImage;
         challenge.ComposeYaml = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeYaml) : null;
         challenge.ComposeProjectName = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeProjectName) : null;
         challenge.FlagSecret = req.FlagSecret;
@@ -78,6 +82,9 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
                 ExpCommand = ChallengeTemplateRequestRules.CleanOptional(req.CheckerConfig.ExpCommand),
             }
             : null;
+        challenge.PenetrationConfigJson = isPenetration && !string.IsNullOrWhiteSpace(req.PenetrationConfigJson)
+            ? req.PenetrationConfigJson
+            : "{}";
 
         await db.SaveChangesAsync(ct);
 

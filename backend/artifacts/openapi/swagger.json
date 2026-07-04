@@ -1,0 +1,7649 @@
+{
+  "x-generator": "NSwag v14.2.0.0 (NJsonSchema v11.1.0.0 (Newtonsoft.Json v13.0.0.0))",
+  "openapi": "3.0.0",
+  "info": {
+    "title": "NoCTF API",
+    "version": "v1"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000"
+    }
+  ],
+  "paths": {
+    "/api/teams/mine": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsGetMyTeamsEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsMyTeamDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/teams": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsCreateTeamEndpoint",
+        "requestBody": {
+          "x-name": "CreateTeamRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsCreateTeamRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/teams/{teamId}/join": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsJoinTeamEndpoint",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/teams/join-by-token": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsJoinTeamByTokenEndpoint",
+        "requestBody": {
+          "x-name": "JoinTeamByTokenRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsJoinTeamByTokenRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/teams/{teamId}/leave": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsLeaveTeamEndpoint",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/teams/{teamId}/transfer-captain": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsTransferCaptainEndpoint",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "TransferCaptainRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTransferCaptainRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/teams/{teamId}/members/{userId}": {
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsRemoveTeamMemberEndpoint",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/teams/{id}": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsUpdateTeamEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateTeamRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsUpdateTeamRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsUpdateTeamResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/awdp/screen/snapshot": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsAwdpScreenSnapshotEndpoint",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdpScreenSnapshotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/awdp/screen/events": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsAwdpScreenEventsEndpoint",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/instance": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetChallengeInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsChallengeInstanceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsCreateChallengeInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsChallengeInstanceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsDestroyChallengeInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsChallengeInstanceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/instance/extend": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsExtendChallengeInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsChallengeInstanceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/teams/mine": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetMyCompetitionTeamsEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsMyCompetitionTeamDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsCreateCompetitionEndpoint",
+        "requestBody": {
+          "x-name": "CreateCompetitionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCreateCompetitionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCreateCompetitionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetCompetitionsEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionListItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}/awd-dashboard": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetAwdDashboardEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdDashboardDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}/challenges": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetChallengesEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsChallengeDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetCompetitionEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}/koh-dashboard": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetKohDashboardEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsKohDashboardDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competitionId}/leaderboard": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetLeaderboardEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGetLeaderboardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competitionId}/leaderboard/trend": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetLeaderboardTrendEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardTrendResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{competitionId}/leaderboard/teams/{teamId}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetLeaderboardTeamDetailEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardTeamDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}/patch-submissions": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetPatchSubmissionsEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsPatchSubmissionDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/patch-submissions/{submissionId}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetPatchSubmissionEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "submissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsPatchSubmissionDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/submissions": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetSubmissionsEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGetSubmissionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/penetration": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetPenetrationChallengeEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/penetration/instance": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetPenetrationInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsDestroyPenetrationInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/penetration/instance/start": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsStartPenetrationInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/penetration/instance/stop": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsStopPenetrationInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/penetration/instance/reset": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsResetPenetrationInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/penetration/flags/submit": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsSubmitPenetrationFlagEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "PenetrationFlagSubmitRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsPenetrationFlagSubmitRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsPenetrationFlagSubmitResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/submit": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsSubmitFlagEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SubmitFlagRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSubmitFlagRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSubmitFlagResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/challenges/{challengeId}/patch": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsSubmitPatchEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSubmitPatchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/capabilities": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetCompetitionCapabilitiesEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionCapabilitiesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}/actions/{actionKey}": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsPostCompetitionActionEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actionKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionActionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/views/{viewKey}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetCompetitionViewEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viewKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationCompetitionModesCompetitionViewResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}/scoreboard": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetCompetitionScoreboardEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFApplicationScoringScoreboardRow"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAuthLoginEndpoint",
+        "requestBody": {
+          "x-name": "LoginRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthLoginRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthLoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAuthRefreshTokenEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthLoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": []
+          },
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAuthRegisterEndpoint",
+        "requestBody": {
+          "x-name": "RegisterRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthRegisterRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthRegisterResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/competitions/{id}/collaborators": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminAddCollaboratorEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "AddCollaboratorRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminAddCollaboratorRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCollaboratorsEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCollaboratorDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/challenges/{id}/attachment": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUploadChallengeAttachmentEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminChallengeAttachmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/challenges/{id}/patch-template": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUploadChallengePatchTemplateEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminChallengePatchTemplateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/challenges/{challengeId}/container/restart": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminRestartStaticChallengeContainerEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsChallengeInstanceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/challenges": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionChallengesAdminEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCompetitionChallengeAdminDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminBindCompetitionChallengeEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "BindCompetitionChallengeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminBindCompetitionChallengeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCompetitionChallengeAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/challenges/{challengeId}": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdateCompetitionChallengeEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateCompetitionChallengeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminUpdateCompetitionChallengeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCompetitionChallengeAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminDeleteCompetitionChallengeEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/logs": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionLogsAdminEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCompetitionLogDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/cheat-incidents": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionCheatIncidentsEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCheatIncidentDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/teams/{teamId}/ban": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminBanCompetitionTeamEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "TeamBanRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamBanRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/teams/{teamId}/unban": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUnbanCompetitionTeamEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/teams": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionTeamsAdminEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamAdminDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/teams/{teamId}/approve": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminApproveCompetitionTeamEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/teams/{teamId}/reject": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminRejectCompetitionTeamEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/teams/{teamId}/lock": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminSetCompetitionTeamLockEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CompetitionTeamLockRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCompetitionTeamLockRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/challenges": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminCreateChallengeEndpoint",
+        "requestBody": {
+          "x-name": "CreateChallengeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCreateChallengeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminChallengeTemplateAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetChallengesAdminEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminChallengeTemplateAdminDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminCreateCompetitionAdminEndpoint",
+        "requestBody": {
+          "x-name": "CreateCompetitionAdminRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCreateCompetitionAdminRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCompetitionSummaryDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionsAdminEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCompetitionSummaryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/challenges/{id}": {
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminDeleteChallengeEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdateChallengeEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateChallengeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminUpdateChallengeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminChallengeTemplateAdminDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{id}": {
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminDeleteCompetitionEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionAdminEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCompetitionSummaryDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdateCompetitionEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateCompetitionAdminRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminUpdateCompetitionAdminRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/teams/{id}": {
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminDeleteTeamEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/containers/{id}": {
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminDestroyContainerEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/logs": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetAdminLogsEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPISignalRLogEntryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/audit-logs": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetAuditLogsEndpoint",
+        "parameters": [
+          {
+            "name": "userName",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminGetAuditLogsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/containers": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetContainersEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminContainerDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/plugins": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetPluginsEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminPluginDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/teams/{id}/members": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetTeamMembersEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamMembersDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/teams": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetTeamsEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminTeamAdminDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetUsersEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminUserDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/challenges/{templateId}/penetration-topology": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetPenetrationTemplateTopologyEndpoint",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdatePenetrationTemplateTopologyEndpoint",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/challenges/{challengeId}/penetration/topology": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetPenetrationCompetitionTopologyEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdatePenetrationCompetitionTopologyEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/penetration/instances": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminListPenetrationAdminInstancesEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "challengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/penetration/instances/{instanceId}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetPenetrationAdminInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminDestroyPenetrationAdminInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/penetration/instances/{instanceId}/reset": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminResetPenetrationAdminInstanceEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{id}/scoreboard/rebuild": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminRebuildScoreboardEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminRebuildScoreboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/competitions/{id}/collaborators/{userId}": {
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminRemoveCollaboratorEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/users/{id}/reset-password": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminResetUserPasswordEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ResetUserPasswordRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminResetUserPasswordRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/challenges/{id}/reveal-secret": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminRevealChallengeSecretEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminRevealChallengeSecretResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/users/{id}/role": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdateUserRoleEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateUserRoleRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminUpdateUserRoleRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "GetApiHealth",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "NoCTFAPIEndpointsTeamsMyTeamDto": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamDto"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionTitle": {
+                "type": "string"
+              },
+              "competitionStatus": {
+                "type": "string"
+              },
+              "gameModeType": {
+                "type": "string"
+              },
+              "startTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "endTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "maxTeamMembers": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "memberCount": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "isCaptain": {
+                "type": "boolean"
+              },
+              "registeredAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "approvedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFAPIEndpointsTeamsTeamDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "captainId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "inviteToken": {
+            "type": "string"
+          },
+          "isLocked": {
+            "type": "boolean"
+          },
+          "isBanned": {
+            "type": "boolean"
+          },
+          "trackName": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationStatus": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsCreateTeamRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsJoinTeamRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTeamsJoinTeamByTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsLeaveTeamRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTeamsTransferCaptainRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "newCaptainUserId": {
+            "type": "string",
+            "format": "guid"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsRemoveTeamMemberRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTeamsUpdateTeamResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsUpdateTeamRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenSnapshotDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "game": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdpScreenGameDto"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdpScreenStatsDto"
+          },
+          "scoreboard": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdpScreenTeamScoreDto"
+            }
+          },
+          "challenges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdpScreenChallengeStatusDto"
+            }
+          },
+          "teamChallengeStates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdpScreenTeamChallengeStateDto"
+            }
+          },
+          "recentEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdpScreenEventDto"
+            }
+          },
+          "roundTimeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsAwdpScreenRoundStatDto"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenGameDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "currentRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalRounds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "roundStartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "roundEndsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenStatsDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "challengeCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalAttackCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalDefenseCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attackSuccessCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attackFailCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defenseSuccessCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defenseFailCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeTeamCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeChallengeCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalScoreDelta": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenTeamScoreDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "previousRank": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "totalScore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attackScore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defenseScore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentRoundScore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastActiveAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "trend": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenChallengeStatusDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeName": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "attackHeat": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defensePassedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defenseFailedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instanceCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeTeamCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastEventAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenTeamChallengeStateDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeName": {
+            "type": "string"
+          },
+          "instanceStatus": {
+            "type": "string"
+          },
+          "breakStatus": {
+            "type": "string"
+          },
+          "fixStatus": {
+            "type": "string"
+          },
+          "serviceStatus": {
+            "type": "string"
+          },
+          "attackAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defenseAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentRoundScore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastActivityAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenEventDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "round": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "challengeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "challengeCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "scoreDelta": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "level": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenRoundStatDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "round": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attackSuccessCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defenseSuccessCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attackFailCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defenseFailCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scoreDelta": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeTeamCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdpScreenRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsChallengeInstanceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "containerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "ports": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessHost": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cooldownUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsChallengeInstanceRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsMyCompetitionTeamDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "captainId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "isCaptain": {
+            "type": "boolean"
+          },
+          "inviteToken": {
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isLocked": {
+            "type": "boolean"
+          },
+          "isBanned": {
+            "type": "boolean"
+          },
+          "bannedReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackName": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationStatus": {
+            "type": "string"
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsCreateCompetitionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsCreateCompetitionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "gameModeType": {
+            "$ref": "#/components/schemas/NoCTFPluginBaseGameModeType"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFPluginBaseGameModeType": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Ctf",
+          "Awd",
+          "Awdp",
+          "Koh"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsAwdDashboardDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "currentRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roundDurationSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsServiceStatusDto"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsServiceStatusDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetAwdDashboardRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsChallengeDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionFormat": {
+            "type": "string"
+          },
+          "typeId": {
+            "type": "string"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "solveCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalStageCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "totalScore": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "fullSolveCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "attachmentUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "patchTemplateUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "deploymentType": {
+            "type": "string"
+          },
+          "exposedPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "hints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetChallengesRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsCompetitionDetailDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gameModeType": {
+            "type": "string"
+          },
+          "teamRegistrationAutoApprove": {
+            "type": "boolean"
+          },
+          "maxTeamMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tracksEnabled": {
+            "type": "boolean"
+          },
+          "trackNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetCompetitionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsCompetitionListItemDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "gameModeType": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "registeredTeamCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsKohDashboardDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challenges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsKohChallengeStatusDto"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsKohChallengeStatusDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeName": {
+            "type": "string"
+          },
+          "currentControllerTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "currentControllerTeamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "controlDurationSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsKohControlHistoryDto"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsKohControlHistoryDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetKohDashboardRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsGetLeaderboardResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardEntryDto"
+            }
+          },
+          "fromCache": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardEntryDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "trackName": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "solvedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstSolveAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetLeaderboardRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardTrendResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardTeamSeriesDto"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardTeamSeriesDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardTrendPointDto"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardTrendPointDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetLeaderboardTrendRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardTeamDetailDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "trackName": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "solvedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "directionScores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDirectionScoreDto"
+            }
+          },
+          "challengeScores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardChallengeScoreDto"
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardMemberHistoryDto"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardDirectionScoreDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "solvedCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardChallengeScoreDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeTitle": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "currentPoints": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baseScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bonusScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bloodRank": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "solvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardMemberHistoryDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "solves": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardMemberSolveDto"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardMemberSolveDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeTitle": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetLeaderboardTeamDetailRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsPatchSubmissionDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFCoreAwdpPatchStatus"
+          },
+          "fixStatus": {
+            "$ref": "#/components/schemas/NoCTFCoreAwdpFixStatus"
+          },
+          "attemptNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fixEntry": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "validationDetail": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFCoreAwdpPatchStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Applied",
+          "Verified",
+          "Rejected"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFCoreAwdpFixStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "FixNotStarted",
+          "FixUploading",
+          "FixAuditing",
+          "FixRunning",
+          "FixChecking",
+          "FixSuccess",
+          "FixFailed",
+          "FixServiceError",
+          "FixScriptError",
+          "FixTimeout",
+          "AuditFailed",
+          "DefenseAttemptsExhausted",
+          "FixRuleViolation"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsGetPatchSubmissionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsGetPatchSubmissionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsGetSubmissionsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "solvedChallenges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSolvedChallengeDto"
+            }
+          },
+          "solvedFlags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsSolvedFlagDto"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSolvedChallengeDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "solvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isFullySolved": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSolvedFlagDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "flagId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "stage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "solvedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetSubmissionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsPenetrationChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsPenetrationFlagSubmitResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "correct": {
+            "type": "boolean"
+          },
+          "alreadySolved": {
+            "type": "boolean"
+          },
+          "result": {
+            "type": "string"
+          },
+          "data": {
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsPenetrationFlagSubmitRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsPenetrationChallengeRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsSubmitFlagResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "correct": {
+            "type": "boolean"
+          },
+          "alreadySolved": {
+            "type": "boolean"
+          },
+          "result": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSubmitFlagRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flag": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSubmitPatchResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "defenseAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxDefenseAttempts": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsSubmitPatchRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsCompetitionCapabilitiesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "modeKey": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "views": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scoringProfile": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetCompetitionCapabilitiesRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsCompetitionActionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string"
+          },
+          "data": {
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionModesCompetitionViewResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "viewKey": {
+            "type": "string"
+          },
+          "data": {}
+        }
+      },
+      "NoCTFApplicationScoringScoreboardRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "totalScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "tieBreakers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetCompetitionScoreboardRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAuthLoginResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthRegisterResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthRegisterRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminAddCollaboratorRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminChallengeAttachmentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attachmentUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "FastEndpointsEmptyRequest": {
+        "type": "object",
+        "description": "a request dto that doesn't have any properties",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminChallengePatchTemplateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "patchTemplateUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminCompetitionChallengeAdminDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionFormat": {
+            "type": "string"
+          },
+          "typeId": {
+            "type": "string"
+          },
+          "containerImage": {
+            "type": "string",
+            "nullable": true
+          },
+          "containerMode": {
+            "$ref": "#/components/schemas/NoCTFCoreChallengeContainerMode"
+          },
+          "composeYaml": {
+            "type": "string",
+            "nullable": true
+          },
+          "composeProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "attachmentUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "patchTemplateUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "deploymentType": {
+            "$ref": "#/components/schemas/NoCTFCoreChallengeDeploymentType"
+          },
+          "exposedPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagPrefix": {
+            "type": "string"
+          },
+          "flagEnvironmentVariable": {
+            "type": "string"
+          },
+          "checkerConfig": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCheckerConfigDto"
+              }
+            ]
+          },
+          "penetrationConfigJson": {
+            "type": "string"
+          },
+          "pointsConfig": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminPointsConfigDto"
+          },
+          "difficultyCoefficient": {
+            "type": "number",
+            "format": "double"
+          },
+          "enableBloodBonus": {
+            "type": "boolean"
+          },
+          "awdpAttackScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpDefenseScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxAttackAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxDefenseAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpFixEntry": {
+            "type": "string",
+            "nullable": true
+          },
+          "awdpFixTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "hints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminChallengeHintDto"
+            }
+          }
+        }
+      },
+      "NoCTFCoreChallengeContainerMode": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "SingleImage",
+          "DockerCompose"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFCoreChallengeDeploymentType": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "NoAttachment",
+          "StaticAttachment",
+          "DynamicContainer",
+          "StaticContainer"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFAPIEndpointsAdminCheckerConfigDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "command": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "expImage": {
+            "type": "string",
+            "nullable": true
+          },
+          "expCommand": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminPointsConfigDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "initialPoints": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minimumPoints": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "decayFactor": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "decayFunction": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminChallengeHintDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "content": {
+            "type": "string"
+          },
+          "displayOrder": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminBindCompetitionChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionFormat": {
+            "type": "string"
+          },
+          "flagPrefix": {
+            "type": "string",
+            "nullable": true
+          },
+          "pointsConfig": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminPointsConfigDto"
+              }
+            ]
+          },
+          "difficultyCoefficient": {
+            "type": "number",
+            "format": "double"
+          },
+          "enableBloodBonus": {
+            "type": "boolean"
+          },
+          "awdpAttackScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpDefenseScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxAttackAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxDefenseAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpFixEntry": {
+            "type": "string",
+            "nullable": true
+          },
+          "awdpFixTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "hints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminUpdateCompetitionChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionFormat": {
+            "type": "string"
+          },
+          "flagPrefix": {
+            "type": "string",
+            "nullable": true
+          },
+          "pointsConfig": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminPointsConfigDto"
+              }
+            ]
+          },
+          "difficultyCoefficient": {
+            "type": "number",
+            "format": "double"
+          },
+          "enableBloodBonus": {
+            "type": "boolean"
+          },
+          "awdpAttackScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpDefenseScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxAttackAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxDefenseAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpFixEntry": {
+            "type": "string",
+            "nullable": true
+          },
+          "awdpFixTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "hints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminCompetitionLogDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "level": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "challengeTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadataJson": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminCheatIncidentDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "suspectTeamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "suspectTeamName": {
+            "type": "string"
+          },
+          "victimTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "victimTeamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeTitle": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "submittedFlag": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminTeamAdminDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "captainName": {
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "competitionTitle": {
+            "type": "string"
+          },
+          "inviteToken": {
+            "type": "string"
+          },
+          "isLocked": {
+            "type": "boolean"
+          },
+          "isBanned": {
+            "type": "boolean"
+          },
+          "bannedReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackName": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationStatus": {
+            "type": "string"
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminTeamBanRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminCompetitionTeamLockRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "isLocked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminChallengeTemplateAdminDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "typeId": {
+            "type": "string"
+          },
+          "containerImage": {
+            "type": "string",
+            "nullable": true
+          },
+          "containerMode": {
+            "$ref": "#/components/schemas/NoCTFCoreChallengeContainerMode"
+          },
+          "composeYaml": {
+            "type": "string",
+            "nullable": true
+          },
+          "composeProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "attachmentUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "patchTemplateUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "deploymentType": {
+            "$ref": "#/components/schemas/NoCTFCoreChallengeDeploymentType"
+          },
+          "exposedPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagEnvironmentVariable": {
+            "type": "string"
+          },
+          "checkerConfig": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCheckerConfigDto"
+              }
+            ]
+          },
+          "penetrationConfigJson": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminCreateChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "typeId": {
+            "type": "string"
+          },
+          "containerImage": {
+            "type": "string",
+            "nullable": true
+          },
+          "containerMode": {
+            "$ref": "#/components/schemas/NoCTFCoreChallengeContainerMode"
+          },
+          "composeYaml": {
+            "type": "string",
+            "nullable": true
+          },
+          "composeProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "flagSecret": {
+            "type": "string",
+            "nullable": true
+          },
+          "flagEnvironmentVariable": {
+            "type": "string",
+            "nullable": true
+          },
+          "attachmentUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "patchTemplateUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "deploymentType": {
+            "$ref": "#/components/schemas/NoCTFCoreChallengeDeploymentType"
+          },
+          "exposedPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "checkerConfig": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCheckerConfigDto"
+              }
+            ]
+          },
+          "penetrationConfigJson": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminCompetitionSummaryDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "gameModeType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "defaultPointsConfig": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminPointsConfigDto"
+          },
+          "difficultyCoefficient": {
+            "type": "number",
+            "format": "double"
+          },
+          "firstBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "secondBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "thirdBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "teamRegistrationAutoApprove": {
+            "type": "boolean"
+          },
+          "maxTeamMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tracksEnabled": {
+            "type": "boolean"
+          },
+          "trackNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "roundDurationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "totalRounds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagFormat": {
+            "type": "string",
+            "nullable": true
+          },
+          "flagPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "attackPoints": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceOnlinePoints": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceDownPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "beenAttackedPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagValidityRounds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpAttackScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpDefenseScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxAttackAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxDefenseAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpAllowAttackAfterBreakSuccess": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpAllowDefenseAfterFixSuccess": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpServicePenaltyEnabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpServicePenaltyPerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpViolationPenaltyEnabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpViolationPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpFixEntry": {
+            "type": "string",
+            "nullable": true
+          },
+          "awdpFixTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminCreateCompetitionAdminRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "gameModeType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "defaultPointsConfig": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminPointsConfigDto"
+              }
+            ]
+          },
+          "difficultyCoefficient": {
+            "type": "number",
+            "format": "double"
+          },
+          "firstBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "secondBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "thirdBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "teamRegistrationAutoApprove": {
+            "type": "boolean"
+          },
+          "maxTeamMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tracksEnabled": {
+            "type": "boolean"
+          },
+          "trackNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "roundDurationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "totalRounds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagFormat": {
+            "type": "string",
+            "nullable": true
+          },
+          "flagPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "attackPoints": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceOnlinePoints": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceDownPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "beenAttackedPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagValidityRounds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpAttackScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpDefenseScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxAttackAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxDefenseAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpAllowAttackAfterBreakSuccess": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpAllowDefenseAfterFixSuccess": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpServicePenaltyEnabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpServicePenaltyPerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpViolationPenaltyEnabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpViolationPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpFixEntry": {
+            "type": "string",
+            "nullable": true
+          },
+          "awdpFixTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminDeleteChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminDestroyContainerRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPISignalRLogEntryDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "level": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminGetAuditLogsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminAuditLogDto"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminAuditLogDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true
+          },
+          "endpointPath": {
+            "type": "string"
+          },
+          "httpMethod": {
+            "type": "string"
+          },
+          "newValues": {
+            "type": "string",
+            "nullable": true
+          },
+          "oldValues": {
+            "type": "string",
+            "nullable": true
+          },
+          "diff": {
+            "type": "string",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "exception": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminGetAuditLogsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminCollaboratorDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminContainerDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "containerId": {
+            "type": "string"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminPluginDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminTeamMembersDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminUserDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminPenetrationTemplateTopologyRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminPenetrationCompetitionTopologyRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminPenetrationAdminInstanceListRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminPenetrationAdminInstanceRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminRebuildScoreboardResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminRebuildScoreboardRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminResetUserPasswordRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "newPassword": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminRevealChallengeSecretResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "flagSecret": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminRevealChallengeSecretRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdminUpdateChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "typeId": {
+            "type": "string"
+          },
+          "containerImage": {
+            "type": "string",
+            "nullable": true
+          },
+          "containerMode": {
+            "$ref": "#/components/schemas/NoCTFCoreChallengeContainerMode"
+          },
+          "composeYaml": {
+            "type": "string",
+            "nullable": true
+          },
+          "composeProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "flagSecret": {
+            "type": "string",
+            "nullable": true
+          },
+          "flagEnvironmentVariable": {
+            "type": "string",
+            "nullable": true
+          },
+          "attachmentUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "patchTemplateUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "deploymentType": {
+            "$ref": "#/components/schemas/NoCTFCoreChallengeDeploymentType"
+          },
+          "exposedPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "checkerConfig": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminCheckerConfigDto"
+              }
+            ]
+          },
+          "penetrationConfigJson": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminUpdateCompetitionAdminRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "gameModeType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "defaultPointsConfig": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminPointsConfigDto"
+              }
+            ]
+          },
+          "difficultyCoefficient": {
+            "type": "number",
+            "format": "double"
+          },
+          "firstBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "secondBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "thirdBloodBonusPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "teamRegistrationAutoApprove": {
+            "type": "boolean"
+          },
+          "maxTeamMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tracksEnabled": {
+            "type": "boolean"
+          },
+          "trackNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "roundDurationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "totalRounds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagFormat": {
+            "type": "string",
+            "nullable": true
+          },
+          "flagPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "attackPoints": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceOnlinePoints": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceDownPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "beenAttackedPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagValidityRounds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpAttackScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpDefenseScorePerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxAttackAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpMaxDefenseAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpAllowAttackAfterBreakSuccess": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpAllowDefenseAfterFixSuccess": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpServicePenaltyEnabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpServicePenaltyPerRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpViolationPenaltyEnabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "awdpViolationPenalty": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdpFixEntry": {
+            "type": "string",
+            "nullable": true
+          },
+          "awdpFixTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdminUpdateUserRoleRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "JWTBearerAuth": {
+        "type": "http",
+        "description": "Enter a JWT token to authorize the requests...",
+        "scheme": "Bearer",
+        "bearerFormat": "JWT"
+      },
+      "Bearer": {
+        "type": "http",
+        "description": "Enter JWT Bearer token",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

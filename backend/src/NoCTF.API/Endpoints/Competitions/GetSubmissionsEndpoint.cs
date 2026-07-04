@@ -14,6 +14,16 @@ public class SolvedChallengeDto
 {
     public Guid ChallengeId { get; set; }
     public DateTime SolvedAt { get; set; }
+    public bool IsFullySolved { get; set; } = true;
+}
+
+public class SolvedFlagDto
+{
+    public Guid ChallengeId { get; set; }
+    public Guid FlagId { get; set; }
+    public int Stage { get; set; }
+    public int Score { get; set; }
+    public DateTime SolvedAt { get; set; }
 }
 
 public class GetSubmissionsResponse
@@ -21,6 +31,7 @@ public class GetSubmissionsResponse
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
     public List<SolvedChallengeDto> SolvedChallenges { get; set; } = [];
+    public List<SolvedFlagDto> SolvedFlags { get; set; } = [];
 }
 
 /// <summary>
@@ -64,24 +75,81 @@ public class GetSubmissionsEndpoint(ApplicationDbContext dbContext) : Endpoint<G
             return;
         }
 
-        var solvedChallenges = await dbContext.Submissions
+        var correctSubmissions = await dbContext.Submissions
             .IgnoreQueryFilters()
             .Where(s => s.CompetitionId == req.Id
                      && s.TeamId == teamMember.Id
                      && s.IsCorrect)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var solvedFlags = await dbContext.PenetrationFlags
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(f => f.CompetitionId == req.Id)
+            .Join(
+                dbContext.Submissions.IgnoreQueryFilters().AsNoTracking().Where(s =>
+                    s.CompetitionId == req.Id &&
+                    s.TeamId == teamMember.Id &&
+                    s.IsCorrect &&
+                    s.PenetrationFlagId != null),
+                f => f.Id,
+                s => s.PenetrationFlagId!.Value,
+                (f, s) => new SolvedFlagDto
+                {
+                    ChallengeId = f.ChallengeId,
+                    FlagId = f.Id,
+                    Stage = f.Stage,
+                    Score = f.Score,
+                    SolvedAt = s.SubmittedAt
+                })
+            .ToListAsync(ct);
+
+        var penetrationChallengeIds = await dbContext.Challenges
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.CompetitionId == req.Id && c.TypeId.ToLower() == "penetration")
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+        var visibleFlagCounts = await dbContext.PenetrationFlags
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(f => f.CompetitionId == req.Id && f.Visible)
+            .GroupBy(f => f.ChallengeId)
+            .Select(g => new { ChallengeId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ChallengeId, x => x.Count, ct);
+
+        var solvedChallenges = correctSubmissions
+            .Where(s => !s.PenetrationFlagId.HasValue)
             .GroupBy(s => s.ChallengeId)
             .Select(g => new SolvedChallengeDto
             {
                 ChallengeId = g.Key,
                 SolvedAt = g.Min(s => s.SubmittedAt)
             })
-            .ToListAsync(ct);
+            .ToList();
+
+        foreach (var challengeId in penetrationChallengeIds)
+        {
+            var solvedForChallenge = solvedFlags.Where(f => f.ChallengeId == challengeId).ToList();
+            var requiredCount = visibleFlagCounts.GetValueOrDefault(challengeId);
+            if (requiredCount > 0 && solvedForChallenge.Count >= requiredCount)
+            {
+                solvedChallenges.Add(new SolvedChallengeDto
+                {
+                    ChallengeId = challengeId,
+                    SolvedAt = solvedForChallenge.Max(f => f.SolvedAt),
+                    IsFullySolved = true
+                });
+            }
+        }
 
         await SendAsync(new GetSubmissionsResponse
         {
             CompetitionId = req.Id,
             TeamId = teamMember.Id,
-            SolvedChallenges = solvedChallenges
+            SolvedChallenges = solvedChallenges,
+            SolvedFlags = solvedFlags
         }, cancellation: ct);
     }
 }

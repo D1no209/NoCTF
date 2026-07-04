@@ -1,5 +1,7 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -75,7 +77,7 @@ public class GetCompetitionChallengesAdminEndpoint(ApplicationDbContext db)
     }
 }
 
-public class BindCompetitionChallengeEndpoint(ApplicationDbContext db)
+public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChallengeAdminFeatureRegistry adminFeatureRegistry)
     : Endpoint<BindCompetitionChallengeRequest, CompetitionChallengeAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -104,6 +106,18 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db)
         {
             await SendStringAsync("challenge_template_not_found", 404, cancellation: ct);
             return;
+        }
+
+        var isPenetration = string.Equals(template.TypeId, "Penetration", StringComparison.OrdinalIgnoreCase);
+        IChallengeAdminFeatureProvider? penetrationProvider = null;
+        if (isPenetration)
+        {
+            penetrationProvider = adminFeatureRegistry.FindProvider(template.TypeId);
+            if (penetrationProvider is null)
+            {
+                await SendStringAsync("challenge_type_plugin_unavailable", 503, cancellation: ct);
+                return;
+            }
         }
 
         var points = req.PointsConfig ?? new PointsConfigDto
@@ -155,13 +169,33 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db)
                     ExpCommand = template.CheckerConfig.ExpCommand,
                 }
                 : null,
+            PenetrationConfigJson = string.IsNullOrWhiteSpace(template.PenetrationConfigJson)
+                ? "{}"
+                : template.PenetrationConfigJson,
             CreatedAt = DateTime.UtcNow,
         };
 
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         db.Challenges.Add(challenge);
         var hints = BuildHints(competitionId, challenge.Id, req.Hints);
         db.ChallengeHints.AddRange(hints);
         await db.SaveChangesAsync(ct);
+
+        if (isPenetration && penetrationProvider is not null)
+        {
+            var payload = JsonSerializer.Serialize(new { templateId = template.Id, challengeId = challenge.Id }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await penetrationProvider.HandleAsync(new ChallengeFeatureContext(
+                CompetitionId: competitionId,
+                ChallengeId: challenge.Id,
+                TeamId: null,
+                UserId: Guid.Empty,
+                TypeId: template.TypeId,
+                FeatureKey: "penetration.template.clone-to-challenge",
+                PayloadJson: payload,
+                IpAddress: "system"), ct);
+        }
+
+        await transaction.CommitAsync(ct);
 
         await SendAsync(ChallengeAdminMapping.ToCompetitionDto(challenge, hints), 201, ct);
     }

@@ -21,6 +21,7 @@ public class ChallengeTemplateAdminDto
     public int? ExposedPort { get; set; }
     public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
     public CheckerConfigDto? CheckerConfig { get; set; }
+    public string PenetrationConfigJson { get; set; } = "{}";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
@@ -45,6 +46,7 @@ public class CompetitionChallengeAdminDto
     public string FlagPrefix { get; set; } = "flag";
     public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
     public CheckerConfigDto? CheckerConfig { get; set; }
+    public string PenetrationConfigJson { get; set; } = "{}";
     public PointsConfigDto PointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
     public bool EnableBloodBonus { get; set; }
@@ -108,6 +110,9 @@ public static class ChallengeAdminMapping
             ExpImage = challenge.CheckerConfig.ExpImage,
             ExpCommand = challenge.CheckerConfig.ExpCommand,
         },
+        PenetrationConfigJson = string.IsNullOrWhiteSpace(challenge.PenetrationConfigJson)
+            ? "{}"
+            : challenge.PenetrationConfigJson,
         CreatedAt = challenge.CreatedAt,
         UpdatedAt = challenge.UpdatedAt,
     };
@@ -141,6 +146,9 @@ public static class ChallengeAdminMapping
             ExpImage = challenge.CheckerConfig.ExpImage,
             ExpCommand = challenge.CheckerConfig.ExpCommand,
         },
+        PenetrationConfigJson = string.IsNullOrWhiteSpace(challenge.PenetrationConfigJson)
+            ? "{}"
+            : challenge.PenetrationConfigJson,
         PointsConfig = new PointsConfigDto
         {
             InitialPoints = challenge.PointsConfig.InitialPoints,

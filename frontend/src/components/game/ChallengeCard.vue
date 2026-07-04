@@ -8,6 +8,10 @@ interface Challenge {
   title: string
   points: number
   solveCount: number
+  typeId?: string
+  totalStageCount?: number | null
+  solvedStageCount?: number | null
+  totalScore?: number | null
 }
 
 const props = defineProps<{
@@ -18,6 +22,12 @@ const props = defineProps<{
 const { t } = useI18n()
 
 const pointsLabel = computed(() => `${props.challenge.points} ${t('nav.score')}`)
+const isPenetration = computed(() => props.challenge.typeId?.toLowerCase() === 'penetration')
+const stageLabel = computed(() => {
+  const solved = props.challenge.solvedStageCount ?? 0
+  const total = props.challenge.totalStageCount ?? 0
+  return total > 0 ? `${solved}/${total}` : ''
+})
 </script>
 
 <template>
@@ -38,7 +48,8 @@ const pointsLabel = computed(() => `${props.challenge.points} ${t('nav.score')}`
     </CardHeader>
     <CardContent class="flex items-center justify-between text-xs text-muted-foreground pt-0">
       <span class="font-medium text-foreground">{{ pointsLabel }}</span>
-      <span>{{ t('challenges.solves', { count: challenge.solveCount }) }}</span>
+      <span v-if="isPenetration && stageLabel">{{ stageLabel }} {{ t('penetration.stages') }}</span>
+      <span v-else>{{ t('challenges.solves', { count: challenge.solveCount }) }}</span>
     </CardContent>
   </Card>
 </template>

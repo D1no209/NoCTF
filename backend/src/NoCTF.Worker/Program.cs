@@ -5,6 +5,7 @@ using NoCTF.Application.Security;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 using NoCTF.Plugins.AWDP;
+using NoCTF.Plugins.Penetration;
 using NoCTF.Runner.Client;
 using NoCTF.Worker;
 
@@ -30,6 +31,7 @@ builder.Services.AddScoped<AwdpConfigResolver>();
 builder.Services.AddScoped<AwdpStateService>();
 builder.Services.AddScoped<IAwdpPatchService, AwdpPatchService>();
 builder.Services.AddScoped<ICompetitionJobHandler, AwdpPatchValidationJobHandler>();
+new PenetrationModule().ConfigureServices(builder.Services);
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<ExpiredInstanceCleanupService>();
 
