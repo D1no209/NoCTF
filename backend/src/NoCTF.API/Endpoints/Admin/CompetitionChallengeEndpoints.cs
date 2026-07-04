@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using NoCTF.API.Permissions;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -45,7 +46,7 @@ public class UpdateCompetitionChallengeRequest
     public List<string> Hints { get; set; } = [];
 }
 
-public class GetCompetitionChallengesAdminEndpoint(ApplicationDbContext db)
+public class GetCompetitionChallengesAdminEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest<List<CompetitionChallengeAdminDto>>
 {
     public override void Configure()
@@ -57,6 +58,12 @@ public class GetCompetitionChallengesAdminEndpoint(ApplicationDbContext db)
     public override async Task HandleAsync(CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var challenges = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -77,7 +84,7 @@ public class GetCompetitionChallengesAdminEndpoint(ApplicationDbContext db)
     }
 }
 
-public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChallengeAdminFeatureRegistry adminFeatureRegistry)
+public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChallengeAdminFeatureRegistry adminFeatureRegistry, ICompetitionPermissionService permissions)
     : Endpoint<BindCompetitionChallengeRequest, CompetitionChallengeAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -89,6 +96,12 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChalleng
     public override async Task HandleAsync(BindCompetitionChallengeRequest req, CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var competition = await db.Competitions
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -215,7 +228,7 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChalleng
             .ToList();
 }
 
-public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db)
+public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
     : Endpoint<UpdateCompetitionChallengeRequest, CompetitionChallengeAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -228,6 +241,12 @@ public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db)
     {
         var competitionId = Route<Guid>("competitionId");
         var challengeId = Route<Guid>("challengeId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.Id == challengeId && c.CompetitionId == competitionId, ct);
@@ -282,7 +301,7 @@ public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db)
     }
 }
 
-public class DeleteCompetitionChallengeEndpoint(ApplicationDbContext db)
+public class DeleteCompetitionChallengeEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
     : EndpointWithoutRequest, IAuditableEndpoint
 {
     public override void Configure()
@@ -295,6 +314,12 @@ public class DeleteCompetitionChallengeEndpoint(ApplicationDbContext db)
     {
         var competitionId = Route<Guid>("competitionId");
         var challengeId = Route<Guid>("challengeId");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.Id == challengeId && c.CompetitionId == competitionId, ct);

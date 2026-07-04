@@ -9,7 +9,7 @@ public class GetAdminLogsEndpoint(LogBuffer logBuffer) : Endpoint<EmptyRequest, 
     public override void Configure()
     {
         Get("/api/admin/logs");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
     }
 
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)

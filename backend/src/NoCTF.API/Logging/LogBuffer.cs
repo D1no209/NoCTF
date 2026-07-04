@@ -5,7 +5,7 @@ namespace NoCTF.API.Logging;
 
 /// <summary>
 /// Thread-safe in-memory circular buffer for log entries.
-/// Broadcasts new entries to all MonitorHub connections via SignalR.
+/// Broadcasts new entries only to admin monitor clients via SignalR.
 /// </summary>
 public sealed class LogBuffer
 {
@@ -58,7 +58,7 @@ public sealed class LogBuffer
         if (_hubContext is null) return;
         try
         {
-            await _hubContext.Clients.All.ReceiveLogEntry(entry);
+            await _hubContext.Clients.Group(MonitorHub.AdminLogGroup).ReceiveLogEntry(entry);
         }
         catch
         {

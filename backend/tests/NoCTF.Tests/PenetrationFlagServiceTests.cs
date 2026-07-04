@@ -28,8 +28,9 @@ public class PenetrationFlagServiceTests
         var firstB = await service.RegenerateDynamicFlagsAsync(challenge, instanceB, [flag], CancellationToken.None);
         var secondA = await service.RegenerateDynamicFlagsAsync(challenge, instanceA, [flag], CancellationToken.None);
 
-        Assert.NotEqual(firstA[0].ValueSecret, firstB[0].ValueSecret);
-        Assert.NotEqual(firstA[0].ValueSecret, secondA[0].ValueSecret);
+        Assert.Equal("[REDACTED]", firstA[0].ValueSecret);
+        Assert.NotEqual(firstA[0].PlainValue, firstB[0].PlainValue);
+        Assert.NotEqual(firstA[0].PlainValue, secondA[0].PlainValue);
         Assert.False(await db.DynamicFlagInstances.IgnoreQueryFilters().Where(f => f.Id == firstA[0].Id).Select(f => f.IsActive).SingleAsync());
         Assert.True(await db.DynamicFlagInstances.IgnoreQueryFilters().Where(f => f.Id == secondA[0].Id).Select(f => f.IsActive).SingleAsync());
     }
@@ -54,8 +55,8 @@ public class PenetrationFlagServiceTests
         var dynamicA = (await service.RegenerateDynamicFlagsAsync(challenge, instanceA, [flag], CancellationToken.None))[0];
         var dynamicB = (await service.RegenerateDynamicFlagsAsync(challenge, instanceB, [flag], CancellationToken.None))[0];
 
-        var own = await service.MatchAsync(challenge, instanceA, PenetrationFlagService.FormatFlag(challenge, dynamicA.ValueSecret), CancellationToken.None);
-        var crossTeam = await service.MatchAsync(challenge, instanceA, PenetrationFlagService.FormatFlag(challenge, dynamicB.ValueSecret), CancellationToken.None);
+        var own = await service.MatchAsync(challenge, instanceA, PenetrationFlagService.FormatFlag(challenge, dynamicA.PlainValue!), CancellationToken.None);
+        var crossTeam = await service.MatchAsync(challenge, instanceA, PenetrationFlagService.FormatFlag(challenge, dynamicB.PlainValue!), CancellationToken.None);
 
         Assert.True(own.IsCorrect);
         Assert.False(own.IsCrossTeamDynamicFlag);

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using System.Security.Claims;
 using FastEndpoints;
 using FastEndpoints.Swagger;
@@ -16,6 +17,7 @@ using NoCTF.API.Permissions;
 using NoCTF.API.Plugins;
 using NoCTF.API.SignalR;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.Application;
 using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.Events;
@@ -49,6 +51,11 @@ var jwtSecret = jwtSettings.GetValue<string>("Secret")!;
 if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
 {
     throw new InvalidOperationException("JwtSettings:Secret must be configured and at least 32 characters long.");
+}
+if (!builder.Environment.IsDevelopment() &&
+    jwtSecret.Equals("your-super-secret-key-must-be-at-least-32-characters-long!", StringComparison.Ordinal))
+{
+    throw new InvalidOperationException("JwtSettings:Secret must be replaced before running outside Development.");
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -87,6 +94,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth-login", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 
 // SignalR with Redis backplane
 var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
@@ -178,7 +199,7 @@ using (var scope = app.Services.CreateScope())
         await db.Database.MigrateAsync();
     }
 
-    await DataSeeder.SeedAsync(db, builder.Configuration);
+    await DataSeeder.SeedAsync(db, builder.Configuration, allowDefaultAdminCredentials: app.Environment.IsDevelopment());
 }
 
 // Wire hub context into LogBuffer so it can broadcast log entries via SignalR
@@ -206,6 +227,7 @@ app.UseCors("Frontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.UseFastEndpoints(c =>

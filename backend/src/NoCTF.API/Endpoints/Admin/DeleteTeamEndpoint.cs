@@ -1,10 +1,11 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
 
-public class DeleteTeamEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest>, IAuditableEndpoint
+public class DeleteTeamEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<EmptyRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -19,6 +20,11 @@ public class DeleteTeamEndpoint(ApplicationDbContext dbContext) : Endpoint<Empty
         if (team is null)
         {
             await SendNotFoundAsync(ct);
+            return;
+        }
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, team.CompetitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
             return;
         }
 

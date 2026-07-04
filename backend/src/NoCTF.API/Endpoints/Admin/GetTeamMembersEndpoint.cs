@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -11,7 +12,7 @@ public class TeamMembersDto
     public string Role { get; set; } = string.Empty;
 }
 
-public class GetTeamMembersEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest, List<TeamMembersDto>>
+public class GetTeamMembersEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<EmptyRequest, List<TeamMembersDto>>
 {
     public override void Configure()
     {
@@ -22,6 +23,18 @@ public class GetTeamMembersEndpoint(ApplicationDbContext dbContext) : Endpoint<E
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)
     {
         var id = Route<Guid>("id");
+        var team = await dbContext.Teams.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (team is null)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, team.CompetitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var members = await dbContext.TeamMembers
             .Where(tm => tm.TeamId == id)
             .Select(tm => new TeamMembersDto

@@ -8,6 +8,7 @@ public interface ICompetitionPermissionService
 {
     Task<bool> CanManageCompetitionAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken = default);
     Task<bool> CanViewCompetitionAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken = default);
+    Task<HashSet<Guid>> GetManageableCompetitionIdsAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public class CompetitionPermissionService(ApplicationDbContext dbContext) : ICompetitionPermissionService
@@ -41,5 +42,32 @@ public class CompetitionPermissionService(ApplicationDbContext dbContext) : ICom
             return true;
 
         return await CanManageCompetitionAsync(userId, competitionId, cancellationToken);
+    }
+
+    public async Task<HashSet<Guid>> GetManageableCompetitionIdsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FindAsync(new object[] { userId }, cancellationToken);
+        if (user?.Role == UserRole.Admin)
+        {
+            var allIds = await dbContext.Competitions
+                .IgnoreQueryFilters()
+                .Select(c => c.Id)
+                .ToListAsync(cancellationToken);
+            return allIds.ToHashSet();
+        }
+
+        var ownedIds = await dbContext.Competitions
+            .IgnoreQueryFilters()
+            .Where(c => c.OwnerId == userId)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+
+        var managedIds = await dbContext.CompetitionCollaborators
+            .IgnoreQueryFilters()
+            .Where(c => c.UserId == userId && c.Role == CollaboratorRole.Manager)
+            .Select(c => c.CompetitionId)
+            .ToListAsync(cancellationToken);
+
+        return ownedIds.Concat(managedIds).ToHashSet();
     }
 }

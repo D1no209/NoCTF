@@ -1,4 +1,5 @@
 using FastEndpoints;
+using NoCTF.API.Permissions;
 using NoCTF.Application.Leaderboard;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -16,7 +17,8 @@ public class RebuildScoreboardResponse
 
 public class RebuildScoreboardEndpoint(
     ILeaderboardService leaderboardService,
-    IRedisLeaderboardCache leaderboardCache)
+    IRedisLeaderboardCache leaderboardCache,
+    ICompetitionPermissionService permissions)
     : Endpoint<RebuildScoreboardRequest, RebuildScoreboardResponse>
 {
     public override void Configure()
@@ -27,6 +29,12 @@ public class RebuildScoreboardEndpoint(
 
     public override async Task HandleAsync(RebuildScoreboardRequest req, CancellationToken ct)
     {
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, req.Id, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
+
         var entries = await leaderboardService.CalculateLeaderboardAsync(req.Id, ct);
         await leaderboardCache.UpdateAsync(req.Id, entries, ct);
 

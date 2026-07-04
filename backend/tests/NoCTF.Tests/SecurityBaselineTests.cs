@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NoCTF.API;
 using NoCTF.API.Permissions;
 using NoCTF.Core;
@@ -114,6 +115,63 @@ public class SecurityBaselineTests
         Assert.True(canManage);
     }
 
+    [Fact]
+    public async Task GetManageableCompetitionIds_ReturnsOnlyOwnedAndManagedCompetitions()
+    {
+        var ownerCompetitionId = Guid.NewGuid();
+        var managedCompetitionId = Guid.NewGuid();
+        var unrelatedCompetitionId = Guid.NewGuid();
+        var organizerId = Guid.NewGuid();
+        await using var db = CreateDb();
+        db.Users.Add(new User
+        {
+            Id = organizerId,
+            UserName = "organizer",
+            Email = "organizer@example.test",
+            Role = UserRole.Organizer,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.Competitions.AddRange(
+            Competition(ownerCompetitionId, organizerId),
+            Competition(managedCompetitionId, Guid.NewGuid()),
+            Competition(unrelatedCompetitionId, Guid.NewGuid()));
+        db.CompetitionCollaborators.Add(new CompetitionCollaborator
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = managedCompetitionId,
+            UserId = organizerId,
+            Role = CollaboratorRole.Manager,
+            AddedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var ids = await new CompetitionPermissionService(db).GetManageableCompetitionIdsAsync(organizerId);
+
+        Assert.Contains(ownerCompetitionId, ids);
+        Assert.Contains(managedCompetitionId, ids);
+        Assert.DoesNotContain(unrelatedCompetitionId, ids);
+    }
+
+    [Fact]
+    public async Task DataSeeder_RejectsDefaultAdminPasswordOutsideDevelopmentDefaults()
+    {
+        await using var db = CreateDb();
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SeedAdmin:Email"] = "admin@noctf.local",
+                ["SeedAdmin:UserName"] = "admin",
+                ["SeedAdmin:Password"] = "Admin@123456"
+            })
+            .Build();
+
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
+            DataSeeder.SeedAsync(db, config, allowDefaultAdminCredentials: false));
+
+        Assert.Contains("SeedAdmin:Password", ex.Message);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -121,6 +179,18 @@ public class SecurityBaselineTests
             .Options;
         return new ApplicationDbContext(options, new MutableTenantContext());
     }
+
+    private static Competition Competition(Guid id, Guid ownerId) => new()
+    {
+        Id = id,
+        CompetitionId = id,
+        Title = $"Competition {id:N}",
+        OwnerId = ownerId,
+        GameModeType = GameModeType.Ctf,
+        Status = CompetitionStatus.Draft,
+        StartTime = DateTime.UtcNow,
+        EndTime = DateTime.UtcNow.AddHours(1)
+    };
 
     private sealed class MutableTenantContext : ITenantContext
     {

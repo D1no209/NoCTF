@@ -26,6 +26,7 @@ public class LoginEndpoint(ApplicationDbContext dbContext, JwtTokenService jwtSe
     {
         Post("/api/auth/login");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("auth-login"));
     }
 
     public override async Task HandleAsync(LoginRequest req, CancellationToken ct)

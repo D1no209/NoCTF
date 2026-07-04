@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using NoCTF.Application;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Events;
@@ -93,6 +95,8 @@ public class CtfGameMode : IGameMode
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
+        var redactedSubmittedFlag = RedactSubmittedFlag(context.FlagContent);
+
         // Record submission regardless of correctness
         var submission = new Submission
         {
@@ -101,7 +105,7 @@ public class CtfGameMode : IGameMode
             TeamId = context.TeamId,
             ChallengeId = context.ChallengeId,
             UserId = context.UserId,
-            FlagContent = context.FlagContent,
+            FlagContent = redactedSubmittedFlag,
             IsCorrect = isCorrect,
             SubmittedAt = DateTime.UtcNow,
             IpAddress = context.IpAddress
@@ -136,7 +140,7 @@ public class CtfGameMode : IGameMode
                 VictimTeamId = stolenFlag.TeamId,
                 ChallengeId = context.ChallengeId,
                 UserId = context.UserId,
-                SubmittedFlag = context.FlagContent,
+                SubmittedFlag = redactedSubmittedFlag,
                 Reason = "submitted_other_team_dynamic_flag",
                 CreatedAt = submission.SubmittedAt,
             });
@@ -289,4 +293,9 @@ public class CtfGameMode : IGameMode
     private static bool LooksLikeLegacyFullFlag(string value)
         => value.Contains('{', StringComparison.Ordinal) && value.EndsWith("}", StringComparison.Ordinal);
 
+    private static string RedactSubmittedFlag(string submittedFlag)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(submittedFlag));
+        return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()};len:{submittedFlag.Length}";
+    }
 }

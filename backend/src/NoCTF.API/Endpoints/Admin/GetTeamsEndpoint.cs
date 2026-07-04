@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -22,7 +23,7 @@ public class TeamAdminDto
     public DateTime? ApprovedAt { get; set; }
 }
 
-public class GetTeamsEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest, List<TeamAdminDto>>
+public class GetTeamsEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<EmptyRequest, List<TeamAdminDto>>
 {
     public override void Configure()
     {
@@ -32,8 +33,16 @@ public class GetTeamsEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRe
 
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)
     {
+        if (!AdminCompetitionAuthorization.TryGetUserId(HttpContext, out var userId))
+        {
+            await SendUnauthorizedAsync(ct);
+            return;
+        }
+
+        var manageableCompetitionIds = await permissions.GetManageableCompetitionIdsAsync(userId, ct);
         var teams = await dbContext.Teams
             .IgnoreQueryFilters()
+            .Where(t => manageableCompetitionIds.Contains(t.CompetitionId))
             .Select(t => new TeamAdminDto
             {
                 Id = t.Id,

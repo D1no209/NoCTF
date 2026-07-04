@@ -113,6 +113,8 @@ public class PenetrationInstanceServiceTests
         Assert.True(fakeManager.ComposeDownCalls >= 1);
         Assert.False(await db.DynamicFlagInstances.IgnoreQueryFilters().Where(f => f.ValueSecret == "old").Select(f => f.IsActive).SingleAsync());
         Assert.Equal(1, await db.DynamicFlagInstances.IgnoreQueryFilters().CountAsync(f => f.TeamId == teamId && f.IsActive));
+        Assert.All(await db.DynamicFlagInstances.IgnoreQueryFilters().Where(f => f.TeamId == teamId && f.IsActive).ToListAsync(), f => Assert.Equal("[REDACTED]", f.ValueSecret));
+        Assert.DoesNotContain("flag{", (await db.TeamChallengeInstances.IgnoreQueryFilters().SingleAsync(i => i.Id == instanceId)).RenderedComposeYaml);
     }
 
     private static ApplicationDbContext CreateDb(Guid competitionId)

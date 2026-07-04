@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Permissions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -11,7 +12,7 @@ public class AddCollaboratorRequest
     public string Role { get; set; } = "Observer";
 }
 
-public class AddCollaboratorEndpoint(ApplicationDbContext dbContext) : Endpoint<AddCollaboratorRequest>, IAuditableEndpoint
+public class AddCollaboratorEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<AddCollaboratorRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -22,6 +23,11 @@ public class AddCollaboratorEndpoint(ApplicationDbContext dbContext) : Endpoint<
     public override async Task HandleAsync(AddCollaboratorRequest req, CancellationToken ct)
     {
         var competitionId = Route<Guid>("id");
+        if (!await AdminCompetitionAuthorization.CanManageAsync(HttpContext, permissions, competitionId, ct))
+        {
+            await SendForbiddenAsync(ct);
+            return;
+        }
 
         var exists = await dbContext.CompetitionCollaborators
             .AnyAsync(cc => cc.CompetitionId == competitionId && cc.UserId == req.UserId, ct);

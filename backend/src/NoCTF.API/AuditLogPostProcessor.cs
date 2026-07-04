@@ -123,7 +123,7 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
         var keys = obj.Select(kv => kv.Key).ToList();
         foreach (var key in keys)
         {
-            if (SensitiveKeys.Contains(key))
+            if (SensitiveKeys.Any(sensitive => key.Contains(sensitive, StringComparison.OrdinalIgnoreCase)))
             {
                 obj[key] = JsonValue.Create("[REDACTED]");
             }
