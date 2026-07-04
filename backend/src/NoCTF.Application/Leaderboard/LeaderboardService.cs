@@ -63,7 +63,7 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
             .Where(t =>
                 t.CompetitionId == competitionId &&
                 !t.IsBanned &&
-                t.RegistrationStatus != TeamRegistrationStatus.Rejected)
+                t.RegistrationStatus == TeamRegistrationStatus.Approved)
             .Select(t => new { t.Id, t.Name, t.TrackName })
             .ToListAsync(ct);
 

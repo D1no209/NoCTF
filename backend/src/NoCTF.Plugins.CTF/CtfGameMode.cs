@@ -47,14 +47,32 @@ public class CtfGameMode : IGameMode
         SubmissionContext context,
         CancellationToken cancellationToken = default)
     {
-        // Load challenge (tenant filter applied by EF global query filter)
         var challenge = await _db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == context.ChallengeId, cancellationToken);
+            .FirstOrDefaultAsync(c =>
+                c.Id == context.ChallengeId &&
+                c.CompetitionId == context.CompetitionId,
+                cancellationToken);
 
         if (challenge is null)
             return SubmissionResult.WrongFlag;
+
+        var competition = await _db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == context.CompetitionId, cancellationToken);
+
+        if (competition is null)
+            return SubmissionResult.WrongFlag;
+
+        var now = DateTime.UtcNow;
+        if (now < competition.StartTime || competition.Status == CompetitionStatus.Draft)
+            return SubmissionResult.CompetitionNotStarted;
+        if (now > competition.EndTime || competition.Status == CompetitionStatus.Finished)
+            return SubmissionResult.CompetitionEnded;
+        if (competition.Status == CompetitionStatus.Paused)
+            return SubmissionResult.CompetitionPaused;
 
         var handler = _challengeSubmissionHandlers.FindHandler(challenge.TypeId);
         if (handler is not null)

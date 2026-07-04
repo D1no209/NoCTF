@@ -20,37 +20,66 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
 
     public async Task<DockerContainerMetadata> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
     {
+        var ownsNetwork = string.IsNullOrWhiteSpace(config.NetworkName);
+        var networkName = ownsNetwork
+            ? $"noctf-{Guid.NewGuid():N}"
+            : config.NetworkName!;
+        if (ownsNetwork)
+        {
+            await _client.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters
+                {
+                    Name = networkName,
+                    Driver = "bridge",
+                    Labels = config.Labels ?? new Dictionary<string, string>()
+                },
+                cancellationToken);
+        }
+
+        var networkedConfig = config with { NetworkName = networkName };
         var createParams = new CreateContainerParameters
         {
-            Image = config.Image,
-            Cmd = string.IsNullOrWhiteSpace(config.Command)
+            Image = networkedConfig.Image,
+            Cmd = string.IsNullOrWhiteSpace(networkedConfig.Command)
                 ? null
-                : config.Entrypoint is { Count: > 0 }
-                    ? [config.Command]
-                    : config.Command.Split(' '),
-            Entrypoint = config.Entrypoint?.ToList(),
-            Env = config.EnvironmentVariables?.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList() ?? [],
-            Labels = config.Labels ?? new Dictionary<string, string>(),
-            ExposedPorts = BuildExposedPorts(config),
+                : networkedConfig.Entrypoint is { Count: > 0 }
+                    ? [networkedConfig.Command]
+                    : networkedConfig.Command.Split(' '),
+            Entrypoint = networkedConfig.Entrypoint?.ToList(),
+            Env = networkedConfig.EnvironmentVariables?.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList() ?? [],
+            Labels = networkedConfig.Labels ?? new Dictionary<string, string>(),
+            User = DockerHostConfigFactory.ResolveUser(networkedConfig),
+            ExposedPorts = BuildExposedPorts(networkedConfig),
             HostConfig = DockerHostConfigFactory.Create(
-                config,
-                config.PortMappings is null || config.PortMappings.Count == 0,
-                BuildPortBindings(config))
+                networkedConfig,
+                networkedConfig.PortMappings is null || networkedConfig.PortMappings.Count == 0,
+                BuildPortBindings(networkedConfig)),
+            NetworkingConfig = BuildNetworkingConfig(networkName, networkedConfig.NetworkAliases)
         };
 
-        await EnsureImageAsync(config.Image, cancellationToken);
+        try
+        {
+            await EnsureImageAsync(networkedConfig.Image, cancellationToken);
 
-        var createResponse = await _client.Containers.CreateContainerAsync(createParams, cancellationToken);
-        await _client.Containers.StartContainerAsync(createResponse.ID, null, cancellationToken);
+            var createResponse = await _client.Containers.CreateContainerAsync(createParams, cancellationToken);
+            await _client.Containers.StartContainerAsync(createResponse.ID, null, cancellationToken);
 
-        var inspect = await _client.Containers.InspectContainerAsync(createResponse.ID, cancellationToken);
+            var inspect = await _client.Containers.InspectContainerAsync(createResponse.ID, cancellationToken);
 
-        return new DockerContainerMetadata(
-            ContainerId: createResponse.ID,
-            Image: config.Image,
-            Status: inspect.State.Status,
-            Ports: ReadPublishedPorts(inspect)
-        );
+            return new DockerContainerMetadata(
+                ContainerId: createResponse.ID,
+                Image: networkedConfig.Image,
+                Status: inspect.State.Status,
+                Ports: ReadPublishedPorts(inspect),
+                NetworkName: ownsNetwork ? networkName : null
+            );
+        }
+        catch
+        {
+            if (ownsNetwork)
+                await RemoveNetworkBestEffortAsync(networkName, cancellationToken);
+            throw;
+        }
     }
 
     private static IDictionary<string, EmptyStruct>? BuildExposedPorts(ContainerConfig config)
@@ -58,6 +87,21 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
         if (config.PortMappings is null || config.PortMappings.Count == 0) return null;
         return config.PortMappings.Keys.ToDictionary(port => $"{port}/tcp", _ => new EmptyStruct());
     }
+
+    private static NetworkingConfig BuildNetworkingConfig(string networkName, IReadOnlyList<string>? aliases)
+        => new()
+        {
+            EndpointsConfig = new Dictionary<string, EndpointSettings>
+            {
+                [networkName] = new()
+                {
+                    Aliases = aliases?
+                        .Where(alias => !string.IsNullOrWhiteSpace(alias))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList()
+                }
+            }
+        };
 
     private static IDictionary<string, IList<PortBinding>> BuildPortBindings(ContainerConfig config)
     {
@@ -121,6 +165,21 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
         catch (DockerContainerNotFoundException)
         {
             // Destroy is idempotent from the platform's point of view; stale DB rows should not block recreation.
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata.NetworkName))
+            await RemoveNetworkBestEffortAsync(metadata.NetworkName, cancellationToken);
+    }
+
+    private async Task RemoveNetworkBestEffortAsync(string networkName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _client.Networks.DeleteNetworkAsync(networkName, cancellationToken);
+        }
+        catch
+        {
+            // Network cleanup should not make container destroy non-idempotent.
         }
     }
 }

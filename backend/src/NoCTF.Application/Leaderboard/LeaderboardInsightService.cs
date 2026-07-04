@@ -149,10 +149,10 @@ public class LeaderboardInsightService(
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(t => t.CompetitionId == competitionId && t.Id == teamId)
-            .Select(t => new { t.Id, t.Name, t.TrackName, t.RegistrationStatus })
+            .Select(t => new { t.Id, t.Name, t.TrackName, t.RegistrationStatus, t.IsBanned })
             .FirstOrDefaultAsync(ct);
 
-        if (team is null || team.RegistrationStatus == TeamRegistrationStatus.Rejected)
+        if (team is null || team.RegistrationStatus != TeamRegistrationStatus.Approved || team.IsBanned)
             return null;
 
         var scoreEvents = await db.ScoreEvents

@@ -211,9 +211,17 @@ internal static class AwdpScreenSnapshotBuilder
         var competition = await db.Competitions
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == competitionId && c.GameModeType == GameModeType.Awdp, ct);
+            .FirstOrDefaultAsync(c =>
+                c.Id == competitionId &&
+                c.GameModeType == GameModeType.Awdp &&
+                (c.Status == CompetitionStatus.Published ||
+                 c.Status == CompetitionStatus.Running ||
+                 c.Status == CompetitionStatus.Finished), ct);
 
         if (competition is null)
+            return null;
+
+        if (competition.Status != CompetitionStatus.Finished && now < competition.StartTime)
             return null;
 
         var teams = await db.Teams

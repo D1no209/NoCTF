@@ -211,6 +211,24 @@ public class LeaderboardServiceTests
     }
 
     [Fact]
+    public async Task BuildTeamDetail_BannedTeam_ReturnsNull()
+    {
+        var competitionId = Guid.NewGuid();
+        var bannedTeam = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+
+        SeedTeam(db, competitionId, bannedTeam, "Banned", isBanned: true);
+        SeedScoreEvent(db, competitionId, bannedTeam, 900);
+        await db.SaveChangesAsync();
+
+        var leaderboard = new LeaderboardService(db);
+        var insight = new LeaderboardInsightService(db, leaderboard);
+        var result = await insight.BuildTeamDetailAsync(competitionId, bannedTeam);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task BuildTeamDetail_ExcludesScoresForDeletedChallenges()
     {
         var competitionId = Guid.NewGuid();

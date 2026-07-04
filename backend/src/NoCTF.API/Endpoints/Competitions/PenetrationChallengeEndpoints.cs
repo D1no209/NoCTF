@@ -255,6 +255,9 @@ public class SubmitPenetrationFlagEndpoint(
             SubmissionResult.InstanceRequired => new PenetrationFlagSubmitResponse { Result = "instance_required" },
             SubmissionResult.InstanceExpired => new PenetrationFlagSubmitResponse { Result = "instance_expired" },
             SubmissionResult.FlagRateLimited => new PenetrationFlagSubmitResponse { Result = "flag_rate_limited" },
+            SubmissionResult.CompetitionNotStarted => new PenetrationFlagSubmitResponse { Result = "competition_not_started" },
+            SubmissionResult.CompetitionEnded => new PenetrationFlagSubmitResponse { Result = "competition_ended" },
+            SubmissionResult.CompetitionPaused => new PenetrationFlagSubmitResponse { Result = "competition_paused" },
             _ => new PenetrationFlagSubmitResponse { Result = "wrong_flag" }
         }, cancellation: ct);
     }

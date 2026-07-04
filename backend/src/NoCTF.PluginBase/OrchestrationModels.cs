@@ -69,10 +69,10 @@ public sealed class KubernetesSecuritySpec
 {
     public bool AllowPrivilegeEscalation { get; set; }
     public bool AutomountServiceAccountToken { get; set; }
-    public bool? RunAsNonRoot { get; set; }
+    public bool? RunAsNonRoot { get; set; } = true;
     public bool? ReadOnlyRootFilesystem { get; set; }
-    public long? RunAsUser { get; set; }
-    public long? RunAsGroup { get; set; }
+    public long? RunAsUser { get; set; } = 1000;
+    public long? RunAsGroup { get; set; } = 1000;
     public List<string> CapabilitiesDrop { get; set; } = ["ALL"];
     public List<string> CapabilitiesAdd { get; set; } = [];
 }

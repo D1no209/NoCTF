@@ -93,7 +93,7 @@ public class AwdCheckerService(
         int roundNumber,
         CancellationToken ct)
     {
-        var targetHost = $"gamebox-{gameBox.TeamId:N}-{gameBox.ChallengeId:N}";
+        var targetHost = BuildGameBoxAlias(gameBox.TeamId, gameBox.ChallengeId);
         const int defaultPort = 80;
 
         var envVars = new Dictionary<string, string>
@@ -112,6 +112,7 @@ public class AwdCheckerService(
             Image: checkerConfig.Image!,
             Command: checkerConfig.Command,
             EnvironmentVariables: envVars,
+            NetworkName: gameBox.OrchestrationNamespace,
             Ttl: timeout
         );
 
@@ -168,4 +169,10 @@ public class AwdCheckerService(
             CheckedAt = DateTime.UtcNow
         };
     }
+
+    private static string BuildGameBoxAlias(Guid teamId, Guid challengeId)
+        => $"gamebox-{ShortId(teamId)}-{ShortId(challengeId)}";
+
+    private static string ShortId(Guid id)
+        => id.ToString("N")[..8];
 }

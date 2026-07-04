@@ -156,6 +156,26 @@ public static class KubernetesManifestFactory
                         },
                         new V1NetworkPolicyEgressRule
                         {
+                            To =
+                            [
+                                new V1NetworkPolicyPeer
+                                {
+                                    NamespaceSelector = new V1LabelSelector
+                                    {
+                                        MatchLabels = new Dictionary<string, string>
+                                        {
+                                            ["kubernetes.io/metadata.name"] = "kube-system"
+                                        }
+                                    },
+                                    PodSelector = new V1LabelSelector
+                                    {
+                                        MatchLabels = new Dictionary<string, string>
+                                        {
+                                            ["k8s-app"] = "kube-dns"
+                                        }
+                                    }
+                                }
+                            ],
                             Ports =
                             [
                                 new V1NetworkPolicyPort { Port = 53, Protocol = "UDP" },
@@ -505,15 +525,15 @@ public static class KubernetesManifestFactory
     private static V1SecurityContext BuildSecurityContext(KubernetesSecuritySpec security)
         => new()
         {
-            AllowPrivilegeEscalation = security.AllowPrivilegeEscalation,
-            RunAsNonRoot = security.RunAsNonRoot,
-            RunAsUser = security.RunAsUser,
-            RunAsGroup = security.RunAsGroup,
+            AllowPrivilegeEscalation = false,
+            RunAsNonRoot = security.RunAsNonRoot != false,
+            RunAsUser = security.RunAsUser is > 0 ? security.RunAsUser : 1000,
+            RunAsGroup = security.RunAsGroup is > 0 ? security.RunAsGroup : 1000,
             ReadOnlyRootFilesystem = security.ReadOnlyRootFilesystem,
             Capabilities = new V1Capabilities
             {
                 Drop = security.CapabilitiesDrop.Count > 0 ? security.CapabilitiesDrop : ["ALL"],
-                Add = security.CapabilitiesAdd.Count > 0 ? security.CapabilitiesAdd : null
+                Add = null
             }
         };
 
@@ -528,10 +548,12 @@ public static class KubernetesManifestFactory
             var name = KubernetesNames.SafeName(volume.Name);
             if (volume.Type.Equals("secret", StringComparison.OrdinalIgnoreCase))
             {
+                ValidateDataVolume(volume);
                 result.Add(new V1Volume { Name = name, Secret = new V1SecretVolumeSource { SecretName = name } });
             }
             else if (volume.Type.Equals("configMap", StringComparison.OrdinalIgnoreCase))
             {
+                ValidateDataVolume(volume);
                 result.Add(new V1Volume { Name = name, ConfigMap = new V1ConfigMapVolumeSource { Name = name } });
             }
             else
@@ -541,6 +563,17 @@ public static class KubernetesManifestFactory
         }
 
         return result;
+    }
+
+    private static void ValidateDataVolume(KubernetesVolumeSpec volume)
+    {
+        var name = KubernetesNames.SafeName(volume.Name);
+        if (name.StartsWith("registry-", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("noctf-", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("default-token", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Kubernetes volume name is reserved: {volume.Name}");
+        if (volume.Data.Count == 0)
+            throw new InvalidOperationException("Kubernetes configMap/secret volumes must declare inline data.");
     }
 
     private static Dictionary<string, string> BuildWorkloadLabels(

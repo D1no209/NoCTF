@@ -6,6 +6,34 @@ namespace NoCTF.Container.Docker;
 
 public static class DockerComposeRunner
 {
+    private static readonly HashSet<string> AllowedRootKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name",
+        "version",
+        "services",
+        "volumes",
+        "networks"
+    };
+
+    private static readonly HashSet<string> AllowedServiceKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image",
+        "command",
+        "entrypoint",
+        "environment",
+        "ports",
+        "labels",
+        "depends_on",
+        "restart",
+        "security_opt",
+        "cap_drop",
+        "read_only",
+        "user",
+        "deploy",
+        "volumes",
+        "healthcheck"
+    };
+
     public static async Task<string> RunAsync(
         string composeYaml,
         string projectName,
@@ -54,6 +82,8 @@ public static class DockerComposeRunner
         if (yaml.Documents.Count == 0 || yaml.Documents[0].RootNode is not YamlMappingNode root)
             throw new InvalidOperationException("Compose YAML must be a mapping document.");
 
+        ValidateRoot(root);
+
         if (TryGetMapping(root, "services") is not { } services || services.Children.Count == 0)
             throw new InvalidOperationException("Compose YAML must define at least one service.");
 
@@ -64,6 +94,18 @@ public static class DockerComposeRunner
 
             ValidateComposeService(service);
         }
+
+        ValidateTopLevelVolumes(TryGetMapping(root, "volumes"));
+        ValidateTopLevelNetworks(TryGetMapping(root, "networks"));
+    }
+
+    private static void ValidateRoot(YamlMappingNode root)
+    {
+        foreach (var key in root.Children.Keys.Select(ScalarValue))
+        {
+            if (!AllowedRootKeys.Contains(key))
+                throw new InvalidOperationException($"Compose YAML contains unsupported top-level directive: {key}");
+        }
     }
 
     private static void ValidateComposeService(YamlMappingNode service)
@@ -71,6 +113,9 @@ public static class DockerComposeRunner
         foreach (var (keyNode, valueNode) in service.Children)
         {
             var key = ScalarValue(keyNode).ToLowerInvariant();
+            if (!AllowedServiceKeys.Contains(key))
+                throw new InvalidOperationException($"Compose YAML contains unsupported service directive: {key}");
+
             switch (key)
             {
                 case "privileged":
@@ -79,6 +124,14 @@ public static class DockerComposeRunner
                 case "devices":
                 case "cap_add":
                 case "extra_hosts":
+                case "build":
+                case "env_file":
+                case "secrets":
+                case "configs":
+                case "networks":
+                case "extends":
+                case "links":
+                case "container_name":
                     throw new InvalidOperationException($"Compose YAML contains forbidden service directive: {key}");
                 case "pid":
                 case "ipc":
@@ -91,7 +144,53 @@ public static class DockerComposeRunner
                 case "volumes":
                     ValidateVolumes(valueNode);
                     break;
+                case "deploy":
+                    ValidateDeploy(valueNode);
+                    break;
+                case "healthcheck":
+                    ValidateHealthcheck(valueNode);
+                    break;
             }
+        }
+    }
+
+    private static void ValidateDeploy(YamlNode node)
+    {
+        if (node is not YamlMappingNode deploy)
+            throw new InvalidOperationException("Compose deploy directive must be a mapping.");
+
+        foreach (var (keyNode, valueNode) in deploy.Children)
+        {
+            var key = ScalarValue(keyNode);
+            if (!key.Equals("resources", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Compose deploy directive is not supported: {key}");
+
+            if (valueNode is not YamlMappingNode resources)
+                throw new InvalidOperationException("Compose deploy.resources directive must be a mapping.");
+
+            foreach (var resourceKey in resources.Children.Keys.Select(ScalarValue))
+            {
+                if (!resourceKey.Equals("limits", StringComparison.OrdinalIgnoreCase) &&
+                    !resourceKey.Equals("reservations", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"Compose deploy.resources directive is not supported: {resourceKey}");
+            }
+        }
+    }
+
+    private static void ValidateHealthcheck(YamlNode node)
+    {
+        if (node is not YamlMappingNode healthcheck)
+            throw new InvalidOperationException("Compose healthcheck directive must be a mapping.");
+
+        foreach (var key in healthcheck.Children.Keys.Select(ScalarValue))
+        {
+            if (!key.Equals("test", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("interval", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("timeout", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("retries", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("start_period", StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals("disable", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Compose healthcheck directive is not supported: {key}");
         }
     }
 
@@ -126,6 +225,73 @@ public static class DockerComposeRunner
                 var volume = ScalarValue(item);
                 if (IsUnsafeVolumeSource(ParseVolumeSource(volume)))
                     throw new InvalidOperationException("Compose YAML host path mounts are not allowed.");
+            }
+        }
+    }
+
+    private static void ValidateTopLevelVolumes(YamlMappingNode? volumes)
+    {
+        if (volumes is null)
+            return;
+
+        foreach (var (_, valueNode) in volumes.Children)
+        {
+            if (valueNode is null or YamlScalarNode)
+                continue;
+
+            if (valueNode is not YamlMappingNode volume)
+                throw new InvalidOperationException("Compose top-level volumes must be mappings.");
+
+            foreach (var (keyNode, childValue) in volume.Children)
+            {
+                var key = ScalarValue(keyNode);
+                if (key.Equals("driver_opts", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("external", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"Compose top-level volume directive is forbidden: {key}");
+
+                if (key.Equals("driver", StringComparison.OrdinalIgnoreCase))
+                {
+                    var driver = ScalarValue(childValue);
+                    if (!string.IsNullOrWhiteSpace(driver) && !driver.Equals("local", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Compose top-level volumes may only use the local driver.");
+                    continue;
+                }
+
+                if (key.Equals("name", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Compose top-level volume names are controlled by NoCTF.");
+
+                if (!key.Equals("labels", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"Compose top-level volume directive is not supported: {key}");
+            }
+        }
+    }
+
+    private static void ValidateTopLevelNetworks(YamlMappingNode? networks)
+    {
+        if (networks is null)
+            return;
+
+        foreach (var (_, valueNode) in networks.Children)
+        {
+            if (valueNode is null or YamlScalarNode)
+                continue;
+
+            if (valueNode is not YamlMappingNode network)
+                throw new InvalidOperationException("Compose top-level networks must be mappings.");
+
+            foreach (var key in network.Children.Keys.Select(ScalarValue))
+            {
+                if (key.Equals("external", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("driver_opts", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("ipam", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"Compose top-level network directive is forbidden: {key}");
+
+                if (key.Equals("name", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Compose top-level network names are controlled by NoCTF.");
+
+                if (!key.Equals("driver", StringComparison.OrdinalIgnoreCase) &&
+                    !key.Equals("labels", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"Compose top-level network directive is not supported: {key}");
             }
         }
     }

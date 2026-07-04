@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Core;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Competitions;
@@ -54,13 +55,38 @@ public class GetSubmissionsEndpoint(ApplicationDbContext dbContext) : Endpoint<G
             return;
         }
 
+        var competition = await dbContext.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Id == req.Id)
+            .Select(c => new { c.Status, c.StartTime })
+            .FirstOrDefaultAsync(ct);
+
+        if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendAsync(new GetSubmissionsResponse
+            {
+                CompetitionId = req.Id,
+                TeamId = Guid.Empty,
+                SolvedChallenges = [],
+                SolvedFlags = []
+            }, cancellation: ct);
+            return;
+        }
+
         // Find the user's team in this competition
         var teamMember = await dbContext.TeamMembers
             .AsNoTracking()
             .Join(dbContext.Teams.IgnoreQueryFilters().Where(t => t.CompetitionId == req.Id),
                   tm => tm.TeamId,
                   t => t.Id,
-                  (tm, t) => new { tm.UserId, t.Id, t.CompetitionId })
+                  (tm, t) => new { tm.UserId, t.Id, t.CompetitionId, t.RegistrationStatus, t.IsBanned })
             .FirstOrDefaultAsync(x => x.UserId == userId, ct);
 
         if (teamMember is null)
@@ -72,6 +98,18 @@ public class GetSubmissionsEndpoint(ApplicationDbContext dbContext) : Endpoint<G
                 TeamId = Guid.Empty,
                 SolvedChallenges = []
             }, cancellation: ct);
+            return;
+        }
+
+        if (teamMember.RegistrationStatus != TeamRegistrationStatus.Approved)
+        {
+            await SendStringAsync("team_not_approved", 403, cancellation: ct);
+            return;
+        }
+
+        if (teamMember.IsBanned)
+        {
+            await SendStringAsync("team_banned", 403, cancellation: ct);
             return;
         }
 

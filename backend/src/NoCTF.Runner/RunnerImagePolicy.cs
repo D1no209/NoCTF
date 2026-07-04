@@ -1,9 +1,25 @@
+using NoCTF.PluginBase;
+using System.Text.Json;
 using YamlDotNet.RepresentationModel;
 
 namespace NoCTF.Runner;
 
 internal static class RunnerImagePolicy
 {
+    public static string? FindDisallowedContainerImage(ContainerConfig config, IReadOnlyCollection<string> allowedRegistries)
+    {
+        if (allowedRegistries.Count == 0)
+            return null;
+
+        foreach (var image in ReadContainerImages(config))
+        {
+            if (!ImageAllowed(image, allowedRegistries))
+                return image;
+        }
+
+        return null;
+    }
+
     public static string? FindDisallowedComposeImage(string composeYaml, IReadOnlyCollection<string> allowedRegistries)
     {
         if (allowedRegistries.Count == 0)
@@ -16,6 +32,22 @@ internal static class RunnerImagePolicy
         }
 
         return null;
+    }
+
+    private static IEnumerable<string> ReadContainerImages(ContainerConfig config)
+    {
+        var images = new List<string>();
+        if (!string.IsNullOrWhiteSpace(config.Image))
+            images.Add(config.Image);
+
+        var spec = OrchestrationSpecSerializer.Read(config.OrchestrationJson);
+        if (!string.IsNullOrWhiteSpace(spec.Image))
+            images.Add(spec.Image);
+
+        if (images.Count == 0)
+            throw new InvalidOperationException("Container image is required.");
+
+        return images.Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
     public static bool ImageAllowed(string image, IReadOnlyCollection<string> allowedRegistries)
@@ -54,6 +86,41 @@ internal static class RunnerImagePolicy
                 throw new InvalidOperationException("Compose service image is required.");
 
             yield return image;
+
+            var orchestrationImage = ReadNoctfOrchestrationImage(GetValue(service, "x-noctf-orchestration"));
+            if (!string.IsNullOrWhiteSpace(orchestrationImage))
+                yield return orchestrationImage;
+        }
+    }
+
+    private static string? ReadNoctfOrchestrationImage(YamlNode? node)
+    {
+        var json = Scalar(node);
+        if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}")
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                throw new InvalidOperationException("x-noctf-orchestration must be a JSON object.");
+
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                if (property.NameEquals("image") ||
+                    property.Name.Equals("image", StringComparison.OrdinalIgnoreCase))
+                {
+                    return property.Value.ValueKind == JsonValueKind.String
+                        ? property.Value.GetString()
+                        : throw new InvalidOperationException("x-noctf-orchestration.image must be a string.");
+                }
+            }
+
+            return null;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("x-noctf-orchestration must be valid JSON.", ex);
         }
     }
 
@@ -106,8 +173,8 @@ internal static class RunnerImagePolicy
 
         private static string StripTag(string repository)
         {
-            var lastSlash = repository.LastIndexOf('/', StringComparison.Ordinal);
-            var lastColon = repository.LastIndexOf(':', StringComparison.Ordinal);
+            var lastSlash = repository.LastIndexOf("/", StringComparison.Ordinal);
+            var lastColon = repository.LastIndexOf(":", StringComparison.Ordinal);
             return lastColon > lastSlash ? repository[..lastColon] : repository;
         }
     }

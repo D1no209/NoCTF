@@ -12,7 +12,8 @@ public record ContainerConfig(
     ContainerResourceLimits? ResourceLimits = null,
     ContainerSecurityPolicy? SecurityPolicy = null,
     IReadOnlyList<string>? Entrypoint = null,
-    string? OrchestrationJson = null
+    string? OrchestrationJson = null,
+    IReadOnlyList<string>? NetworkAliases = null
 );
 
 public record ContainerResourceLimits(
@@ -24,7 +25,7 @@ public record ContainerResourceLimits(
 public record ContainerSecurityPolicy(
     bool NoNewPrivileges = true,
     bool ReadonlyRootfs = false,
-    bool RunAsNonRoot = true,
+    bool RunAsNonRoot = false,
     IReadOnlyList<string>? CapDrop = null,
     IReadOnlyList<string>? CapAdd = null
 );

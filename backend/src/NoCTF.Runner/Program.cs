@@ -69,8 +69,16 @@ app.MapPost("/runner/containers", async (
     if (RequireRunnerAuth(request, runnerApiKey, requireRunnerAuth) is { } authFailure)
         return authFailure;
 
-    if (!RunnerImagePolicy.ImageAllowed(config.Image, allowedRegistries))
-        return Results.BadRequest(new { code = "image_registry_not_allowed" });
+    try
+    {
+        var disallowed = RunnerImagePolicy.FindDisallowedContainerImage(config, allowedRegistries);
+        if (!string.IsNullOrWhiteSpace(disallowed))
+            return Results.BadRequest(new { code = "image_registry_not_allowed", image = disallowed });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { code = "invalid_container_config", message = ex.Message });
+    }
 
     return Results.Ok(await manager.CreateContainerAsync(config, ct));
 });
@@ -97,8 +105,16 @@ app.MapPost("/runner/jobs/one-shot", async (
     if (RequireRunnerAuth(request, runnerApiKey, requireRunnerAuth) is { } authFailure)
         return authFailure;
 
-    if (!RunnerImagePolicy.ImageAllowed(config.Image, allowedRegistries))
-        return Results.BadRequest(new { code = "image_registry_not_allowed" });
+    try
+    {
+        var disallowed = RunnerImagePolicy.FindDisallowedContainerImage(config, allowedRegistries);
+        if (!string.IsNullOrWhiteSpace(disallowed))
+            return Results.BadRequest(new { code = "image_registry_not_allowed", image = disallowed });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { code = "invalid_container_config", message = ex.Message });
+    }
 
     return Results.Ok(await manager.RunContainerAsync(config, ct));
 });

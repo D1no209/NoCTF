@@ -93,6 +93,13 @@ public class SubmitPatchEndpoint(
             return;
         }
 
+        var timingResult = PublicCompetitionGuard.ResolvePlayBlockReason(competition, DateTime.UtcNow);
+        if (timingResult is not null)
+        {
+            await SendAsync(new SubmitPatchResponse { Status = timingResult }, 403, ct);
+            return;
+        }
+
         var modeKey = string.IsNullOrWhiteSpace(competition.ModeKey)
             ? competition.GameModeType.ToString()
             : competition.ModeKey;

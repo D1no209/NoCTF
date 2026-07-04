@@ -71,7 +71,8 @@ public class ExpiredInstanceCleanupService(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to destroy expired container {ContainerId}. The instance record will still be cleared.", containerId);
+                logger.LogWarning(ex, "Failed to destroy expired container {ContainerId}. The instance record will be preserved for retry.", containerId);
+                continue;
             }
 
             box.ContainerInstanceId = null;

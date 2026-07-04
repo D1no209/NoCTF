@@ -326,7 +326,9 @@ public class AwdpPatchServiceTests
             var checkConfig = containerManager.RunConfigs[1];
             Assert.Equal("checker:latest", checkConfig.Image);
             Assert.Equal("exit 0", checkConfig.Command);
-            Assert.Equal($"gamebox-{teamId:N}-{challengeId:N}", checkConfig.EnvironmentVariables?["TARGET_HOST"]);
+            Assert.Equal(
+                $"gamebox-{teamId:N}"[..16] + $"-{challengeId:N}"[..9],
+                checkConfig.EnvironmentVariables?["TARGET_HOST"]);
             Assert.Equal("80", checkConfig.EnvironmentVariables?["TARGET_PORT"]);
             Assert.Equal(teamId.ToString(), checkConfig.EnvironmentVariables?["TEAM_ID"]);
             Assert.Equal("http://storage/fix.tar.gz", checkConfig.EnvironmentVariables?["PATCH_URL"]);

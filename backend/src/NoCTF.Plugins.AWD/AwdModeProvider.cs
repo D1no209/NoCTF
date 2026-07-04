@@ -40,6 +40,9 @@ public class AwdModeProvider(AwdGameMode gameMode) : ICompetitionModeProvider
             SubmissionResult.Accepted => new CompetitionActionResult(true, "accepted", new { correct = true }),
             SubmissionResult.AlreadySolved => new CompetitionActionResult(true, "already_solved", new { correct = true, alreadySolved = true }),
             SubmissionResult.WrongFlag => new CompetitionActionResult(false, "wrong_flag", new { correct = false }),
+            SubmissionResult.CompetitionNotStarted => new CompetitionActionResult(false, "competition_not_started"),
+            SubmissionResult.CompetitionEnded => new CompetitionActionResult(false, "competition_ended"),
+            SubmissionResult.CompetitionPaused => new CompetitionActionResult(false, "competition_paused"),
             _ => new CompetitionActionResult(false, result.ToString().ToLowerInvariant())
         };
     }

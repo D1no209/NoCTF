@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Core;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Competitions;
@@ -48,6 +49,12 @@ public class GetCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<G
             return;
         }
 
+        if (!PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
         await SendAsync(new CompetitionDetailDto
         {
             Id = competition.Id,
@@ -63,4 +70,5 @@ public class GetCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<G
             TrackNames = Admin.GetCompetitionAdminEndpoint.ParseTracks(competition.TrackNamesJson),
         }, cancellation: ct);
     }
+
 }

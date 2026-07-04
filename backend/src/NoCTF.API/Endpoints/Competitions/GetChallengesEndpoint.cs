@@ -43,6 +43,25 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
 
     public override async Task HandleAsync(GetChallengesRequest req, CancellationToken ct)
     {
+        var competition = await dbContext.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Id == req.Id)
+            .Select(c => new { c.Status, c.StartTime })
+            .FirstOrDefaultAsync(ct);
+
+        if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
+        if (DateTime.UtcNow < competition.StartTime && competition.Status != CompetitionStatus.Finished)
+        {
+            await SendAsync([], cancellation: ct);
+            return;
+        }
+
         var challengeRows = await dbContext.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -115,6 +134,7 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
 
         await SendAsync(challenges, cancellation: ct);
     }
+
 }
 
 public static class ChallengeSolveCounts

@@ -14,6 +14,11 @@ public class KubernetesManifestFactoryTests
         Assert.Contains(policies, p => p.Metadata.Name == "default-deny");
         var allow = Assert.Single(policies, p => p.Metadata.Name == "allow-same-instance");
         Assert.Equal(2, allow.Spec.Egress.Count);
+        var dnsRule = Assert.Single(allow.Spec.Egress.Where(rule =>
+            rule.Ports?.Any(port => port.Port.Value == "53") == true));
+        var dnsPeer = Assert.Single(dnsRule.To);
+        Assert.Equal("kube-system", dnsPeer.NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"]);
+        Assert.Equal("kube-dns", dnsPeer.PodSelector.MatchLabels["k8s-app"]);
         Assert.DoesNotContain(policies, p => p.Metadata.Name == "allow-open-egress");
     }
 
@@ -57,7 +62,11 @@ public class KubernetesManifestFactoryTests
 
         var container = Assert.Single(deployment.Spec.Template.Spec.Containers);
         Assert.False(container.SecurityContext.AllowPrivilegeEscalation);
+        Assert.True(container.SecurityContext.RunAsNonRoot);
+        Assert.Equal(1000, container.SecurityContext.RunAsUser);
+        Assert.Equal(1000, container.SecurityContext.RunAsGroup);
         Assert.Contains("ALL", container.SecurityContext.Capabilities.Drop);
+        Assert.Null(container.SecurityContext.Capabilities.Add);
         Assert.False(deployment.Spec.Template.Spec.AutomountServiceAccountToken);
         Assert.Equal(80, Assert.Single(container.Ports).ContainerPort);
     }
@@ -145,6 +154,54 @@ services:
   web:
     image: nginx:alpine
     privileged: true
+""";
+
+        Assert.Throws<InvalidOperationException>(() => KubernetesComposeParser.Parse(yaml, new OrchestrationSpec()));
+    }
+
+    [Fact]
+    public void ComposeParser_RejectsCapabilityAdd()
+    {
+        var yaml = """
+services:
+  web:
+    image: nginx:alpine
+    cap_add:
+      - SYS_ADMIN
+""";
+
+        Assert.Throws<InvalidOperationException>(() => KubernetesComposeParser.Parse(yaml, new OrchestrationSpec()));
+    }
+
+    [Fact]
+    public void ComposeParser_RejectsSecretVolumeWithoutInlineData()
+    {
+        var yaml = """
+services:
+  web:
+    image: nginx:alpine
+    volumes:
+      - type: secret
+        source: app-secret
+        target: /etc/secret
+""";
+
+        Assert.Throws<InvalidOperationException>(() => KubernetesComposeParser.Parse(yaml, new OrchestrationSpec()));
+    }
+
+    [Fact]
+    public void ComposeParser_RejectsReservedSecretVolumeNames()
+    {
+        var yaml = """
+services:
+  web:
+    image: nginx:alpine
+    volumes:
+      - type: secret
+        source: registry-private
+        target: /etc/secret
+        data:
+          password: value
 """;
 
         Assert.Throws<InvalidOperationException>(() => KubernetesComposeParser.Parse(yaml, new OrchestrationSpec()));

@@ -29,6 +29,7 @@ public class PenetrationInstanceService(
         Guid teamId,
         CancellationToken ct)
     {
+        await EnsureCompetitionAllowsPlayerViewAsync(competitionId, ct);
         var challenge = await LoadChallengeAsync(competitionId, challengeId, ct);
         var topology = await db.PenetrationTopologies
             .IgnoreQueryFilters()
@@ -60,6 +61,7 @@ public class PenetrationInstanceService(
         Guid teamId,
         CancellationToken ct)
     {
+        await EnsureCompetitionAllowsPlayerViewAsync(competitionId, ct);
         var challenge = await LoadChallengeAsync(competitionId, challengeId, ct);
         var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, ct);
         return ToDto(instance, PenetrationTopologyService.ReadConfig(challenge));
@@ -167,10 +169,17 @@ public class PenetrationInstanceService(
         }
         catch (Exception ex)
         {
-            await DownBestEffortAsync(instance, ct);
+            try
+            {
+                await DownBestEffortAsync(instance, ct);
+            }
+            catch (Exception cleanupEx)
+            {
+                instance.LastError = $"Start failed: {ex.Message}; cleanup failed: {cleanupEx.Message}";
+            }
             await DeactivateDynamicFlagsAsync(instance, ct);
             instance.Status = PenetrationInstanceStatus.Failed;
-            instance.LastError = ex.Message;
+            instance.LastError ??= ex.Message;
             instance.UpdatedAt = DateTime.UtcNow;
             AddCompetitionLog(
                 db,
@@ -404,8 +413,17 @@ public class PenetrationInstanceService(
         var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(c => c.Id == competitionId, ct)
             ?? throw new InvalidOperationException("competition_not_found");
         var now = DateTime.UtcNow;
-        if (now < competition.StartTime) throw new InvalidOperationException("competition_not_started");
+        if (now < competition.StartTime || competition.Status == CompetitionStatus.Draft) throw new InvalidOperationException("competition_not_started");
         if (now > competition.EndTime || competition.Status == CompetitionStatus.Finished) throw new InvalidOperationException("competition_ended");
+        if (competition.Status == CompetitionStatus.Paused) throw new InvalidOperationException("competition_paused");
+    }
+
+    private async Task EnsureCompetitionAllowsPlayerViewAsync(Guid competitionId, CancellationToken ct)
+    {
+        var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(c => c.Id == competitionId, ct)
+            ?? throw new InvalidOperationException("competition_not_found");
+        var now = DateTime.UtcNow;
+        if (now < competition.StartTime || competition.Status == CompetitionStatus.Draft) throw new InvalidOperationException("competition_not_started");
         if (competition.Status == CompetitionStatus.Paused) throw new InvalidOperationException("competition_paused");
     }
 
@@ -426,9 +444,11 @@ public class PenetrationInstanceService(
                 Status: instance.Status.ToString(),
                 StartedAt: instance.CreatedAt), ct);
         }
-        catch
+        catch (Exception ex)
         {
-            // Cleanup is best-effort here; the caller records the operation outcome.
+            instance.LastError = ex.Message;
+            instance.UpdatedAt = DateTime.UtcNow;
+            throw;
         }
     }
 

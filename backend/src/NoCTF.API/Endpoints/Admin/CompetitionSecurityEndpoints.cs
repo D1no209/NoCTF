@@ -5,6 +5,7 @@ using NoCTF.API.Permissions;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Infrastructure;
+using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -140,7 +141,8 @@ public class BanCompetitionTeamEndpoint(
     ICompetitionPermissionService permissions,
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
-    IHubNotifierService hubNotifier)
+    IHubNotifierService hubNotifier,
+    IContainerManager containerManager)
     : Endpoint<TeamBanRequest, TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -172,6 +174,16 @@ public class BanCompetitionTeamEndpoint(
         team.BannedReason = string.IsNullOrWhiteSpace(req.Reason) ? "cheat_suspected" : req.Reason.Trim();
         if (Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId))
             team.BannedById = userId;
+
+        await ContainerCleanupRuntime.CleanupTeamAsync(
+            db,
+            containerManager,
+            competitionId,
+            team.Id,
+            HttpContext,
+            team.BannedById,
+            "team_banned",
+            ct);
 
         CompetitionLogWriter.Add(
             db,
