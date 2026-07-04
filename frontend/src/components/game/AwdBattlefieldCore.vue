@@ -683,12 +683,10 @@ function serviceHealthLabel(node: ServiceNode) {
   position: relative;
   overflow: hidden;
   border: 1px solid oklch(0.38 0.07 252 / 0.58);
-  border-radius: 1rem;
-  background:
-    radial-gradient(circle at 50% 42%, oklch(0.31 0.08 220 / 0.36), transparent 34%),
-    linear-gradient(135deg, oklch(0.14 0.04 255), oklch(0.19 0.04 244) 46%, oklch(0.12 0.032 260));
+  border-radius: 0.75rem;
+  background: oklch(0.15 0.035 252);
   color: oklch(0.94 0.018 230);
-  box-shadow: 0 28px 90px rgb(7 14 32 / 0.28);
+  box-shadow: 0 18px 54px rgb(7 14 32 / 0.22);
 }
 
 .awd-battlefield-core::before {
@@ -696,10 +694,9 @@ function serviceHealthLabel(node: ServiceNode) {
   inset: 0;
   content: "";
   background:
-    linear-gradient(rgb(120 190 255 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(120 190 255 / 0.035) 1px, transparent 1px);
-  background-size: 32px 32px;
-  mask-image: radial-gradient(circle at center, black 0 56%, transparent 82%);
+    linear-gradient(rgb(148 163 184 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(148 163 184 / 0.035) 1px, transparent 1px);
+  background-size: 36px 36px;
   pointer-events: none;
 }
 
@@ -707,8 +704,7 @@ function serviceHealthLabel(node: ServiceNode) {
   position: absolute;
   inset: 0;
   content: "";
-  background: linear-gradient(180deg, transparent 0%, rgb(140 210 255 / 0.08) 51%, transparent 100%);
-  animation: stage-scan 4.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  display: none;
   pointer-events: none;
 }
 
@@ -732,8 +728,7 @@ function serviceHealthLabel(node: ServiceNode) {
   color: oklch(0.75 0.08 220);
   font-size: 0.67rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .battlefield-heading h2 {
@@ -794,8 +789,7 @@ function serviceHealthLabel(node: ServiceNode) {
   color: oklch(0.74 0.04 230);
   font-size: 0.7rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .rail-title strong {
@@ -899,7 +893,7 @@ function serviceHealthLabel(node: ServiceNode) {
 
 .has-fault .node-dot {
   background: oklch(0.65 0.21 25);
-  box-shadow: 0 0 12px rgb(248 113 113 / 0.62);
+  box-shadow: none;
 }
 
 .node-name {
@@ -932,20 +926,17 @@ function serviceHealthLabel(node: ServiceNode) {
   min-height: 26rem;
   overflow: hidden;
   border: 1px solid rgb(149 196 255 / 0.16);
-  border-radius: 0.85rem;
-  background:
-    radial-gradient(circle at center, rgb(24 110 150 / 0.16), transparent 31%),
-    radial-gradient(circle at 50% 70%, rgb(37 99 235 / 0.08), transparent 42%),
-    rgb(7 15 32 / 0.66);
+  border-radius: 0.65rem;
+  background: rgb(7 15 32 / 0.72);
 }
 
 .stage-grid {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, transparent 49.7%, rgb(125 211 252 / 0.13) 50%, transparent 50.3%),
-    linear-gradient(0deg, transparent 49.7%, rgb(125 211 252 / 0.13) 50%, transparent 50.3%);
-  opacity: 0.55;
+    linear-gradient(90deg, transparent 49.7%, rgb(148 163 184 / 0.08) 50%, transparent 50.3%),
+    linear-gradient(0deg, transparent 49.7%, rgb(148 163 184 / 0.08) 50%, transparent 50.3%);
+  opacity: 0.45;
   pointer-events: none;
 }
 
@@ -963,14 +954,11 @@ function serviceHealthLabel(node: ServiceNode) {
   height: 13rem;
   border: 1px dashed rgb(125 211 252 / 0.18);
   border-radius: 999px;
-  animation: radar-rotate 10s linear infinite;
 }
 
 .idle-pulse-field span:nth-child(2) {
   width: 19rem;
   height: 19rem;
-  animation-duration: 14s;
-  animation-direction: reverse;
 }
 
 .idle-pulse-field span:nth-child(3) {
@@ -978,7 +966,6 @@ function serviceHealthLabel(node: ServiceNode) {
   height: 25rem;
   border-style: solid;
   opacity: 0.32;
-  animation-duration: 18s;
 }
 
 .event-path-layer {
@@ -1044,7 +1031,7 @@ function serviceHealthLabel(node: ServiceNode) {
 .diagnostic-scan {
   width: 62%;
   height: 55%;
-  border: 1px dashed rgb(192 132 252 / 0.72);
+  border: 1px dashed rgb(148 163 184 / 0.58);
   border-radius: 1rem;
 }
 
@@ -1112,15 +1099,13 @@ function serviceHealthLabel(node: ServiceNode) {
 .outer-orbit {
   width: 16.5rem;
   height: 16.5rem;
-  border: 1px dashed rgb(125 211 252 / 0.28);
-  animation: radar-rotate 18s linear infinite;
+  border: 1px dashed rgb(148 163 184 / 0.24);
 }
 
 .inner-orbit {
   width: 12.2rem;
   height: 12.2rem;
-  border: 1px solid rgb(125 211 252 / 0.18);
-  animation: radar-rotate 11s linear infinite reverse;
+  border: 1px solid rgb(148 163 184 / 0.18);
 }
 
 .battle-core {
@@ -1128,20 +1113,15 @@ function serviceHealthLabel(node: ServiceNode) {
   place-items: center;
   width: 10.6rem;
   height: 10.6rem;
-  background:
-    radial-gradient(circle, rgb(12 30 56 / 0.95) 0 55%, rgb(7 18 38 / 0.88) 56%),
-    rgb(8 19 39);
-  box-shadow:
-    inset 0 0 34px rgb(56 189 248 / 0.12),
-    0 0 40px rgb(56 189 248 / 0.12);
+  background: rgb(8 19 39);
+  box-shadow: inset 0 0 0 1px rgb(148 163 184 / 0.08);
 }
 
 .core-ring {
   position: absolute;
   inset: 0.38rem;
-  border: 1px solid rgb(125 211 252 / 0.42);
+  border: 1px solid rgb(125 211 252 / 0.32);
   border-radius: inherit;
-  animation: core-breathe 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
 .core-content {

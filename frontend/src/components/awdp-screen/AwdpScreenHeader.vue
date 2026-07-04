@@ -36,15 +36,15 @@ const timeText = computed(() => {
 </script>
 
 <template>
-  <header class="awdp-panel awdp-header-grid p-3">
+  <header class="awdp-panel awdp-header-grid px-3 py-2.5">
     <div class="flex min-w-0 items-center gap-3">
-      <div class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-cyan-200/25 bg-cyan-200/10 text-cyan-100">
+      <div class="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-600/60 bg-slate-900 text-slate-200">
         <Activity class="size-5" />
       </div>
       <div class="min-w-0">
-        <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase text-cyan-100/70">
+        <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-400">
           <span>AWDP command screen</span>
-          <span class="rounded border border-cyan-200/20 px-2 py-0.5 text-cyan-50">{{ statusLabel }}</span>
+          <span class="rounded border border-slate-500/30 px-2 py-0.5 text-slate-200">{{ statusLabel }}</span>
           <span class="rounded border border-slate-300/15 px-2 py-0.5 text-slate-200">{{ phaseLabel }}</span>
         </div>
         <h1 class="mt-1 truncate text-xl font-semibold text-slate-50">
@@ -55,34 +55,34 @@ const timeText = computed(() => {
 
     <div class="grid grid-cols-4 gap-2">
       <div class="awdp-header-metric">
-        <Clock3 class="size-4 text-cyan-200" />
+        <Clock3 class="size-4 text-slate-300" />
         <span>Round</span>
         <strong>{{ game.currentRound }} / {{ game.totalRounds }}</strong>
       </div>
       <div class="awdp-header-metric">
-        <Users class="size-4 text-cyan-200" />
+        <Users class="size-4 text-slate-300" />
         <span>Teams</span>
         <strong>{{ stats.teamCount }}</strong>
       </div>
       <div class="awdp-header-metric">
-        <Flag class="size-4 text-cyan-200" />
+        <Flag class="size-4 text-slate-300" />
         <span>Challenges</span>
         <strong>{{ stats.challengeCount }}</strong>
       </div>
       <div class="awdp-header-metric">
-        <Swords class="size-4 text-cyan-200" />
+        <Swords class="size-4 text-slate-300" />
         <span>Attack</span>
         <strong>{{ stats.totalAttackCount }}</strong>
       </div>
     </div>
 
     <div class="flex items-center justify-end gap-3">
-      <div class="rounded-lg border border-orange-200/20 bg-orange-200/10 px-3 py-1.5 text-right">
-        <div class="flex items-center justify-end gap-2 text-[11px] font-semibold uppercase text-orange-100/70">
+      <div class="rounded-md border border-slate-500/25 bg-slate-950/45 px-3 py-1.5 text-right">
+        <div class="flex items-center justify-end gap-2 text-[11px] font-semibold text-slate-400">
           <Shield class="size-3.5" />
           Round timer
         </div>
-        <div class="font-mono text-2xl font-semibold tabular-nums text-orange-50">
+        <div class="font-mono text-2xl font-semibold tabular-nums text-slate-50">
           {{ timeText }}
         </div>
       </div>
@@ -100,7 +100,7 @@ const timeText = computed(() => {
 .awdp-header-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(34rem, 0.85fr) auto;
-  gap: 0.75rem;
+  gap: 0.65rem;
   align-items: center;
 }
 
@@ -113,9 +113,9 @@ const timeText = computed(() => {
   align-items: center;
   column-gap: 0.5rem;
   min-height: 3rem;
-  border: 1px solid rgb(148 163 184 / 0.16);
-  border-radius: 0.5rem;
-  background: rgb(15 23 42 / 0.46);
+  border: 1px solid rgb(148 163 184 / 0.14);
+  border-radius: 0.45rem;
+  background: rgb(2 6 23 / 0.32);
   padding: 0.42rem 0.65rem;
 }
 
@@ -128,7 +128,6 @@ const timeText = computed(() => {
   font-size: 0.68rem;
   font-weight: 700;
   color: rgb(203 213 225 / 0.66);
-  text-transform: uppercase;
 }
 
 .awdp-header-metric strong {

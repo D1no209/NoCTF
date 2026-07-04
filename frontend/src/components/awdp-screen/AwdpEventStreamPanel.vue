@@ -45,12 +45,12 @@ function levelIcon(level: AwdpScreenEvent['level']) {
 
 function levelClass(level: AwdpScreenEvent['level']) {
   if (level === 'success')
-    return 'text-emerald-200 bg-emerald-300/10 border-emerald-300/20'
+    return 'text-emerald-200 bg-emerald-400/8 border-emerald-300/18'
   if (level === 'warning')
-    return 'text-amber-200 bg-amber-300/10 border-amber-300/20'
+    return 'text-amber-200 bg-amber-400/8 border-amber-300/18'
   if (level === 'danger')
-    return 'text-rose-200 bg-rose-300/10 border-rose-300/20'
-  return 'text-cyan-200 bg-cyan-300/10 border-cyan-300/20'
+    return 'text-rose-200 bg-rose-400/8 border-rose-300/18'
+  return 'text-slate-200 bg-slate-300/8 border-slate-300/18'
 }
 
 function eventTypeLabel(type: AwdpScreenEvent['type']) {
@@ -80,16 +80,16 @@ function formatTime(value: string) {
   <section class="awdp-panel flex min-h-0 flex-col">
     <div class="flex items-center justify-between border-b border-slate-200/10 px-4 py-3">
       <div>
-        <h2 class="text-sm font-semibold uppercase text-slate-100">
+        <h2 class="text-sm font-semibold text-slate-100">
           Event stream
         </h2>
         <p class="text-xs text-slate-500">
-          Real AWDP events · page {{ pageLabel }}
+          Real AWDP events, page {{ pageLabel }}
         </p>
       </div>
       <div class="flex items-center gap-2 text-slate-500">
-        <RotateCw v-if="pageCount > 1" class="size-3.5 text-cyan-200" />
-        <Bell class="size-5 text-cyan-100" />
+        <RotateCw v-if="pageCount > 1" class="size-3.5 text-slate-300" />
+        <Bell class="size-5 text-slate-300" />
       </div>
     </div>
 
@@ -106,11 +106,11 @@ function formatTime(value: string) {
       <article
         v-for="event in visibleEvents"
         :key="event.id"
-        class="event-row rounded-lg border border-slate-300/10 bg-slate-950/46 p-2.5"
+        class="event-row rounded-md border border-slate-300/10 bg-slate-950/28 p-2.5"
       >
         <div class="mb-1.5 flex items-center justify-between gap-2">
           <span
-            class="inline-flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-bold uppercase"
+            class="inline-flex min-w-0 items-center gap-1.5 rounded border px-2 py-1 text-[10px] font-bold"
             :class="levelClass(event.level)"
           >
             <component :is="levelIcon(event.level)" class="size-3.5 shrink-0" />

@@ -28,23 +28,35 @@ defineProps<{
       </div>
 
       <div class="relative z-10">
-        <div class="mb-12 ml-auto mr-8 flex size-56 items-center justify-center rounded-2xl border border-blue-300/20 bg-white/[0.035] shadow-[0_28px_80px_rgb(2_6_23/0.32)] backdrop-blur">
+        <div class="mb-12 ml-auto mr-8 flex size-56 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04]">
           <div class="flex size-28 items-center justify-center rounded-2xl border border-cyan-300/25 bg-slate-950/60">
             <span class="noctf-logo size-16" />
           </div>
         </div>
-        <div class="grid grid-cols-3 gap-3 rounded-xl border border-white/10 bg-white/[0.045] p-4 text-sm backdrop-blur">
+        <div class="grid grid-cols-3 gap-3 rounded-xl border border-white/10 bg-white/[0.055] p-4 text-sm">
           <div class="border-r border-white/10 pr-4">
-            <div class="font-semibold text-blue-200">{{ $t('auth.featureSecure') }}</div>
-            <div class="mt-1 text-xs text-slate-400">{{ $t('auth.featureSecureDesc') }}</div>
+            <div class="font-semibold text-blue-200">
+              {{ $t('auth.featureSecure') }}
+            </div>
+            <div class="mt-1 text-xs text-slate-400">
+              {{ $t('auth.featureSecureDesc') }}
+            </div>
           </div>
           <div class="border-r border-white/10 px-4">
-            <div class="font-semibold text-blue-200">{{ $t('auth.featureStable') }}</div>
-            <div class="mt-1 text-xs text-slate-400">{{ $t('auth.featureStableDesc') }}</div>
+            <div class="font-semibold text-blue-200">
+              {{ $t('auth.featureStable') }}
+            </div>
+            <div class="mt-1 text-xs text-slate-400">
+              {{ $t('auth.featureStableDesc') }}
+            </div>
           </div>
           <div class="pl-4">
-            <div class="font-semibold text-blue-200">{{ $t('auth.featureFair') }}</div>
-            <div class="mt-1 text-xs text-slate-400">{{ $t('auth.featureFairDesc') }}</div>
+            <div class="font-semibold text-blue-200">
+              {{ $t('auth.featureFair') }}
+            </div>
+            <div class="mt-1 text-xs text-slate-400">
+              {{ $t('auth.featureFairDesc') }}
+            </div>
           </div>
         </div>
       </div>

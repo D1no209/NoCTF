@@ -1105,7 +1105,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                     {{ incident.suspectTeamName }} → {{ incident.victimTeamName || '-' }}
                   </div>
                   <div class="text-xs text-muted-foreground">
-                    {{ incident.challengeTitle }} · {{ incident.userName }} · {{ new Date(incident.createdAt).toLocaleString() }}
+                    {{ incident.challengeTitle }} / {{ incident.userName }} / {{ new Date(incident.createdAt).toLocaleString() }}
                   </div>
                 </div>
                 <Button size="sm" variant="destructive" @click="banTeamMutation.mutate(incident.suspectTeamId)">
@@ -1142,7 +1142,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                 {{ log.message }}
               </p>
               <p v-if="log.teamName || log.challengeTitle" class="mt-1 text-xs text-muted-foreground">
-                {{ log.teamName || '-' }} · {{ log.challengeTitle || '-' }}
+                {{ log.teamName || '-' }} / {{ log.challengeTitle || '-' }}
               </p>
             </div>
             <div v-if="!competitionLogs?.length" class="noctf-state-box min-h-0 p-6 text-sm text-muted-foreground">

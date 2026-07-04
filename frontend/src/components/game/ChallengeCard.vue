@@ -22,7 +22,7 @@ const pointsLabel = computed(() => `${props.challenge.points} ${t('nav.score')}`
 
 <template>
   <Card
-    class="relative h-full cursor-pointer overflow-hidden transition-all hover:border-primary/30 hover:shadow-[0_16px_45px_rgb(79_70_229/0.12)]"
+    class="relative h-full cursor-pointer overflow-hidden transition-all hover:border-primary/30 hover:shadow-[0_12px_34px_rgb(15_23_42/0.08)]"
     :class="solved ? 'border-green-500/50 bg-green-500/5' : ''"
   >
     <div
@@ -32,7 +32,9 @@ const pointsLabel = computed(() => `${props.challenge.points} ${t('nav.score')}`
       {{ t('challenges.attackSolved') }}
     </div>
     <CardHeader class="pb-2">
-      <CardTitle class="text-sm font-semibold leading-snug" :class="solved ? 'pr-24' : ''">{{ challenge.title }}</CardTitle>
+      <CardTitle class="text-sm font-semibold leading-snug" :class="solved ? 'pr-24' : ''">
+        {{ challenge.title }}
+      </CardTitle>
     </CardHeader>
     <CardContent class="flex items-center justify-between text-xs text-muted-foreground pt-0">
       <span class="font-medium text-foreground">{{ pointsLabel }}</span>

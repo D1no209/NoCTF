@@ -84,7 +84,7 @@ const {
   display: grid;
   place-items: center;
   padding: min(1.1vw, 0.9rem);
-  background: #03080d;
+  background: #050b12;
   color: rgb(226 232 240);
 }
 
@@ -93,12 +93,10 @@ const {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 20% 18%, rgb(14 116 144 / 0.22), transparent 28rem),
-    radial-gradient(circle at 80% 8%, rgb(217 119 6 / 0.14), transparent 26rem),
-    linear-gradient(rgb(148 163 184 / 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(148 163 184 / 0.045) 1px, transparent 1px),
-    linear-gradient(180deg, #061018 0%, #02060b 56%, #020409 100%);
-  background-size: auto, auto, 44px 44px, 44px 44px, auto;
+    linear-gradient(rgb(148 163 184 / 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(148 163 184 / 0.028) 1px, transparent 1px),
+    #050b12;
+  background-size: 48px 48px, 48px 48px, auto;
 }
 
 .awdp-screen-frame,
@@ -113,7 +111,7 @@ const {
   width: min(calc(100vw - 1.8rem), calc((100dvh - 1.8rem) * 16 / 9));
   aspect-ratio: 16 / 9;
   grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 0.2fr);
-  padding: clamp(0.55rem, 0.75vw, 0.9rem);
+  padding: clamp(0.5rem, 0.7vw, 0.85rem);
 }
 
 .awdp-screen-layout {
@@ -137,21 +135,17 @@ const {
 }
 
 .awdp-panel {
-  border: 1px solid rgb(148 163 184 / 0.16);
-  border-radius: 0.65rem;
-  background:
-    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(2 6 23 / 0.84)),
-    rgb(2 6 23 / 0.88);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.04),
-    0 18px 55px rgb(0 0 0 / 0.22);
+  border: 1px solid rgb(148 163 184 / 0.14);
+  border-radius: 0.5rem;
+  background: rgb(8 15 25 / 0.94);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
 }
 
 .awdp-skeleton {
   border-radius: 0.65rem;
   border: 1px solid rgb(148 163 184 / 0.12);
   background:
-    linear-gradient(90deg, rgb(15 23 42 / 0.78), rgb(30 41 59 / 0.68), rgb(15 23 42 / 0.78));
+    linear-gradient(90deg, rgb(15 23 42 / 0.82), rgb(30 41 59 / 0.62), rgb(15 23 42 / 0.82));
   background-size: 220% 100%;
   animation: awdp-skeleton 1600ms ease-in-out infinite;
 }

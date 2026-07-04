@@ -1,36 +1,36 @@
 <script setup lang="ts">
+import {
+  Activity,
+  BadgeCheck,
+  ClipboardList,
+  Container,
+  FileText,
+  Handshake,
+  Home,
+  LogOut,
+  Plug,
+  Puzzle,
+  Trophy,
+  User,
+  Users,
+} from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
-  SidebarInset,
 } from '@/components/ui/sidebar'
-import {
-  BadgeCheck,
-  Activity,
-  ClipboardList,
-  Container,
-  FileText,
-  Handshake,
-  Plug,
-  Puzzle,
-  Trophy,
-  User,
-  Users,
-  LogOut,
-  Home,
-} from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -79,8 +79,8 @@ async function handleLogout() {
       <SidebarContent class="py-5">
         <SidebarMenu>
           <SidebarMenuItem v-for="item in navItems" :key="item.to">
-            <SidebarMenuButton 
-              as-child 
+            <SidebarMenuButton
+              as-child
               :tooltip="item.label"
               :is-active="route.path === item.to"
             >
@@ -101,13 +101,17 @@ async function handleLogout() {
                 {{ auth.user?.userName?.charAt(0)?.toUpperCase() ?? 'A' }}
               </div>
               <div class="min-w-0">
-                <div class="truncate text-sm font-semibold text-white">{{ auth.user?.userName ?? 'Admin' }}</div>
-                <div class="text-xs text-slate-400">{{ auth.userRole }}</div>
+                <div class="truncate text-sm font-semibold text-white">
+                  {{ auth.user?.userName ?? 'Admin' }}
+                </div>
+                <div class="text-xs text-slate-400">
+                  {{ auth.userRole }}
+                </div>
               </div>
             </div>
           </div>
         </div>
-        
+
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton as-child :tooltip="t('nav.backToApp')">
@@ -118,7 +122,7 @@ async function handleLogout() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton @click="handleLogout" :tooltip="t('auth.logout')">
+            <SidebarMenuButton :tooltip="t('auth.logout')" @click="handleLogout">
               <LogOut class="size-4" />
               <span>{{ t('auth.logout') }}</span>
             </SidebarMenuButton>
@@ -128,7 +132,7 @@ async function handleLogout() {
     </Sidebar>
 
     <SidebarInset>
-      <header class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-white/[0.85] px-4 backdrop-blur-xl">
+      <header class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-white/95 px-4">
         <SidebarTrigger class="-ml-1" />
         <div class="h-4 w-px bg-border mx-2" />
         <div class="flex min-w-0 flex-1 items-center gap-3">
@@ -148,7 +152,7 @@ async function handleLogout() {
           <LanguageSwitch />
         </div>
       </header>
-      
+
       <main class="flex-1 p-4 md:p-6 lg:p-8">
         <RouterView v-slot="{ Component }">
           <transition

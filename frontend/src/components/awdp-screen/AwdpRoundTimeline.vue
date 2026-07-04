@@ -18,14 +18,14 @@ const maxEvents = computed(() => Math.max(1, ...visibleRounds.value.map(round =>
   <section class="awdp-panel flex min-h-0 flex-col">
     <div class="flex items-center justify-between border-b border-slate-200/10 px-4 py-2">
       <div>
-        <h2 class="text-sm font-semibold uppercase text-slate-100">
+        <h2 class="text-sm font-semibold text-slate-100">
           Round timeline
         </h2>
         <p class="text-xs text-slate-500">
           Recent attack and defense intensity
         </p>
       </div>
-      <Timer class="size-5 text-cyan-100" />
+      <Timer class="size-5 text-slate-300" />
     </div>
 
     <div v-if="visibleRounds.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-500">
@@ -77,14 +77,14 @@ const maxEvents = computed(() => Math.max(1, ...visibleRounds.value.map(round =>
 .timeline-cell {
   min-width: 0;
   border: 1px solid rgb(148 163 184 / 0.12);
-  border-radius: 0.5rem;
-  background: rgb(15 23 42 / 0.54);
+  border-radius: 0.42rem;
+  background: rgb(2 6 23 / 0.28);
   padding: 0.45rem;
 }
 
 .timeline-cell-current {
-  border-color: rgb(103 232 249 / 0.42);
-  background: rgb(8 47 73 / 0.58);
+  border-color: rgb(203 213 225 / 0.34);
+  background: rgb(15 23 42 / 0.72);
 }
 
 .timeline-bar {

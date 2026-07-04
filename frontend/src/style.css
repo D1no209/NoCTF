@@ -50,18 +50,18 @@
   --card-foreground: oklch(0.18 0.04 260);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.04 260);
-  --primary: oklch(0.56 0.23 262);
+  --primary: oklch(0.48 0.16 248);
   --primary-foreground: oklch(0.985 0.004 255);
   --secondary: oklch(0.95 0.03 258);
   --secondary-foreground: oklch(0.26 0.06 260);
   --muted: oklch(0.955 0.017 252);
   --muted-foreground: oklch(0.49 0.05 260);
-  --accent: oklch(0.93 0.045 258);
-  --accent-foreground: oklch(0.29 0.09 262);
+  --accent: oklch(0.94 0.025 248);
+  --accent-foreground: oklch(0.25 0.055 248);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.9 0.023 252);
   --input: oklch(0.88 0.027 252);
-  --ring: oklch(0.58 0.22 262);
+  --ring: oklch(0.56 0.14 248);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -69,9 +69,9 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.16 0.055 260);
   --sidebar-foreground: oklch(0.95 0.012 255);
-  --sidebar-primary: oklch(0.59 0.23 262);
+  --sidebar-primary: oklch(0.56 0.14 248);
   --sidebar-primary-foreground: oklch(0.985 0.004 255);
-  --sidebar-accent: oklch(0.25 0.08 262);
+  --sidebar-accent: oklch(0.24 0.055 248);
   --sidebar-accent-foreground: oklch(0.985 0.004 255);
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.68 0.17 255);
@@ -124,20 +124,14 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    background:
-      linear-gradient(90deg, rgb(15 23 42 / 0.025) 1px, transparent 1px),
-      linear-gradient(180deg, rgb(15 23 42 / 0.025) 1px, transparent 1px),
-      radial-gradient(circle at 88% 4%, rgb(37 99 235 / 0.075), transparent 28rem),
-      linear-gradient(180deg, #f8fbff 0%, #f3f7fb 52%, #f8fafc 100%);
-    background-size: 48px 48px, 48px 48px, auto, auto;
+    background: #f6f8fb;
   }
 }
 
 @layer components {
   .noctf-logo {
-    @apply relative inline-flex shrink-0 items-center justify-center rounded-xl text-white shadow-lg shadow-blue-600/25;
-    background:
-      linear-gradient(145deg, #42d2ff 0%, #1264ff 45%, #5a3bff 100%);
+    @apply relative inline-flex shrink-0 items-center justify-center rounded-lg text-white shadow-sm;
+    background: #1f5fbf;
   }
 
   .noctf-logo::after {
@@ -151,21 +145,19 @@
   }
 
   .noctf-panel {
-    @apply border border-slate-900/10 bg-white/[0.92] shadow-[0_18px_55px_rgb(15_23_42/0.06)] backdrop-blur-xl;
+    @apply border border-slate-900/10 bg-white shadow-[0_12px_36px_rgb(15_23_42/0.045)];
   }
 
   .noctf-dark-shell {
-    background:
-      linear-gradient(135deg, rgb(59 130 246 / 0.16), transparent 36%),
-      linear-gradient(180deg, #06142a 0%, #020817 100%);
+    background: #07111f;
   }
 
   .noctf-grid-glow {
     background-image:
-      linear-gradient(rgb(59 130 246 / 0.1) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(59 130 246 / 0.1) 1px, transparent 1px);
+      linear-gradient(rgb(148 163 184 / 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(148 163 184 / 0.08) 1px, transparent 1px);
     background-size: 48px 48px;
-    mask-image: radial-gradient(circle at center, black, transparent 72%);
+    mask-image: linear-gradient(180deg, black, transparent 82%);
   }
 
   .noctf-page {
@@ -181,27 +173,27 @@
   }
 
   .noctf-surface {
-    @apply overflow-hidden rounded-xl border border-slate-900/10 bg-card/95 shadow-[0_14px_45px_rgb(15_23_42/0.055)] backdrop-blur-sm;
+    @apply overflow-hidden rounded-xl border border-slate-900/10 bg-card shadow-[0_12px_36px_rgb(15_23_42/0.045)];
   }
 
   .noctf-surface-plain {
-    @apply rounded-xl border border-slate-900/10 bg-card/95;
+    @apply rounded-xl border border-slate-900/10 bg-card;
   }
 
   .noctf-section {
-    @apply rounded-xl border border-slate-900/10 bg-card/95 p-5 shadow-[0_14px_45px_rgb(15_23_42/0.05)];
+    @apply rounded-xl border border-slate-900/10 bg-card p-5 shadow-[0_12px_32px_rgb(15_23_42/0.04)];
   }
 
   .noctf-toolbar {
-    @apply flex flex-col gap-3 rounded-xl border border-slate-900/10 bg-white/80 p-3 shadow-[0_10px_35px_rgb(15_23_42/0.045)] backdrop-blur md:flex-row md:items-center md:justify-between;
+    @apply flex flex-col gap-3 rounded-xl border border-slate-900/10 bg-white p-3 shadow-[0_8px_28px_rgb(15_23_42/0.035)] md:flex-row md:items-center md:justify-between;
   }
 
   .noctf-filter-bar {
-    @apply grid gap-3 rounded-xl border border-slate-900/10 bg-white/[0.78] p-3 shadow-[0_10px_35px_rgb(15_23_42/0.04)] backdrop-blur;
+    @apply grid gap-3 rounded-xl border border-slate-900/10 bg-white p-3 shadow-[0_8px_28px_rgb(15_23_42/0.03)];
   }
 
   .noctf-table-shell {
-    @apply overflow-hidden rounded-xl border border-slate-900/10 bg-card/95 shadow-[0_14px_45px_rgb(15_23_42/0.055)];
+    @apply overflow-hidden rounded-xl border border-slate-900/10 bg-card shadow-[0_12px_36px_rgb(15_23_42/0.045)];
   }
 
   .noctf-table-footer {
@@ -253,7 +245,7 @@
   }
 
   .noctf-live-card {
-    @apply rounded-xl border border-slate-900/10 bg-card/95 shadow-[0_14px_45px_rgb(15_23_42/0.055)];
+    @apply rounded-xl border border-slate-900/10 bg-card shadow-[0_12px_36px_rgb(15_23_42/0.045)];
   }
 
   .noctf-scrollbar::-webkit-scrollbar {
