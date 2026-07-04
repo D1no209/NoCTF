@@ -18,10 +18,13 @@ const router = useRouter()
 const qc = useQueryClient()
 
 const createMutation = useMutation({
-  mutationFn: async ({ payload, attachmentFile }: { payload: Record<string, unknown>; attachmentFile: File | null }) => {
+  mutationFn: async ({ payload, attachmentFile, patchTemplateFile }: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null }) => {
     const saved = await adminApi.createChallenge<ChallengeTemplateDto>(payload)
     if (attachmentFile) {
       await adminApi.uploadChallengeAttachment(saved.id, attachmentFile)
+    }
+    if (patchTemplateFile) {
+      await adminApi.uploadChallengePatchTemplate(saved.id, patchTemplateFile)
     }
   },
   onSuccess: () => {

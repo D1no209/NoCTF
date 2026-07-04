@@ -16,6 +16,7 @@ public class ChallengeTemplateAdminDto
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
     public string? AttachmentUrl { get; set; }
+    public string? PatchTemplateUrl { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
@@ -38,6 +39,7 @@ public class CompetitionChallengeAdminDto
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
     public string? AttachmentUrl { get; set; }
+    public string? PatchTemplateUrl { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public string FlagPrefix { get; set; } = "flag";
@@ -92,6 +94,7 @@ public static class ChallengeAdminMapping
         ComposeYaml = challenge.ComposeYaml,
         ComposeProjectName = challenge.ComposeProjectName,
         AttachmentUrl = challenge.AttachmentUrl,
+        PatchTemplateUrl = challenge.PatchTemplateUrl,
         DeploymentType = challenge.DeploymentType,
         ExposedPort = challenge.ExposedPort,
         FlagEnvironmentVariable = string.IsNullOrWhiteSpace(challenge.FlagEnvironmentVariable)
@@ -123,6 +126,7 @@ public static class ChallengeAdminMapping
         ComposeYaml = challenge.ComposeYaml,
         ComposeProjectName = challenge.ComposeProjectName,
         AttachmentUrl = challenge.AttachmentUrl,
+        PatchTemplateUrl = challenge.PatchTemplateUrl,
         DeploymentType = challenge.DeploymentType,
         ExposedPort = challenge.ExposedPort,
         FlagPrefix = string.IsNullOrWhiteSpace(challenge.FlagPrefix) ? "flag" : challenge.FlagPrefix,

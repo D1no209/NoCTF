@@ -31,6 +31,7 @@ interface ChallengeTemplateDto {
   composeYaml?: string
   composeProjectName?: string
   attachmentUrl?: string
+  patchTemplateUrl?: string
   flagEnvironmentVariable?: string
   deploymentType?: 'NoAttachment' | 'StaticAttachment' | 'DynamicContainer' | 'StaticContainer' | number
   exposedPort?: number | null
@@ -50,18 +51,20 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  submit: [value: { payload: Record<string, unknown>; attachmentFile: File | null }]
+  submit: [value: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null }]
   cancel: []
 }>()
 
 const { t } = useI18n()
 const attachmentFile = ref<File | null>(null)
+const patchTemplateFile = ref<File | null>(null)
 
 const defaultForm = () => ({
   title: '',
   description: '',
   typeId: 'Ctf',
   attachmentUrl: '',
+  patchTemplateUrl: '',
   deploymentType: 'StaticAttachment',
   exposedPort: undefined as number | undefined,
   flagSecret: '',
@@ -115,12 +118,23 @@ const isContainerDeployment = computed(() =>
   containerDeploymentTypes.includes(form.value.deploymentType as typeof containerDeploymentTypes[number]))
 const usesRuntimeContainer = computed(() =>
   selectedChallengeType.value !== 'Ctf' || isContainerDeployment.value)
-const usesExpConfig = computed(() => selectedChallengeType.value === 'Awd' || selectedChallengeType.value === 'Awdp')
+const usesExpConfig = computed(() => selectedChallengeType.value === 'Awd')
+const usesPatchTemplate = computed(() => selectedChallengeType.value === 'Awdp')
+const checkerImageLabel = computed(() => selectedChallengeType.value === 'Awdp'
+  ? t('admin.challenges.awdpCheckImage')
+  : t('admin.challenges.checkerImage'))
+const checkerCommandLabel = computed(() => selectedChallengeType.value === 'Awdp'
+  ? t('admin.challenges.awdpCheckCommand')
+  : t('admin.challenges.checkerCommand'))
+const checkerTimeoutLabel = computed(() => selectedChallengeType.value === 'Awdp'
+  ? t('admin.challenges.awdpCheckTimeout')
+  : t('admin.challenges.checkerTimeout'))
 const isContainerImageMissing = computed(() => usesRuntimeContainer.value && !form.value.containerImage.trim())
 const canSave = computed(() => Boolean(form.value.title.trim()) && !isContainerImageMissing.value)
 
 watch(() => props.template, (template) => {
   attachmentFile.value = null
+  patchTemplateFile.value = null
   if (!template) {
     form.value = defaultForm()
     return
@@ -131,6 +145,7 @@ watch(() => props.template, (template) => {
     description: template.description ?? '',
     typeId: normalizeChallengeType(template.typeId),
     attachmentUrl: template.attachmentUrl ?? '',
+    patchTemplateUrl: template.patchTemplateUrl ?? '',
     deploymentType: deploymentTypeKey(template.deploymentType),
     exposedPort: template.exposedPort ?? undefined,
     flagSecret: '',
@@ -181,6 +196,7 @@ function buildPayload() {
     description: form.value.description.trim() || undefined,
     typeId: normalizeChallengeType(form.value.typeId),
     attachmentUrl: form.value.attachmentUrl.trim() || undefined,
+    patchTemplateUrl: usesPatchTemplate.value ? form.value.patchTemplateUrl.trim() || undefined : undefined,
     deploymentType: deploymentTypeValue(effectiveDeploymentType),
     exposedPort: runtimeEnabled ? optionalPositiveNumber(form.value.exposedPort) : undefined,
     flagSecret: selectedChallengeType.value === 'Ctf' ? form.value.flagSecret.trim() || undefined : undefined,
@@ -203,7 +219,7 @@ function buildPayload() {
 
 function submit() {
   if (!canSave.value || props.saving) return
-  emit('submit', { payload: buildPayload(), attachmentFile: attachmentFile.value })
+  emit('submit', { payload: buildPayload(), attachmentFile: attachmentFile.value, patchTemplateFile: patchTemplateFile.value })
 }
 </script>
 
@@ -238,6 +254,15 @@ function submit() {
         <Label>{{ t('admin.challenges.attachmentUpload') }}</Label>
         <Input type="file" @change="attachmentFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
         <p class="text-xs text-muted-foreground">{{ t('admin.challenges.attachmentEmptyHint') }}</p>
+      </div>
+      <div v-if="usesPatchTemplate" class="grid gap-2">
+        <Label>{{ t('admin.challenges.patchTemplateUrl') }}</Label>
+        <Input v-model="form.patchTemplateUrl" placeholder="/api/files/patch-template.zip" />
+      </div>
+      <div v-if="usesPatchTemplate" class="grid gap-2">
+        <Label>{{ t('admin.challenges.patchTemplateUpload') }}</Label>
+        <Input type="file" accept=".zip,.tar.gz,.tgz" @change="patchTemplateFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
+        <p class="text-xs text-muted-foreground">{{ t('admin.challenges.patchTemplateHint') }}</p>
       </div>
     </div>
 
@@ -311,15 +336,15 @@ function submit() {
       </div>
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="grid gap-2">
-          <Label>{{ t('admin.challenges.checkerImage') }}</Label>
+          <Label>{{ checkerImageLabel }}</Label>
           <Input v-model="form.checkerImage" :placeholder="t('admin.challenges.optional')" />
         </div>
         <div class="grid gap-2">
-          <Label>{{ t('admin.challenges.checkerCommand') }}</Label>
+          <Label>{{ checkerCommandLabel }}</Label>
           <Input v-model="form.checkerCommand" :placeholder="t('admin.challenges.optional')" />
         </div>
         <div class="grid gap-2">
-          <Label>{{ t('admin.challenges.checkerTimeout') }}</Label>
+          <Label>{{ checkerTimeoutLabel }}</Label>
           <Input v-model.number="form.checkerTimeoutSeconds" type="number" min="1" :placeholder="t('admin.challenges.optional')" />
         </div>
         <div v-if="usesExpConfig" class="grid gap-2">

@@ -62,13 +62,13 @@ public class GetPatchSubmissionsEndpoint(ApplicationDbContext db)
                 TeamId = s.TeamId,
                 ChallengeId = s.ChallengeId,
                 Status = s.Status,
-                FixStatus = s.FixStatus,
+                FixStatus = AwdpPlayerDefenseResult.ToVisibleFixStatus(s.FixStatus),
                 AttemptNumber = s.AttemptNumber,
                 FileName = s.FileName,
                 FixEntry = s.FixEntry,
                 SubmittedAt = s.SubmittedAt,
                 ValidatedAt = s.ValidatedAt,
-                ValidationDetail = s.ValidationDetail
+                ValidationDetail = AwdpPlayerDefenseResult.ToVisibleDetail(s.FixStatus)
             })
             .ToListAsync(ct);
 
@@ -125,13 +125,13 @@ public class GetPatchSubmissionEndpoint(ApplicationDbContext db)
                 TeamId = s.TeamId,
                 ChallengeId = s.ChallengeId,
                 Status = s.Status,
-                FixStatus = s.FixStatus,
+                FixStatus = AwdpPlayerDefenseResult.ToVisibleFixStatus(s.FixStatus),
                 AttemptNumber = s.AttemptNumber,
                 FileName = s.FileName,
                 FixEntry = s.FixEntry,
                 SubmittedAt = s.SubmittedAt,
                 ValidatedAt = s.ValidatedAt,
-                ValidationDetail = s.ValidationDetail
+                ValidationDetail = AwdpPlayerDefenseResult.ToVisibleDetail(s.FixStatus)
             })
             .FirstOrDefaultAsync(ct);
 

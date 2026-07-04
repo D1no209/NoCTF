@@ -29,6 +29,7 @@ interface Challenge {
   descriptionFormat?: string | null
   hints?: string[]
   attachmentUrl?: string | null
+  patchTemplateUrl?: string | null
 }
 
 interface SubmitResponse {
@@ -432,6 +433,13 @@ function formatStatus(value?: string | number | null) {
   return key.replace(/([a-z])([A-Z])/g, '$1 $2')
 }
 
+function formatDefenseResult(value?: string | null) {
+  if (!value) return ''
+  const translated = t(`awdp.results.${value}`)
+  if (translated !== `awdp.results.${value}`) return translated
+  return value
+}
+
 function statusBadgeVariant(value?: string | number | null): 'default' | 'secondary' | 'destructive' | 'outline' {
   const key = String(value ?? '').toLowerCase()
   if (key.includes('success') || key.includes('ok') || key.includes('running')) return 'default'
@@ -687,7 +695,7 @@ function getApiErrorDetail(error: unknown) {
 
             <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>{{ t('awdp.fixEntry', { entry: awdpState?.fixEntry ?? 'fix.sh' }) }}</span>
-              <span v-if="awdpState?.lastValidationDetail">· {{ awdpState.lastValidationDetail }}</span>
+              <span v-if="awdpState?.lastValidationDetail">· {{ formatDefenseResult(awdpState.lastValidationDetail) }}</span>
             </div>
           </div>
 
@@ -706,7 +714,7 @@ function getApiErrorDetail(error: unknown) {
                 </div>
                 <p v-if="patch.validationDetail" class="text-xs leading-relaxed text-muted-foreground">
                   <CheckCircle2 class="mr-1 inline size-3" />
-                  {{ patch.validationDetail }}
+                  {{ formatDefenseResult(patch.validationDetail) }}
                 </p>
               </div>
             </div>
@@ -732,6 +740,18 @@ function getApiErrorDetail(error: unknown) {
           >
             <Download class="mr-1 inline size-4" />
             {{ t('challenges.downloadAttachment') }}
+          </a>
+        </div>
+
+        <div v-if="isAwdpMode && challenge?.patchTemplateUrl" class="text-sm">
+          <a
+            :href="challenge.patchTemplateUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-primary underline-offset-4 hover:underline"
+          >
+            <Download class="mr-1 inline size-4" />
+            {{ t('awdp.downloadPatchTemplate') }}
           </a>
         </div>
 

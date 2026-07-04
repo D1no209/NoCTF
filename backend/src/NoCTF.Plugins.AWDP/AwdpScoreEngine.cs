@@ -193,7 +193,8 @@ public class AwdpScoreEngine(
     private static bool IsViolationStatus(AwdpFixStatus status)
         => status is AwdpFixStatus.AuditFailed
             or AwdpFixStatus.FixScriptError
-            or AwdpFixStatus.FixTimeout;
+            or AwdpFixStatus.FixTimeout
+            or AwdpFixStatus.FixRuleViolation;
 
     private static bool IsEffectiveForRound(DateTime? succeededAt, DateTime roundStart)
         => succeededAt is null || succeededAt <= roundStart;

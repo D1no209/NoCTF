@@ -36,9 +36,9 @@ public class AwdpScoreEngineTests
         var roundStart = DateTime.UtcNow;
         var successAt = roundStart.AddSeconds(30);
         await using var db = CreateDb(competitionId);
-        SeedCompetition(db, competitionId, attackScore: 70, defenseScore: 130);
+        SeedCompetition(db, competitionId);
         var teamId = SeedTeam(db, competitionId);
-        var challengeId = SeedChallenge(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId, attackScore: 70, defenseScore: 130);
         SeedRound(db, competitionId, 1, roundStart);
         SeedRound(db, competitionId, 2, roundStart.AddMinutes(5));
         db.AwdpTeamChallengeStates.Add(new AwdpTeamChallengeState
@@ -82,9 +82,9 @@ public class AwdpScoreEngineTests
         var competitionId = Guid.NewGuid();
         var roundStart = DateTime.UtcNow;
         await using var db = CreateDb(competitionId);
-        SeedCompetition(db, competitionId, attackScore: 70, defenseScore: 130);
+        SeedCompetition(db, competitionId);
         var teamId = SeedTeam(db, competitionId);
-        var challengeId = SeedChallenge(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId, attackScore: 70, defenseScore: 130);
         SeedRound(db, competitionId, 1, roundStart);
         db.AwdpTeamChallengeStates.Add(new AwdpTeamChallengeState
         {
@@ -116,13 +116,15 @@ public class AwdpScoreEngineTests
         var competitionId = Guid.NewGuid();
         var roundStart = DateTime.UtcNow;
         await using var db = CreateDb(competitionId);
-        SeedCompetition(db, competitionId, attackScore: 100, defenseScore: 80);
+        SeedCompetition(db, competitionId);
         var firstTeamId = SeedTeam(db, competitionId);
         var secondTeamId = SeedTeam(db, competitionId);
         var challengeId = SeedChallenge(
             db,
             competitionId,
-            new PointsConfig(InitialPoints: 500, MinimumPoints: 10, DecayFactor: 1, DecayFunction: "linear"));
+            attackScore: 100,
+            defenseScore: 80,
+            pointsConfig: new PointsConfig(InitialPoints: 500, MinimumPoints: 10, DecayFactor: 1, DecayFunction: "linear"));
         SeedRound(db, competitionId, 1, roundStart);
 
         foreach (var teamId in new[] { firstTeamId, secondTeamId })
@@ -162,9 +164,7 @@ public class AwdpScoreEngineTests
 
     private static void SeedCompetition(
         ApplicationDbContext db,
-        Guid competitionId,
-        int attackScore,
-        int defenseScore)
+        Guid competitionId)
     {
         db.Competitions.Add(new Competition
         {
@@ -176,9 +176,7 @@ public class AwdpScoreEngineTests
             ModeKey = "awdp",
             StartTime = DateTime.UtcNow.AddMinutes(-1),
             EndTime = DateTime.UtcNow.AddHours(2),
-            Status = CompetitionStatus.Running,
-            AwdpAttackScorePerRound = attackScore,
-            AwdpDefenseScorePerRound = defenseScore
+            Status = CompetitionStatus.Running
         });
     }
 
@@ -200,6 +198,8 @@ public class AwdpScoreEngineTests
     private static Guid SeedChallenge(
         ApplicationDbContext db,
         Guid competitionId,
+        int attackScore = 70,
+        int defenseScore = 130,
         PointsConfig? pointsConfig = null)
     {
         var id = Guid.NewGuid();
@@ -210,6 +210,8 @@ public class AwdpScoreEngineTests
             Title = "Web",
             TypeId = "awdp",
             PointsConfig = pointsConfig ?? new PointsConfig(),
+            AwdpAttackScorePerRound = attackScore,
+            AwdpDefenseScorePerRound = defenseScore,
             CreatedAt = DateTime.UtcNow
         });
         return id;

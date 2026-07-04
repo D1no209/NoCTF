@@ -185,7 +185,7 @@ public class AwdpModeProvider(
                 challengeId = challenge.Id,
                 instanceStatus = instanceStatus.ToString(),
                 breakStatus = breakStatus.ToString(),
-                fixStatus = fixStatus.ToString(),
+                fixStatus = AwdpPlayerDefenseResult.ToVisibleFixStatus(fixStatus).ToString(),
                 serviceStatus = serviceStatus.ToString(),
                 currentRoundAttackScore = attackDelta,
                 currentRoundDefenseScore = defenseDelta,
@@ -202,7 +202,7 @@ public class AwdpModeProvider(
                 allowAttackAfterBreakSuccess = config.AllowAttackAfterBreakSuccess,
                 allowDefenseAfterFixSuccess = config.AllowDefenseAfterFixSuccess,
                 fixEntry = config.FixEntry,
-                lastValidationDetail = state?.LastValidationDetail,
+                lastValidationDetail = AwdpPlayerDefenseResult.ToVisibleDetail(fixStatus),
                 cooldownUntil = box?.LastInstanceActionAt?.Add(TimeSpan.FromSeconds(5))
             });
         }

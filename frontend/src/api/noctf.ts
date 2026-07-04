@@ -288,6 +288,15 @@ export const adminApi = {
       body,
     }), 'Failed to upload attachment')
   },
+  async uploadChallengePatchTemplate<T = unknown>(id: string, file: File) {
+    const body = new FormData()
+    body.append('file', file)
+    return unwrap(await client.post<{ 200: T }, unknown, false>({
+      url: '/api/admin/challenges/{id}/patch-template',
+      path: { id },
+      body,
+    }), 'Failed to upload patch template')
+  },
   async updateChallenge<T = unknown>(id: string, body: unknown) {
     return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/challenges/{id}', path: { id }, body }), 'Failed to update challenge')
   },

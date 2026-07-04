@@ -247,6 +247,11 @@ app.MapHub<LeaderboardHub>("/hubs/leaderboard");
 app.MapHub<GameHub>("/hubs/game");
 app.MapHub<MonitorHub>("/hubs/monitor");
 
+app.MapFallback("/api/{**path}", () => Results.NotFound(new
+{
+    error = "API endpoint not found"
+}));
+
 if (app.Environment.IsDevelopment())
 {
     app.UseWhen(

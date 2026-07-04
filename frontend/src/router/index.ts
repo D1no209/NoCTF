@@ -35,6 +35,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/awdp/screen/:gameId',
+      name: 'awdp-screen',
+      component: () => import('@/views/AwdpScreenView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/competitions/:id/register',
       name: 'competition-register',
       component: () => import('@/views/CompetitionRegistrationView.vue'),
@@ -60,7 +66,7 @@ const router = createRouter({
           name: 'koh-dashboard',
           component: () => import('@/views/KohDashboardView.vue'),
         },
-      ]
+      ],
     },
     {
       path: '/admin',
