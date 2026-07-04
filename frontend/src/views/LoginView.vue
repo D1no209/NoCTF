@@ -12,13 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 import { AlertCircle, Loader2 } from 'lucide-vue-next'
 
@@ -29,10 +23,12 @@ const route = useRoute()
 const loading = ref(false)
 const loginError = ref('')
 
-const formSchema = toTypedSchema(z.object({
-  email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
-  password: z.string().min(8, t('validation.passwordMin')),
-}))
+const formSchema = toTypedSchema(
+  z.object({
+    email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
+    password: z.string().min(8, t('validation.passwordMin')),
+  }),
+)
 
 const form = useForm({
   validationSchema: formSchema,
@@ -44,11 +40,12 @@ const onSubmit = form.handleSubmit(async (values) => {
   try {
     await auth.login(values.email, values.password)
     toast.success(t('auth.loginSuccess'))
-    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
-      ? route.query.redirect
-      : '/'
+    const redirect =
+      typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+        ? route.query.redirect
+        : '/'
     await router.push(redirect)
-  } catch (error: any) {
+  } catch {
     loginError.value = t('errors.loginFailed')
     toast.error(loginError.value)
   } finally {
@@ -75,10 +72,10 @@ const onSubmit = form.handleSubmit(async (values) => {
             <FormItem>
               <FormLabel>{{ t('auth.email') }}</FormLabel>
               <FormControl>
-                <Input 
-                  type="email" 
-                  placeholder="name@example.com" 
-                  v-bind="componentField" 
+                <Input
+                  type="email"
+                  placeholder="name@example.com"
+                  v-bind="componentField"
                   :disabled="loading"
                   autocomplete="email"
                 />
@@ -91,9 +88,9 @@ const onSubmit = form.handleSubmit(async (values) => {
             <FormItem>
               <FormLabel>{{ t('auth.password') }}</FormLabel>
               <FormControl>
-                <Input 
-                  type="password" 
-                  v-bind="componentField" 
+                <Input
+                  type="password"
+                  v-bind="componentField"
                   :disabled="loading"
                   autocomplete="current-password"
                 />

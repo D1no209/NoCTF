@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowRight, Calendar, CheckCircle2, EyeOff, Loader2, Lock, Puzzle, Trophy, UserPlus, Users } from 'lucide-vue-next'
+import { ArrowRight, Calendar, CheckCircle2, EyeOff, Puzzle, Trophy } from 'lucide-vue-next'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
@@ -174,13 +174,15 @@ const { data: submissionsResponse, refetch: refetchSubmissions } = useQuery({
   enabled: computed(() => !!competitionId.value),
 })
 
-const { data: myTeams, isLoading: loadingMyTeams } = useQuery({
+const { data: myTeams } = useQuery({
   queryKey: computed(() => queryKeys.myCompetitionTeams(competitionId.value)),
   queryFn: () => competitionApi.myTeams<MyCompetitionTeam[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
-const solvedIds = computed(() => new Set((submissionsResponse.value?.solvedChallenges ?? []).map(s => s.challengeId)))
+const solvedIds = computed(
+  () => new Set((submissionsResponse.value?.solvedChallenges ?? []).map((s) => s.challengeId)),
+)
 const solvedFlagCounts = computed(() => {
   const counts = new Map<string, number>()
   for (const flag of submissionsResponse.value?.solvedFlags ?? []) {
@@ -221,12 +223,9 @@ function markDefenseRequested(challengeId: string) {
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const s = status.toLowerCase()
-  if (s === 'active' || s === 'running')
-    return 'default'
-  if (s === 'upcoming' || s === 'pending')
-    return 'secondary'
-  if (s === 'ended' || s === 'finished')
-    return 'outline'
+  if (s === 'active' || s === 'running') return 'default'
+  if (s === 'upcoming' || s === 'pending') return 'secondary'
+  if (s === 'ended' || s === 'finished') return 'outline'
   return 'secondary'
 }
 
@@ -243,20 +242,31 @@ const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
 const isAwdMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awd')
 const isAwdpMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awdp')
 const canManageCompetition = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
-const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.registrationStatus === 'approved') ?? null)
+const approvedTeam = computed(
+  () => (myTeams.value ?? []).find((team) => team.registrationStatus === 'approved') ?? null,
+)
 const currentTeam = computed(() => approvedTeam.value ?? myTeams.value?.[0] ?? null)
-const canUseParticipantActions = computed(() => Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
-const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
+const canUseParticipantActions = computed(() =>
+  Boolean(approvedTeam.value && !approvedTeam.value.isBanned),
+)
+const canAccessChallenges = computed(
+  () => canManageCompetition.value || Boolean(approvedTeam.value && !approvedTeam.value.isBanned),
+)
 
 const { data: headerLeaderboard } = useQuery({
   queryKey: computed(() => [...queryKeys.leaderboard(competitionId.value), 'header-score']),
   queryFn: () => competitionApi.leaderboard(competitionId.value) as Promise<LeaderboardResponse>,
   enabled: computed(() => !!competitionId.value && !!approvedTeam.value?.id),
-  refetchInterval: computed(() => approvedTeam.value?.id ? 10_000 : false),
+  refetchInterval: computed(() => (approvedTeam.value?.id ? 10_000 : false)),
 })
 
 watch(
-  () => [competitionId.value, approvedTeam.value?.id, currentTeam.value?.id, headerLeaderboard.value?.entries],
+  () => [
+    competitionId.value,
+    approvedTeam.value?.id,
+    currentTeam.value?.id,
+    headerLeaderboard.value?.entries,
+  ],
   () => {
     if (!competitionId.value) {
       scoreStore.reset()
@@ -274,9 +284,14 @@ watch(
     }
 
     const entries = headerLeaderboard.value?.entries ?? []
-    const currentEntry = entries.find(entry => entry.teamId === approvedTeam.value?.id)
+    const currentEntry = entries.find((entry) => entry.teamId === approvedTeam.value?.id)
     if (!currentEntry) {
-      scoreStore.setCurrentTeamScore(competitionId.value, approvedTeam.value.id, approvedTeam.value.name, 0)
+      scoreStore.setCurrentTeamScore(
+        competitionId.value,
+        approvedTeam.value.id,
+        approvedTeam.value.name,
+        0,
+      )
       return
     }
 
@@ -289,14 +304,18 @@ const { data: patchSubmissions } = useQuery({
   queryKey: computed(() => queryKeys.patchSubmissions(competitionId.value)),
   queryFn: () => competitionApi.patchSubmissions<PatchSubmissionStatus[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value && isAwdpMode.value),
-  refetchInterval: computed(() => isAwdpMode.value ? 10_000 : false),
+  refetchInterval: computed(() => (isAwdpMode.value ? 10_000 : false)),
 })
 
 const { data: awdpStateView } = useQuery({
   queryKey: computed(() => queryKeys.awdpState(competitionId.value)),
-  queryFn: () => competitionApi.view<CompetitionViewResult<AwdpStateData>>(competitionId.value, 'challenge-state'),
+  queryFn: () =>
+    competitionApi.view<CompetitionViewResult<AwdpStateData>>(
+      competitionId.value,
+      'challenge-state',
+    ),
   enabled: computed(() => !!competitionId.value && isAwdpMode.value && !!approvedTeam.value?.id),
-  refetchInterval: computed(() => isAwdpMode.value ? 5_000 : false),
+  refetchInterval: computed(() => (isAwdpMode.value ? 5_000 : false)),
 })
 
 const awdpStateData = computed(() => awdpStateView.value?.data ?? null)
@@ -304,20 +323,21 @@ const awdpStateData = computed(() => awdpStateView.value?.data ?? null)
 const filteredChallenges = computed(() => {
   return (challenges.value ?? []).filter((challenge) => {
     const solved = solvedIds.value.has(challenge.id)
-    const matchesDirection = activeDirection.value === 'ALL' || normalizeDirection(challenge.typeId) === activeDirection.value
+    const matchesDirection =
+      activeDirection.value === 'ALL' ||
+      normalizeDirection(challenge.typeId) === activeDirection.value
     const matchesSolved = !hideSolved.value || !solved
     return matchesDirection && matchesSolved
   })
 })
 
 const directionCounts = computed(() => {
-  const counts = new Map<string, { total: number, unsolved: number }>()
+  const counts = new Map<string, { total: number; unsolved: number }>()
   for (const challenge of challenges.value ?? []) {
     const direction = normalizeDirection(challenge.typeId)
     const current = counts.get(direction) ?? { total: 0, unsolved: 0 }
     current.total += 1
-    if (!solvedIds.value.has(challenge.id))
-      current.unsolved += 1
+    if (!solvedIds.value.has(challenge.id)) current.unsolved += 1
     counts.set(direction, current)
   }
   return counts
@@ -331,22 +351,27 @@ const directionOptions = computed(() => {
     {
       direction: 'ALL',
       total: challenges.value?.length ?? 0,
-      unsolved: (challenges.value ?? []).filter(challenge => !solvedIds.value.has(challenge.id)).length,
+      unsolved: (challenges.value ?? []).filter((challenge) => !solvedIds.value.has(challenge.id))
+        .length,
     },
     ...entries,
   ]
 })
 
 const selectedChallengePatchSubmissions = computed(() => {
-  if (!selectedChallenge.value)
-    return []
-  return (patchSubmissions.value ?? []).filter(item => item.challengeId === selectedChallenge.value?.id)
+  if (!selectedChallenge.value) return []
+  return (patchSubmissions.value ?? []).filter(
+    (item) => item.challengeId === selectedChallenge.value?.id,
+  )
 })
 
 const selectedChallengeAwdpState = computed(() => {
-  if (!selectedChallenge.value)
-    return null
-  return awdpStateData.value?.challenges.find(item => item.challengeId === selectedChallenge.value?.id) ?? null
+  if (!selectedChallenge.value) return null
+  return (
+    awdpStateData.value?.challenges.find(
+      (item) => item.challengeId === selectedChallenge.value?.id,
+    ) ?? null
+  )
 })
 
 function handleInstanceCreated(challengeId: string) {
@@ -375,19 +400,22 @@ function withChallengeProgress(challenge: Challenge): Challenge {
       <Skeleton class="h-10 w-1/3" />
       <Skeleton class="h-6 w-1/2" />
     </div>
-    <div v-else-if="competition" class="noctf-panel flex flex-col justify-between gap-6 rounded-xl p-6 md:flex-row md:items-center">
+    <div
+      v-else-if="competition"
+      class="noctf-panel flex flex-col justify-between gap-6 rounded-xl p-6 md:flex-row md:items-center"
+    >
       <div class="flex items-start gap-5">
         <div class="noctf-logo size-16 rounded-2xl" />
-        <PageHeader
-          :title="competition.title"
-          :description="competition.description"
-        >
+        <PageHeader :title="competition.title" :description="competition.description">
           <template #actions>
             <div class="flex items-center gap-2">
-              <Badge :variant="statusVariant(competition.status)" class="font-semibold">
+              <Badge
+                :variant="statusVariant(competition.status)"
+                class="px-2.5 py-1 text-sm font-semibold"
+              >
                 {{ competition.status }}
               </Badge>
-              <Badge variant="secondary" class="bg-violet-100 text-violet-700">
+              <Badge variant="secondary" class="bg-violet-100 px-2.5 py-1 text-sm text-violet-700">
                 {{ competition.gameModeType }}
               </Badge>
               <Button v-if="isAwdpMode" variant="outline" size="sm" as-child>
@@ -404,79 +432,30 @@ function withChallengeProgress(challenge: Challenge): Challenge {
       <div class="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
         <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
           <Calendar class="size-4 text-primary" />
-          <span>{{ formatDate(competition.startTime) }} ~ {{ formatDate(competition.endTime) }}</span>
+          <span
+            >{{ formatDate(competition.startTime) }} ~ {{ formatDate(competition.endTime) }}</span
+          >
         </div>
         <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
           <CheckCircle2 class="size-4 text-green-500" />
-          <span>{{ solvedIds.size }} / {{ challenges?.length || 0 }} {{ t('challenges.solved') }}</span>
+          <span
+            >{{ solvedIds.size }} / {{ challenges?.length || 0 }} {{ t('challenges.solved') }}</span
+          >
         </div>
       </div>
     </div>
 
-    <div class="noctf-section">
-      <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div v-if="currentTeam?.isBanned" class="noctf-danger-panel">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 class="flex items-center gap-2 font-semibold">
-            <Users class="size-4 text-primary" />
-            {{ t('teams.currentRegistration') }}
-          </h3>
-          <p class="text-sm text-muted-foreground">
-            {{ t('teams.currentRegistrationDescription') }}
+          <div class="font-semibold">{{ t('teams.banned') }}</div>
+          <p class="text-sm">
+            {{ currentTeam.bannedReason || t('teams.bannedDetail') }}
           </p>
         </div>
-        <Badge
-          v-if="currentTeam"
-          :variant="currentTeam.registrationStatus === 'approved' ? 'default' : currentTeam.registrationStatus === 'rejected' ? 'destructive' : 'secondary'"
-        >
-          {{ currentTeam.registrationStatus }}
+        <Badge variant="destructive" class="w-fit">
+          {{ t('teams.banned') }}
         </Badge>
-      </div>
-
-      <div v-if="loadingMyTeams" class="text-sm text-muted-foreground">
-        <Loader2 class="mr-2 inline size-4 animate-spin" />
-        {{ t('common.loading') }}
-      </div>
-      <div v-else-if="currentTeam" class="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-        <div class="space-y-1">
-          <div class="font-medium">
-            {{ currentTeam.name }}
-          </div>
-          <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span>{{ currentTeam.memberCount }} / {{ competition?.maxTeamMembers ?? 5 }} {{ t('common.members') }}</span>
-            <span v-if="currentTeam.trackName">{{ currentTeam.trackName }}</span>
-            <span class="flex items-center gap-1">
-              <Lock class="size-3" />
-              {{ currentTeam.isLocked ? t('teams.locked') : t('teams.unlocked') }}
-            </span>
-            <span v-if="currentTeam.isBanned" class="font-medium text-destructive">{{ t('teams.banned') }}</span>
-            <code>{{ currentTeam.inviteToken }}</code>
-          </div>
-        </div>
-        <div v-if="!canAccessChallenges" class="space-y-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          <div>{{ currentTeam.isBanned ? t('teams.bannedDetail') : t('teams.waitingApproval') }}</div>
-          <Button variant="outline" size="sm" as-child>
-            <RouterLink :to="`/competitions/${competitionId}/register`">
-              {{ t('teams.manageRegistration') }}
-            </RouterLink>
-          </Button>
-        </div>
-        <Button v-else as-child>
-          <RouterLink :to="`/competitions/${competitionId}/register`">
-            {{ t('teams.manageRegistration') }}
-            <ArrowRight class="size-4" />
-          </RouterLink>
-        </Button>
-      </div>
-      <div v-else class="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-        <div class="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          {{ t('teams.notRegisteredDetail') }}
-        </div>
-        <Button as-child>
-          <RouterLink :to="`/competitions/${competitionId}/register`">
-            <UserPlus class="size-4" />
-            {{ t('teams.registerForCompetition') }}
-          </RouterLink>
-        </Button>
       </div>
     </div>
 
@@ -518,17 +497,25 @@ function withChallengeProgress(challenge: Challenge): Challenge {
                 :key="item.direction"
                 type="button"
                 class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-                :class="activeDirection === item.direction ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary' : 'text-foreground'"
+                :class="
+                  activeDirection === item.direction
+                    ? 'bg-primary text-primary-foreground hover:bg-primary'
+                    : 'text-foreground'
+                "
                 @click="activeDirection = item.direction"
               >
                 <span>{{ item.direction === 'ALL' ? t('common.all') : item.direction }}</span>
-                <span class="text-xs tabular-nums opacity-80">{{ hideSolved ? item.unsolved : item.total }}</span>
+                <span class="text-xs tabular-nums opacity-80">{{
+                  hideSolved ? item.unsolved : item.total
+                }}</span>
               </button>
             </div>
             <button
               type="button"
               class="mt-4 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-              :class="hideSolved ? 'border-primary/50 bg-primary/5 text-primary' : 'text-muted-foreground'"
+              :class="
+                hideSolved ? 'border-primary/50 bg-primary/5 text-primary' : 'text-muted-foreground'
+              "
               @click="hideSolved = !hideSolved"
             >
               <span class="flex items-center gap-2">
@@ -565,13 +552,15 @@ function withChallengeProgress(challenge: Challenge): Challenge {
                 <ChallengeCard
                   :challenge="withChallengeProgress(challenge)"
                   :solved="solvedIds.has(challenge.id)"
-                  class="transition-all duration-300 group-hover:shadow-lg group-hover:-translate-y-1 group-hover:border-primary/20"
+                  class="transition-colors duration-200 group-hover:border-primary/20 group-hover:bg-accent/35"
                 />
               </div>
             </div>
 
             <div v-if="!isLoading && filteredChallenges.length === 0" class="noctf-state-box py-20">
-              <div class="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
+              <div
+                class="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4"
+              >
                 <Puzzle class="size-6" />
               </div>
               <h3 class="text-lg font-medium">
@@ -613,8 +602,14 @@ function withChallengeProgress(challenge: Challenge): Challenge {
       :awdp-state="selectedChallengeAwdpState"
       :awdp-current-round="awdpStateData?.currentRound ?? null"
       :can-create-instance="canUseParticipantActions"
-      :can-submit-flag="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canSubmitFlag !== false)"
-      :can-request-defense="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canRequestDefense !== false)"
+      :can-submit-flag="
+        canUseParticipantActions &&
+        (!isAwdpMode || selectedChallengeAwdpState?.canSubmitFlag !== false)
+      "
+      :can-request-defense="
+        canUseParticipantActions &&
+        (!isAwdpMode || selectedChallengeAwdpState?.canRequestDefense !== false)
+      "
       @create-instance="handleInstanceCreated(selectedChallenge.id)"
       @request-defense="markDefenseRequested(selectedChallenge.id)"
       @patch-uploaded="handlePatchUploaded"

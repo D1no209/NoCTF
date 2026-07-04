@@ -2,6 +2,8 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API;
 using NoCTF.API.Permissions;
+using NoCTF.Application;
+using NoCTF.Application.Leaderboard;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -133,7 +135,12 @@ public class GetCompetitionCheatIncidentsEndpoint(ApplicationDbContext db, IComp
     }
 }
 
-public class BanCompetitionTeamEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
+public class BanCompetitionTeamEndpoint(
+    ApplicationDbContext db,
+    ICompetitionPermissionService permissions,
+    ILeaderboardService leaderboardService,
+    IRedisLeaderboardCache leaderboardCache,
+    IHubNotifierService hubNotifier)
     : Endpoint<TeamBanRequest, TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -176,11 +183,32 @@ public class BanCompetitionTeamEndpoint(ApplicationDbContext db, ICompetitionPer
             userId: team.BannedById,
             metadata: new { team.BannedReason });
         await db.SaveChangesAsync(ct);
+        await RefreshLeaderboardAsync(competitionId, ct);
         await SendAsync(await ApproveCompetitionTeamEndpoint.ToDto(team.Id, db, ct), cancellation: ct);
+    }
+
+    private async Task RefreshLeaderboardAsync(Guid competitionId, CancellationToken ct)
+    {
+        var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
+        await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+        await hubNotifier.NotifyLeaderboardSnapshotAsync(
+            competitionId,
+            entries.Select(e => new LeaderboardEntryPayload(
+                e.Rank,
+                e.TeamId,
+                e.TeamName,
+                e.TotalScore,
+                e.SolvedCount)),
+            ct);
     }
 }
 
-public class UnbanCompetitionTeamEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
+public class UnbanCompetitionTeamEndpoint(
+    ApplicationDbContext db,
+    ICompetitionPermissionService permissions,
+    ILeaderboardService leaderboardService,
+    IRedisLeaderboardCache leaderboardCache,
+    IHubNotifierService hubNotifier)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -219,6 +247,22 @@ public class UnbanCompetitionTeamEndpoint(ApplicationDbContext db, ICompetitionP
             $"Team {team.Name} was unbanned for this competition.",
             teamId: team.Id);
         await db.SaveChangesAsync(ct);
+        await RefreshLeaderboardAsync(competitionId, ct);
         await SendAsync(await ApproveCompetitionTeamEndpoint.ToDto(team.Id, db, ct), cancellation: ct);
+    }
+
+    private async Task RefreshLeaderboardAsync(Guid competitionId, CancellationToken ct)
+    {
+        var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
+        await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+        await hubNotifier.NotifyLeaderboardSnapshotAsync(
+            competitionId,
+            entries.Select(e => new LeaderboardEntryPayload(
+                e.Rank,
+                e.TeamId,
+                e.TeamName,
+                e.TotalScore,
+                e.SolvedCount)),
+            ct);
     }
 }

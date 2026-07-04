@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -7,7 +7,7 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius-lg);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -43,12 +43,12 @@
 }
 
 :root {
-  --radius: 0.75rem;
+  --radius: 0.625rem;
   --background: oklch(0.984 0.006 255);
   --foreground: oklch(0.18 0.04 260);
-  --card: oklch(1 0 0);
+  --card: oklch(0.992 0.004 255);
   --card-foreground: oklch(0.18 0.04 260);
-  --popover: oklch(1 0 0);
+  --popover: oklch(0.996 0.004 255);
   --popover-foreground: oklch(0.18 0.04 260);
   --primary: oklch(0.48 0.16 248);
   --primary-foreground: oklch(0.985 0.004 255);
@@ -78,37 +78,37 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --background: oklch(0.16 0.028 260);
+  --foreground: oklch(0.965 0.008 255);
+  --card: oklch(0.2 0.032 260);
+  --card-foreground: oklch(0.965 0.008 255);
+  --popover: oklch(0.205 0.032 260);
+  --popover-foreground: oklch(0.965 0.008 255);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.27 0.036 260);
+  --secondary-foreground: oklch(0.965 0.008 255);
+  --muted: oklch(0.27 0.032 260);
+  --muted-foreground: oklch(0.72 0.025 255);
+  --accent: oklch(0.28 0.045 250);
+  --accent-foreground: oklch(0.965 0.008 255);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(0.965 0.008 255 / 12%);
+  --input: oklch(0.965 0.008 255 / 16%);
+  --ring: oklch(0.62 0.12 255);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.17 0.048 260);
+  --sidebar-foreground: oklch(0.965 0.008 255);
   --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-primary-foreground: oklch(0.965 0.008 255);
+  --sidebar-accent: oklch(0.25 0.055 248);
+  --sidebar-accent-foreground: oklch(0.965 0.008 255);
+  --sidebar-border: oklch(0.965 0.008 255 / 12%);
+  --sidebar-ring: oklch(0.62 0.12 255);
 }
 
 @layer base {
@@ -118,13 +118,17 @@
 
   html {
     font-family:
-      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-      "Segoe UI", sans-serif;
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    background: #f6f8fb;
   }
 }
 
@@ -135,7 +139,7 @@
   }
 
   .noctf-logo::after {
-    content: "";
+    content: '';
     position: absolute;
     inset: 18%;
     border-radius: var(--radius-sm);
@@ -145,17 +149,24 @@
   }
 
   .noctf-panel {
-    @apply border border-slate-900/10 bg-white;
+    @apply border border-border/90 bg-card;
   }
 
   .noctf-dark-shell {
-    background: #07111f;
+    background: oklch(0.17 0.048 260);
   }
 
   .noctf-grid-glow {
     background-image:
-      linear-gradient(color-mix(in oklch, var(--sidebar-foreground) 8%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in oklch, var(--sidebar-foreground) 8%, transparent) 1px, transparent 1px);
+      linear-gradient(
+        color-mix(in oklch, var(--sidebar-foreground) 8%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in oklch, var(--sidebar-foreground) 8%, transparent) 1px,
+        transparent 1px
+      );
     background-size: 48px 48px;
     mask-image: linear-gradient(180deg, black, transparent 82%);
   }
@@ -173,27 +184,39 @@
   }
 
   .noctf-surface {
-    @apply overflow-hidden rounded-xl border border-slate-900/10 bg-card;
+    @apply overflow-hidden rounded-lg border border-border/90 bg-card;
   }
 
   .noctf-surface-plain {
-    @apply rounded-xl border border-slate-900/10 bg-card;
+    @apply rounded-lg border border-border/90 bg-card;
   }
 
   .noctf-section {
-    @apply rounded-xl border border-slate-900/10 bg-card p-5;
+    @apply rounded-lg border border-border/90 bg-card p-5;
   }
 
   .noctf-toolbar {
-    @apply flex flex-col gap-3 rounded-xl border border-slate-900/10 bg-white p-3 md:flex-row md:items-center md:justify-between;
+    @apply flex flex-col gap-3 rounded-lg border border-border/90 bg-card p-3 md:flex-row md:items-center md:justify-between;
+  }
+
+  .noctf-top-tabs {
+    @apply flex min-w-0 flex-wrap items-end gap-5 border-b border-border/90;
+  }
+
+  .noctf-top-tab {
+    @apply relative -mb-px inline-flex min-h-10 items-center border-b-2 border-transparent px-1 pb-3 pt-1 text-sm font-semibold transition-colors;
+  }
+
+  .noctf-top-tab-active {
+    @apply border-primary text-foreground;
   }
 
   .noctf-filter-bar {
-    @apply grid gap-3 rounded-xl border border-slate-900/10 bg-white p-3;
+    @apply grid gap-3 rounded-lg border border-border/90 bg-card p-3;
   }
 
   .noctf-table-shell {
-    @apply overflow-hidden rounded-xl border border-slate-900/10 bg-card;
+    @apply overflow-hidden rounded-lg border border-border/90 bg-card;
   }
 
   .noctf-table-footer {
@@ -201,7 +224,7 @@
   }
 
   .noctf-kpi {
-    @apply rounded-lg border border-slate-900/10 bg-background/75 p-4;
+    @apply rounded-md border border-border/90 bg-background/70 p-4;
   }
 
   .noctf-field-grid {
@@ -209,7 +232,7 @@
   }
 
   .noctf-fieldset {
-    @apply rounded-lg border border-slate-900/10 bg-muted/30 p-4;
+    @apply rounded-md border border-border/90 bg-muted/30 p-4;
   }
 
   .noctf-label {
@@ -217,11 +240,11 @@
   }
 
   .noctf-muted-box {
-    @apply rounded-lg border border-slate-900/10 bg-background/75 px-3 py-2;
+    @apply rounded-md border border-border/90 bg-background/70 px-3 py-2;
   }
 
   .noctf-state-box {
-    @apply flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-slate-900/15 bg-muted/25 px-4 py-8 text-center;
+    @apply flex min-h-40 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/25 px-4 py-8 text-center;
   }
 
   .noctf-segmented {
@@ -233,7 +256,7 @@
   }
 
   .noctf-segmented-button-active {
-    @apply bg-background text-foreground shadow-sm;
+    @apply bg-background text-foreground;
   }
 
   .noctf-status-dot {
@@ -241,11 +264,31 @@
   }
 
   .noctf-terminal {
-    @apply rounded-xl border border-slate-950/80 bg-zinc-950 text-zinc-200;
+    @apply rounded-lg border border-sidebar-border bg-sidebar text-sidebar-foreground;
   }
 
   .noctf-live-card {
-    @apply rounded-xl border border-slate-900/10 bg-card;
+    @apply rounded-lg border border-border/90 bg-card;
+  }
+
+  .noctf-workbench {
+    @apply overflow-hidden rounded-lg border border-border/90 bg-card;
+  }
+
+  .noctf-status-strip {
+    @apply grid overflow-hidden rounded-lg border border-border/90 bg-card;
+  }
+
+  .noctf-status-item {
+    @apply flex min-w-0 items-center gap-3 border-border/80 p-3;
+  }
+
+  .noctf-row-panel {
+    @apply rounded-md border border-border/90 bg-muted/25 p-3;
+  }
+
+  .noctf-danger-panel {
+    @apply rounded-md border border-destructive/25 bg-destructive/10 p-3 text-destructive;
   }
 
   .noctf-scrollbar::-webkit-scrollbar {

@@ -12,7 +12,10 @@ function inlineMarkdown(value: string) {
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+    )
 }
 
 export function renderMarkdown(markdown?: string | null) {
@@ -32,24 +35,28 @@ export function renderMarkdown(markdown?: string | null) {
       continue
     }
 
-    const heading = /^(#{1,3})\s+(.+)$/.exec(line)
+    const heading = /^(#{1,3})[ \t]/.exec(line)
     if (heading) {
+      const headingText = line.slice(heading[1].length).trimStart()
+      if (!headingText) continue
       if (inList) {
         html.push('</ul>')
         inList = false
       }
       const level = heading[1].length + 2
-      html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`)
+      html.push(`<h${level}>${inlineMarkdown(headingText)}</h${level}>`)
       continue
     }
 
-    const bullet = /^[-*]\s+(.+)$/.exec(line)
+    const bullet = /^[-*][ \t]/.exec(line)
     if (bullet) {
+      const bulletText = line.slice(1).trimStart()
+      if (!bulletText) continue
       if (!inList) {
         html.push('<ul>')
         inList = true
       }
-      html.push(`<li>${inlineMarkdown(bullet[1])}</li>`)
+      html.push(`<li>${inlineMarkdown(bulletText)}</li>`)
       continue
     }
 

@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/crash',
+      name: 'crash',
+      component: () => import('@/views/CrashView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/competitions',
       name: 'competitions',
       component: () => import('@/views/CompetitionsView.vue'),
@@ -156,6 +162,12 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
       ],
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+      meta: { requiresAuth: false },
     },
   ],
 })

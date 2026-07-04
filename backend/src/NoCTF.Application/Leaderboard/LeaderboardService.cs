@@ -25,11 +25,19 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
         Guid competitionId,
         CancellationToken ct = default)
     {
+        var activeChallengeIds = await db.Challenges
+            .IgnoreQueryFilters()
+            .Where(c => c.CompetitionId == competitionId)
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+
         // Aggregate total score per team from ScoreEvents
         // IgnoreQueryFilters: we filter by competitionId explicitly; avoids tenant context dependency
         var scores = await db.ScoreEvents
             .IgnoreQueryFilters()
-            .Where(se => se.CompetitionId == competitionId)
+            .Where(se =>
+                se.CompetitionId == competitionId &&
+                (!se.ChallengeId.HasValue || activeChallengeIds.Contains(se.ChallengeId.Value)))
             .GroupBy(se => se.TeamId)
             .Select(g => new { TeamId = g.Key, TotalScore = g.Sum(se => (long)se.PointsDelta) })
             .ToListAsync(ct);
@@ -37,7 +45,10 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
         // Count distinct solved challenges per team + earliest correct submission time
         var solveStats = await db.Submissions
             .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == competitionId && s.IsCorrect)
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                s.IsCorrect &&
+                activeChallengeIds.Contains(s.ChallengeId))
             .GroupBy(s => s.TeamId)
             .Select(g => new
             {
@@ -51,6 +62,7 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
             .IgnoreQueryFilters()
             .Where(t =>
                 t.CompetitionId == competitionId &&
+                !t.IsBanned &&
                 t.RegistrationStatus != TeamRegistrationStatus.Rejected)
             .Select(t => new { t.Id, t.Name, t.TrackName })
             .ToListAsync(ct);

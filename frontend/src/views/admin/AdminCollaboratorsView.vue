@@ -13,12 +13,12 @@ import { queryKeys } from '@/api/queryKeys'
 import { useRoute } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -74,13 +74,18 @@ const { data: competitions } = useQuery({
 })
 
 // Load collaborators for selected competition
-const { data: collaborators, isLoading } = useQuery({
+const {
+  data: collaborators,
+  isLoading,
+  isError: isCollaboratorsError,
+  refetch: refetchCollaborators,
+} = useQuery({
   queryKey: computed(() => queryKeys.adminCollaborators(selectedCompetitionId.value)),
   queryFn: async () => {
     if (!selectedCompetitionId.value) return []
     return adminApi.collaborators<CollaboratorDto[]>(selectedCompetitionId.value)
   },
-  enabled: () => !!selectedCompetitionId.value,
+  enabled: computed(() => !!selectedCompetitionId.value),
 })
 
 // User search for add dialog
@@ -89,14 +94,17 @@ const { data: userSearchResults } = useQuery({
   queryFn: async () => {
     if (!newUserSearch.value || newUserSearch.value.length < 2) return []
     const all = await adminApi.users<{ id: string; userName: string }[]>()
-    return all.filter(u => u.userName.toLowerCase().includes(newUserSearch.value.toLowerCase()))
+    return all.filter((u) => u.userName.toLowerCase().includes(newUserSearch.value.toLowerCase()))
   },
   enabled: () => newUserSearch.value.length >= 2,
 })
 
 const addMutation = useMutation({
   mutationFn: async () => {
-    await adminApi.addCollaborator(selectedCompetitionId.value, { userId: newUserId.value, role: newRole.value })
+    await adminApi.addCollaborator(selectedCompetitionId.value, {
+      userId: newUserId.value,
+      role: newRole.value,
+    })
   },
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCollaborators(selectedCompetitionId.value) })
@@ -105,7 +113,9 @@ const addMutation = useMutation({
     newUserSearch.value = ''
     toast.success(t('admin.collaborators.addSuccess'))
   },
-  onError: () => { toast.error(t('admin.collaborators.addError')) },
+  onError: () => {
+    toast.error(t('admin.collaborators.addError'))
+  },
 })
 
 const removeMutation = useMutation({
@@ -117,7 +127,9 @@ const removeMutation = useMutation({
     removeDialog.value = false
     toast.success(t('admin.collaborators.removeSuccess'))
   },
-  onError: () => { toast.error(t('admin.collaborators.removeError')) }
+  onError: () => {
+    toast.error(t('admin.collaborators.removeError'))
+  },
 })
 
 function openRemove(collab: CollaboratorDto) {
@@ -130,28 +142,41 @@ function selectUser(user: { id: string; userName: string }) {
   newUserSearch.value = user.userName
 }
 
-watch(() => route.query.competitionId, (id) => {
-  if (id) {
-    selectedCompetitionId.value = id as string
-    selectedCompetitionTitle.value = route.query.competitionTitle as string ?? ''
-  }
-})
+watch(
+  () => route.query.competitionId,
+  (id) => {
+    if (id) {
+      selectedCompetitionId.value = id as string
+      selectedCompetitionTitle.value = (route.query.competitionTitle as string) ?? ''
+    }
+  },
+)
 
 const columnHelper = createColumnHelper<CollaboratorDto>()
 
 const columns = [
-  columnHelper.accessor('userName', { 
+  columnHelper.accessor('userName', {
     header: t('admin.collaborators.username'),
-    cell: (info) => h('span', { class: 'font-medium' }, info.getValue())
+    cell: (info) => h('span', { class: 'font-medium' }, info.getValue()),
   }),
   columnHelper.accessor('role', {
     header: t('admin.collaborators.role'),
-    cell: (info) => h(Badge, { variant: info.getValue().toLowerCase() === 'manager' ? 'default' : 'secondary', class: 'capitalize' }, () => info.getValue()),
+    cell: (info) =>
+      h(
+        Badge,
+        {
+          variant: info.getValue().toLowerCase() === 'manager' ? 'default' : 'secondary',
+          class: 'capitalize',
+        },
+        () => info.getValue(),
+      ),
   }),
 ]
 
 const table = useVueTable({
-  get data() { return collaborators.value ?? [] },
+  get data() {
+    return collaborators.value ?? []
+  },
   columns,
   getCoreRowModel: getCoreRowModel(),
   getPaginationRowModel: getPaginationRowModel(),
@@ -176,7 +201,9 @@ const table = useVueTable({
             <SelectValue :placeholder="t('admin.collaborators.selectCompetition')" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem v-for="c in competitions" :key="c.id" :value="c.id">{{ c.title }}</SelectItem>
+            <SelectItem v-for="c in competitions" :key="c.id" :value="c.id">{{
+              c.title
+            }}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -192,7 +219,9 @@ const table = useVueTable({
           <TableHeader>
             <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
               <TableHead v-for="header in headerGroup.headers" :key="header.id" class="px-4 py-3">
-                <template v-if="!header.isPlaceholder">{{ header.column.columnDef.header as string }}</template>
+                <template v-if="!header.isPlaceholder">{{
+                  header.column.columnDef.header as string
+                }}</template>
               </TableHead>
               <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
             </TableRow>
@@ -203,8 +232,24 @@ const table = useVueTable({
                 <Loader2 class="size-4 animate-spin mx-auto text-muted-foreground" />
               </TableCell>
             </TableRow>
+            <TableRow v-else-if="isCollaboratorsError">
+              <TableCell
+                :colspan="columns.length + 1"
+                class="h-24 text-center text-sm text-muted-foreground"
+              >
+                <div class="flex flex-col items-center gap-3">
+                  <span>{{ t('admin.collaborators.loadError') }}</span>
+                  <Button size="sm" variant="outline" @click="refetchCollaborators()">
+                    {{ t('common.refresh') }}
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
             <TableRow v-else-if="table.getRowModel().rows.length === 0">
-              <TableCell :colspan="columns.length + 1" class="h-24 text-center text-muted-foreground text-sm">
+              <TableCell
+                :colspan="columns.length + 1"
+                class="h-24 text-center text-muted-foreground text-sm"
+              >
                 {{ t('admin.collaborators.empty') }}
               </TableCell>
             </TableRow>
@@ -213,9 +258,9 @@ const table = useVueTable({
                 <component :is="() => cell.renderValue()" />
               </TableCell>
               <TableCell class="px-4 py-3 text-right">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   class="text-destructive hover:text-destructive hover:bg-destructive/10"
                   @click="openRemove(row.original)"
                 >
@@ -229,17 +274,36 @@ const table = useVueTable({
 
       <div class="noctf-table-footer">
         <p class="text-xs text-muted-foreground">
-          {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
+          {{
+            t('common.pageOf', {
+              page: table.getState().pagination.pageIndex + 1,
+              total: table.getPageCount(),
+            })
+          }}
         </p>
         <div class="flex gap-2">
-          <Button size="sm" variant="outline" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">{{ t('common.previous') }}</Button>
-          <Button size="sm" variant="outline" :disabled="!table.getCanNextPage()" @click="table.nextPage()">{{ t('common.next') }}</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            :disabled="!table.getCanPreviousPage()"
+            @click="table.previousPage()"
+            >{{ t('common.previous') }}</Button
+          >
+          <Button
+            size="sm"
+            variant="outline"
+            :disabled="!table.getCanNextPage()"
+            @click="table.nextPage()"
+            >{{ t('common.next') }}</Button
+          >
         </div>
       </div>
     </template>
 
     <div v-else class="noctf-state-box py-20">
-      <div class="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
+      <div
+        class="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4"
+      >
         <Users class="size-6" />
       </div>
       <h3 class="text-lg font-medium">{{ t('admin.collaborators.noCompetitionSelected') }}</h3>
@@ -257,12 +321,25 @@ const table = useVueTable({
           <div class="space-y-2">
             <Label>{{ t('admin.collaborators.searchUser') }}</Label>
             <div class="relative">
-              <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input v-model="newUserSearch" :placeholder="t('admin.collaborators.typeUsername')" class="pl-10" />
+              <Search
+                class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                v-model="newUserSearch"
+                :placeholder="t('admin.collaborators.typeUsername')"
+                class="pl-10"
+              />
             </div>
-            
-            <div v-if="newUserSearch.length >= 2" v-auto-animate class="mt-2 border rounded-lg overflow-hidden bg-muted/20">
-              <div v-if="!userSearchResults || userSearchResults.length === 0" class="p-3 text-center text-xs text-muted-foreground">
+
+            <div
+              v-if="newUserSearch.length >= 2"
+              v-auto-animate
+              class="mt-2 border rounded-lg overflow-hidden bg-muted/20"
+            >
+              <div
+                v-if="!userSearchResults || userSearchResults.length === 0"
+                class="p-3 text-center text-xs text-muted-foreground"
+              >
                 {{ t('admin.collaborators.noUsersFound') }}
               </div>
               <div
@@ -277,7 +354,7 @@ const table = useVueTable({
               </div>
             </div>
           </div>
-          
+
           <div class="space-y-2">
             <Label>{{ t('admin.collaborators.role') }}</Label>
             <Select v-model="newRole">
@@ -286,7 +363,9 @@ const table = useVueTable({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Manager">{{ t('admin.collaborators.roleManager') }}</SelectItem>
-                <SelectItem value="Observer">{{ t('admin.collaborators.roleObserver') }}</SelectItem>
+                <SelectItem value="Observer">{{
+                  t('admin.collaborators.roleObserver')
+                }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -308,11 +387,19 @@ const table = useVueTable({
     <Dialog v-model:open="removeDialog">
       <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle class="text-destructive">{{ t('admin.collaborators.removeDialogTitle') }}</DialogTitle>
-          <DialogDescription>{{ t('admin.collaborators.removeDialogDescription') }}</DialogDescription>
+          <DialogTitle class="text-destructive">{{
+            t('admin.collaborators.removeDialogTitle')
+          }}</DialogTitle>
+          <DialogDescription>{{
+            t('admin.collaborators.removeDialogDescription')
+          }}</DialogDescription>
         </DialogHeader>
         <div class="py-4">
-          <p class="text-sm font-medium">{{ t('admin.collaborators.removeQuestion') }} <span class="font-bold underline">{{ selectedCollab?.userName }}</span>?</p>
+          <p class="text-sm font-medium">
+            {{ t('admin.collaborators.removeQuestion') }}
+            <span class="font-bold underline">{{ selectedCollab?.userName }}</span
+            >?
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" @click="removeDialog = false">{{ t('common.cancel') }}</Button>

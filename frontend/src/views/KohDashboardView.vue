@@ -26,7 +26,12 @@ interface KohDashboardResponse {
   challenges: KohChallengeStatus[]
 }
 
-const { data: dashboard, refetch, isLoading, isError } = useQuery({
+const {
+  data: dashboard,
+  refetch,
+  isLoading,
+  isError,
+} = useQuery({
   queryKey: computed(() => queryKeys.kohDashboard(competitionId.value)),
   queryFn: () => competitionApi.kohDashboard<KohDashboardResponse>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
@@ -41,7 +46,7 @@ const signalR = useSignalR({
 })
 
 signalR.onKohUpdate((dto) => {
-  const ch = challenges.value.find(c => c.challengeId === dto.challengeId)
+  const ch = challenges.value.find((c) => c.challengeId === dto.challengeId)
   if (ch) {
     ch.controllerTeamId = dto.controllerTeamId
     ch.controllerTeamName = dto.controllerTeamName
@@ -54,11 +59,9 @@ signalR.onKohUpdate((dto) => {
         startTime: dto.timestamp,
         endTime: null,
       })
-      if (ch.history.length > 50)
-        ch.history.pop()
+      if (ch.history.length > 50) ch.history.pop()
     }
-  }
-  else {
+  } else {
     refetch()
   }
 })
@@ -70,17 +73,20 @@ onUnmounted(() => signalR.stop())
 <template>
   <div class="noctf-page">
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-      <PageHeader
-        :title="t('koh.kingOfTheHill')"
-        :description="t('koh.subtitle')"
-      >
+      <PageHeader :title="t('koh.kingOfTheHill')" :description="t('koh.subtitle')">
         <template #actions>
           <div class="flex items-center gap-2">
-            <Badge variant="secondary" class="animate-pulse bg-amber-500/10 text-amber-500 border-amber-500/20 px-3">
+            <Badge
+              variant="secondary"
+              class="animate-pulse bg-amber-500/10 text-amber-500 border-amber-500/20 px-3"
+            >
               <Trophy class="mr-1.5 size-3.5" />
               {{ t('common.live') }}
             </Badge>
-            <Badge variant="outline" class="font-mono text-[10px] uppercase tracking-widest bg-muted/30">
+            <Badge
+              variant="outline"
+              class="font-mono text-[10px] uppercase tracking-widest bg-muted/30"
+            >
               {{ t('common.mode') }}: KOH
             </Badge>
           </div>
@@ -89,12 +95,17 @@ onUnmounted(() => signalR.stop())
     </div>
 
     <!-- Content Area -->
-    <div v-if="isLoading" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div
+      v-if="isLoading"
+      class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+    >
       <Skeleton v-for="i in 4" :key="i" class="h-64 rounded-xl" />
     </div>
 
     <div v-else-if="isError" class="noctf-state-box py-20">
-      <div class="size-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4">
+      <div
+        class="size-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4"
+      >
         <ShieldAlert class="size-8" />
       </div>
       <h3 class="text-xl font-bold">
@@ -109,7 +120,9 @@ onUnmounted(() => signalR.stop())
     </div>
 
     <div v-else-if="challenges.length === 0" class="noctf-state-box py-20">
-      <div class="size-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
+      <div
+        class="size-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4"
+      >
         <Trophy class="size-8" />
       </div>
       <h3 class="text-xl font-bold">
@@ -125,16 +138,18 @@ onUnmounted(() => signalR.stop())
       v-auto-animate
       class="grid gap-6"
       :class="[
-        challenges.length === 1 ? 'grid-cols-1 max-w-xl mx-auto'
-        : challenges.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'
-          : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+        challenges.length === 1
+          ? 'grid-cols-1 max-w-xl mx-auto'
+          : challenges.length === 2
+            ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
       ]"
     >
       <KohStatusCard
         v-for="ch in challenges"
         :key="ch.challengeId"
         :status="ch"
-        class="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_34px_rgb(15_23_42/0.08)]"
+        class="transition-colors duration-200 hover:border-primary/20 hover:bg-accent/35"
       />
     </div>
   </div>

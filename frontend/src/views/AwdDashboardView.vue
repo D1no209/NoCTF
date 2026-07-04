@@ -97,7 +97,7 @@ const { data: patchSubmissions } = useQuery({
   queryKey: computed(() => queryKeys.patchSubmissions(competitionId.value)),
   queryFn: () => competitionApi.patchSubmissions<PatchSubmissionStatus[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value && isAwdp.value),
-  refetchInterval: computed(() => isAwdp.value ? 10_000 : false),
+  refetchInterval: computed(() => (isAwdp.value ? 10_000 : false)),
 })
 
 const round = computed(() => dashboard.value?.currentRound ?? 0)
@@ -142,9 +142,13 @@ function onPatchFileChange(e: Event) {
   patchFile.value = input.files?.[0] ?? null
 }
 
+function onPatchDrop(e: DragEvent) {
+  isDragOver.value = false
+  patchFile.value = e.dataTransfer?.files[0] ?? null
+}
+
 async function submitPatch() {
-  if (!patchFile.value || !patchChallenge.value)
-    return
+  if (!patchFile.value || !patchChallenge.value) return
   patchLoading.value = true
   try {
     const data = await competitionApi.submitPatch<{ submissionId?: string }>(
@@ -157,11 +161,9 @@ async function submitPatch() {
     })
     qc.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId.value) })
     patchFile.value = null
-  }
-  catch {
+  } catch {
     toast.error(t('awd.patchUploadFailed'))
-  }
-  finally {
+  } finally {
     patchLoading.value = false
   }
 }
@@ -172,11 +174,10 @@ const flagInput = ref('')
 const flagLoading = ref(false)
 
 async function submitFlag() {
-  if (!flagInput.value.trim() || !selectedChallenge.value)
-    return
+  if (!flagInput.value.trim() || !selectedChallenge.value) return
   flagLoading.value = true
   try {
-    const data = await competitionApi.submitFlag<{ correct?: boolean, message?: string }>(
+    const data = await competitionApi.submitFlag<{ correct?: boolean; message?: string }>(
       competitionId.value,
       selectedChallenge.value,
       flagInput.value.trim(),
@@ -184,24 +185,21 @@ async function submitFlag() {
     if (data?.correct) {
       toast.success(t('challenges.correctFlag'))
       flagInput.value = ''
-    }
-    else {
+    } else {
       enqueueAttackFailed(data?.message ?? t('challenges.incorrectFlag'))
       toast.error(data?.message ?? t('challenges.incorrectFlag'))
     }
-  }
-  catch {
+  } catch {
     toast.error(t('challenges.submissionFailed'))
-  }
-  finally {
+  } finally {
     flagLoading.value = false
   }
 }
 
 function enqueueAttackFailed(reason: string) {
   const timestamp = new Date().toISOString()
-  const victim = teams.value?.find(team => team.id === selectedVictim.value)
-  const challenge = challenges.value?.find(item => item.id === selectedChallenge.value)
+  const victim = teams.value?.find((team) => team.id === selectedVictim.value)
+  const challenge = challenges.value?.find((item) => item.id === selectedChallenge.value)
 
   localAwarenessEvents.value.unshift({
     id: `local-attack-failed:${competitionId.value}:${selectedVictim.value || 'unknown'}:${selectedChallenge.value}:${timestamp}`,
@@ -218,8 +216,7 @@ function enqueueAttackFailed(reason: string) {
     reason,
   })
 
-  if (localAwarenessEvents.value.length > 50)
-    localAwarenessEvents.value.splice(50)
+  if (localAwarenessEvents.value.length > 50) localAwarenessEvents.value.splice(50)
 }
 </script>
 
@@ -329,7 +326,9 @@ function enqueueAttackFailed(reason: string) {
             </CardHeader>
             <CardContent class="space-y-4">
               <div class="space-y-2">
-                <label class="text-xs font-bold uppercase text-muted-foreground">{{ t('common.challenge') }}</label>
+                <label class="text-xs font-bold uppercase text-muted-foreground">{{
+                  t('common.challenge')
+                }}</label>
                 <Select v-model="patchChallenge">
                   <SelectTrigger>
                     <SelectValue :placeholder="t('awd.selectChallenge')" />
@@ -352,19 +351,19 @@ function enqueueAttackFailed(reason: string) {
                 ]"
                 @dragover.prevent="isDragOver = true"
                 @dragleave.prevent="isDragOver = false"
-                @drop.prevent="isDragOver = false; patchFile = $event.dataTransfer?.files[0] || null"
+                @drop.prevent="onPatchDrop"
                 @click="($refs.patchFileInput as HTMLInputElement)?.click()"
               >
-                <div class="flex size-10 items-center justify-center rounded-full bg-background shadow-sm border group-hover:scale-110 transition-transform">
+                <div
+                  class="flex size-10 items-center justify-center rounded-full border bg-background transition-colors group-hover:border-primary/30"
+                >
                   <Upload class="size-5 text-muted-foreground" />
                 </div>
                 <div class="text-center">
                   <p class="text-sm font-medium">
                     {{ patchFile ? patchFile.name : t('awd.dropFile') }}
                   </p>
-                  <p class="text-xs text-muted-foreground mt-1">
-                    .tar.gz or .tgz max 10MB
-                  </p>
+                  <p class="text-xs text-muted-foreground mt-1">.tar.gz or .tgz max 10MB</p>
                 </div>
                 <input
                   ref="patchFileInput"
@@ -372,7 +371,7 @@ function enqueueAttackFailed(reason: string) {
                   accept=".tar.gz,.tgz"
                   class="sr-only"
                   @change="onPatchFileChange"
-                >
+                />
               </div>
 
               <Button
@@ -403,9 +402,17 @@ function enqueueAttackFailed(reason: string) {
                   :key="ps.challengeId"
                   class="flex items-center justify-between py-2.5 first:pt-0 last:pb-0"
                 >
-                  <span class="text-sm font-medium">{{ ps.challengeName ?? ps.challengeTitle ?? ps.challengeId }}</span>
+                  <span class="text-sm font-medium">{{
+                    ps.challengeName ?? ps.challengeTitle ?? ps.challengeId
+                  }}</span>
                   <Badge
-                    :variant="ps.status === 'Verified' ? 'default' : ps.status === 'Rejected' || ps.status === 'Failed' ? 'destructive' : 'secondary'"
+                    :variant="
+                      ps.status === 'Verified'
+                        ? 'default'
+                        : ps.status === 'Rejected' || ps.status === 'Failed'
+                          ? 'destructive'
+                          : 'secondary'
+                    "
                     class="text-[10px] uppercase font-bold tracking-tighter h-5"
                   >
                     {{ ps.status }}
@@ -429,10 +436,25 @@ function enqueueAttackFailed(reason: string) {
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 
-.slide-up-enter-active, .slide-up-leave-active { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-.slide-up-enter-from { opacity: 0; transform: translateY(20px); }
-.slide-up-leave-to { opacity: 0; transform: translateY(-20px); }
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-up-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
 </style>

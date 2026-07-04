@@ -30,18 +30,18 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { 
-  Search, 
-  RotateCw, 
-  Download, 
-  Eye, 
-  Loader2, 
-  FileJson, 
-  ShieldAlert, 
+import {
+  Search,
+  RotateCw,
+  Download,
+  Eye,
+  Loader2,
+  FileJson,
+  ShieldAlert,
   CheckCircle2,
   Clock,
   User as UserIcon,
-  Globe
+  Globe,
 } from 'lucide-vue-next'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { toast } from 'vue-sonner'
@@ -105,6 +105,25 @@ function openDetail(log: AuditLogDto) {
   detailDialog.value = true
 }
 
+function applyFilters() {
+  page.value = 1
+  refetch()
+}
+
+function previousPage() {
+  if (page.value <= 1)
+    return
+  page.value -= 1
+  refetch()
+}
+
+function nextPage() {
+  if (page.value >= totalPages.value)
+    return
+  page.value += 1
+  refetch()
+}
+
 function formatJson(json?: string) {
   if (!json) return ''
   try {
@@ -118,8 +137,15 @@ function exportCsv() {
   const items = logs.value
   if (!items.length) return
   try {
-    const headers = [t('admin.auditLogs.timestamp'), t('admin.auditLogs.user'), t('admin.auditLogs.action'), t('admin.auditLogs.endpoint'), t('admin.auditLogs.method'), t('admin.auditLogs.status')]
-    const rows = items.map(l => [
+    const headers = [
+      t('admin.auditLogs.timestamp'),
+      t('admin.auditLogs.user'),
+      t('admin.auditLogs.action'),
+      t('admin.auditLogs.endpoint'),
+      t('admin.auditLogs.method'),
+      t('admin.auditLogs.status'),
+    ]
+    const rows = items.map((l) => [
       l.timestamp,
       l.userName ?? '',
       l.action,
@@ -127,7 +153,9 @@ function exportCsv() {
       l.httpMethod,
       l.exception ? t('common.error') : t('common.success'),
     ])
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const csv = [headers, ...rows]
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -146,49 +174,61 @@ const columnHelper = createColumnHelper<AuditLogDto>()
 const columns = [
   columnHelper.accessor('timestamp', {
     header: t('admin.auditLogs.timestamp'),
-    cell: info => h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
-      h(Clock, { class: 'size-3 text-muted-foreground' }),
-      h('span', new Date(info.getValue()).toLocaleString())
-    ]),
+    cell: (info) =>
+      h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
+        h(Clock, { class: 'size-3 text-muted-foreground' }),
+        h('span', new Date(info.getValue()).toLocaleString()),
+      ]),
     enableSorting: true,
   }),
-  columnHelper.accessor('userName', { 
-    header: t('admin.auditLogs.user'), 
+  columnHelper.accessor('userName', {
+    header: t('admin.auditLogs.user'),
     enableSorting: true,
-    cell: info => h('div', { class: 'flex items-center gap-2' }, [
-      h(UserIcon, { class: 'size-3 text-muted-foreground' }),
-      h('span', info.getValue() || 'Anonymous')
-    ])
+    cell: (info) =>
+      h('div', { class: 'flex items-center gap-2' }, [
+        h(UserIcon, { class: 'size-3 text-muted-foreground' }),
+        h('span', info.getValue() || 'Anonymous'),
+      ]),
   }),
-  columnHelper.accessor('action', { 
-    header: t('admin.auditLogs.action'), 
+  columnHelper.accessor('action', {
+    header: t('admin.auditLogs.action'),
     enableSorting: true,
-    cell: info => h(Badge, { variant: 'outline', class: 'font-mono text-[10px]' }, () => info.getValue())
+    cell: (info) =>
+      h(Badge, { variant: 'outline', class: 'font-mono text-[10px]' }, () => info.getValue()),
   }),
-  columnHelper.accessor('endpointPath', { 
+  columnHelper.accessor('endpointPath', {
     header: t('admin.auditLogs.endpoint'),
-    cell: info => h('code', { class: 'text-[10px] bg-muted px-1 rounded truncate max-w-[150px] inline-block' }, info.getValue())
+    cell: (info) =>
+      h(
+        'code',
+        { class: 'text-[10px] bg-muted px-1 rounded truncate max-w-[150px] inline-block' },
+        info.getValue(),
+      ),
   }),
   columnHelper.accessor('exception', {
     header: t('admin.auditLogs.status'),
-    cell: info => {
+    cell: (info) => {
       const val = info.getValue()
       return h('div', { class: 'flex items-center justify-center' }, [
-        val 
-          ? h(ShieldAlert, { class: 'size-4 text-destructive' }) 
-          : h(CheckCircle2, { class: 'size-4 text-green-500' })
+        val
+          ? h(ShieldAlert, { class: 'size-4 text-destructive' })
+          : h(CheckCircle2, { class: 'size-4 text-emerald-600' }),
       ])
     },
   }),
 ]
 
 const table = useVueTable({
-  get data() { return logs.value },
+  get data() {
+    return logs.value
+  },
   columns,
   state: {
-    get sorting() { return sorting.value },
+    get sorting() {
+      return sorting.value
+    },
   },
-  onSortingChange: updater => {
+  onSortingChange: (updater) => {
     sorting.value = typeof updater === 'function' ? updater(sorting.value) : updater
   },
   getCoreRowModel: getCoreRowModel(),
@@ -224,18 +264,23 @@ const table = useVueTable({
         <label class="noctf-label ml-1">{{ t('admin.auditLogs.user') }}</label>
         <div class="relative">
           <Search class="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="filterUserName" :placeholder="t('admin.auditLogs.filterUser')" class="pl-9 h-9" @keyup.enter="page = 1; refetch()" />
+          <Input
+            v-model="filterUserName"
+            :placeholder="t('admin.auditLogs.filterUser')"
+            class="pl-9 h-9"
+            @keyup.enter="applyFilters"
+          />
         </div>
       </div>
       <div class="space-y-2">
         <label class="noctf-label ml-1">{{ t('admin.auditLogs.action') }}</label>
-        <Input v-model="filterAction" :placeholder="t('admin.auditLogs.filterAction')" class="h-9" @keyup.enter="page = 1; refetch()" />
+        <Input v-model="filterAction" :placeholder="t('admin.auditLogs.filterAction')" class="h-9" @keyup.enter="applyFilters" />
       </div>
       <div class="space-y-2">
         <label class="noctf-label ml-1">{{ t('admin.auditLogs.entityType') }}</label>
-        <Input v-model="filterEntityType" :placeholder="t('admin.auditLogs.filterEntity')" class="h-9" @keyup.enter="page = 1; refetch()" />
+        <Input v-model="filterEntityType" :placeholder="t('admin.auditLogs.filterEntity')" class="h-9" @keyup.enter="applyFilters" />
       </div>
-      <Button class="h-9" @click="page = 1; refetch()">{{ t('common.search') }}</Button>
+      <Button class="h-9" @click="applyFilters">{{ t('common.search') }}</Button>
     </div>
 
     <!-- Table -->
@@ -254,7 +299,9 @@ const table = useVueTable({
                 <div class="flex items-center gap-2">
                   <span>{{ header.column.columnDef.header as string }}</span>
                   <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
-                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
+                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]"
+                    >▼</span
+                  >
                 </div>
               </template>
             </TableHead>
@@ -268,7 +315,10 @@ const table = useVueTable({
             </TableCell>
           </TableRow>
           <TableRow v-else-if="logs.length === 0">
-            <TableCell :colspan="columns.length + 1" class="h-24 text-center text-muted-foreground text-sm">
+            <TableCell
+              :colspan="columns.length + 1"
+              class="h-24 text-center text-muted-foreground text-sm"
+            >
               {{ t('admin.auditLogs.empty') }}
             </TableCell>
           </TableRow>
@@ -282,7 +332,13 @@ const table = useVueTable({
               <component :is="() => cell.renderValue()" />
             </TableCell>
             <TableCell class="px-4 py-3 text-right">
-              <Button variant="ghost" size="icon" class="size-8 opacity-0 group-hover:opacity-100 transition-opacity" @click="openDetail(row.original)">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="size-8 text-muted-foreground hover:text-foreground"
+                aria-label="Open audit log details"
+                @click="openDetail(row.original)"
+              >
                 <Eye class="size-4" />
               </Button>
             </TableCell>
@@ -297,8 +353,14 @@ const table = useVueTable({
         {{ t('admin.auditLogs.pageTotal', { page, totalPages, total }) }}
       </p>
       <div class="flex items-center gap-2">
-        <Button size="sm" variant="outline" :disabled="page <= 1" @click="page--; refetch()">{{ t('common.previous') }}</Button>
-        <Button size="sm" variant="outline" :disabled="page >= totalPages" @click="page++; refetch()">{{ t('common.next') }}</Button>
+        <Button size="sm" variant="outline" :disabled="page <= 1" @click="previousPage">{{ t('common.previous') }}</Button>
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="page >= totalPages"
+          @click="nextPage"
+          >{{ t('common.next') }}</Button
+        >
       </div>
     </div>
 
@@ -312,19 +374,18 @@ const table = useVueTable({
           </DialogTitle>
           <DialogDescription>{{ t('admin.auditLogs.detailDialogDescription') }}</DialogDescription>
         </DialogHeader>
-        
+
         <div v-if="selectedLog" class="flex-1 overflow-y-auto p-6 pt-4 space-y-6">
-          <!-- Metadata Cards -->
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
+            <div class="noctf-row-panel space-y-1">
               <span class="noctf-label block">{{ t('admin.auditLogs.user') }}</span>
               <p class="text-sm font-medium">{{ selectedLog.userName || 'Anonymous' }}</p>
             </div>
-            <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
+            <div class="noctf-row-panel space-y-1">
               <span class="noctf-label block">{{ t('admin.auditLogs.action') }}</span>
               <Badge variant="outline" class="mt-0.5 font-mono">{{ selectedLog.action }}</Badge>
             </div>
-            <div class="space-y-1 p-3 rounded-lg border bg-muted/30">
+            <div class="noctf-row-panel space-y-1">
               <span class="noctf-label block">{{ t('admin.auditLogs.ip') }}</span>
               <div class="flex items-center gap-1.5 mt-0.5">
                 <Globe class="size-3 text-muted-foreground" />
@@ -334,44 +395,70 @@ const table = useVueTable({
           </div>
 
           <!-- HTTP Detail -->
-          <div class="rounded-lg border overflow-hidden">
+          <div class="overflow-hidden rounded-md border">
             <div class="bg-muted/50 px-4 py-2 border-b flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider">{{ t('admin.auditLogs.endpointDetails') }}</span>
-              <Badge :variant="selectedLog.httpMethod === 'POST' || selectedLog.httpMethod === 'PUT' ? 'default' : 'secondary'">
+              <span class="text-xs font-bold uppercase tracking-wider">{{
+                t('admin.auditLogs.endpointDetails')
+              }}</span>
+              <Badge
+                :variant="
+                  selectedLog.httpMethod === 'POST' || selectedLog.httpMethod === 'PUT'
+                    ? 'default'
+                    : 'secondary'
+                "
+              >
                 {{ selectedLog.httpMethod }}
               </Badge>
             </div>
             <div class="p-4 bg-muted/20">
-              <code class="text-xs break-all text-primary font-mono font-bold">{{ selectedLog.endpointPath }}</code>
+              <code class="text-xs break-all text-primary font-mono font-bold">{{
+                selectedLog.endpointPath
+              }}</code>
             </div>
           </div>
 
           <!-- Exception if any -->
-          <div v-if="selectedLog.exception" class="p-4 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
+          <div v-if="selectedLog.exception" class="noctf-danger-panel space-y-2">
             <div class="flex items-center gap-2 text-destructive">
               <ShieldAlert class="size-4" />
-              <span class="text-xs font-bold uppercase tracking-wider">{{ t('admin.auditLogs.exceptionLogged') }}</span>
+              <span class="text-xs font-bold uppercase tracking-wider">{{
+                t('admin.auditLogs.exceptionLogged')
+              }}</span>
             </div>
-            <pre class="text-[10px] font-mono whitespace-pre-wrap break-all opacity-80">{{ selectedLog.exception }}</pre>
+            <pre class="text-[10px] font-mono whitespace-pre-wrap break-all opacity-80">{{
+              selectedLog.exception
+            }}</pre>
           </div>
 
           <!-- JSON Payloads -->
           <div class="space-y-4">
             <div v-if="selectedLog.diff" class="space-y-2">
               <div class="flex items-center justify-between px-1">
-                <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">{{ t('admin.auditLogs.diff') }}</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">{{
+                  t('admin.auditLogs.diff')
+                }}</span>
               </div>
-              <pre class="bg-zinc-950 text-emerald-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.diff) }}</pre>
+              <pre
+                class="max-h-60 overflow-auto rounded-md border bg-sidebar p-4 font-mono text-[11px] text-sidebar-foreground"
+                >{{ formatJson(selectedLog.diff) }}</pre>
             </div>
 
             <div v-if="selectedLog.newValues" class="space-y-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">{{ t('admin.auditLogs.newValues') }}</span>
-              <pre class="bg-zinc-950 text-blue-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.newValues) }}</pre>
+              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">{{
+                t('admin.auditLogs.newValues')
+              }}</span>
+              <pre
+                class="max-h-60 overflow-auto rounded-md border bg-sidebar p-4 font-mono text-[11px] text-sidebar-foreground"
+                >{{ formatJson(selectedLog.newValues) }}</pre>
             </div>
 
             <div v-if="selectedLog.oldValues" class="space-y-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">{{ t('admin.auditLogs.oldValues') }}</span>
-              <pre class="bg-zinc-950 text-rose-400 p-4 rounded-xl text-[11px] font-mono overflow-auto max-h-60 border shadow-inner">{{ formatJson(selectedLog.oldValues) }}</pre>
+              <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">{{
+                t('admin.auditLogs.oldValues')
+              }}</span>
+              <pre
+                class="max-h-60 overflow-auto rounded-md border bg-sidebar p-4 font-mono text-[11px] text-sidebar-foreground"
+                >{{ formatJson(selectedLog.oldValues) }}</pre>
             </div>
           </div>
         </div>

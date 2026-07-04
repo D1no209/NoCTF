@@ -16,10 +16,12 @@ const forwardedProps = useForwardProps(delegatedProps)
 <template>
   <SelectTrigger
     v-bind="forwardedProps"
-    :class="cn(
-      'flex h-10 w-full items-center justify-between rounded-lg border border-input bg-white px-3 py-2 text-sm shadow-sm ring-offset-background transition-all data-[placeholder]:text-muted-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate text-start',
-      props.class,
-    )"
+    :class="
+      cn(
+        'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background/80 px-3 py-2 text-sm shadow-none ring-offset-background transition-all data-[placeholder]:text-muted-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate text-start',
+        props.class,
+      )
+    "
   >
     <slot />
     <SelectIcon as-child>
