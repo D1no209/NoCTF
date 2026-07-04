@@ -25,10 +25,13 @@ async function handleLogout() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 w-full border-b border-slate-900/10 bg-white/95">
+  <header class="sticky top-0 z-50 w-full border-b border-border/90 bg-background/95">
     <div class="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
       <div class="flex items-center gap-6">
-        <RouterLink to="/" class="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-80 transition-all active:scale-95">
+        <RouterLink
+          to="/"
+          class="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-80 transition-all active:scale-95"
+        >
           <span class="noctf-logo size-8" />
           <span>NoCTF</span>
         </RouterLink>
@@ -78,7 +81,10 @@ async function handleLogout() {
         </Button>
 
         <template v-if="auth.isAuthenticated">
-          <div v-if="displayName" class="flex items-center gap-2 rounded-lg border bg-white px-2 py-1.5 text-sm">
+          <div
+            v-if="displayName"
+            class="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 text-sm"
+          >
             <span class="text-muted-foreground hidden lg:inline">{{ displayName }}</span>
           </div>
           <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="handleLogout">
@@ -100,7 +106,7 @@ async function handleLogout() {
               <Menu class="size-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" class="w-[280px] bg-white">
+          <SheetContent side="right" class="w-[280px] bg-background">
             <SheetHeader class="text-left">
               <SheetTitle>NoCTF</SheetTitle>
             </SheetHeader>
@@ -108,13 +114,23 @@ async function handleLogout() {
               <RouterLink to="/" class="text-lg font-medium hover:text-primary transition-colors">
                 {{ t('nav.home') }}
               </RouterLink>
-              <RouterLink to="/competitions" class="text-lg font-medium hover:text-primary transition-colors">
+              <RouterLink
+                to="/competitions"
+                class="text-lg font-medium hover:text-primary transition-colors"
+              >
                 {{ t('nav.competitions') }}
               </RouterLink>
-              <RouterLink to="/teams" class="text-lg font-medium hover:text-primary transition-colors">
+              <RouterLink
+                to="/teams"
+                class="text-lg font-medium hover:text-primary transition-colors"
+              >
                 {{ t('nav.teams') }}
               </RouterLink>
-              <RouterLink v-if="canManage" to="/admin" class="text-lg font-medium hover:text-primary transition-colors">
+              <RouterLink
+                v-if="canManage"
+                to="/admin"
+                class="text-lg font-medium hover:text-primary transition-colors"
+              >
                 {{ t('nav.admin') }}
               </RouterLink>
 

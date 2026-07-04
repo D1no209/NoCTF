@@ -6,7 +6,6 @@ import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface InfrastructureDto {
@@ -44,67 +43,104 @@ function display(value: unknown) {
       <p class="text-sm text-muted-foreground">{{ t('admin.infrastructure.subtitle') }}</p>
     </div>
 
-    <div v-if="isLoading" class="grid gap-4 md:grid-cols-3">
-      <Skeleton v-for="index in 3" :key="index" class="h-32 rounded-lg" />
+    <div v-if="isLoading" class="noctf-workbench p-4">
+      <div class="grid gap-4 md:grid-cols-3">
+        <Skeleton v-for="index in 3" :key="index" class="h-28 rounded-md" />
+      </div>
     </div>
 
-    <div v-else class="grid gap-4 lg:grid-cols-3">
-      <Card>
-        <CardHeader class="flex flex-row items-center justify-between">
-          <CardTitle class="text-base">{{ t('admin.infrastructure.runner') }}</CardTitle>
-          <Server class="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent class="space-y-3 text-sm">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">{{ t('admin.infrastructure.provider') }}</span>
-            <Badge variant="outline">{{ data?.runnerProvider ?? '-' }}</Badge>
+    <div v-else class="noctf-workbench">
+      <div class="grid border-b border-border/80 md:grid-cols-[1.1fr_1fr_1fr]">
+        <div class="flex min-w-0 items-start gap-3 p-4">
+          <div
+            class="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary"
+          >
+            <Server class="size-4" />
           </div>
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">{{ t('admin.infrastructure.status') }}</span>
-            <Badge :variant="data?.runnerReachable ? 'default' : 'destructive'">
-              {{ data?.runnerReachable ? t('admin.infrastructure.reachable') : t('admin.infrastructure.unreachable') }}
-            </Badge>
+          <div class="min-w-0 space-y-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-sm font-semibold">{{ t('admin.infrastructure.runner') }}</h3>
+              <Badge variant="outline">{{ data?.runnerProvider ?? '-' }}</Badge>
+              <Badge :variant="data?.runnerReachable ? 'default' : 'destructive'">
+                {{
+                  data?.runnerReachable
+                    ? t('admin.infrastructure.reachable')
+                    : t('admin.infrastructure.unreachable')
+                }}
+              </Badge>
+            </div>
+            <p class="break-all font-mono text-xs text-muted-foreground">
+              {{ data?.runnerBaseUrl ?? '-' }}
+            </p>
           </div>
-          <div class="break-all text-muted-foreground">{{ data?.runnerBaseUrl ?? '-' }}</div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader class="flex flex-row items-center justify-between">
-          <CardTitle class="text-base">Kubernetes</CardTitle>
-          <Cloud class="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent class="space-y-3 text-sm">
-          <div v-for="key in ['connectionMode', 'defaultExposure', 'publicEntry', 'ingressBaseDomain', 'namespacePrefix']" :key="key" class="flex items-center justify-between gap-3">
+        <div
+          class="flex min-w-0 items-start gap-3 border-t border-border/80 p-4 md:border-l md:border-t-0"
+        >
+          <div
+            class="flex size-9 items-center justify-center rounded-md bg-muted text-muted-foreground"
+          >
+            <Cloud class="size-4" />
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-sm font-semibold">Kubernetes</h3>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {{ display(kubernetesInfo.connectionMode) }} /
+              {{ display(kubernetesInfo.defaultExposure) }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="flex min-w-0 items-start gap-3 border-t border-border/80 p-4 md:border-l md:border-t-0"
+        >
+          <div
+            class="flex size-9 items-center justify-center rounded-md bg-muted text-muted-foreground"
+          >
+            <Activity class="size-4" />
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-sm font-semibold">{{ t('admin.infrastructure.policy') }}</h3>
+            <p class="mt-1 text-xs text-muted-foreground">
+              network: {{ display(kubernetesInfo.networkMode) }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid gap-0 md:grid-cols-2">
+        <div class="divide-y divide-border/70 p-4">
+          <div
+            v-for="key in ['publicEntry', 'ingressBaseDomain', 'namespacePrefix']"
+            :key="key"
+            class="grid grid-cols-[11rem_minmax(0,1fr)] gap-3 py-2 text-sm"
+          >
             <span class="text-muted-foreground">{{ key }}</span>
-            <span class="max-w-44 truncate font-medium">{{ display(kubernetesInfo[key]) }}</span>
+            <span class="min-w-0 truncate font-medium">{{ display(kubernetesInfo[key]) }}</span>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader class="flex flex-row items-center justify-between">
-          <CardTitle class="text-base">{{ t('admin.infrastructure.policy') }}</CardTitle>
-          <Activity class="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent class="space-y-3 text-sm">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">networkMode</span>
-            <span class="font-medium">{{ display(kubernetesInfo.networkMode) }}</span>
+        </div>
+        <div
+          class="divide-y divide-border/70 border-t border-border/80 p-4 md:border-l md:border-t-0"
+        >
+          <div
+            v-for="key in ['registryCount', 'imagePullSecrets']"
+            :key="key"
+            class="grid grid-cols-[11rem_minmax(0,1fr)] gap-3 py-2 text-sm"
+          >
+            <span class="text-muted-foreground">{{ key }}</span>
+            <span class="min-w-0 truncate font-medium">{{ display(kubernetesInfo[key]) }}</span>
           </div>
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">registryCount</span>
-            <span class="font-medium">{{ display(kubernetesInfo.registryCount) }}</span>
+          <div class="grid gap-2 py-2 text-sm">
+            <span class="text-muted-foreground">quota</span>
+            <code
+              class="block max-h-28 overflow-auto rounded-md bg-muted/50 p-3 font-mono text-xs text-foreground/80"
+            >
+              {{ display(kubernetesInfo.quota) }}
+            </code>
           </div>
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">imagePullSecrets</span>
-            <span class="max-w-44 truncate font-medium">{{ display(kubernetesInfo.imagePullSecrets) }}</span>
-          </div>
-          <div class="break-all rounded-md bg-muted p-3 font-mono text-xs">
-            {{ display(kubernetesInfo.quota) }}
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   </div>
 </template>

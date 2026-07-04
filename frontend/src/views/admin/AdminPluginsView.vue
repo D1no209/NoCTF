@@ -1,19 +1,11 @@
 <script setup lang="ts">
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useQuery } from '@tanstack/vue-query'
-import {
-  CheckCircle2,
-  Gamepad2,
-  HardDrive,
-  Plug,
-  Puzzle,
-  ShieldCheck,
-} from 'lucide-vue-next'
+import { CheckCircle2, Gamepad2, HardDrive, Plug, Puzzle, ShieldCheck } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
 const { t } = useI18n()
@@ -31,23 +23,17 @@ const { data: plugins, isLoading } = useQuery({
 
 function typeVariant(type: string): 'default' | 'secondary' | 'outline' | 'destructive' {
   const t = type.toLowerCase()
-  if (t.includes('gamemode'))
-    return 'default'
-  if (t.includes('challenge'))
-    return 'secondary'
-  if (t.includes('container'))
-    return 'outline'
+  if (t.includes('gamemode')) return 'default'
+  if (t.includes('challenge')) return 'secondary'
+  if (t.includes('container')) return 'outline'
   return 'outline'
 }
 
 function getPluginIcon(type: string) {
   const t = type.toLowerCase()
-  if (t.includes('gamemode'))
-    return Gamepad2
-  if (t.includes('challenge'))
-    return Puzzle
-  if (t.includes('container'))
-    return HardDrive
+  if (t.includes('gamemode')) return Gamepad2
+  if (t.includes('challenge')) return Puzzle
+  if (t.includes('container')) return HardDrive
   return Plug
 }
 </script>
@@ -65,66 +51,58 @@ function getPluginIcon(type: string) {
       </div>
     </div>
 
-    <!-- Stats Summary -->
-    <div v-if="plugins" class="flex flex-wrap items-center gap-6 rounded-xl border border-slate-900/10 bg-white p-4 shadow-[0_8px_28px_rgb(15_23_42/0.035)]">
-      <div class="flex items-center gap-2">
+    <div v-if="plugins" class="noctf-status-strip grid-cols-1 sm:grid-cols-2">
+      <div class="noctf-status-item border-b sm:border-b-0 sm:border-r">
         <span class="noctf-label">{{ t('admin.plugins.totalPlugins') }}</span>
         <Badge variant="secondary" class="font-mono">
           {{ plugins.length }}
         </Badge>
       </div>
-      <div class="h-4 w-px bg-border" />
-      <div class="flex items-center gap-2">
-        <ShieldCheck class="size-4 text-emerald-500" />
+      <div class="noctf-status-item">
+        <ShieldCheck class="size-4 text-emerald-600" />
         <span class="noctf-label">{{ t('admin.plugins.coreEngine') }}</span>
         <span class="text-xs font-mono opacity-60">v1.0.0-stable</span>
       </div>
     </div>
 
-    <!-- Skeleton Grid -->
-    <div v-if="isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      <Skeleton v-for="i in 8" :key="i" class="h-40 rounded-xl" />
+    <div v-if="isLoading" class="noctf-workbench divide-y divide-border/80">
+      <Skeleton v-for="i in 8" :key="i" class="h-16 rounded-none" />
     </div>
 
-    <!-- Plugin Grid -->
-    <div v-else v-auto-animate class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      <Card
+    <div v-else v-auto-animate class="noctf-workbench divide-y divide-border/80">
+      <div
         v-for="plugin in plugins"
         :key="plugin.name"
-        class="group flex flex-col overflow-hidden transition-all duration-200 hover:border-primary/20 hover:shadow-[0_14px_38px_rgb(15_23_42/0.08)]"
+        class="grid gap-3 p-4 transition-colors hover:bg-muted/35 md:grid-cols-[minmax(0,1fr)_auto]"
       >
-        <CardHeader class="pb-3 space-y-4">
-          <div class="flex items-center justify-between">
-            <div class="bg-primary/5 p-2 rounded-lg border border-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-              <component :is="getPluginIcon(plugin.type)" class="size-5" />
-            </div>
-            <Badge variant="outline" class="font-mono text-[10px] opacity-70">
-              v{{ plugin.version }}
-            </Badge>
+        <div class="flex min-w-0 items-center gap-3">
+          <div
+            class="flex size-9 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/5 text-primary"
+          >
+            <component :is="getPluginIcon(plugin.type)" class="size-5" />
           </div>
-          <div>
-            <CardTitle class="text-base font-bold truncate">
+          <div class="min-w-0">
+            <div class="truncate text-sm font-semibold">
               {{ plugin.name }}
-            </CardTitle>
-            <CardDescription class="text-[10px] font-black uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
-              <div class="size-1 rounded-full bg-primary" />
+            </div>
+            <div
+              class="mt-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
               {{ plugin.type }}
-            </CardDescription>
-          </div>
-        </CardHeader>
-
-        <CardContent class="mt-auto pt-0">
-          <div class="flex items-center justify-between border-t pt-4 mt-2">
-            <Badge :variant="typeVariant(plugin.type)" class="text-[9px] px-1.5 h-4 uppercase tracking-tighter">
-              {{ t('admin.plugins.active') }}
-            </Badge>
-            <div class="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
-              <CheckCircle2 class="size-3 text-emerald-500" />
-              {{ t('admin.plugins.verified') }}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 md:justify-end">
+          <Badge variant="outline" class="font-mono text-[10px]"> v{{ plugin.version }} </Badge>
+          <Badge :variant="typeVariant(plugin.type)" class="uppercase">
+            {{ t('admin.plugins.active') }}
+          </Badge>
+          <div class="flex items-center gap-1 text-xs text-muted-foreground">
+            <CheckCircle2 class="size-3 text-emerald-600" />
+            {{ t('admin.plugins.verified') }}
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="!isLoading && plugins?.length === 0" class="noctf-state-box py-20">

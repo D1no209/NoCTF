@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -70,22 +70,30 @@ const { t } = useI18n()
 const qc = useQueryClient()
 const flagInput = ref('')
 const submitMessage = ref('')
+const destroyArmed = ref(false)
 
 const detailQuery = useQuery({
   queryKey: computed(() => queryKeys.penetrationDetail(props.competitionId, props.challenge.id)),
-  queryFn: () => competitionApi.penetrationDetail<PenetrationDetail>(props.competitionId, props.challenge.id),
+  queryFn: () =>
+    competitionApi.penetrationDetail<PenetrationDetail>(props.competitionId, props.challenge.id),
   refetchInterval: 10_000,
 })
 
 const detail = computed(() => detailQuery.data.value)
 const instance = computed(() => detail.value?.instance ?? null)
-const flags = computed(() => (detail.value?.topology?.flags ?? []).filter(flag => flag.visible !== false))
+const flags = computed(() =>
+  (detail.value?.topology?.flags ?? []).filter((flag) => flag.visible !== false),
+)
 const running = computed(() => instance.value?.status === 'Running')
 const canOperate = computed(() => props.canSubmitFlag !== false)
-const busy = computed(() => ['Starting', 'Stopping', 'Resetting', 'Destroying'].includes(instance.value?.status ?? ''))
+const busy = computed(() =>
+  ['Starting', 'Stopping', 'Resetting', 'Destroying'].includes(instance.value?.status ?? ''),
+)
 
 function invalidate() {
-  qc.invalidateQueries({ queryKey: queryKeys.penetrationDetail(props.competitionId, props.challenge.id) })
+  qc.invalidateQueries({
+    queryKey: queryKeys.penetrationDetail(props.competitionId, props.challenge.id),
+  })
   qc.invalidateQueries({ queryKey: queryKeys.submissions(props.competitionId) })
   qc.invalidateQueries({ queryKey: queryKeys.challenges(props.competitionId) })
   qc.invalidateQueries({ queryKey: queryKeys.leaderboard(props.competitionId) })
@@ -114,23 +122,34 @@ const resetMutation = useMutation({
 
 const destroyMutation = useMutation({
   mutationFn: () => competitionApi.penetrationDestroy(props.competitionId, props.challenge.id),
-  onSuccess: invalidate,
+  onSuccess: () => {
+    destroyArmed.value = false
+    invalidate()
+  },
   onError: () => toast.error(t('penetration.instanceActionFailed')),
 })
 
 const submitMutation = useMutation({
-  mutationFn: () => competitionApi.submitPenetrationFlag<SubmitResult>(props.competitionId, props.challenge.id, flagInput.value.trim()),
+  mutationFn: () =>
+    competitionApi.submitPenetrationFlag<SubmitResult>(
+      props.competitionId,
+      props.challenge.id,
+      flagInput.value.trim(),
+    ),
   onSuccess: (data) => {
     if (data.correct) {
-      submitMessage.value = data.alreadySolved ? t('challenges.alreadySolved') : t('challenges.correctFlag')
+      submitMessage.value = data.alreadySolved
+        ? t('challenges.alreadySolved')
+        : t('challenges.correctFlag')
       flagInput.value = ''
       emit('solved')
       invalidate()
       return
     }
-    submitMessage.value = data.result === 'flag_rate_limited'
-      ? t('penetration.flagRateLimited')
-      : t('challenges.incorrectFlag')
+    submitMessage.value =
+      data.result === 'flag_rate_limited'
+        ? t('penetration.flagRateLimited')
+        : t('challenges.incorrectFlag')
   },
   onError: () => {
     submitMessage.value = t('challenges.submissionFailed')
@@ -142,6 +161,21 @@ async function copyEntry() {
   await navigator.clipboard.writeText(instance.value.entryUrl)
   toast.success(t('challenges.addressCopied'))
 }
+
+function requestDestroy() {
+  if (!destroyArmed.value) {
+    destroyArmed.value = true
+    return
+  }
+  destroyMutation.mutate()
+}
+
+watch(
+  () => instance.value?.id,
+  () => {
+    destroyArmed.value = false
+  },
+)
 </script>
 
 <template>
@@ -158,31 +192,64 @@ async function copyEntry() {
             <span>{{ t('penetration.instance') }}</span>
             <Badge variant="outline">{{ instance?.status ?? 'None' }}</Badge>
           </div>
-          <div v-if="running && instance?.entryUrl" class="flex flex-wrap items-center gap-2 text-sm">
+          <div
+            v-if="running && instance?.entryUrl"
+            class="flex flex-wrap items-center gap-2 text-sm"
+          >
             <code class="break-all rounded bg-background px-2 py-1">{{ instance.entryUrl }}</code>
             <Button type="button" variant="ghost" size="icon-sm" @click="copyEntry">
               <Copy class="size-4" />
             </Button>
           </div>
-          <p v-else-if="instance?.lastError" class="text-xs text-destructive">{{ instance.lastError }}</p>
+          <p v-else-if="instance?.lastError" class="text-xs text-destructive">
+            {{ instance.lastError }}
+          </p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <Button type="button" size="sm" :disabled="!canOperate || busy || running || startMutation.isPending.value" @click="startMutation.mutate()">
+          <Button
+            type="button"
+            size="sm"
+            :disabled="!canOperate || busy || running || startMutation.isPending.value"
+            @click="startMutation.mutate()"
+          >
             <Loader2 v-if="startMutation.isPending.value" class="size-4 animate-spin" />
             <Server v-else class="size-4" />
             {{ t('penetration.start') }}
           </Button>
-          <Button type="button" size="sm" variant="outline" :disabled="!canOperate || busy || !running" @click="stopMutation.mutate()">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            :disabled="!canOperate || busy || !running"
+            @click="stopMutation.mutate()"
+          >
             <Square class="size-4" />
             {{ t('penetration.stop') }}
           </Button>
-          <Button type="button" size="sm" variant="outline" :disabled="!canOperate || busy || !instance?.id" @click="resetMutation.mutate()">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            :disabled="!canOperate || busy || !instance?.id"
+            @click="resetMutation.mutate()"
+          >
             <RotateCcw class="size-4" />
-            {{ t('penetration.resetCount', { count: instance?.resetCount ?? 0, limit: instance?.resetLimit ?? 0 }) }}
+            {{
+              t('penetration.resetCount', {
+                count: instance?.resetCount ?? 0,
+                limit: instance?.resetLimit ?? 0,
+              })
+            }}
           </Button>
-          <Button type="button" size="sm" variant="destructive" :disabled="!canOperate || busy || !instance?.id" @click="destroyMutation.mutate()">
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            :disabled="!canOperate || busy || !instance?.id"
+            @click="requestDestroy"
+          >
             <Trash2 class="size-4" />
-            {{ t('penetration.destroy') }}
+            {{ destroyArmed ? t('common.confirm') : t('penetration.destroy') }}
           </Button>
         </div>
       </div>
@@ -190,13 +257,20 @@ async function copyEntry() {
 
     <div class="rounded-lg border">
       <div class="border-b px-3 py-2 text-sm font-semibold">
-        {{ t('penetration.stages') }} · {{ detail?.solvedStageCount ?? 0 }} / {{ detail?.totalStageCount ?? flags.length }}
+        {{ t('penetration.stages') }} · {{ detail?.solvedStageCount ?? 0 }} /
+        {{ detail?.totalStageCount ?? flags.length }}
       </div>
       <div class="divide-y">
-        <div v-for="flag in flags" :key="flag.id" class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+        <div
+          v-for="flag in flags"
+          :key="flag.id"
+          class="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+        >
           <div>
             <div class="font-medium">{{ flag.stage }}. {{ flag.name }}</div>
-            <p v-if="flag.solved && flag.hintAfterSolved" class="text-xs text-muted-foreground">{{ flag.hintAfterSolved }}</p>
+            <p v-if="flag.solved && flag.hintAfterSolved" class="text-xs text-muted-foreground">
+              {{ flag.hintAfterSolved }}
+            </p>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs text-muted-foreground">{{ flag.score }} {{ t('nav.score') }}</span>
@@ -216,7 +290,10 @@ async function copyEntry() {
         :placeholder="t('challenges.flagPlaceholder')"
         @keydown.enter="submitMutation.mutate()"
       />
-      <Button :disabled="submitMutation.isPending.value || !flagInput.trim() || !canOperate" @click="submitMutation.mutate()">
+      <Button
+        :disabled="submitMutation.isPending.value || !flagInput.trim() || !canOperate"
+        @click="submitMutation.mutate()"
+      >
         <Loader2 v-if="submitMutation.isPending.value" class="size-4 animate-spin" />
         {{ t('common.submit') }}
       </Button>

@@ -11,13 +11,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 import { Loader2 } from 'lucide-vue-next'
 
@@ -26,11 +20,13 @@ const auth = useAuthStore()
 const router = useRouter()
 const loading = ref(false)
 
-const formSchema = toTypedSchema(z.object({
-  userName: z.string().min(2, t('validation.userNameRequired')),
-  email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
-  password: z.string().min(8, t('validation.passwordMin')),
-}))
+const formSchema = toTypedSchema(
+  z.object({
+    userName: z.string().min(2, t('validation.userNameRequired')),
+    email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
+    password: z.string().min(8, t('validation.passwordMin')),
+  }),
+)
 
 const form = useForm({
   validationSchema: formSchema,
@@ -42,7 +38,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     await auth.register(values.userName, values.email, values.password)
     toast.success(t('auth.registerSuccess', { name: values.userName }))
     await router.push('/login')
-  } catch (error: any) {
+  } catch {
     toast.error(t('errors.registerFailed'))
   } finally {
     loading.value = false
@@ -54,7 +50,9 @@ const onSubmit = form.handleSubmit(async (values) => {
   <AuthLayout :subtitle="t('auth.registerSubtitle')">
     <Card class="noctf-panel w-full rounded-xl px-2 py-4 sm:px-4">
       <CardHeader class="space-y-2 text-center">
-        <CardTitle class="text-3xl font-bold tracking-tight">{{ t('auth.registerTitle') }}</CardTitle>
+        <CardTitle class="text-3xl font-bold tracking-tight">{{
+          t('auth.registerTitle')
+        }}</CardTitle>
         <CardDescription class="text-base">{{ t('auth.registerSubtitle') }}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -63,10 +61,10 @@ const onSubmit = form.handleSubmit(async (values) => {
             <FormItem>
               <FormLabel>{{ t('auth.userName') }}</FormLabel>
               <FormControl>
-                <Input 
-                  type="text" 
-                  placeholder="johndoe" 
-                  v-bind="componentField" 
+                <Input
+                  type="text"
+                  placeholder="johndoe"
+                  v-bind="componentField"
                   :disabled="loading"
                   autocomplete="username"
                 />
@@ -79,10 +77,10 @@ const onSubmit = form.handleSubmit(async (values) => {
             <FormItem>
               <FormLabel>{{ t('auth.email') }}</FormLabel>
               <FormControl>
-                <Input 
-                  type="email" 
-                  placeholder="name@example.com" 
-                  v-bind="componentField" 
+                <Input
+                  type="email"
+                  placeholder="name@example.com"
+                  v-bind="componentField"
                   :disabled="loading"
                   autocomplete="email"
                 />
@@ -95,9 +93,9 @@ const onSubmit = form.handleSubmit(async (values) => {
             <FormItem>
               <FormLabel>{{ t('auth.password') }}</FormLabel>
               <FormControl>
-                <Input 
-                  type="password" 
-                  v-bind="componentField" 
+                <Input
+                  type="password"
+                  v-bind="componentField"
                   :disabled="loading"
                   autocomplete="new-password"
                 />

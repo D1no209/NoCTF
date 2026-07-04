@@ -2,7 +2,9 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using NoCTF.API.Permissions;
+using NoCTF.Application;
 using NoCTF.Application.CompetitionModes;
+using NoCTF.Application.Leaderboard;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -319,7 +321,12 @@ public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db, ICompet
     }
 }
 
-public class DeleteCompetitionChallengeEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
+public class DeleteCompetitionChallengeEndpoint(
+    ApplicationDbContext db,
+    ICompetitionPermissionService permissions,
+    ILeaderboardService leaderboardService,
+    IRedisLeaderboardCache leaderboardCache,
+    IHubNotifierService hubNotifier)
     : EndpointWithoutRequest, IAuditableEndpoint
 {
     public override void Configure()
@@ -352,8 +359,48 @@ public class DeleteCompetitionChallengeEndpoint(ApplicationDbContext db, ICompet
             .Where(h => h.CompetitionId == competitionId && h.ChallengeId == challengeId)
             .ToListAsync(ct);
         db.ChallengeHints.RemoveRange(hints);
+        await db.Submissions
+            .IgnoreQueryFilters()
+            .Where(s => s.CompetitionId == competitionId && s.ChallengeId == challengeId)
+            .ExecuteDeleteAsync(ct);
+        await db.ScoreEvents
+            .IgnoreQueryFilters()
+            .Where(s => s.CompetitionId == competitionId && s.ChallengeId == challengeId)
+            .ExecuteDeleteAsync(ct);
+        await db.ScoreSignals
+            .IgnoreQueryFilters()
+            .Where(s => s.CompetitionId == competitionId && s.SubjectId == challengeId)
+            .ExecuteDeleteAsync(ct);
+        await db.CtfDynamicFlags
+            .IgnoreQueryFilters()
+            .Where(f => f.CompetitionId == competitionId && f.ChallengeId == challengeId)
+            .ExecuteDeleteAsync(ct);
+        await db.DynamicFlagInstances
+            .IgnoreQueryFilters()
+            .Where(f => f.CompetitionId == competitionId && f.ChallengeId == challengeId)
+            .ExecuteDeleteAsync(ct);
+        await db.CheatIncidents
+            .IgnoreQueryFilters()
+            .Where(i => i.CompetitionId == competitionId && i.ChallengeId == challengeId)
+            .ExecuteDeleteAsync(ct);
         db.Challenges.Remove(challenge);
         await db.SaveChangesAsync(ct);
+        await RefreshLeaderboardAsync(competitionId, ct);
         await SendNoContentAsync(ct);
+    }
+
+    private async Task RefreshLeaderboardAsync(Guid competitionId, CancellationToken ct)
+    {
+        var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
+        await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+        await hubNotifier.NotifyLeaderboardSnapshotAsync(
+            competitionId,
+            entries.Select(e => new LeaderboardEntryPayload(
+                e.Rank,
+                e.TeamId,
+                e.TeamName,
+                e.TotalScore,
+                e.SolvedCount)),
+            ct);
     }
 }

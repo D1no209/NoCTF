@@ -353,7 +353,7 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
 
         var env = dynamicFlag is null
             ? null
-            : new Dictionary<string, string> { [dynamicFlag.EnvironmentVariable] = dynamicFlag.FlagUuid };
+            : new Dictionary<string, string> { [dynamicFlag.EnvironmentVariable] = FormatFlag(challenge, dynamicFlag.FlagUuid) };
 
         return new ContainerConfig(
             Image: image,
@@ -369,6 +369,22 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             Entrypoint: spec.Entrypoint.Count > 0 ? spec.Entrypoint : null,
             OrchestrationJson: challenge.OrchestrationJson,
             Ttl: ChallengeInstanceRuntime.InstanceTtl);
+    }
+
+    private static string FormatFlag(Challenge challenge, string content)
+    {
+        var prefix = string.IsNullOrWhiteSpace(challenge.FlagPrefix) ? "flag" : challenge.FlagPrefix.Trim();
+        if (prefix.Contains("{0}", StringComparison.Ordinal))
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, prefix, content);
+
+        if (prefix.Contains("{}", StringComparison.Ordinal))
+            return prefix.Replace("{}", $"{{{content}}}", StringComparison.Ordinal);
+
+        var braceIndex = prefix.IndexOf('{', StringComparison.Ordinal);
+        if (braceIndex >= 0)
+            prefix = prefix[..braceIndex].Trim();
+
+        return $"{prefix}{{{content}}}";
     }
 
     internal static async Task DestroyTrackedBoxAsync(

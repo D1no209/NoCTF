@@ -4,12 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { competitionApi } from '@/api/noctf'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Table,
   TableBody,
@@ -90,6 +85,17 @@ interface ChallengeScore {
   solvedAt?: string | null
 }
 
+interface TeamScoreRow {
+  challengeId: string
+  challengeTitle: string
+  direction: string
+  submitter: string
+  score: string
+  submittedAt?: string | null
+  sortTime: number
+  bloodRank?: number | null
+}
+
 const props = defineProps<{
   competitionId: string
   teamId?: string | null
@@ -113,10 +119,15 @@ const hoveredTeamId = ref<string | null>(null)
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
 const chartFrame = {
-  left: 58,
-  right: 624,
-  top: 32,
-  bottom: 198,
+  left: 68,
+  right: 724,
+  top: 38,
+  bottom: 282,
+}
+const radarFrame = {
+  centerX: 180,
+  centerY: 150,
+  radius: 98,
 }
 const chartColors = [
   'oklch(0.56 0.23 262)',
@@ -130,66 +141,31 @@ const chartColors = [
   'oklch(0.62 0.14 125)',
   'oklch(0.58 0.17 75)',
 ]
-const leaderboardFrame = {
-  left: 78,
-  right: 624,
-  top: 30,
-  bottom: 248,
-}
-const leaderboardRowHeight = 20
+const sortedEntries = computed(() =>
+  entries.value.map((entry) => ({
+    ...entry,
+    totalScore: entry.totalScore ?? entry.score ?? 0,
+    solvedCount: entry.solvedCount ?? 0,
+  })),
+)
 
-const sortedEntries = computed(() => entries.value.map(entry => ({
-  ...entry,
-  totalScore: entry.totalScore ?? entry.score ?? 0,
-  solvedCount: entry.solvedCount ?? 0,
-})))
+const visibleTrend = computed(() => {
+  const activeTeamIds = new Set(
+    sortedEntries.value
+      .map((entry) => entry.teamId)
+      .filter((teamId): teamId is string => Boolean(teamId)),
+  )
 
-const leaderboardChartEntries = computed(() => sortedEntries.value.slice(0, 10))
-
-const leaderboardBounds = computed(() => {
-  const scores = leaderboardChartEntries.value.map(entry => entry.totalScore ?? 0)
-  const maxScore = niceScoreCeil(Math.max(...scores, 1))
-  const minScore = Math.min(0, ...scores)
-  return {
-    minScore: minScore < 0 ? -niceScoreCeil(Math.abs(minScore)) : 0,
-    maxScore,
-  }
+  if (!activeTeamIds.size) return []
+  return trend.value.filter((series) => activeTeamIds.has(series.teamId)).slice(0, 10)
 })
-
-const leaderboardScoreTicks = computed(() => {
-  const { minScore, maxScore } = leaderboardBounds.value
-  const range = Math.max(1, maxScore - minScore)
-  const ticks = 5
-  const values = new Set<number>()
-  for (let index = 0; index < ticks; index++)
-    values.add(Math.round(minScore + (range * index) / (ticks - 1)))
-  values.add(0)
-  return Array.from(values).sort((first, second) => first - second)
-})
-
-const leaderboardChartRows = computed(() => leaderboardChartEntries.value.map((entry, index) => {
-  const score = entry.totalScore ?? 0
-  const zeroX = leaderboardScoreToX(0)
-  const scoreX = leaderboardScoreToX(score)
-  return {
-    entry,
-    y: leaderboardFrame.top + index * leaderboardRowHeight,
-    x: Math.min(zeroX, scoreX),
-    width: Math.max(2, Math.abs(scoreX - zeroX)),
-    scoreX,
-    scoreLabelX: score >= 0
-      ? Math.min(leaderboardFrame.right - 8, scoreX + 8)
-      : Math.max(leaderboardFrame.left + 8, scoreX - 8),
-    scoreLabelAnchor: score >= 0 ? 'start' : 'end',
-  }
-}))
 
 const chartBounds = computed(() => {
-  const allPoints = trend.value.flatMap(series => series.points ?? [])
+  const allPoints = visibleTrend.value.flatMap((series) => series.points ?? [])
   const timestamps = allPoints
-    .map(point => Date.parse(point.timestamp))
-    .filter(value => Number.isFinite(value))
-  const scores = allPoints.map(point => point.score ?? 0)
+    .map((point) => Date.parse(point.timestamp))
+    .filter((value) => Number.isFinite(value))
+  const scores = allPoints.map((point) => point.score ?? 0)
   const now = Date.now()
   const minTime = timestamps.length ? Math.min(...timestamps) : now
   const rawMaxTime = timestamps.length ? Math.max(...timestamps) : now + 60_000
@@ -222,30 +198,131 @@ const timeTicks = computed(() => {
   })
 })
 
-const hoveredSeries = computed(() => trend.value.find(series => series.teamId === hoveredTeamId.value) ?? null)
-const hoveredSeriesIndex = computed(() => trend.value.findIndex(series => series.teamId === hoveredTeamId.value))
-const hoveredSeriesPath = computed(() => hoveredSeries.value ? buildPath(hoveredSeries.value.points) : '')
-const hoveredSeriesColor = computed(() => chartColors[Math.max(0, hoveredSeriesIndex.value) % chartColors.length])
+const hoveredSeries = computed(
+  () => visibleTrend.value.find((series) => series.teamId === hoveredTeamId.value) ?? null,
+)
+const hoveredSeriesIndex = computed(() =>
+  visibleTrend.value.findIndex((series) => series.teamId === hoveredTeamId.value),
+)
+const hoveredSeriesPath = computed(() =>
+  hoveredSeries.value ? buildPath(hoveredSeries.value.points) : '',
+)
+const hoveredSeriesColor = computed(
+  () => chartColors[Math.max(0, hoveredSeriesIndex.value) % chartColors.length],
+)
+
+const selectedDirectionRadar = computed(() => {
+  const directions = selectedTeam.value?.directionScores ?? []
+  const axisCount = Math.max(directions.length, 3)
+  const maxScore = niceScoreCeil(Math.max(...directions.map((direction) => direction.score), 1))
+  const rings = [0.25, 0.5, 0.75, 1].map((ratio) => ({
+    ratio,
+    label: Math.round(maxScore * ratio),
+    points: radarPolygonPoints(axisCount, radarFrame.radius * ratio),
+  }))
+  const axes = directions.map((direction, index) => {
+    const outer = radarPoint(index, axisCount, radarFrame.radius)
+    const label = radarPoint(index, axisCount, radarFrame.radius + 27)
+    const value = radarPoint(
+      index,
+      axisCount,
+      radarFrame.radius * (direction.score / Math.max(1, maxScore)),
+    )
+    return {
+      ...direction,
+      outer,
+      label,
+      value,
+      textAnchor: radarTextAnchor(label.x),
+      labelDy: radarLabelDy(label.y),
+    }
+  })
+  const valuePoints = Array.from({ length: axisCount }, (_, index) => {
+    const score = directions[index]?.score ?? 0
+    return radarPoint(index, axisCount, radarFrame.radius * (score / Math.max(1, maxScore)))
+  })
+  return {
+    axes,
+    rings,
+    maxScore,
+    valuePoints: pointList(valuePoints),
+  }
+})
+
+const selectedScoreRows = computed<TeamScoreRow[]>(() => {
+  if (!selectedTeam.value) return []
+  const challengeScores = new Map(
+    selectedTeam.value.challengeScores.map((score) => [score.challengeId, score]),
+  )
+  const memberRows = selectedTeam.value.members.flatMap((member) =>
+    member.solves.map((solve) => {
+      const challengeScore = challengeScores.get(solve.challengeId)
+      return {
+        challengeId: solve.challengeId,
+        challengeTitle: solve.challengeTitle,
+        direction: solve.direction,
+        submitter: member.userName,
+        score: challengeScore ? formatChallengeScore(challengeScore) : '-',
+        submittedAt: solve.submittedAt,
+        sortTime: Date.parse(solve.submittedAt) || 0,
+        bloodRank: challengeScore?.bloodRank,
+      }
+    }),
+  )
+
+  if (memberRows.length) {
+    return memberRows.sort((first, second) => second.sortTime - first.sortTime)
+  }
+
+  return selectedTeam.value.challengeScores
+    .filter((score) => score.solvedAt)
+    .map((score) => ({
+      challengeId: score.challengeId,
+      challengeTitle: score.challengeTitle,
+      direction: score.direction,
+      submitter: '-',
+      score: formatChallengeScore(score),
+      submittedAt: score.solvedAt,
+      sortTime: Date.parse(score.solvedAt ?? '') || 0,
+      bloodRank: score.bloodRank,
+    }))
+    .sort((first, second) => second.sortTime - first.sortTime)
+})
 
 function niceScoreCeil(value: number) {
-  if (value <= 10)
-    return 10
+  if (value <= 10) return 10
   const magnitude = 10 ** Math.floor(Math.log10(value))
   const normalized = value / magnitude
   const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
   return nice * magnitude
 }
 
-function leaderboardScoreToX(score: number) {
-  const width = leaderboardFrame.right - leaderboardFrame.left
-  const { minScore, maxScore } = leaderboardBounds.value
-  return leaderboardFrame.left + ((score - minScore) / Math.max(1, maxScore - minScore)) * width
+function radarPoint(index: number, count: number, radius: number) {
+  const angle = -Math.PI / 2 + (Math.PI * 2 * index) / count
+  return {
+    x: radarFrame.centerX + Math.cos(angle) * radius,
+    y: radarFrame.centerY + Math.sin(angle) * radius,
+  }
 }
 
-function shortTeamName(name?: string) {
-  if (!name)
-    return '-'
-  return name.length > 18 ? `${name.slice(0, 17)}...` : name
+function pointList(points: { x: number; y: number }[]) {
+  return points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ')
+}
+
+function radarPolygonPoints(count: number, radius: number) {
+  return pointList(Array.from({ length: count }, (_, index) => radarPoint(index, count, radius)))
+}
+
+function radarTextAnchor(x: number) {
+  if (x > radarFrame.centerX + 12) return 'start'
+  if (x < radarFrame.centerX - 12) return 'end'
+  return 'middle'
+}
+
+function radarLabelDy(y: number) {
+  if (y < radarFrame.centerY - radarFrame.radius * 0.7) return '-0.45em'
+  if (y > radarFrame.centerY + radarFrame.radius * 0.7) return '0.9em'
+  return '0.35em'
 }
 
 function scoreToY(score: number) {
@@ -261,23 +338,21 @@ function timeToX(time: number) {
 
 function normalizePoints(points: TrendPoint[]) {
   return (points ?? [])
-    .map(point => ({
+    .map((point) => ({
       time: Date.parse(point.timestamp),
       score: point.score ?? 0,
     }))
-    .filter(point => Number.isFinite(point.time))
+    .filter((point) => Number.isFinite(point.time))
     .sort((a, b) => a.time - b.time)
 }
 
 function buildPath(points: TrendPoint[]) {
-  if (!points?.length)
-    return ''
-  const mapped = normalizePoints(points).map(point => ({
+  if (!points?.length) return ''
+  const mapped = normalizePoints(points).map((point) => ({
     x: timeToX(point.time),
     y: scoreToY(point.score),
   }))
-  if (!mapped.length)
-    return ''
+  if (!mapped.length) return ''
 
   let path = `M ${chartFrame.left} ${mapped[0].y.toFixed(1)} L ${mapped[0].x.toFixed(1)} ${mapped[0].y.toFixed(1)}`
   for (let index = 1; index < mapped.length; index += 1) {
@@ -311,27 +386,21 @@ function formatTimeTick(time: number) {
 }
 
 function bloodLabel(rank?: number | null) {
-  if (rank === 1)
-    return t('scoreboard.firstBlood')
-  if (rank === 2)
-    return t('scoreboard.secondBlood')
-  if (rank === 3)
-    return t('scoreboard.thirdBlood')
+  if (rank === 1) return t('scoreboard.firstBlood')
+  if (rank === 2) return t('scoreboard.secondBlood')
+  if (rank === 3) return t('scoreboard.thirdBlood')
   return ''
 }
 
 function formatChallengeScore(score: ChallengeScore) {
-  if (!score.solvedAt)
-    return '-'
-  if (score.bonusScore === 0)
-    return `${score.baseScore}`
+  if (!score.solvedAt) return '-'
+  if (score.bonusScore === 0) return `${score.baseScore}`
   const sign = score.bonusScore > 0 ? '+' : ''
   return `${score.baseScore} (${sign}${score.bonusScore})`
 }
 
 function formatDate(value?: string | null) {
-  if (!value)
-    return '-'
+  if (!value) return '-'
   return new Intl.DateTimeFormat(locale.value, {
     month: '2-digit',
     day: '2-digit',
@@ -354,32 +423,30 @@ async function fetchLeaderboard() {
     ])
     applyLeaderboard(leaderboardData?.entries ?? [])
     trend.value = trendData?.series ?? []
-  }
-  catch {
+  } catch {
     // Keep the last successful snapshot while polling.
-  }
-  finally {
+  } finally {
     loading.value = false
   }
 }
 
 async function openTeamDetail(teamId?: string) {
-  if (!teamId)
-    return
+  if (!teamId) return
   selectedTeamId.value = teamId
   detailLoading.value = true
   selectedTeam.value = null
   try {
-    selectedTeam.value = await competitionApi.leaderboardTeam<TeamDetail>(props.competitionId, teamId)
-  }
-  finally {
+    selectedTeam.value = await competitionApi.leaderboardTeam<TeamDetail>(
+      props.competitionId,
+      teamId,
+    )
+  } finally {
     detailLoading.value = false
   }
 }
 
 function startPolling() {
-  if (pollInterval)
-    return
+  if (pollInterval) return
   usingFallback.value = true
   pollInterval = setInterval(fetchLeaderboard, 10_000)
 }
@@ -407,32 +474,38 @@ const { connection, isConnected, start } = useSignalR({
   },
 })
 
-watch(connection, (conn) => {
-  if (!conn)
-    return
-  conn.on('ReceiveLeaderboardSnapshot', (data: LeaderboardEntry[]) => {
-    applyLeaderboard(data ?? [])
-    competitionApi.leaderboardTrend<TrendResponse>(props.competitionId)
-      .then((nextTrend) => {
-        trend.value = nextTrend?.series ?? []
-      })
-      .catch(() => undefined)
-  })
-  conn.on('ReceiveScoreUpdate', () => {
-    fetchLeaderboard()
-  })
-}, { immediate: true })
+watch(
+  connection,
+  (conn) => {
+    if (!conn) return
+    conn.on('ReceiveLeaderboardSnapshot', (data: LeaderboardEntry[]) => {
+      applyLeaderboard(data ?? [])
+      competitionApi
+        .leaderboardTrend<TrendResponse>(props.competitionId)
+        .then((nextTrend) => {
+          trend.value = nextTrend?.series ?? []
+        })
+        .catch(() => undefined)
+    })
+    conn.on('ReceiveScoreUpdate', () => {
+      fetchLeaderboard()
+    })
+  },
+  { immediate: true },
+)
 
-watch(() => props.teamId, () => {
-  scoreStore.updateFromLeaderboard(entries.value as never, props.teamId, props.competitionId)
-})
+watch(
+  () => props.teamId,
+  () => {
+    scoreStore.updateFromLeaderboard(entries.value as never, props.teamId, props.competitionId)
+  },
+)
 
 onMounted(async () => {
   await fetchLeaderboard()
   try {
     await start()
-  }
-  catch {
+  } catch {
     startPolling()
   }
 })
@@ -461,14 +534,26 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="trend.length" class="rounded-xl border bg-background/55 p-3">
-      <div class="mb-2 flex items-center justify-between gap-3">
+    <div v-if="visibleTrend.length" class="rounded-lg border bg-background p-4">
+      <div class="mb-3 flex items-center justify-between gap-3">
         <h3 class="text-sm font-medium">
           {{ t('scoreboard.topTrend') }}
         </h3>
         <span class="text-xs text-muted-foreground">{{ t('scoreboard.topTrendHint') }}</span>
       </div>
-      <svg viewBox="0 0 660 240" class="h-56 w-full overflow-visible" @mouseleave="hoveredTeamId = null">
+      <svg
+        viewBox="0 0 760 328"
+        class="h-80 w-full overflow-visible"
+        @mouseleave="hoveredTeamId = null"
+      >
+        <rect
+          :x="chartFrame.left"
+          :y="chartFrame.top"
+          :width="chartFrame.right - chartFrame.left"
+          :height="chartFrame.bottom - chartFrame.top"
+          rx="8"
+          class="fill-muted/20"
+        />
         <g class="text-[10px]">
           <g v-for="tick in scoreTicks" :key="`score-${tick.value}`">
             <line
@@ -476,9 +561,9 @@ onUnmounted(() => {
               :y1="tick.y"
               :x2="chartFrame.right"
               :y2="tick.y"
-              class="stroke-border/80"
+              class="stroke-border/70"
               stroke-width="1"
-              stroke-dasharray="3 5"
+              stroke-dasharray="2 7"
             />
             <text
               :x="chartFrame.left - 10"
@@ -492,11 +577,12 @@ onUnmounted(() => {
           <g v-for="tick in timeTicks" :key="`time-${tick.timestamp}`">
             <line
               :x1="tick.x"
-              :y1="chartFrame.bottom"
+              :y1="chartFrame.top"
               :x2="tick.x"
-              :y2="chartFrame.bottom + 4"
-              class="stroke-border"
+              :y2="chartFrame.bottom"
+              class="stroke-border/45"
               stroke-width="1"
+              stroke-dasharray="2 9"
             />
             <text
               :x="tick.x"
@@ -523,10 +609,24 @@ onUnmounted(() => {
         >
           {{ t('scoreboard.time') }}
         </text>
-        <line :x1="chartFrame.left" :y1="chartFrame.bottom" :x2="chartFrame.right" :y2="chartFrame.bottom" class="stroke-border" stroke-width="1" />
-        <line :x1="chartFrame.left" :y1="chartFrame.top" :x2="chartFrame.left" :y2="chartFrame.bottom" class="stroke-border" stroke-width="1" />
+        <line
+          :x1="chartFrame.left"
+          :y1="chartFrame.bottom"
+          :x2="chartFrame.right"
+          :y2="chartFrame.bottom"
+          class="stroke-border"
+          stroke-width="1"
+        />
+        <line
+          :x1="chartFrame.left"
+          :y1="chartFrame.top"
+          :x2="chartFrame.left"
+          :y2="chartFrame.bottom"
+          class="stroke-border"
+          stroke-width="1"
+        />
         <path
-          v-for="(series, index) in trend"
+          v-for="(series, index) in visibleTrend"
           :key="series.teamId"
           :d="buildPath(series.points)"
           fill="none"
@@ -537,8 +637,31 @@ onUnmounted(() => {
           class="scoreboard-trend-line"
           :style="{ opacity: seriesOpacity(series.teamId) }"
         />
+        <g
+          v-for="(series, index) in visibleTrend"
+          :key="`end-${series.teamId}`"
+          :style="{ opacity: seriesOpacity(series.teamId) }"
+        >
+          <circle
+            v-if="normalizePoints(series.points).length"
+            :cx="chartFrame.right"
+            :cy="scoreToY(normalizePoints(series.points).at(-1)?.score ?? 0)"
+            r="4"
+            :fill="chartColors[index % chartColors.length]"
+            class="stroke-background"
+            stroke-width="2"
+          />
+          <text
+            v-if="normalizePoints(series.points).length"
+            :x="chartFrame.right + 10"
+            :y="scoreToY(normalizePoints(series.points).at(-1)?.score ?? 0) + 4"
+            class="fill-muted-foreground text-[10px] font-semibold"
+          >
+            {{ normalizePoints(series.points).at(-1)?.score ?? 0 }}
+          </text>
+        </g>
         <path
-          v-for="series in trend"
+          v-for="series in visibleTrend"
           :key="`hit-${series.teamId}`"
           :d="buildPath(series.points)"
           fill="none"
@@ -578,10 +701,14 @@ onUnmounted(() => {
       </svg>
       <div class="flex flex-wrap gap-3 text-xs">
         <span
-          v-for="(series, index) in trend"
+          v-for="(series, index) in visibleTrend"
           :key="series.teamId"
           class="inline-flex cursor-default items-center gap-1.5 rounded-full px-2 py-1 transition-colors"
-          :class="hoveredTeamId === series.teamId ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'"
+          :class="
+            hoveredTeamId === series.teamId
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+          "
           @mouseenter="hoveredTeamId = series.teamId"
           @mouseleave="hoveredTeamId = null"
         >
@@ -594,105 +721,14 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="leaderboardChartEntries.length" class="rounded-xl border bg-background/55 p-3">
-      <div class="mb-2 flex items-center justify-between gap-3">
-        <h3 class="text-sm font-medium">
-          {{ t('scoreboard.scoreDistribution') }}
-        </h3>
-        <span class="text-xs text-muted-foreground">{{ t('scoreboard.scoreDistributionHint') }}</span>
-      </div>
-      <svg viewBox="0 0 660 292" class="h-72 w-full overflow-visible">
-        <g class="text-[10px]">
-          <g v-for="tick in leaderboardScoreTicks" :key="`leaderboard-score-${tick}`">
-            <line
-              :x1="leaderboardScoreToX(tick)"
-              :y1="leaderboardFrame.top - 10"
-              :x2="leaderboardScoreToX(tick)"
-              :y2="leaderboardFrame.bottom"
-              class="stroke-border/80"
-              stroke-width="1"
-              stroke-dasharray="3 6"
-            />
-            <text
-              :x="leaderboardScoreToX(tick)"
-              :y="leaderboardFrame.bottom + 17"
-              text-anchor="middle"
-              class="fill-muted-foreground tabular-nums"
-            >
-              {{ tick }}
-            </text>
-          </g>
-          <line
-            v-if="leaderboardBounds.minScore < 0"
-            :x1="leaderboardScoreToX(0)"
-            :y1="leaderboardFrame.top - 10"
-            :x2="leaderboardScoreToX(0)"
-            :y2="leaderboardFrame.bottom"
-            class="stroke-foreground/35"
-            stroke-width="1.5"
-          />
-          <line :x1="leaderboardFrame.left" :y1="leaderboardFrame.bottom" :x2="leaderboardFrame.right" :y2="leaderboardFrame.bottom" class="stroke-border" stroke-width="1" />
-          <line :x1="leaderboardFrame.left" :y1="leaderboardFrame.top - 10" :x2="leaderboardFrame.left" :y2="leaderboardFrame.bottom" class="stroke-border" stroke-width="1" />
-        </g>
-
-        <text :x="leaderboardFrame.left - 54" :y="leaderboardFrame.top - 15" class="fill-muted-foreground text-[10px] font-medium">
-          {{ t('scoreboard.rank') }}
-        </text>
-        <text :x="leaderboardFrame.right" :y="leaderboardFrame.bottom + 34" text-anchor="end" class="fill-muted-foreground text-[10px] font-medium">
-          {{ t('scoreboard.score') }}
-        </text>
-
-        <g v-for="row in leaderboardChartRows" :key="row.entry.teamId ?? row.entry.teamName">
-          <line
-            :x1="leaderboardFrame.left"
-            :y1="row.y + 8"
-            :x2="leaderboardFrame.right"
-            :y2="row.y + 8"
-            class="stroke-border/55"
-            stroke-width="1"
-            stroke-dasharray="2 8"
-          />
-          <text
-            :x="leaderboardFrame.left - 13"
-            :y="row.y + 12"
-            text-anchor="end"
-            class="fill-muted-foreground text-[10px] font-semibold tabular-nums"
-          >
-            {{ row.entry.rank ?? '-' }}
-          </text>
-          <text
-            :x="leaderboardFrame.left + 4"
-            :y="row.y + 25"
-            class="fill-muted-foreground text-[10px]"
-          >
-            {{ shortTeamName(row.entry.teamName) }}
-          </text>
-          <rect
-            :x="row.x"
-            :y="row.y"
-            :width="row.width"
-            height="14"
-            rx="4"
-            :class="(row.entry.rank ?? 99) <= 3 ? 'fill-primary/80' : 'fill-primary/50'"
-          />
-          <circle :cx="row.scoreX" :cy="row.y + 7" r="3" class="fill-primary stroke-background" stroke-width="1.5" />
-          <text
-            :x="row.scoreLabelX"
-            :y="row.y + 12"
-            :text-anchor="row.scoreLabelAnchor"
-            class="fill-foreground text-[10px] font-semibold tabular-nums"
-          >
-            {{ row.entry.totalScore }}
-          </text>
-        </g>
-      </svg>
-    </div>
-
     <div v-if="loading" class="text-sm text-muted-foreground">
       {{ t('scoreboard.loading') }}
     </div>
 
-    <div v-else-if="sortedEntries.length === 0" class="noctf-state-box text-sm text-muted-foreground">
+    <div
+      v-else-if="sortedEntries.length === 0"
+      class="noctf-state-box text-sm text-muted-foreground"
+    >
       {{ t('scoreboard.empty') }}
     </div>
 
@@ -743,8 +779,15 @@ onUnmounted(() => {
       </Table>
     </div>
 
-    <Dialog :open="Boolean(selectedTeamId)" @update:open="(open) => { if (!open) selectedTeamId = null }">
-      <DialogContent class="noctf-scrollbar max-h-[85vh] max-w-3xl overflow-y-auto">
+    <Dialog
+      :open="Boolean(selectedTeamId)"
+      @update:open="
+        (open) => {
+          if (!open) selectedTeamId = null
+        }
+      "
+    >
+      <DialogContent class="noctf-scrollbar max-h-[85vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ selectedTeam?.teamName ?? t('scoreboard.teamDetail') }}</DialogTitle>
         </DialogHeader>
@@ -785,14 +828,80 @@ onUnmounted(() => {
             <h3 class="mb-2 text-sm font-medium">
               {{ t('scoreboard.directionScores') }}
             </h3>
-            <div v-if="selectedTeam.directionScores.length" class="grid gap-2 sm:grid-cols-2">
-              <div
-                v-for="direction in selectedTeam.directionScores"
-                :key="direction.direction"
-                class="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2 text-sm"
-              >
-                <span class="font-medium">{{ direction.direction }}</span>
-                <span class="font-mono">{{ direction.score }} / {{ direction.solvedCount }}</span>
+            <div
+              v-if="selectedDirectionRadar.axes.length"
+              class="grid gap-4 rounded-lg border bg-background p-3 md:grid-cols-[minmax(0,22rem)_1fr] md:items-center"
+            >
+              <svg viewBox="0 0 360 300" class="h-72 w-full overflow-visible">
+                <polygon
+                  v-for="ring in selectedDirectionRadar.rings"
+                  :key="ring.ratio"
+                  :points="ring.points"
+                  fill="none"
+                  class="stroke-border/75"
+                  stroke-width="1"
+                />
+                <line
+                  v-for="axis in selectedDirectionRadar.axes"
+                  :key="`axis-${axis.direction}`"
+                  :x1="radarFrame.centerX"
+                  :y1="radarFrame.centerY"
+                  :x2="axis.outer.x"
+                  :y2="axis.outer.y"
+                  class="stroke-border/70"
+                  stroke-width="1"
+                  stroke-dasharray="3 6"
+                />
+                <polygon
+                  :points="selectedDirectionRadar.valuePoints"
+                  class="fill-primary/15 stroke-primary"
+                  stroke-width="2"
+                />
+                <circle
+                  v-for="axis in selectedDirectionRadar.axes"
+                  :key="`point-${axis.direction}`"
+                  :cx="axis.value.x"
+                  :cy="axis.value.y"
+                  r="4"
+                  class="fill-primary stroke-background"
+                  stroke-width="2"
+                >
+                  <title>{{ axis.direction }}: {{ axis.score }}</title>
+                </circle>
+                <text
+                  v-for="axis in selectedDirectionRadar.axes"
+                  :key="`score-${axis.direction}`"
+                  :x="axis.value.x + 9"
+                  :y="axis.value.y + 4"
+                  class="fill-primary text-[11px] font-semibold tabular-nums"
+                >
+                  {{ axis.score }}
+                </text>
+                <text
+                  v-for="axis in selectedDirectionRadar.axes"
+                  :key="`label-${axis.direction}`"
+                  :x="axis.label.x"
+                  :y="axis.label.y"
+                  :text-anchor="axis.textAnchor"
+                  :dy="axis.labelDy"
+                  class="fill-foreground text-[11px] font-semibold"
+                >
+                  {{ axis.direction }}
+                </text>
+              </svg>
+
+              <div class="divide-y rounded-md border text-sm">
+                <div
+                  v-for="direction in selectedTeam.directionScores"
+                  :key="direction.direction"
+                  class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-2"
+                >
+                  <span class="truncate font-medium">{{ direction.direction }}</span>
+                  <span class="font-mono tabular-nums">{{ direction.score }}</span>
+                  <span class="text-xs text-muted-foreground tabular-nums">
+                    {{ direction.solvedCount }} {{ t('scoreboard.solves') }}
+                  </span>
+                </div>
               </div>
             </div>
             <p v-else class="text-sm text-muted-foreground">
@@ -802,82 +911,59 @@ onUnmounted(() => {
 
           <div>
             <h3 class="mb-2 text-sm font-medium">
-              {{ t('scoreboard.challengeScores') }}
+              {{ t('scoreboard.scoreDetails') }}
             </h3>
-            <div class="noctf-table-shell">
+            <div v-if="selectedScoreRows.length" class="noctf-table-shell">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{{ t('challenges.title') }}</TableHead>
                     <TableHead>{{ t('admin.challenges.direction') }}</TableHead>
+                    <TableHead>{{ t('scoreboard.submitter') }}</TableHead>
                     <TableHead class="text-right">
-                      {{ t('scoreboard.currentPoints') }}
+                      {{ t('scoreboard.score') }}
                     </TableHead>
                     <TableHead class="text-right">
-                      {{ t('scoreboard.teamScore') }}
+                      {{ t('scoreboard.time') }}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow v-for="score in selectedTeam.challengeScores" :key="score.challengeId">
+                  <TableRow
+                    v-for="row in selectedScoreRows"
+                    :key="`${row.challengeId}-${row.submitter}-${row.submittedAt ?? 'unknown'}`"
+                  >
                     <TableCell>
                       <div class="font-medium">
-                        {{ score.challengeTitle }}
+                        {{ row.challengeTitle }}
                       </div>
                       <Badge
-                        v-if="score.bloodRank"
+                        v-if="row.bloodRank"
                         variant="outline"
                         class="mt-1 border-amber-500/70 bg-amber-500/10 text-amber-700"
                       >
-                        {{ bloodLabel(score.bloodRank) }}
+                        {{ bloodLabel(row.bloodRank) }}
                       </Badge>
                     </TableCell>
                     <TableCell class="text-muted-foreground">
-                      {{ score.direction }}
+                      {{ row.direction }}
                     </TableCell>
-                    <TableCell class="text-right font-mono">
-                      {{ score.currentPoints }}
+                    <TableCell>
+                      {{ row.submitter }}
                     </TableCell>
-                    <TableCell class="text-right font-mono" :class="score.solvedAt ? 'font-semibold text-foreground' : 'text-muted-foreground'">
-                      {{ formatChallengeScore(score) }}
+                    <TableCell class="text-right font-mono font-semibold">
+                      {{ row.score }}
+                    </TableCell>
+                    <TableCell class="text-right font-mono text-xs text-muted-foreground">
+                      {{ formatDate(row.submittedAt) }}
                     </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
             </div>
-          </div>
-
-          <div>
-            <h3 class="mb-2 text-sm font-medium">
-              {{ t('scoreboard.memberHistory') }}
-            </h3>
-            <div class="space-y-3">
-              <div
-                v-for="member in selectedTeam.members"
-                :key="member.userId"
-                class="rounded-lg border bg-background/60 p-3"
-              >
-                <div class="mb-2 flex items-center justify-between">
-                  <span class="font-medium">{{ member.userName }}</span>
-                  <Badge variant="secondary">
-                    {{ member.solves.length }}
-                  </Badge>
-                </div>
-                <div v-if="member.solves.length" class="space-y-1 text-sm">
-                  <div
-                    v-for="solve in member.solves"
-                    :key="`${member.userId}-${solve.challengeId}-${solve.submittedAt}`"
-                    class="flex flex-wrap items-center justify-between gap-2 text-muted-foreground"
-                  >
-                    <span>{{ solve.challengeTitle }} / {{ solve.direction }}</span>
-                    <span class="font-mono text-xs">{{ formatDate(solve.submittedAt) }}</span>
-                  </div>
-                </div>
-                <p v-else class="text-sm text-muted-foreground">
-                  {{ t('scoreboard.noMemberSolves') }}
-                </p>
-              </div>
-            </div>
+            <p v-else class="text-sm text-muted-foreground">
+              {{ t('scoreboard.noScoreDetails') }}
+            </p>
           </div>
 
           <div class="flex justify-end">

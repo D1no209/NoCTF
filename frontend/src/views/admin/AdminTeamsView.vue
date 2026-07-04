@@ -41,7 +41,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Search, MoreHorizontal, Users, Trash2, Shield, User as UserIcon, Loader2, Trophy } from 'lucide-vue-next'
+import {
+  Search,
+  MoreHorizontal,
+  Users,
+  Trash2,
+  Shield,
+  User as UserIcon,
+  Loader2,
+  Trophy,
+} from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 
@@ -74,7 +83,12 @@ const selectedTeam = ref<TeamDto | null>(null)
 const teamMembers = ref<TeamMemberDto[]>([])
 const loadingMembers = ref(false)
 
-const { data: teams, isLoading, isError, refetch } = useQuery({
+const {
+  data: teams,
+  isLoading,
+  isError,
+  refetch,
+} = useQuery({
   queryKey: queryKeys.adminTeams,
   queryFn: () => adminApi.teams<TeamDto[]>(),
 })
@@ -90,7 +104,7 @@ const disbandMutation = useMutation({
   },
   onError: () => {
     toast.error(t('admin.teams.disbandError', 'Failed to disband team.'))
-  }
+  },
 })
 
 async function openMembersDialog(team: TeamDto) {
@@ -114,43 +128,65 @@ function openDisbandDialog(team: TeamDto) {
 const columnHelper = createColumnHelper<TeamDto>()
 
 const columns = [
-  columnHelper.accessor('name', { 
-    header: t('admin.teams.name'), 
+  columnHelper.accessor('name', {
+    header: t('admin.teams.name'),
     enableSorting: true,
-    cell: (info) => info.getValue()
+    cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor('captainName', { 
-    header: t('admin.teams.captain'), 
-    enableSorting: true 
-  }),
-  columnHelper.accessor('memberCount', { 
-    header: t('admin.teams.members'), 
+  columnHelper.accessor('captainName', {
+    header: t('admin.teams.captain'),
     enableSorting: true,
-    cell: (info) => h(Badge, { variant: 'secondary', class: 'font-mono' }, () => info.getValue().toString())
+  }),
+  columnHelper.accessor('memberCount', {
+    header: t('admin.teams.members'),
+    enableSorting: true,
+    cell: (info) =>
+      h(Badge, { variant: 'secondary', class: 'font-mono' }, () => info.getValue().toString()),
   }),
   columnHelper.accessor('registrationStatus', {
     header: t('admin.teams.registrationStatus'),
     enableSorting: true,
-    cell: (info) => h(Badge, { variant: info.getValue() === 'approved' ? 'default' : info.getValue() === 'rejected' ? 'destructive' : 'secondary' }, () => info.getValue() ?? 'pending')
+    cell: (info) =>
+      h(
+        Badge,
+        {
+          variant:
+            info.getValue() === 'approved'
+              ? 'default'
+              : info.getValue() === 'rejected'
+                ? 'destructive'
+                : 'secondary',
+        },
+        () => info.getValue() ?? 'pending',
+      ),
   }),
-  columnHelper.accessor('competitionTitle', { 
-    header: t('admin.teams.competition'), 
+  columnHelper.accessor('competitionTitle', {
+    header: t('admin.teams.competition'),
     enableSorting: true,
-    cell: (info) => h('div', { class: 'flex items-center gap-2' }, [
-      h(Trophy, { class: 'size-3 text-muted-foreground' }),
-      h('span', info.getValue())
-    ])
+    cell: (info) =>
+      h('div', { class: 'flex items-center gap-2' }, [
+        h(Trophy, { class: 'size-3 text-muted-foreground' }),
+        h('span', info.getValue()),
+      ]),
   }),
 ]
 
 const table = useVueTable({
-  get data() { return teams.value ?? [] },
+  get data() {
+    return teams.value ?? []
+  },
   columns,
   state: {
-    get globalFilter() { return globalFilter.value },
-    get sorting() { return sorting.value },
+    get globalFilter() {
+      return globalFilter.value
+    },
+    get sorting() {
+      return sorting.value
+    },
   },
-  onGlobalFilterChange: (v) => { globalFilter.value = v },
+  onGlobalFilterChange: (v) => {
+    globalFilter.value = v
+  },
   onSortingChange: (updater) => {
     sorting.value = typeof updater === 'function' ? updater(sorting.value) : updater
   },
@@ -166,14 +202,20 @@ const table = useVueTable({
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.teams.title') }}</h2>
-        <p class="text-sm text-muted-foreground">Monitor and manage registered teams across all competitions.</p>
+        <p class="text-sm text-muted-foreground">
+          Monitor and manage registered teams across all competitions.
+        </p>
       </div>
     </div>
 
     <div class="noctf-filter-bar md:grid-cols-[minmax(0,24rem)]">
       <div class="relative w-full max-w-sm">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="globalFilter" :placeholder="t('admin.teams.searchPlaceholder')" class="pl-10" />
+        <Input
+          v-model="globalFilter"
+          :placeholder="t('admin.teams.searchPlaceholder')"
+          class="pl-10"
+        />
       </div>
     </div>
 
@@ -192,7 +234,9 @@ const table = useVueTable({
                 <div class="flex items-center gap-2">
                   <span>{{ header.column.columnDef.header as string }}</span>
                   <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
-                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
+                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]"
+                    >▼</span
+                  >
                 </div>
               </template>
             </TableHead>
@@ -212,7 +256,9 @@ const table = useVueTable({
             <TableCell :colspan="columns.length + 1" class="h-32 text-center">
               <div class="flex flex-col items-center justify-center gap-3 text-muted-foreground">
                 <span>{{ t('admin.teams.loadError', t('errors.loadFailed')) }}</span>
-                <Button variant="outline" size="sm" @click="refetch()">{{ t('common.refresh') }}</Button>
+                <Button variant="outline" size="sm" @click="refetch()">{{
+                  t('common.refresh')
+                }}</Button>
               </div>
             </TableCell>
           </TableRow>
@@ -221,9 +267,9 @@ const table = useVueTable({
               {{ t('admin.teams.empty') }}
             </TableCell>
           </TableRow>
-          <TableRow 
-            v-else 
-            v-for="row in table.getRowModel().rows" 
+          <TableRow
+            v-else
+            v-for="row in table.getRowModel().rows"
             :key="row.id"
             class="group transition-colors hover:bg-muted/50"
           >
@@ -245,7 +291,10 @@ const table = useVueTable({
                     {{ t('admin.teams.members') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem @click="openDisbandDialog(row.original)" class="text-destructive focus:text-destructive font-medium">
+                  <DropdownMenuItem
+                    @click="openDisbandDialog(row.original)"
+                    class="text-destructive focus:text-destructive font-medium"
+                  >
                     <Trash2 class="mr-2 size-4" />
                     {{ t('admin.teams.disband') }}
                   </DropdownMenuItem>
@@ -259,13 +308,28 @@ const table = useVueTable({
 
     <div class="noctf-table-footer">
       <p class="text-xs text-muted-foreground">
-        {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
+        {{
+          t('common.pageOf', {
+            page: table.getState().pagination.pageIndex + 1,
+            total: table.getPageCount(),
+          })
+        }}
       </p>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="!table.getCanPreviousPage()"
+          @click="table.previousPage()"
+        >
           {{ t('common.previous') }}
         </Button>
-        <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="!table.getCanNextPage()"
+          @click="table.nextPage()"
+        >
           {{ t('common.next') }}
         </Button>
       </div>
@@ -275,40 +339,57 @@ const table = useVueTable({
     <Dialog v-model:open="membersDialog">
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{{ t('admin.teams.membersDialog', { name: selectedTeam?.name }) }}</DialogTitle>
+          <DialogTitle>{{
+            t('admin.teams.membersDialog', { name: selectedTeam?.name })
+          }}</DialogTitle>
           <DialogDescription>{{ t('admin.teams.membersDialogDescription') }}</DialogDescription>
         </DialogHeader>
         <div class="py-4">
-          <div v-if="loadingMembers" class="flex items-center justify-center p-8 text-muted-foreground">
+          <div
+            v-if="loadingMembers"
+            class="flex items-center justify-center p-8 text-muted-foreground"
+          >
             <Loader2 class="size-6 animate-spin mr-3" /> {{ t('common.loading') }}
           </div>
-          <div v-else-if="teamMembers.length === 0" class="text-center p-8 text-muted-foreground text-sm border rounded-lg border-dashed">
+          <div
+            v-else-if="teamMembers.length === 0"
+            class="text-center p-8 text-muted-foreground text-sm border rounded-lg border-dashed"
+          >
             {{ t('admin.teams.noMembers') }}
           </div>
           <ul v-else class="space-y-2">
-            <li 
-              v-for="m in teamMembers" 
-              :key="m.userId" 
-              class="flex items-center justify-between p-3 rounded-xl border bg-muted/30 transition-all hover:bg-muted/50"
+            <li
+              v-for="m in teamMembers"
+              :key="m.userId"
+              class="flex items-center justify-between rounded-lg border bg-muted/30 p-3 transition-colors hover:bg-muted/50"
             >
               <div class="flex items-center gap-3">
-                <div class="flex size-8 items-center justify-center rounded-full bg-background shadow-sm border">
+                <div
+                  class="flex size-8 items-center justify-center rounded-full border bg-background"
+                >
                   <Shield v-if="m.role.toLowerCase() === 'captain'" class="size-4 text-primary" />
                   <UserIcon v-else class="size-4 text-muted-foreground" />
                 </div>
                 <div class="flex flex-col">
                   <span class="font-semibold text-sm leading-none">{{ m.userName }}</span>
-                  <span class="text-[10px] text-muted-foreground mt-1">{{ m.userId.slice(0, 8) }}</span>
+                  <span class="text-[10px] text-muted-foreground mt-1">{{
+                    m.userId.slice(0, 8)
+                  }}</span>
                 </div>
               </div>
-              <Badge :variant="m.role.toLowerCase() === 'captain' ? 'default' : 'secondary'" class="capitalize text-[10px] font-bold tracking-tighter">
+              <Badge
+                :variant="m.role.toLowerCase() === 'captain' ? 'default' : 'secondary'"
+                class="capitalize text-[10px] font-bold tracking-tighter"
+              >
                 {{ m.role }}
               </Badge>
             </li>
           </ul>
         </div>
         <DialogFooter>
-          <Button variant="outline" class="w-full sm:w-auto" @click="membersDialog = false">{{ t('common.close') }}</Button>
+          <Button variant="outline" class="w-full sm:w-auto" @click="membersDialog = false">{{
+            t('common.close')
+          }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -326,12 +407,22 @@ const table = useVueTable({
           </DialogDescription>
         </DialogHeader>
         <div class="py-4">
-          <div class="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-            <p class="font-medium">Confirm disbanding <span class="font-bold underline">{{ selectedTeam?.name }}</span>?</p>
+          <div
+            class="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm"
+          >
+            <p class="font-medium">
+              Confirm disbanding <span class="font-bold underline">{{ selectedTeam?.name }}</span
+              >?
+            </p>
           </div>
         </div>
         <DialogFooter class="gap-2">
-          <Button variant="outline" @click="disbandDialog = false" :disabled="disbandMutation.isPending.value">{{ t('common.cancel') }}</Button>
+          <Button
+            variant="outline"
+            @click="disbandDialog = false"
+            :disabled="disbandMutation.isPending.value"
+            >{{ t('common.cancel') }}</Button
+          >
           <Button
             variant="destructive"
             :disabled="disbandMutation.isPending.value"

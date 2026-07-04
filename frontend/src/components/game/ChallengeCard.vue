@@ -32,7 +32,7 @@ const stageLabel = computed(() => {
 
 <template>
   <Card
-    class="relative h-full cursor-pointer overflow-hidden transition-all hover:border-primary/30 hover:shadow-[0_12px_34px_rgb(15_23_42/0.08)]"
+    class="relative h-full cursor-pointer overflow-hidden transition-colors hover:border-primary/30 hover:bg-accent/40"
     :class="solved ? 'border-green-500/50 bg-green-500/5' : ''"
   >
     <div

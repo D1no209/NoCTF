@@ -64,6 +64,13 @@ public class LeaderboardInsightService(
     ApplicationDbContext db,
     ILeaderboardService leaderboardService) : ILeaderboardInsightService
 {
+    private sealed record ChallengeInfo(
+        Guid Id,
+        string Title,
+        string TypeId,
+        PointsConfig PointsConfig,
+        double DifficultyCoefficient);
+
     public async Task<LeaderboardTrendResult> BuildTrendAsync(Guid competitionId, int limit = 10, CancellationToken ct = default)
     {
         var leaderboard = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
@@ -82,14 +89,30 @@ public class LeaderboardInsightService(
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(c => c.Id == competitionId)
-            .Select(c => new { c.StartTime })
+            .Select(c => new { c.StartTime, c.EndTime })
             .FirstOrDefaultAsync(ct);
 
         var startTime = competition?.StartTime ?? DateTime.UtcNow;
+        var now = DateTime.UtcNow;
+        var endTime = competition?.EndTime ?? now;
+        var timelineEnd = endTime <= now ? endTime : now;
+        if (timelineEnd <= startTime)
+            timelineEnd = startTime.AddMinutes(1);
+
+        var activeChallengeIds = await db.Challenges
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.CompetitionId == competitionId)
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+
         var events = await db.ScoreEvents
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(e => e.CompetitionId == competitionId && teamIds.Contains(e.TeamId))
+            .Where(e =>
+                e.CompetitionId == competitionId &&
+                teamIds.Contains(e.TeamId) &&
+                (!e.ChallengeId.HasValue || activeChallengeIds.Contains(e.ChallengeId.Value)))
             .OrderBy(e => e.Timestamp)
             .Select(e => new { e.TeamId, e.Timestamp, e.PointsDelta })
             .ToListAsync(ct);
@@ -109,13 +132,15 @@ public class LeaderboardInsightService(
                 }
             }
 
-            if (points.Count == 1 || points[^1].Score != team.TotalScore)
-                points.Add(new LeaderboardTrendPoint(DateTime.UtcNow, team.TotalScore));
+            if (points[^1].Timestamp < timelineEnd)
+                points.Add(new LeaderboardTrendPoint(timelineEnd, team.TotalScore));
+            else if (points[^1].Score != team.TotalScore)
+                points.Add(new LeaderboardTrendPoint(points[^1].Timestamp, team.TotalScore));
 
             return new LeaderboardTeamSeries(team.TeamId, team.TeamName, points);
         }).ToList();
 
-        return new LeaderboardTrendResult(competitionId, series, DateTime.UtcNow);
+        return new LeaderboardTrendResult(competitionId, series, now);
     }
 
     public async Task<LeaderboardTeamDetailResult?> BuildTeamDetailAsync(Guid competitionId, Guid teamId, CancellationToken ct = default)
@@ -141,17 +166,20 @@ public class LeaderboardInsightService(
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(c => c.CompetitionId == competitionId)
-            .Select(c => new
-            {
+            .Select(c => new ChallengeInfo(
                 c.Id,
                 c.Title,
                 c.TypeId,
                 c.PointsConfig,
                 c.DifficultyCoefficient
-            })
+            ))
             .ToListAsync(ct);
 
         var challengeMap = allChallenges.ToDictionary(c => c.Id);
+        scoreEvents = scoreEvents
+            .Where(e => !e.ChallengeId.HasValue || challengeMap.ContainsKey(e.ChallengeId.Value))
+            .ToList();
+
         var correctSubmissions = await db.Submissions
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -167,6 +195,9 @@ public class LeaderboardInsightService(
             .OrderBy(s => s.SubmittedAt)
             .Select(s => new { s.TeamId, s.UserId, s.ChallengeId, s.SubmittedAt })
             .ToListAsync(ct);
+        correctSubmissions = correctSubmissions
+            .Where(s => challengeMap.ContainsKey(s.ChallengeId))
+            .ToList();
 
         var teamCorrectSubmissions = correctSubmissions
             .Where(s => s.TeamId == teamId)
@@ -183,7 +214,7 @@ public class LeaderboardInsightService(
                     .Select((solve, index) => new { solve.TeamId, Rank = index + 1 })
                     .ToDictionary(s => s.TeamId, s => s.Rank));
 
-        var currentSolveCounts = await db.Submissions
+        var currentSolveRows = await db.Submissions
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s => s.CompetitionId == competitionId && s.IsCorrect)
@@ -196,9 +227,13 @@ public class LeaderboardInsightService(
                 t => t.Id,
                 (s, _) => new { s.ChallengeId, s.TeamId })
             .Distinct()
+            .ToListAsync(ct);
+
+        var currentSolveCounts = currentSolveRows
+            .Where(s => challengeMap.ContainsKey(s.ChallengeId))
+            .Distinct()
             .GroupBy(s => s.ChallengeId)
-            .Select(g => new { ChallengeId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.ChallengeId, g => g.Count, ct);
+            .ToDictionary(g => g.Key, g => g.Count());
 
         var directionScores = scoreEvents
             .GroupBy(e =>
@@ -229,10 +264,18 @@ public class LeaderboardInsightService(
             .Select(c =>
             {
                 var baseScore = scoreEvents
-                    .Where(e => e.ChallengeId == c.Id && e.PointsDelta != 0 && e.ScoringKey == ScoringKeys.DecaySolve)
+                    .Where(e =>
+                        e.ChallengeId.HasValue &&
+                        e.ChallengeId.Value == c.Id &&
+                        e.PointsDelta != 0 &&
+                        e.ScoringKey == ScoringKeys.DecaySolve)
                     .Sum(e => (long)e.PointsDelta);
                 var bonusScore = scoreEvents
-                    .Where(e => e.ChallengeId == c.Id && e.PointsDelta != 0 && e.ScoringKey == ScoringKeys.BloodBonus)
+                    .Where(e =>
+                        e.ChallengeId.HasValue &&
+                        e.ChallengeId.Value == c.Id &&
+                        e.PointsDelta != 0 &&
+                        e.ScoringKey == ScoringKeys.BloodBonus)
                     .Sum(e => (long)e.PointsDelta);
                 currentSolveCounts.TryGetValue(c.Id, out var solveCount);
                 var currentPoints = CtfScoreCalculator.CalculateChallengePoints(solveCount, c.PointsConfig, c.DifficultyCoefficient);
