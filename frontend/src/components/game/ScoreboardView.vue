@@ -2,9 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { competitionApi } from '@/api/noctf'
-import { useAuthStore } from '@/stores/auth'
-import { useScoreStore } from '@/stores/score'
-import { useSignalR } from '@/composables/useSignalR'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,9 +18,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+import { useSignalR } from '@/composables/useSignalR'
+import { useAuthStore } from '@/stores/auth'
+import { useScoreStore } from '@/stores/score'
 
-type LeaderboardEntry = {
+interface LeaderboardEntry {
   rank?: number
   teamId?: string
   teamName?: string
@@ -33,41 +33,41 @@ type LeaderboardEntry = {
   firstSolveAt?: string | null
 }
 
-type TrendPoint = {
+interface TrendPoint {
   timestamp: string
   score: number
 }
 
-type TrendSeries = {
+interface TrendSeries {
   teamId: string
   teamName: string
   points: TrendPoint[]
 }
 
-type TrendResponse = {
+interface TrendResponse {
   series?: TrendSeries[]
 }
 
-type DirectionScore = {
+interface DirectionScore {
   direction: string
   score: number
   solvedCount: number
 }
 
-type MemberSolve = {
+interface MemberSolve {
   challengeId: string
   challengeTitle: string
   direction: string
   submittedAt: string
 }
 
-type MemberHistory = {
+interface MemberHistory {
   userId: string
   userName: string
   solves: MemberSolve[]
 }
 
-type TeamDetail = {
+interface TeamDetail {
   teamId: string
   teamName: string
   trackName?: string | null
@@ -78,7 +78,7 @@ type TeamDetail = {
   members: MemberHistory[]
 }
 
-type ChallengeScore = {
+interface ChallengeScore {
   challengeId: string
   challengeTitle: string
   direction: string
@@ -130,19 +130,66 @@ const chartColors = [
   'oklch(0.62 0.14 125)',
   'oklch(0.58 0.17 75)',
 ]
+const leaderboardFrame = {
+  left: 78,
+  right: 624,
+  top: 30,
+  bottom: 248,
+}
+const leaderboardRowHeight = 20
 
-const sortedEntries = computed(() => entries.value.map((entry) => ({
+const sortedEntries = computed(() => entries.value.map(entry => ({
   ...entry,
   totalScore: entry.totalScore ?? entry.score ?? 0,
   solvedCount: entry.solvedCount ?? 0,
 })))
 
+const leaderboardChartEntries = computed(() => sortedEntries.value.slice(0, 10))
+
+const leaderboardBounds = computed(() => {
+  const scores = leaderboardChartEntries.value.map(entry => entry.totalScore ?? 0)
+  const maxScore = niceScoreCeil(Math.max(...scores, 1))
+  const minScore = Math.min(0, ...scores)
+  return {
+    minScore: minScore < 0 ? -niceScoreCeil(Math.abs(minScore)) : 0,
+    maxScore,
+  }
+})
+
+const leaderboardScoreTicks = computed(() => {
+  const { minScore, maxScore } = leaderboardBounds.value
+  const range = Math.max(1, maxScore - minScore)
+  const ticks = 5
+  const values = new Set<number>()
+  for (let index = 0; index < ticks; index++)
+    values.add(Math.round(minScore + (range * index) / (ticks - 1)))
+  values.add(0)
+  return Array.from(values).sort((first, second) => first - second)
+})
+
+const leaderboardChartRows = computed(() => leaderboardChartEntries.value.map((entry, index) => {
+  const score = entry.totalScore ?? 0
+  const zeroX = leaderboardScoreToX(0)
+  const scoreX = leaderboardScoreToX(score)
+  return {
+    entry,
+    y: leaderboardFrame.top + index * leaderboardRowHeight,
+    x: Math.min(zeroX, scoreX),
+    width: Math.max(2, Math.abs(scoreX - zeroX)),
+    scoreX,
+    scoreLabelX: score >= 0
+      ? Math.min(leaderboardFrame.right - 8, scoreX + 8)
+      : Math.max(leaderboardFrame.left + 8, scoreX - 8),
+    scoreLabelAnchor: score >= 0 ? 'start' : 'end',
+  }
+}))
+
 const chartBounds = computed(() => {
-  const allPoints = trend.value.flatMap((series) => series.points ?? [])
+  const allPoints = trend.value.flatMap(series => series.points ?? [])
   const timestamps = allPoints
-    .map((point) => Date.parse(point.timestamp))
-    .filter((value) => Number.isFinite(value))
-  const scores = allPoints.map((point) => point.score ?? 0)
+    .map(point => Date.parse(point.timestamp))
+    .filter(value => Number.isFinite(value))
+  const scores = allPoints.map(point => point.score ?? 0)
   const now = Date.now()
   const minTime = timestamps.length ? Math.min(...timestamps) : now
   const rawMaxTime = timestamps.length ? Math.max(...timestamps) : now + 60_000
@@ -181,11 +228,24 @@ const hoveredSeriesPath = computed(() => hoveredSeries.value ? buildPath(hovered
 const hoveredSeriesColor = computed(() => chartColors[Math.max(0, hoveredSeriesIndex.value) % chartColors.length])
 
 function niceScoreCeil(value: number) {
-  if (value <= 10) return 10
+  if (value <= 10)
+    return 10
   const magnitude = 10 ** Math.floor(Math.log10(value))
   const normalized = value / magnitude
   const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
   return nice * magnitude
+}
+
+function leaderboardScoreToX(score: number) {
+  const width = leaderboardFrame.right - leaderboardFrame.left
+  const { minScore, maxScore } = leaderboardBounds.value
+  return leaderboardFrame.left + ((score - minScore) / Math.max(1, maxScore - minScore)) * width
+}
+
+function shortTeamName(name?: string) {
+  if (!name)
+    return '-'
+  return name.length > 18 ? `${name.slice(0, 17)}...` : name
 }
 
 function scoreToY(score: number) {
@@ -210,12 +270,14 @@ function normalizePoints(points: TrendPoint[]) {
 }
 
 function buildPath(points: TrendPoint[]) {
-  if (!points?.length) return ''
+  if (!points?.length)
+    return ''
   const mapped = normalizePoints(points).map(point => ({
     x: timeToX(point.time),
     y: scoreToY(point.score),
   }))
-  if (!mapped.length) return ''
+  if (!mapped.length)
+    return ''
 
   let path = `M ${chartFrame.left} ${mapped[0].y.toFixed(1)} L ${mapped[0].x.toFixed(1)} ${mapped[0].y.toFixed(1)}`
   for (let index = 1; index < mapped.length; index += 1) {
@@ -249,21 +311,27 @@ function formatTimeTick(time: number) {
 }
 
 function bloodLabel(rank?: number | null) {
-  if (rank === 1) return t('scoreboard.firstBlood')
-  if (rank === 2) return t('scoreboard.secondBlood')
-  if (rank === 3) return t('scoreboard.thirdBlood')
+  if (rank === 1)
+    return t('scoreboard.firstBlood')
+  if (rank === 2)
+    return t('scoreboard.secondBlood')
+  if (rank === 3)
+    return t('scoreboard.thirdBlood')
   return ''
 }
 
 function formatChallengeScore(score: ChallengeScore) {
-  if (!score.solvedAt) return '-'
-  if (score.bonusScore === 0) return `${score.baseScore}`
+  if (!score.solvedAt)
+    return '-'
+  if (score.bonusScore === 0)
+    return `${score.baseScore}`
   const sign = score.bonusScore > 0 ? '+' : ''
   return `${score.baseScore} (${sign}${score.bonusScore})`
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return '-'
+  if (!value)
+    return '-'
   return new Intl.DateTimeFormat(locale.value, {
     month: '2-digit',
     day: '2-digit',
@@ -286,27 +354,32 @@ async function fetchLeaderboard() {
     ])
     applyLeaderboard(leaderboardData?.entries ?? [])
     trend.value = trendData?.series ?? []
-  } catch {
+  }
+  catch {
     // Keep the last successful snapshot while polling.
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
 
 async function openTeamDetail(teamId?: string) {
-  if (!teamId) return
+  if (!teamId)
+    return
   selectedTeamId.value = teamId
   detailLoading.value = true
   selectedTeam.value = null
   try {
     selectedTeam.value = await competitionApi.leaderboardTeam<TeamDetail>(props.competitionId, teamId)
-  } finally {
+  }
+  finally {
     detailLoading.value = false
   }
 }
 
 function startPolling() {
-  if (pollInterval) return
+  if (pollInterval)
+    return
   usingFallback.value = true
   pollInterval = setInterval(fetchLeaderboard, 10_000)
 }
@@ -335,7 +408,8 @@ const { connection, isConnected, start } = useSignalR({
 })
 
 watch(connection, (conn) => {
-  if (!conn) return
+  if (!conn)
+    return
   conn.on('ReceiveLeaderboardSnapshot', (data: LeaderboardEntry[]) => {
     applyLeaderboard(data ?? [])
     competitionApi.leaderboardTrend<TrendResponse>(props.competitionId)
@@ -357,7 +431,8 @@ onMounted(async () => {
   await fetchLeaderboard()
   try {
     await start()
-  } catch {
+  }
+  catch {
     startPolling()
   }
 })
@@ -370,7 +445,9 @@ onUnmounted(() => {
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h2 class="text-xl font-semibold">{{ t('scoreboard.title') }}</h2>
+      <h2 class="text-xl font-semibold">
+        {{ t('scoreboard.title') }}
+      </h2>
       <div class="flex items-center gap-2">
         <Badge v-if="isConnected" class="bg-green-600 text-white border-transparent text-xs">
           {{ t('common.live') }}
@@ -386,7 +463,9 @@ onUnmounted(() => {
 
     <div v-if="trend.length" class="rounded-xl border bg-background/55 p-3">
       <div class="mb-2 flex items-center justify-between gap-3">
-        <h3 class="text-sm font-medium">{{ t('scoreboard.topTrend') }}</h3>
+        <h3 class="text-sm font-medium">
+          {{ t('scoreboard.topTrend') }}
+        </h3>
         <span class="text-xs text-muted-foreground">{{ t('scoreboard.topTrendHint') }}</span>
       </div>
       <svg viewBox="0 0 660 240" class="h-56 w-full overflow-visible" @mouseleave="hoveredTeamId = null">
@@ -515,7 +594,103 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">{{ t('scoreboard.loading') }}</div>
+    <div v-if="leaderboardChartEntries.length" class="rounded-xl border bg-background/55 p-3">
+      <div class="mb-2 flex items-center justify-between gap-3">
+        <h3 class="text-sm font-medium">
+          {{ t('scoreboard.scoreDistribution') }}
+        </h3>
+        <span class="text-xs text-muted-foreground">{{ t('scoreboard.scoreDistributionHint') }}</span>
+      </div>
+      <svg viewBox="0 0 660 292" class="h-72 w-full overflow-visible">
+        <g class="text-[10px]">
+          <g v-for="tick in leaderboardScoreTicks" :key="`leaderboard-score-${tick}`">
+            <line
+              :x1="leaderboardScoreToX(tick)"
+              :y1="leaderboardFrame.top - 10"
+              :x2="leaderboardScoreToX(tick)"
+              :y2="leaderboardFrame.bottom"
+              class="stroke-border/80"
+              stroke-width="1"
+              stroke-dasharray="3 6"
+            />
+            <text
+              :x="leaderboardScoreToX(tick)"
+              :y="leaderboardFrame.bottom + 17"
+              text-anchor="middle"
+              class="fill-muted-foreground tabular-nums"
+            >
+              {{ tick }}
+            </text>
+          </g>
+          <line
+            v-if="leaderboardBounds.minScore < 0"
+            :x1="leaderboardScoreToX(0)"
+            :y1="leaderboardFrame.top - 10"
+            :x2="leaderboardScoreToX(0)"
+            :y2="leaderboardFrame.bottom"
+            class="stroke-foreground/35"
+            stroke-width="1.5"
+          />
+          <line :x1="leaderboardFrame.left" :y1="leaderboardFrame.bottom" :x2="leaderboardFrame.right" :y2="leaderboardFrame.bottom" class="stroke-border" stroke-width="1" />
+          <line :x1="leaderboardFrame.left" :y1="leaderboardFrame.top - 10" :x2="leaderboardFrame.left" :y2="leaderboardFrame.bottom" class="stroke-border" stroke-width="1" />
+        </g>
+
+        <text :x="leaderboardFrame.left - 54" :y="leaderboardFrame.top - 15" class="fill-muted-foreground text-[10px] font-medium">
+          {{ t('scoreboard.rank') }}
+        </text>
+        <text :x="leaderboardFrame.right" :y="leaderboardFrame.bottom + 34" text-anchor="end" class="fill-muted-foreground text-[10px] font-medium">
+          {{ t('scoreboard.score') }}
+        </text>
+
+        <g v-for="row in leaderboardChartRows" :key="row.entry.teamId ?? row.entry.teamName">
+          <line
+            :x1="leaderboardFrame.left"
+            :y1="row.y + 8"
+            :x2="leaderboardFrame.right"
+            :y2="row.y + 8"
+            class="stroke-border/55"
+            stroke-width="1"
+            stroke-dasharray="2 8"
+          />
+          <text
+            :x="leaderboardFrame.left - 13"
+            :y="row.y + 12"
+            text-anchor="end"
+            class="fill-muted-foreground text-[10px] font-semibold tabular-nums"
+          >
+            {{ row.entry.rank ?? '-' }}
+          </text>
+          <text
+            :x="leaderboardFrame.left + 4"
+            :y="row.y + 25"
+            class="fill-muted-foreground text-[10px]"
+          >
+            {{ shortTeamName(row.entry.teamName) }}
+          </text>
+          <rect
+            :x="row.x"
+            :y="row.y"
+            :width="row.width"
+            height="14"
+            rx="4"
+            :class="(row.entry.rank ?? 99) <= 3 ? 'fill-primary/80' : 'fill-primary/50'"
+          />
+          <circle :cx="row.scoreX" :cy="row.y + 7" r="3" class="fill-primary stroke-background" stroke-width="1.5" />
+          <text
+            :x="row.scoreLabelX"
+            :y="row.y + 12"
+            :text-anchor="row.scoreLabelAnchor"
+            class="fill-foreground text-[10px] font-semibold tabular-nums"
+          >
+            {{ row.entry.totalScore }}
+          </text>
+        </g>
+      </svg>
+    </div>
+
+    <div v-if="loading" class="text-sm text-muted-foreground">
+      {{ t('scoreboard.loading') }}
+    </div>
 
     <div v-else-if="sortedEntries.length === 0" class="noctf-state-box text-sm text-muted-foreground">
       {{ t('scoreboard.empty') }}
@@ -525,11 +700,17 @@ onUnmounted(() => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead class="w-12 text-center">{{ t('scoreboard.rank') }}</TableHead>
+            <TableHead class="w-12 text-center">
+              {{ t('scoreboard.rank') }}
+            </TableHead>
             <TableHead>{{ t('scoreboard.team') }}</TableHead>
             <TableHead>{{ t('scoreboard.track') }}</TableHead>
-            <TableHead class="text-right">{{ t('scoreboard.score') }}</TableHead>
-            <TableHead class="text-right">{{ t('scoreboard.solves') }}</TableHead>
+            <TableHead class="text-right">
+              {{ t('scoreboard.score') }}
+            </TableHead>
+            <TableHead class="text-right">
+              {{ t('scoreboard.solves') }}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -545,10 +726,18 @@ onUnmounted(() => {
             <TableCell class="text-center font-mono text-sm font-medium">
               {{ entry.rank }}
             </TableCell>
-            <TableCell class="font-medium">{{ entry.teamName }}</TableCell>
-            <TableCell class="text-muted-foreground">{{ entry.trackName || '-' }}</TableCell>
-            <TableCell class="text-right font-mono font-semibold">{{ entry.totalScore }}</TableCell>
-            <TableCell class="text-right text-muted-foreground">{{ entry.solvedCount }}</TableCell>
+            <TableCell class="font-medium">
+              {{ entry.teamName }}
+            </TableCell>
+            <TableCell class="text-muted-foreground">
+              {{ entry.trackName || '-' }}
+            </TableCell>
+            <TableCell class="text-right font-mono font-semibold">
+              {{ entry.totalScore }}
+            </TableCell>
+            <TableCell class="text-right text-muted-foreground">
+              {{ entry.solvedCount }}
+            </TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -567,21 +756,35 @@ onUnmounted(() => {
         <div v-else-if="selectedTeam" class="space-y-5">
           <div class="grid gap-3 sm:grid-cols-3">
             <div class="noctf-kpi">
-              <div class="text-xs text-muted-foreground">{{ t('scoreboard.score') }}</div>
-              <div class="mt-1 font-mono text-2xl font-semibold">{{ selectedTeam.totalScore }}</div>
+              <div class="text-xs text-muted-foreground">
+                {{ t('scoreboard.score') }}
+              </div>
+              <div class="mt-1 font-mono text-2xl font-semibold">
+                {{ selectedTeam.totalScore }}
+              </div>
             </div>
             <div class="noctf-kpi">
-              <div class="text-xs text-muted-foreground">{{ t('scoreboard.solves') }}</div>
-              <div class="mt-1 font-mono text-2xl font-semibold">{{ selectedTeam.solvedCount }}</div>
+              <div class="text-xs text-muted-foreground">
+                {{ t('scoreboard.solves') }}
+              </div>
+              <div class="mt-1 font-mono text-2xl font-semibold">
+                {{ selectedTeam.solvedCount }}
+              </div>
             </div>
             <div class="noctf-kpi">
-              <div class="text-xs text-muted-foreground">{{ t('scoreboard.track') }}</div>
-              <div class="mt-1 text-lg font-semibold">{{ selectedTeam.trackName || '-' }}</div>
+              <div class="text-xs text-muted-foreground">
+                {{ t('scoreboard.track') }}
+              </div>
+              <div class="mt-1 text-lg font-semibold">
+                {{ selectedTeam.trackName || '-' }}
+              </div>
             </div>
           </div>
 
           <div>
-            <h3 class="mb-2 text-sm font-medium">{{ t('scoreboard.directionScores') }}</h3>
+            <h3 class="mb-2 text-sm font-medium">
+              {{ t('scoreboard.directionScores') }}
+            </h3>
             <div v-if="selectedTeam.directionScores.length" class="grid gap-2 sm:grid-cols-2">
               <div
                 v-for="direction in selectedTeam.directionScores"
@@ -592,25 +795,35 @@ onUnmounted(() => {
                 <span class="font-mono">{{ direction.score }} / {{ direction.solvedCount }}</span>
               </div>
             </div>
-            <p v-else class="text-sm text-muted-foreground">{{ t('scoreboard.noDirectionScores') }}</p>
+            <p v-else class="text-sm text-muted-foreground">
+              {{ t('scoreboard.noDirectionScores') }}
+            </p>
           </div>
 
           <div>
-            <h3 class="mb-2 text-sm font-medium">{{ t('scoreboard.challengeScores') }}</h3>
+            <h3 class="mb-2 text-sm font-medium">
+              {{ t('scoreboard.challengeScores') }}
+            </h3>
             <div class="noctf-table-shell">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{{ t('challenges.title') }}</TableHead>
                     <TableHead>{{ t('admin.challenges.direction') }}</TableHead>
-                    <TableHead class="text-right">{{ t('scoreboard.currentPoints') }}</TableHead>
-                    <TableHead class="text-right">{{ t('scoreboard.teamScore') }}</TableHead>
+                    <TableHead class="text-right">
+                      {{ t('scoreboard.currentPoints') }}
+                    </TableHead>
+                    <TableHead class="text-right">
+                      {{ t('scoreboard.teamScore') }}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow v-for="score in selectedTeam.challengeScores" :key="score.challengeId">
                     <TableCell>
-                      <div class="font-medium">{{ score.challengeTitle }}</div>
+                      <div class="font-medium">
+                        {{ score.challengeTitle }}
+                      </div>
                       <Badge
                         v-if="score.bloodRank"
                         variant="outline"
@@ -619,8 +832,12 @@ onUnmounted(() => {
                         {{ bloodLabel(score.bloodRank) }}
                       </Badge>
                     </TableCell>
-                    <TableCell class="text-muted-foreground">{{ score.direction }}</TableCell>
-                    <TableCell class="text-right font-mono">{{ score.currentPoints }}</TableCell>
+                    <TableCell class="text-muted-foreground">
+                      {{ score.direction }}
+                    </TableCell>
+                    <TableCell class="text-right font-mono">
+                      {{ score.currentPoints }}
+                    </TableCell>
                     <TableCell class="text-right font-mono" :class="score.solvedAt ? 'font-semibold text-foreground' : 'text-muted-foreground'">
                       {{ formatChallengeScore(score) }}
                     </TableCell>
@@ -631,7 +848,9 @@ onUnmounted(() => {
           </div>
 
           <div>
-            <h3 class="mb-2 text-sm font-medium">{{ t('scoreboard.memberHistory') }}</h3>
+            <h3 class="mb-2 text-sm font-medium">
+              {{ t('scoreboard.memberHistory') }}
+            </h3>
             <div class="space-y-3">
               <div
                 v-for="member in selectedTeam.members"
@@ -640,7 +859,9 @@ onUnmounted(() => {
               >
                 <div class="mb-2 flex items-center justify-between">
                   <span class="font-medium">{{ member.userName }}</span>
-                  <Badge variant="secondary">{{ member.solves.length }}</Badge>
+                  <Badge variant="secondary">
+                    {{ member.solves.length }}
+                  </Badge>
                 </div>
                 <div v-if="member.solves.length" class="space-y-1 text-sm">
                   <div
@@ -652,13 +873,17 @@ onUnmounted(() => {
                     <span class="font-mono text-xs">{{ formatDate(solve.submittedAt) }}</span>
                   </div>
                 </div>
-                <p v-else class="text-sm text-muted-foreground">{{ t('scoreboard.noMemberSolves') }}</p>
+                <p v-else class="text-sm text-muted-foreground">
+                  {{ t('scoreboard.noMemberSolves') }}
+                </p>
               </div>
             </div>
           </div>
 
           <div class="flex justify-end">
-            <Button variant="outline" @click="selectedTeamId = null">{{ t('common.close') }}</Button>
+            <Button variant="outline" @click="selectedTeamId = null">
+              {{ t('common.close') }}
+            </Button>
           </div>
         </div>
       </DialogContent>

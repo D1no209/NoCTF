@@ -133,6 +133,7 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db)
                 ? "NOCTF_FLAG_UUID"
                 : template.FlagEnvironmentVariable,
             AttachmentUrl = template.AttachmentUrl,
+            PatchTemplateUrl = template.PatchTemplateUrl,
             DeploymentType = template.DeploymentType,
             ExposedPort = template.ExposedPort,
             PointsConfig = new PointsConfig(points.InitialPoints, points.MinimumPoints, points.DecayFactor, points.DecayFunction),

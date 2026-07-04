@@ -68,8 +68,8 @@ public class AwdpGameModeTests
         var competitionId = Guid.NewGuid();
         var teamId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
-        SeedCompetition(db, competitionId, maxAttackAttempts: 1);
-        var challengeId = SeedChallenge(db, competitionId);
+        SeedCompetition(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId, maxAttackAttempts: 1);
         SeedGameBox(db, competitionId, teamId, challengeId);
         db.AwdpTeamChallengeStates.Add(new AwdpTeamChallengeState
         {
@@ -110,8 +110,7 @@ public class AwdpGameModeTests
 
     private static void SeedCompetition(
         ApplicationDbContext db,
-        Guid competitionId,
-        int maxAttackAttempts = 5)
+        Guid competitionId)
     {
         db.Competitions.Add(new Competition
         {
@@ -123,13 +122,11 @@ public class AwdpGameModeTests
             ModeKey = "awdp",
             StartTime = DateTime.UtcNow.AddMinutes(-1),
             EndTime = DateTime.UtcNow.AddHours(2),
-            Status = CompetitionStatus.Running,
-            AwdpMaxAttackAttempts = maxAttackAttempts,
-            AwdpFixEntry = "fix.sh"
+            Status = CompetitionStatus.Running
         });
     }
 
-    private static Guid SeedChallenge(ApplicationDbContext db, Guid competitionId)
+    private static Guid SeedChallenge(ApplicationDbContext db, Guid competitionId, int maxAttackAttempts = 5)
     {
         var id = Guid.NewGuid();
         db.Challenges.Add(new Challenge
@@ -142,6 +139,8 @@ public class AwdpGameModeTests
             PointsConfig = new PointsConfig(),
             ContainerImage = "vuln-service:latest",
             ExposedPort = 80,
+            AwdpMaxAttackAttempts = maxAttackAttempts,
+            AwdpFixEntry = "fix.sh",
             CreatedAt = DateTime.UtcNow
         });
         return id;

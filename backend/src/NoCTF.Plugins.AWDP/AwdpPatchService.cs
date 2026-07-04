@@ -281,32 +281,17 @@ public class AwdpPatchService(
         if (!string.IsNullOrWhiteSpace(oldContainerId))
             await DestroyContainerIdAsync(gameBox, oldContainerId, ct);
 
-        var checkerPassed = await RunCheckerAsync(challenge, submission, ct);
-        if (!checkerPassed)
+        var checkResult = await RunCheckAsync(challenge, submission, ct);
+        if (checkResult.FixStatus != AwdpFixStatus.FixSuccess)
         {
             await RollbackAsync(challenge, gameBox, patchedContainer, ct);
             await CompleteValidationAsync(
                 submission,
                 state,
                 AwdpPatchStatus.Rejected,
-                AwdpFixStatus.FixServiceError,
-                AwdpServiceStatus.ServiceError,
-                "Checker failed - service is unavailable or business behavior is broken.",
-                ct);
-            return;
-        }
-
-        var expSucceeded = await RunExpAsync(challenge, submission, ct);
-        if (expSucceeded)
-        {
-            await RollbackAsync(challenge, gameBox, patchedContainer, ct);
-            await CompleteValidationAsync(
-                submission,
-                state,
-                AwdpPatchStatus.Rejected,
-                AwdpFixStatus.FixFailed,
-                AwdpServiceStatus.ServiceOk,
-                "EXP succeeded - service is healthy but the vulnerability still exists.",
+                checkResult.FixStatus,
+                checkResult.ServiceStatus,
+                checkResult.Detail,
                 ct);
             return;
         }
@@ -317,7 +302,7 @@ public class AwdpPatchService(
             AwdpPatchStatus.Verified,
             AwdpFixStatus.FixSuccess,
             AwdpServiceStatus.ServiceOk,
-            "Checker passed and EXP failed - FixScript verified for future round defense scoring.",
+            checkResult.Detail,
             ct);
 
         logger.LogInformation(
@@ -380,67 +365,52 @@ public class AwdpPatchService(
         return await containerManager.CreateContainerAsync(patchedContainerConfig, ct);
     }
 
-    private async Task<bool> RunCheckerAsync(
+    private async Task<CheckOutcome> RunCheckAsync(
         Challenge challenge,
         AwdpPatchSubmission submission,
         CancellationToken ct)
     {
         if (challenge.CheckerConfig?.Image is null)
-            return true;
+        {
+            return new CheckOutcome(
+                AwdpFixStatus.FixSuccess,
+                AwdpServiceStatus.ServiceOk,
+                "No check container configured; FixScript accepted.");
+        }
 
         var timeout = TimeSpan.FromSeconds(challenge.CheckerConfig.TimeoutSeconds ?? 30);
-        var checkerConfig = new ContainerConfig(
+        var checkConfig = new ContainerConfig(
             Image: challenge.CheckerConfig.Image,
             Command: challenge.CheckerConfig.Command,
-            EnvironmentVariables: BuildProbeEnvironment(submission),
+            EnvironmentVariables: BuildCheckEnvironment(submission),
             Ttl: timeout);
 
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(timeout.Add(TimeSpan.FromSeconds(10)));
-            var result = await containerManager.RunContainerAsync(checkerConfig, cts.Token);
+            var result = await containerManager.RunContainerAsync(checkConfig, cts.Token);
             logger.LogDebug(
-                "AWDP checker for submission {SubmissionId}: exit={ExitCode}.",
+                "AWDP check container for submission {SubmissionId}: exit={ExitCode}.",
                 submission.Id, result.ExitCode);
-            return result.ExitCode == 0;
+
+            return MapCheckExitCode(result.ExitCode, result.StdErr);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning("AWDP check container timed out for submission {SubmissionId}.", submission.Id);
+            return new CheckOutcome(
+                AwdpFixStatus.FixServiceError,
+                AwdpServiceStatus.ServiceError,
+                "Check timed out; treating defense as service error.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "AWDP checker failed for submission {SubmissionId}.", submission.Id);
-            return false;
-        }
-    }
-
-    private async Task<bool> RunExpAsync(
-        Challenge challenge,
-        AwdpPatchSubmission submission,
-        CancellationToken ct)
-    {
-        if (challenge.CheckerConfig?.ExpImage is null)
-            return false;
-
-        var timeout = TimeSpan.FromSeconds(challenge.CheckerConfig.TimeoutSeconds ?? 60);
-        var expConfig = new ContainerConfig(
-            Image: challenge.CheckerConfig.ExpImage,
-            Command: challenge.CheckerConfig.ExpCommand,
-            EnvironmentVariables: BuildProbeEnvironment(submission),
-            Ttl: timeout);
-
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(timeout.Add(TimeSpan.FromSeconds(10)));
-            var result = await containerManager.RunContainerAsync(expConfig, cts.Token);
-            logger.LogDebug(
-                "AWDP EXP for submission {SubmissionId}: exit={ExitCode}.",
-                submission.Id, result.ExitCode);
-            return result.ExitCode == 0;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            logger.LogWarning(ex, "AWDP EXP failed for submission {SubmissionId}; treating exploit as failed.", submission.Id);
-            return false;
+            logger.LogWarning(ex, "AWDP check container failed for submission {SubmissionId}.", submission.Id);
+            return new CheckOutcome(
+                AwdpFixStatus.FixServiceError,
+                AwdpServiceStatus.ServiceError,
+                $"Check container failed: {ex.Message}");
         }
     }
 
@@ -566,6 +536,45 @@ public class AwdpPatchService(
             ["TEAM_ID"] = submission.TeamId.ToString()
         };
 
+    private static Dictionary<string, string> BuildCheckEnvironment(AwdpPatchSubmission submission)
+    {
+        var env = BuildProbeEnvironment(submission);
+        foreach (var (key, value) in BuildPatchEnvironment(submission))
+            env[key] = value;
+        return env;
+    }
+
+    private static CheckOutcome MapCheckExitCode(int exitCode, string? stderr)
+    {
+        var suffix = string.IsNullOrWhiteSpace(stderr)
+            ? string.Empty
+            : $" stderr={stderr.Trim()}";
+
+        return exitCode switch
+        {
+            0 => new CheckOutcome(
+                AwdpFixStatus.FixSuccess,
+                AwdpServiceStatus.ServiceOk,
+                $"Check exited 0; FixScript verified for future round defense scoring.{suffix}"),
+            1 => new CheckOutcome(
+                AwdpFixStatus.FixFailed,
+                AwdpServiceStatus.ServiceOk,
+                $"Check exited 1; EXP exploit succeeded and the vulnerability still exists.{suffix}"),
+            2 => new CheckOutcome(
+                AwdpFixStatus.FixRuleViolation,
+                AwdpServiceStatus.ServiceError,
+                $"Check exited 2; bad or rule-violating patch detected.{suffix}"),
+            3 => new CheckOutcome(
+                AwdpFixStatus.FixServiceError,
+                AwdpServiceStatus.ServiceError,
+                $"Check exited 3; interaction error or service behavior failure.{suffix}"),
+            _ => new CheckOutcome(
+                AwdpFixStatus.FixServiceError,
+                AwdpServiceStatus.ServiceError,
+                $"Check exited with unsupported code {exitCode}; treating defense as service error.{suffix}")
+        };
+    }
+
     private static Dictionary<string, string> BuildLabels(Guid competitionId, Guid teamId, Guid challengeId)
         => new()
         {
@@ -676,5 +685,11 @@ public class AwdpPatchService(
             or AwdpFixStatus.FixScriptError
             or AwdpFixStatus.FixTimeout
             or AwdpFixStatus.AuditFailed
+            or AwdpFixStatus.FixRuleViolation
             or AwdpFixStatus.DefenseAttemptsExhausted;
+
+    private sealed record CheckOutcome(
+        AwdpFixStatus FixStatus,
+        AwdpServiceStatus ServiceStatus,
+        string Detail);
 }

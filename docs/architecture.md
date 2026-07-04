@@ -54,8 +54,8 @@ Future versions may load plugins dynamically via `AssemblyLoadContext` so new ga
 - **Attempt limits**: `AwdpGameMode` enforces maximum Break attempts, and `AwdpPatchService` enforces maximum Fix attempts
 - **Round settlement**: `AwdpRoundEngine` advances AWDP rounds, then `AwdpScoreEngine` writes per-team, per-challenge `AwdpRoundScore` rows and `awdp-round` score events
 - **No starting score**: AWDP totals are the sum of round score deltas; there is no initial score pool
-- **FixScript validation**: Teams upload `.zip`, `.tar.gz`, or `.tgz` archives. The configured entry script, for example `fix.sh`, runs in an isolated side container before checker and EXP validation
-- **Outcome separation**: `FixFailed`, `FixServiceError`, `FixScriptError`, `FixTimeout`, and `AuditFailed` are tracked separately. `FixFailed` does not create a penalty by default; service and violation penalties are controlled by AWDP configuration
+- **FixScript validation**: Teams upload `.zip`, `.tar.gz`, or `.tgz` archives. The configured entry script, for example `fix.sh`, runs in an isolated side container before one challenge-author-provided `check` container validates service health, exploitability, and patch rules
+- **Outcome separation**: `FixFailed`, `FixServiceError`, `FixScriptError`, `FixTimeout`, `AuditFailed`, and `FixRuleViolation` are tracked separately. `FixFailed` does not create a penalty by default; service and violation penalties are controlled by AWDP configuration
 
 ### KoH (King of the Hill)
 

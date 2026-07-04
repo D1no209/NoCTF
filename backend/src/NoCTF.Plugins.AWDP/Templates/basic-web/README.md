@@ -1,10 +1,10 @@
 # AWDP Basic Web Template
 
-This template mirrors the current AWDP plugin flow:
+This template demonstrates the current AWDP flow:
 
-- The challenge image runs the vulnerable service and accepts `NOCTF_FLAG`.
-- The challenge image can also apply a submitted patch archive when `PATCH_URL` is present.
-- The checker image reads `TARGET_HOST`, `TARGET_PORT`, and `TEAM_ID`, then exits `0` only when the service is healthy.
+- The target image runs a vulnerable service and applies a submitted FixScript archive when `PATCH_URL` is present.
+- The platform runs one challenge-author-provided `check` container after patch application.
+- The check script receives target and patch environment variables, can inspect the patch archive, probes service availability, and verifies exploitability.
 
 ## Platform Fields
 
@@ -15,10 +15,31 @@ Use these values when creating the challenge template in the admin challenge ban
 | Deployment type | Dynamic container |
 | Container image | Your built `awdp-basic-web-target` image |
 | Exposed port | `80` |
-| Checker image | Your built `awdp-basic-web-checker` image |
-| Checker command | `python /checker/check.py` |
+| check container | Your built `awdp-basic-web-checker` image |
+| check command | `python /checker/check.py` |
+| check timeout | `30` |
+| Patch template | Archive the `patch-template/` directory as the downloadable starter package |
 
-The AWDP validator also supports EXP containers through `CheckerConfig.ExpImage` and `CheckerConfig.ExpCommand`. This template keeps the checker focused on service availability; add an EXP image and command when you want the template to prove that the vulnerability is still exploitable before a FixScript is accepted.
+`CheckerConfig.Image` is the check container image. `CheckerConfig.Command` is the check command. AWDP does not use a separate EXP phase.
+
+## Check Contract
+
+The check container receives:
+
+- `TARGET_HOST`
+- `TARGET_PORT`
+- `TEAM_ID`
+- `PATCH_URL`
+- `PATCH_FILE_NAME`
+- `FIX_ENTRY`
+
+Return codes:
+
+- `0`: fix success
+- `1`: EXP exploit succeeded
+- `2`: bad or rule-violating patch
+- `3`: interaction or service error
+- Timeout: handled by the platform as service error
 
 ## Build
 
@@ -31,18 +52,6 @@ docker build -t awdp-basic-web-checker:latest ./checker
 
 Participants upload a `.tar.gz`, `.tgz`, or `.zip` archive. The archive root must contain the configured FixScript entry. The recommended default is `fix.sh`.
 
-For this template, a valid patch can replace `/app/service.py` or edit it in place. The patch script runs from `/app` inside the challenge container:
+For this template, a valid patch edits `/app/service.py` so `/echo?q=flag` no longer leaks the flag while `/health` still returns `ok`.
 
-```bash
-#!/bin/sh
-set -eu
-python - <<'PY'
-from pathlib import Path
-path = Path("/app/service.py")
-text = path.read_text()
-text = text.replace("return query", "return query.replace('flag', 'blocked')")
-path.write_text(text)
-PY
-```
-
-Keep the configured FixScript entry executable-friendly and POSIX shell compatible.
+The `patch-example/fix.sh` and `patch-template/fix.sh` files show the expected shape.

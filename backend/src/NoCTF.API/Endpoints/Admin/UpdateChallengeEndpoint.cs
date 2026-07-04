@@ -18,6 +18,7 @@ public class UpdateChallengeRequest
     public string? FlagSecret { get; set; }
     public string? FlagEnvironmentVariable { get; set; }
     public string? AttachmentUrl { get; set; }
+    public string? PatchTemplateUrl { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public CheckerConfigDto? CheckerConfig { get; set; }
@@ -63,6 +64,7 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
             ? "NOCTF_FLAG_UUID"
             : req.FlagEnvironmentVariable.Trim();
         challenge.AttachmentUrl = attachmentUrl;
+        challenge.PatchTemplateUrl = ChallengeTemplateRequestRules.CleanOptional(req.PatchTemplateUrl);
         challenge.DeploymentType = deploymentType;
         challenge.ExposedPort = usesRuntimeContainer ? req.ExposedPort : null;
         challenge.UpdatedAt = DateTime.UtcNow;

@@ -1,44 +1,41 @@
 <script setup lang="ts">
-import { computed, ref, h } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import type { SortingState } from '@tanstack/vue-table'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
-  FlexRender,
-  useVueTable,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
   createColumnHelper,
-  type SortingState,
+  FlexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+
+  useVueTable,
 } from '@tanstack/vue-table'
+import {
+  ExternalLink,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+  Users2,
+} from 'lucide-vue-next'
+import { computed, h, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogDescription,
 } from '@/components/ui/dialog'
 import {
   DropdownMenu,
@@ -48,19 +45,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useRouter } from 'vue-router'
-import { 
-  MoreHorizontal, 
-  Plus, 
-  Search, 
-  Settings, 
-  Users2, 
-  Trash2, 
-  ExternalLink,
-  Loader2
-} from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -110,7 +111,8 @@ function defaultSchedule() {
 }
 
 const isScheduleValid = computed(() => {
-  if (!form.value.startTime || !form.value.endTime) return false
+  if (!form.value.startTime || !form.value.endTime)
+    return false
   return new Date(form.value.endTime).getTime() > new Date(form.value.startTime).getTime()
 })
 
@@ -139,7 +141,8 @@ const saveMutation = useMutation({
     const body = competitionPayload()
     if (isCreating.value) {
       await adminApi.createCompetition(body)
-    } else {
+    }
+    else {
       await adminApi.updateCompetition(selectedComp.value!.id, body)
     }
   },
@@ -164,7 +167,7 @@ const deleteMutation = useMutation({
   },
   onError: () => {
     toast.error(t('admin.competitions.deleteError'))
-  }
+  },
 })
 
 function openCreate() {
@@ -189,37 +192,41 @@ function goManage(comp: CompetitionAdminDto) {
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const s = status.toLowerCase()
-  if (s === 'running' || s === 'active') return 'default'
-  if (s === 'published') return 'secondary'
-  if (s === 'finished' || s === 'ended') return 'outline'
-  if (s === 'draft') return 'outline'
+  if (s === 'running' || s === 'active')
+    return 'default'
+  if (s === 'published')
+    return 'secondary'
+  if (s === 'finished' || s === 'ended')
+    return 'outline'
+  if (s === 'draft')
+    return 'outline'
   return 'secondary'
 }
 
 const columnHelper = createColumnHelper<CompetitionAdminDto>()
 
 const columns = [
-  columnHelper.accessor('title', { 
-    header: t('admin.competitions.titleColumn'), 
+  columnHelper.accessor('title', {
+    header: t('admin.competitions.titleColumn'),
     enableSorting: true,
-    cell: (info) => info.getValue() 
+    cell: info => info.getValue(),
   }),
-  columnHelper.accessor('gameModeType', { 
-    header: t('admin.competitions.mode'), 
+  columnHelper.accessor('gameModeType', {
+    header: t('admin.competitions.mode'),
     enableSorting: true,
-    cell: (info) => h(Badge, { variant: 'outline', class: 'font-mono' }, () => info.getValue())
+    cell: info => h(Badge, { variant: 'outline', class: 'font-mono' }, () => info.getValue()),
   }),
   columnHelper.accessor('status', {
     header: t('admin.competitions.status'),
-    cell: (info) => h(Badge, { variant: statusVariant(info.getValue()) }, () => info.getValue()),
+    cell: info => h(Badge, { variant: statusVariant(info.getValue()) }, () => info.getValue()),
   }),
   columnHelper.accessor('startTime', {
     header: t('admin.competitions.start'),
-    cell: (info) => new Date(info.getValue()).toLocaleDateString(),
+    cell: info => new Date(info.getValue()).toLocaleDateString(),
   }),
   columnHelper.accessor('endTime', {
     header: t('admin.competitions.end'),
-    cell: (info) => new Date(info.getValue()).toLocaleDateString(),
+    cell: info => new Date(info.getValue()).toLocaleDateString(),
   }),
 ]
 
@@ -245,10 +252,14 @@ const table = useVueTable({
   <div class="noctf-admin-page">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
-        <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.competitions.title') }}</h2>
-        <p class="text-sm text-muted-foreground">{{ t('admin.competitions.subtitle') }}</p>
+        <h2 class="text-2xl font-bold tracking-tight">
+          {{ t('admin.competitions.title') }}
+        </h2>
+        <p class="text-sm text-muted-foreground">
+          {{ t('admin.competitions.subtitle') }}
+        </p>
       </div>
-      <Button @click="openCreate" class="shrink-0">
+      <Button class="shrink-0" @click="openCreate">
         <Plus class="mr-2 size-4" />
         {{ t('admin.competitions.create') }}
       </Button>
@@ -280,7 +291,9 @@ const table = useVueTable({
                 </div>
               </template>
             </TableHead>
-            <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
+            <TableHead class="w-[80px] text-right px-4">
+              {{ t('common.actions') }}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -296,7 +309,9 @@ const table = useVueTable({
             <TableCell :colspan="columns.length + 1" class="h-32 text-center">
               <div class="flex flex-col items-center justify-center gap-3 text-muted-foreground">
                 <span>{{ t('admin.competitions.loadError', t('errors.loadFailed')) }}</span>
-                <Button variant="outline" size="sm" @click="refetch()">{{ t('common.refresh') }}</Button>
+                <Button variant="outline" size="sm" @click="refetch()">
+                  {{ t('common.refresh') }}
+                </Button>
               </div>
             </TableCell>
           </TableRow>
@@ -305,9 +320,9 @@ const table = useVueTable({
               {{ t('admin.competitions.empty') }}
             </TableCell>
           </TableRow>
-          <TableRow 
-            v-else 
-            v-for="row in table.getRowModel().rows" 
+          <TableRow
+            v-for="row in table.getRowModel().rows"
+            v-else
             :key="row.id"
             class="group transition-colors hover:bg-muted/50"
           >
@@ -337,8 +352,15 @@ const table = useVueTable({
                     <ExternalLink class="mr-2 size-4" />
                     {{ t('admin.competitions.viewPublic') }}
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-if="row.original.gameModeType.toLowerCase() === 'awdp'"
+                    @click="router.push({ name: 'awdp-screen', params: { gameId: row.original.id } })"
+                  >
+                    <ExternalLink class="mr-2 size-4" />
+                    {{ t('awdp.screenEntry') }}
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem @click="openDelete(row.original)" class="text-destructive focus:text-destructive">
+                  <DropdownMenuItem class="text-destructive focus:text-destructive" @click="openDelete(row.original)">
                     <Trash2 class="mr-2 size-4" />
                     {{ t('common.delete') }}
                   </DropdownMenuItem>
@@ -400,10 +422,18 @@ const table = useVueTable({
                   <SelectValue placeholder="Select mode" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Ctf">{{ t('admin.competitions.modeCtf') }}</SelectItem>
-                  <SelectItem value="Awd">{{ t('admin.competitions.modeAwd') }}</SelectItem>
-                  <SelectItem value="Awdp">{{ t('admin.competitions.modeAwdp') }}</SelectItem>
-                  <SelectItem value="Koh">{{ t('admin.competitions.modeKoh') }}</SelectItem>
+                  <SelectItem value="Ctf">
+                    {{ t('admin.competitions.modeCtf') }}
+                  </SelectItem>
+                  <SelectItem value="Awd">
+                    {{ t('admin.competitions.modeAwd') }}
+                  </SelectItem>
+                  <SelectItem value="Awdp">
+                    {{ t('admin.competitions.modeAwdp') }}
+                  </SelectItem>
+                  <SelectItem value="Koh">
+                    {{ t('admin.competitions.modeKoh') }}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -414,11 +444,21 @@ const table = useVueTable({
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Draft">{{ t('competitions.status.draft') }}</SelectItem>
-                  <SelectItem value="Published">{{ t('competitions.status.published') }}</SelectItem>
-                  <SelectItem value="Running">{{ t('competitions.status.running') }}</SelectItem>
-                  <SelectItem value="Paused">{{ t('competitions.status.paused') }}</SelectItem>
-                  <SelectItem value="Finished">{{ t('competitions.status.finished') }}</SelectItem>
+                  <SelectItem value="Draft">
+                    {{ t('competitions.status.draft') }}
+                  </SelectItem>
+                  <SelectItem value="Published">
+                    {{ t('competitions.status.published') }}
+                  </SelectItem>
+                  <SelectItem value="Running">
+                    {{ t('competitions.status.running') }}
+                  </SelectItem>
+                  <SelectItem value="Paused">
+                    {{ t('competitions.status.paused') }}
+                  </SelectItem>
+                  <SelectItem value="Finished">
+                    {{ t('competitions.status.finished') }}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -435,7 +475,9 @@ const table = useVueTable({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="editDialog = false" :disabled="saveMutation.isPending.value">{{ t('common.cancel') }}</Button>
+          <Button variant="outline" :disabled="saveMutation.isPending.value" @click="editDialog = false">
+            {{ t('common.cancel') }}
+          </Button>
           <Button :disabled="saveMutation.isPending.value || !canSave" @click="saveMutation.mutate()">
             <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ isCreating ? t('common.create') : t('common.save') }}
@@ -454,10 +496,14 @@ const table = useVueTable({
           </DialogDescription>
         </DialogHeader>
         <div class="py-4">
-          <p class="text-sm font-medium">{{ t('admin.competitions.deleteQuestion') }} <span class="font-bold text-foreground">"{{ selectedComp?.title }}"</span>?</p>
+          <p class="text-sm font-medium">
+            {{ t('admin.competitions.deleteQuestion') }} <span class="font-bold text-foreground">"{{ selectedComp?.title }}"</span>?
+          </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="deleteDialog = false">{{ t('common.cancel') }}</Button>
+          <Button variant="outline" @click="deleteDialog = false">
+            {{ t('common.cancel') }}
+          </Button>
           <Button
             variant="destructive"
             :disabled="deleteMutation.isPending.value"

@@ -21,6 +21,7 @@ public class ChallengeDto
     public int Points { get; set; }
     public int SolveCount { get; set; }
     public string? AttachmentUrl { get; set; }
+    public string? PatchTemplateUrl { get; set; }
     public string DeploymentType { get; set; } = string.Empty;
     public int? ExposedPort { get; set; }
     public List<string> Hints { get; set; } = [];
@@ -55,6 +56,7 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
                     TypeId = c.TypeId,
                     Points = c.PointsConfig.InitialPoints,
                     AttachmentUrl = c.AttachmentUrl,
+                    PatchTemplateUrl = c.PatchTemplateUrl,
                     DeploymentType = c.DeploymentType.ToString(),
                     ExposedPort = c.ExposedPort
                 },

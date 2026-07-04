@@ -115,14 +115,15 @@ When attempts are exhausted, the backend rejects the request and the frontend di
 1. **Archive audit**: The archive must be `.zip`, `.tar.gz`, or `.tgz`, must use safe paths, and must contain the configured entry script, such as `fix.sh`
 2. **Side runner**: A temporary container downloads and extracts the archive, then runs the configured FixScript entry
 3. **Recreate game box**: The team's container is recreated with the accepted FixScript environment
-4. **Checker run**: The challenge checker is executed against the patched container
-5. **EXP run**: The challenge exploit container is executed against the patched container
+4. **Check run**: The challenge author's check container is executed against the patched container with both target and patch archive metadata
 
 The validation result is classified precisely:
 
-- Checker failed: `FixServiceError`, meaning the service is unavailable or business behavior is broken
-- Checker passed and EXP passed: `FixFailed`, meaning the service works but the vulnerability still exists
-- Checker passed and EXP failed: `FixSuccess`, meaning the service works and the vulnerability is fixed
+- Check exit `0`: `FixSuccess`, meaning the service works and the vulnerability is fixed
+- Check exit `1`: `FixFailed`, meaning EXP exploit succeeded and the vulnerability still exists
+- Check exit `2`: `FixRuleViolation`, meaning the patch is bad or violates rules; players see this as service error
+- Check exit `3`: `FixServiceError`, meaning the service is unavailable or interaction failed
+- Check timeout: `FixServiceError`, shown to players as service error
 - FixScript execution failed: `FixScriptError`
 - FixScript timed out: `FixTimeout`
 - Archive audit failed: `AuditFailed`
@@ -137,7 +138,7 @@ If validation rejects a patched container, the platform destroys it and restores
 - `FixSuccess` earns the configured defense score for that round
 - `FixFailed` does not earn defense points and does not create a penalty by default
 - `ServiceError` creates a penalty only when AWDP service penalties are enabled
-- `AuditFailed`, `FixScriptError`, and `FixTimeout` create violation penalties only when AWDP violation penalties are enabled
+- `AuditFailed`, `FixScriptError`, `FixTimeout`, and `FixRuleViolation` create violation penalties only when AWDP violation penalties are enabled
 
 Total score is the sum of round deltas:
 

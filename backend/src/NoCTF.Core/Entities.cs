@@ -139,6 +139,7 @@ public class Challenge : ITenantEntity
     public double DifficultyCoefficient { get; set; } = 1.0;
     public bool EnableBloodBonus { get; set; }
     public string? AttachmentUrl { get; set; }
+    public string? PatchTemplateUrl { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public string FlagPrefix { get; set; } = "flag";
@@ -166,6 +167,7 @@ public class ChallengeTemplate
     public string? Description { get; set; }
     public string TypeId { get; set; } = "ctf";
     public string? AttachmentUrl { get; set; }
+    public string? PatchTemplateUrl { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
@@ -371,10 +373,10 @@ public class CheckerConfig
     public string? Command { get; set; }
     public int? TimeoutSeconds { get; set; }
 
-    /// <summary>EXP (exploit) container image for AWDP patch validation.</summary>
+    /// <summary>Legacy optional exploit container image. AWDP now uses Image/Command as a single check container.</summary>
     public string? ExpImage { get; set; }
 
-    /// <summary>EXP (exploit) container command for AWDP patch validation.</summary>
+    /// <summary>Legacy optional exploit container command. AWDP now uses Image/Command as a single check container.</summary>
     public string? ExpCommand { get; set; }
 }
 
@@ -418,7 +420,8 @@ public enum AwdpFixStatus
     FixScriptError,
     FixTimeout,
     AuditFailed,
-    DefenseAttemptsExhausted
+    DefenseAttemptsExhausted,
+    FixRuleViolation
 }
 
 public enum AwdpServiceStatus
@@ -532,4 +535,37 @@ public class BackgroundTaskItem : ITenantEntity
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? LockedUntil { get; set; }
+}
+
+public static class AwdpPlayerDefenseResult
+{
+    public const string DefenseSuccess = "defense_success";
+    public const string ExpExploited = "defense_exp_exploited";
+    public const string ServiceError = "defense_service_error";
+
+    public static AwdpFixStatus ToVisibleFixStatus(AwdpFixStatus status)
+        => status switch
+        {
+            AwdpFixStatus.FixSuccess => AwdpFixStatus.FixSuccess,
+            AwdpFixStatus.FixFailed => AwdpFixStatus.FixFailed,
+            AwdpFixStatus.FixServiceError
+                or AwdpFixStatus.FixScriptError
+                or AwdpFixStatus.FixTimeout
+                or AwdpFixStatus.AuditFailed
+                or AwdpFixStatus.FixRuleViolation => AwdpFixStatus.FixServiceError,
+            _ => status
+        };
+
+    public static string? ToVisibleDetail(AwdpFixStatus status)
+        => status switch
+        {
+            AwdpFixStatus.FixSuccess => DefenseSuccess,
+            AwdpFixStatus.FixFailed => ExpExploited,
+            AwdpFixStatus.FixServiceError
+                or AwdpFixStatus.FixScriptError
+                or AwdpFixStatus.FixTimeout
+                or AwdpFixStatus.AuditFailed
+                or AwdpFixStatus.FixRuleViolation => ServiceError,
+            _ => null
+        };
 }

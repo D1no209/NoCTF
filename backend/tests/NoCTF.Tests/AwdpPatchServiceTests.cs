@@ -86,9 +86,9 @@ public class AwdpPatchServiceTests
     {
         var competitionId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
-        SeedCompetition(db, competitionId, maxDefenseAttempts: 1);
+        SeedCompetition(db, competitionId);
         var teamId = Guid.NewGuid();
-        var challengeId = SeedChallenge(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId, maxDefenseAttempts: 1);
         SeedGameBox(db, competitionId, teamId, challengeId);
         db.AwdpTeamChallengeStates.Add(new AwdpTeamChallengeState
         {
@@ -163,10 +163,10 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_CheckerPassExpFail_VerifiesWithoutImmediateScore()
+    public async Task ValidatePatchAsync_CheckExit0_VerifiesWithoutImmediateScore()
     {
         var (db, service, competitionId, teamId, challengeId, _) =
-            await CreateValidationScenarioAsync([0, 0, 1]);
+            await CreateValidationScenarioAsync([0, 0]);
         await using (db)
         {
             var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
@@ -185,10 +185,10 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_CheckerPassExpPass_RecordsFixFailedWithoutPenaltyEvent()
+    public async Task ValidatePatchAsync_CheckExit1_RecordsExploitSuccessAsFixFailedWithoutPenaltyEvent()
     {
         var (db, service, competitionId, teamId, challengeId, containerManager) =
-            await CreateValidationScenarioAsync([0, 0, 0]);
+            await CreateValidationScenarioAsync([0, 1]);
         await using (db)
         {
             var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
@@ -207,10 +207,31 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_CheckerFails_RecordsServiceErrorSeparately()
+    public async Task ValidatePatchAsync_CheckExit2_RecordsRuleViolationAsInternalServiceError()
     {
         var (db, service, competitionId, teamId, challengeId, _) =
-            await CreateValidationScenarioAsync([0, 1]);
+            await CreateValidationScenarioAsync([0, 2]);
+        await using (db)
+        {
+            var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+            await service.ValidatePatchAsync(submissionId);
+
+            var submission = await db.AwdpPatchSubmissions.IgnoreQueryFilters().FirstAsync(s => s.Id == submissionId);
+            var state = await db.AwdpTeamChallengeStates.IgnoreQueryFilters().FirstAsync(s => s.TeamId == teamId);
+
+            Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
+            Assert.Equal(AwdpFixStatus.FixRuleViolation, submission.FixStatus);
+            Assert.Equal(AwdpServiceStatus.ServiceError, state.ServiceStatus);
+            Assert.Contains("bad or rule-violating patch", submission.ValidationDetail);
+        }
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_CheckExit3_RecordsServiceErrorSeparately()
+    {
+        var (db, service, competitionId, teamId, challengeId, _) =
+            await CreateValidationScenarioAsync([0, 3]);
         await using (db)
         {
             var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
@@ -227,13 +248,62 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_NoCheckerOrExp_TreatsExploitAsFailed()
+    public async Task ValidatePatchAsync_CheckTimeout_RecordsServiceError()
     {
         var competitionId = Guid.NewGuid();
         var teamId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
         SeedCompetition(db, competitionId);
-        var challengeId = SeedChallenge(db, competitionId, checkerImage: null, expImage: null);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+
+        var containerManager = new SequencedContainerManager([0], timeoutOnRunIndex: 1);
+        var service = CreateService(db, containerManager);
+        var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+        await service.ValidatePatchAsync(submissionId);
+
+        var submission = await db.AwdpPatchSubmissions.IgnoreQueryFilters().FirstAsync(s => s.Id == submissionId);
+        var state = await db.AwdpTeamChallengeStates.IgnoreQueryFilters().FirstAsync(s => s.TeamId == teamId);
+
+        Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
+        Assert.Equal(AwdpFixStatus.FixServiceError, submission.FixStatus);
+        Assert.Equal(AwdpServiceStatus.ServiceError, state.ServiceStatus);
+        Assert.Contains("timed out", submission.ValidationDetail);
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_CheckEnvironmentIncludesTargetAndPatchMetadata()
+    {
+        var (db, service, competitionId, teamId, challengeId, containerManager) =
+            await CreateValidationScenarioAsync([0, 0]);
+        await using (db)
+        {
+            var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+            await service.ValidatePatchAsync(submissionId);
+
+            var checkConfig = containerManager.RunConfigs[1];
+            Assert.Equal("checker:latest", checkConfig.Image);
+            Assert.Equal("exit 0", checkConfig.Command);
+            Assert.Equal($"gamebox-{teamId:N}-{challengeId:N}", checkConfig.EnvironmentVariables?["TARGET_HOST"]);
+            Assert.Equal("80", checkConfig.EnvironmentVariables?["TARGET_PORT"]);
+            Assert.Equal(teamId.ToString(), checkConfig.EnvironmentVariables?["TEAM_ID"]);
+            Assert.Equal("http://storage/fix.tar.gz", checkConfig.EnvironmentVariables?["PATCH_URL"]);
+            Assert.Equal("fix.tar.gz", checkConfig.EnvironmentVariables?["PATCH_FILE_NAME"]);
+            Assert.Equal("fix.sh", checkConfig.EnvironmentVariables?["FIX_ENTRY"]);
+        }
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_NoCheckContainer_AcceptsAfterFixScript()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId, checkerImage: null);
         SeedGameBox(db, competitionId, teamId, challengeId);
         await db.SaveChangesAsync();
 
@@ -289,7 +359,8 @@ public class AwdpPatchServiceTests
         ApplicationDbContext db,
         Guid competitionId,
         string? checkerImage = "checker:latest",
-        string? expImage = "exp:latest")
+        int defensePoints = 150,
+        int maxDefenseAttempts = 3)
     {
         var id = Guid.NewGuid();
         db.Challenges.Add(new Challenge
@@ -301,15 +372,16 @@ public class AwdpPatchServiceTests
             PointsConfig = new PointsConfig(),
             ContainerImage = "vuln-service:latest",
             ExposedPort = 80,
-            CheckerConfig = checkerImage is null && expImage is null
+            AwdpDefenseScorePerRound = defensePoints,
+            AwdpMaxDefenseAttempts = maxDefenseAttempts,
+            AwdpFixEntry = "fix.sh",
+            CheckerConfig = checkerImage is null
                 ? null
                 : new CheckerConfig
                 {
                     Image = checkerImage,
                     Command = "exit 0",
-                    TimeoutSeconds = 5,
-                    ExpImage = expImage,
-                    ExpCommand = "exit 0"
+                    TimeoutSeconds = 5
                 },
             CreatedAt = DateTime.UtcNow
         });
@@ -397,11 +469,12 @@ public class AwdpPatchServiceTests
             => Task.CompletedTask;
     }
 
-    private sealed class SequencedContainerManager(int[] exitCodes) : IContainerManager
+    private sealed class SequencedContainerManager(int[] exitCodes, int? timeoutOnRunIndex = null) : IContainerManager
     {
         private int _runIndex;
         public int CreateCount { get; private set; }
         public int DestroyCount { get; private set; }
+        public List<ContainerConfig> RunConfigs { get; } = [];
 
         public Task<ContainerInstance> CreateContainerAsync(ContainerConfig config, CancellationToken ct = default)
         {
@@ -419,6 +492,10 @@ public class AwdpPatchServiceTests
         public Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, CancellationToken ct = default)
         {
             var idx = _runIndex++;
+            RunConfigs.Add(config);
+            if (timeoutOnRunIndex == idx)
+                throw new OperationCanceledException();
+
             var exitCode = idx < exitCodes.Length ? exitCodes[idx] : 0;
             return Task.FromResult(new ContainerRunResult("run-id", exitCode, null, null, DateTime.UtcNow, DateTime.UtcNow));
         }

@@ -64,6 +64,7 @@ interface ChallengeTemplateDto {
   composeYaml?: string
   composeProjectName?: string
   attachmentUrl?: string
+  patchTemplateUrl?: string
   flagEnvironmentVariable?: string
   deploymentType: 'NoAttachment' | 'StaticAttachment' | 'DynamicContainer' | 'StaticContainer' | number
   exposedPort?: number | null
@@ -111,10 +112,13 @@ const { data: templates, isLoading } = useQuery({
 })
 
 const saveMutation = useMutation({
-  mutationFn: async ({ payload, attachmentFile }: { payload: Record<string, unknown>; attachmentFile: File | null }) => {
+  mutationFn: async ({ payload, attachmentFile, patchTemplateFile }: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null }) => {
     const saved = await adminApi.updateChallenge<ChallengeTemplateDto>(selectedTemplate.value!.id, payload)
     if (attachmentFile) {
       await adminApi.uploadChallengeAttachment(saved.id, attachmentFile)
+    }
+    if (patchTemplateFile) {
+      await adminApi.uploadChallengePatchTemplate(saved.id, patchTemplateFile)
     }
   },
   onSuccess: () => {

@@ -1,23 +1,23 @@
 <script setup lang="ts">
+import { vAutoAnimate } from '@formkit/auto-animate/vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { ArrowRight, Calendar, CheckCircle2, EyeOff, Loader2, Lock, Puzzle, Trophy, UserPlus, Users } from 'lucide-vue-next'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
-import { useAuthStore } from '@/stores/auth'
-import { useScoreStore } from '@/stores/score'
+import ChallengeCard from '@/components/game/ChallengeCard.vue'
+import ChallengeModal from '@/components/game/ChallengeModal.vue'
+import ScoreboardView from '@/components/game/ScoreboardView.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import PageHeader from '@/components/layout/PageHeader.vue'
-import ChallengeCard from '@/components/game/ChallengeCard.vue'
-import ChallengeModal from '@/components/game/ChallengeModal.vue'
-import ScoreboardView from '@/components/game/ScoreboardView.vue'
-import { vAutoAnimate } from '@formkit/auto-animate/vue'
-import { ArrowRight, Trophy, Puzzle, Calendar, CheckCircle2, EyeOff, Loader2, Lock, UserPlus, Users } from 'lucide-vue-next'
 import { normalizeDirection } from '@/lib/challengeDirections'
+import { useAuthStore } from '@/stores/auth'
+import { useScoreStore } from '@/stores/score'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -51,6 +51,7 @@ interface Challenge {
   descriptionFormat?: string | null
   hints?: string[]
   attachmentUrl?: string | null
+  patchTemplateUrl?: string | null
 }
 
 interface SubmissionItem {
@@ -170,7 +171,7 @@ const { data: myTeams, isLoading: loadingMyTeams } = useQuery({
   enabled: computed(() => !!competitionId.value),
 })
 
-const solvedIds = computed(() => new Set((submissionsResponse.value?.solvedChallenges ?? []).map((s) => s.challengeId)))
+const solvedIds = computed(() => new Set((submissionsResponse.value?.solvedChallenges ?? []).map(s => s.challengeId)))
 
 // UI State
 const modalOpen = ref(false)
@@ -204,9 +205,12 @@ function markDefenseRequested(challengeId: string) {
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const s = status.toLowerCase()
-  if (s === 'active' || s === 'running') return 'default'
-  if (s === 'upcoming' || s === 'pending') return 'secondary'
-  if (s === 'ended' || s === 'finished') return 'outline'
+  if (s === 'active' || s === 'running')
+    return 'default'
+  if (s === 'upcoming' || s === 'pending')
+    return 'secondary'
+  if (s === 'ended' || s === 'finished')
+    return 'outline'
   return 'secondary'
 }
 
@@ -215,7 +219,7 @@ function formatDate(iso: string) {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   })
 }
 
@@ -291,12 +295,13 @@ const filteredChallenges = computed(() => {
 })
 
 const directionCounts = computed(() => {
-  const counts = new Map<string, { total: number; unsolved: number }>()
+  const counts = new Map<string, { total: number, unsolved: number }>()
   for (const challenge of challenges.value ?? []) {
     const direction = normalizeDirection(challenge.typeId)
     const current = counts.get(direction) ?? { total: 0, unsolved: 0 }
     current.total += 1
-    if (!solvedIds.value.has(challenge.id)) current.unsolved += 1
+    if (!solvedIds.value.has(challenge.id))
+      current.unsolved += 1
     counts.set(direction, current)
   }
   return counts
@@ -317,12 +322,14 @@ const directionOptions = computed(() => {
 })
 
 const selectedChallengePatchSubmissions = computed(() => {
-  if (!selectedChallenge.value) return []
+  if (!selectedChallenge.value)
+    return []
   return (patchSubmissions.value ?? []).filter(item => item.challengeId === selectedChallenge.value?.id)
 })
 
 const selectedChallengeAwdpState = computed(() => {
-  if (!selectedChallenge.value) return null
+  if (!selectedChallenge.value)
+    return null
   return awdpStateData.value?.challenges.find(item => item.challengeId === selectedChallenge.value?.id) ?? null
 })
 
@@ -359,6 +366,12 @@ function handlePatchUploaded() {
               <Badge variant="secondary" class="bg-violet-100 text-violet-700">
                 {{ competition.gameModeType }}
               </Badge>
+              <Button v-if="isAwdpMode" variant="outline" size="sm" as-child>
+                <RouterLink :to="{ name: 'awdp-screen', params: { gameId: competitionId } }">
+                  {{ t('awdp.screenEntry') }}
+                  <ArrowRight class="size-4" />
+                </RouterLink>
+              </Button>
             </div>
           </template>
         </PageHeader>
@@ -383,7 +396,9 @@ function handlePatchUploaded() {
             <Users class="size-4 text-primary" />
             {{ t('teams.currentRegistration') }}
           </h3>
-          <p class="text-sm text-muted-foreground">{{ t('teams.currentRegistrationDescription') }}</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t('teams.currentRegistrationDescription') }}
+          </p>
         </div>
         <Badge
           v-if="currentTeam"
@@ -399,7 +414,9 @@ function handlePatchUploaded() {
       </div>
       <div v-else-if="currentTeam" class="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
         <div class="space-y-1">
-          <div class="font-medium">{{ currentTeam.name }}</div>
+          <div class="font-medium">
+            {{ currentTeam.name }}
+          </div>
           <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span>{{ currentTeam.memberCount }} / {{ competition?.maxTeamMembers ?? 5 }} {{ t('common.members') }}</span>
             <span v-if="currentTeam.trackName">{{ currentTeam.trackName }}</span>
@@ -502,7 +519,9 @@ function handlePatchUploaded() {
           <div class="space-y-6">
             <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h3 class="text-lg font-semibold">{{ t('challenges.workspaceTitle') }}</h3>
+                <h3 class="text-lg font-semibold">
+                  {{ t('challenges.workspaceTitle') }}
+                </h3>
                 <p class="text-sm text-muted-foreground">
                   {{ t('challenges.workspaceSubtitle', { count: filteredChallenges.length }) }}
                 </p>
@@ -516,8 +535,8 @@ function handlePatchUploaded() {
               <div
                 v-for="challenge in filteredChallenges"
                 :key="challenge.id"
-                @click="openChallenge(challenge)"
                 class="cursor-pointer group"
+                @click="openChallenge(challenge)"
               >
                 <ChallengeCard
                   :challenge="challenge"
@@ -531,8 +550,12 @@ function handlePatchUploaded() {
               <div class="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
                 <Puzzle class="size-6" />
               </div>
-              <h3 class="text-lg font-medium">{{ t('challenges.empty') }}</h3>
-              <p class="text-sm text-muted-foreground mt-1">{{ t('challenges.emptyDetail') }}</p>
+              <h3 class="text-lg font-medium">
+                {{ t('challenges.empty') }}
+              </h3>
+              <p class="text-sm text-muted-foreground mt-1">
+                {{ t('challenges.emptyDetail') }}
+              </p>
             </div>
           </div>
         </div>

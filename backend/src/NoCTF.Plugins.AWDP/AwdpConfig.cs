@@ -37,26 +37,26 @@ public class AwdpConfigResolver(ApplicationDbContext db)
 
     public static AwdpChallengeConfig Resolve(Competition competition, Challenge challenge)
     {
-        var fixEntry = FirstNonBlank(challenge.AwdpFixEntry, competition.AwdpFixEntry, "fix.sh");
+        var fixEntry = FirstNonBlank(challenge.AwdpFixEntry, "fix.sh");
         return new AwdpChallengeConfig(
             AttackScorePerRound: PositiveOrDefault(
                 challenge.AwdpAttackScorePerRound,
-                competition.AwdpAttackScorePerRound,
-                competition.AttackPoints,
+                null,
+                null,
                 50),
             DefenseScorePerRound: PositiveOrDefault(
                 challenge.AwdpDefenseScorePerRound,
-                competition.AwdpDefenseScorePerRound,
-                competition.DefensePoints,
+                null,
+                null,
                 100),
             MaxAttackAttempts: PositiveOrDefault(
                 challenge.AwdpMaxAttackAttempts,
-                competition.AwdpMaxAttackAttempts,
+                null,
                 null,
                 5),
             MaxDefenseAttempts: PositiveOrDefault(
                 challenge.AwdpMaxDefenseAttempts,
-                competition.AwdpMaxDefenseAttempts,
+                null,
                 null,
                 3),
             AllowAttackAfterBreakSuccess: competition.AwdpAllowAttackAfterBreakSuccess ?? false,
@@ -76,8 +76,8 @@ public class AwdpConfigResolver(ApplicationDbContext db)
             FixEntry: fixEntry,
             FixTimeoutSeconds: PositiveOrDefault(
                 challenge.AwdpFixTimeoutSeconds,
-                competition.AwdpFixTimeoutSeconds,
                 challenge.CheckerConfig?.TimeoutSeconds,
+                null,
                 60));
     }
 

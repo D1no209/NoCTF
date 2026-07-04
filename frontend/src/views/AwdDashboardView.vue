@@ -1,40 +1,44 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import type { AttackLogDto } from '@/components/game/AttackLogFeed.vue'
+import type { AwdAwarenessEvent } from '@/components/game/AwdBattlefieldCore.vue'
+import type { ServiceStatus } from '@/components/game/ServiceStatusGrid.vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { CheckCircle2, Loader2, Upload } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { toast } from 'vue-sonner'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
-import { useAuthStore } from '@/stores/auth'
+import AttackLogFeed from '@/components/game/AttackLogFeed.vue'
+import AwdBattlefieldCore from '@/components/game/AwdBattlefieldCore.vue'
 import RoundTimer from '@/components/game/RoundTimer.vue'
 import ServiceStatusGrid from '@/components/game/ServiceStatusGrid.vue'
-import type { ServiceStatus } from '@/components/game/ServiceStatusGrid.vue'
-import AttackLogFeed from '@/components/game/AttackLogFeed.vue'
-import type { AttackLogDto } from '@/components/game/AttackLogFeed.vue'
-import { useSignalR } from '@/composables/useSignalR'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Select, 
-  SelectContent, 
-  SelectGroup, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
-import { toast } from 'vue-sonner'
-import { Loader2, Upload, CheckCircle2 } from 'lucide-vue-next'
+import { useSignalR } from '@/composables/useSignalR'
+import { useAuthStore } from '@/stores/auth'
+import { useScoreStore } from '@/stores/score'
 
+const props = withDefaults(defineProps<{ gameModeType?: string }>(), { gameModeType: 'Awd' })
 const { t } = useI18n()
 const qc = useQueryClient()
 
-const props = withDefaults(defineProps<{ gameModeType?: string }>(), { gameModeType: 'Awd' })
 const isAwdp = computed(() => props.gameModeType?.toLowerCase() === 'awdp')
 
 const route = useRoute()
 const auth = useAuthStore()
+const scoreStore = useScoreStore()
 const competitionId = computed(() => route.params.id as string)
 
 // ── Dashboard data ──────────────────────────────────────────────────────────
@@ -102,8 +106,9 @@ const totalSeconds = computed(() => dashboard.value?.roundDurationSeconds ?? 300
 const services = computed<ServiceStatus[]>(() => dashboard.value?.services ?? [])
 
 const attackLogs = ref<AttackLogDto[]>([])
+const localAwarenessEvents = ref<AwdAwarenessEvent[]>([])
 const signalR = useSignalR({
-  hubUrl: '/hubs/game',
+  hubUrl: `/hubs/game?competitionId=${competitionId.value}`,
   accessToken: () => auth.accessToken,
 })
 
@@ -138,7 +143,8 @@ function onPatchFileChange(e: Event) {
 }
 
 async function submitPatch() {
-  if (!patchFile.value || !patchChallenge.value) return
+  if (!patchFile.value || !patchChallenge.value)
+    return
   patchLoading.value = true
   try {
     const data = await competitionApi.submitPatch<{ submissionId?: string }>(
@@ -147,13 +153,15 @@ async function submitPatch() {
       patchFile.value,
     )
     toast.success(t('awd.patchSubmitted'), {
-      description: data?.submissionId ? `Submission ID: ${data.submissionId}` : undefined
+      description: data?.submissionId ? `Submission ID: ${data.submissionId}` : undefined,
     })
     qc.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId.value) })
     patchFile.value = null
-  } catch {
+  }
+  catch {
     toast.error(t('awd.patchUploadFailed'))
-  } finally {
+  }
+  finally {
     patchLoading.value = false
   }
 }
@@ -164,10 +172,11 @@ const flagInput = ref('')
 const flagLoading = ref(false)
 
 async function submitFlag() {
-  if (!flagInput.value.trim() || !selectedChallenge.value) return
+  if (!flagInput.value.trim() || !selectedChallenge.value)
+    return
   flagLoading.value = true
   try {
-    const data = await competitionApi.submitFlag<{ correct?: boolean; message?: string }>(
+    const data = await competitionApi.submitFlag<{ correct?: boolean, message?: string }>(
       competitionId.value,
       selectedChallenge.value,
       flagInput.value.trim(),
@@ -175,14 +184,42 @@ async function submitFlag() {
     if (data?.correct) {
       toast.success(t('challenges.correctFlag'))
       flagInput.value = ''
-    } else {
+    }
+    else {
+      enqueueAttackFailed(data?.message ?? t('challenges.incorrectFlag'))
       toast.error(data?.message ?? t('challenges.incorrectFlag'))
     }
-  } catch {
+  }
+  catch {
     toast.error(t('challenges.submissionFailed'))
-  } finally {
+  }
+  finally {
     flagLoading.value = false
   }
+}
+
+function enqueueAttackFailed(reason: string) {
+  const timestamp = new Date().toISOString()
+  const victim = teams.value?.find(team => team.id === selectedVictim.value)
+  const challenge = challenges.value?.find(item => item.id === selectedChallenge.value)
+
+  localAwarenessEvents.value.unshift({
+    id: `local-attack-failed:${competitionId.value}:${selectedVictim.value || 'unknown'}:${selectedChallenge.value}:${timestamp}`,
+    type: 'attack',
+    result: 'failed',
+    attackerTeamId: scoreStore.teamId ?? undefined,
+    attackerTeamName: scoreStore.myTeamName ?? auth.user?.userName ?? 'Current team',
+    victimTeamId: victim?.id ?? selectedVictim.value,
+    victimTeamName: victim?.name ?? 'Selected target',
+    challengeId: challenge?.id ?? selectedChallenge.value,
+    challengeName: challenge?.title ?? 'Selected service',
+    round: round.value,
+    timestamp,
+    reason,
+  })
+
+  if (localAwarenessEvents.value.length > 50)
+    localAwarenessEvents.value.splice(50)
 }
 </script>
 
@@ -195,6 +232,13 @@ async function submitFlag() {
         :total-seconds="totalSeconds"
       />
     </div>
+
+    <AwdBattlefieldCore
+      :round="round"
+      :services="services"
+      :attack-logs="attackLogs"
+      :external-events="localAwarenessEvents"
+    />
 
     <!-- Main grid -->
     <div class="grid w-full grid-cols-12 gap-6">
@@ -258,13 +302,13 @@ async function submitFlag() {
                   v-model="flagInput"
                   :placeholder="t('challenges.flagPlaceholder')"
                   class="font-mono"
-                  @keydown.enter="submitFlag"
                   :disabled="flagLoading"
+                  @keydown.enter="submitFlag"
                 />
                 <Button
                   :disabled="flagLoading || !flagInput.trim() || !selectedChallenge"
-                  @click="submitFlag"
                   class="shrink-0"
+                  @click="submitFlag"
                 >
                   <Loader2 v-if="flagLoading" class="mr-2 size-4 animate-spin" />
                   {{ t('awd.submitFlag') }}
@@ -304,7 +348,7 @@ async function submitFlag() {
                 class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 transition-all hover:bg-muted/50"
                 :class="[
                   isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25',
-                  patchFile ? 'bg-muted/30' : ''
+                  patchFile ? 'bg-muted/30' : '',
                 ]"
                 @dragover.prevent="isDragOver = true"
                 @dragleave.prevent="isDragOver = false"
@@ -315,8 +359,12 @@ async function submitFlag() {
                   <Upload class="size-5 text-muted-foreground" />
                 </div>
                 <div class="text-center">
-                  <p class="text-sm font-medium">{{ patchFile ? patchFile.name : t('awd.dropFile') }}</p>
-                  <p class="text-xs text-muted-foreground mt-1">.tar.gz or .tgz max 10MB</p>
+                  <p class="text-sm font-medium">
+                    {{ patchFile ? patchFile.name : t('awd.dropFile') }}
+                  </p>
+                  <p class="text-xs text-muted-foreground mt-1">
+                    .tar.gz or .tgz max 10MB
+                  </p>
                 </div>
                 <input
                   ref="patchFileInput"
@@ -324,7 +372,7 @@ async function submitFlag() {
                   accept=".tar.gz,.tgz"
                   class="sr-only"
                   @change="onPatchFileChange"
-                />
+                >
               </div>
 
               <Button
@@ -344,7 +392,9 @@ async function submitFlag() {
         <transition name="fade">
           <Card v-if="isAwdp && patchStatuses.length > 0" class="noctf-panel">
             <CardHeader class="pb-2">
-              <CardTitle class="text-sm font-bold uppercase text-muted-foreground">{{ t('awd.patchStatus') }}</CardTitle>
+              <CardTitle class="text-sm font-bold uppercase text-muted-foreground">
+                {{ t('awd.patchStatus') }}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div class="divide-y">
@@ -385,5 +435,4 @@ async function submitFlag() {
 .slide-up-enter-active, .slide-up-leave-active { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 .slide-up-enter-from { opacity: 0; transform: translateY(20px); }
 .slide-up-leave-to { opacity: 0; transform: translateY(-20px); }
-
 </style>
