@@ -207,6 +207,30 @@ Competition-specific values belong in competition challenge management, not the 
 - hint publication for a specific competition
 - flag prefix for that competition
 
+### AWDP Challenge Authoring
+
+AWDP is implemented as its own plugin and should stay separate from AWD. The current AWDP validation model is:
+
+- A participant uploads a FixScript archive.
+- The platform audits the archive, runs the configured FixScript entry in an isolated side runner, recreates the team instance with patch metadata, then runs one challenge-author `check` container.
+- There is no separate AWDP EXP phase. For AWDP, `CheckerConfig.Image`, `CheckerConfig.Command`, and `CheckerConfig.TimeoutSeconds` mean the check container image, command, and timeout.
+- The check container receives `TARGET_HOST`, `TARGET_PORT`, `TEAM_ID`, `PATCH_URL`, `PATCH_FILE_NAME`, and `FIX_ENTRY`.
+- Check exit codes map as `0` fix success, `1` exploit still succeeds, `2` bad/rule-violating patch, `3` service or interaction error, and timeout as service error.
+- Participant UI only exposes defense success, exploit-success defense abnormal, or service-error defense abnormal. Internal bad-patch detail remains operator-facing.
+
+AWDP challenge-bank assets can include a downloadable patch template:
+
+- `ChallengeTemplate.PatchTemplateUrl` and `Challenge.PatchTemplateUrl`
+- upload endpoint: `POST /api/admin/challenges/{id}/patch-template`
+- participant download button appears in the challenge modal when `patchTemplateUrl` exists
+
+Reference authoring templates live under:
+
+```text
+backend/src/NoCTF.Plugins.AWDP/Templates/basic-web
+backend/src/NoCTF.Plugins.AWDP/Templates/standard-web
+```
+
 ### Player Flow
 
 1. Register or login.
@@ -348,23 +372,40 @@ For frontend/player/admin flows:
 As of this handoff update, the active local branch is:
 
 ```text
-codex/competition-row-list
+main
 ```
 
-Open PR:
+Repository state:
 
 ```text
-https://github.com/D1no209/NoCTF/pull/1
+origin/main: 51a0791 feat: add AWDP screen and management improvements
+local HEAD:  a28a98f style: refine frontend product UI
 ```
 
-Recent focus areas:
+The local `main` branch is ahead of `origin/main` by one commit. A push attempt failed because the local GitHub SSH key was not accepted:
 
-- competition list UI is now a full-width square-row layout
-- competition list API exposes approved non-banned team counts
-- dynamic challenge instances show reachable `host:port` addresses
-- instance lifecycle includes create, destroy, extend, cooldown, and TTL
-- CTF scoring and leaderboard details have been expanded
-- AWDP includes a basic challenge/checker template
+```text
+git@github.com: Permission denied (publickey).
+```
+
+Recent completed focus areas:
+
+- AWDP round scoring and admin challenge workflow
+- AWDP single check-container validation flow
+- AWDP patch-template upload/download support
+- AWDP basic and standard authoring templates
+- Admin competition detail navigation split across settings, challenges, team review, cheating info, and logs
+- AWDP management score configuration moved to per-challenge management
+- AWDP command screen and AWD/AWDP realtime visual polish
+- Frontend visual cleanup to reduce glassmorphism, cheap gradients, and template-like surfaces
+
+Most recent verification:
+
+- `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore` passed with 93 tests
+- `bunx eslint <changed frontend files>` passed for the frontend UI cleanup
+- `bun run build` passed
+- In-app browser loaded `http://127.0.0.1:5173/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f` at desktop and narrow widths with no console errors
+- Full `bun run lint` still reports pre-existing lint issues in generated/config/unrelated admin files
 
 ## Common Pitfalls
 
@@ -375,6 +416,7 @@ Recent focus areas:
 - Do not bypass team approval checks for player competition actions.
 - Do not move game-mode-specific logic into the API project unless it is orchestration glue.
 - Do not forget i18n for new visible UI text.
+- Do not reintroduce a separate AWDP EXP container or expose internal bad-patch details to participants.
 - Do not leave old JWTs in local storage when testing auth; expired tokens can make admin pages appear broken.
 
 ## Useful Links

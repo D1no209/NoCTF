@@ -70,9 +70,11 @@ NoCTF/
 │   └── k8s/                        # Kubernetes manifests
 ├── docs/
 │   ├── architecture.md             # System architecture and plugin design
+│   ├── handoff.md                  # Maintainer handoff and current project context
 │   ├── deployment.md               # Docker Compose and K8s deployment guides
 │   ├── development.md              # Local development setup
 │   ├── game-modes.md               # Game mode mechanics
+│   ├── quickstart-test.md          # Manual smoke-test flow
 │   └── api.md                      # API and SignalR reference
 ├── .env.example                    # Example environment variables
 └── README.md                       # This file
@@ -117,6 +119,7 @@ flowchart LR
 - [Development Guide](docs/development.md)
 - [Game Modes](docs/game-modes.md)
 - [API Reference](docs/api.md)
+- [Quickstart Test Guide](docs/quickstart-test.md)
 
 ## License
 

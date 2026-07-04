@@ -97,6 +97,8 @@ For each AWDP challenge, a team works through the plugin operation card:
 
 Break success and Fix success are state changes. They do not grant the whole challenge score immediately.
 
+Challenge authors can attach a patch-template archive to an AWDP challenge. When `patchTemplateUrl` exists, players can download it from the challenge modal and use it as the starter FixScript package.
+
 ### Attempt Limits
 
 AWDP tracks attempts per team and challenge:
@@ -116,6 +118,17 @@ When attempts are exhausted, the backend rejects the request and the frontend di
 2. **Side runner**: A temporary container downloads and extracts the archive, then runs the configured FixScript entry
 3. **Recreate game box**: The team's container is recreated with the accepted FixScript environment
 4. **Check run**: The challenge author's check container is executed against the patched container with both target and patch archive metadata
+
+AWDP uses one check container. It does not run a separate EXP container phase. The admin challenge fields `CheckerConfig.Image`, `CheckerConfig.Command`, and `CheckerConfig.TimeoutSeconds` are interpreted as the AWDP check container image, check command, and timeout.
+
+The check container receives:
+
+- `TARGET_HOST`
+- `TARGET_PORT`
+- `TEAM_ID`
+- `PATCH_URL`
+- `PATCH_FILE_NAME`
+- `FIX_ENTRY`
 
 The validation result is classified precisely:
 
