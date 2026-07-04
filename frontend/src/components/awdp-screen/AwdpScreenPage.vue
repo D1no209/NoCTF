@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AwdpBattleMapPanel from '@/components/awdp-screen/AwdpBattleMapPanel.vue'
+import AwdpChallengeMatrixPanel from '@/components/awdp-screen/AwdpChallengeMatrixPanel.vue'
 import AwdpEventStreamPanel from '@/components/awdp-screen/AwdpEventStreamPanel.vue'
 import AwdpRoundTimeline from '@/components/awdp-screen/AwdpRoundTimeline.vue'
 import AwdpScoreboardPanel from '@/components/awdp-screen/AwdpScoreboardPanel.vue'
@@ -71,6 +72,7 @@ const {
 
       <div class="awdp-screen-bottom">
         <AwdpRoundTimeline :rounds="roundTimeline" :current-round="game.currentRound" />
+        <AwdpChallengeMatrixPanel :challenges="challenges" />
       </div>
     </div>
   </main>
@@ -78,16 +80,24 @@ const {
 
 <style>
 .awdp-screen-shell {
-  --awdp-screen-border: color-mix(in oklch, var(--sidebar-foreground) 14%, transparent);
-  --awdp-screen-grid: color-mix(in oklch, var(--sidebar-foreground) 4%, transparent);
-  --awdp-screen-panel: color-mix(in oklch, var(--sidebar) 90%, black);
+  --awdp-screen-bg: oklch(0.135 0.035 252);
+  --awdp-screen-bg-deep: oklch(0.105 0.03 252);
+  --awdp-screen-panel: oklch(0.17 0.036 252);
+  --awdp-screen-panel-raised: oklch(0.205 0.04 252);
+  --awdp-screen-border: oklch(0.78 0.035 240 / 0.16);
+  --awdp-screen-border-strong: oklch(0.78 0.035 240 / 0.32);
+  --awdp-screen-grid: oklch(0.78 0.035 240 / 0.045);
+  --awdp-break: oklch(0.73 0.13 205);
+  --awdp-fix: oklch(0.74 0.13 158);
+  --awdp-warn: oklch(0.78 0.15 68);
+  --awdp-error: oklch(0.67 0.19 24);
   position: relative;
   min-height: 100dvh;
   overflow: hidden;
   display: grid;
   place-items: center;
   padding: min(1.1vw, 0.9rem);
-  background: var(--sidebar);
+  background: var(--awdp-screen-bg-deep);
   color: var(--sidebar-foreground);
 }
 
@@ -98,41 +108,35 @@ const {
   background:
     linear-gradient(var(--awdp-screen-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--awdp-screen-grid) 1px, transparent 1px),
-    var(--sidebar);
+    linear-gradient(180deg, var(--awdp-screen-bg), var(--awdp-screen-bg-deep));
   background-size: 48px 48px, 48px 48px, auto;
 }
 
 .awdp-screen-frame,
-.awdp-screen-layout {
+.awdp-screen-frame > * {
   position: relative;
   z-index: 1;
-  display: grid;
-  gap: clamp(0.42rem, 0.62vw, 0.75rem);
 }
 
 .awdp-screen-frame {
+  display: grid;
+  gap: clamp(0.42rem, 0.62vw, 0.75rem);
   width: min(100%, calc(100vw - 1.8rem), calc((100dvh - 1.8rem) * 16 / 9));
   aspect-ratio: 16 / 9;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 0.2fr);
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(11.5rem, 0.34fr);
   padding: clamp(0.5rem, 0.7vw, 0.85rem);
-}
-
-.awdp-screen-layout {
-  min-height: 100dvh;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(13rem, 0.38fr);
-  padding: 0.9rem;
 }
 
 .awdp-screen-main {
   display: grid;
-  grid-template-columns: minmax(15.5rem, 0.72fr) minmax(0, 1.65fr) minmax(17rem, 0.82fr);
+  grid-template-columns: minmax(17rem, 0.78fr) minmax(0, 1.62fr) minmax(18rem, 0.86fr);
   gap: clamp(0.42rem, 0.62vw, 0.75rem);
   min-height: 0;
 }
 
 .awdp-screen-bottom {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1.45fr) minmax(21rem, 1fr);
   gap: clamp(0.42rem, 0.62vw, 0.75rem);
   min-height: 0;
 }
@@ -141,13 +145,14 @@ const {
   border: 1px solid var(--awdp-screen-border);
   border-radius: var(--radius-md);
   background: var(--awdp-screen-panel);
+  box-shadow: inset 0 1px 0 oklch(0.95 0.01 240 / 0.035);
 }
 
 .awdp-skeleton {
   border-radius: var(--radius-md);
   border: 1px solid var(--awdp-screen-border);
   background:
-    linear-gradient(90deg, var(--awdp-screen-panel), color-mix(in oklch, var(--sidebar-foreground) 10%, var(--sidebar)), var(--awdp-screen-panel));
+    linear-gradient(90deg, var(--awdp-screen-panel), var(--awdp-screen-panel-raised), var(--awdp-screen-panel));
   background-size: 220% 100%;
   animation: awdp-skeleton 1600ms ease-in-out infinite;
 }

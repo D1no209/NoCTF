@@ -423,6 +423,7 @@ Recent completed focus areas:
 - Admin competition detail navigation split across settings, challenges, team review, cheating info, and logs
 - AWDP management score configuration moved to per-challenge management
 - AWDP command screen and AWD/AWDP realtime visual polish
+- AWDP command screen 16:9 redesign: event-wall style center sensing, dense paginated scoreboard, event stream, round timeline, and challenge matrix for projection use
 - Frontend visual cleanup to reduce glassmorphism, cheap gradients, and template-like surfaces
 - Targeted anti-AI frontend cleanup on 2026-07-04: auth shell, competition list rows, shared panel shadows, AWDP/AWD live-screen tokens, and narrow-screen AWDP screen overflow
 
@@ -438,6 +439,8 @@ Most recent verification:
 - `bun run fetch-openapi` and `bun run generate-api` passed after Penetration API additions
 - `bunx eslint <changed frontend files>` passed for the frontend UI cleanup
 - In-app browser loaded `http://127.0.0.1:5173/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f` at desktop and narrow widths with no console errors
+- In-app browser loaded `http://127.0.0.1:5173/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f` and the same route with `?mock=1` at 1920x1080; the command screen stayed 16:9, had no row clipping, no horizontal overflow, and the center sensing module/event log did not expose instant score deltas or `scoreDelta`/`penalty` fields
+- In-app browser loaded `http://127.0.0.1:5173/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f?mock=1` at 390x844 with no horizontal overflow and no console errors
 - In-app browser loaded `http://127.0.0.1:5173/admin/competitions/792a8e46-920a-4a2c-8d74-c82008a41a6c?section=instances`; the Penetration instance monitor rendered at desktop and 390px width with no console errors
 - Full `bun run lint` still reports pre-existing lint issues in generated/config/unrelated admin files
 
