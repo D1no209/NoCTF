@@ -173,7 +173,7 @@ function modeLabel(mode?: string | null) {
 
       <div class="min-h-40">
         <div v-if="isState('loading')" class="grid gap-4">
-          <Skeleton v-for="i in 4" :key="i" class="h-48 rounded-xl" />
+          <Skeleton v-for="i in 4" :key="i" class="h-32 rounded-xl" />
         </div>
 
         <div v-else-if="isState('error')" class="noctf-state-box">
@@ -208,12 +208,8 @@ function modeLabel(mode?: string | null) {
             :key="comp.id"
             class="competition-row"
           >
-            <div class="competition-poster" :data-mode="modeLabel(comp.gameModeType)">
-              <span class="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">{{ t('competitions.posterLabel') }}</span>
-              <div>
-                <p class="text-4xl font-black tracking-normal text-white md:text-5xl">{{ modeLabel(comp.gameModeType) }}</p>
-                <p class="mt-2 line-clamp-2 text-sm font-medium text-white/72">{{ comp.title }}</p>
-              </div>
+            <div class="competition-mode">
+              <span>{{ modeLabel(comp.gameModeType) }}</span>
             </div>
 
             <div class="competition-row-main">
@@ -249,7 +245,7 @@ function modeLabel(mode?: string | null) {
 
             <div class="competition-row-count">
               <Users class="size-5 text-primary" />
-              <span class="text-3xl font-bold tracking-normal text-foreground">{{ comp.registeredTeamCount ?? 0 }}</span>
+              <span class="text-2xl font-bold tracking-normal text-foreground">{{ comp.registeredTeamCount ?? 0 }}</span>
               <span class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{{ t('competitions.registeredTeams') }}</span>
             </div>
 
@@ -281,61 +277,42 @@ function modeLabel(mode?: string | null) {
 
 .competition-row {
   display: grid;
-  grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr) minmax(8.5rem, 10rem) minmax(10rem, 12rem);
-  min-height: 13rem;
+  grid-template-columns: 6rem minmax(0, 1fr) minmax(8.5rem, 10rem) minmax(10rem, 12rem);
+  min-height: 9.5rem;
   overflow: hidden;
-  border: 1px solid oklch(0.87 0.025 255);
-  background: oklch(1 0 0);
-  border-radius: 0.85rem;
-  box-shadow: 0 16px 45px rgb(15 23 42 / 0.055);
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius-lg);
   transition:
     border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    background-color 150ms ease;
 }
 
 .competition-row:hover {
-  border-color: oklch(0.78 0.075 262);
-  box-shadow: 0 22px 55px rgb(79 70 229 / 0.11);
-  transform: translateY(-1px);
+  border-color: color-mix(in oklch, var(--primary) 36%, var(--border));
+  background: color-mix(in oklch, var(--card) 92%, var(--accent));
 }
 
-.competition-poster {
-  position: relative;
-  isolation: isolate;
-  display: flex;
-  min-height: 13rem;
-  flex-direction: column;
-  justify-content: space-between;
-  overflow: hidden;
-  border-right: 1px solid oklch(0.87 0.025 255);
-  background:
-    linear-gradient(135deg, oklch(0.24 0.08 255), oklch(0.16 0.045 255)),
-    oklch(0.19 0.05 255);
-  padding: 1.35rem;
+.competition-mode {
+  display: grid;
+  place-items: center;
+  border-right: 1px solid var(--border);
+  background: var(--muted);
+  padding: 1rem;
 }
 
-.competition-poster::before {
-  position: absolute;
-  inset: -35% auto auto 38%;
-  z-index: -1;
-  width: 14rem;
-  height: 14rem;
-  content: "";
-  background: oklch(0.62 0.2 262 / 0.34);
-  transform: rotate(24deg);
-}
-
-.competition-poster::after {
-  position: absolute;
-  right: 1rem;
-  bottom: 0.5rem;
-  z-index: -1;
-  content: attr(data-mode);
-  color: oklch(1 0 0 / 0.07);
-  font-size: 5.5rem;
-  font-weight: 900;
-  line-height: 1;
+.competition-mode span {
+  display: inline-flex;
+  min-width: 3.5rem;
+  justify-content: center;
+  border: 1px solid color-mix(in oklch, var(--primary) 22%, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--card);
+  padding: 0.55rem 0.65rem;
+  color: var(--foreground);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .competition-row-main {
@@ -343,15 +320,15 @@ function modeLabel(mode?: string | null) {
   min-width: 0;
   flex-direction: column;
   justify-content: space-between;
-  gap: 1.25rem;
-  padding: 1.35rem 1.5rem;
+  gap: 1rem;
+  padding: 1.2rem 1.35rem;
 }
 
 .competition-row-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.85rem 1.25rem;
-  color: oklch(0.42 0.02 255);
+  color: var(--muted-foreground);
   font-size: 0.9rem;
 }
 
@@ -360,8 +337,8 @@ function modeLabel(mode?: string | null) {
   flex-direction: column;
   justify-content: center;
   gap: 0.35rem;
-  border-left: 1px solid oklch(0.9 0.018 255);
-  background: oklch(0.98 0.007 255);
+  border-left: 1px solid var(--border);
+  background: color-mix(in oklch, var(--muted) 44%, var(--card));
   padding: 1.25rem;
 }
 
@@ -370,20 +347,20 @@ function modeLabel(mode?: string | null) {
   flex-direction: column;
   justify-content: center;
   gap: 0.75rem;
-  border-left: 1px solid oklch(0.9 0.018 255);
+  border-left: 1px solid var(--border);
   padding: 1.25rem;
 }
 
 @media (max-width: 1120px) {
   .competition-row {
-    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr) minmax(9rem, 11rem);
+    grid-template-columns: 5.5rem minmax(0, 1fr) minmax(9rem, 11rem);
   }
 
   .competition-row-actions {
     grid-column: 1 / -1;
     flex-direction: row;
     justify-content: flex-end;
-    border-top: 1px solid oklch(0.9 0.018 255);
+    border-top: 1px solid var(--border);
     border-left: 0;
   }
 }
@@ -393,16 +370,22 @@ function modeLabel(mode?: string | null) {
     grid-template-columns: 1fr;
   }
 
-  .competition-poster,
+  .competition-mode,
   .competition-row-count,
   .competition-row-actions {
     border-left: 0;
     border-right: 0;
   }
 
-  .competition-poster,
+  .competition-mode,
   .competition-row-count {
-    border-bottom: 1px solid oklch(0.9 0.018 255);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .competition-mode {
+    min-height: 4.25rem;
+    justify-content: start;
+    place-items: center start;
   }
 
   .competition-row-count {

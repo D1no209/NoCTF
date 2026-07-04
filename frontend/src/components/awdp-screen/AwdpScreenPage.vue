@@ -78,14 +78,17 @@ const {
 
 <style>
 .awdp-screen-shell {
+  --awdp-screen-border: color-mix(in oklch, var(--sidebar-foreground) 14%, transparent);
+  --awdp-screen-grid: color-mix(in oklch, var(--sidebar-foreground) 4%, transparent);
+  --awdp-screen-panel: color-mix(in oklch, var(--sidebar) 90%, black);
   position: relative;
   min-height: 100dvh;
   overflow: hidden;
   display: grid;
   place-items: center;
   padding: min(1.1vw, 0.9rem);
-  background: #050b12;
-  color: rgb(226 232 240);
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
 }
 
 .awdp-screen-bg {
@@ -93,9 +96,9 @@ const {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgb(148 163 184 / 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(148 163 184 / 0.028) 1px, transparent 1px),
-    #050b12;
+    linear-gradient(var(--awdp-screen-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--awdp-screen-grid) 1px, transparent 1px),
+    var(--sidebar);
   background-size: 48px 48px, 48px 48px, auto;
 }
 
@@ -108,7 +111,7 @@ const {
 }
 
 .awdp-screen-frame {
-  width: min(calc(100vw - 1.8rem), calc((100dvh - 1.8rem) * 16 / 9));
+  width: min(100%, calc(100vw - 1.8rem), calc((100dvh - 1.8rem) * 16 / 9));
   aspect-ratio: 16 / 9;
   grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 0.2fr);
   padding: clamp(0.5rem, 0.7vw, 0.85rem);
@@ -135,17 +138,16 @@ const {
 }
 
 .awdp-panel {
-  border: 1px solid rgb(148 163 184 / 0.14);
-  border-radius: 0.5rem;
-  background: rgb(8 15 25 / 0.94);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+  border: 1px solid var(--awdp-screen-border);
+  border-radius: var(--radius-md);
+  background: var(--awdp-screen-panel);
 }
 
 .awdp-skeleton {
-  border-radius: 0.65rem;
-  border: 1px solid rgb(148 163 184 / 0.12);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--awdp-screen-border);
   background:
-    linear-gradient(90deg, rgb(15 23 42 / 0.82), rgb(30 41 59 / 0.62), rgb(15 23 42 / 0.82));
+    linear-gradient(90deg, var(--awdp-screen-panel), color-mix(in oklch, var(--sidebar-foreground) 10%, var(--sidebar)), var(--awdp-screen-panel));
   background-size: 220% 100%;
   animation: awdp-skeleton 1600ms ease-in-out infinite;
 }
@@ -166,7 +168,7 @@ const {
   }
 
   .awdp-screen-frame {
-    width: min(calc(100vw - 1rem), 1200px);
+    width: min(100%, 1200px);
     min-height: auto;
     grid-template-rows: auto auto auto auto;
     aspect-ratio: auto;

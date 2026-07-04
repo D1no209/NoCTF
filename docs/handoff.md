@@ -404,7 +404,7 @@ Repository state:
 
 ```text
 origin/main: 51a0791 feat: add AWDP screen and management improvements
-local HEAD:  a28a98f style: refine frontend product UI
+local main:  contains local commits for frontend product UI cleanup and Penetration Challenge work
 ```
 
 The local `main` branch is ahead of `origin/main` by one commit. A push attempt failed because the local GitHub SSH key was not accepted:
@@ -424,9 +424,14 @@ Recent completed focus areas:
 - AWDP management score configuration moved to per-challenge management
 - AWDP command screen and AWD/AWDP realtime visual polish
 - Frontend visual cleanup to reduce glassmorphism, cheap gradients, and template-like surfaces
+- Targeted anti-AI frontend cleanup on 2026-07-04: auth shell, competition list rows, shared panel shadows, AWDP/AWD live-screen tokens, and narrow-screen AWDP screen overflow
 
 Most recent verification:
 
+- `npx --yes impeccable --json frontend/src` passed with zero findings after the targeted anti-AI frontend cleanup
+- `bun run build` passed after the targeted frontend cleanup; Rollup still emits existing third-party PURE annotation warnings from SignalR/reka-ui
+- In-app browser loaded `/login?redirect=/competitions`, logged in with the seeded admin account, and rendered `/competitions` with no console errors or horizontal overflow
+- In-app browser loaded `/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f` at 1920x1080 and 390x844; the screen rendered, the frame stayed 16:9 on wide view, narrow view had no horizontal overflow, the center realtime awareness module did not show score-delta fields, and no console errors were reported
 - `dotnet build backend/NoCTF.slnx --no-restore` passed after Penetration changes
 - `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore` passed with 111 tests
 - `bun run build` passed after Penetration frontend changes

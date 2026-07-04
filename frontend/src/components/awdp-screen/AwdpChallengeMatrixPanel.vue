@@ -109,15 +109,15 @@ function formatTime(value?: string) {
 
 <style scoped>
 .awdp-mini-cell {
-  border: 1px solid rgb(148 163 184 / 0.12);
-  border-radius: 0.45rem;
-  background: rgb(15 23 42 / 0.58);
+  border: 1px solid color-mix(in oklch, var(--sidebar-foreground) 12%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--sidebar) 82%, black);
   padding: 0.35rem 0.25rem;
 }
 
 .awdp-mini-cell span {
   display: block;
-  color: rgb(100 116 139);
+  color: color-mix(in oklch, var(--sidebar-foreground) 45%, transparent);
   font-size: 0.62rem;
   font-weight: 700;
 }
@@ -125,8 +125,8 @@ function formatTime(value?: string) {
 .awdp-mini-cell strong {
   display: block;
   margin-top: 0.15rem;
-  color: rgb(226 232 240);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  color: var(--sidebar-foreground);
   font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
 }
 </style>

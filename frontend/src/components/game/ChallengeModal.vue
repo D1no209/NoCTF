@@ -855,14 +855,14 @@ function getApiErrorDetail(error: unknown) {
 }
 
 .challenge-markdown :deep(code) {
-  border-radius: 0.25rem;
-  background: hsl(var(--muted));
+  border-radius: var(--radius-sm);
+  background: var(--muted);
   padding: 0.1rem 0.3rem;
   font-size: 0.85em;
 }
 
 .challenge-markdown :deep(a) {
-  color: hsl(var(--primary));
+  color: var(--primary);
   text-underline-offset: 0.2rem;
 }
 

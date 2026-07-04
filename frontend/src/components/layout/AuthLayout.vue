@@ -9,52 +9,47 @@ defineProps<{
 <template>
   <div class="grid min-h-[100dvh] bg-background lg:grid-cols-[minmax(420px,0.86fr)_1.14fr]">
     <section class="noctf-dark-shell relative hidden overflow-hidden px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
-      <div class="noctf-grid-glow absolute inset-0 opacity-35" />
-
-      <div class="relative z-10">
-        <div class="mb-20 flex items-center gap-4">
+      <div>
+        <div class="mb-16 flex items-center gap-4">
           <span class="noctf-logo size-12" />
           <span class="text-3xl font-bold tracking-tight">NoCTF</span>
         </div>
-        <div class="max-w-xl space-y-7">
-          <h1 class="text-5xl font-bold leading-tight tracking-normal">
-            Hack. Learn. Compete.
-            <span class="block text-blue-400">NoCTF.</span>
+        <div class="max-w-lg space-y-5">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Competition control surface
+          </p>
+          <h1 class="text-4xl font-bold leading-tight tracking-normal">
+            NoCTF
           </h1>
-          <p class="max-w-md text-lg leading-8 text-blue-100/80">
+          <p class="max-w-md text-base leading-7 text-slate-300">
             {{ subtitle }}
           </p>
         </div>
       </div>
 
-      <div class="relative z-10">
-        <div class="mb-12 ml-auto mr-8 flex size-56 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04]">
-          <div class="flex size-28 items-center justify-center rounded-2xl border border-cyan-300/25 bg-slate-950/60">
-            <span class="noctf-logo size-16" />
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-3 rounded-xl border border-white/10 bg-white/[0.055] p-4 text-sm">
-          <div class="border-r border-white/10 pr-4">
-            <div class="font-semibold text-blue-200">
+      <div class="max-w-xl border-t border-white/10 pt-6">
+        <div class="grid gap-4 text-sm">
+          <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-4">
+            <div class="font-semibold text-slate-100">
               {{ $t('auth.featureSecure') }}
             </div>
-            <div class="mt-1 text-xs text-slate-400">
+            <div class="text-slate-400">
               {{ $t('auth.featureSecureDesc') }}
             </div>
           </div>
-          <div class="border-r border-white/10 px-4">
-            <div class="font-semibold text-blue-200">
+          <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-4">
+            <div class="font-semibold text-slate-100">
               {{ $t('auth.featureStable') }}
             </div>
-            <div class="mt-1 text-xs text-slate-400">
+            <div class="text-slate-400">
               {{ $t('auth.featureStableDesc') }}
             </div>
           </div>
-          <div class="pl-4">
-            <div class="font-semibold text-blue-200">
+          <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-4">
+            <div class="font-semibold text-slate-100">
               {{ $t('auth.featureFair') }}
             </div>
-            <div class="mt-1 text-xs text-slate-400">
+            <div class="text-slate-400">
               {{ $t('auth.featureFairDesc') }}
             </div>
           </div>
