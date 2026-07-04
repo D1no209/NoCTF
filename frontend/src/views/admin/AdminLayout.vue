@@ -7,6 +7,7 @@ import {
   FileText,
   Handshake,
   Home,
+  Network,
   LogOut,
   Plug,
   Puzzle,
@@ -53,6 +54,7 @@ const navItems = computed(() => {
   ]
   if (isAdmin.value) {
     items.unshift({ to: '/admin/users', label: t('admin.nav.users'), icon: User })
+    items.splice(6, 0, { to: '/admin/infrastructure', label: t('admin.nav.infrastructure'), icon: Network })
   }
   return items
 })
@@ -159,7 +161,7 @@ async function handleLogout() {
             name="fade"
             mode="out-in"
           >
-            <component :is="Component" :key="route.fullPath" />
+            <component :is="Component" />
           </transition>
         </RouterView>
       </main>

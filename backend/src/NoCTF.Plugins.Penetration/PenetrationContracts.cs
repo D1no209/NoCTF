@@ -44,6 +44,7 @@ public sealed class PenetrationNodeDocument
     public bool IsInternal { get; set; } = true;
     public JsonElement? ResourceLimit { get; set; }
     public JsonElement? Healthcheck { get; set; }
+    public JsonElement? Orchestration { get; set; }
     public int DisplayOrder { get; set; }
 }
 
@@ -95,6 +96,7 @@ public sealed class PenetrationNodeDto
     public bool IsInternal { get; set; }
     public object? ResourceLimit { get; set; }
     public object? Healthcheck { get; set; }
+    public object? Orchestration { get; set; }
     public int DisplayOrder { get; set; }
 }
 

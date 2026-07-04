@@ -166,8 +166,21 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<DateTime?>("LastInstanceActionAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("EntryUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OrchestrationNamespace")
+                        .HasColumnType("text");
+
                     b.Property<string>("PortMappingsJson")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProviderType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PublicHost")
                         .HasColumnType("text");
 
                     b.Property<Guid>("TeamId")
@@ -545,6 +558,10 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<string>("FlagSecret")
                         .HasColumnType("text");
 
+                    b.Property<string>("OrchestrationJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("PatchTemplateUrl")
                         .HasColumnType("text");
 
@@ -642,6 +659,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("FlagSecret")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OrchestrationJson")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PatchTemplateUrl")
@@ -1259,6 +1280,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("OrchestrationJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("PortsJson")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1339,6 +1364,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("NetworksJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("OrchestrationJson")
                         .IsRequired()
                         .HasColumnType("text");
 

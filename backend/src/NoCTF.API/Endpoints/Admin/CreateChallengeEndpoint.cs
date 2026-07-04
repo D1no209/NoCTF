@@ -13,6 +13,7 @@ public class CreateChallengeRequest
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
     public string? ComposeProjectName { get; set; }
+    public string? OrchestrationJson { get; set; }
     public string? FlagSecret { get; set; }
     public string? FlagEnvironmentVariable { get; set; }
     public string? AttachmentUrl { get; set; }
@@ -40,7 +41,23 @@ public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateC
             : ChallengeTemplateRequestRules.ResolveDeploymentType(req.DeploymentType, attachmentUrl);
         var usesRuntimeContainer = ChallengeTemplateRequestRules.UsesRuntimeContainer(deploymentType);
         var containerImage = ChallengeTemplateRequestRules.CleanOptional(req.ContainerImage);
-        if (usesRuntimeContainer && !isPenetration && string.IsNullOrWhiteSpace(containerImage))
+        if (!ChallengeTemplateRequestRules.IsValidJsonObject(req.OrchestrationJson))
+        {
+            await SendStringAsync("invalid_orchestration_json", 400, cancellation: ct);
+            return;
+        }
+
+        var orchestrationJson = usesRuntimeContainer || isPenetration
+            ? ChallengeTemplateRequestRules.BuildOrchestrationJson(
+                req.OrchestrationJson,
+                containerImage,
+                req.ExposedPort,
+                req.ComposeYaml,
+                req.ComposeProjectName,
+                isPenetration ? ChallengeContainerMode.DockerCompose : req.ContainerMode)
+            : "{}";
+        var resolvedImage = ChallengeTemplateRequestRules.ResolveImage(orchestrationJson, containerImage);
+        if (usesRuntimeContainer && !isPenetration && string.IsNullOrWhiteSpace(resolvedImage))
         {
             await SendStringAsync("container_image_required", 400, cancellation: ct);
             return;
@@ -52,10 +69,11 @@ public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateC
             Title = req.Title.Trim(),
             Description = ChallengeTemplateRequestRules.CleanOptional(req.Description),
             TypeId = string.IsNullOrWhiteSpace(req.TypeId) ? "ctf" : req.TypeId.Trim(),
-            ContainerImage = usesRuntimeContainer && !isPenetration ? containerImage : null,
+            ContainerImage = usesRuntimeContainer && !isPenetration ? resolvedImage : null,
             ContainerMode = isPenetration ? ChallengeContainerMode.DockerCompose : usesRuntimeContainer ? req.ContainerMode : ChallengeContainerMode.SingleImage,
             ComposeYaml = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeYaml) : null,
             ComposeProjectName = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeProjectName) : null,
+            OrchestrationJson = orchestrationJson,
             FlagSecret = req.FlagSecret,
             FlagEnvironmentVariable = string.IsNullOrWhiteSpace(req.FlagEnvironmentVariable)
                 ? "NOCTF_FLAG_UUID"

@@ -212,9 +212,13 @@ public class PenetrationInstanceMaintenanceService(
                 var hostPort = entryService?.PublishedPorts.GetValueOrDefault(entryContainerPort) ?? 0;
                 if (hostPort > 0)
                 {
-                    instance.EntryHost = ResolveAccessHost();
+                    instance.EntryHost = !string.IsNullOrWhiteSpace(entryService?.PublicHost)
+                        ? entryService.PublicHost
+                        : ResolveAccessHost();
                     instance.EntryPort = hostPort;
-                    instance.EntryUrl = BuildEntryUrl(instance.EntryHost, hostPort, await ReadEntryConfigJsonAsync(instance, ct));
+                    instance.EntryUrl = !string.IsNullOrWhiteSpace(entryService?.EntryUrl)
+                        ? entryService.EntryUrl
+                        : BuildEntryUrl(instance.EntryHost, hostPort, await ReadEntryConfigJsonAsync(instance, ct));
                     instance.PortMappingsJson = JsonSerializer.Serialize(new Dictionary<int, int> { [entryContainerPort] = hostPort }, JsonOptions);
                 }
             }

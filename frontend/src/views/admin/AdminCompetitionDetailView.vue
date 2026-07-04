@@ -81,6 +81,7 @@ interface ChallengeTemplateDto {
   title: string
   description?: string
   typeId: string
+  orchestrationJson?: string
 }
 
 interface ChallengeHintDto {
@@ -97,6 +98,7 @@ interface CompetitionChallengeDto {
   descriptionFormat: string
   typeId: string
   deploymentType?: string | number
+  orchestrationJson?: string
   exposedPort?: number | null
   flagPrefix?: string
   flagEnvironmentVariable?: string
@@ -243,6 +245,7 @@ const bindForm = reactive({
   awdpMaxDefenseAttempts: 3 as number | undefined,
   awdpFixEntry: 'fix.sh',
   awdpFixTimeoutSeconds: 60 as number | undefined,
+  orchestrationJson: '{}',
   hints: [''],
 })
 
@@ -261,10 +264,13 @@ const selectedEdit = reactive({
   awdpMaxDefenseAttempts: 3 as number | undefined,
   awdpFixEntry: 'fix.sh',
   awdpFixTimeoutSeconds: 60 as number | undefined,
+  orchestrationJson: '{}',
   hints: [''],
 })
 const selectedPenetrationTopologyJson = ref('')
 const selectedPenetrationTopologyError = ref('')
+const bindOrchestrationError = ref('')
+const editOrchestrationError = ref('')
 const loadingSelectedPenetrationTopology = ref(false)
 const penetrationInstanceFilters = reactive({
   challengeId: 'all',
@@ -448,6 +454,13 @@ watch(templates, (items) => {
     bindForm.templateId = items[0].id
 }, { immediate: true })
 
+const selectedTemplate = computed(() => templates.value?.find(template => template.id === bindForm.templateId) ?? null)
+
+watch(() => bindForm.templateId, () => {
+  bindOrchestrationError.value = ''
+  bindForm.orchestrationJson = selectedTemplate.value?.orchestrationJson || '{}'
+})
+
 const selectedChallenge = computed(() => competitionChallenges.value?.find(c => c.id === selectedChallengeId.value) ?? null)
 const selectedIsPenetration = computed(() =>
   selectedChallenge.value?.typeId?.toLowerCase() === 'penetration')
@@ -490,7 +503,9 @@ watch(selectedChallenge, (challenge) => {
   selectedEdit.awdpMaxDefenseAttempts = challenge.awdpMaxDefenseAttempts ?? competitionForm.awdpMaxDefenseAttempts ?? 3
   selectedEdit.awdpFixEntry = challenge.awdpFixEntry ?? competitionForm.awdpFixEntry ?? 'fix.sh'
   selectedEdit.awdpFixTimeoutSeconds = challenge.awdpFixTimeoutSeconds ?? competitionForm.awdpFixTimeoutSeconds ?? 60
+  selectedEdit.orchestrationJson = challenge.orchestrationJson || '{}'
   selectedEdit.hints = challenge.hints?.length ? challenge.hints.map(h => h.content) : ['']
+  editOrchestrationError.value = ''
   selectedPenetrationTopologyJson.value = ''
   selectedPenetrationTopologyError.value = ''
   if (challenge.typeId?.toLowerCase() === 'penetration')
@@ -499,6 +514,31 @@ watch(selectedChallenge, (challenge) => {
 
 function cleanHints(hints: string[]) {
   return hints.map(h => h.trim()).filter(Boolean)
+}
+
+function parseJsonObject(value: string) {
+  const parsed = JSON.parse(value || '{}')
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object')
+    throw new Error('invalid_json_object')
+  return parsed as Record<string, unknown>
+}
+
+function optionalOrchestrationJson(value: string, error: typeof bindOrchestrationError) {
+  error.value = ''
+  const text = value.trim()
+  if (!text)
+    return undefined
+  try {
+    parseJsonObject(text)
+    return text
+  } catch {
+    error.value = t('admin.challenges.invalidOrchestration')
+    throw new Error('invalid_orchestration_json')
+  }
+}
+
+function isHttpUrl(value?: string | null) {
+  return Boolean(value && /^https?:\/\//i.test(value))
 }
 
 const saveCompetitionMutation = useMutation({
@@ -512,30 +552,35 @@ const saveCompetitionMutation = useMutation({
 })
 
 const bindMutation = useMutation({
-  mutationFn: () => adminApi.bindCompetitionChallenge(competitionId.value, {
-    templateId: bindForm.templateId,
-    description: bindForm.description.trim() || undefined,
-    descriptionFormat: 'markdown',
-    pointsConfig: {
-      initialPoints: numberOrDefault(bindForm.initialPoints, 500),
-      minimumPoints: numberOrDefault(bindForm.minimumPoints, 100),
-      decayFactor: numberOrDefault(bindForm.decayFactor, 450),
-      decayFunction: bindForm.decayFunction || 'sigmoid',
-    },
-    difficultyCoefficient: numberOrDefault(bindForm.difficultyCoefficient, 1),
-    enableBloodBonus: bindForm.enableBloodBonus,
-    flagPrefix: bindForm.flagPrefix.trim() || 'flag',
-    awdpAttackScorePerRound: optionalNumber(bindForm.awdpAttackScorePerRound),
-    awdpDefenseScorePerRound: optionalNumber(bindForm.awdpDefenseScorePerRound),
-    awdpMaxAttackAttempts: optionalNumber(bindForm.awdpMaxAttackAttempts),
-    awdpMaxDefenseAttempts: optionalNumber(bindForm.awdpMaxDefenseAttempts),
-    awdpFixEntry: bindForm.awdpFixEntry.trim() || undefined,
-    awdpFixTimeoutSeconds: optionalNumber(bindForm.awdpFixTimeoutSeconds),
-    hints: cleanHints(bindForm.hints),
-  }),
+  mutationFn: () => {
+    const orchestrationJson = optionalOrchestrationJson(bindForm.orchestrationJson, bindOrchestrationError)
+    return adminApi.bindCompetitionChallenge(competitionId.value, {
+      templateId: bindForm.templateId,
+      description: bindForm.description.trim() || undefined,
+      descriptionFormat: 'markdown',
+      pointsConfig: {
+        initialPoints: numberOrDefault(bindForm.initialPoints, 500),
+        minimumPoints: numberOrDefault(bindForm.minimumPoints, 100),
+        decayFactor: numberOrDefault(bindForm.decayFactor, 450),
+        decayFunction: bindForm.decayFunction || 'sigmoid',
+      },
+      difficultyCoefficient: numberOrDefault(bindForm.difficultyCoefficient, 1),
+      enableBloodBonus: bindForm.enableBloodBonus,
+      flagPrefix: bindForm.flagPrefix.trim() || 'flag',
+      awdpAttackScorePerRound: optionalNumber(bindForm.awdpAttackScorePerRound),
+      awdpDefenseScorePerRound: optionalNumber(bindForm.awdpDefenseScorePerRound),
+      awdpMaxAttackAttempts: optionalNumber(bindForm.awdpMaxAttackAttempts),
+      awdpMaxDefenseAttempts: optionalNumber(bindForm.awdpMaxDefenseAttempts),
+      awdpFixEntry: bindForm.awdpFixEntry.trim() || undefined,
+      awdpFixTimeoutSeconds: optionalNumber(bindForm.awdpFixTimeoutSeconds),
+      orchestrationJson,
+      hints: cleanHints(bindForm.hints),
+    })
+  },
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCompetitionChallenges(competitionId.value) })
     bindForm.description = ''
+    bindForm.orchestrationJson = '{}'
     bindForm.hints = ['']
     toast.success(t('admin.competitionDetail.deploySuccess'))
   },
@@ -543,26 +588,30 @@ const bindMutation = useMutation({
 })
 
 const updateChallengeMutation = useMutation({
-  mutationFn: () => adminApi.updateCompetitionChallenge(competitionId.value, selectedChallenge.value!.id, {
-    description: selectedEdit.description.trim() || undefined,
-    descriptionFormat: 'markdown',
-    pointsConfig: {
-      initialPoints: numberOrDefault(selectedEdit.initialPoints, 500),
-      minimumPoints: numberOrDefault(selectedEdit.minimumPoints, 100),
-      decayFactor: numberOrDefault(selectedEdit.decayFactor, 450),
-      decayFunction: selectedEdit.decayFunction || 'sigmoid',
-    },
-    difficultyCoefficient: numberOrDefault(selectedEdit.difficultyCoefficient, 1),
-    enableBloodBonus: selectedEdit.enableBloodBonus,
-    flagPrefix: selectedEdit.flagPrefix.trim() || 'flag',
-    awdpAttackScorePerRound: optionalNumber(selectedEdit.awdpAttackScorePerRound),
-    awdpDefenseScorePerRound: optionalNumber(selectedEdit.awdpDefenseScorePerRound),
-    awdpMaxAttackAttempts: optionalNumber(selectedEdit.awdpMaxAttackAttempts),
-    awdpMaxDefenseAttempts: optionalNumber(selectedEdit.awdpMaxDefenseAttempts),
-    awdpFixEntry: selectedEdit.awdpFixEntry.trim() || undefined,
-    awdpFixTimeoutSeconds: optionalNumber(selectedEdit.awdpFixTimeoutSeconds),
-    hints: cleanHints(selectedEdit.hints),
-  }),
+  mutationFn: () => {
+    const orchestrationJson = optionalOrchestrationJson(selectedEdit.orchestrationJson, editOrchestrationError)
+    return adminApi.updateCompetitionChallenge(competitionId.value, selectedChallenge.value!.id, {
+      description: selectedEdit.description.trim() || undefined,
+      descriptionFormat: 'markdown',
+      pointsConfig: {
+        initialPoints: numberOrDefault(selectedEdit.initialPoints, 500),
+        minimumPoints: numberOrDefault(selectedEdit.minimumPoints, 100),
+        decayFactor: numberOrDefault(selectedEdit.decayFactor, 450),
+        decayFunction: selectedEdit.decayFunction || 'sigmoid',
+      },
+      difficultyCoefficient: numberOrDefault(selectedEdit.difficultyCoefficient, 1),
+      enableBloodBonus: selectedEdit.enableBloodBonus,
+      flagPrefix: selectedEdit.flagPrefix.trim() || 'flag',
+      awdpAttackScorePerRound: optionalNumber(selectedEdit.awdpAttackScorePerRound),
+      awdpDefenseScorePerRound: optionalNumber(selectedEdit.awdpDefenseScorePerRound),
+      awdpMaxAttackAttempts: optionalNumber(selectedEdit.awdpMaxAttackAttempts),
+      awdpMaxDefenseAttempts: optionalNumber(selectedEdit.awdpMaxDefenseAttempts),
+      awdpFixEntry: selectedEdit.awdpFixEntry.trim() || undefined,
+      awdpFixTimeoutSeconds: optionalNumber(selectedEdit.awdpFixTimeoutSeconds),
+      orchestrationJson,
+      hints: cleanHints(selectedEdit.hints),
+    })
+  },
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCompetitionChallenges(competitionId.value) })
     toast.success(t('admin.competitionDetail.updateChallengeSuccess'))
@@ -1099,6 +1148,12 @@ function sectionRoute(section: CompetitionDetailSection) {
 
           <DecayCurvePreview class="mt-4" :config="bindForm" />
 
+          <div class="mt-4 grid gap-2 rounded-lg border bg-muted/30 p-3">
+            <Label>{{ t('admin.challenges.orchestration') }}</Label>
+            <Textarea v-model="bindForm.orchestrationJson" class="min-h-40 font-mono text-xs" />
+            <p v-if="bindOrchestrationError" class="text-xs text-destructive">{{ bindOrchestrationError }}</p>
+          </div>
+
           <div class="mt-4 space-y-2">
             <div class="flex items-center justify-between">
               <Label>{{ t('admin.competitionDetail.hints') }}</Label>
@@ -1308,9 +1363,10 @@ function sectionRoute(section: CompetitionDetailSection) {
                     </Badge>
                   </TableCell>
                   <TableCell class="text-xs">
-                    <a v-if="instance.entryUrl" :href="instance.entryUrl" target="_blank" rel="noreferrer" class="text-primary underline-offset-4 hover:underline">
+                    <a v-if="isHttpUrl(instance.entryUrl)" :href="instance.entryUrl || undefined" target="_blank" rel="noreferrer" class="text-primary underline-offset-4 hover:underline">
                       {{ instance.entryUrl }}
                     </a>
+                    <code v-else-if="instance.entryUrl" class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{{ instance.entryUrl }}</code>
                     <span v-else class="text-muted-foreground">-</span>
                   </TableCell>
                   <TableCell>{{ instance.resetCount }}</TableCell>
@@ -1544,6 +1600,11 @@ function sectionRoute(section: CompetitionDetailSection) {
             <div class="grid gap-2">
               <Label>{{ t('admin.competitionDetail.flagPrefix') }}</Label>
               <Input v-model="selectedEdit.flagPrefix" placeholder="flag" />
+            </div>
+            <div class="grid gap-2 rounded-lg border bg-muted/30 p-3">
+              <Label>{{ t('admin.challenges.orchestration') }}</Label>
+              <Textarea v-model="selectedEdit.orchestrationJson" class="min-h-60 font-mono text-xs" />
+              <p v-if="editOrchestrationError" class="text-xs text-destructive">{{ editOrchestrationError }}</p>
             </div>
             <div v-if="selectedIsPenetration" class="grid gap-3 rounded-lg border bg-muted/30 p-3">
               <div>

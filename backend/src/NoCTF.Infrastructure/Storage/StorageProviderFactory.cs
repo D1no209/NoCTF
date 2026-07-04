@@ -18,7 +18,8 @@ public static class StorageProviderFactory
                 configuration["StorageProvider:S3:Bucket"]!,
                 configuration["StorageProvider:S3:AccessKey"]!,
                 configuration["StorageProvider:S3:SecretKey"]!,
-                configuration["StorageProvider:S3:Region"]);
+                configuration["StorageProvider:S3:Region"],
+                configuration["StorageProvider:PublicBaseUrl"]);
         }
 
         return new LocalFileStorageProvider(

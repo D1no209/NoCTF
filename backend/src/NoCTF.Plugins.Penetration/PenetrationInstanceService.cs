@@ -121,6 +121,7 @@ public class PenetrationInstanceService(
                 ProjectName: instance.ComposeProjectName!,
                 ComposeYaml: build.ComposeYaml,
                 Labels: BuildLabels(challenge, instance),
+                OrchestrationJson: challenge.OrchestrationJson,
                 Ttl: TimeSpan.FromSeconds(config.InstanceTtlSeconds)), ct);
 
             var composeStatus = await containerManager.GetComposeStatusAsync(
@@ -132,9 +133,13 @@ public class PenetrationInstanceService(
             var containerIds = composeStatus.Services.Select(s => s.ContainerId).Where(id => !string.IsNullOrWhiteSpace(id)).ToArray();
 
             instance.Status = PenetrationInstanceStatus.Running;
-            instance.EntryHost = ResolveAccessHost();
+            instance.EntryHost = !string.IsNullOrWhiteSpace(entryService?.PublicHost)
+                ? entryService.PublicHost
+                : ResolveAccessHost();
             instance.EntryPort = hostPort > 0 ? hostPort : null;
-            instance.EntryUrl = BuildEntryUrl(instance.EntryHost, instance.EntryPort, topology.EntryConfigJson);
+            instance.EntryUrl = !string.IsNullOrWhiteSpace(entryService?.EntryUrl)
+                ? entryService.EntryUrl
+                : BuildEntryUrl(instance.EntryHost, instance.EntryPort, topology.EntryConfigJson);
             instance.ContainerIdsJson = JsonSerializer.Serialize(containerIds, JsonOptions);
             instance.PortMappingsJson = hostPort > 0
                 ? JsonSerializer.Serialize(new Dictionary<int, int> { [build.EntryContainerPort] = hostPort }, JsonOptions)

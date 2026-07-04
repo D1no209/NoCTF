@@ -22,6 +22,7 @@ public class ChallengeInstanceResponse
     public Dictionary<int, int> Ports { get; set; } = [];
     public List<string> Addresses { get; set; } = [];
     public string? Address { get; set; }
+    public string? EntryUrl { get; set; }
     public string AccessHost { get; set; } = string.Empty;
     public string Status { get; set; } = "none";
     public DateTime? ExpiresAt { get; set; }
@@ -29,7 +30,7 @@ public class ChallengeInstanceResponse
     public DateTime ServerTime { get; set; }
 }
 
-internal static class ChallengeInstanceRuntime
+public static class ChallengeInstanceRuntime
 {
     public static readonly TimeSpan InstanceTtl = TimeSpan.FromHours(2);
     public static readonly TimeSpan ExtendBy = TimeSpan.FromMinutes(30);
@@ -83,11 +84,18 @@ internal static class ChallengeInstanceRuntime
         DateTime now)
     {
         var ports = IsActive(box, now) ? ReadPorts(box) : [];
-        var host = ResolveAccessHost(configuration, httpContext);
-        var addresses = ports.Values
-            .Where(port => port > 0)
-            .Select(port => $"{FormatHost(host)}:{port}")
-            .ToList();
+        var host = !string.IsNullOrWhiteSpace(box?.PublicHost)
+            ? box.PublicHost
+            : ResolveAccessHost(configuration, httpContext);
+        var entryUrl = IsActive(box, now) && !string.IsNullOrWhiteSpace(box?.EntryUrl)
+            ? box.EntryUrl
+            : null;
+        var addresses = entryUrl is not null
+            ? [entryUrl]
+            : ports.Values
+                .Where(port => port > 0)
+                .Select(port => $"{FormatHost(host)}:{port}")
+                .ToList();
 
         return new ChallengeInstanceResponse
         {
@@ -95,6 +103,7 @@ internal static class ChallengeInstanceRuntime
             Ports = ports,
             Addresses = addresses,
             Address = addresses.FirstOrDefault(),
+            EntryUrl = entryUrl,
             AccessHost = host,
             Status = IsActive(box, now) ? "running" : "none",
             ExpiresAt = IsActive(box, now) ? box?.ExpiresAt : null,
@@ -106,6 +115,10 @@ internal static class ChallengeInstanceRuntime
     public static void ClearContainer(AwdGameBox box)
     {
         box.ContainerInstanceId = null;
+        box.ProviderType = "docker";
+        box.PublicHost = null;
+        box.EntryUrl = null;
+        box.OrchestrationNamespace = null;
         box.PortMappingsJson = "{}";
         box.ExpiresAt = null;
     }
@@ -219,6 +232,10 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         };
 
         box.ContainerInstanceId = instance.ContainerId;
+        box.ProviderType = instance.ProviderType;
+        box.PublicHost = instance.PublicHost;
+        box.EntryUrl = instance.EntryUrl;
+        box.OrchestrationNamespace = instance.OrchestrationNamespace;
         box.PortMappingsJson = ChallengeInstanceRuntime.WritePorts(instance.PortMappings);
         box.ExpiresAt = now.Add(ChallengeInstanceRuntime.InstanceTtl);
         box.LastInstanceActionAt = now;
@@ -324,11 +341,14 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
 
     internal static ContainerConfig BuildContainerConfig(Challenge challenge, Guid? teamId, CtfDynamicFlag? dynamicFlag = null)
     {
-        if (string.IsNullOrWhiteSpace(challenge.ContainerImage))
+        var spec = OrchestrationSpecSerializer.Read(challenge.OrchestrationJson);
+        var image = string.IsNullOrWhiteSpace(spec.Image) ? challenge.ContainerImage : spec.Image;
+        if (string.IsNullOrWhiteSpace(image))
             throw new InvalidOperationException("challenge_container_image_required");
 
-        var ports = challenge.ExposedPort is > 0
-            ? new Dictionary<int, int> { [challenge.ExposedPort.Value] = 0 }
+        var exposedPort = spec.ExposedPort is > 0 ? spec.ExposedPort : challenge.ExposedPort;
+        var ports = exposedPort is > 0
+            ? new Dictionary<int, int> { [exposedPort.Value] = 0 }
             : null;
 
         var env = dynamicFlag is null
@@ -336,7 +356,8 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             : new Dictionary<string, string> { [dynamicFlag.EnvironmentVariable] = dynamicFlag.FlagUuid };
 
         return new ContainerConfig(
-            Image: challenge.ContainerImage,
+            Image: image,
+            Command: string.IsNullOrWhiteSpace(spec.Command) ? null : spec.Command,
             EnvironmentVariables: env,
             Labels: new Dictionary<string, string>
             {
@@ -345,6 +366,8 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
                 ["teamId"] = teamId?.ToString() ?? Guid.Empty.ToString(),
             },
             PortMappings: ports,
+            Entrypoint: spec.Entrypoint.Count > 0 ? spec.Entrypoint : null,
+            OrchestrationJson: challenge.OrchestrationJson,
             Ttl: ChallengeInstanceRuntime.InstanceTtl);
     }
 
@@ -418,11 +441,12 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             box.CompetitionId,
             box.TeamId,
             box.ChallengeId,
-            "docker",
+            box.ProviderType,
             box.ContainerInstanceId,
             ChallengeInstanceRuntime.ReadPorts(box),
             "running",
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            OrchestrationNamespace: box.OrchestrationNamespace);
         await containerManager.DestroyContainerAsync(instance, ct);
     }
 }

@@ -63,6 +63,7 @@ interface ChallengeTemplateDto {
   containerMode: 'SingleImage' | 'DockerCompose' | number
   composeYaml?: string
   composeProjectName?: string
+  orchestrationJson?: string
   attachmentUrl?: string
   patchTemplateUrl?: string
   flagEnvironmentVariable?: string

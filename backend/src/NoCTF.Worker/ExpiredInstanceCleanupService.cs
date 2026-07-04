@@ -62,11 +62,12 @@ public class ExpiredInstanceCleanupService(
                     box.CompetitionId,
                     box.TeamId,
                     box.ChallengeId,
-                    "docker",
+                    box.ProviderType,
                     containerId,
                     ReadPorts(box.PortMappingsJson),
                     "running",
-                    DateTime.UtcNow), ct);
+                    DateTime.UtcNow,
+                    OrchestrationNamespace: box.OrchestrationNamespace), ct);
             }
             catch (Exception ex)
             {
@@ -74,6 +75,9 @@ public class ExpiredInstanceCleanupService(
             }
 
             box.ContainerInstanceId = null;
+            box.PublicHost = null;
+            box.EntryUrl = null;
+            box.OrchestrationNamespace = null;
             box.PortMappingsJson = "{}";
             box.ExpiresAt = null;
 

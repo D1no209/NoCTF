@@ -32,6 +32,7 @@ interface ChallengeTemplateDto {
   containerMode?: 'SingleImage' | 'DockerCompose' | number
   composeYaml?: string
   composeProjectName?: string
+  orchestrationJson?: string
   attachmentUrl?: string
   patchTemplateUrl?: string
   flagEnvironmentVariable?: string
@@ -61,6 +62,46 @@ const { t } = useI18n()
 const attachmentFile = ref<File | null>(null)
 const patchTemplateFile = ref<File | null>(null)
 const topologyError = ref('')
+const orchestrationError = ref('')
+const topologyLoading = ref(false)
+let topologyLoadId = 0
+
+const defaultOrchestrationJson = () => JSON.stringify({
+  provider: 'Docker',
+  runtime: 'SingleContainer',
+  kubernetes: {
+    exposure: 'NodePort',
+    networkMode: 'Isolated',
+    imagePullPolicy: 'IfNotPresent',
+    imagePullSecrets: [],
+    resources: {
+      cpuRequest: '50m',
+      memoryRequest: '64Mi',
+      cpuLimit: '500m',
+      memoryLimit: '256Mi',
+      ephemeralStorageLimit: '1Gi',
+    },
+    security: {
+      allowPrivilegeEscalation: false,
+      automountServiceAccountToken: false,
+      runAsNonRoot: null,
+      readOnlyRootFilesystem: null,
+      capabilitiesDrop: ['ALL'],
+      capabilitiesAdd: [],
+    },
+    ingress: {
+      baseDomain: '',
+      className: '',
+      tlsSecretName: '',
+      path: '/',
+    },
+    nodeSelector: {},
+    tolerations: [],
+    annotations: {},
+    labels: {},
+    volumes: [],
+  },
+}, null, 2)
 
 const defaultForm = () => ({
   title: '',
@@ -76,6 +117,7 @@ const defaultForm = () => ({
   containerMode: 'SingleImage',
   composeYaml: '',
   composeProjectName: '',
+  orchestrationJson: defaultOrchestrationJson(),
   checkerImage: '',
   checkerCommand: '',
   checkerTimeoutSeconds: undefined as number | undefined,
@@ -169,17 +211,30 @@ const checkerCommandLabel = computed(() => selectedChallengeType.value === 'Awdp
 const checkerTimeoutLabel = computed(() => selectedChallengeType.value === 'Awdp'
   ? t('admin.challenges.awdpCheckTimeout')
   : t('admin.challenges.checkerTimeout'))
-const isContainerImageMissing = computed(() => usesRuntimeContainer.value && !usesPenetrationTopology.value && !form.value.containerImage.trim())
-const canSave = computed(() => Boolean(form.value.title.trim()) && !isContainerImageMissing.value)
+const orchestrationImage = computed(() => {
+  try {
+    const parsed = JSON.parse(form.value.orchestrationJson || '{}') as { image?: unknown }
+    return typeof parsed.image === 'string' ? parsed.image.trim() : ''
+  } catch {
+    return ''
+  }
+})
+const isContainerImageMissing = computed(() => usesRuntimeContainer.value && !usesPenetrationTopology.value && !form.value.containerImage.trim() && !orchestrationImage.value)
+const canSave = computed(() => Boolean(form.value.title.trim()) && !isContainerImageMissing.value && !topologyLoading.value)
 
 watch(() => props.template, (template) => {
   attachmentFile.value = null
   patchTemplateFile.value = null
+  topologyError.value = ''
+  orchestrationError.value = ''
+  topologyLoadId += 1
+  topologyLoading.value = false
   if (!template) {
     form.value = defaultForm()
     return
   }
 
+  const defaults = defaultForm()
   form.value = {
     title: template.title ?? '',
     description: template.description ?? '',
@@ -194,12 +249,13 @@ watch(() => props.template, (template) => {
     containerMode: template.containerMode === 1 || template.containerMode === 'DockerCompose' ? 'DockerCompose' : 'SingleImage',
     composeYaml: template.composeYaml ?? '',
     composeProjectName: template.composeProjectName ?? '',
+    orchestrationJson: template.orchestrationJson || defaultOrchestrationJson(),
     checkerImage: template.checkerConfig?.image ?? '',
     checkerCommand: template.checkerConfig?.command ?? '',
     checkerTimeoutSeconds: template.checkerConfig?.timeoutSeconds ?? undefined,
     expImage: template.checkerConfig?.expImage ?? '',
     expCommand: template.checkerConfig?.expCommand ?? '',
-    penetrationTopologyJson: form.value.penetrationTopologyJson,
+    penetrationTopologyJson: defaults.penetrationTopologyJson,
   }
   if (normalizeChallengeType(template.typeId) === 'Penetration' && template.id) {
     void loadPenetrationTopology(template.id)
@@ -253,6 +309,7 @@ function buildPayload() {
     containerMode: usesPenetrationTopology.value ? 1 : form.value.containerMode === 'DockerCompose' ? 1 : 0,
     composeYaml: runtimeEnabled ? form.value.composeYaml.trim() || undefined : undefined,
     composeProjectName: runtimeEnabled ? form.value.composeProjectName.trim() || undefined : undefined,
+    orchestrationJson: runtimeEnabled || usesPenetrationTopology.value ? form.value.orchestrationJson.trim() || undefined : undefined,
     checkerConfig: hasCheckerConfig
       ? {
           image: form.value.checkerImage.trim() || undefined,
@@ -277,18 +334,36 @@ function parsePenetrationTopology() {
 }
 
 async function loadPenetrationTopology(templateId: string) {
+  const loadId = ++topologyLoadId
+  topologyLoading.value = true
   try {
     const topology = await adminApi.penetrationTemplateTopology<Record<string, unknown>>(templateId)
+    if (loadId !== topologyLoadId) return
     if ((topology as { code?: string }).code !== 'not_configured') {
       form.value.penetrationTopologyJson = JSON.stringify(topology, null, 2)
     }
   } catch {
-    // Topology loading is non-blocking; save will surface backend validation errors.
+    if (loadId === topologyLoadId)
+      topologyError.value = t('penetration.invalidTopology')
+  } finally {
+    if (loadId === topologyLoadId)
+      topologyLoading.value = false
   }
 }
 
 function submit() {
   if (!canSave.value || props.saving) return
+  orchestrationError.value = ''
+  if (usesRuntimeContainer.value || usesPenetrationTopology.value) {
+    try {
+      const parsed = JSON.parse(form.value.orchestrationJson || '{}')
+      if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object')
+        throw new Error('invalid')
+    } catch {
+      orchestrationError.value = t('admin.challenges.invalidOrchestration')
+      return
+    }
+  }
   const penetrationTopology = parsePenetrationTopology()
   if (usesPenetrationTopology.value && !penetrationTopology) return
   emit('submit', {
@@ -368,6 +443,7 @@ function submit() {
       </div>
       <Textarea v-model="form.penetrationTopologyJson" class="min-h-80 font-mono text-xs" />
       <p v-if="topologyError" class="text-xs text-destructive">{{ topologyError }}</p>
+      <p v-else-if="topologyLoading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</p>
     </div>
 
     <div v-if="!usesPenetrationTopology" class="grid gap-4 sm:grid-cols-2">
@@ -442,6 +518,15 @@ function submit() {
           <Input v-model="form.expCommand" :placeholder="t('admin.challenges.optional')" />
         </div>
       </div>
+    </div>
+
+    <div v-if="usesRuntimeContainer || usesPenetrationTopology" class="space-y-3 rounded-lg border bg-muted/20 p-4">
+      <div>
+        <div class="text-sm font-semibold">{{ t('admin.challenges.orchestration') }}</div>
+        <p class="text-xs text-muted-foreground">{{ t('admin.challenges.orchestrationHint') }}</p>
+      </div>
+      <Textarea v-model="form.orchestrationJson" class="min-h-72 font-mono text-xs" />
+      <p v-if="orchestrationError" class="text-xs text-destructive">{{ orchestrationError }}</p>
     </div>
 
     <div class="flex flex-col-reverse gap-2 border-t pt-5 sm:flex-row sm:justify-end">

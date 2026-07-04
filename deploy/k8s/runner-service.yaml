@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: runner
+  namespace: noctf
+  labels:
+    app: runner
+    app.kubernetes.io/part-of: noctf
+spec:
+  selector:
+    app: runner
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP

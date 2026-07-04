@@ -31,6 +31,7 @@ cp .env.example .env
 POSTGRES_PASSWORD=change_me_strong_password
 JWT_SECRET=change_me_at_least_32_chars_long_secret_key
 MINIO_ROOT_PASSWORD=change_me_minio_password
+RUNNER_API_KEY=change_me_runner_internal_api_key
 ```
 
 3. Start the stack:
@@ -60,13 +61,11 @@ curl http://localhost/api/health
 - The backend does not mount `/var/run/docker.sock`. Container access is isolated in the `runner` service; the worker calls runner over the internal Compose network.
 - The Docker Compose API image builds the Vue SPA with Bun and serves the built `dist` from ASP.NET Core `wwwroot`, so no separate Nginx frontend container is required.
 - Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
-- Penetration Challenge ranges currently use Docker Compose only. Set `NOCTF_PUBLIC_HOST` or `InstanceAccess:PublicHost` to a player-reachable host when entry ports are published by the runner.
+- Penetration Challenge ranges can run through the Docker Runner or the Kubernetes Runner. Set `NOCTF_PUBLIC_HOST` / `InstanceAccess:PublicHost` for Docker NodePort-style entry URLs, or `K8s:PublicEntry` / `K8s:IngressBaseDomain` for Kubernetes entries.
 
 ## Kubernetes
 
-NoCTF includes a full set of K8s manifests under `deploy/k8s/`.
-
-These manifests deploy the platform services. Penetration Challenge orchestration is not implemented for Kubernetes yet; use Docker Compose/Runner for Penetration ranges until a Kubernetes provider is added.
+NoCTF includes a full set of K8s manifests under `deploy/k8s/`. These manifests deploy the platform services plus a Kubernetes-backed Runner that creates per-instance namespaces for dynamic challenge workloads.
 
 ### Prerequisites
 
@@ -86,6 +85,8 @@ kubectl create secret generic noctf-secrets \
   --namespace noctf \
   --from-literal=jwt-secret='your-jwt-secret-at-least-32-chars' \
   --from-literal=db-password='your-db-password' \
+  --from-literal=seed-admin-password='your-initial-admin-password' \
+  --from-literal=runner-api-key='your-runner-internal-api-key' \
   --from-literal=minio-access-key='your-minio-access-key' \
   --from-literal=minio-secret-key='your-minio-secret-key'
 ```
@@ -96,6 +97,8 @@ From the repo root:
 
 ```bash
 docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
+docker build -f backend/Dockerfile --target worker -t noctf-worker:latest .
+docker build -f backend/Dockerfile --target runner -t noctf-runner:latest .
 ```
 
 For local clusters, load the images:
@@ -103,9 +106,13 @@ For local clusters, load the images:
 ```bash
 # kind
 kind load docker-image noctf-backend:latest
+kind load docker-image noctf-worker:latest
+kind load docker-image noctf-runner:latest
 
 # minikube
 minikube image load noctf-backend:latest
+minikube image load noctf-worker:latest
+minikube image load noctf-runner:latest
 ```
 
 ### Apply Manifests
@@ -122,8 +129,16 @@ kubectl apply -f deploy/k8s/postgres-deployment.yaml
 kubectl apply -f deploy/k8s/postgres-service.yaml
 kubectl apply -f deploy/k8s/redis-deployment.yaml
 kubectl apply -f deploy/k8s/redis-service.yaml
+kubectl apply -f deploy/k8s/minio-pvc.yaml
+kubectl apply -f deploy/k8s/minio-deployment.yaml
+kubectl apply -f deploy/k8s/minio-service.yaml
+kubectl apply -f deploy/k8s/minio-init-job.yaml
+kubectl apply -f deploy/k8s/runner-rbac.yaml
+kubectl apply -f deploy/k8s/runner-deployment.yaml
+kubectl apply -f deploy/k8s/runner-service.yaml
 kubectl apply -f deploy/k8s/backend-deployment.yaml
 kubectl apply -f deploy/k8s/backend-service.yaml
+kubectl apply -f deploy/k8s/worker-deployment.yaml
 kubectl apply -f deploy/k8s/backend-hpa.yaml
 kubectl apply -f deploy/k8s/ingress.yaml
 kubectl apply -f deploy/k8s/networkpolicy.yaml
@@ -141,7 +156,7 @@ The ingress is configured for `noctf.local`. Add it to your hosts file:
 
 ```bash
 # Replace <ingress-ip> with the actual external IP of your ingress controller
-echo "<ingress-ip> noctf.local" | sudo tee -a /etc/hosts
+echo "<ingress-ip> noctf.local minio.noctf.local" | sudo tee -a /etc/hosts
 ```
 
 Verify:
@@ -152,7 +167,32 @@ kubectl get all -n noctf
 kubectl get hpa -n noctf
 ```
 
-### AWD Privileged Node Requirements
+### Kubernetes Runner
+
+The Kubernetes Runner is selected with `Runner__Provider=Kubernetes` and uses either in-cluster ServiceAccount credentials or `K8s__KubeConfigPath` for an external runner. The included `runner-rbac.yaml` grants the Runner permission to create and delete per-instance namespaces, Deployments, Services, Jobs, NetworkPolicies, ResourceQuotas, LimitRanges, Secrets, and Ingresses.
+
+Useful settings:
+
+| Setting | Purpose |
+|---------|---------|
+| `K8s__PublicEntry` | Hostname/IP shown with NodePort entries |
+| `K8s__IngressBaseDomain` | Wildcard domain for Ingress entries, e.g. `challenges.example.com` |
+| `K8s__DefaultExposure` | `NodePort`, `Ingress`, or `ClusterIP` |
+| `K8s__NetworkMode` | `Isolated` by default; `Open` allows outbound traffic |
+| `K8s__Registries__0__Registry/UserName/Password` | Optional private registry credentials materialized as image pull Secrets |
+
+Optional kind/minikube smoke flow:
+
+```bash
+kubectl apply -f deploy/k8s/
+kubectl get pods -n noctf
+kubectl port-forward -n noctf svc/backend-service 8080:8080
+curl http://localhost:8080/api/health
+```
+
+Then create a dynamic challenge, start an instance, verify that the entry URL points to either the configured NodePort host or wildcard Ingress host, stop the instance, and confirm that the generated `noctf-inst-*` namespace is removed.
+
+### Docker Runner On Privileged Nodes
 
 AWD mode requires access to a container runtime for spawning challenge containers. This should be isolated to a dedicated Runner deployment.
 

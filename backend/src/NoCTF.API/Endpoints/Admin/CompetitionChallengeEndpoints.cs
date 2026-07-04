@@ -24,6 +24,7 @@ public class BindCompetitionChallengeRequest
     public int? AwdpMaxDefenseAttempts { get; set; }
     public string? AwdpFixEntry { get; set; }
     public int? AwdpFixTimeoutSeconds { get; set; }
+    public string? OrchestrationJson { get; set; }
     public List<string> Hints { get; set; } = [];
 }
 
@@ -43,6 +44,7 @@ public class UpdateCompetitionChallengeRequest
     public int? AwdpMaxDefenseAttempts { get; set; }
     public string? AwdpFixEntry { get; set; }
     public int? AwdpFixTimeoutSeconds { get; set; }
+    public string? OrchestrationJson { get; set; }
     public List<string> Hints { get; set; } = [];
 }
 
@@ -121,6 +123,12 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChalleng
             return;
         }
 
+        if (!ChallengeTemplateRequestRules.IsValidJsonObject(req.OrchestrationJson))
+        {
+            await SendStringAsync("invalid_orchestration_json", 400, cancellation: ct);
+            return;
+        }
+
         var isPenetration = string.Equals(template.TypeId, "Penetration", StringComparison.OrdinalIgnoreCase);
         IChallengeAdminFeatureProvider? penetrationProvider = null;
         if (isPenetration)
@@ -154,6 +162,9 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChalleng
             ContainerMode = template.ContainerMode,
             ComposeYaml = template.ComposeYaml,
             ComposeProjectName = template.ComposeProjectName,
+            OrchestrationJson = string.IsNullOrWhiteSpace(req.OrchestrationJson)
+                ? template.OrchestrationJson
+                : req.OrchestrationJson,
             FlagSecret = template.FlagSecret,
             FlagPrefix = string.IsNullOrWhiteSpace(req.FlagPrefix) ? "flag" : req.FlagPrefix.Trim(),
             FlagEnvironmentVariable = string.IsNullOrWhiteSpace(template.FlagEnvironmentVariable)
@@ -268,6 +279,13 @@ public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db, ICompet
         challenge.AwdpMaxDefenseAttempts = req.AwdpMaxDefenseAttempts;
         challenge.AwdpFixEntry = string.IsNullOrWhiteSpace(req.AwdpFixEntry) ? null : req.AwdpFixEntry.Trim();
         challenge.AwdpFixTimeoutSeconds = req.AwdpFixTimeoutSeconds;
+        if (!ChallengeTemplateRequestRules.IsValidJsonObject(req.OrchestrationJson))
+        {
+            await SendStringAsync("invalid_orchestration_json", 400, cancellation: ct);
+            return;
+        }
+        if (!string.IsNullOrWhiteSpace(req.OrchestrationJson))
+            challenge.OrchestrationJson = req.OrchestrationJson;
         if (req.PointsConfig is not null)
         {
             challenge.PointsConfig = new PointsConfig(

@@ -27,6 +27,7 @@
     <ProjectReference Include="../../src/NoCTF.Core/NoCTF.Core.csproj" />
     <ProjectReference Include="../../src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
     <ProjectReference Include="../../src/NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Container.K8s/NoCTF.Container.K8s.csproj" />
     <ProjectReference Include="../../src/NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj" />
     <ProjectReference Include="../../src/NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
     <ProjectReference Include="../../src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
