@@ -27,6 +27,7 @@ import {
 import { Trash2, RefreshCw, Loader2, Activity, Cpu, Layers, Monitor } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
+import { runtimeStatusVariant } from '@/lib/statusTones'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -76,14 +77,6 @@ function openDestroy(c: ContainerDto) {
   destroyDialog.value = true
 }
 
-function statusVariant(status: string): 'default' | 'success' | 'warning' | 'destructive' | 'outline' {
-  const s = status.toLowerCase()
-  if (s === 'running' || s === 'active') return 'success'
-  if (s === 'created' || s === 'paused') return 'warning'
-  if (s === 'exited' || s === 'dead') return 'destructive'
-  return 'outline'
-}
-
 const columnHelper = createColumnHelper<ContainerDto>()
 
 function statusLabel(status: string) {
@@ -124,7 +117,7 @@ const columns = computed(() => [
       h(
         Badge,
         {
-          variant: statusVariant(info.getValue()),
+          variant: runtimeStatusVariant(info.getValue()),
           class: 'uppercase text-[9px] font-black tracking-widest',
         },
         () => statusLabel(info.getValue()),
@@ -184,7 +177,7 @@ const table = useVueTable({
         </div>
       </div>
       <div class="noctf-status-item border-b sm:border-b-0 sm:border-r">
-        <div class="rounded-md bg-destructive/10 p-2 text-destructive">
+        <div class="rounded-md bg-danger-muted p-2 text-danger">
           <Cpu class="size-5" />
         </div>
         <div class="min-w-0">
@@ -248,7 +241,7 @@ const table = useVueTable({
               <Button
                 variant="ghost"
                 size="icon"
-                class="size-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                class="size-8 text-muted-foreground hover:bg-danger-muted hover:text-danger"
                 :aria-label="t('admin.containers.destroyAriaLabel')"
                 @click="openDestroy(row.original)"
               >
@@ -264,7 +257,7 @@ const table = useVueTable({
     <Dialog v-model:open="destroyDialog">
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle class="text-destructive flex items-center gap-2">
+          <DialogTitle class="text-danger flex items-center gap-2">
             <Trash2 class="size-5" />
             {{ t('admin.containers.destroyDialogTitle') }}
           </DialogTitle>

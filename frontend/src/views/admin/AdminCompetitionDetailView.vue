@@ -49,6 +49,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { competitionStatusVariant, registrationStatusVariant, runtimeStatusVariant } from '@/lib/statusTones'
 
 interface PointsConfigDto {
   initialPoints: number
@@ -997,14 +998,6 @@ function isStaticContainer(challenge: CompetitionChallengeDto) {
   return challenge.deploymentType === 'StaticContainer' || challenge.deploymentType === 3
 }
 
-function penetrationStatusVariant(status: string) {
-  const normalized = status.toLowerCase()
-  if (normalized === 'running') return 'default'
-  if (normalized === 'failed' || normalized === 'expired') return 'destructive'
-  if (normalized === 'stopped' || normalized === 'destroyed') return 'secondary'
-  return 'outline'
-}
-
 function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleString() : '-'
 }
@@ -1073,7 +1066,7 @@ function sectionRoute(section: CompetitionDetailSection) {
             {{ t('awdp.screenEntry') }}
           </RouterLink>
         </Button>
-        <Badge v-if="competition?.status" variant="outline" class="capitalize">
+        <Badge v-if="competition?.status" :variant="competitionStatusVariant(competition.status)" class="capitalize">
           {{ competition.status }}
         </Badge>
       </div>
@@ -1151,7 +1144,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                 <p class="noctf-label">{{ t('admin.competitionDetail.overviewSignals') }}</p>
                 <p
                   class="mt-1 text-lg font-semibold"
-                  :class="unresolvedCheatCount ? 'text-destructive' : ''"
+                  :class="unresolvedCheatCount ? 'text-danger' : ''"
                 >
                   {{ unresolvedCheatCount }}
                 </p>
@@ -1649,7 +1642,7 @@ function sectionRoute(section: CompetitionDetailSection) {
           <div class="mt-4 grid gap-2 rounded-lg border bg-muted/30 p-3">
             <Label>{{ t('admin.challenges.orchestration') }}</Label>
             <Textarea v-model="selectedEdit.orchestrationJson" class="min-h-48 font-mono text-xs" />
-            <p v-if="editOrchestrationError" class="text-xs text-destructive">
+            <p v-if="editOrchestrationError" class="text-xs text-danger">
               {{ editOrchestrationError }}
             </p>
           </div>
@@ -1674,7 +1667,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                 v-model="selectedPenetrationTopologyJson"
                 class="min-h-80 font-mono text-xs"
               />
-              <p v-if="selectedPenetrationTopologyError" class="text-xs text-destructive">
+              <p v-if="selectedPenetrationTopologyError" class="text-xs text-danger">
                 {{ selectedPenetrationTopologyError }}
               </p>
               <Button
@@ -1882,7 +1875,7 @@ function sectionRoute(section: CompetitionDetailSection) {
           <div class="mt-4 grid gap-2 rounded-lg border bg-muted/30 p-3">
             <Label>{{ t('admin.challenges.orchestration') }}</Label>
             <Textarea v-model="bindForm.orchestrationJson" class="min-h-40 font-mono text-xs" />
-            <p v-if="bindOrchestrationError" class="text-xs text-destructive">
+            <p v-if="bindOrchestrationError" class="text-xs text-danger">
               {{ bindOrchestrationError }}
             </p>
           </div>
@@ -1966,20 +1959,12 @@ function sectionRoute(section: CompetitionDetailSection) {
                   {{ team.trackName || '-' }}
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    :variant="
-                      team.registrationStatus === 'approved'
-                        ? 'default'
-                        : team.registrationStatus === 'rejected'
-                          ? 'destructive'
-                          : 'secondary'
-                    "
-                  >
+                  <Badge :variant="registrationStatusVariant(team.registrationStatus)">
                     {{ team.registrationStatus }}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge :variant="team.isLocked ? 'outline' : 'secondary'">
+                  <Badge :variant="team.isLocked ? 'warning' : 'neutral'">
                     {{
                       team.isLocked
                         ? t('admin.competitionDetail.locked')
@@ -1988,7 +1973,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge :variant="team.isBanned ? 'destructive' : 'secondary'">
+                  <Badge :variant="team.isBanned ? 'destructive' : 'neutral'">
                     {{
                       team.isBanned
                         ? t('admin.competitionDetail.banned')
@@ -2011,7 +1996,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                       v-if="team.registrationStatus !== 'rejected'"
                       variant="ghost"
                       size="icon"
-                      class="size-8 text-destructive"
+                      class="size-8 text-danger"
                       @click="rejectTeamMutation.mutate(team.id)"
                     >
                       <X class="size-4" />
@@ -2031,7 +2016,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                       variant="ghost"
                       size="icon"
                       class="size-8"
-                      :class="team.isBanned ? '' : 'text-destructive'"
+                      :class="team.isBanned ? '' : 'text-danger'"
                       @click="
                         team.isBanned
                           ? unbanTeamMutation.mutate(team.id)
@@ -2161,14 +2146,14 @@ function sectionRoute(section: CompetitionDetailSection) {
                       </div>
                       <div
                         v-if="instance.lastError"
-                        class="mt-1 max-w-64 truncate text-xs text-destructive"
+                        class="mt-1 max-w-64 truncate text-xs text-danger"
                         :title="instance.lastError"
                       >
                         {{ instance.lastError }}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge :variant="penetrationStatusVariant(instance.status)">
+                      <Badge :variant="runtimeStatusVariant(instance.status)">
                         {{ instance.status }}
                       </Badge>
                     </TableCell>
@@ -2214,7 +2199,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          class="size-8 text-destructive"
+                          class="size-8 text-danger"
                           :disabled="destroyPenetrationInstanceMutation.isPending.value"
                           @click="openDestroyInstance(instance)"
                         >
@@ -2497,7 +2482,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="size-8 text-destructive"
+                    class="size-8 text-danger"
                     @click.stop="openDeleteChallenge(challenge)"
                   >
                     <Trash2 class="size-4" />
@@ -2565,7 +2550,7 @@ function sectionRoute(section: CompetitionDetailSection) {
     <Dialog v-model:open="dangerDialogOpen">
       <DialogContent class="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle class="flex items-center gap-2 text-destructive">
+          <DialogTitle class="flex items-center gap-2 text-danger">
             <ShieldAlert class="size-5" />
             {{ pendingDangerAction?.title }}
           </DialogTitle>

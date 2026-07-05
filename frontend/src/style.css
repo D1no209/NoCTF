@@ -117,7 +117,7 @@
   --sidebar-primary-foreground: oklch(0.985 0.004 255);
   --sidebar-accent: oklch(0.24 0.055 248);
   --sidebar-accent-foreground: oklch(0.985 0.004 255);
-  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-border: oklch(0.95 0.012 255 / 12%);
   --sidebar-ring: oklch(0.68 0.17 255);
 }
 
@@ -128,8 +128,8 @@
   --card-foreground: oklch(0.965 0.008 255);
   --popover: oklch(0.205 0.032 260);
   --popover-foreground: oklch(0.965 0.008 255);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.76 0.13 252);
+  --primary-foreground: oklch(0.16 0.04 260);
   --secondary: oklch(0.27 0.036 260);
   --secondary-foreground: oklch(0.965 0.008 255);
   --muted: oklch(0.27 0.032 260);
@@ -200,7 +200,7 @@
 
 @layer components {
   .noctf-logo {
-    @apply relative inline-flex shrink-0 items-center justify-center rounded-lg text-white shadow-sm;
+    @apply relative inline-flex shrink-0 items-center justify-center rounded-lg text-primary-foreground shadow-sm;
     background: var(--primary);
   }
 
@@ -387,7 +387,7 @@
   }
 
   .noctf-danger-panel {
-    @apply rounded-md border border-destructive/25 bg-destructive/10 p-3 text-destructive;
+    @apply rounded-md border border-danger/25 bg-danger-muted/70 p-3 text-danger;
   }
 
   .noctf-scrollbar::-webkit-scrollbar {

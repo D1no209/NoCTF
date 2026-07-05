@@ -120,6 +120,14 @@ function formatDate(iso: string) {
 function modeLabel(mode?: string | null) {
   return (mode || 'CTF').toUpperCase()
 }
+
+function modeToneClass(mode?: string | null) {
+  const key = (mode || 'ctf').toLowerCase()
+  if (key === 'awd') return 'competition-mode-attack'
+  if (key === 'awdp') return 'competition-mode-defense'
+  if (key === 'koh') return 'competition-mode-warning'
+  return 'competition-mode-info'
+}
 </script>
 
 <template>
@@ -177,7 +185,7 @@ function modeLabel(mode?: string | null) {
         </div>
 
         <div v-else-if="isState('error')" class="noctf-state-box">
-          <AlertCircle class="size-8 text-destructive" />
+          <AlertCircle class="size-8 text-danger" />
           <h3 class="mt-3 text-sm font-medium">{{ t('competitions.loadError') }}</h3>
           <Button variant="outline" size="sm" class="mt-4" @click="loadCompetitions">
             {{ t('common.refresh') }}
@@ -208,7 +216,7 @@ function modeLabel(mode?: string | null) {
             :key="comp.id"
             class="competition-row"
           >
-            <div class="competition-mode">
+            <div class="competition-mode" :class="modeToneClass(comp.gameModeType)">
               <span>{{ modeLabel(comp.gameModeType) }}</span>
             </div>
 
@@ -217,7 +225,7 @@ function modeLabel(mode?: string | null) {
                 <Badge variant="outline" :class="statusToneClass(comp.status)">
                   {{ statusLabel(comp.status) }}
                 </Badge>
-                <Badge variant="secondary">
+                <Badge variant="outline" :class="modeToneClass(comp.gameModeType)">
                   {{ modeLabel(comp.gameModeType) }}
                 </Badge>
               </div>
@@ -305,14 +313,42 @@ function modeLabel(mode?: string | null) {
   display: inline-flex;
   min-width: 3.5rem;
   justify-content: center;
-  border: 1px solid color-mix(in oklch, var(--primary) 22%, var(--border));
+  border: 1px solid color-mix(in oklch, var(--mode-color, var(--primary)) 22%, var(--border));
   border-radius: var(--radius-md);
   background: var(--card);
   padding: 0.55rem 0.65rem;
-  color: var(--foreground);
+  color: var(--mode-color, var(--foreground));
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.04em;
+}
+
+.competition-mode-info {
+  --mode-color: var(--info);
+  border-color: color-mix(in oklch, var(--info) 28%, var(--border));
+  background: color-mix(in oklch, var(--info-muted) 42%, var(--card));
+  color: var(--info);
+}
+
+.competition-mode-attack {
+  --mode-color: var(--attack);
+  border-color: color-mix(in oklch, var(--attack) 28%, var(--border));
+  background: color-mix(in oklch, var(--attack-muted) 42%, var(--card));
+  color: var(--attack);
+}
+
+.competition-mode-defense {
+  --mode-color: var(--defense);
+  border-color: color-mix(in oklch, var(--defense) 28%, var(--border));
+  background: color-mix(in oklch, var(--defense-muted) 42%, var(--card));
+  color: var(--defense);
+}
+
+.competition-mode-warning {
+  --mode-color: var(--warning);
+  border-color: color-mix(in oklch, var(--warning) 30%, var(--border));
+  background: color-mix(in oklch, var(--warning-muted) 46%, var(--card));
+  color: var(--warning);
 }
 
 .competition-row-main {

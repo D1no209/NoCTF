@@ -61,7 +61,7 @@ function display(value: unknown) {
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="text-sm font-semibold">{{ t('admin.infrastructure.runner') }}</h3>
               <Badge variant="outline">{{ data?.runnerProvider ?? '-' }}</Badge>
-              <Badge :variant="data?.runnerReachable ? 'default' : 'destructive'">
+              <Badge :variant="data?.runnerReachable ? 'success' : 'destructive'">
                 {{
                   data?.runnerReachable
                     ? t('admin.infrastructure.reachable')

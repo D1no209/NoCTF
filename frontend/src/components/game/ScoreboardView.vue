@@ -550,10 +550,10 @@ onUnmounted(() => {
         <Badge v-if="isConnected" variant="success" class="text-xs">
           {{ t('common.live') }}
         </Badge>
-        <Badge v-else-if="usingFallback" variant="secondary" class="text-xs">
+        <Badge v-else-if="usingFallback" variant="info" class="text-xs">
           {{ t('common.polling') }}
         </Badge>
-        <Badge v-else variant="outline" class="text-xs text-muted-foreground">
+        <Badge v-else variant="neutral" class="text-xs">
           {{ t('common.connecting') }}
         </Badge>
       </div>

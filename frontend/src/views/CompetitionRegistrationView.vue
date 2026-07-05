@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { competitionStatusVariant, gameModeVariant, registrationStatusVariant } from '@/lib/statusTones'
 import ErrorState from '@/components/state/ErrorState.vue'
 import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, Copy, KeyRound, Loader2, Lock, UserPlus, Users } from 'lucide-vue-next'
 
@@ -95,14 +96,6 @@ const joinByTokenMutation = useMutation({
   onError: () => toast.error(t('teams.actionError')),
 })
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const s = status.toLowerCase()
-  if (s === 'running' || s === 'approved') return 'default'
-  if (s === 'rejected') return 'destructive'
-  if (s === 'finished') return 'outline'
-  return 'secondary'
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
     month: 'short',
@@ -146,8 +139,8 @@ async function copyToken(token: string) {
             <PageHeader :title="competition.title" :description="competition.description ?? t('teams.registrationDetailFallback')">
               <template #actions>
                 <div class="flex flex-wrap gap-2">
-                  <Badge :variant="statusVariant(competition.status)">{{ competition.status }}</Badge>
-                  <Badge variant="secondary">{{ competition.gameModeType }}</Badge>
+                  <Badge :variant="competitionStatusVariant(competition.status)">{{ competition.status }}</Badge>
+                  <Badge :variant="gameModeVariant(competition.gameModeType)">{{ competition.gameModeType }}</Badge>
                   <Badge variant="outline">{{ t('teams.maxMembers', { count: competition.maxTeamMembers }) }}</Badge>
                 </div>
               </template>
@@ -186,7 +179,7 @@ async function copyToken(token: string) {
                     <div class="space-y-2">
                       <div class="flex flex-wrap items-center gap-2">
                         <h3 class="text-lg font-semibold">{{ currentTeam.name }}</h3>
-                        <Badge :variant="statusVariant(currentTeam.registrationStatus)">
+                        <Badge :variant="registrationStatusVariant(currentTeam.registrationStatus)">
                           {{ currentTeam.registrationStatus }}
                         </Badge>
                         <Badge v-if="currentTeam.trackName" variant="outline">{{ currentTeam.trackName }}</Badge>
@@ -215,7 +208,7 @@ async function copyToken(token: string) {
                   </div>
                 </div>
 
-                <div v-if="currentTeam.isBanned" class="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                <div v-if="currentTeam.isBanned" class="rounded-lg border border-danger/30 bg-danger-muted/50 p-4 text-sm text-danger">
                   {{ t('teams.bannedDetail') }}
                 </div>
                 <div v-else-if="currentTeam.registrationStatus !== 'approved'" class="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">

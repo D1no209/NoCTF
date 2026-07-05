@@ -21,12 +21,12 @@ const { data: plugins, isLoading } = useQuery({
   queryFn: () => adminApi.plugins<PluginDto[]>(),
 })
 
-function typeVariant(type: string): 'default' | 'secondary' | 'outline' | 'destructive' {
+function typeVariant(type: string): 'info' | 'attack' | 'defense' | 'neutral' {
   const t = type.toLowerCase()
-  if (t.includes('gamemode')) return 'default'
-  if (t.includes('challenge')) return 'secondary'
-  if (t.includes('container')) return 'outline'
-  return 'outline'
+  if (t.includes('gamemode')) return 'attack'
+  if (t.includes('challenge')) return 'info'
+  if (t.includes('container')) return 'defense'
+  return 'neutral'
 }
 
 function getPluginIcon(type: string) {
@@ -54,7 +54,7 @@ function getPluginIcon(type: string) {
     <div v-if="plugins" class="noctf-status-strip grid-cols-1 sm:grid-cols-2">
       <div class="noctf-status-item border-b sm:border-b-0 sm:border-r">
         <span class="noctf-label">{{ t('admin.plugins.totalPlugins') }}</span>
-        <Badge variant="secondary" class="font-mono">
+        <Badge variant="neutral" class="font-mono">
           {{ plugins.length }}
         </Badge>
       </div>

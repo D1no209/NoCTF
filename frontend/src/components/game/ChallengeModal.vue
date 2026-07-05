@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert } from '@/components/ui/alert'
 import { renderMarkdown } from '@/lib/markdown'
+import { runtimeStatusVariant, type SemanticBadgeVariant } from '@/lib/statusTones'
 import { toast } from 'vue-sonner'
 import {
   Activity,
@@ -597,21 +598,8 @@ function formatDefenseResult(value?: string | null) {
 
 function statusBadgeVariant(
   value?: string | number | null,
-): 'default' | 'success' | 'warning' | 'info' | 'destructive' | 'outline' {
-  const key = String(value ?? '').toLowerCase()
-  if (key.includes('success') || key.includes('ok') || key.includes('running')) return 'success'
-  if (
-    key.includes('error') ||
-    key.includes('failed') ||
-    key.includes('timeout') ||
-    key.includes('exhausted')
-  )
-    return 'destructive'
-  if (key.includes('notstarted') || key.includes('unknown') || key.includes('notcreated'))
-    return 'outline'
-  if (key.includes('uploading') || key.includes('checking') || key.includes('auditing') || key.includes('submitted'))
-    return 'info'
-  return 'warning'
+): SemanticBadgeVariant {
+  return runtimeStatusVariant(value)
 }
 
 function getApiErrorDetail(error: unknown) {
@@ -675,7 +663,7 @@ function getApiErrorDetail(error: unknown) {
                   <div class="flex flex-wrap items-center gap-2 text-sm font-semibold">
                     <Server class="size-4 text-primary" />
                     <span>{{ t('challenges.instanceReady') }}</span>
-                    <Badge variant="secondary" class="font-mono">{{
+                    <Badge variant="info" class="font-mono">{{
                       formatDuration(expiresInMs)
                     }}</Badge>
                   </div>
@@ -712,10 +700,10 @@ function getApiErrorDetail(error: unknown) {
             </div>
             <div
               v-if="runningInstance && destroyConfirmOpen"
-              class="rounded-lg border border-destructive/35 bg-destructive/5 p-3"
+              class="rounded-lg border border-danger/30 bg-danger-muted/50 p-3"
             >
               <div class="space-y-2 text-sm">
-                <p class="font-medium text-destructive">
+                <p class="font-medium text-danger">
                   {{ t('challenges.destroyConfirmTitle') }}
                 </p>
                 <p class="text-muted-foreground">
@@ -844,7 +832,7 @@ function getApiErrorDetail(error: unknown) {
               </div>
               <p class="text-xs text-muted-foreground">{{ t('awdp.roundScoringHint') }}</p>
             </div>
-            <Badge variant="secondary" class="w-fit">
+            <Badge variant="info" class="w-fit">
               {{
                 awdpCurrentRound
                   ? t('awdp.roundLabel', {
@@ -1085,7 +1073,7 @@ function getApiErrorDetail(error: unknown) {
                 {{ defenseEnabled ? t('challenges.patchUnlocked') : t('challenges.patchLocked') }}
               </p>
             </div>
-            <Badge :variant="defenseEnabled ? 'default' : 'outline'">
+            <Badge :variant="defenseEnabled ? 'defense' : 'warning'">
               {{ defenseEnabled ? t('challenges.defenseReady') : t('challenges.defenseRequired') }}
             </Badge>
           </div>

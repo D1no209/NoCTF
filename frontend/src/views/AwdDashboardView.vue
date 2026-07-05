@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useSignalR } from '@/composables/useSignalR'
+import { runtimeStatusVariant } from '@/lib/statusTones'
 import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
 
@@ -246,12 +247,13 @@ function enqueueAttackFailed(reason: string) {
 
   if (localAwarenessEvents.value.length > 50) localAwarenessEvents.value.splice(50)
 }
+
 </script>
 
 <template>
   <div class="noctf-page-wide">
     <div v-if="dashboardError" class="noctf-state-box py-12">
-      <AlertCircle class="size-8 text-destructive" />
+      <AlertCircle class="size-8 text-danger" />
       <div class="space-y-1 text-center">
         <p class="font-medium">{{ t('awd.dashboardLoadFailed') }}</p>
         <p class="text-sm text-muted-foreground">{{ t('awd.dashboardLoadFailedDetail') }}</p>
@@ -424,7 +426,6 @@ function enqueueAttackFailed(reason: string) {
               </div>
 
               <Button
-                variant="secondary"
                 class="w-full bg-info text-info-foreground hover:bg-info/90"
                 :disabled="patchLoading || !patchFile || !patchChallenge"
                 @click="submitPatch"
@@ -455,13 +456,7 @@ function enqueueAttackFailed(reason: string) {
                     ps.challengeName ?? ps.challengeTitle ?? ps.challengeId
                   }}</span>
                   <Badge
-                    :variant="
-                      ps.status === 'Verified'
-                        ? 'default'
-                        : ps.status === 'Rejected' || ps.status === 'Failed'
-                          ? 'destructive'
-                          : 'secondary'
-                    "
+                    :variant="runtimeStatusVariant(ps.status)"
                     class="text-[10px] uppercase font-bold tracking-tighter h-5"
                   >
                     {{ ps.status }}

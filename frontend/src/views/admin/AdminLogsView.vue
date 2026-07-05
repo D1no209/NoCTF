@@ -138,7 +138,7 @@ onMounted(async () => {
 
         <div class="h-4 w-px bg-border mx-1" />
 
-        <div class="flex bg-muted/50 p-1 rounded-md border border-white/5">
+        <div class="flex rounded-md border border-border/80 bg-muted/50 p-1">
           <button
             v-for="lvl in ['All', 'Information', 'Warning', 'Error']"
             :key="lvl"
@@ -172,7 +172,7 @@ onMounted(async () => {
         <Button
           size="sm"
           variant="ghost"
-          class="h-8 size-8 p-0 text-muted-foreground hover:text-destructive"
+          class="h-8 size-8 p-0 text-muted-foreground hover:text-danger"
           @click="clearLogs"
         >
           <Trash2 class="size-4" />

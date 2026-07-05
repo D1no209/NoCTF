@@ -50,7 +50,7 @@ function formatTime(iso: string) {
       <div class="flex items-center justify-between gap-2">
         <CardTitle class="text-sm font-semibold truncate">{{ status.challengeName }}</CardTitle>
         <Badge
-          :variant="status.controllerTeamId ? 'default' : 'outline'"
+          :variant="status.controllerTeamId ? 'warning' : 'neutral'"
           class="shrink-0 text-xs"
         >
           {{ status.controllerTeamId ? t('koh.controlled') : t('koh.uncontested') }}

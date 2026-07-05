@@ -220,7 +220,7 @@ function getServiceIcon(name: string) {
               />
               <path
                 d="M9.5 6.9h5M11 5.7l-1.8 1 1.8 1M13 5.7l1.8 1-1.8 1"
-                stroke="white"
+                stroke="var(--danger-foreground)"
                 stroke-width="1.2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -249,7 +249,7 @@ function getServiceIcon(name: string) {
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
-              <path d="M7.1 14.6h.1" stroke="white" stroke-width="2" stroke-linecap="round" />
+              <path d="M7.1 14.6h.1" stroke="var(--info-foreground)" stroke-width="2" stroke-linecap="round" />
             </svg>
             <component v-else :is="getServiceIcon(check.name)" class="size-4" />
           </div>
@@ -280,7 +280,7 @@ function getServiceIcon(name: string) {
 
     <div v-if="!loading && !health" class="noctf-state-box py-20">
       <div
-        class="size-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4"
+        class="size-16 rounded-full bg-danger-muted flex items-center justify-center text-danger mb-4"
       >
         <AlertTriangle class="size-8" />
       </div>

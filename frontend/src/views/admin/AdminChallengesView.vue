@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/table'
 import { Edit, Key, Loader2, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import { gameModeVariant } from '@/lib/statusTones'
 
 interface CheckerConfigDto {
   image?: string
@@ -171,7 +172,7 @@ const columns = [
   columnHelper.accessor('typeId', {
     header: () => t('admin.challenges.challengeMode'),
     enableSorting: true,
-    cell: (info) => h(Badge, { variant: 'secondary', class: 'font-bold text-[10px]' }, () => challengeTypeLabel(info.getValue())),
+    cell: (info) => h(Badge, { variant: gameModeVariant(info.getValue()), class: 'font-bold text-[10px]' }, () => challengeTypeLabel(info.getValue())),
   }),
   columnHelper.accessor('attachmentUrl', {
     header: () => t('admin.challenges.attachment'),
@@ -285,7 +286,7 @@ const table = useVueTable({
                     {{ t('admin.challenges.revealSecret') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem class="text-destructive focus:text-destructive" @click="openDelete(row.original)">
+                  <DropdownMenuItem class="text-danger focus:text-danger" @click="openDelete(row.original)">
                     <Trash2 class="mr-2 size-4" />
                     {{ t('common.delete') }}
                   </DropdownMenuItem>
