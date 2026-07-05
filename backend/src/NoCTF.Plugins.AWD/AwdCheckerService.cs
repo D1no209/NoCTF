@@ -19,9 +19,18 @@ public class AwdCheckerService(
     public async Task RunCheckerAsync(Guid competitionId, int roundNumber, CancellationToken ct = default)
     {
         // Load all game boxes for this competition
+        var activeTeamIds = await db.Teams
+            .IgnoreQueryFilters()
+            .Where(t =>
+                t.CompetitionId == competitionId &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned)
+            .Select(t => t.Id)
+            .ToListAsync(ct);
+
         var gameBoxes = await db.AwdGameBoxes
             .IgnoreQueryFilters()
-            .Where(g => g.CompetitionId == competitionId)
+            .Where(g => g.CompetitionId == competitionId && activeTeamIds.Contains(g.TeamId))
             .ToListAsync(ct);
 
         if (gameBoxes.Count == 0)

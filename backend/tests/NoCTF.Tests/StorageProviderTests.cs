@@ -41,6 +41,38 @@ public class StorageProviderTests
     }
 
     [Fact]
+    public async Task LocalFileStorageProvider_GetUrl_WithSigningKey_SignsAttachmentUrls()
+    {
+        var basePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var provider = new LocalFileStorageProvider(basePath, "local-file-signing-secret");
+
+        var url = await provider.GetUrlAsync("challenge-attachments/competition1/file.zip");
+
+        Assert.StartsWith("/api/files/challenge-attachments/competition1/file.zip?", url);
+        var query = ParseQuery(url);
+        Assert.True(long.TryParse(query["expires"], out var expires));
+        Assert.True(LocalFileUrlSigner.Validate(
+            "challenge-attachments/competition1/file.zip",
+            expires,
+            query["sig"],
+            "local-file-signing-secret",
+            DateTimeOffset.UtcNow));
+    }
+
+    private static Dictionary<string, string> ParseQuery(string url)
+    {
+        var queryStart = url.IndexOf('?', StringComparison.Ordinal);
+        Assert.True(queryStart >= 0);
+        return url[(queryStart + 1)..]
+            .Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Split('=', 2))
+            .ToDictionary(
+                part => Uri.UnescapeDataString(part[0]),
+                part => part.Length == 2 ? Uri.UnescapeDataString(part[1]) : string.Empty,
+                StringComparer.Ordinal);
+    }
+
+    [Fact]
     public async Task LocalFileStorageProvider_Upload_CreatesSubdirectories()
     {
         var basePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

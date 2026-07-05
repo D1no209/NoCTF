@@ -224,6 +224,35 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
+    public async Task ValidatePatchAsync_DestroyOriginalFails_RejectsAndDestroysPatchedContainer()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+
+        var containerManager = new SequencedContainerManager([0, 0], throwOnDestroyContainerId: "container-123");
+        var service = CreateService(db, containerManager);
+        var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+        await service.ValidatePatchAsync(submissionId);
+
+        var submission = await db.AwdpPatchSubmissions.IgnoreQueryFilters().FirstAsync(s => s.Id == submissionId);
+        var state = await db.AwdpTeamChallengeStates.IgnoreQueryFilters().FirstAsync(s => s.TeamId == teamId);
+        var gameBox = await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync(g => g.TeamId == teamId);
+
+        Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
+        Assert.Equal(AwdpFixStatus.FixServiceError, submission.FixStatus);
+        Assert.Equal(AwdpServiceStatus.ServiceError, state.ServiceStatus);
+        Assert.Equal("container-123", gameBox.ContainerInstanceId);
+        Assert.Contains(containerManager.DestroyedContainers, c => c.ContainerId == "container-123");
+        Assert.Contains(containerManager.DestroyedContainers, c => c.ContainerId == "container-1");
+    }
+
+    [Fact]
     public async Task ValidatePatchAsync_CheckExit1_RecordsExploitSuccessAsFixFailedWithoutPenaltyEvent()
     {
         var (db, service, competitionId, teamId, challengeId, containerManager) =
@@ -519,7 +548,10 @@ public class AwdpPatchServiceTests
             => Task.CompletedTask;
     }
 
-    private sealed class SequencedContainerManager(int[] exitCodes, int? timeoutOnRunIndex = null) : IContainerManager
+    private sealed class SequencedContainerManager(
+        int[] exitCodes,
+        int? timeoutOnRunIndex = null,
+        string? throwOnDestroyContainerId = null) : IContainerManager
     {
         private int _runIndex;
         public int CreateCount { get; private set; }
@@ -551,6 +583,8 @@ public class AwdpPatchServiceTests
         {
             DestroyCount++;
             DestroyedContainers.Add(container);
+            if (container.ContainerId == throwOnDestroyContainerId)
+                throw new InvalidOperationException("Destroy failed.");
             return Task.CompletedTask;
         }
 

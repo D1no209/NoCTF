@@ -26,13 +26,17 @@ public class SubmitFlagResponse
 /// POST /api/competitions/{id}/challenges/{challengeId}/submit
 /// Delegates flag-like submissions to the competition's registered game mode.
 /// </summary>
-public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGameMode> gameModes)
+public class SubmitFlagEndpoint(
+    ApplicationDbContext dbContext,
+    IEnumerable<IGameMode> gameModes,
+    IConfiguration configuration)
     : Endpoint<SubmitFlagRequest, SubmitFlagResponse>
 {
     public override void Configure()
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/submit");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("flag-submit"));
     }
 
     public override async Task HandleAsync(SubmitFlagRequest req, CancellationToken ct)
@@ -43,6 +47,20 @@ public class SubmitFlagEndpoint(ApplicationDbContext dbContext, IEnumerable<IGam
             await SendUnauthorizedAsync(ct);
             return;
         }
+
+        var submittedFlag = req.Flag?.Trim() ?? string.Empty;
+        var maxFlagLength = configuration.GetValue("Submissions:MaxFlagLength", 1024);
+        if (submittedFlag.Length == 0 || submittedFlag.Length > maxFlagLength)
+        {
+            await SendAsync(new SubmitFlagResponse
+            {
+                Correct = false,
+                AlreadySolved = false,
+                Result = "invalid_flag_format"
+            }, 400, ct);
+            return;
+        }
+        req.Flag = submittedFlag;
 
         var competition = await dbContext.Competitions
             .IgnoreQueryFilters()

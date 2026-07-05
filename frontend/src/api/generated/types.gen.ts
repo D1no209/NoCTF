@@ -180,6 +180,7 @@ export type NoCtfapiEndpointsCompetitionsChallengeInstanceResponse = {
     };
     addresses?: Array<string>;
     address?: string | null;
+    entryUrl?: string | null;
     accessHost?: string;
     status?: string;
     expiresAt?: string | null;

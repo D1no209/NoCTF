@@ -240,11 +240,18 @@ internal static class AwdpScreenSnapshotBuilder
             .Where(c => c.CompetitionId == competitionId)
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(ct);
+        var activeTeamIds = teams.Select(t => t.Id).ToList();
+        var activeChallengeIds = challenges.Select(c => c.Id).ToList();
+        var activeTeamIdSet = activeTeamIds.ToHashSet();
+        var activeChallengeIdSet = activeChallengeIds.ToHashSet();
 
         var states = await db.AwdpTeamChallengeStates
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(s => s.CompetitionId == competitionId)
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                activeTeamIds.Contains(s.TeamId) &&
+                activeChallengeIds.Contains(s.ChallengeId))
             .ToListAsync(ct);
 
         var rounds = await db.AwdpRounds
@@ -257,13 +264,19 @@ internal static class AwdpScreenSnapshotBuilder
         var roundScores = await db.AwdpRoundScores
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(s => s.CompetitionId == competitionId)
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                activeTeamIds.Contains(s.TeamId) &&
+                activeChallengeIds.Contains(s.ChallengeId))
             .ToListAsync(ct);
 
         var scoreEvents = await db.ScoreEvents
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(e => e.CompetitionId == competitionId)
+            .Where(e =>
+                e.CompetitionId == competitionId &&
+                activeTeamIds.Contains(e.TeamId) &&
+                (!e.ChallengeId.HasValue || activeChallengeIds.Contains(e.ChallengeId.Value)))
             .OrderByDescending(e => e.Timestamp)
             .Take(80)
             .ToListAsync(ct);
@@ -271,7 +284,10 @@ internal static class AwdpScreenSnapshotBuilder
         var patchSubmissions = await db.AwdpPatchSubmissions
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(s => s.CompetitionId == competitionId)
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                activeTeamIds.Contains(s.TeamId) &&
+                activeChallengeIds.Contains(s.ChallengeId))
             .OrderByDescending(s => s.SubmittedAt)
             .Take(60)
             .ToListAsync(ct);
@@ -279,7 +295,11 @@ internal static class AwdpScreenSnapshotBuilder
         var competitionLogs = await db.CompetitionLogs
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(l => l.CompetitionId == competitionId && l.EventType.StartsWith("awdp."))
+            .Where(l =>
+                l.CompetitionId == competitionId &&
+                l.EventType.StartsWith("awdp.") &&
+                (!l.TeamId.HasValue || activeTeamIds.Contains(l.TeamId.Value)) &&
+                (!l.ChallengeId.HasValue || activeChallengeIds.Contains(l.ChallengeId.Value)))
             .OrderByDescending(l => l.CreatedAt)
             .Take(80)
             .ToListAsync(ct);
@@ -298,7 +318,10 @@ internal static class AwdpScreenSnapshotBuilder
         var scoreByTeam = await db.ScoreEvents
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(e => e.CompetitionId == competitionId)
+            .Where(e =>
+                e.CompetitionId == competitionId &&
+                activeTeamIds.Contains(e.TeamId) &&
+                (!e.ChallengeId.HasValue || activeChallengeIds.Contains(e.ChallengeId.Value)))
             .GroupBy(e => e.TeamId)
             .Select(g => new { TeamId = g.Key, Score = g.Sum(e => e.PointsDelta) })
             .ToDictionaryAsync(x => x.TeamId, x => x.Score, ct);
@@ -341,7 +364,11 @@ internal static class AwdpScreenSnapshotBuilder
 
         var challengeStatuses = challenges.Select(challenge =>
         {
-            var challengeStates = states.Where(s => s.ChallengeId == challenge.Id).ToList();
+            var challengeStates = states
+                .Where(s => s.ChallengeId == challenge.Id &&
+                            activeTeamIdSet.Contains(s.TeamId) &&
+                            activeChallengeIdSet.Contains(s.ChallengeId))
+                .ToList();
             var lastEventAt = challengeStates.Count == 0
                 ? null
                 : challengeStates.Max(LastActivityAt);

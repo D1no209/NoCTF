@@ -40,6 +40,21 @@ public class AwdCheckerServiceTests
         });
     }
 
+    private static Guid SeedTeam(ApplicationDbContext db, Guid competitionId)
+    {
+        var id = Guid.NewGuid();
+        db.Teams.Add(new Team
+        {
+            Id = id,
+            CompetitionId = competitionId,
+            Name = "Team " + id.ToString("N")[..6],
+            CaptainId = Guid.NewGuid(),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            CreatedAt = DateTime.UtcNow
+        });
+        return id;
+    }
+
     private static Guid SeedChallengeWithChecker(ApplicationDbContext db, Guid competitionId, string image = "checker:latest")
     {
         var id = Guid.NewGuid();
@@ -94,7 +109,7 @@ public class AwdCheckerServiceTests
         await using var db = CreateDb(competitionId);
 
         SeedCompetition(db, competitionId);
-        var teamId = Guid.NewGuid();
+        var teamId = SeedTeam(db, competitionId);
         var challengeId = SeedChallengeWithChecker(db, competitionId);
         SeedGameBox(db, competitionId, teamId, challengeId);
         await db.SaveChangesAsync();
@@ -119,7 +134,7 @@ public class AwdCheckerServiceTests
         await using var db = CreateDb(competitionId);
 
         SeedCompetition(db, competitionId);
-        var teamId = Guid.NewGuid();
+        var teamId = SeedTeam(db, competitionId);
         var challengeId = SeedChallengeWithChecker(db, competitionId);
         SeedGameBox(db, competitionId, teamId, challengeId);
         await db.SaveChangesAsync();
@@ -141,7 +156,7 @@ public class AwdCheckerServiceTests
         await using var db = CreateDb(competitionId);
 
         SeedCompetition(db, competitionId);
-        var teamId = Guid.NewGuid();
+        var teamId = SeedTeam(db, competitionId);
         var challengeId = SeedChallengeWithChecker(db, competitionId);
         SeedGameBox(db, competitionId, teamId, challengeId);
         await db.SaveChangesAsync();
@@ -163,7 +178,7 @@ public class AwdCheckerServiceTests
         await using var db = CreateDb(competitionId);
 
         SeedCompetition(db, competitionId);
-        var teamId = Guid.NewGuid();
+        var teamId = SeedTeam(db, competitionId);
         var challengeId = SeedChallengeWithoutChecker(db, competitionId);
         SeedGameBox(db, competitionId, teamId, challengeId);
         await db.SaveChangesAsync();
@@ -189,7 +204,7 @@ public class AwdCheckerServiceTests
 
         const int teamCount = 6;
         for (int i = 0; i < teamCount; i++)
-            SeedGameBox(db, competitionId, Guid.NewGuid(), challengeId);
+            SeedGameBox(db, competitionId, SeedTeam(db, competitionId), challengeId);
 
         await db.SaveChangesAsync();
 
@@ -216,7 +231,7 @@ public class AwdCheckerServiceTests
 
         const int teamCount = 10;
         for (int i = 0; i < teamCount; i++)
-            SeedGameBox(db, competitionId, Guid.NewGuid(), challengeId);
+            SeedGameBox(db, competitionId, SeedTeam(db, competitionId), challengeId);
 
         await db.SaveChangesAsync();
 
@@ -238,7 +253,7 @@ public class AwdCheckerServiceTests
         await using var db = CreateDb(competitionId);
 
         SeedCompetition(db, competitionId);
-        var teamId = Guid.NewGuid();
+        var teamId = SeedTeam(db, competitionId);
         var challengeId = SeedChallengeWithChecker(db, competitionId);
         SeedGameBox(db, competitionId, teamId, challengeId);
         await db.SaveChangesAsync();
@@ -261,7 +276,7 @@ public class AwdCheckerServiceTests
         await using var db = CreateDb(competitionId);
 
         SeedCompetition(db, competitionId);
-        var teamId = Guid.NewGuid();
+        var teamId = SeedTeam(db, competitionId);
         var challengeId = SeedChallengeWithChecker(db, competitionId);
         SeedGameBox(db, competitionId, teamId, challengeId);
         await db.SaveChangesAsync();

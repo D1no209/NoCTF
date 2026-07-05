@@ -83,22 +83,22 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
             remainingSeconds = Math.Max(0, roundDuration - elapsed);
         }
 
-        // Service statuses: for each GameBox, find latest CheckResult for current round
-        var gameBoxes = await dbContext.AwdGameBoxes
-            .IgnoreQueryFilters()
-            .Where(gb => gb.CompetitionId == req.Id)
-            .ToListAsync(ct);
-
-        var teamIds = gameBoxes.Select(gb => gb.TeamId).Distinct().ToList();
-        var challengeIds = gameBoxes.Select(gb => gb.ChallengeId).Distinct().ToList();
-
         var teams = await dbContext.Teams
             .IgnoreQueryFilters()
             .Where(t =>
-                teamIds.Contains(t.Id) &&
+                t.CompetitionId == req.Id &&
                 t.RegistrationStatus == TeamRegistrationStatus.Approved &&
                 !t.IsBanned)
             .ToDictionaryAsync(t => t.Id, t => t.Name, ct);
+        var activeTeamIds = teams.Keys.ToHashSet();
+
+        // Service statuses: for each active GameBox, find latest CheckResult for current round
+        var gameBoxes = await dbContext.AwdGameBoxes
+            .IgnoreQueryFilters()
+            .Where(gb => gb.CompetitionId == req.Id && activeTeamIds.Contains(gb.TeamId))
+            .ToListAsync(ct);
+
+        var challengeIds = gameBoxes.Select(gb => gb.ChallengeId).Distinct().ToList();
 
         var challenges = await dbContext.Challenges
             .IgnoreQueryFilters()
@@ -109,7 +109,10 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
         var checkResults = roundNumber > 0
             ? await dbContext.AwdCheckResults
                 .IgnoreQueryFilters()
-                .Where(cr => cr.CompetitionId == req.Id && cr.RoundNumber == roundNumber)
+                .Where(cr =>
+                    cr.CompetitionId == req.Id &&
+                    cr.RoundNumber == roundNumber &&
+                    activeTeamIds.Contains(cr.TeamId))
                 .ToListAsync(ct)
             : [];
 

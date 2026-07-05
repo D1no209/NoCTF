@@ -68,16 +68,13 @@ public class AwdFlagServiceTests
     }
 
     [Fact]
-    public void ComputeFlag_NullSecret_UsesDefaultAndIsDeterministic()
+    public void ComputeFlag_NullSecret_Throws()
     {
         var teamId = Guid.NewGuid();
         var challengeId = Guid.NewGuid();
 
-        var flag1 = AwdFlagService.ComputeFlag(teamId, challengeId, 1, null);
-        var flag2 = AwdFlagService.ComputeFlag(teamId, challengeId, 1, null);
-
-        Assert.Equal(flag1, flag2);
-        Assert.NotEmpty(flag1);
+        Assert.Throws<InvalidOperationException>(() =>
+            AwdFlagService.ComputeFlag(teamId, challengeId, 1, null));
     }
 
     // ── DB-level GenerateFlagsAsync tests ─────────────────────────────────────
@@ -208,6 +205,7 @@ public class AwdFlagServiceTests
             CompetitionId = competitionId,
             Name = "Team " + teamId.ToString("N")[..6],
             CaptainId = Guid.NewGuid(),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
             CreatedAt = DateTime.UtcNow
         });
     }

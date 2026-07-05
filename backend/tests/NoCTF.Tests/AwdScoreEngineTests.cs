@@ -73,6 +73,7 @@ public class AwdScoreEngineTests
             CompetitionId = competitionId,
             Name = name,
             CaptainId = Guid.NewGuid(),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
             CreatedAt = DateTime.UtcNow
         });
         return id;
@@ -373,6 +374,30 @@ public class AwdScoreEngineTests
         var result = await gameMode.ProcessSubmissionAsync(ctx);
 
         Assert.Equal(SubmissionResult.WrongFlag, result);
+    }
+
+    [Fact]
+    public async Task ProcessSubmissionAsync_FutureRoundFlag_Rejected()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+
+        SeedCompetition(db, competitionId);
+        var attackerTeamId = SeedTeam(db, competitionId, "Attacker");
+        var victimTeamId = SeedTeam(db, competitionId, "Victim");
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedRound(db, competitionId, roundNumber: 1);
+        const string futureFlag = "flag{future-round}";
+        SeedFlag(db, competitionId, victimTeamId, challengeId, round: 2, futureFlag);
+        await db.SaveChangesAsync();
+
+        var gameMode = CreateGameMode(db);
+        var ctx = new SubmissionContext(competitionId, attackerTeamId, challengeId, Guid.NewGuid(), futureFlag, "127.0.0.1");
+        var result = await gameMode.ProcessSubmissionAsync(ctx);
+
+        Assert.Equal(SubmissionResult.WrongFlag, result);
+        Assert.Empty(await db.AwdAttackRecords.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreEvents.IgnoreQueryFilters().ToListAsync());
     }
 
     [Fact]

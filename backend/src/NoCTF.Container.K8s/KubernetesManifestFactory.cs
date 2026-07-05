@@ -44,7 +44,13 @@ public static class KubernetesManifestFactory
                 {
                     ["limits.cpu"] = new(options.NamespaceCpuLimit),
                     ["limits.memory"] = new(options.NamespaceMemoryLimit),
-                    ["pods"] = new(options.NamespacePodLimit)
+                    ["limits.ephemeral-storage"] = new(options.EphemeralStorageLimit),
+                    ["requests.ephemeral-storage"] = new(options.EphemeralStorageLimit),
+                    ["pods"] = new(options.NamespacePodLimit),
+                    ["services"] = new("8"),
+                    ["secrets"] = new("16"),
+                    ["configmaps"] = new("16"),
+                    ["services.nodeports"] = new("4")
                 }
             }
         };

@@ -162,6 +162,70 @@ public class AwdpScoreEngineTests
         });
     }
 
+    [Fact]
+    public async Task CalculateRoundScoreAsync_DecayCountsOnlyRoundEffectiveSuccesses()
+    {
+        var competitionId = Guid.NewGuid();
+        var roundStart = DateTime.UtcNow;
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var earlyTeamId = SeedTeam(db, competitionId);
+        var lateTeamId = SeedTeam(db, competitionId);
+        var challengeId = SeedChallenge(
+            db,
+            competitionId,
+            attackScore: 100,
+            defenseScore: 80,
+            pointsConfig: new PointsConfig(InitialPoints: 500, MinimumPoints: 10, DecayFactor: 1, DecayFunction: "linear"));
+        SeedRound(db, competitionId, 1, roundStart);
+
+        db.AwdpTeamChallengeStates.AddRange(
+            new AwdpTeamChallengeState
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = earlyTeamId,
+                ChallengeId = challengeId,
+                BreakStatus = AwdpBreakStatus.BreakSuccess,
+                FixStatus = AwdpFixStatus.FixSuccess,
+                BreakSucceededAt = roundStart.AddSeconds(-1),
+                FixSucceededAt = roundStart.AddSeconds(-1),
+                CreatedAt = roundStart.AddMinutes(-1),
+                UpdatedAt = roundStart.AddSeconds(-1)
+            },
+            new AwdpTeamChallengeState
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = lateTeamId,
+                ChallengeId = challengeId,
+                BreakStatus = AwdpBreakStatus.BreakSuccess,
+                FixStatus = AwdpFixStatus.FixSuccess,
+                BreakSucceededAt = roundStart.AddSeconds(30),
+                FixSucceededAt = roundStart.AddSeconds(30),
+                CreatedAt = roundStart,
+                UpdatedAt = roundStart.AddSeconds(30)
+            });
+        await db.SaveChangesAsync();
+
+        var engine = CreateEngine(db);
+        await engine.CalculateRoundScoreAsync(competitionId, 1);
+
+        var earlyScore = await db.AwdpRoundScores
+            .IgnoreQueryFilters()
+            .SingleAsync(s => s.TeamId == earlyTeamId);
+        var lateScore = await db.AwdpRoundScores
+            .IgnoreQueryFilters()
+            .SingleAsync(s => s.TeamId == lateTeamId);
+
+        Assert.Equal(100, earlyScore.AttackScoreDelta);
+        Assert.Equal(80, earlyScore.DefenseScoreDelta);
+        Assert.Equal(180, earlyScore.RoundScoreDelta);
+        Assert.Equal(0, lateScore.RoundScoreDelta);
+        Assert.Contains("break_success_next_round", lateScore.Reason);
+        Assert.Contains("fix_success_next_round", lateScore.Reason);
+    }
+
     private static void SeedCompetition(
         ApplicationDbContext db,
         Guid competitionId)

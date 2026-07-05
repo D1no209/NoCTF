@@ -12,6 +12,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Regex ServiceNamePattern = new("^[A-Za-z0-9_-]+$", RegexOptions.Compiled);
+    private static readonly Regex EnvironmentKeyPattern = new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
     private static readonly string[] ForbiddenTokens =
     [
         "privileged:",
@@ -475,6 +476,7 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 throw new InvalidOperationException("forbidden_container_directive");
             if (!node.IsEntry && JsonOrDefault(node.Ports, "[]").Contains(':', StringComparison.Ordinal))
                 throw new InvalidOperationException("internal_node_cannot_publish_ports");
+            ValidateEnvironmentKeys(JsonOrDefault(node.Environment, "{}"));
         }
 
         var stages = new HashSet<int>();
@@ -491,6 +493,8 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 throw new InvalidOperationException("file_injection_not_supported");
             if (flag.IsDynamic && string.IsNullOrWhiteSpace(flag.InjectionKey))
                 throw new InvalidOperationException("dynamic_flag_injection_key_required");
+            if (flag.IsDynamic && !EnvironmentKeyPattern.IsMatch(flag.InjectionKey!.Trim()))
+                throw new InvalidOperationException("invalid_dynamic_flag_injection_key");
             if (!flag.IsDynamic)
             {
                 if (string.IsNullOrWhiteSpace(flag.ValueSecret) && flag.Id is null)
@@ -498,6 +502,19 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 if (!string.IsNullOrWhiteSpace(flag.ValueSecret) && !staticSecrets.Add(flag.ValueSecret.Trim()))
                     throw new InvalidOperationException("duplicate_static_flag_secret");
             }
+        }
+    }
+
+    private static void ValidateEnvironmentKeys(string environmentJson)
+    {
+        using var document = JsonDocument.Parse(environmentJson);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("node_environment_must_be_object");
+
+        foreach (var property in document.RootElement.EnumerateObject())
+        {
+            if (!EnvironmentKeyPattern.IsMatch(property.Name))
+                throw new InvalidOperationException("invalid_environment_key");
         }
     }
 

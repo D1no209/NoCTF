@@ -255,13 +255,25 @@ public class RoundAccumulationScoringStrategy(ApplicationDbContext db, IScoreEve
     {
         if (signal.SignalType == ScoreSignalTypes.AttackAccepted)
         {
-            return await db.AwdAttackRecords
+            var attacks = db.AwdAttackRecords
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(a =>
                     a.CompetitionId == signal.CompetitionId &&
-                    a.ChallengeId == challengeId)
-                .Select(a => a.AttackerTeamId)
+                    a.ChallengeId == challengeId);
+
+            if (signal.RoundNumber.HasValue)
+                attacks = attacks.Where(a => a.RoundNumber == signal.RoundNumber.Value);
+
+            return await attacks
+                .Join(
+                    db.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
+                        t.CompetitionId == signal.CompetitionId &&
+                        t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                        !t.IsBanned),
+                    a => a.AttackerTeamId,
+                    t => t.Id,
+                    (a, _) => a.AttackerTeamId)
                 .Distinct()
                 .CountAsync(ct);
         }
@@ -276,7 +288,14 @@ public class RoundAccumulationScoringStrategy(ApplicationDbContext db, IScoreEve
                     r.ChallengeId == challengeId &&
                     r.RoundNumber == signal.RoundNumber.Value &&
                     r.Status == AwdCheckStatus.Healthy)
-                .Select(r => r.TeamId)
+                .Join(
+                    db.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
+                        t.CompetitionId == signal.CompetitionId &&
+                        t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                        !t.IsBanned),
+                    r => r.TeamId,
+                    t => t.Id,
+                    (r, _) => r.TeamId)
                 .Distinct()
                 .CountAsync(ct);
         }

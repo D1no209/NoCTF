@@ -372,22 +372,26 @@ function competitionPayload() {
     serviceDownPenalty: optionalNumber(competitionForm.serviceDownPenalty),
     beenAttackedPenalty: optionalNumber(competitionForm.beenAttackedPenalty),
     flagValidityRounds: optionalNumber(competitionForm.flagValidityRounds),
-    awdpAttackScorePerRound: undefined,
-    awdpDefenseScorePerRound: undefined,
-    awdpMaxAttackAttempts: undefined,
-    awdpMaxDefenseAttempts: undefined,
+    awdpAttackScorePerRound: optionalNumber(competitionForm.awdpAttackScorePerRound),
+    awdpDefenseScorePerRound: optionalNumber(competitionForm.awdpDefenseScorePerRound),
+    awdpMaxAttackAttempts: optionalNumber(competitionForm.awdpMaxAttackAttempts),
+    awdpMaxDefenseAttempts: optionalNumber(competitionForm.awdpMaxDefenseAttempts),
     awdpAllowAttackAfterBreakSuccess: competitionForm.awdpAllowAttackAfterBreakSuccess,
     awdpAllowDefenseAfterFixSuccess: competitionForm.awdpAllowDefenseAfterFixSuccess,
     awdpServicePenaltyEnabled: competitionForm.awdpServicePenaltyEnabled,
     awdpServicePenaltyPerRound: optionalNumber(competitionForm.awdpServicePenaltyPerRound),
     awdpViolationPenaltyEnabled: competitionForm.awdpViolationPenaltyEnabled,
     awdpViolationPenalty: optionalNumber(competitionForm.awdpViolationPenalty),
-    awdpFixEntry: undefined,
-    awdpFixTimeoutSeconds: undefined,
+    awdpFixEntry: competitionForm.awdpFixEntry.trim() || undefined,
+    awdpFixTimeoutSeconds: optionalNumber(competitionForm.awdpFixTimeoutSeconds),
   }
 }
 
-const { data: competition, isLoading: loadingCompetition } = useQuery({
+const {
+  data: competition,
+  isLoading: loadingCompetition,
+  isError: competitionLoadError,
+} = useQuery({
   queryKey: computed(() => queryKeys.adminCompetition(competitionId.value)),
   queryFn: () => adminApi.competition<CompetitionDto>(competitionId.value),
 })
@@ -1076,7 +1080,7 @@ function sectionRoute(section: CompetitionDetailSection) {
     </div>
 
     <nav
-      v-if="!loadingCompetition"
+      v-if="!loadingCompetition && !competitionLoadError"
       class="noctf-top-tabs"
       :aria-label="t('admin.competitionDetail.detailNavigation')"
     >
@@ -1098,6 +1102,9 @@ function sectionRoute(section: CompetitionDetailSection) {
     <div v-if="loadingCompetition" class="noctf-state-box text-muted-foreground">
       <Loader2 class="mr-2 inline size-4 animate-spin" />
       {{ t('admin.competitionDetail.loadingCompetition') }}
+    </div>
+    <div v-else-if="competitionLoadError" class="noctf-state-box text-muted-foreground">
+      {{ t('errors.loadFailed') }}
     </div>
 
     <div

@@ -1,9 +1,11 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace NoCTF.Infrastructure.Migrations
 {
+    [DbContext(typeof(ApplicationDbContext))]
     [Migration("20260704120000_AddOrchestrationAndKubernetesSupport")]
     public partial class AddOrchestrationAndKubernetesSupport : Migration
     {

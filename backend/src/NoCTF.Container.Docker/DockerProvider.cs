@@ -57,17 +57,19 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
             NetworkingConfig = BuildNetworkingConfig(networkName, networkedConfig.NetworkAliases)
         };
 
+        string? containerId = null;
         try
         {
             await EnsureImageAsync(networkedConfig.Image, cancellationToken);
 
             var createResponse = await _client.Containers.CreateContainerAsync(createParams, cancellationToken);
-            await _client.Containers.StartContainerAsync(createResponse.ID, null, cancellationToken);
+            containerId = createResponse.ID;
+            await _client.Containers.StartContainerAsync(containerId, null, cancellationToken);
 
-            var inspect = await _client.Containers.InspectContainerAsync(createResponse.ID, cancellationToken);
+            var inspect = await _client.Containers.InspectContainerAsync(containerId, cancellationToken);
 
             return new DockerContainerMetadata(
-                ContainerId: createResponse.ID,
+                ContainerId: containerId,
                 Image: networkedConfig.Image,
                 Status: inspect.State.Status,
                 Ports: ReadPublishedPorts(inspect),
@@ -76,6 +78,8 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
         }
         catch
         {
+            if (!string.IsNullOrWhiteSpace(containerId))
+                await RemoveContainerBestEffortAsync(containerId, cancellationToken);
             if (ownsNetwork)
                 await RemoveNetworkBestEffortAsync(networkName, cancellationToken);
             throw;
@@ -180,6 +184,21 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
         catch
         {
             // Network cleanup should not make container destroy non-idempotent.
+        }
+    }
+
+    private async Task RemoveContainerBestEffortAsync(string containerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _client.Containers.RemoveContainerAsync(
+                containerId,
+                new ContainerRemoveParameters { Force = true },
+                cancellationToken);
+        }
+        catch
+        {
+            // The create path is already failing; best-effort cleanup must not hide the original error.
         }
     }
 }

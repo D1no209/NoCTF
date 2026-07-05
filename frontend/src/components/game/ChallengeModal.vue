@@ -415,8 +415,12 @@ async function extendInstance() {
 
 async function copyInstanceAccess() {
   if (!instanceAccess.value.text) return
-  await navigator.clipboard.writeText(instanceAccess.value.text)
-  toast.success(t('challenges.addressCopied'))
+  try {
+    await navigator.clipboard.writeText(instanceAccess.value.text)
+    toast.success(t('challenges.addressCopied'))
+  } catch {
+    toast.error(t('common.copyFailed'))
+  }
 }
 
 function onPatchFileChange(e: Event) {

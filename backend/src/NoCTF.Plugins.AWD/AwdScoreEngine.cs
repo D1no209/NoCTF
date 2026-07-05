@@ -27,7 +27,10 @@ public class AwdScoreEngine(
 
         var teams = await db.Teams
             .IgnoreQueryFilters()
-            .Where(t => t.CompetitionId == competitionId)
+            .Where(t =>
+                t.CompetitionId == competitionId &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned)
             .ToListAsync(ct);
 
         var challenges = await db.Challenges

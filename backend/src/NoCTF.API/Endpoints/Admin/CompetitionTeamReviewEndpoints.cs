@@ -3,6 +3,8 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API;
 using NoCTF.API.Permissions;
+using NoCTF.Application;
+using NoCTF.Application.Leaderboard;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -65,7 +67,12 @@ public class GetCompetitionTeamsAdminEndpoint(ApplicationDbContext dbContext, IC
     }
 }
 
-public class ApproveCompetitionTeamEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions)
+public class ApproveCompetitionTeamEndpoint(
+    ApplicationDbContext dbContext,
+    ICompetitionPermissionService permissions,
+    ILeaderboardService leaderboardService,
+    IRedisLeaderboardCache leaderboardCache,
+    IHubNotifierService hubNotifier)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -107,6 +114,12 @@ public class ApproveCompetitionTeamEndpoint(ApplicationDbContext dbContext, ICom
             teamId: team.Id,
             userId: team.ApprovedById);
         await dbContext.SaveChangesAsync(ct);
+        await TeamReviewLeaderboardRefresh.RefreshAsync(
+            competitionId,
+            leaderboardService,
+            leaderboardCache,
+            hubNotifier,
+            ct);
         await SendAsync(await ToDto(team.Id, dbContext, ct), cancellation: ct);
     }
 
@@ -134,7 +147,12 @@ public class ApproveCompetitionTeamEndpoint(ApplicationDbContext dbContext, ICom
             .FirstAsync(ct);
 }
 
-public class RejectCompetitionTeamEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions)
+public class RejectCompetitionTeamEndpoint(
+    ApplicationDbContext dbContext,
+    ICompetitionPermissionService permissions,
+    ILeaderboardService leaderboardService,
+    IRedisLeaderboardCache leaderboardCache,
+    IHubNotifierService hubNotifier)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -174,7 +192,36 @@ public class RejectCompetitionTeamEndpoint(ApplicationDbContext dbContext, IComp
             $"Team {team.Name} was rejected.",
             teamId: team.Id);
         await dbContext.SaveChangesAsync(ct);
+        await TeamReviewLeaderboardRefresh.RefreshAsync(
+            competitionId,
+            leaderboardService,
+            leaderboardCache,
+            hubNotifier,
+            ct);
         await SendAsync(await ApproveCompetitionTeamEndpoint.ToDto(team.Id, dbContext, ct), cancellation: ct);
+    }
+}
+
+internal static class TeamReviewLeaderboardRefresh
+{
+    public static async Task RefreshAsync(
+        Guid competitionId,
+        ILeaderboardService leaderboardService,
+        IRedisLeaderboardCache leaderboardCache,
+        IHubNotifierService hubNotifier,
+        CancellationToken ct)
+    {
+        var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
+        await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+        await hubNotifier.NotifyLeaderboardSnapshotAsync(
+            competitionId,
+            entries.Select(e => new LeaderboardEntryPayload(
+                e.Rank,
+                e.TeamId,
+                e.TeamName,
+                e.TotalScore,
+                e.SolvedCount)),
+            ct);
     }
 }
 

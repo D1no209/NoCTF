@@ -48,7 +48,7 @@ export function apiUrl(path: string) {
 
 export function setAuthToken(token: string | null) {
   client.setConfig({
-    headers: { Authorization: token ? `Bearer ${token}` : '' },
+    headers: { Authorization: token ? `Bearer ${token}` : null },
   })
 }
 
@@ -437,9 +437,12 @@ export const adminApi = {
       'Failed to delete competition',
     )
   },
-  async users<T = unknown[]>() {
+  async users<T = unknown[]>(query?: { q?: string; limit?: number }) {
     return unwrap(
-      await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/users' }),
+      await client.get<{ 200: T }, unknown, false>({
+        url: '/api/admin/users',
+        query,
+      }),
       'Failed to load users',
     )
   },
@@ -825,7 +828,10 @@ export const adminApi = {
     )
   },
   async health<T = unknown>() {
-    const response = await fetch(apiUrl('/api/health'))
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 12000)
+    const response = await fetch(apiUrl('/api/health'), { signal: controller.signal })
+      .finally(() => window.clearTimeout(timeout))
     const data = await response.json().catch(() => undefined)
     if (!response.ok && !data) {
       throw new ApiError('Failed to load health', response.status)
