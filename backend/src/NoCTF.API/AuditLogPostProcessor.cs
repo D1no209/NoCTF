@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using FastEndpoints;
 using NoCTF.Infrastructure;
 
@@ -8,11 +7,6 @@ namespace NoCTF.API;
 
 public class AuditLogPostProcessor : IGlobalPostProcessor
 {
-    private static readonly HashSet<string> SensitiveKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "password", "token", "secret", "flag", "jwt"
-    };
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -54,7 +48,7 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
             if (ctx.Request is not null)
             {
                 var reqJson = JsonSerializer.Serialize(ctx.Request, ctx.Request.GetType(), JsonOptions);
-                newValues = RedactSensitiveFields(reqJson);
+                newValues = AuditValueRedactor.RedactJson(reqJson);
                 (entityType, entityId) = ExtractEntityInfo(ctx.Request);
             }
         }
@@ -100,44 +94,6 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
         }
     }
 
-    private static string RedactSensitiveFields(string json)
-    {
-        try
-        {
-            var node = JsonNode.Parse(json);
-            if (node is JsonObject obj)
-            {
-                RedactObject(obj);
-                return obj.ToJsonString();
-            }
-            return json;
-        }
-        catch
-        {
-            return json;
-        }
-    }
-
-    private static void RedactObject(JsonObject obj)
-    {
-        var keys = obj.Select(kv => kv.Key).ToList();
-        foreach (var key in keys)
-        {
-            if (SensitiveKeys.Any(sensitive => key.Contains(sensitive, StringComparison.OrdinalIgnoreCase)))
-            {
-                obj[key] = JsonValue.Create("[REDACTED]");
-            }
-            else if (obj[key] is JsonObject nested)
-            {
-                RedactObject(nested);
-            }
-            else if (obj[key] is JsonArray arr)
-            {
-                RedactArray(arr);
-            }
-        }
-    }
-
     private static readonly (string Suffix, string EntityName)[] EntityPropertyMap =
     [
         ("CompetitionId", "Competition"),
@@ -164,14 +120,5 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
         }
         catch { /* best-effort */ }
         return (null, null);
-    }
-
-    private static void RedactArray(JsonArray arr)
-    {
-        foreach (var item in arr)
-        {
-            if (item is JsonObject obj)
-                RedactObject(obj);
-        }
     }
 }

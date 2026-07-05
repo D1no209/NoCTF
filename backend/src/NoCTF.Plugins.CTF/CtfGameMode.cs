@@ -21,6 +21,7 @@ public class CtfGameMode : IGameMode
     private readonly ApplicationDbContext _db;
     private readonly ISubmissionEventHandler _submissionEventHandler;
     private readonly IScoreSignalEmitter _scoreSignalEmitter;
+    private readonly ICtfScoreRebuilder _scoreRebuilder;
     private readonly IChallengeSubmissionHandlerRegistry _challengeSubmissionHandlers;
 
     public GameModeType Type => GameModeType.Ctf;
@@ -29,11 +30,13 @@ public class CtfGameMode : IGameMode
         ApplicationDbContext db,
         ISubmissionEventHandler submissionEventHandler,
         IScoreSignalEmitter scoreSignalEmitter,
+        ICtfScoreRebuilder scoreRebuilder,
         IChallengeSubmissionHandlerRegistry challengeSubmissionHandlers)
     {
         _db = db;
         _submissionEventHandler = submissionEventHandler;
         _scoreSignalEmitter = scoreSignalEmitter;
+        _scoreRebuilder = scoreRebuilder;
         _challengeSubmissionHandlers = challengeSubmissionHandlers;
     }
 
@@ -212,6 +215,7 @@ public class CtfGameMode : IGameMode
             OccurredAt: submission.SubmittedAt), cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
+        await _scoreRebuilder.RebuildChallengeAsync(context.CompetitionId, context.ChallengeId, cancellationToken);
 
         // Load team name for notification
         var team = await _db.Teams

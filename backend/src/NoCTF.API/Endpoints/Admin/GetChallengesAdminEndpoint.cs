@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -87,7 +88,7 @@ public class ChallengeHintDto
 
 public static class ChallengeAdminMapping
 {
-    public static ChallengeTemplateAdminDto ToTemplateDto(ChallengeTemplate challenge) => new()
+    public static ChallengeTemplateAdminDto ToTemplateDto(ChallengeTemplate challenge, bool includeSensitive = true) => new()
     {
         Id = challenge.Id,
         Title = challenge.Title,
@@ -95,9 +96,9 @@ public static class ChallengeAdminMapping
         TypeId = challenge.TypeId,
         ContainerImage = challenge.ContainerImage,
         ContainerMode = challenge.ContainerMode,
-        ComposeYaml = challenge.ComposeYaml,
-        ComposeProjectName = challenge.ComposeProjectName,
-        OrchestrationJson = string.IsNullOrWhiteSpace(challenge.OrchestrationJson)
+        ComposeYaml = includeSensitive ? challenge.ComposeYaml : null,
+        ComposeProjectName = includeSensitive ? challenge.ComposeProjectName : null,
+        OrchestrationJson = !includeSensitive || string.IsNullOrWhiteSpace(challenge.OrchestrationJson)
             ? "{}"
             : challenge.OrchestrationJson,
         AttachmentUrl = challenge.AttachmentUrl,
@@ -107,7 +108,7 @@ public static class ChallengeAdminMapping
         FlagEnvironmentVariable = string.IsNullOrWhiteSpace(challenge.FlagEnvironmentVariable)
             ? "NOCTF_FLAG_UUID"
             : challenge.FlagEnvironmentVariable,
-        CheckerConfig = challenge.CheckerConfig is null ? null : new CheckerConfigDto
+        CheckerConfig = !includeSensitive || challenge.CheckerConfig is null ? null : new CheckerConfigDto
         {
             Image = challenge.CheckerConfig.Image,
             Command = challenge.CheckerConfig.Command,
@@ -115,7 +116,7 @@ public static class ChallengeAdminMapping
             ExpImage = challenge.CheckerConfig.ExpImage,
             ExpCommand = challenge.CheckerConfig.ExpCommand,
         },
-        PenetrationConfigJson = string.IsNullOrWhiteSpace(challenge.PenetrationConfigJson)
+        PenetrationConfigJson = !includeSensitive || string.IsNullOrWhiteSpace(challenge.PenetrationConfigJson)
             ? "{}"
             : challenge.PenetrationConfigJson,
         CreatedAt = challenge.CreatedAt,
@@ -199,6 +200,11 @@ public class GetChallengesAdminEndpoint(ApplicationDbContext db) : Endpoint<Empt
             .OrderBy(c => c.Title)
             .ToListAsync(ct);
 
-        await SendAsync(challenges.Select(ChallengeAdminMapping.ToTemplateDto).ToList(), cancellation: ct);
+        var includeSensitive = User.IsInRole(UserRole.Admin.ToString()) ||
+                               string.Equals(
+                                   User.FindFirst(ClaimTypes.Role)?.Value,
+                                   UserRole.Admin.ToString(),
+                                   StringComparison.OrdinalIgnoreCase);
+        await SendAsync(challenges.Select(c => ChallengeAdminMapping.ToTemplateDto(c, includeSensitive)).ToList(), cancellation: ct);
     }
 }

@@ -6,6 +6,7 @@ using NoCTF.API.Permissions;
 using NoCTF.Application;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -243,7 +244,10 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChalleng
             .ToList();
 }
 
-public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
+public class UpdateCompetitionChallengeEndpoint(
+    ApplicationDbContext db,
+    ICompetitionPermissionService permissions,
+    ICtfScoreRebuilder ctfScoreRebuilder)
     : Endpoint<UpdateCompetitionChallengeRequest, CompetitionChallengeAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -319,6 +323,7 @@ public class UpdateCompetitionChallengeEndpoint(ApplicationDbContext db, ICompet
         db.ChallengeHints.AddRange(hints);
 
         await db.SaveChangesAsync(ct);
+        await ctfScoreRebuilder.RebuildChallengeAsync(competitionId, challengeId, ct);
         await SendAsync(ChallengeAdminMapping.ToCompetitionDto(challenge, hints), cancellation: ct);
     }
 }

@@ -26,7 +26,6 @@ public class AwdpPatchService(
     ILogger<AwdpPatchService> logger) : IAwdpPatchService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private const string HostGatewayLabel = "noctf.host-gateway";
 
     public async Task<AwdpPatchSubmitResult> SubmitPatchAsync(
         Guid competitionId,
@@ -174,13 +173,11 @@ public class AwdpPatchService(
 
         var storagePath = $"patches/{competitionId}/{teamId}/{challengeId}/{Guid.NewGuid():N}{GetArchiveExtension(fileName)}";
         var storageKey = await storageProvider.UploadAsync(storagePath, patchArchive, GetContentType(fileName), ct);
-        var url = ResolveDownloadUrl(await storageProvider.GetUrlAsync(storageKey, ct));
-
         var submission = CreateSubmission(
             competitionId,
             teamId,
             challengeId,
-            url,
+            storageKey,
             AwdpPatchStatus.Pending,
             AwdpFixStatus.FixUploading,
             attemptNumber,
@@ -238,6 +235,7 @@ public class AwdpPatchService(
             return;
         }
 
+        await using var stateLock = await AwdpPatchStateLock.AcquireAsync(db, submission.TeamId, submission.ChallengeId, ct);
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .FirstAsync(c => c.Id == submission.ChallengeId && c.CompetitionId == submission.CompetitionId, ct);
@@ -254,29 +252,42 @@ public class AwdpPatchService(
                 g.TeamId == submission.TeamId &&
                 g.ChallengeId == submission.ChallengeId, ct);
 
-        if (string.IsNullOrWhiteSpace(challenge.ContainerImage))
+        async Task CompleteAndCommitAsync(
+            AwdpPatchStatus patchStatus,
+            AwdpFixStatus fixStatus,
+            AwdpServiceStatus serviceStatus,
+            string detail,
+            bool preserveSuccessfulState = false)
         {
             await CompleteValidationAsync(
                 submission,
                 state,
+                patchStatus,
+                fixStatus,
+                serviceStatus,
+                detail,
+                ct,
+                preserveSuccessfulState);
+            await stateLock.CommitAsync(ct);
+        }
+
+        if (string.IsNullOrWhiteSpace(challenge.ContainerImage))
+        {
+            await CompleteAndCommitAsync(
                 AwdpPatchStatus.Rejected,
                 AwdpFixStatus.AuditFailed,
                 AwdpServiceStatus.ServiceUnknown,
-                "Challenge has no container image.",
-                ct);
+                "Challenge has no container image.");
             return;
         }
 
         if (gameBox?.ContainerInstanceId is null)
         {
-            await CompleteValidationAsync(
-                submission,
-                state,
+            await CompleteAndCommitAsync(
                 AwdpPatchStatus.Rejected,
                 AwdpFixStatus.FixServiceError,
                 AwdpServiceStatus.ServiceError,
-                "Instance is not running.",
-                ct);
+                "Instance is not running.");
             return;
         }
 
@@ -289,14 +300,11 @@ public class AwdpPatchService(
         var sandboxResult = await RunFixScriptAsync(challenge, submission, config, ct);
         if (sandboxResult.Status is AwdpFixStatus.FixTimeout or AwdpFixStatus.FixScriptError)
         {
-            await CompleteValidationAsync(
-                submission,
-                state,
+            await CompleteAndCommitAsync(
                 AwdpPatchStatus.Rejected,
                 sandboxResult.Status,
                 AwdpServiceStatus.ServiceUnknown,
-                sandboxResult.Detail,
-                ct);
+                sandboxResult.Detail);
             return;
         }
 
@@ -318,14 +326,11 @@ public class AwdpPatchService(
             {
                 logger.LogWarning(ex, "Failed to destroy old AWDP container {ContainerId}; rejecting patch to preserve tracked instance.", oldInstance.ContainerId);
                 await DestroyContainerBestEffortAsync(patchedContainer);
-                await CompleteValidationAsync(
-                    submission,
-                    state,
+                await CompleteAndCommitAsync(
                     AwdpPatchStatus.Rejected,
                     AwdpFixStatus.FixServiceError,
                     AwdpServiceStatus.ServiceError,
-                    "Failed to replace the running container safely.",
-                    ct);
+                    "Failed to replace the running container safely.");
                 return;
             }
         }
@@ -346,26 +351,21 @@ public class AwdpPatchService(
         var checkResult = await RunCheckAsync(challenge, submission, gameBox, ct);
         if (checkResult.FixStatus != AwdpFixStatus.FixSuccess)
         {
-            await RollbackAsync(challenge, gameBox, patchedContainer, submission, ct);
-            await CompleteValidationAsync(
-                submission,
-                state,
+            var restoredPreviousSuccess = await RollbackAsync(challenge, gameBox, patchedContainer, submission, ct);
+            await CompleteAndCommitAsync(
                 AwdpPatchStatus.Rejected,
                 checkResult.FixStatus,
                 checkResult.ServiceStatus,
                 checkResult.Detail,
-                ct);
+                preserveSuccessfulState: restoredPreviousSuccess);
             return;
         }
 
-        await CompleteValidationAsync(
-            submission,
-            state,
+        await CompleteAndCommitAsync(
             AwdpPatchStatus.Verified,
             AwdpFixStatus.FixSuccess,
             AwdpServiceStatus.ServiceOk,
-            checkResult.Detail,
-            ct);
+            checkResult.Detail);
 
         logger.LogInformation(
             "AWDP FixScript verified: submission={SubmissionId} team={TeamId} challenge={ChallengeId}; round scoring will award defense points.",
@@ -378,13 +378,13 @@ public class AwdpPatchService(
         AwdpChallengeConfig config,
         CancellationToken ct)
     {
-        var env = BuildPatchEnvironment(submission);
+        var env = await BuildPatchEnvironmentAsync(submission, ct);
         var timeout = TimeSpan.FromSeconds(config.FixTimeoutSeconds);
         var sandboxConfig = new ContainerConfig(
             Image: challenge.ContainerImage!,
             Command: BuildFixScriptCommand(),
             EnvironmentVariables: env,
-            Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId, allowHostGateway: true),
+            Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
             NetworkName: ResolveUtilityNetwork(),
             Ttl: timeout,
             Entrypoint: ["/bin/sh", "-c"],
@@ -449,7 +449,7 @@ public class AwdpPatchService(
         var environment = BuildChallengeEnvironment(challenge);
         if (patch is not null)
         {
-            foreach (var (key, value) in BuildPatchEnvironment(patch))
+            foreach (var (key, value) in await BuildPatchEnvironmentAsync(patch, ct))
                 environment[key] = value;
         }
 
@@ -484,9 +484,9 @@ public class AwdpPatchService(
         if (challenge.CheckerConfig?.Image is null)
         {
             return new CheckOutcome(
-                AwdpFixStatus.FixSuccess,
-                AwdpServiceStatus.ServiceOk,
-                "No check container configured; FixScript accepted.");
+                AwdpFixStatus.FixRuleViolation,
+                AwdpServiceStatus.ServiceError,
+                "AWDP check container is required before a FixScript can be verified.");
         }
 
         var timeout = TimeSpan.FromSeconds(challenge.CheckerConfig.TimeoutSeconds ?? 30);
@@ -494,7 +494,7 @@ public class AwdpPatchService(
             Image: challenge.CheckerConfig.Image,
             Command: challenge.CheckerConfig.Command,
             EnvironmentVariables: BuildCheckEnvironment(challenge, submission),
-            Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId, allowHostGateway: true),
+            Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
             NetworkName: gameBox.OrchestrationNamespace,
             Ttl: timeout);
 
@@ -544,7 +544,7 @@ public class AwdpPatchService(
         }
     }
 
-    private async Task RollbackAsync(
+    private async Task<bool> RollbackAsync(
         Challenge challenge,
         AwdGameBox gameBox,
         ContainerInstance patchedContainer,
@@ -573,6 +573,7 @@ public class AwdpPatchService(
             gameBox.LastInstanceActionAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
             await DestroyContainerBestEffortAsync(patchedContainer);
+            return previousPatch is not null;
         }
         catch (Exception ex)
         {
@@ -580,6 +581,7 @@ public class AwdpPatchService(
             await DestroyContainerBestEffortAsync(patchedContainer);
             ClearContainerMetadata(gameBox);
             await db.SaveChangesAsync(ct);
+            return false;
         }
     }
 
@@ -634,7 +636,8 @@ public class AwdpPatchService(
         AwdpFixStatus fixStatus,
         AwdpServiceStatus serviceStatus,
         string detail,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool preserveSuccessfulState = false)
     {
         var now = DateTime.UtcNow;
         submission.Status = patchStatus;
@@ -642,10 +645,19 @@ public class AwdpPatchService(
         submission.ValidatedAt = now;
         submission.ValidationDetail = detail;
 
-        state.FixStatus = fixStatus;
-        state.ServiceStatus = serviceStatus;
+        if (preserveSuccessfulState)
+        {
+            state.FixStatus = AwdpFixStatus.FixSuccess;
+            state.ServiceStatus = AwdpServiceStatus.ServiceOk;
+            state.LastValidationDetail = $"Latest FixScript rejected; previous verified FixScript restored. {detail}";
+        }
+        else
+        {
+            state.FixStatus = fixStatus;
+            state.ServiceStatus = serviceStatus;
+            state.LastValidationDetail = detail;
+        }
         state.FixSucceededAt = fixStatus == AwdpFixStatus.FixSuccess ? now : state.FixSucceededAt;
-        state.LastValidationDetail = detail;
         state.UpdatedAt = now;
 
         await db.SaveChangesAsync(ct);
@@ -677,13 +689,25 @@ public class AwdpPatchService(
             SubmittedAt = now
         };
 
-    private Dictionary<string, string> BuildPatchEnvironment(AwdpPatchSubmission submission)
-        => new()
+    private async Task<Dictionary<string, string>> BuildPatchEnvironmentAsync(
+        AwdpPatchSubmission submission,
+        CancellationToken ct)
+    {
+        var patchUrl = submission.PatchArchiveUrl;
+        if (!string.IsNullOrWhiteSpace(patchUrl) &&
+            !patchUrl.StartsWith("/", StringComparison.Ordinal) &&
+            !Uri.TryCreate(patchUrl, UriKind.Absolute, out _))
         {
-            ["PATCH_URL"] = ResolveDownloadUrl(submission.PatchArchiveUrl),
+            patchUrl = await storageProvider.GetUrlAsync(patchUrl, ct);
+        }
+
+        return new Dictionary<string, string>
+        {
+            ["PATCH_URL"] = ResolveDownloadUrl(patchUrl),
             ["PATCH_FILE_NAME"] = submission.FileName,
             ["FIX_ENTRY"] = submission.FixEntry
         };
+    }
 
     private static Dictionary<string, string> BuildProbeEnvironment(Challenge challenge, AwdpPatchSubmission submission)
         => new()
@@ -747,20 +771,13 @@ public class AwdpPatchService(
     private static Dictionary<string, string> BuildLabels(
         Guid competitionId,
         Guid teamId,
-        Guid challengeId,
-        bool allowHostGateway = false)
-    {
-        var labels = new Dictionary<string, string>
+        Guid challengeId)
+        => new()
         {
             ["competitionId"] = competitionId.ToString(),
             ["teamId"] = teamId.ToString(),
             ["challengeId"] = challengeId.ToString()
         };
-        if (allowHostGateway)
-            labels[HostGatewayLabel] = bool.TrueString;
-
-        return labels;
-    }
 
     private async Task<AwdpPatchSubmission?> FindPreviousSuccessfulPatchAsync(
         AwdpPatchSubmission rejectedSubmission,
@@ -832,9 +849,14 @@ public class AwdpPatchService(
     }
 
     private string? ResolveUtilityNetwork()
-        => FirstNonBlank(
+    {
+        if (!configuration.GetValue("Awdp:FixSandboxAllowUtilityNetwork", false))
+            return null;
+
+        return FirstNonBlank(
             configuration["Runner:UtilityNetwork"],
             configuration["Docker:UtilityNetwork"]);
+    }
 
     private static bool IsRunningInContainer()
         => string.Equals(

@@ -325,10 +325,17 @@ public class PenetrationInstanceMaintenanceService(
         return topology?.EntryConfigJson ?? "{}";
     }
 
-    private string ResolveAccessHost()
+    private string? ResolveAccessHost()
     {
         var configured = configuration["InstanceAccess:PublicHost"];
-        return string.IsNullOrWhiteSpace(configured) ? "127.0.0.1" : configured.Trim();
+        if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim();
+        if (Uri.TryCreate(configuration["App:PublicBaseUrl"], UriKind.Absolute, out var appBaseUrl) &&
+            !string.IsNullOrWhiteSpace(appBaseUrl.Host))
+            return appBaseUrl.Host;
+
+        return string.Equals(configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase)
+            ? "127.0.0.1"
+            : null;
     }
 
     private static string? BuildEntryUrl(string? host, int? port, string entryConfigJson)

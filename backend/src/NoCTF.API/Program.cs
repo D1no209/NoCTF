@@ -91,6 +91,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     context.Token = accessToken;
                 }
                 return Task.CompletedTask;
+            },
+            OnTokenValidated = async context =>
+            {
+                var userIdClaim = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                  ?? context.Principal?.FindFirst("sub")?.Value;
+                if (!Guid.TryParse(userIdClaim, out var userId))
+                {
+                    context.Fail("Invalid user token.");
+                    return;
+                }
+
+                var tokenVersionText = context.Principal?.FindFirst("token_version")?.Value;
+                if (!int.TryParse(tokenVersionText, out var tokenVersion))
+                {
+                    context.Fail("Token version missing.");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                var currentVersion = await db.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => (int?)u.TokenVersion)
+                    .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+                if (currentVersion is null || currentVersion.Value != tokenVersion)
+                    context.Fail("Token has been revoked.");
             }
         };
     });

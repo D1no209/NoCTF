@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -29,7 +30,7 @@ public class SubmitPatchEndpoint(
     ApplicationDbContext dbContext,
     IEnumerable<ICompetitionFileActionProvider> fileActionProviders,
     IConfiguration configuration)
-    : Endpoint<SubmitPatchRequest, SubmitPatchResponse>
+    : Endpoint<SubmitPatchRequest, SubmitPatchResponse>, IAuditableEndpoint
 {
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {

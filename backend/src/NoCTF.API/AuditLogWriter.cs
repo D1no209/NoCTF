@@ -78,5 +78,5 @@ public static class AuditLogWriter
     }
 
     private static string? Serialize(object? value)
-        => value is null ? null : JsonSerializer.Serialize(value, JsonOptions);
+        => AuditValueRedactor.Serialize(value, JsonOptions);
 }

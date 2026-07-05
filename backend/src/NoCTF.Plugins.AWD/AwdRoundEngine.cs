@@ -121,6 +121,7 @@ public sealed class AwdRoundEngine : BackgroundService
                 _logger.LogInformation(
                     "Competition {CompetitionId} finished all {TotalRounds} rounds.",
                     competition.Id, totalRounds);
+                competition.Status = CompetitionStatus.Finished;
                 return;
             }
 
@@ -129,7 +130,10 @@ public sealed class AwdRoundEngine : BackgroundService
         else if (latestRound.Status == AwdRoundStatus.Finished)
         {
             if (latestRound.RoundNumber >= totalRounds)
+            {
+                competition.Status = CompetitionStatus.Finished;
                 return; // All rounds done
+            }
 
             nextRoundNumber = latestRound.RoundNumber + 1;
         }

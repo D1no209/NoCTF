@@ -1,6 +1,7 @@
 using FastEndpoints;
 using NoCTF.API.Permissions;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -18,8 +19,9 @@ public class RebuildScoreboardResponse
 public class RebuildScoreboardEndpoint(
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
+    ICtfScoreRebuilder ctfScoreRebuilder,
     ICompetitionPermissionService permissions)
-    : Endpoint<RebuildScoreboardRequest, RebuildScoreboardResponse>
+    : Endpoint<RebuildScoreboardRequest, RebuildScoreboardResponse>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -35,6 +37,7 @@ public class RebuildScoreboardEndpoint(
             return;
         }
 
+        await ctfScoreRebuilder.RebuildCompetitionAsync(req.Id, ct);
         var entries = await leaderboardService.CalculateLeaderboardAsync(req.Id, ct);
         await leaderboardCache.UpdateAsync(req.Id, entries, ct);
 

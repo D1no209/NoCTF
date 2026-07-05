@@ -49,7 +49,10 @@ public class UpdateCompetitionAdminRequest
     public int? AwdpFixTimeoutSeconds { get; set; }
 }
 
-public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext, ICompetitionPermissionService permissions) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
+public class UpdateCompetitionEndpoint(
+    ApplicationDbContext dbContext,
+    ICompetitionPermissionService permissions,
+    ICtfScoreRebuilder ctfScoreRebuilder) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -129,6 +132,7 @@ public class UpdateCompetitionEndpoint(ApplicationDbContext dbContext, ICompetit
             competition.Status = status;
 
         await dbContext.SaveChangesAsync(ct);
+        await ctfScoreRebuilder.RebuildCompetitionAsync(id, ct);
         await SendOkAsync(ct);
     }
 

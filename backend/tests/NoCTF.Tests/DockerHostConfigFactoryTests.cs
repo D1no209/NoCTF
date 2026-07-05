@@ -6,11 +6,11 @@ namespace NoCTF.Tests;
 public class DockerHostConfigFactoryTests
 {
     [Fact]
-    public void Create_DefaultPolicyKeepsDockerDefaultCapabilities()
+    public void Create_DefaultPolicyDropsAllCapabilities()
     {
         var hostConfig = DockerHostConfigFactory.Create(new ContainerConfig("example/challenge:latest"), publishAllPorts: false);
 
-        Assert.Empty(hostConfig.CapDrop);
+        Assert.Equal(["ALL"], hostConfig.CapDrop);
         Assert.Empty(hostConfig.CapAdd);
         Assert.Contains("no-new-privileges:true", hostConfig.SecurityOpt);
     }

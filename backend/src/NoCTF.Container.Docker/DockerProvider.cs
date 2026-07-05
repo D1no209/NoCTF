@@ -6,6 +6,8 @@ namespace NoCTF.Container.Docker;
 
 public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMetadata>
 {
+    internal const string ManagedLabel = "noctf.managed";
+
     private readonly DockerClient _client;
 
     public DockerProvider(string? dockerHost = null)
@@ -20,6 +22,7 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
 
     public async Task<DockerContainerMetadata> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
     {
+        config = config with { Labels = WithManagedLabels(config.Labels) };
         var ownsNetwork = string.IsNullOrWhiteSpace(config.NetworkName);
         var networkName = ownsNetwork
             ? $"noctf-{Guid.NewGuid():N}"
@@ -161,6 +164,10 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
     {
         try
         {
+            var inspect = await _client.Containers.InspectContainerAsync(metadata.ContainerId, cancellationToken);
+            if (!IsManagedNoCtfContainer(inspect))
+                throw new InvalidOperationException($"Refusing to destroy unmanaged Docker container '{metadata.ContainerId}'.");
+
             await _client.Containers.RemoveContainerAsync(
                 metadata.ContainerId,
                 new ContainerRemoveParameters { Force = true },
@@ -175,8 +182,27 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
             await RemoveNetworkBestEffortAsync(metadata.NetworkName, cancellationToken);
     }
 
+    internal static Dictionary<string, string> WithManagedLabels(IReadOnlyDictionary<string, string>? labels)
+    {
+        var result = labels is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : new Dictionary<string, string>(labels, StringComparer.Ordinal);
+        result[ManagedLabel] = bool.TrueString;
+        return result;
+    }
+
+    private static bool IsManagedNoCtfContainer(ContainerInspectResponse inspect)
+        => inspect.Config.Labels is not null &&
+           inspect.Config.Labels.TryGetValue(ManagedLabel, out var managed) &&
+           bool.TryParse(managed, out var isManaged) &&
+           isManaged &&
+           inspect.Config.Labels.ContainsKey("competitionId");
+
     private async Task RemoveNetworkBestEffortAsync(string networkName, CancellationToken cancellationToken)
     {
+        if (!networkName.StartsWith("noctf-", StringComparison.OrdinalIgnoreCase))
+            return;
+
         try
         {
             await _client.Networks.DeleteNetworkAsync(networkName, cancellationToken);

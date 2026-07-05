@@ -501,11 +501,16 @@ public class AwdpPatchServiceTests
             Assert.Equal("previous.tar.gz", restoredConfig.EnvironmentVariables?["PATCH_FILE_NAME"]);
             Assert.Equal("fix.sh", restoredConfig.EnvironmentVariables?["FIX_ENTRY"]);
             Assert.Equal("container-2", (await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync()).ContainerInstanceId);
+            var rejectedSubmission = await db.AwdpPatchSubmissions.IgnoreQueryFilters().FirstAsync(s => s.Id == submissionId);
+            var state = await db.AwdpTeamChallengeStates.IgnoreQueryFilters().SingleAsync(s => s.TeamId == teamId);
+            Assert.Equal(AwdpPatchStatus.Rejected, rejectedSubmission.Status);
+            Assert.Equal(AwdpFixStatus.FixSuccess, state.FixStatus);
+            Assert.Equal(AwdpServiceStatus.ServiceOk, state.ServiceStatus);
         }
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_NoCheckContainer_AcceptsAfterFixScript()
+    public async Task ValidatePatchAsync_NoCheckContainer_RejectsAfterFixScript()
     {
         var competitionId = Guid.NewGuid();
         var teamId = Guid.NewGuid();
@@ -521,8 +526,8 @@ public class AwdpPatchServiceTests
         await service.ValidatePatchAsync(submissionId);
 
         var submission = await db.AwdpPatchSubmissions.IgnoreQueryFilters().FirstAsync(s => s.Id == submissionId);
-        Assert.Equal(AwdpPatchStatus.Verified, submission.Status);
-        Assert.Equal(AwdpFixStatus.FixSuccess, submission.FixStatus);
+        Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
+        Assert.Equal(AwdpFixStatus.FixRuleViolation, submission.FixStatus);
     }
 
     private static async Task<(ApplicationDbContext Db, AwdpPatchService Service, Guid CompetitionId, Guid TeamId, Guid ChallengeId, SequencedContainerManager ContainerManager)>
