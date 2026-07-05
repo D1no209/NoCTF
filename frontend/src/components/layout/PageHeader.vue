@@ -16,7 +16,7 @@ defineProps<{
       <RouterLink
         v-if="backTo"
         :to="backTo"
-        class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:text-foreground"
       >
         <ArrowLeft class="size-4" />
         {{ backLabel }}

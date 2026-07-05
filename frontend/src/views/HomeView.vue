@@ -187,7 +187,7 @@ function formatDate(iso: string) {
             <div
               v-for="competition in activeCompetitions"
               :key="competition.id"
-              class="grid gap-3 p-4 transition-colors hover:bg-muted/35 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+              class="grid gap-3 p-4 transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/35 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
             >
               <div class="min-w-0 space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
@@ -252,7 +252,7 @@ function formatDate(iso: string) {
               v-for="team in recentTeams"
               :key="team.id"
               :to="`/competitions/${team.competitionId}/register`"
-              class="grid gap-2 p-4 transition-colors hover:bg-muted/35"
+              class="grid gap-2 p-4 transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/35"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">

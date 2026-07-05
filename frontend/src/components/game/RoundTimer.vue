@@ -52,9 +52,9 @@ function formatTime(seconds: number) {
       </div>
       <div class="h-2 overflow-hidden rounded-full bg-muted">
         <div
-          class="h-full rounded-full transition-all duration-1000"
+          class="h-full w-full origin-left rounded-full transition-transform duration-1000 ease-linear"
           :class="progressColor"
-          :style="{ width: `${progress}%` }"
+          :style="{ transform: `scaleX(${progress / 100})` }"
         />
       </div>
     </div>
@@ -63,7 +63,7 @@ function formatTime(seconds: number) {
 
 <style scoped>
 .round-fade {
-  animation: fadeIn 0.4s ease-out;
+  animation: fadeIn var(--motion-standard) var(--ease-out-expo);
 }
 
 @keyframes fadeIn {

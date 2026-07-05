@@ -494,7 +494,7 @@ function withChallengeProgress(challenge: Challenge): Challenge {
                 v-for="item in directionOptions"
                 :key="item.direction"
                 type="button"
-                class="flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted lg:w-full"
+                class="flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted lg:w-full"
                 :class="
                   activeDirection === item.direction
                     ? 'bg-primary text-primary-foreground hover:bg-primary'
@@ -510,7 +510,7 @@ function withChallengeProgress(challenge: Challenge): Challenge {
             </div>
             <button
               type="button"
-              class="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-muted lg:mt-4"
+              class="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted lg:mt-4"
               :class="
                 hideSolved ? 'border-primary/50 bg-primary/5 text-primary' : 'text-muted-foreground'
               "
@@ -540,7 +540,11 @@ function withChallengeProgress(challenge: Challenge): Challenge {
             <div v-if="isLoading" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Skeleton v-for="i in 6" :key="i" class="h-32 rounded-xl" />
             </div>
-            <div v-else v-auto-animate class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div
+              v-else
+              v-auto-animate="{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }"
+              class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            >
               <div
                 v-for="challenge in filteredChallenges"
                 :key="challenge.id"
@@ -550,7 +554,7 @@ function withChallengeProgress(challenge: Challenge): Challenge {
                 <ChallengeCard
                   :challenge="withChallengeProgress(challenge)"
                   :solved="solvedIds.has(challenge.id)"
-                  class="transition-colors duration-200 group-hover:border-primary/20 group-hover:bg-accent/35"
+                  class="group-hover:border-primary/20 group-hover:bg-accent/35"
                 />
               </div>
             </div>

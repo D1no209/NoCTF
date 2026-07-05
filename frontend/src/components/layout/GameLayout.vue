@@ -39,7 +39,7 @@ watch(
         <div class="flex min-w-0 items-center gap-2 sm:gap-4">
           <RouterLink
             to="/competitions"
-            class="flex min-h-11 items-center gap-2 rounded-lg border border-sidebar-foreground/10 bg-sidebar-foreground/5 px-2.5 py-2 text-sm font-semibold text-sidebar-foreground transition-colors hover:bg-sidebar-foreground/10 sm:px-3 sm:py-2.5"
+            class="flex min-h-11 items-center gap-2 rounded-lg border border-sidebar-foreground/10 bg-sidebar-foreground/5 px-2.5 py-2 text-sm font-semibold text-sidebar-foreground transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-sidebar-foreground/10 sm:px-3 sm:py-2.5"
           >
             <ChevronLeft class="size-4" />
             <span class="text-sm font-medium hidden sm:inline">{{ t('nav.back') }}</span>
@@ -85,11 +85,18 @@ watch(
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition:
+    opacity var(--motion-fast) var(--ease-out-quint),
+    transform var(--motion-fast) var(--ease-out-quint);
 }
 
-.fade-enter-from,
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
 .fade-leave-to {
   opacity: 0;
+  transform: translateY(-2px);
 }
 </style>

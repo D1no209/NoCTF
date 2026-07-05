@@ -8,7 +8,6 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-
   useVueTable,
 } from '@tanstack/vue-table'
 import {
@@ -112,8 +111,7 @@ function defaultSchedule() {
 }
 
 const isScheduleValid = computed(() => {
-  if (!form.value.startTime || !form.value.endTime)
-    return false
+  if (!form.value.startTime || !form.value.endTime) return false
   return new Date(form.value.endTime).getTime() > new Date(form.value.startTime).getTime()
 })
 
@@ -129,7 +127,12 @@ function competitionPayload() {
   }
 }
 
-const { data: competitions, isLoading, isError, refetch } = useQuery({
+const {
+  data: competitions,
+  isLoading,
+  isError,
+  refetch,
+} = useQuery({
   queryKey: queryKeys.adminCompetitions,
   queryFn: () => adminApi.competitions<CompetitionAdminDto[]>(),
 })
@@ -142,15 +145,18 @@ const saveMutation = useMutation({
     const body = competitionPayload()
     if (isCreating.value) {
       await adminApi.createCompetition(body)
-    }
-    else {
+    } else {
       await adminApi.updateCompetition(selectedComp.value!.id, body)
     }
   },
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCompetitions })
     editDialog.value = false
-    toast.success(isCreating.value ? t('admin.competitions.createSuccess') : t('admin.competitions.updateSuccess'))
+    toast.success(
+      isCreating.value
+        ? t('admin.competitions.createSuccess')
+        : t('admin.competitions.updateSuccess'),
+    )
   },
   onError: () => {
     toast.error(t('admin.competitions.saveError'))
@@ -174,7 +180,13 @@ const deleteMutation = useMutation({
 function openCreate() {
   isCreating.value = true
   selectedComp.value = null
-  form.value = { title: '', description: '', gameModeType: 'Ctf', status: 'Draft', ...defaultSchedule() }
+  form.value = {
+    title: '',
+    description: '',
+    gameModeType: 'Ctf',
+    status: 'Draft',
+    ...defaultSchedule(),
+  }
   editDialog.value = true
 }
 
@@ -184,7 +196,10 @@ function openDelete(comp: CompetitionAdminDto) {
 }
 
 function goCollaborators(comp: CompetitionAdminDto) {
-  router.push({ name: 'admin-collaborators', query: { competitionId: comp.id, competitionTitle: comp.title } })
+  router.push({
+    name: 'admin-collaborators',
+    query: { competitionId: comp.id, competitionTitle: comp.title },
+  })
 }
 
 function goManage(comp: CompetitionAdminDto) {
@@ -197,35 +212,47 @@ const columns = [
   columnHelper.accessor('title', {
     header: t('admin.competitions.titleColumn'),
     enableSorting: true,
-    cell: info => info.getValue(),
+    cell: (info) => info.getValue(),
   }),
   columnHelper.accessor('gameModeType', {
     header: t('admin.competitions.mode'),
     enableSorting: true,
-    cell: info => h(Badge, { variant: gameModeVariant(info.getValue()), class: 'font-mono' }, () => info.getValue()),
+    cell: (info) =>
+      h(Badge, { variant: gameModeVariant(info.getValue()), class: 'font-mono' }, () =>
+        info.getValue(),
+      ),
   }),
   columnHelper.accessor('status', {
     header: t('admin.competitions.status'),
-    cell: info => h(Badge, { variant: competitionStatusVariant(info.getValue()) }, () => info.getValue()),
+    cell: (info) =>
+      h(Badge, { variant: competitionStatusVariant(info.getValue()) }, () => info.getValue()),
   }),
   columnHelper.accessor('startTime', {
     header: t('admin.competitions.start'),
-    cell: info => new Date(info.getValue()).toLocaleDateString(),
+    cell: (info) => new Date(info.getValue()).toLocaleDateString(),
   }),
   columnHelper.accessor('endTime', {
     header: t('admin.competitions.end'),
-    cell: info => new Date(info.getValue()).toLocaleDateString(),
+    cell: (info) => new Date(info.getValue()).toLocaleDateString(),
   }),
 ]
 
 const table = useVueTable({
-  get data() { return competitions.value ?? [] },
+  get data() {
+    return competitions.value ?? []
+  },
   columns,
   state: {
-    get globalFilter() { return globalFilter.value },
-    get sorting() { return sorting.value },
+    get globalFilter() {
+      return globalFilter.value
+    },
+    get sorting() {
+      return sorting.value
+    },
   },
-  onGlobalFilterChange: (v) => { globalFilter.value = v },
+  onGlobalFilterChange: (v) => {
+    globalFilter.value = v
+  },
   onSortingChange: (updater) => {
     sorting.value = typeof updater === 'function' ? updater(sorting.value) : updater
   },
@@ -256,7 +283,11 @@ const table = useVueTable({
     <div class="noctf-filter-bar md:grid-cols-[minmax(0,24rem)]">
       <div class="relative w-full max-w-sm">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="globalFilter" :placeholder="t('admin.competitions.searchPlaceholder')" class="pl-10" />
+        <Input
+          v-model="globalFilter"
+          :placeholder="t('admin.competitions.searchPlaceholder')"
+          class="pl-10"
+        />
       </div>
     </div>
 
@@ -273,9 +304,14 @@ const table = useVueTable({
             >
               <template v-if="!header.isPlaceholder">
                 <div class="flex items-center gap-2">
-                  <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
+                  <FlexRender
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
                   <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
-                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
+                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]"
+                    >▼</span
+                  >
                 </div>
               </template>
             </TableHead>
@@ -312,7 +348,7 @@ const table = useVueTable({
             v-for="row in table.getRowModel().rows"
             v-else
             :key="row.id"
-            class="group transition-colors hover:bg-muted/50"
+            class="group transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
               <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
@@ -342,13 +378,18 @@ const table = useVueTable({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     v-if="row.original.gameModeType.toLowerCase() === 'awdp'"
-                    @click="router.push({ name: 'awdp-screen', params: { gameId: row.original.id } })"
+                    @click="
+                      router.push({ name: 'awdp-screen', params: { gameId: row.original.id } })
+                    "
                   >
                     <ExternalLink class="mr-2 size-4" />
                     {{ t('awdp.screenEntry') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem class="text-danger focus:text-danger" @click="openDelete(row.original)">
+                  <DropdownMenuItem
+                    class="text-danger focus:text-danger"
+                    @click="openDelete(row.original)"
+                  >
                     <Trash2 class="mr-2 size-4" />
                     {{ t('common.delete') }}
                   </DropdownMenuItem>
@@ -362,7 +403,12 @@ const table = useVueTable({
 
     <div class="noctf-table-footer">
       <p class="text-xs text-muted-foreground">
-        {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
+        {{
+          t('common.pageOf', {
+            page: table.getState().pagination.pageIndex + 1,
+            total: table.getPageCount(),
+          })
+        }}
       </p>
       <div class="flex items-center space-x-2">
         <Button
@@ -388,19 +434,35 @@ const table = useVueTable({
     <Dialog v-model:open="editDialog">
       <DialogContent class="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{{ isCreating ? t('admin.competitions.createDialogTitle') : t('admin.competitions.editDialogTitle') }}</DialogTitle>
+          <DialogTitle>{{
+            isCreating
+              ? t('admin.competitions.createDialogTitle')
+              : t('admin.competitions.editDialogTitle')
+          }}</DialogTitle>
           <DialogDescription>
-            {{ isCreating ? t('admin.competitions.createDialogDescription') : t('admin.competitions.editDialogDescription') }}
+            {{
+              isCreating
+                ? t('admin.competitions.createDialogDescription')
+                : t('admin.competitions.editDialogDescription')
+            }}
           </DialogDescription>
         </DialogHeader>
         <div class="grid gap-4 py-4">
           <div class="grid gap-2">
             <Label for="title">{{ t('admin.competitions.titleColumn') }}</Label>
-            <Input id="title" v-model="form.title" :placeholder="t('admin.competitions.titleColumn')" />
+            <Input
+              id="title"
+              v-model="form.title"
+              :placeholder="t('admin.competitions.titleColumn')"
+            />
           </div>
           <div class="grid gap-2">
             <Label for="description">{{ t('admin.competitions.description') }}</Label>
-            <Input id="description" v-model="form.description" :placeholder="t('admin.competitions.description')" />
+            <Input
+              id="description"
+              v-model="form.description"
+              :placeholder="t('admin.competitions.description')"
+            />
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div class="grid gap-2">
@@ -463,10 +525,17 @@ const table = useVueTable({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" :disabled="saveMutation.isPending.value" @click="editDialog = false">
+          <Button
+            variant="outline"
+            :disabled="saveMutation.isPending.value"
+            @click="editDialog = false"
+          >
             {{ t('common.cancel') }}
           </Button>
-          <Button :disabled="saveMutation.isPending.value || !canSave" @click="saveMutation.mutate()">
+          <Button
+            :disabled="saveMutation.isPending.value || !canSave"
+            @click="saveMutation.mutate()"
+          >
             <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
             {{ isCreating ? t('common.create') : t('common.save') }}
           </Button>
@@ -485,7 +554,8 @@ const table = useVueTable({
         </DialogHeader>
         <div class="py-4">
           <p class="text-sm font-medium">
-            {{ t('admin.competitions.deleteQuestion') }} <span class="font-bold text-foreground">"{{ selectedComp?.title }}"</span>?
+            {{ t('admin.competitions.deleteQuestion') }}
+            <span class="font-bold text-foreground">"{{ selectedComp?.title }}"</span>?
           </p>
         </div>
         <DialogFooter>

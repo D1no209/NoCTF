@@ -247,7 +247,6 @@ function enqueueAttackFailed(reason: string) {
 
   if (localAwarenessEvents.value.length > 50) localAwarenessEvents.value.splice(50)
 }
-
 </script>
 
 <template>
@@ -395,7 +394,7 @@ function enqueueAttackFailed(reason: string) {
               </div>
 
               <div
-                class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 transition-all hover:bg-muted/50"
+                class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 transition-[background-color,border-color,transform] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:-translate-y-0.5 hover:bg-muted/50"
                 :class="[
                   isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25',
                   patchFile ? 'bg-muted/30' : '',
@@ -406,7 +405,7 @@ function enqueueAttackFailed(reason: string) {
                 @click="($refs.patchFileInput as HTMLInputElement)?.click()"
               >
                 <div
-                  class="flex size-10 items-center justify-center rounded-full border bg-background transition-colors group-hover:border-primary/30"
+                  class="flex size-10 items-center justify-center rounded-full border bg-background transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] group-hover:border-primary/30"
                 >
                   <Upload class="size-5 text-muted-foreground" />
                 </div>
@@ -485,23 +484,31 @@ function enqueueAttackFailed(reason: string) {
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition:
+    opacity var(--motion-fast) var(--ease-out-quint),
+    transform var(--motion-fast) var(--ease-out-quint);
 }
-.fade-enter-from,
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
 .fade-leave-to {
   opacity: 0;
+  transform: translateY(-2px);
 }
 
 .slide-up-enter-active,
 .slide-up-leave-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    opacity var(--motion-standard) var(--ease-out-expo),
+    transform var(--motion-standard) var(--ease-out-expo);
 }
 .slide-up-enter-from {
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(10px);
 }
 .slide-up-leave-to {
   opacity: 0;
-  transform: translateY(-20px);
+  transform: translateY(-6px);
 }
 </style>

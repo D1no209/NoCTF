@@ -21,7 +21,11 @@ const props = defineProps<{
 const sortedLogs = computed(() => [...props.logs].reverse())
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  return new Date(iso).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }
 </script>
 
@@ -64,13 +68,13 @@ function formatTime(iso: string) {
 
 <style scoped>
 .log-entry {
-  animation: slideIn 0.25s ease-out;
+  animation: logEntryIn var(--motion-standard) var(--ease-out-expo) both;
 }
 
-@keyframes slideIn {
+@keyframes logEntryIn {
   from {
     opacity: 0;
-    transform: translateX(8px);
+    transform: translateX(6px);
   }
   to {
     opacity: 1;

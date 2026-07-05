@@ -355,7 +355,7 @@ const table = useVueTable({
 
             <div
               v-if="newUserSearch.length >= 2"
-              v-auto-animate
+              v-auto-animate="{ duration: 140, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }"
               class="mt-2 border rounded-lg overflow-hidden bg-muted/20"
             >
               <div
@@ -367,7 +367,7 @@ const table = useVueTable({
               <div
                 v-for="u in userSearchResults"
                 :key="u.id"
-                class="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-accent transition-colors"
+                class="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-accent transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)]"
                 :class="newUserId === u.id ? 'bg-accent font-bold' : ''"
                 @click="selectUser(u)"
               >

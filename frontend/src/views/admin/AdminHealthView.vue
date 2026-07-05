@@ -136,7 +136,7 @@ function getServiceIcon(name: string) {
       </div>
     </div>
 
-    <div v-if="health" v-auto-animate>
+    <div v-if="health" v-auto-animate="{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }">
       <div
         class="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-center"
         :class="
@@ -181,11 +181,15 @@ function getServiceIcon(name: string) {
       <Skeleton v-for="i in 6" :key="i" class="h-16 rounded-none" />
     </div>
 
-    <div v-if="health" v-auto-animate class="noctf-workbench divide-y divide-border/80">
+    <div
+      v-if="health"
+      v-auto-animate="{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }"
+      class="noctf-workbench divide-y divide-border/80"
+    >
       <div
         v-for="check in health.checks"
         :key="check.name"
-        class="grid gap-3 p-4 transition-colors hover:bg-muted/35 md:grid-cols-[minmax(0,1fr)_auto]"
+        class="grid gap-3 p-4 transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/35 md:grid-cols-[minmax(0,1fr)_auto]"
       >
         <div class="flex min-w-0 items-start gap-3">
           <div

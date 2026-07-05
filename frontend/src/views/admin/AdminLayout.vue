@@ -167,7 +167,7 @@ async function handleLogout() {
         <div class="flex shrink-0 items-center gap-2 sm:gap-4">
           <RouterLink
             to="/competitions"
-            class="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:inline"
+            class="hidden text-sm font-medium text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:text-foreground md:inline"
           >
             {{ t('nav.backToApp') }}
           </RouterLink>
@@ -190,11 +190,18 @@ async function handleLogout() {
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition:
+    opacity var(--motion-fast) var(--ease-out-quint),
+    transform var(--motion-fast) var(--ease-out-quint);
 }
 
-.fade-enter-from,
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
 .fade-leave-to {
   opacity: 0;
+  transform: translateY(-2px);
 }
 </style>

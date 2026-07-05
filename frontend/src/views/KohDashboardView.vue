@@ -76,10 +76,7 @@ onUnmounted(() => signalR.stop())
       <PageHeader :title="t('koh.kingOfTheHill')" :description="t('koh.subtitle')">
         <template #actions>
           <div class="flex items-center gap-2">
-            <Badge
-              variant="warning"
-              class="animate-pulse px-3"
-            >
+            <Badge variant="warning" class="animate-pulse px-3">
               <Trophy class="mr-1.5 size-3.5" />
               {{ t('common.live') }}
             </Badge>
@@ -135,7 +132,7 @@ onUnmounted(() => signalR.stop())
 
     <div
       v-else
-      v-auto-animate
+      v-auto-animate="{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }"
       class="grid gap-6"
       :class="[
         challenges.length === 1
@@ -149,7 +146,7 @@ onUnmounted(() => signalR.stop())
         v-for="ch in challenges"
         :key="ch.challengeId"
         :status="ch"
-        class="transition-colors duration-200 hover:border-primary/20 hover:bg-accent/35"
+        class="transition-[background-color,border-color,transform] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:-translate-y-0.5 hover:border-primary/20 hover:bg-accent/35"
       />
     </div>
   </div>
