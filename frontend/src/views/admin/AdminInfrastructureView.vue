@@ -114,7 +114,7 @@ function display(value: unknown) {
           <div
             v-for="key in ['publicEntry', 'ingressBaseDomain', 'namespacePrefix']"
             :key="key"
-            class="grid grid-cols-[11rem_minmax(0,1fr)] gap-3 py-2 text-sm"
+            class="grid gap-1 py-2 text-sm sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-3"
           >
             <span class="text-muted-foreground">{{ key }}</span>
             <span class="min-w-0 truncate font-medium">{{ display(kubernetesInfo[key]) }}</span>
@@ -126,7 +126,7 @@ function display(value: unknown) {
           <div
             v-for="key in ['registryCount', 'imagePullSecrets']"
             :key="key"
-            class="grid grid-cols-[11rem_minmax(0,1fr)] gap-3 py-2 text-sm"
+            class="grid gap-1 py-2 text-sm sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-3"
           >
             <span class="text-muted-foreground">{{ key }}</span>
             <span class="min-w-0 truncate font-medium">{{ display(kubernetesInfo[key]) }}</span>

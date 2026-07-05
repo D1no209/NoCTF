@@ -26,14 +26,16 @@ async function handleLogout() {
 
 <template>
   <header class="sticky top-0 z-50 w-full border-b border-border/90 bg-background/95">
-    <div class="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
-      <div class="flex items-center gap-6">
+    <div
+      class="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-2 px-3 sm:h-16 sm:gap-4 sm:px-4 md:px-6"
+    >
+      <div class="flex min-w-0 items-center gap-4 lg:gap-6">
         <RouterLink
           to="/"
-          class="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-80 transition-all active:scale-95"
+          class="flex min-w-0 items-center gap-2 text-lg font-bold tracking-tight transition-all hover:opacity-80 active:scale-95"
         >
           <span class="noctf-logo size-8" />
-          <span>NoCTF</span>
+          <span class="truncate">NoCTF</span>
         </RouterLink>
         <nav class="hidden items-center gap-2 text-sm font-medium sm:flex">
           <RouterLink
@@ -71,7 +73,7 @@ async function handleLogout() {
         </nav>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex shrink-0 items-center gap-2 sm:gap-3">
         <div class="shrink-0">
           <LanguageSwitch />
         </div>
@@ -106,40 +108,43 @@ async function handleLogout() {
               <Menu class="size-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" class="w-[280px] bg-background">
+          <SheetContent side="right" class="w-[min(20rem,calc(100vw-1.5rem))] bg-background">
             <SheetHeader class="text-left">
               <SheetTitle>NoCTF</SheetTitle>
             </SheetHeader>
-            <div class="flex flex-col gap-4 py-8">
-              <RouterLink to="/" class="text-lg font-medium hover:text-primary transition-colors">
+            <div class="flex flex-col gap-1 py-6">
+              <RouterLink
+                to="/"
+                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-colors hover:bg-accent hover:text-primary"
+              >
                 {{ t('nav.home') }}
               </RouterLink>
               <RouterLink
                 to="/competitions"
-                class="text-lg font-medium hover:text-primary transition-colors"
+                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-colors hover:bg-accent hover:text-primary"
               >
                 {{ t('nav.competitions') }}
               </RouterLink>
               <RouterLink
                 to="/teams"
-                class="text-lg font-medium hover:text-primary transition-colors"
+                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-colors hover:bg-accent hover:text-primary"
               >
                 {{ t('nav.teams') }}
               </RouterLink>
               <RouterLink
                 v-if="canManage"
                 to="/admin"
-                class="text-lg font-medium hover:text-primary transition-colors"
+                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-colors hover:bg-accent hover:text-primary"
               >
                 {{ t('nav.admin') }}
               </RouterLink>
 
               <template v-if="auth.isAuthenticated">
-                <div class="flex flex-col gap-1 py-2">
+                <div class="mt-3 flex flex-col gap-1 border-t border-border/80 py-3">
                   <span class="text-xs text-muted-foreground">{{ t('common.user') }}</span>
                   <span class="font-medium">{{ displayName }}</span>
                 </div>
-                <Button variant="outline" class="w-full mt-4" @click="handleLogout">
+                <Button variant="outline" class="mt-2 w-full" @click="handleLogout">
                   {{ t('auth.logout') }}
                 </Button>
               </template>

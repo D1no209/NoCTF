@@ -429,7 +429,9 @@ function normalizeTeamDetail(detail: TeamDetail): TeamDetail {
 
 async function fetchLeaderboard() {
   try {
-    const leaderboardData = await competitionApi.leaderboard(props.competitionId) as { entries?: LeaderboardEntry[] }
+    const leaderboardData = (await competitionApi.leaderboard(props.competitionId)) as {
+      entries?: LeaderboardEntry[]
+    }
     applyLeaderboard(leaderboardData?.entries ?? [])
   } catch {
     // Keep the last successful snapshot while polling.
@@ -453,10 +455,7 @@ async function openTeamDetail(teamId?: string) {
   selectedTeam.value = null
   detailError.value = ''
   try {
-    const detail = await competitionApi.leaderboardTeam<TeamDetail>(
-      props.competitionId,
-      teamId,
-    )
+    const detail = await competitionApi.leaderboardTeam<TeamDetail>(props.competitionId, teamId)
     if (requestId !== teamDetailRequestId) return
     selectedTeam.value = normalizeTeamDetail(detail)
   } catch {
@@ -464,8 +463,7 @@ async function openTeamDetail(teamId?: string) {
     detailError.value = t('scoreboard.teamDetailLoadError')
     toast.error(detailError.value)
   } finally {
-    if (requestId === teamDetailRequestId)
-      detailLoading.value = false
+    if (requestId === teamDetailRequestId) detailLoading.value = false
   }
 }
 
@@ -559,8 +557,8 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="visibleTrend.length" class="rounded-lg border bg-background p-4">
-      <div class="mb-3 flex items-center justify-between gap-3">
+    <div v-if="visibleTrend.length" class="rounded-lg border bg-background p-3 sm:p-4">
+      <div class="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <h3 class="text-sm font-medium">
           {{ t('scoreboard.topTrend') }}
         </h3>
@@ -568,7 +566,7 @@ onUnmounted(() => {
       </div>
       <svg
         viewBox="0 0 760 328"
-        class="h-80 w-full overflow-visible"
+        class="h-64 w-full overflow-visible sm:h-80"
         @mouseleave="hoveredTeamId = null"
       >
         <rect
@@ -758,7 +756,7 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="noctf-table-shell">
-      <Table>
+      <Table class="min-w-[42rem]">
         <TableHeader>
           <TableRow>
             <TableHead class="w-12 text-center">
@@ -871,7 +869,7 @@ onUnmounted(() => {
               v-if="selectedDirectionRadar.axes.length"
               class="grid gap-4 rounded-lg border bg-background p-3 md:grid-cols-[minmax(0,22rem)_1fr] md:items-center"
             >
-              <svg viewBox="0 0 360 300" class="h-72 w-full overflow-visible">
+              <svg viewBox="0 0 360 300" class="h-64 w-full overflow-visible sm:h-72">
                 <polygon
                   v-for="ring in selectedDirectionRadar.rings"
                   :key="ring.ratio"
@@ -953,7 +951,7 @@ onUnmounted(() => {
               {{ t('scoreboard.scoreDetails') }}
             </h3>
             <div v-if="selectedScoreRows.length" class="noctf-table-shell">
-              <Table>
+              <Table class="min-w-[42rem]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>{{ t('challenges.title') }}</TableHead>
@@ -976,11 +974,7 @@ onUnmounted(() => {
                       <div class="font-medium">
                         {{ row.challengeTitle }}
                       </div>
-                      <Badge
-                        v-if="row.bloodRank"
-                        variant="warning"
-                        class="mt-1"
-                      >
+                      <Badge v-if="row.bloodRank" variant="warning" class="mt-1">
                         {{ bloodLabel(row.bloodRank) }}
                       </Badge>
                     </TableCell>

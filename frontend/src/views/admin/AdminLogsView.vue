@@ -99,10 +99,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-8rem)] flex-col gap-4">
+  <div class="flex min-h-[calc(100dvh-7rem)] flex-col gap-4 sm:h-[calc(100vh-8rem)]">
     <!-- Toolbar -->
     <div class="noctf-toolbar">
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3 sm:gap-4">
         <div
           class="flex size-10 items-center justify-center rounded-md border border-border bg-muted text-primary"
         >
@@ -124,8 +124,8 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="relative w-48">
+      <div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
+        <div class="relative w-full sm:w-48">
           <Search
             class="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
           />
@@ -136,9 +136,11 @@ onMounted(async () => {
           />
         </div>
 
-        <div class="h-4 w-px bg-border mx-1" />
+        <div class="mx-1 hidden h-4 w-px bg-border sm:block" />
 
-        <div class="flex rounded-md border border-border/80 bg-muted/50 p-1">
+        <div
+          class="noctf-scrollbar flex max-w-full overflow-x-auto rounded-md border border-border/80 bg-muted/50 p-1"
+        >
           <button
             v-for="lvl in ['All', 'Information', 'Warning', 'Error']"
             :key="lvl"
@@ -154,12 +156,12 @@ onMounted(async () => {
           </button>
         </div>
 
-        <div class="h-4 w-px bg-border mx-1" />
+        <div class="mx-1 hidden h-4 w-px bg-border sm:block" />
 
         <Button
           size="sm"
           variant="outline"
-          class="h-8 gap-2 border-dashed"
+          class="gap-2 border-dashed sm:h-8"
           :class="paused ? 'border-danger/45 text-danger hover:bg-danger-muted/45' : ''"
           @click="paused = !paused"
         >
@@ -172,7 +174,7 @@ onMounted(async () => {
         <Button
           size="sm"
           variant="ghost"
-          class="h-8 size-8 p-0 text-muted-foreground hover:text-danger"
+          class="size-11 p-0 text-muted-foreground hover:text-danger sm:size-8 sm:h-8"
           @click="clearLogs"
         >
           <Trash2 class="size-4" />
