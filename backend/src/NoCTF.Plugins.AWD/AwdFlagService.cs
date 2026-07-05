@@ -49,7 +49,10 @@ public class AwdFlagService
 
         var teams = await _db.Teams
             .IgnoreQueryFilters()
-            .Where(t => t.CompetitionId == competitionId)
+            .Where(t =>
+                t.CompetitionId == competitionId &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned)
             .ToListAsync(ct);
 
         var challenges = await _db.Challenges
@@ -76,6 +79,14 @@ public class AwdFlagService
         {
             foreach (var challenge in challenges)
             {
+                if (string.IsNullOrWhiteSpace(challenge.FlagSecret))
+                {
+                    _logger.LogWarning(
+                        "GenerateFlagsAsync: challenge {ChallengeId} has no FlagSecret; skipping AWD flags.",
+                        challenge.Id);
+                    continue;
+                }
+
                 for (int round = 1; round <= totalRounds; round++)
                 {
                     if (existingKeys.Contains((team.Id, challenge.Id, round)))
@@ -114,9 +125,21 @@ public class AwdFlagService
     /// </summary>
     public async Task RefreshFlagsAsync(Guid competitionId, int roundNumber, CancellationToken ct = default)
     {
+        var activeTeamIds = await _db.Teams
+            .IgnoreQueryFilters()
+            .Where(t =>
+                t.CompetitionId == competitionId &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned)
+            .Select(t => t.Id)
+            .ToListAsync(ct);
+
         var flags = await _db.AwdFlags
             .IgnoreQueryFilters()
-            .Where(f => f.CompetitionId == competitionId && f.RoundNumber == roundNumber)
+            .Where(f =>
+                f.CompetitionId == competitionId &&
+                f.RoundNumber == roundNumber &&
+                activeTeamIds.Contains(f.TeamId))
             .ToListAsync(ct);
 
         if (flags.Count == 0)
@@ -219,6 +242,7 @@ public class AwdFlagService
                     _logger.LogWarning(ex,
                         "RefreshFlagsAsync: failed to destroy old container {ContainerId} for team {TeamId} challenge {ChallengeId}.",
                         gameBox.ContainerInstanceId, flag.TeamId, flag.ChallengeId);
+                    continue;
                 }
             }
 
@@ -254,7 +278,10 @@ public class AwdFlagService
     /// </summary>
     public static string ComputeFlag(Guid teamId, Guid challengeId, int roundNumber, string? roundSecret)
     {
-        var secret = roundSecret ?? "default-noctf-secret";
+        if (string.IsNullOrWhiteSpace(roundSecret))
+            throw new InvalidOperationException("AWD challenge FlagSecret is required to generate round flags.");
+
+        var secret = roundSecret.Trim();
         var keyBytes = Encoding.UTF8.GetBytes(secret);
         var message = Encoding.UTF8.GetBytes(
             teamId.ToString("N") + challengeId.ToString("N") + roundNumber.ToString());

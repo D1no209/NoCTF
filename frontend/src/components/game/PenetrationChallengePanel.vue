@@ -158,8 +158,12 @@ const submitMutation = useMutation({
 
 async function copyEntry() {
   if (!instance.value?.entryUrl) return
-  await navigator.clipboard.writeText(instance.value.entryUrl)
-  toast.success(t('challenges.addressCopied'))
+  try {
+    await navigator.clipboard.writeText(instance.value.entryUrl)
+    toast.success(t('challenges.addressCopied'))
+  } catch {
+    toast.error(t('common.copyFailed'))
+  }
 }
 
 function requestDestroy() {

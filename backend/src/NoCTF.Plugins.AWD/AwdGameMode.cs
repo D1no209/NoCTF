@@ -97,7 +97,7 @@ public class AwdGameMode : IGameMode
         int validityRounds = competition.FlagValidityRounds ?? 2;
         int minValidRound = currentRound - validityRounds + 1;
 
-        if (flag.RoundNumber < minValidRound)
+        if (flag.RoundNumber < minValidRound || flag.RoundNumber > currentRound)
             return SubmissionResult.WrongFlag;
 
         // Duplicate attack prevention: same attacker/victim/challenge/round

@@ -91,23 +91,16 @@ const challengeTypeOptions = [
   { value: 'Koh', label: 'KoH' },
   { value: 'Penetration', label: 'Penetration' },
 ] as const
-type ChallengeTypeKey = typeof challengeTypeOptions[number]['value']
 
 function deploymentTypeKey(value: ChallengeTemplateDto['deploymentType']) {
   return typeof value === 'number' ? deploymentTypeKeys[value] ?? 'NoAttachment' : value
 }
-function normalizeChallengeType(value?: string | null): ChallengeTypeKey {
-  const key = (value ?? 'Ctf').trim().toLowerCase()
-  if (key === 'awd') return 'Awd'
-  if (key === 'awdp') return 'Awdp'
-  if (key === 'koh') return 'Koh'
-  if (key === 'penetration') return 'Penetration'
-  return 'Ctf'
-}
 
 function challengeTypeLabel(value?: string | null) {
-  const normalized = normalizeChallengeType(value)
-  return challengeTypeOptions.find(option => option.value === normalized)?.label ?? 'CTF'
+  const raw = value?.trim()
+  if (!raw) return 'CTF'
+  const exact = challengeTypeOptions.find(option => option.value.toLowerCase() === raw.toLowerCase())
+  return exact?.label ?? raw.toUpperCase()
 }
 
 const { data: templates, isLoading } = useQuery({
@@ -302,6 +295,35 @@ const table = useVueTable({
           </TableRow>
         </TableBody>
       </Table>
+    </div>
+
+    <div class="noctf-table-footer">
+      <p class="text-xs text-muted-foreground">
+        {{
+          t('common.pageOf', {
+            page: table.getState().pagination.pageIndex + 1,
+            total: table.getPageCount(),
+          })
+        }}
+      </p>
+      <div class="flex gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="!table.getCanPreviousPage()"
+          @click="table.previousPage()"
+        >
+          {{ t('common.previous') }}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="!table.getCanNextPage()"
+          @click="table.nextPage()"
+        >
+          {{ t('common.next') }}
+        </Button>
+      </div>
     </div>
 
     <Dialog v-model:open="editDialog">

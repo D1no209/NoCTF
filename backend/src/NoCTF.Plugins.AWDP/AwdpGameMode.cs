@@ -107,6 +107,9 @@ public class AwdpGameMode(
         state.UpdatedAt = now;
 
         var expectedFlag = await ResolveExpectedFlagAsync(challenge, context.TeamId, cancellationToken);
+        if (expectedFlag is null)
+            return SubmissionResult.InstanceRequired;
+
         var isCorrect = IsMatch(context.FlagContent, expectedFlag);
 
         if (!isCorrect && LooksLikeLegacyFullFlag(challenge.FlagSecret ?? string.Empty))
@@ -185,7 +188,7 @@ public class AwdpGameMode(
                 s.ChallengeId == context.ChallengeId &&
                 s.IsCorrect, ct);
 
-    private async Task<string> ResolveExpectedFlagAsync(Challenge challenge, Guid teamId, CancellationToken ct)
+    private async Task<string?> ResolveExpectedFlagAsync(Challenge challenge, Guid teamId, CancellationToken ct)
     {
         var flagSecret = challenge.FlagSecret ?? string.Empty;
         if (!string.Equals(flagSecret.Trim(), "[UUID]", StringComparison.OrdinalIgnoreCase))
@@ -199,7 +202,7 @@ public class AwdpGameMode(
                 f.TeamId == teamId &&
                 f.ChallengeId == challenge.Id, ct);
 
-        return flag is null ? string.Empty : FormatFlag(challenge, flag.FlagUuid);
+        return flag is null ? null : FormatFlag(challenge, flag.FlagUuid);
     }
 
     private static string FormatFlag(Challenge challenge, string content)
@@ -223,6 +226,9 @@ public class AwdpGameMode(
 
     private static bool IsMatch(string submitted, string expected)
     {
+        if (string.IsNullOrWhiteSpace(submitted) || string.IsNullOrWhiteSpace(expected))
+            return false;
+
         var submittedBytes = Encoding.UTF8.GetBytes(submitted.Trim());
         var expectedBytes = Encoding.UTF8.GetBytes(expected.Trim());
         return submittedBytes.Length == expectedBytes.Length &&

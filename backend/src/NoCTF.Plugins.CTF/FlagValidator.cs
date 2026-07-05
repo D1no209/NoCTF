@@ -16,12 +16,13 @@ public static class FlagValidator
     /// <returns>True if the flags match; otherwise false.</returns>
     public static bool IsMatch(string submitted, string expected)
     {
-        if (submitted is null || expected is null)
+        if (string.IsNullOrWhiteSpace(submitted) || string.IsNullOrWhiteSpace(expected))
             return false;
 
-        var submittedBytes = Encoding.UTF8.GetBytes(submitted);
-        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        var submittedBytes = Encoding.UTF8.GetBytes(submitted.Trim());
+        var expectedBytes = Encoding.UTF8.GetBytes(expected.Trim());
 
-        return CryptographicOperations.FixedTimeEquals(submittedBytes, expectedBytes);
+        return submittedBytes.Length == expectedBytes.Length &&
+               CryptographicOperations.FixedTimeEquals(submittedBytes, expectedBytes);
     }
 }

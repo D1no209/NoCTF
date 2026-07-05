@@ -39,20 +39,25 @@ public class AwdpScoreEngine(
             .AsNoTracking()
             .Where(c => c.CompetitionId == competitionId)
             .ToListAsync(ct);
+        var activeTeamIds = teams.Select(t => t.Id).ToHashSet();
 
         var states = await db.AwdpTeamChallengeStates
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(s => s.CompetitionId == competitionId)
+            .Where(s => s.CompetitionId == competitionId && activeTeamIds.Contains(s.TeamId))
             .ToListAsync(ct);
 
         var stateMap = states.ToDictionary(s => (s.TeamId, s.ChallengeId));
         var breakSuccessCounts = states
-            .Where(s => s.BreakStatus == AwdpBreakStatus.BreakSuccess)
+            .Where(s =>
+                s.BreakStatus == AwdpBreakStatus.BreakSuccess &&
+                IsEffectiveForRound(s.BreakSucceededAt, roundStart))
             .GroupBy(s => s.ChallengeId)
             .ToDictionary(g => g.Key, g => g.Count());
         var fixSuccessCounts = states
-            .Where(s => s.FixStatus == AwdpFixStatus.FixSuccess)
+            .Where(s =>
+                s.FixStatus == AwdpFixStatus.FixSuccess &&
+                IsEffectiveForRound(s.FixSucceededAt, roundStart))
             .GroupBy(s => s.ChallengeId)
             .ToDictionary(g => g.Key, g => g.Count());
 

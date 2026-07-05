@@ -271,9 +271,8 @@ services:
   web:
     image: nginx:alpine
     ports:
-      - "8080:80/tcp"
+      - "80/tcp"
       - target: 8443
-        published: 30443
         protocol: tcp
 """;
 

@@ -11,6 +11,18 @@ public class DockerComposeRunnerTests
 services:
   web:
     image: registry/challenge:latest
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    read_only: true
+    pids_limit: 128
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "256M"
 """;
 
         DockerComposeRunner.ValidateComposeYaml(yaml);
@@ -25,6 +37,16 @@ services:
     image: registry/challenge:latest
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    read_only: true
+    pids_limit: 128
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "256M"
 """;
 
         DockerComposeRunner.ValidateComposeYaml(yaml);
@@ -146,6 +168,18 @@ services:
     image: registry/challenge:latest
     volumes:
       - challenge-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    read_only: true
+    pids_limit: 128
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "256M"
 volumes:
   challenge-data:
 """;

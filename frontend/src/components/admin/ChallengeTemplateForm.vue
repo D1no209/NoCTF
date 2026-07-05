@@ -166,6 +166,18 @@ const ctfDeploymentTypes = ['StaticAttachment', 'DynamicContainer', 'StaticConta
 const containerDeploymentTypes = ['DynamicContainer', 'StaticContainer'] as const
 const challengeTypeOptions = [
   { value: 'Ctf', label: 'CTF' },
+  { value: 'WEB', label: 'WEB' },
+  { value: 'PWN', label: 'PWN' },
+  { value: 'MISC', label: 'MISC' },
+  { value: 'REVERSE', label: 'REVERSE' },
+  { value: 'MOBILE', label: 'MOBILE' },
+  { value: 'CRYPTO', label: 'CRYPTO' },
+  { value: 'FORENSICS', label: 'FORENSICS' },
+  { value: 'AI', label: 'AI' },
+  { value: 'BLOCKCHAIN', label: 'BLOCKCHAIN' },
+  { value: 'HARDWARE', label: 'HARDWARE' },
+  { value: 'OSINT', label: 'OSINT' },
+  { value: 'CLOUD', label: 'CLOUD' },
   { value: 'Awd', label: 'AWD' },
   { value: 'Awdp', label: 'AWDP' },
   { value: 'Koh', label: 'KoH' },
@@ -184,6 +196,8 @@ function deploymentTypeValue(value: DeploymentTypeKey) {
 
 function normalizeChallengeType(value?: string | null): ChallengeTypeKey {
   const key = (value ?? 'Ctf').trim().toLowerCase()
+  const direction = challengeTypeOptions.find((option) => option.value.toLowerCase() === key)
+  if (direction) return direction.value
   if (key === 'awd') return 'Awd'
   if (key === 'awdp') return 'Awdp'
   if (key === 'koh') return 'Koh'
@@ -191,7 +205,12 @@ function normalizeChallengeType(value?: string | null): ChallengeTypeKey {
   return 'Ctf'
 }
 
-const selectedChallengeType = computed(() => normalizeChallengeType(form.value.typeId))
+const selectedChallengeType = computed(() => {
+  const normalized = normalizeChallengeType(form.value.typeId)
+  return normalized === 'Awd' || normalized === 'Awdp' || normalized === 'Koh' || normalized === 'Penetration'
+    ? normalized
+    : 'Ctf'
+})
 const deploymentOptions = computed(() => selectedChallengeType.value === 'Ctf'
   ? ctfDeploymentTypes
   : containerDeploymentTypes)

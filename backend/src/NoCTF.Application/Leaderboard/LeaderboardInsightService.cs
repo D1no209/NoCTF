@@ -236,11 +236,11 @@ public class LeaderboardInsightService(
             .ToDictionary(g => g.Key, g => g.Count());
 
         var directionScores = scoreEvents
+            .Where(e => e.ChallengeId.HasValue && challengeMap.ContainsKey(e.ChallengeId.Value))
             .GroupBy(e =>
             {
-                if (e.ChallengeId.HasValue && challengeMap.TryGetValue(e.ChallengeId.Value, out var challenge))
-                    return NormalizeDirection(challenge.TypeId);
-                return "GENERAL";
+                challengeMap.TryGetValue(e.ChallengeId!.Value, out var challenge);
+                return NormalizeDirection(challenge?.TypeId);
             })
             .Select(g => new LeaderboardDirectionScore(
                 g.Key,
@@ -310,7 +310,7 @@ public class LeaderboardInsightService(
             .Select(u => new { u.Id, u.UserName })
             .ToListAsync(ct);
 
-        var solvesByUser = correctSubmissions
+        var solvesByUser = teamCorrectSubmissions
             .GroupBy(s => s.UserId)
             .ToDictionary(
                 g => g.Key,

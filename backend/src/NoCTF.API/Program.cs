@@ -24,6 +24,7 @@ using NoCTF.Application.Events;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Application.Security;
 using NoCTF.Infrastructure;
+using NoCTF.Infrastructure.Storage;
 using NoCTF.PluginBase;
 using NoCTF.Runner.Client;
 using StackExchange.Redis;
@@ -108,6 +109,20 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+    options.AddPolicy("flag-submit", httpContext =>
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var partition = $"{userId ?? "anonymous"}:{httpContext.Connection.RemoteIpAddress}";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partition,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
 });
 
 // SignalR with Redis backplane
@@ -227,12 +242,6 @@ var localBasePath = builder.Configuration["StorageProvider:Local:BasePath"] ?? "
 if (!Directory.Exists(localBasePath))
     Directory.CreateDirectory(localBasePath);
 
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(Path.GetFullPath(localBasePath)),
-    RequestPath = "/api/files"
-});
-
 if (!app.Environment.IsDevelopment())
 {
     var spaFileProvider = new PhysicalFileProvider(Path.Combine(Environment.CurrentDirectory, "wwwroot"));
@@ -245,6 +254,46 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.UseMiddleware<TenantResolutionMiddleware>();
+
+app.MapGet("/api/files/{**filePath}", (string filePath, HttpContext httpContext, IConfiguration configuration) =>
+{
+    var normalized = filePath.TrimStart('/').Replace("\\", "/", StringComparison.Ordinal);
+    if (string.IsNullOrWhiteSpace(normalized) ||
+        normalized.Contains("..", StringComparison.Ordinal) ||
+        Path.IsPathRooted(normalized))
+    {
+        return Results.NotFound();
+    }
+
+    var fullBasePath = Path.GetFullPath(localBasePath);
+    var fullPath = Path.GetFullPath(Path.Combine(fullBasePath, normalized));
+    if (!fullPath.StartsWith(fullBasePath, StringComparison.OrdinalIgnoreCase) ||
+        !System.IO.File.Exists(fullPath))
+    {
+        return Results.NotFound();
+    }
+
+    var signature = httpContext.Request.Query["sig"].ToString();
+    var hasValidSignature =
+        long.TryParse(httpContext.Request.Query["expires"].ToString(), out var expires) &&
+        LocalFileUrlSigner.Validate(
+            normalized,
+            expires,
+            signature,
+            configuration["StorageProvider:Local:UrlSigningKey"] ?? configuration["JwtSettings:Secret"],
+            DateTimeOffset.UtcNow);
+    var isPatchArchive = normalized.StartsWith("patches/", StringComparison.OrdinalIgnoreCase);
+    if (isPatchArchive && !hasValidSignature)
+    {
+        return Results.NotFound();
+    }
+    else if (!hasValidSignature && httpContext.User.Identity?.IsAuthenticated != true)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.File(fullPath, "application/octet-stream", Path.GetFileName(fullPath));
+});
 
 app.UseFastEndpoints(c =>
 {

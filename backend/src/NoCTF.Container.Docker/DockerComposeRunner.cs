@@ -29,6 +29,7 @@ public static class DockerComposeRunner
         "cap_drop",
         "read_only",
         "user",
+        "pids_limit",
         "deploy",
         "volumes",
         "healthcheck"
@@ -141,18 +142,114 @@ public static class DockerComposeRunner
                 case "security_opt":
                     ValidateSecurityOptions(valueNode);
                     break;
+                case "ports":
+                    ValidatePorts(valueNode);
+                    break;
                 case "volumes":
                     ValidateVolumes(valueNode);
                     break;
                 case "deploy":
                     ValidateDeploy(valueNode);
                     break;
+                case "pids_limit":
+                    ValidatePidsLimit(valueNode);
+                    break;
                 case "healthcheck":
                     ValidateHealthcheck(valueNode);
                     break;
             }
         }
+
+        if (!HasNoNewPrivileges(service))
+            throw new InvalidOperationException("Compose services must set security_opt: no-new-privileges:true.");
+        if (!HasCapDropAll(service))
+            throw new InvalidOperationException("Compose services must drop all Linux capabilities.");
+        if (!HasNonRootUser(service))
+            throw new InvalidOperationException("Compose services must run as a non-root user.");
+        if (!HasReadOnlyRootFilesystem(service))
+            throw new InvalidOperationException("Compose services must set read_only: true.");
+        if (!HasRequiredResourceLimits(service))
+            throw new InvalidOperationException("Compose services must define deploy.resources.limits.cpus and memory.");
+        if (!HasValidPidsLimit(service))
+            throw new InvalidOperationException("Compose services must define pids_limit between 1 and 512.");
     }
+
+    private static void ValidatePorts(YamlNode node)
+    {
+        foreach (var item in SequenceItems(node))
+        {
+            if (item is YamlMappingNode mapping)
+            {
+                var hostIp = ScalarValue(GetValue(mapping, "host_ip"));
+                if (!string.IsNullOrWhiteSpace(hostIp))
+                    throw new InvalidOperationException("Compose port host_ip bindings are not allowed.");
+
+                var mode = ScalarValue(GetValue(mapping, "mode"));
+                if (mode.Equals("host", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Compose host-mode ports are not allowed.");
+
+                var published = ScalarValue(GetValue(mapping, "published"));
+                if (!string.IsNullOrWhiteSpace(published) && published != "0")
+                    throw new InvalidOperationException("Compose fixed published ports are not allowed.");
+
+                continue;
+            }
+
+            var value = ScalarValue(item).Trim();
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
+
+            if (value.Contains('[', StringComparison.Ordinal) ||
+                value.Count(c => c == ':') > 1)
+                throw new InvalidOperationException("Compose port host bindings are not allowed.");
+
+            var segments = value.Split(':', StringSplitOptions.TrimEntries);
+            if (segments.Length > 1 && segments[0] != "0")
+                throw new InvalidOperationException("Compose fixed published ports are not allowed.");
+        }
+    }
+
+    private static bool HasNoNewPrivileges(YamlMappingNode service)
+        => GetValue(service, "security_opt") is { } node &&
+           ToScalarList(node).Any(option =>
+               option.Replace(" ", string.Empty, StringComparison.Ordinal)
+                   .Equals("no-new-privileges:true", StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasCapDropAll(YamlMappingNode service)
+        => GetValue(service, "cap_drop") is { } node &&
+           ToScalarList(node).Any(option => option.Equals("ALL", StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasNonRootUser(YamlMappingNode service)
+    {
+        var user = ScalarValue(GetValue(service, "user")).Trim();
+        if (string.IsNullOrWhiteSpace(user))
+            return false;
+
+        var first = user.Split(':', 2, StringSplitOptions.TrimEntries)[0];
+        return !first.Equals("0", StringComparison.Ordinal) &&
+               !first.Equals("root", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasReadOnlyRootFilesystem(YamlMappingNode service)
+        => ScalarValue(GetValue(service, "read_only"))
+            .Equals("true", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasRequiredResourceLimits(YamlMappingNode service)
+    {
+        if (GetValue(service, "deploy") is not YamlMappingNode deploy ||
+            GetValue(deploy, "resources") is not YamlMappingNode resources ||
+            GetValue(resources, "limits") is not YamlMappingNode limits)
+        {
+            return false;
+        }
+
+        return !string.IsNullOrWhiteSpace(ScalarValue(GetValue(limits, "cpus"))) &&
+               !string.IsNullOrWhiteSpace(ScalarValue(GetValue(limits, "memory")));
+    }
+
+    private static bool HasValidPidsLimit(YamlMappingNode service)
+        => int.TryParse(ScalarValue(GetValue(service, "pids_limit")), out var value) &&
+           value is > 0 and <= 512;
 
     private static void ValidateDeploy(YamlNode node)
     {
@@ -175,6 +272,12 @@ public static class DockerComposeRunner
                     throw new InvalidOperationException($"Compose deploy.resources directive is not supported: {resourceKey}");
             }
         }
+    }
+
+    private static void ValidatePidsLimit(YamlNode node)
+    {
+        if (!int.TryParse(ScalarValue(node), out var value) || value is <= 0 or > 512)
+            throw new InvalidOperationException("Compose pids_limit must be between 1 and 512.");
     }
 
     private static void ValidateHealthcheck(YamlNode node)

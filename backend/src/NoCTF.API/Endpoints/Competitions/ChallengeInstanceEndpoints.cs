@@ -68,6 +68,9 @@ public static class ChallengeInstanceRuntime
         var configured = configuration["InstanceAccess:PublicHost"];
         if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim();
 
+        if (!configuration.GetValue("InstanceAccess:TrustRequestHost", false))
+            return "127.0.0.1";
+
         var requestHost = httpContext.Request.Host.Host;
         if (!string.IsNullOrWhiteSpace(requestHost) &&
             !IPAddress.IsLoopback(IPAddress.TryParse(requestHost, out var parsed) ? parsed : IPAddress.None) &&
@@ -307,7 +310,15 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
                 expiresAt = box.ExpiresAt,
                 flagEnv = dynamicFlag.EnvironmentVariable
             });
-        await dbContext.SaveChangesAsync(ct);
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            await DestroyBoxAsync(box, containerManager, CancellationToken.None);
+            throw;
+        }
 
         await SendAsync(ChallengeInstanceRuntime.BuildResponse(box, configuration, HttpContext, DateTime.UtcNow), cancellation: ct);
     }

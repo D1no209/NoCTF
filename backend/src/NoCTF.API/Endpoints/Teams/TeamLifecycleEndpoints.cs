@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Data;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API;
@@ -152,6 +153,11 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
             await SendStringAsync("competition_not_found", 404, cancellation: ct);
             return;
         }
+        if (TeamLifecycleRules.GetRegistrationBlockReason(competition) is { } registrationBlockReason)
+        {
+            await SendStringAsync(registrationBlockReason, 403, cancellation: ct);
+            return;
+        }
 
         var alreadyInTeam = await db.TeamMembers
             .AnyAsync(tm => tm.CompetitionId == req.CompetitionId && tm.UserId == userId.Value, ct);
@@ -270,36 +276,12 @@ public class JoinTeamEndpoint(ApplicationDbContext db) : Endpoint<JoinTeamReques
             return;
         }
 
-        var alreadyInCompetition = await db.TeamMembers
-            .AnyAsync(tm => tm.CompetitionId == team.CompetitionId && tm.UserId == userId.Value, ct);
-        if (alreadyInCompetition)
+        var joinResult = await TeamLifecycleRules.TryAddMemberAsync(db, team.Id, userId.Value, ct);
+        if (!joinResult.Success)
         {
-            await SendAsync(new TeamDto(), 409, ct);
+            await SendStringAsync(joinResult.Code ?? "join_failed", joinResult.StatusCode, cancellation: ct);
             return;
         }
-
-        var maxMembers = await db.Competitions
-            .IgnoreQueryFilters()
-            .Where(c => c.Id == team.CompetitionId)
-            .Select(c => c.MaxTeamMembers)
-            .FirstOrDefaultAsync(ct);
-        var memberCount = await db.TeamMembers.CountAsync(tm => tm.TeamId == team.Id, ct);
-        if (maxMembers > 0 && memberCount >= maxMembers)
-        {
-            await SendStringAsync("team_full", 409, cancellation: ct);
-            return;
-        }
-
-        db.TeamMembers.Add(new TeamMember
-        {
-            Id = Guid.NewGuid(),
-            CompetitionId = team.CompetitionId,
-            TeamId = team.Id,
-            UserId = userId.Value,
-            Role = TeamMemberRole.Member,
-            JoinedAt = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync(ct);
 
         await SendAsync(CreateTeamEndpoint.ToDto(team), cancellation: ct);
     }
@@ -342,36 +324,12 @@ public class JoinTeamByTokenEndpoint(ApplicationDbContext db) : Endpoint<JoinTea
             return;
         }
 
-        var alreadyInCompetition = await db.TeamMembers
-            .AnyAsync(tm => tm.CompetitionId == team.CompetitionId && tm.UserId == userId.Value, ct);
-        if (alreadyInCompetition)
+        var joinResult = await TeamLifecycleRules.TryAddMemberAsync(db, team.Id, userId.Value, ct);
+        if (!joinResult.Success)
         {
-            await SendStringAsync("already_registered", 409, cancellation: ct);
+            await SendStringAsync(joinResult.Code ?? "join_failed", joinResult.StatusCode, cancellation: ct);
             return;
         }
-
-        var maxMembers = await db.Competitions
-            .IgnoreQueryFilters()
-            .Where(c => c.Id == team.CompetitionId)
-            .Select(c => c.MaxTeamMembers)
-            .FirstOrDefaultAsync(ct);
-        var memberCount = await db.TeamMembers.CountAsync(tm => tm.TeamId == team.Id, ct);
-        if (maxMembers > 0 && memberCount >= maxMembers)
-        {
-            await SendStringAsync("team_full", 409, cancellation: ct);
-            return;
-        }
-
-        db.TeamMembers.Add(new TeamMember
-        {
-            Id = Guid.NewGuid(),
-            CompetitionId = team.CompetitionId,
-            TeamId = team.Id,
-            UserId = userId.Value,
-            Role = TeamMemberRole.Member,
-            JoinedAt = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync(ct);
 
         await SendAsync(CreateTeamEndpoint.ToDto(team), cancellation: ct);
     }
@@ -515,4 +473,79 @@ public class RemoveTeamMemberEndpoint(ApplicationDbContext db, ITeamPermissionSe
         await db.SaveChangesAsync(ct);
         await SendNoContentAsync(ct);
     }
+}
+
+internal static class TeamLifecycleRules
+{
+    public static string? GetRegistrationBlockReason(Competition competition)
+    {
+        var now = DateTime.UtcNow;
+        if (competition.Status == CompetitionStatus.Draft)
+            return "competition_not_open";
+        if (competition.Status == CompetitionStatus.Paused)
+            return "competition_paused";
+        if (competition.Status == CompetitionStatus.Finished || now > competition.EndTime)
+            return "competition_ended";
+
+        return null;
+    }
+
+    public static async Task<(bool Success, string? Code, int StatusCode)> TryAddMemberAsync(
+        ApplicationDbContext db,
+        Guid teamId,
+        Guid userId,
+        CancellationToken ct)
+    {
+        await using var transaction = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
+            : null;
+
+        if (transaction is not null)
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({AdvisoryLockKey(teamId)})",
+                ct);
+
+        var team = await db.Teams.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == teamId, ct);
+        if (team is null)
+            return (false, "team_not_found", 404);
+        if (team.IsLocked)
+            return (false, "team_locked", 409);
+        if (team.IsBanned)
+            return (false, "team_banned", 403);
+
+        var competition = await db.Competitions
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == team.CompetitionId, ct);
+        if (competition is null)
+            return (false, "competition_not_found", 404);
+        if (GetRegistrationBlockReason(competition) is { } registrationBlockReason)
+            return (false, registrationBlockReason, 403);
+
+        var alreadyInCompetition = await db.TeamMembers
+            .AnyAsync(tm => tm.CompetitionId == team.CompetitionId && tm.UserId == userId, ct);
+        if (alreadyInCompetition)
+            return (false, "already_registered", 409);
+
+        var memberCount = await db.TeamMembers.CountAsync(tm => tm.TeamId == team.Id, ct);
+        if (competition.MaxTeamMembers > 0 && memberCount >= competition.MaxTeamMembers)
+            return (false, "team_full", 409);
+
+        db.TeamMembers.Add(new TeamMember
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = team.CompetitionId,
+            TeamId = team.Id,
+            UserId = userId,
+            Role = TeamMemberRole.Member,
+            JoinedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
+
+        return (true, null, 200);
+    }
+
+    private static long AdvisoryLockKey(Guid id)
+        => BitConverter.ToInt64(id.ToByteArray(), 0);
 }

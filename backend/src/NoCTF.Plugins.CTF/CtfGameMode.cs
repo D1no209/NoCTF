@@ -83,7 +83,10 @@ public class CtfGameMode : IGameMode
         var flagSecret = challenge.FlagSecret ?? string.Empty;
         var isDynamicUuid = string.Equals(flagSecret.Trim(), "[UUID]", StringComparison.OrdinalIgnoreCase);
         var expectedFlag = await ResolveExpectedFlagAsync(challenge, context.TeamId, isDynamicUuid, cancellationToken);
-        var isCorrect = FlagValidator.IsMatch(context.FlagContent, expectedFlag);
+        if (isDynamicUuid && expectedFlag is null)
+            return SubmissionResult.InstanceRequired;
+
+        var isCorrect = FlagValidator.IsMatch(context.FlagContent, expectedFlag ?? string.Empty);
 
         if (!isCorrect && !isDynamicUuid && LooksLikeLegacyFullFlag(flagSecret))
         {
@@ -252,7 +255,7 @@ public class CtfGameMode : IGameMode
                 s.IsCorrect,
                 cancellationToken);
 
-    private async Task<string> ResolveExpectedFlagAsync(
+    private async Task<string?> ResolveExpectedFlagAsync(
         Challenge challenge,
         Guid teamId,
         bool isDynamicUuid,
@@ -270,7 +273,7 @@ public class CtfGameMode : IGameMode
                 f.ChallengeId == challenge.Id,
                 cancellationToken);
 
-        return flag is null ? string.Empty : FormatFlag(challenge, flag.FlagUuid);
+        return flag is null ? null : FormatFlag(challenge, flag.FlagUuid);
     }
 
     private async Task<CtfDynamicFlag?> FindStolenDynamicFlagAsync(

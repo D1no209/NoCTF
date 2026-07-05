@@ -16,9 +16,9 @@ else
     builder.Services.AddScoped<IContainerManager, NoCTF.Container.Docker.DockerManager>();
 }
 
-var allowedRegistries = builder.Configuration
-    .GetSection("Runner:AllowedRegistries")
-    .Get<string[]>() ?? [];
+var allowedRegistries = RunnerImagePolicy.ReadAllowedRegistries(builder.Configuration);
+if (!builder.Environment.IsDevelopment() && allowedRegistries.Length == 0)
+    throw new InvalidOperationException("Runner:AllowedRegistries must be configured outside Development.");
 var runnerApiKey = builder.Configuration["Runner:ApiKey"];
 var requireRunnerAuth = !builder.Environment.IsDevelopment() || !string.IsNullOrWhiteSpace(runnerApiKey);
 if (requireRunnerAuth && string.IsNullOrWhiteSpace(runnerApiKey))
@@ -71,6 +71,7 @@ app.MapPost("/runner/containers", async (
 
     try
     {
+        RunnerImagePolicy.ValidateContainerConfig(config);
         var disallowed = RunnerImagePolicy.FindDisallowedContainerImage(config, allowedRegistries);
         if (!string.IsNullOrWhiteSpace(disallowed))
             return Results.BadRequest(new { code = "image_registry_not_allowed", image = disallowed });
@@ -107,6 +108,7 @@ app.MapPost("/runner/jobs/one-shot", async (
 
     try
     {
+        RunnerImagePolicy.ValidateContainerConfig(config);
         var disallowed = RunnerImagePolicy.FindDisallowedContainerImage(config, allowedRegistries);
         if (!string.IsNullOrWhiteSpace(disallowed))
             return Results.BadRequest(new { code = "image_registry_not_allowed", image = disallowed });

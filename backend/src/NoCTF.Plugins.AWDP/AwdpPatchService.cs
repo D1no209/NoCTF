@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Security;
@@ -59,6 +61,13 @@ public class AwdpPatchService(
         if (challenge is null)
             return new AwdpPatchSubmitResult(false, "challenge_not_found");
 
+        await using var stateLock = await AwdpPatchStateLock.AcquireAsync(db, teamId, challengeId, ct);
+        async Task SaveAndCommitAsync()
+        {
+            await db.SaveChangesAsync(ct);
+            await stateLock.CommitAsync(ct);
+        }
+
         var config = await configResolver.ResolveAsync(competitionId, challengeId, ct);
         var state = await stateService.GetOrCreateAsync(competitionId, teamId, challengeId, ct);
         var gameBox = await db.AwdGameBoxes
@@ -73,7 +82,7 @@ public class AwdpPatchService(
         {
             state.InstanceStatus = AwdpInstanceStatus.InstanceNotCreated;
             state.UpdatedAt = now;
-            await db.SaveChangesAsync(ct);
+            await SaveAndCommitAsync();
             return new AwdpPatchSubmitResult(
                 false,
                 "instance_required",
@@ -85,7 +94,7 @@ public class AwdpPatchService(
         {
             state.InstanceStatus = AwdpInstanceStatus.InstanceExpired;
             state.UpdatedAt = now;
-            await db.SaveChangesAsync(ct);
+            await SaveAndCommitAsync();
             return new AwdpPatchSubmitResult(
                 false,
                 "instance_expired",
@@ -98,7 +107,7 @@ public class AwdpPatchService(
         if (state.FixStatus == AwdpFixStatus.FixSuccess && !config.AllowDefenseAfterFixSuccess)
         {
             state.UpdatedAt = now;
-            await db.SaveChangesAsync(ct);
+            await SaveAndCommitAsync();
             return new AwdpPatchSubmitResult(
                 false,
                 "already_fixed",
@@ -110,7 +119,7 @@ public class AwdpPatchService(
         {
             state.FixStatus = AwdpFixStatus.DefenseAttemptsExhausted;
             state.UpdatedAt = now;
-            await db.SaveChangesAsync(ct);
+            await SaveAndCommitAsync();
             return new AwdpPatchSubmitResult(
                 false,
                 "defense_attempts_exhausted",
@@ -150,7 +159,7 @@ public class AwdpPatchService(
             state.UpdatedAt = now;
 
             db.AwdpPatchSubmissions.Add(rejectedSubmission);
-            await db.SaveChangesAsync(ct);
+            await SaveAndCommitAsync();
             return new AwdpPatchSubmitResult(
                 false,
                 validation.Error ?? "invalid_archive",
@@ -179,7 +188,7 @@ public class AwdpPatchService(
             now);
 
         db.AwdpPatchSubmissions.Add(submission);
-        await db.SaveChangesAsync(ct);
+        await SaveAndCommitAsync();
 
         logger.LogInformation(
             "AWDP FixScript submitted: submission={SubmissionId} team={TeamId} challenge={ChallengeId} attempt={Attempt}/{MaxAttempts}",
@@ -197,7 +206,14 @@ public class AwdpPatchService(
     {
         var submission = await db.AwdpPatchSubmissions
             .IgnoreQueryFilters()
-            .FirstAsync(s => s.Id == submissionId, ct);
+            .FirstOrDefaultAsync(s => s.Id == submissionId, ct);
+        if (submission is null)
+        {
+            logger.LogInformation(
+                "AWDP FixScript submission {SubmissionId} no longer exists; skipping validation.",
+                submissionId);
+            return;
+        }
 
         if (IsTerminal(submission.FixStatus))
         {
@@ -275,13 +291,40 @@ public class AwdpPatchService(
 
         var oldInstance = ToContainerInstance(gameBox, gameBox.ContainerInstanceId);
         var patchedContainer = await CreatePatchedContainerAsync(challenge, submission, ct);
+        if (oldInstance is not null)
+        {
+            try
+            {
+                await DestroyContainerInstanceAsync(oldInstance, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to destroy old AWDP container {ContainerId}; rejecting patch to preserve tracked instance.", oldInstance.ContainerId);
+                await DestroyContainerBestEffortAsync(patchedContainer);
+                await CompleteValidationAsync(
+                    submission,
+                    state,
+                    AwdpPatchStatus.Rejected,
+                    AwdpFixStatus.FixServiceError,
+                    AwdpServiceStatus.ServiceError,
+                    "Failed to replace the running container safely.",
+                    ct);
+                return;
+            }
+        }
+
         ApplyContainerMetadata(gameBox, patchedContainer);
         gameBox.ExpiresAt ??= DateTime.UtcNow.AddHours(2);
         gameBox.LastInstanceActionAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-
-        if (oldInstance is not null)
-            await DestroyContainerInstanceAsync(oldInstance, ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            await DestroyContainerBestEffortAsync(patchedContainer);
+            throw;
+        }
 
         var checkResult = await RunCheckAsync(challenge, submission, gameBox, ct);
         if (checkResult.FixStatus != AwdpFixStatus.FixSuccess)
@@ -455,16 +498,21 @@ public class AwdpPatchService(
         }
     }
 
-    private async Task DestroyContainerInstanceAsync(ContainerInstance instance, CancellationToken ct)
+    private async Task DestroyContainerBestEffortAsync(ContainerInstance container)
     {
         try
         {
-            await containerManager.DestroyContainerAsync(instance, ct);
+            await containerManager.DestroyContainerAsync(container, CancellationToken.None);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to destroy previous AWDP container {ContainerId}.", instance.ContainerId);
+            logger.LogWarning(ex, "Failed to destroy AWDP container {ContainerId}.", container.ContainerId);
         }
+    }
+
+    private async Task DestroyContainerInstanceAsync(ContainerInstance instance, CancellationToken ct)
+    {
+        await containerManager.DestroyContainerAsync(instance, ct);
     }
 
     private static ContainerInstance? ToContainerInstance(AwdGameBox gameBox, string? containerId)
@@ -726,4 +774,53 @@ public class AwdpPatchService(
         AwdpFixStatus FixStatus,
         AwdpServiceStatus ServiceStatus,
         string Detail);
+}
+
+internal sealed class AwdpPatchStateLock : IAsyncDisposable
+{
+    private readonly IDbContextTransaction? _transaction;
+    private bool _committed;
+
+    private AwdpPatchStateLock(IDbContextTransaction? transaction)
+    {
+        _transaction = transaction;
+    }
+
+    public static async Task<AwdpPatchStateLock> AcquireAsync(
+        ApplicationDbContext db,
+        Guid teamId,
+        Guid challengeId,
+        CancellationToken ct)
+    {
+        if (!db.Database.IsRelational())
+            return new AwdpPatchStateLock(null);
+
+        var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({AdvisoryLockKey(teamId, challengeId)})",
+            ct);
+        return new AwdpPatchStateLock(transaction);
+    }
+
+    public async Task CommitAsync(CancellationToken ct)
+    {
+        if (_transaction is null || _committed)
+            return;
+
+        await _transaction.CommitAsync(ct);
+        _committed = true;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_transaction is not null)
+            await _transaction.DisposeAsync();
+    }
+
+    private static long AdvisoryLockKey(Guid teamId, Guid challengeId)
+    {
+        var teamPart = BitConverter.ToInt32(teamId.ToByteArray(), 0);
+        var challengePart = BitConverter.ToInt32(challengeId.ToByteArray(), 0);
+        return ((long)teamPart << 32) ^ (uint)challengePart;
+    }
 }

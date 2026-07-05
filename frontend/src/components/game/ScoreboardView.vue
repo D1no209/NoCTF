@@ -119,6 +119,7 @@ const detailLoading = ref(false)
 const detailError = ref('')
 const hoveredTeamId = ref<string | null>(null)
 let pollInterval: ReturnType<typeof setInterval> | null = null
+let teamDetailRequestId = 0
 
 const chartFrame = {
   left: 68,
@@ -417,16 +418,28 @@ function applyLeaderboard(nextEntries: LeaderboardEntry[]) {
   emit('scoreUpdate', entries.value)
 }
 
+function normalizeTeamDetail(detail: TeamDetail): TeamDetail {
+  return {
+    ...detail,
+    directionScores: detail.directionScores ?? [],
+    challengeScores: detail.challengeScores ?? [],
+    members: detail.members ?? [],
+  }
+}
+
 async function fetchLeaderboard() {
   try {
-    const [leaderboardData, trendData] = await Promise.all([
-      competitionApi.leaderboard(props.competitionId) as Promise<{ entries?: LeaderboardEntry[] }>,
-      competitionApi.leaderboardTrend<TrendResponse>(props.competitionId),
-    ])
+    const leaderboardData = await competitionApi.leaderboard(props.competitionId) as { entries?: LeaderboardEntry[] }
     applyLeaderboard(leaderboardData?.entries ?? [])
-    trend.value = trendData?.series ?? []
   } catch {
     // Keep the last successful snapshot while polling.
+  }
+
+  try {
+    const trendData = await competitionApi.leaderboardTrend<TrendResponse>(props.competitionId)
+    trend.value = trendData?.series ?? []
+  } catch {
+    // Trend is decorative; the ranking should remain usable if it fails.
   } finally {
     loading.value = false
   }
@@ -434,20 +447,25 @@ async function fetchLeaderboard() {
 
 async function openTeamDetail(teamId?: string) {
   if (!teamId) return
+  const requestId = ++teamDetailRequestId
   selectedTeamId.value = teamId
   detailLoading.value = true
   selectedTeam.value = null
   detailError.value = ''
   try {
-    selectedTeam.value = await competitionApi.leaderboardTeam<TeamDetail>(
+    const detail = await competitionApi.leaderboardTeam<TeamDetail>(
       props.competitionId,
       teamId,
     )
+    if (requestId !== teamDetailRequestId) return
+    selectedTeam.value = normalizeTeamDetail(detail)
   } catch {
+    if (requestId !== teamDetailRequestId) return
     detailError.value = t('scoreboard.teamDetailLoadError')
     toast.error(detailError.value)
   } finally {
-    detailLoading.value = false
+    if (requestId === teamDetailRequestId)
+      detailLoading.value = false
   }
 }
 

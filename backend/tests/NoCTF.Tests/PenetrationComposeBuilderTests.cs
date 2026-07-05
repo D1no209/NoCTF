@@ -86,6 +86,12 @@ public class PenetrationComposeBuilderTests
         Assert.DoesNotContain("0:8080", result.ComposeYaml);
         Assert.Contains("no-new-privileges:true", result.ComposeYaml);
         Assert.Contains("cap_drop:", result.ComposeYaml);
+        Assert.Contains("user: \"1000:1000\"", result.ComposeYaml);
+        Assert.Contains("read_only: true", result.ComposeYaml);
+        Assert.Contains("pids_limit: 128", result.ComposeYaml);
+        Assert.Contains("cpus: \"0.50\"", result.ComposeYaml);
+        Assert.Contains("memory: \"256M\"", result.ComposeYaml);
+        Assert.DoesNotContain("networks:", result.ComposeYaml);
         Assert.Contains($"instanceId: \"{instanceId}\"", result.ComposeYaml);
     }
 

@@ -35,16 +35,22 @@ const health = ref<HealthResponse | null>(null)
 const loading = ref(false)
 const lastUpdated = ref<Date | null>(null)
 let intervalId: ReturnType<typeof setInterval> | null = null
+let inFlight = false
 
 async function fetchHealth(silent = false) {
+  if (inFlight) return
+  inFlight = true
   if (!silent) loading.value = true
   try {
-    health.value = await adminApi.health<HealthResponse>()
+    const next = await adminApi.health<HealthResponse>()
+    if (!isHealthResponse(next)) throw new Error('invalid_health_response')
+    health.value = next
     lastUpdated.value = new Date()
   } catch {
     health.value = null
-    toast.error(t('admin.health.checkFailed'))
+    if (!silent) toast.error(t('admin.health.checkFailed'))
   } finally {
+    inFlight = false
     if (!silent) loading.value = false
   }
 }
@@ -63,6 +69,15 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
   if (s === 'healthy') return 'outline'
   if (s === 'degraded' || s === 'warning') return 'secondary'
   return 'destructive'
+}
+
+function isHealthResponse(value: unknown): value is HealthResponse {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      typeof (value as HealthResponse).status === 'string' &&
+      Array.isArray((value as HealthResponse).checks),
+  )
 }
 
 function statusBadgeClass(status: string) {

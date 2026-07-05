@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Configuration;
 using NoCTF.PluginBase;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using YamlDotNet.RepresentationModel;
 
@@ -6,6 +8,32 @@ namespace NoCTF.Runner;
 
 internal static class RunnerImagePolicy
 {
+    private static readonly Regex NetworkNamePattern = new("^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$", RegexOptions.Compiled);
+    private static readonly Regex NetworkAliasPattern = new("^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$", RegexOptions.Compiled);
+
+    public static string[] ReadAllowedRegistries(IConfiguration configuration)
+    {
+        var values = configuration.GetSection("Runner:AllowedRegistries").Get<string[]>() ?? [];
+        var raw = configuration["Runner:AllowedRegistries"];
+        return values
+            .Concat(string.IsNullOrWhiteSpace(raw) ? [] : [raw])
+            .SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public static void ValidateContainerConfig(ContainerConfig config)
+    {
+        if (string.IsNullOrWhiteSpace(config.Image))
+            throw new InvalidOperationException("Container image is required.");
+
+        ValidateNetworkName(config.NetworkName);
+        ValidateNetworkAliases(config.NetworkAliases);
+        ValidateSecurityPolicy(config.SecurityPolicy);
+        ValidateResourceLimits(config.ResourceLimits);
+    }
+
     public static string? FindDisallowedContainerImage(ContainerConfig config, IReadOnlyCollection<string> allowedRegistries)
     {
         if (allowedRegistries.Count == 0)
@@ -18,6 +46,69 @@ internal static class RunnerImagePolicy
         }
 
         return null;
+    }
+
+    private static void ValidateNetworkName(string? networkName)
+    {
+        if (string.IsNullOrWhiteSpace(networkName))
+            return;
+
+        var value = networkName.Trim();
+        if (value.Equals("host", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("bridge", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("none", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("container:", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Container network mode is not allowed.");
+        }
+
+        if (!NetworkNamePattern.IsMatch(value) ||
+            (!value.StartsWith("noctf-", StringComparison.OrdinalIgnoreCase) &&
+             !value.StartsWith("noctf_", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Container network must be managed by NoCTF.");
+        }
+    }
+
+    private static void ValidateNetworkAliases(IReadOnlyList<string>? aliases)
+    {
+        if (aliases is null)
+            return;
+
+        foreach (var alias in aliases)
+        {
+            if (string.IsNullOrWhiteSpace(alias) || !NetworkAliasPattern.IsMatch(alias.Trim()))
+                throw new InvalidOperationException("Container network alias is invalid.");
+        }
+    }
+
+    private static void ValidateSecurityPolicy(ContainerSecurityPolicy? policy)
+    {
+        if (policy is null)
+            return;
+
+        if (!policy.NoNewPrivileges)
+            throw new InvalidOperationException("Container security policy must enable no-new-privileges.");
+        if (policy.CapAdd is { Count: > 0 })
+            throw new InvalidOperationException("Container security policy cannot add Linux capabilities.");
+        if (policy.CapDrop is { Count: > 0 } &&
+            !policy.CapDrop.Any(cap => cap.Equals("ALL", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("Container security policy must drop all Linux capabilities when cap_drop is specified.");
+    }
+
+    private static void ValidateResourceLimits(ContainerResourceLimits? limits)
+    {
+        if (limits is null)
+            return;
+
+        if (limits.MemoryBytes <= 0 || limits.NanoCpus <= 0 || limits.PidsLimit <= 0)
+            throw new InvalidOperationException("Container resource limits must be positive.");
+        if (limits.MemoryBytes > 2L * 1024 * 1024 * 1024)
+            throw new InvalidOperationException("Container memory limit is too high.");
+        if (limits.NanoCpus > 2_000_000_000L)
+            throw new InvalidOperationException("Container CPU limit is too high.");
+        if (limits.PidsLimit > 512)
+            throw new InvalidOperationException("Container PID limit is too high.");
     }
 
     public static string? FindDisallowedComposeImage(string composeYaml, IReadOnlyCollection<string> allowedRegistries)

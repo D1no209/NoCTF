@@ -23,6 +23,7 @@ public static class StorageProviderFactory
         }
 
         return new LocalFileStorageProvider(
-            configuration["StorageProvider:Local:BasePath"] ?? "uploads");
+            configuration["StorageProvider:Local:BasePath"] ?? "uploads",
+            configuration["StorageProvider:Local:UrlSigningKey"] ?? configuration["JwtSettings:Secret"]);
     }
 }

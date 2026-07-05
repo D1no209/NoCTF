@@ -66,6 +66,7 @@ const removeDialog = ref(false)
 const selectedCollab = ref<CollaboratorDto | null>(null)
 const newUserId = ref('')
 const newUserSearch = ref('')
+const selectedNewUserName = ref('')
 const newRole = ref('Observer')
 
 // Load competitions for dropdown
@@ -94,8 +95,10 @@ const { data: userSearchResults } = useQuery({
   queryKey: computed(() => ['admin-user-search', newUserSearch.value]),
   queryFn: async () => {
     if (!newUserSearch.value || newUserSearch.value.length < 2) return []
-    const all = await adminApi.users<{ id: string; userName: string }[]>()
-    return all.filter((u) => u.userName.toLowerCase().includes(newUserSearch.value.toLowerCase()))
+    return adminApi.users<{ id: string; userName: string }[]>({
+      q: newUserSearch.value.trim(),
+      limit: 20,
+    })
   },
   enabled: () => newUserSearch.value.length >= 2,
 })
@@ -112,6 +115,7 @@ const addMutation = useMutation({
     addDialog.value = false
     newUserId.value = ''
     newUserSearch.value = ''
+    selectedNewUserName.value = ''
     toast.success(t('admin.collaborators.addSuccess'))
   },
   onError: () => {
@@ -141,7 +145,24 @@ function openRemove(collab: CollaboratorDto) {
 function selectUser(user: { id: string; userName: string }) {
   newUserId.value = user.id
   newUserSearch.value = user.userName
+  selectedNewUserName.value = user.userName
 }
+
+watch(newUserSearch, (value) => {
+  if (selectedNewUserName.value && value !== selectedNewUserName.value) {
+    newUserId.value = ''
+    selectedNewUserName.value = ''
+  }
+})
+
+watch(addDialog, (open) => {
+  if (!open) {
+    newUserId.value = ''
+    newUserSearch.value = ''
+    selectedNewUserName.value = ''
+    newRole.value = 'Observer'
+  }
+})
 
 watch(
   () => route.query.competitionId,

@@ -371,6 +371,14 @@ public static class KubernetesComposeParser
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("Compose port cannot be empty.");
 
+        if (text.Contains('[', StringComparison.Ordinal) ||
+            text.Count(c => c == ':') > 1)
+            throw new InvalidOperationException("Kubernetes runner does not allow compose host port bindings.");
+
+        var segments = text.Split(':', StringSplitOptions.TrimEntries);
+        if (segments.Length > 1 && segments[0] != "0")
+            throw new InvalidOperationException("Kubernetes runner does not allow fixed compose host ports.");
+
         var target = text.Split(':', StringSplitOptions.TrimEntries).Last();
         target = target.Split('/', 2, StringSplitOptions.TrimEntries)[0];
         if (target.Contains('-', StringComparison.Ordinal) ||
@@ -386,6 +394,13 @@ public static class KubernetesComposeParser
         var protocol = Scalar(GetValue(map, "protocol"));
         if (!string.IsNullOrWhiteSpace(protocol) && !protocol.Equals("tcp", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Kubernetes runner only supports TCP compose ports.");
+        if (!string.IsNullOrWhiteSpace(Scalar(GetValue(map, "host_ip"))))
+            throw new InvalidOperationException("Kubernetes runner does not allow compose host_ip bindings.");
+        if (Scalar(GetValue(map, "mode")).Equals("host", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Kubernetes runner does not allow host-mode compose ports.");
+        var published = Scalar(GetValue(map, "published"));
+        if (!string.IsNullOrWhiteSpace(published) && published != "0")
+            throw new InvalidOperationException("Kubernetes runner does not allow fixed compose host ports.");
 
         var target = FirstNonEmpty(Scalar(GetValue(map, "target")), Scalar(GetValue(map, "containerPort")));
         if (!int.TryParse(target, NumberStyles.Integer, CultureInfo.InvariantCulture, out var port) ||

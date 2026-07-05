@@ -3,7 +3,7 @@ services:
     image: postgres:16
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-noctf}
       POSTGRES_USER: ${POSTGRES_USER:-noctf}
@@ -20,7 +20,7 @@ services:
     image: redis:7
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -35,8 +35,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -127,7 +127,8 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
-      Runner__ApiKey: ${RUNNER_API_KEY:-dev-runner-token-change-me}
+      Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
+      Runner__AllowedRegistries: ${RUNNER_ALLOWED_REGISTRIES:-docker.io,ghcr.io,quay.io,registry.k8s.io,localhost}
       Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       K8s__PublicEntry: ${K8S_PUBLIC_ENTRY:-}
       K8s__IngressBaseDomain: ${K8S_INGRESS_BASE_DOMAIN:-}

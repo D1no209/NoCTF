@@ -60,6 +60,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "close": "Close",
+    "copyFailed": "Copy failed. Please copy manually.",
     "submit": "Submit",
     "submitting": "Submitting...",
     "uploading": "Uploading...",
