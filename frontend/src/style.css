@@ -23,6 +23,28 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-muted: var(--danger-muted);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-attack: var(--attack);
+  --color-attack-foreground: var(--attack-foreground);
+  --color-attack-muted: var(--attack-muted);
+  --color-defense: var(--defense);
+  --color-defense-foreground: var(--defense-foreground);
+  --color-defense-muted: var(--defense-muted);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-neutral-foreground: var(--status-neutral-foreground);
+  --color-status-neutral-muted: var(--status-neutral-muted);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -59,6 +81,28 @@
   --accent: oklch(0.94 0.025 248);
   --accent-foreground: oklch(0.25 0.055 248);
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: var(--danger-foreground);
+  --success: oklch(0.49 0.13 154);
+  --success-foreground: oklch(0.985 0.006 154);
+  --success-muted: oklch(0.94 0.045 154);
+  --warning: oklch(0.62 0.145 72);
+  --warning-foreground: oklch(0.18 0.035 72);
+  --warning-muted: oklch(0.94 0.055 78);
+  --danger: var(--destructive);
+  --danger-foreground: oklch(0.985 0.006 27);
+  --danger-muted: oklch(0.94 0.045 27);
+  --info: oklch(0.52 0.135 235);
+  --info-foreground: oklch(0.985 0.006 235);
+  --info-muted: oklch(0.94 0.04 235);
+  --attack: oklch(0.59 0.175 31);
+  --attack-foreground: oklch(0.985 0.006 31);
+  --attack-muted: oklch(0.94 0.048 31);
+  --defense: oklch(0.5 0.135 164);
+  --defense-foreground: oklch(0.985 0.006 164);
+  --defense-muted: oklch(0.94 0.042 164);
+  --status-neutral: oklch(0.47 0.045 255);
+  --status-neutral-foreground: oklch(0.985 0.006 255);
+  --status-neutral-muted: oklch(0.935 0.02 255);
   --border: oklch(0.9 0.023 252);
   --input: oklch(0.88 0.027 252);
   --ring: oklch(0.56 0.14 248);
@@ -93,6 +137,28 @@
   --accent: oklch(0.28 0.045 250);
   --accent-foreground: oklch(0.965 0.008 255);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: var(--danger-foreground);
+  --success: oklch(0.72 0.14 154);
+  --success-foreground: oklch(0.16 0.035 154);
+  --success-muted: oklch(0.25 0.05 154);
+  --warning: oklch(0.78 0.15 72);
+  --warning-foreground: oklch(0.18 0.035 72);
+  --warning-muted: oklch(0.29 0.055 78);
+  --danger: var(--destructive);
+  --danger-foreground: oklch(0.18 0.035 22);
+  --danger-muted: oklch(0.28 0.06 22);
+  --info: oklch(0.72 0.13 230);
+  --info-foreground: oklch(0.16 0.035 230);
+  --info-muted: oklch(0.26 0.055 230);
+  --attack: oklch(0.73 0.16 31);
+  --attack-foreground: oklch(0.18 0.035 31);
+  --attack-muted: oklch(0.29 0.06 31);
+  --defense: oklch(0.73 0.13 164);
+  --defense-foreground: oklch(0.16 0.035 164);
+  --defense-muted: oklch(0.25 0.055 164);
+  --status-neutral: oklch(0.72 0.025 255);
+  --status-neutral-foreground: oklch(0.16 0.025 255);
+  --status-neutral-muted: oklch(0.27 0.025 255);
   --border: oklch(0.965 0.008 255 / 12%);
   --input: oklch(0.965 0.008 255 / 16%);
   --ring: oklch(0.62 0.12 255);
@@ -154,21 +220,6 @@
 
   .noctf-dark-shell {
     background: oklch(0.17 0.048 260);
-  }
-
-  .noctf-grid-glow {
-    background-image:
-      linear-gradient(
-        color-mix(in oklch, var(--sidebar-foreground) 8%, transparent) 1px,
-        transparent 1px
-      ),
-      linear-gradient(
-        90deg,
-        color-mix(in oklch, var(--sidebar-foreground) 8%, transparent) 1px,
-        transparent 1px
-      );
-    background-size: 48px 48px;
-    mask-image: linear-gradient(180deg, black, transparent 82%);
   }
 
   .noctf-page {
@@ -248,7 +299,7 @@
   }
 
   .noctf-segmented {
-    @apply inline-grid items-center rounded-lg border border-slate-900/10 bg-muted/70 p-1 text-muted-foreground;
+    @apply inline-grid items-center rounded-lg border border-border/90 bg-muted/70 p-1 text-muted-foreground;
   }
 
   .noctf-segmented-button {
@@ -261,6 +312,54 @@
 
   .noctf-status-dot {
     @apply size-2 rounded-full;
+  }
+
+  .noctf-status-success {
+    @apply border-success/30 bg-success-muted text-success;
+  }
+
+  .noctf-status-warning {
+    @apply border-warning/35 bg-warning-muted text-warning;
+  }
+
+  .noctf-status-danger {
+    @apply border-danger/30 bg-danger-muted text-danger;
+  }
+
+  .noctf-status-info {
+    @apply border-info/30 bg-info-muted text-info;
+  }
+
+  .noctf-status-attack {
+    @apply border-attack/35 bg-attack-muted text-attack;
+  }
+
+  .noctf-status-defense {
+    @apply border-defense/35 bg-defense-muted text-defense;
+  }
+
+  .noctf-status-neutral {
+    @apply border-status-neutral/25 bg-status-neutral-muted text-status-neutral;
+  }
+
+  .noctf-status-badge-success {
+    @apply border-success/30 bg-success text-success-foreground;
+  }
+
+  .noctf-status-badge-warning {
+    @apply border-warning/35 bg-warning-muted text-warning;
+  }
+
+  .noctf-status-badge-danger {
+    @apply border-danger/30 bg-danger text-danger-foreground;
+  }
+
+  .noctf-status-badge-info {
+    @apply border-info/30 bg-info-muted text-info;
+  }
+
+  .noctf-status-badge-neutral {
+    @apply border-status-neutral/25 bg-status-neutral-muted text-status-neutral;
   }
 
   .noctf-terminal {

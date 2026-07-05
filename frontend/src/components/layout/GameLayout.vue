@@ -43,13 +43,13 @@ watch(
 
           <div class="flex min-w-0 items-center gap-3 text-lg font-bold tracking-tight md:text-2xl">
             <span class="noctf-logo size-9 md:size-10" />
-            <span class="truncate">NoCTF <span class="text-slate-400">/ {{ t('common.live') }}</span></span>
+            <span class="truncate">NoCTF <span class="text-sidebar-foreground/60">/ {{ t('common.live') }}</span></span>
           </div>
         </div>
 
         <div class="flex min-w-0 items-center gap-3">
           <div v-if="displayName" class="flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-            <Users class="size-4 text-blue-400" />
+            <Users class="size-4 text-info" />
             <span class="hidden truncate text-sm font-medium md:inline">{{ displayName }}</span>
             <Badge variant="default" class="font-mono tabular-nums">
               {{ displayScore }}

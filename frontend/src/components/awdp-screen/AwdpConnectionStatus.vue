@@ -15,7 +15,7 @@ const statusView = computed(() => {
     return {
       label: 'Mock feed',
       detail: 'central mock data',
-      tone: 'text-amber-200 bg-amber-400/8 border-amber-300/22',
+      tone: 'connection-warning',
       icon: Radio,
     }
   }
@@ -23,7 +23,7 @@ const statusView = computed(() => {
     return {
       label: 'Live',
       detail: formatTime(props.lastSyncAt),
-      tone: 'text-slate-100 bg-slate-300/8 border-slate-300/20',
+      tone: 'connection-live',
       icon: Wifi,
     }
   }
@@ -31,7 +31,7 @@ const statusView = computed(() => {
     return {
       label: 'Reconnecting',
       detail: `attempt ${Math.max(1, props.reconnectAttempts)}`,
-      tone: 'text-amber-100 bg-amber-400/8 border-amber-300/22',
+      tone: 'connection-warning',
       icon: RefreshCw,
     }
   }
@@ -39,14 +39,14 @@ const statusView = computed(() => {
     return {
       label: 'Connecting',
       detail: 'opening stream',
-      tone: 'text-slate-200 bg-slate-300/8 border-slate-300/18',
+      tone: 'connection-neutral',
       icon: RefreshCw,
     }
   }
   return {
     label: 'Offline',
     detail: 'snapshot only',
-    tone: 'text-rose-100 bg-rose-400/8 border-rose-300/22',
+    tone: 'connection-danger',
     icon: WifiOff,
   }
 })
@@ -78,3 +78,29 @@ function formatTime(value?: string | null) {
     <span class="shrink-0 font-mono text-[11px] opacity-75">{{ statusView.detail }}</span>
   </div>
 </template>
+
+<style scoped>
+.connection-live {
+  border-color: color-mix(in oklch, var(--awdp-fix) 26%, transparent);
+  background: color-mix(in oklch, var(--awdp-fix) 8%, transparent);
+  color: color-mix(in oklch, var(--sidebar-foreground) 92%, var(--awdp-fix));
+}
+
+.connection-warning {
+  border-color: color-mix(in oklch, var(--awdp-warn) 28%, transparent);
+  background: color-mix(in oklch, var(--awdp-warn) 9%, transparent);
+  color: color-mix(in oklch, var(--sidebar-foreground) 88%, var(--awdp-warn));
+}
+
+.connection-danger {
+  border-color: color-mix(in oklch, var(--awdp-error) 28%, transparent);
+  background: color-mix(in oklch, var(--awdp-error) 9%, transparent);
+  color: color-mix(in oklch, var(--sidebar-foreground) 88%, var(--awdp-error));
+}
+
+.connection-neutral {
+  border-color: color-mix(in oklch, var(--sidebar-foreground) 20%, transparent);
+  background: color-mix(in oklch, var(--sidebar-foreground) 8%, transparent);
+  color: color-mix(in oklch, var(--sidebar-foreground) 82%, transparent);
+}
+</style>

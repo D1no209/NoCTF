@@ -33,11 +33,11 @@ const stageLabel = computed(() => {
 <template>
   <Card
     class="relative h-full cursor-pointer overflow-hidden transition-colors hover:border-primary/30 hover:bg-accent/40"
-    :class="solved ? 'border-green-500/50 bg-green-500/5' : ''"
+    :class="solved ? 'border-success/40 bg-success-muted/50' : ''"
   >
     <div
       v-if="solved"
-      class="pointer-events-none absolute right-3 top-3 rounded-md border border-emerald-600/45 bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.08em] text-emerald-700"
+      class="pointer-events-none absolute right-3 top-3 rounded-md border px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.08em] noctf-status-success"
     >
       {{ t('challenges.attackSolved') }}
     </div>

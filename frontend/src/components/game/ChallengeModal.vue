@@ -597,9 +597,9 @@ function formatDefenseResult(value?: string | null) {
 
 function statusBadgeVariant(
   value?: string | number | null,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
+): 'default' | 'success' | 'warning' | 'info' | 'destructive' | 'outline' {
   const key = String(value ?? '').toLowerCase()
-  if (key.includes('success') || key.includes('ok') || key.includes('running')) return 'default'
+  if (key.includes('success') || key.includes('ok') || key.includes('running')) return 'success'
   if (
     key.includes('error') ||
     key.includes('failed') ||
@@ -609,7 +609,9 @@ function statusBadgeVariant(
     return 'destructive'
   if (key.includes('notstarted') || key.includes('unknown') || key.includes('notcreated'))
     return 'outline'
-  return 'secondary'
+  if (key.includes('uploading') || key.includes('checking') || key.includes('auditing') || key.includes('submitted'))
+    return 'info'
+  return 'warning'
 }
 
 function getApiErrorDetail(error: unknown) {
@@ -628,7 +630,7 @@ function getApiErrorDetail(error: unknown) {
       <DialogHeader>
         <div class="flex items-center gap-2">
           <DialogTitle>{{ challenge?.title }}</DialogTitle>
-          <Badge v-if="solved" class="bg-green-600 text-white border-transparent shrink-0">
+          <Badge v-if="solved" variant="success" class="shrink-0">
             {{ t('challenges.solved') }}
           </Badge>
         </div>

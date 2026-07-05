@@ -415,7 +415,7 @@ function withChallengeProgress(challenge: Challenge): Challenge {
               >
                 {{ competition.status }}
               </Badge>
-              <Badge variant="secondary" class="bg-violet-100 px-2.5 py-1 text-sm text-violet-700">
+              <Badge variant="info" class="px-2.5 py-1 text-sm">
                 {{ competition.gameModeType }}
               </Badge>
               <Button v-if="isAwdpMode" variant="outline" size="sm" as-child>
@@ -437,7 +437,7 @@ function withChallengeProgress(challenge: Challenge): Challenge {
           >
         </div>
         <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
-          <CheckCircle2 class="size-4 text-green-500" />
+          <CheckCircle2 class="size-4 text-success" />
           <span
             >{{ solvedIds.size }} / {{ challenges?.length || 0 }} {{ t('challenges.solved') }}</span
           >

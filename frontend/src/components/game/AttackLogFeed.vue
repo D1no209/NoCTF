@@ -48,10 +48,10 @@ function formatTime(iso: string) {
             <span class="text-muted-foreground shrink-0">R{{ log.roundNumber }}</span>
           </div>
           <div class="flex items-center gap-1 text-muted-foreground">
-            <span class="text-red-500">-&gt;</span>
+            <span class="text-attack">-&gt;</span>
             <span class="truncate">{{ log.victimTeamName }}</span>
             <span class="mx-1">·</span>
-            <span class="truncate text-blue-400">{{ log.challengeName }}</span>
+            <span class="truncate text-info">{{ log.challengeName }}</span>
           </div>
           <div class="text-[10px] text-muted-foreground/60 mt-0.5">
             {{ formatTime(log.timestamp) }}

@@ -64,10 +64,10 @@ onUnmounted(() => {
   if (intervalId) clearInterval(intervalId)
 })
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusVariant(status: string): 'success' | 'warning' | 'destructive' {
   const s = status.toLowerCase()
-  if (s === 'healthy') return 'outline'
-  if (s === 'degraded' || s === 'warning') return 'secondary'
+  if (s === 'healthy') return 'success'
+  if (s === 'degraded' || s === 'warning') return 'warning'
   return 'destructive'
 }
 
@@ -78,17 +78,6 @@ function isHealthResponse(value: unknown): value is HealthResponse {
       typeof (value as HealthResponse).status === 'string' &&
       Array.isArray((value as HealthResponse).checks),
   )
-}
-
-function statusBadgeClass(status: string) {
-  const s = status.toLowerCase()
-  if (s === 'healthy') {
-    return 'border-emerald-600/20 bg-emerald-600 text-white hover:bg-emerald-600'
-  }
-  if (s === 'degraded' || s === 'warning') {
-    return 'border-amber-500/25 bg-amber-500/10 text-amber-700'
-  }
-  return undefined
 }
 
 const overallHealthy = computed(() => health.value?.status.toLowerCase() === 'healthy')
@@ -108,8 +97,8 @@ function isDockerService(name: string) {
 }
 
 function serviceIconShellClass(name: string) {
-  if (isRedisService(name)) return 'border-red-500/20 bg-red-500/10 text-red-600'
-  if (isDockerService(name)) return 'border-sky-500/20 bg-sky-500/10 text-sky-600'
+  if (isRedisService(name)) return 'noctf-status-danger'
+  if (isDockerService(name)) return 'noctf-status-info'
   return 'border-border bg-background/70 text-muted-foreground'
 }
 
@@ -152,16 +141,16 @@ function getServiceIcon(name: string) {
         class="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-center"
         :class="
           overallHealthy
-            ? 'border-emerald-500/25 bg-emerald-500/5'
-            : 'border-destructive/25 bg-destructive/5'
+            ? 'border-success/25 bg-success-muted/50'
+            : 'border-danger/25 bg-danger-muted/60'
         "
       >
         <div
           class="flex size-11 shrink-0 items-center justify-center rounded-md"
           :class="
             overallHealthy
-              ? 'bg-emerald-500/10 text-emerald-700'
-              : 'bg-destructive/10 text-destructive'
+              ? 'bg-success-muted text-success'
+              : 'bg-danger-muted text-danger'
           "
         >
           <HeartPulse class="size-5" />
@@ -170,7 +159,7 @@ function getServiceIcon(name: string) {
         <div class="min-w-0 flex-1 space-y-1">
           <h3 class="text-lg font-semibold">
             {{ t('admin.health.overallStatus') }}:
-            <span :class="overallHealthy ? 'text-emerald-700' : 'text-destructive'">{{
+            <span :class="overallHealthy ? 'text-success' : 'text-danger'">{{
               health.status
             }}</span>
           </h3>
@@ -275,7 +264,6 @@ function getServiceIcon(name: string) {
           <Badge
             :variant="statusVariant(check.status)"
             class="uppercase"
-            :class="statusBadgeClass(check.status)"
           >
             {{ check.status }}
           </Badge>

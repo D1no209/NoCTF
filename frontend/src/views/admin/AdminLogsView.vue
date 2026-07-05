@@ -41,10 +41,10 @@ const filteredLogs = computed(() => {
 })
 
 function levelColor(level: string) {
-  if (level === 'Warning') return 'text-amber-400'
-  if (level === 'Error') return 'text-rose-400'
-  if (level === 'Information') return 'text-emerald-400'
-  return 'text-zinc-400'
+  if (level === 'Warning') return 'text-warning'
+  if (level === 'Error') return 'text-danger'
+  if (level === 'Information') return 'text-success'
+  return 'text-status-neutral'
 }
 
 function formatTime(ts: string) {
@@ -115,7 +115,7 @@ onMounted(async () => {
           <div class="flex items-center gap-2 mt-1.5">
             <div
               class="size-2 rounded-full animate-pulse"
-              :class="signalR.isConnected.value ? 'bg-emerald-500' : 'bg-zinc-600'"
+              :class="signalR.isConnected.value ? 'bg-success' : 'bg-status-neutral'"
             />
             <span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               {{ signalR.isConnected.value ? t('admin.logs.streaming') : t('common.disconnected') }}
@@ -160,7 +160,7 @@ onMounted(async () => {
           size="sm"
           variant="outline"
           class="h-8 gap-2 border-dashed"
-          :class="paused ? 'text-rose-500 border-rose-500/50 hover:bg-rose-500/10' : ''"
+          :class="paused ? 'border-danger/45 text-danger hover:bg-danger-muted/45' : ''"
           @click="paused = !paused"
         >
           <component :is="paused ? Play : Pause" class="size-3.5" />
@@ -207,7 +207,7 @@ onMounted(async () => {
       >
         <div
           v-if="filteredLogs.length === 0"
-          class="flex h-full flex-col items-center justify-center space-y-2 text-zinc-600 opacity-50"
+          class="flex h-full flex-col items-center justify-center space-y-2 text-status-neutral opacity-50"
         >
           <Terminal class="size-8" />
           <p>{{ t('admin.logs.waiting') }}</p>
@@ -218,11 +218,11 @@ onMounted(async () => {
           :key="i"
           class="flex gap-4 rounded-sm px-2 py-0.5 transition-colors hover:bg-sidebar-foreground/5"
         >
-          <span class="text-zinc-600 shrink-0 select-none w-20">{{
+          <span class="shrink-0 w-20 select-none text-status-neutral">{{
             formatTime(entry.timestamp)
           }}</span>
           <span
-            class="shrink-0 w-24 truncate text-zinc-500 italic opacity-60 group-hover/line:opacity-100 transition-opacity"
+            class="shrink-0 w-24 truncate text-status-neutral italic opacity-60 group-hover/line:opacity-100 transition-opacity"
             >[{{ entry.source }}]</span
           >
           <span

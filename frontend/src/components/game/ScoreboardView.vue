@@ -171,7 +171,7 @@ const chartBounds = computed(() => {
   const scores = allPoints.map((point) => point.score ?? 0)
   const now = Date.now()
   const minTime = timestamps.length ? Math.min(...timestamps) : now
-  const rawMaxTime = timestamps.length ? Math.max(...timestamps) : now + 60_000
+  const rawMaxTime = timestamps.length ? Math.max(Math.max(...timestamps), now) : now + 60_000
   const maxTime = rawMaxTime <= minTime ? minTime + 60_000 : rawMaxTime
   const maxScore = niceScoreCeil(Math.max(...scores, 1))
   return { minTime, maxTime, maxScore }
@@ -547,7 +547,7 @@ onUnmounted(() => {
         {{ t('scoreboard.title') }}
       </h2>
       <div class="flex items-center gap-2">
-        <Badge v-if="isConnected" class="bg-green-600 text-white border-transparent text-xs">
+        <Badge v-if="isConnected" variant="success" class="text-xs">
           {{ t('common.live') }}
         </Badge>
         <Badge v-else-if="usingFallback" variant="secondary" class="text-xs">
@@ -721,7 +721,7 @@ onUnmounted(() => {
           stroke-width="6"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="scoreboard-trend-glow"
+          class="scoreboard-trend-highlight"
         />
       </svg>
       <div class="flex flex-wrap gap-3 text-xs">
@@ -978,8 +978,8 @@ onUnmounted(() => {
                       </div>
                       <Badge
                         v-if="row.bloodRank"
-                        variant="outline"
-                        class="mt-1 border-amber-500/70 bg-amber-500/10 text-amber-700"
+                        variant="warning"
+                        class="mt-1"
                       >
                         {{ bloodLabel(row.bloodRank) }}
                       </Badge>
@@ -1023,14 +1023,12 @@ onUnmounted(() => {
     stroke-width 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.scoreboard-trend-glow {
+.scoreboard-trend-highlight {
   opacity: 0.16;
   pointer-events: none;
-  filter: drop-shadow(0 0 10px currentColor);
 }
 
 .scoreboard-trend-particle {
   pointer-events: none;
-  filter: drop-shadow(0 0 8px currentColor);
 }
 </style>

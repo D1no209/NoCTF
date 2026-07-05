@@ -27,9 +27,9 @@ withDefaults(defineProps<{
         class="size-5 shrink-0"
         :class="{
           'text-muted-foreground': tone === 'default',
-          'text-green-600': tone === 'success',
-          'text-yellow-600': tone === 'warning',
-          'text-destructive': tone === 'danger',
+          'text-success': tone === 'success',
+          'text-warning': tone === 'warning',
+          'text-danger': tone === 'danger',
         }"
       />
     </CardContent>

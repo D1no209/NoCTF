@@ -15,13 +15,13 @@ defineProps<{
           <span class="text-3xl font-bold tracking-tight">NoCTF</span>
         </div>
         <div class="max-w-lg space-y-5">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/60">
             Competition control surface
           </p>
           <h1 class="text-4xl font-bold leading-tight tracking-normal">
             NoCTF
           </h1>
-          <p class="max-w-md text-base leading-7 text-slate-300">
+          <p class="max-w-md text-base leading-7 text-sidebar-foreground/75">
             {{ subtitle }}
           </p>
         </div>
@@ -30,26 +30,26 @@ defineProps<{
       <div class="max-w-xl border-t border-white/10 pt-6">
         <div class="grid gap-4 text-sm">
           <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-4">
-            <div class="font-semibold text-slate-100">
+            <div class="font-semibold text-sidebar-foreground">
               {{ $t('auth.featureSecure') }}
             </div>
-            <div class="text-slate-400">
+            <div class="text-sidebar-foreground/60">
               {{ $t('auth.featureSecureDesc') }}
             </div>
           </div>
           <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-4">
-            <div class="font-semibold text-slate-100">
+            <div class="font-semibold text-sidebar-foreground">
               {{ $t('auth.featureStable') }}
             </div>
-            <div class="text-slate-400">
+            <div class="text-sidebar-foreground/60">
               {{ $t('auth.featureStableDesc') }}
             </div>
           </div>
           <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-4">
-            <div class="font-semibold text-slate-100">
+            <div class="font-semibold text-sidebar-foreground">
               {{ $t('auth.featureFair') }}
             </div>
-            <div class="text-slate-400">
+            <div class="text-sidebar-foreground/60">
               {{ $t('auth.featureFairDesc') }}
             </div>
           </div>

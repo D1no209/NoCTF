@@ -59,7 +59,7 @@ function getPluginIcon(type: string) {
         </Badge>
       </div>
       <div class="noctf-status-item">
-        <ShieldCheck class="size-4 text-emerald-600" />
+        <ShieldCheck class="size-4 text-success" />
         <span class="noctf-label">{{ t('admin.plugins.coreEngine') }}</span>
         <span class="text-xs font-mono opacity-60">v1.0.0-stable</span>
       </div>
@@ -98,7 +98,7 @@ function getPluginIcon(type: string) {
             {{ t('admin.plugins.active') }}
           </Badge>
           <div class="flex items-center gap-1 text-xs text-muted-foreground">
-            <CheckCircle2 class="size-3 text-emerald-600" />
+            <CheckCircle2 class="size-3 text-success" />
             {{ t('admin.plugins.verified') }}
           </div>
         </div>
