@@ -30,7 +30,7 @@ function formatTime(iso: string) {
     <CardHeader>
       <CardTitle class="text-base flex items-center gap-2">
         {{ $t('awd.attackLog') }}
-        <Badge variant="secondary" class="font-mono text-xs">{{ logs.length }}</Badge>
+        <Badge variant="attack" class="font-mono text-xs">{{ logs.length }}</Badge>
       </CardTitle>
     </CardHeader>
     <CardContent class="flex-1 overflow-hidden p-0">

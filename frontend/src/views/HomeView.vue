@@ -10,6 +10,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { competitionStatusVariant, gameModeVariant, registrationStatusVariant } from '@/lib/statusTones'
 import { ArrowRight, Calendar, LayoutDashboard, Trophy, Users } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -77,14 +78,6 @@ const pendingTeams = computed(
   () => (teams.value ?? []).filter((team) => team.registrationStatus === 'pending').length,
 )
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const s = status.toLowerCase()
-  if (s === 'running' || s === 'approved') return 'default'
-  if (s === 'rejected' || s === 'banned') return 'destructive'
-  if (s === 'finished') return 'outline'
-  return 'secondary'
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
     month: 'short',
@@ -144,11 +137,11 @@ function formatDate(iso: string) {
                 <div class="mt-1 text-xs text-muted-foreground">{{ t('home.joinedTeams') }}</div>
               </div>
               <div class="p-4">
-                <div class="text-2xl font-bold tabular-nums">{{ approvedTeams }}</div>
+                <div class="text-2xl font-bold tabular-nums text-success">{{ approvedTeams }}</div>
                 <div class="mt-1 text-xs text-muted-foreground">{{ t('home.readyTeams') }}</div>
               </div>
               <div class="p-4">
-                <div class="text-2xl font-bold tabular-nums">{{ pendingTeams }}</div>
+                <div class="text-2xl font-bold tabular-nums text-warning">{{ pendingTeams }}</div>
                 <div class="mt-1 text-xs text-muted-foreground">{{ t('home.pendingReview') }}</div>
               </div>
             </div>
@@ -190,10 +183,10 @@ function formatDate(iso: string) {
               <div class="min-w-0 space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
                   <h3 class="truncate font-semibold">{{ competition.title }}</h3>
-                  <Badge :variant="statusVariant(competition.status)">{{
+                  <Badge :variant="competitionStatusVariant(competition.status)">{{
                     competition.status
                   }}</Badge>
-                  <Badge variant="secondary">{{ competition.gameModeType || 'CTF' }}</Badge>
+                  <Badge :variant="gameModeVariant(competition.gameModeType)">{{ competition.gameModeType || 'CTF' }}</Badge>
                 </div>
                 <div class="flex items-center gap-2 text-xs text-muted-foreground">
                   <Calendar class="size-3.5" />
@@ -257,7 +250,7 @@ function formatDate(iso: string) {
                     {{ team.competitionTitle }}
                   </div>
                 </div>
-                <Badge :variant="statusVariant(team.registrationStatus)">{{
+                <Badge :variant="registrationStatusVariant(team.registrationStatus)">{{
                   team.registrationStatus
                 }}</Badge>
               </div>

@@ -62,6 +62,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { competitionStatusVariant, gameModeVariant } from '@/lib/statusTones'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -190,19 +191,6 @@ function goManage(comp: CompetitionAdminDto) {
   router.push({ name: 'admin-competition-detail', params: { id: comp.id } })
 }
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const s = status.toLowerCase()
-  if (s === 'running' || s === 'active')
-    return 'default'
-  if (s === 'published')
-    return 'secondary'
-  if (s === 'finished' || s === 'ended')
-    return 'outline'
-  if (s === 'draft')
-    return 'outline'
-  return 'secondary'
-}
-
 const columnHelper = createColumnHelper<CompetitionAdminDto>()
 
 const columns = [
@@ -214,11 +202,11 @@ const columns = [
   columnHelper.accessor('gameModeType', {
     header: t('admin.competitions.mode'),
     enableSorting: true,
-    cell: info => h(Badge, { variant: 'outline', class: 'font-mono' }, () => info.getValue()),
+    cell: info => h(Badge, { variant: gameModeVariant(info.getValue()), class: 'font-mono' }, () => info.getValue()),
   }),
   columnHelper.accessor('status', {
     header: t('admin.competitions.status'),
-    cell: info => h(Badge, { variant: statusVariant(info.getValue()) }, () => info.getValue()),
+    cell: info => h(Badge, { variant: competitionStatusVariant(info.getValue()) }, () => info.getValue()),
   }),
   columnHelper.accessor('startTime', {
     header: t('admin.competitions.start'),
@@ -360,7 +348,7 @@ const table = useVueTable({
                     {{ t('awdp.screenEntry') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem class="text-destructive focus:text-destructive" @click="openDelete(row.original)">
+                  <DropdownMenuItem class="text-danger focus:text-danger" @click="openDelete(row.original)">
                     <Trash2 class="mr-2 size-4" />
                     {{ t('common.delete') }}
                   </DropdownMenuItem>

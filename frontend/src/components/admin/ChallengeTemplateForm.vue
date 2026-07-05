@@ -461,7 +461,7 @@ function submit() {
         <p class="text-xs text-muted-foreground">{{ t('penetration.topologyHint') }}</p>
       </div>
       <Textarea v-model="form.penetrationTopologyJson" class="min-h-80 font-mono text-xs" />
-      <p v-if="topologyError" class="text-xs text-destructive">{{ topologyError }}</p>
+      <p v-if="topologyError" class="text-xs text-danger">{{ topologyError }}</p>
       <p v-else-if="topologyLoading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</p>
     </div>
 
@@ -499,10 +499,10 @@ function submit() {
         <div class="grid gap-2">
           <Label>
             {{ t('admin.challenges.challengeImage') }}
-            <span class="text-destructive">*</span>
+            <span class="text-danger">*</span>
           </Label>
           <Input v-model="form.containerImage" required :aria-invalid="isContainerImageMissing" />
-          <p v-if="isContainerImageMissing" class="text-xs text-destructive">
+          <p v-if="isContainerImageMissing" class="text-xs text-danger">
             {{ t('admin.challenges.challengeImageRequired') }}
           </p>
         </div>
@@ -545,7 +545,7 @@ function submit() {
         <p class="text-xs text-muted-foreground">{{ t('admin.challenges.orchestrationHint') }}</p>
       </div>
       <Textarea v-model="form.orchestrationJson" class="min-h-72 font-mono text-xs" />
-      <p v-if="orchestrationError" class="text-xs text-destructive">{{ orchestrationError }}</p>
+      <p v-if="orchestrationError" class="text-xs text-danger">{{ orchestrationError }}</p>
     </div>
 
     <div class="flex flex-col-reverse gap-2 border-t pt-5 sm:flex-row sm:justify-end">

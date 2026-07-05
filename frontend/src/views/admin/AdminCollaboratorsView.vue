@@ -187,7 +187,7 @@ const columns = [
       h(
         Badge,
         {
-          variant: info.getValue().toLowerCase() === 'manager' ? 'default' : 'secondary',
+          variant: info.getValue().toLowerCase() === 'manager' ? 'info' : 'neutral',
           class: 'capitalize',
         },
         () => info.getValue(),
@@ -283,7 +283,7 @@ const table = useVueTable({
                 <Button
                   variant="ghost"
                   size="icon"
-                  class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  class="text-danger hover:text-danger hover:bg-danger-muted"
                   @click="openRemove(row.original)"
                 >
                   <UserMinus class="size-4" />
@@ -409,7 +409,7 @@ const table = useVueTable({
     <Dialog v-model:open="removeDialog">
       <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle class="text-destructive">{{
+          <DialogTitle class="text-danger">{{
             t('admin.collaborators.removeDialogTitle')
           }}</DialogTitle>
           <DialogDescription>{{

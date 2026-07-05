@@ -10,6 +10,7 @@ import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { runtimeStatusVariant } from '@/lib/statusTones'
 
 interface Challenge {
   id: string
@@ -194,7 +195,7 @@ watch(
           <div class="flex items-center gap-2 text-sm font-semibold">
             <Server class="size-4 text-primary" />
             <span>{{ t('penetration.instance') }}</span>
-            <Badge variant="outline">{{ instance?.status ?? 'None' }}</Badge>
+            <Badge :variant="runtimeStatusVariant(instance?.status)">{{ instance?.status ?? 'None' }}</Badge>
           </div>
           <div
             v-if="running && instance?.entryUrl"
@@ -205,7 +206,7 @@ watch(
               <Copy class="size-4" />
             </Button>
           </div>
-          <p v-else-if="instance?.lastError" class="text-xs text-destructive">
+          <p v-else-if="instance?.lastError" class="text-xs text-danger">
             {{ instance.lastError }}
           </p>
         </div>
@@ -278,7 +279,7 @@ watch(
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs text-muted-foreground">{{ flag.score }} {{ t('nav.score') }}</span>
-            <Badge :variant="flag.solved ? 'default' : 'outline'">
+            <Badge :variant="flag.solved ? 'success' : 'warning'">
               <CheckCircle2 v-if="flag.solved" class="mr-1 size-3" />
               {{ flag.solved ? t('challenges.solved') : t('common.pending') }}
             </Badge>

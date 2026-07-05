@@ -68,12 +68,12 @@ async function copyDetails() {
         <div class="grid gap-5 p-5 md:grid-cols-[9rem_minmax(0,1fr)] md:p-6">
           <div class="min-w-0">
             <p class="noctf-label">{{ t('pages.crash.kicker') }}</p>
-            <p class="mt-3 font-mono text-5xl font-semibold leading-none text-destructive">500</p>
+            <p class="mt-3 font-mono text-5xl font-semibold leading-none text-danger">500</p>
           </div>
 
           <div class="min-w-0 space-y-3">
             <div class="flex items-center gap-2">
-              <ShieldAlert class="size-5 shrink-0 text-destructive" />
+              <ShieldAlert class="size-5 shrink-0 text-danger" />
               <h1 class="text-xl font-semibold tracking-normal">{{ t('pages.crash.title') }}</h1>
             </div>
             <p class="max-w-2xl text-sm leading-6 text-muted-foreground">

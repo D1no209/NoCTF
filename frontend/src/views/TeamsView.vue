@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { gameModeVariant, registrationStatusVariant } from '@/lib/statusTones'
 
 const { t } = useI18n()
 const queryClient = useQueryClient()
@@ -127,15 +128,6 @@ const leaveTeamMutation = useMutation({
   },
   onError: () => toast.error(t('teams.leaveError')),
 })
-
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const s = status.toLowerCase()
-  if (s === 'approved')
-    return 'default'
-  if (s === 'rejected')
-    return 'destructive'
-  return 'secondary'
-}
 
 async function copyToken(token: string) {
   await navigator.clipboard.writeText(token)
@@ -245,7 +237,7 @@ async function copyToken(token: string) {
       </div>
 
       <div v-else-if="isError" class="noctf-state-box">
-        <AlertCircle class="size-8 text-destructive" />
+        <AlertCircle class="size-8 text-danger" />
         <h3 class="mt-3 text-sm font-medium">
           {{ t('teams.loadError') }}
         </h3>
@@ -270,7 +262,7 @@ async function copyToken(token: string) {
             <h2 class="text-lg font-semibold">
               {{ t('teams.activeTeams') }}
             </h2>
-            <Badge variant="secondary">
+            <Badge variant="neutral">
               {{ activeTeams.length }}
             </Badge>
           </div>
@@ -291,12 +283,12 @@ async function copyToken(token: string) {
                       {{ team.competitionTitle }}
                     </p>
                   </div>
-                  <Badge :variant="statusVariant(team.registrationStatus)">
+                  <Badge :variant="registrationStatusVariant(team.registrationStatus)">
                     {{ team.registrationStatus }}
                   </Badge>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <Badge variant="secondary">
+                  <Badge :variant="gameModeVariant(team.gameModeType)">
                     {{ team.gameModeType }}
                   </Badge>
                   <Badge v-if="team.trackName" variant="outline">
@@ -346,7 +338,7 @@ async function copyToken(token: string) {
 
         <section v-if="bannedTeams.length" class="space-y-4">
           <div class="flex items-center gap-2">
-            <ShieldAlert class="size-5 text-destructive" />
+            <ShieldAlert class="size-5 text-danger" />
             <h2 class="text-lg font-semibold">
               {{ t('teams.bannedTeams') }}
             </h2>

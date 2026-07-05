@@ -133,6 +133,14 @@ function formatJson(json?: string) {
   }
 }
 
+function httpMethodVariant(method?: string) {
+  const normalized = method?.toUpperCase()
+  if (normalized === 'DELETE') return 'destructive'
+  if (normalized === 'POST' || normalized === 'PUT' || normalized === 'PATCH') return 'warning'
+  if (normalized === 'GET') return 'info'
+  return 'neutral'
+}
+
 function exportCsv() {
   const items = logs.value
   if (!items.length) return
@@ -211,7 +219,7 @@ const columns = [
       const val = info.getValue()
       return h('div', { class: 'flex items-center justify-center' }, [
         val
-          ? h(ShieldAlert, { class: 'size-4 text-destructive' })
+          ? h(ShieldAlert, { class: 'size-4 text-danger' })
           : h(CheckCircle2, { class: 'size-4 text-success' }),
       ])
     },
@@ -400,13 +408,7 @@ const table = useVueTable({
               <span class="text-xs font-bold uppercase tracking-wider">{{
                 t('admin.auditLogs.endpointDetails')
               }}</span>
-              <Badge
-                :variant="
-                  selectedLog.httpMethod === 'POST' || selectedLog.httpMethod === 'PUT'
-                    ? 'default'
-                    : 'secondary'
-                "
-              >
+              <Badge :variant="httpMethodVariant(selectedLog.httpMethod)">
                 {{ selectedLog.httpMethod }}
               </Badge>
             </div>
@@ -419,7 +421,7 @@ const table = useVueTable({
 
           <!-- Exception if any -->
           <div v-if="selectedLog.exception" class="noctf-danger-panel space-y-2">
-            <div class="flex items-center gap-2 text-destructive">
+            <div class="flex items-center gap-2 text-danger">
               <ShieldAlert class="size-4" />
               <span class="text-xs font-bold uppercase tracking-wider">{{
                 t('admin.auditLogs.exceptionLogged')

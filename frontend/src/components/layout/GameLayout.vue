@@ -30,12 +30,12 @@ watch(
 
 <template>
   <div class="min-h-[100dvh] flex flex-col bg-background">
-    <header class="noctf-dark-shell sticky top-0 z-50 w-full border-b border-white/10 text-white">
+    <header class="noctf-dark-shell sticky top-0 z-50 w-full border-b border-sidebar-foreground/10 text-sidebar-foreground">
       <div class="mx-auto flex min-h-[4.5rem] max-w-[1800px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:flex-nowrap md:px-6">
         <div class="flex min-w-0 items-center gap-4">
           <RouterLink 
             to="/competitions"
-            class="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            class="flex items-center gap-2 rounded-lg border border-sidebar-foreground/10 bg-sidebar-foreground/5 px-3 py-2.5 text-sm font-semibold text-sidebar-foreground transition-colors hover:bg-sidebar-foreground/10"
           >
             <ChevronLeft class="size-4" />
             <span class="text-sm font-medium hidden sm:inline">{{ t('nav.back') }}</span>
@@ -48,10 +48,10 @@ watch(
         </div>
 
         <div class="flex min-w-0 items-center gap-3">
-          <div v-if="displayName" class="flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+          <div v-if="displayName" class="flex min-w-0 items-center gap-3 rounded-lg border border-sidebar-foreground/10 bg-sidebar-foreground/5 px-3 py-2">
             <Users class="size-4 text-info" />
             <span class="hidden truncate text-sm font-medium md:inline">{{ displayName }}</span>
-            <Badge variant="default" class="font-mono tabular-nums">
+            <Badge variant="info" class="font-mono tabular-nums">
               {{ displayScore }}
             </Badge>
           </div>

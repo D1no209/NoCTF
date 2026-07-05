@@ -53,6 +53,7 @@ import {
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
+import { registrationStatusVariant } from '@/lib/statusTones'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -149,14 +150,7 @@ const columns = [
     cell: (info) =>
       h(
         Badge,
-        {
-          variant:
-            info.getValue() === 'approved'
-              ? 'default'
-              : info.getValue() === 'rejected'
-                ? 'destructive'
-                : 'secondary',
-        },
+        { variant: registrationStatusVariant(info.getValue()) },
         () => info.getValue() ?? 'pending',
       ),
   }),
@@ -293,7 +287,7 @@ const table = useVueTable({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     @click="openDisbandDialog(row.original)"
-                    class="text-destructive focus:text-destructive font-medium"
+                    class="text-danger focus:text-danger font-medium"
                   >
                     <Trash2 class="mr-2 size-4" />
                     {{ t('admin.teams.disband') }}
@@ -378,7 +372,7 @@ const table = useVueTable({
                 </div>
               </div>
               <Badge
-                :variant="m.role.toLowerCase() === 'captain' ? 'default' : 'secondary'"
+                :variant="m.role.toLowerCase() === 'captain' ? 'info' : 'neutral'"
                 class="capitalize text-[10px] font-bold tracking-tighter"
               >
                 {{ m.role }}
@@ -398,7 +392,7 @@ const table = useVueTable({
     <Dialog v-model:open="disbandDialog">
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle class="text-destructive flex items-center gap-2">
+          <DialogTitle class="text-danger flex items-center gap-2">
             <Trash2 class="size-5" />
             {{ t('admin.teams.disbandDialogTitle') }}
           </DialogTitle>
@@ -408,7 +402,7 @@ const table = useVueTable({
         </DialogHeader>
         <div class="py-4">
           <div
-            class="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm"
+            class="p-3 rounded-lg bg-danger-muted/70 border border-danger/25 text-danger text-sm"
           >
             <p class="font-medium">
               Confirm disbanding <span class="font-bold underline">{{ selectedTeam?.name }}</span

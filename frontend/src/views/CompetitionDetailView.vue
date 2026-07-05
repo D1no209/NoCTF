@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { normalizeDirection } from '@/lib/challengeDirections'
+import { competitionStatusVariant, gameModeVariant } from '@/lib/statusTones'
 import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
 
@@ -221,14 +222,6 @@ function markDefenseRequested(challengeId: string) {
   defenseChallengeIds.value = new Set(defenseChallengeIds.value).add(challengeId)
 }
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const s = status.toLowerCase()
-  if (s === 'active' || s === 'running') return 'default'
-  if (s === 'upcoming' || s === 'pending') return 'secondary'
-  if (s === 'ended' || s === 'finished') return 'outline'
-  return 'secondary'
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
     month: 'short',
@@ -410,12 +403,12 @@ function withChallengeProgress(challenge: Challenge): Challenge {
           <template #actions>
             <div class="flex items-center gap-2">
               <Badge
-                :variant="statusVariant(competition.status)"
+                :variant="competitionStatusVariant(competition.status)"
                 class="px-2.5 py-1 text-sm font-semibold"
               >
                 {{ competition.status }}
               </Badge>
-              <Badge variant="info" class="px-2.5 py-1 text-sm">
+              <Badge :variant="gameModeVariant(competition.gameModeType)" class="px-2.5 py-1 text-sm">
                 {{ competition.gameModeType }}
               </Badge>
               <Button v-if="isAwdpMode" variant="outline" size="sm" as-child>

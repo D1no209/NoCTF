@@ -680,19 +680,19 @@ function serviceHealthLabel(node: ServiceNode) {
 
 <style scoped>
 .awd-battlefield-core {
-  --awd-bg: color-mix(in oklch, var(--sidebar) 88%, black);
+  --awd-bg: color-mix(in oklch, var(--sidebar) 90%, oklch(0.11 0.035 260));
   --awd-bg-soft: color-mix(in oklch, var(--sidebar) 72%, transparent);
-  --awd-bg-raised: color-mix(in oklch, var(--sidebar) 78%, black);
+  --awd-bg-raised: color-mix(in oklch, var(--sidebar) 82%, oklch(0.13 0.04 260));
   --awd-border: color-mix(in oklch, var(--sidebar-foreground) 13%, transparent);
   --awd-border-strong: color-mix(in oklch, var(--sidebar-primary) 42%, transparent);
   --awd-grid: color-mix(in oklch, var(--sidebar-foreground) 4%, transparent);
   --awd-text: var(--sidebar-foreground);
   --awd-muted: color-mix(in oklch, var(--sidebar-foreground) 58%, transparent);
   --awd-muted-strong: color-mix(in oklch, var(--sidebar-foreground) 74%, transparent);
-  --awd-attack: var(--chart-1);
-  --awd-defense: var(--chart-2);
-  --awd-system: var(--chart-2);
-  --awd-error: var(--destructive);
+  --awd-attack: var(--attack);
+  --awd-defense: var(--defense);
+  --awd-system: var(--info);
+  --awd-error: var(--danger);
   --awd-checker: var(--primary);
   position: relative;
   overflow: hidden;

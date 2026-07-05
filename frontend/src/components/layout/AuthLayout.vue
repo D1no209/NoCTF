@@ -8,7 +8,7 @@ defineProps<{
 
 <template>
   <div class="grid min-h-[100dvh] bg-background lg:grid-cols-[minmax(420px,0.86fr)_1.14fr]">
-    <section class="noctf-dark-shell relative hidden overflow-hidden px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
+    <section class="noctf-dark-shell relative hidden overflow-hidden px-10 py-12 text-sidebar-foreground lg:flex lg:flex-col lg:justify-between">
       <div>
         <div class="mb-16 flex items-center gap-4">
           <span class="noctf-logo size-12" />
@@ -27,7 +27,7 @@ defineProps<{
         </div>
       </div>
 
-      <div class="max-w-xl border-t border-white/10 pt-6">
+      <div class="max-w-xl border-t border-sidebar-foreground/10 pt-6">
         <div class="grid gap-4 text-sm">
           <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-4">
             <div class="font-semibold text-sidebar-foreground">

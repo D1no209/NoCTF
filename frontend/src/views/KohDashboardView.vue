@@ -104,7 +104,7 @@ onUnmounted(() => signalR.stop())
 
     <div v-else-if="isError" class="noctf-state-box py-20">
       <div
-        class="size-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-4"
+        class="size-16 rounded-full bg-danger-muted flex items-center justify-center text-danger mb-4"
       >
         <ShieldAlert class="size-8" />
       </div>

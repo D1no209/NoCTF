@@ -72,13 +72,13 @@ async function handleLogout() {
 <template>
   <SidebarProvider>
     <Sidebar collapsible="icon" class="border-r-0">
-      <SidebarHeader class="h-20 flex items-center border-b border-white/10 px-4">
+      <SidebarHeader class="h-20 flex items-center border-b border-sidebar-foreground/10 px-4">
         <div class="flex items-center gap-2 overflow-hidden">
           <span class="noctf-logo size-10" />
           <div
             class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden"
           >
-            <span class="truncate text-xl font-bold tracking-tight text-white">NoCTF</span>
+            <span class="truncate text-xl font-bold tracking-tight text-sidebar-foreground">NoCTF</span>
             <span
               class="mt-0.5 inline-flex w-fit rounded-md bg-sidebar-foreground/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/75"
               >{{ t('nav.admin') }}</span
@@ -101,10 +101,10 @@ async function handleLogout() {
       </SidebarContent>
 
       <SidebarFooter
-        class="space-y-4 border-t border-white/10 p-4 group-data-[collapsible=icon]:p-2"
+        class="space-y-4 border-t border-sidebar-foreground/10 p-4 group-data-[collapsible=icon]:p-2"
       >
         <div class="group-data-[collapsible=icon]:hidden">
-          <div class="mb-3 rounded-lg border border-white/10 bg-white/5 p-3">
+          <div class="mb-3 rounded-lg border border-sidebar-foreground/10 bg-sidebar-foreground/5 p-3">
             <div class="flex items-center gap-3">
               <div
                 class="flex size-9 items-center justify-center rounded-full bg-sidebar-foreground text-sidebar font-semibold"
@@ -112,7 +112,7 @@ async function handleLogout() {
                 {{ auth.user?.userName?.charAt(0)?.toUpperCase() ?? 'A' }}
               </div>
               <div class="min-w-0">
-                <div class="truncate text-sm font-semibold text-white">
+                <div class="truncate text-sm font-semibold text-sidebar-foreground">
                   {{ auth.user?.userName ?? 'Admin' }}
                 </div>
                 <div class="text-xs text-sidebar-foreground/60">

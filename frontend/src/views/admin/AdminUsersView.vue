@@ -60,6 +60,7 @@ import {
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
+import { userRoleVariant } from '@/lib/statusTones'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -122,13 +123,6 @@ function openPasswordDialog(user: UserDto) {
   passwordDialog.value = true
 }
 
-function roleVariant(role: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const r = role.toLowerCase()
-  if (r === 'admin') return 'destructive'
-  if (r === 'organizer') return 'default'
-  return 'secondary'
-}
-
 const columnHelper = createColumnHelper<UserDto>()
 
 const columns = [
@@ -146,7 +140,7 @@ const columns = [
   }),
   columnHelper.accessor('role', {
     header: t('admin.users.role'),
-    cell: (info) => h(Badge, { variant: roleVariant(info.getValue()) }, () => info.getValue()),
+    cell: (info) => h(Badge, { variant: userRoleVariant(info.getValue()) }, () => info.getValue()),
   }),
 ]
 
@@ -303,9 +297,9 @@ const table = useVueTable({
             </Select>
           </div>
           
-          <div v-if="newRole === 'admin'" class="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex gap-3">
-            <ShieldAlert class="size-5 text-destructive shrink-0" />
-            <p class="text-xs text-destructive font-medium leading-tight">
+          <div v-if="newRole === 'admin'" class="p-3 rounded-lg bg-danger-muted/70 border border-danger/25 flex gap-3">
+            <ShieldAlert class="size-5 text-danger shrink-0" />
+            <p class="text-xs text-danger font-medium leading-tight">
               {{ t('admin.users.adminRoleWarning') }}
             </p>
           </div>
