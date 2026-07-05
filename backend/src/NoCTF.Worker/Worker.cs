@@ -10,11 +10,18 @@ public class Worker(IServiceScopeFactory scopeFactory, ILogger<Worker> logger) :
     {
         logger.LogInformation("NoCTF worker started.");
         await RecoverExpiredTasksAsync(stoppingToken);
+        var nextRecoveryAt = DateTime.UtcNow.AddMinutes(1);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                if (DateTime.UtcNow >= nextRecoveryAt)
+                {
+                    await RecoverExpiredTasksAsync(stoppingToken);
+                    nextRecoveryAt = DateTime.UtcNow.AddMinutes(1);
+                }
+
                 using var scope = scopeFactory.CreateScope();
                 var queue = scope.ServiceProvider.GetRequiredService<IBackgroundTaskQueue>();
                 var task = await queue.TryAcquireNextAsync(LockDuration, stoppingToken);

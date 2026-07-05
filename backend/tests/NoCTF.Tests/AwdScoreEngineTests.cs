@@ -26,7 +26,7 @@ public class AwdScoreEngineTests
     }
 
     private static AwdScoreEngine CreateScoreEngine(ApplicationDbContext db)
-        => new(db, new NullLeaderboardService(), new NullHubNotifier(), CreateScoreSignalEmitter(db), NullLogger<AwdScoreEngine>.Instance);
+        => new(db, new NullLeaderboardService(), new NullRedisLeaderboardCache(), new NullHubNotifier(), CreateScoreSignalEmitter(db), NullLogger<AwdScoreEngine>.Instance);
 
     private static AwdGameMode CreateGameMode(ApplicationDbContext db)
         => new(db, new NullHubNotifier(), CreateScoreSignalEmitter(db));

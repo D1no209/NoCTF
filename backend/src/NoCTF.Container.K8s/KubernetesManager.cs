@@ -25,10 +25,11 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
             ?? $"ctf-{Path.GetFileNameWithoutExtension(spec.Image).Split(':')[0]}-{Guid.NewGuid():N}";
         var name = KubernetesNames.SafeName(nameSeed);
         var namespaceName = KubernetesNames.InstanceNamespace(_options.NamespacePrefix, $"{name}-{Guid.NewGuid():N}");
-        await PrepareNamespaceAsync(namespaceName, spec, config.Labels, cancellationToken);
 
         try
         {
+            await PrepareNamespaceAsync(namespaceName, spec, config.Labels, cancellationToken);
+
             var deployment = KubernetesManifestFactory.Deployment(namespaceName, name, config, _options, spec);
             await _client.AppsV1.CreateNamespacedDeploymentAsync(deployment, namespaceName, cancellationToken: cancellationToken);
 
@@ -73,8 +74,14 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
     public async Task DestroyContainerAsync(ContainerInstance container, CancellationToken cancellationToken = default)
     {
         var namespaceName = container.OrchestrationNamespace ?? container.ContainerId;
-        await EnsureManagedNamespaceAsync(namespaceName, cancellationToken);
-        await DeleteNamespaceBestEffortAsync(namespaceName);
+        try
+        {
+            await EnsureManagedNamespaceAsync(namespaceName, cancellationToken);
+            await DeleteNamespaceAsync(namespaceName, cancellationToken);
+        }
+        catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
+        {
+        }
     }
 
     public async Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
@@ -89,14 +96,15 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
         var namespaceName = ownsNamespace
             ? KubernetesNames.InstanceNamespace(_options.NamespacePrefix, name)
             : config.NetworkName!;
-        if (ownsNamespace)
-            await PrepareNamespaceAsync(namespaceName, spec, config.Labels, cancellationToken);
-        else
-            await EnsureManagedNamespaceAsync(namespaceName, cancellationToken);
         var started = DateTime.UtcNow;
 
         try
         {
+            if (ownsNamespace)
+                await PrepareNamespaceAsync(namespaceName, spec, config.Labels, cancellationToken);
+            else
+                await EnsureManagedNamespaceAsync(namespaceName, cancellationToken);
+
             var job = KubernetesManifestFactory.Job(namespaceName, name, config, _options, spec);
             await _client.BatchV1.CreateNamespacedJobAsync(job, namespaceName, cancellationToken: cancellationToken);
 
@@ -145,10 +153,11 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
         var baseSpec = OrchestrationSpecSerializer.Read(config.OrchestrationJson);
         var services = KubernetesComposeParser.Parse(config.ComposeYaml, baseSpec);
         var namespaceName = KubernetesNames.InstanceNamespace(_options.NamespacePrefix, config.ProjectName);
-        await PrepareNamespaceAsync(namespaceName, baseSpec, config.Labels, cancellationToken);
 
         try
         {
+            await PrepareNamespaceAsync(namespaceName, baseSpec, config.Labels, cancellationToken);
+
             foreach (var service in services)
             {
                 var name = KubernetesNames.SafeName(service.Name);
@@ -220,7 +229,7 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
     {
         var namespaceName = deployment.OrchestrationNamespace ?? KubernetesNames.InstanceNamespace(_options.NamespacePrefix, deployment.ProjectName);
         await EnsureManagedNamespaceAsync(namespaceName, cancellationToken);
-        await DeleteNamespaceBestEffortAsync(namespaceName);
+        await DeleteNamespaceAsync(namespaceName, cancellationToken);
     }
 
     public async Task<ComposeStatus> GetComposeStatusAsync(
@@ -519,8 +528,7 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
             return;
         try
         {
-            using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            await _client.CoreV1.DeleteNamespaceAsync(namespaceName, cancellationToken: cleanupCts.Token);
+            await DeleteNamespaceAsync(namespaceName, CancellationToken.None);
         }
         catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -529,6 +537,13 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
         {
             logger.LogWarning(ex, "Failed to delete Kubernetes namespace {Namespace}.", namespaceName);
         }
+    }
+
+    private async Task DeleteNamespaceAsync(string namespaceName, CancellationToken cancellationToken)
+    {
+        using var cleanupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cleanupCts.CancelAfter(TimeSpan.FromSeconds(30));
+        await _client.CoreV1.DeleteNamespaceAsync(namespaceName, cancellationToken: cleanupCts.Token);
     }
 
     private async Task DeleteJobBestEffortAsync(string namespaceName, string jobName)

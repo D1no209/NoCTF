@@ -264,6 +264,20 @@ public class CtfGameMode : IGameMode
         if (!isDynamicUuid)
             return FormatFlag(challenge, challenge.FlagSecret ?? string.Empty);
 
+        var now = DateTime.UtcNow;
+        var hasActiveInstance = await _db.AwdGameBoxes
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(g =>
+                g.CompetitionId == challenge.CompetitionId &&
+                g.TeamId == teamId &&
+                g.ChallengeId == challenge.Id &&
+                g.ContainerInstanceId != null &&
+                (g.ExpiresAt == null || g.ExpiresAt > now),
+                cancellationToken);
+        if (!hasActiveInstance)
+            return null;
+
         var flag = await _db.CtfDynamicFlags
             .IgnoreQueryFilters()
             .AsNoTracking()

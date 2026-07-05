@@ -25,7 +25,7 @@ public class KohScoreEngineTests
     }
 
     private static KohScoreEngine CreateEngine(ApplicationDbContext db, KohHubNotifierSpy? notifier = null)
-        => new(db, new NullLeaderboardKoh(), notifier ?? new KohHubNotifierSpy(), CreateScoreSignalEmitter(db));
+        => new(db, new NullLeaderboardKoh(), new NullRedisLeaderboardCache(), notifier ?? new KohHubNotifierSpy(), CreateScoreSignalEmitter(db));
 
     private static IScoreSignalEmitter CreateScoreSignalEmitter(ApplicationDbContext db)
     {
@@ -64,6 +64,7 @@ public class KohScoreEngineTests
             CompetitionId = competitionId,
             Name = name,
             CaptainId = Guid.NewGuid(),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
             CreatedAt = DateTime.UtcNow
         });
         db.SaveChanges();

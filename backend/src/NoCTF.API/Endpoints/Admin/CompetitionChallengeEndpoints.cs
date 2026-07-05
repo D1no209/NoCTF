@@ -522,6 +522,7 @@ public class DeleteCompetitionChallengeEndpoint(
             .IgnoreQueryFilters()
             .Where(s => s.CompetitionId == competitionId && s.ChallengeId == challengeId)
             .ToListAsync(ct);
+        await RemoveAwdpPatchValidationTasksAsync(db, competitionId, awdpPatchSubmissions.Select(s => s.Id).ToList(), ct);
         db.AwdpPatchSubmissions.RemoveRange(awdpPatchSubmissions);
 
         var penetrationNodes = await db.PenetrationNodes
@@ -552,5 +553,23 @@ public class DeleteCompetitionChallengeEndpoint(
                 e.TotalScore,
                 e.SolvedCount)),
             ct);
+    }
+
+    private static async Task RemoveAwdpPatchValidationTasksAsync(
+        ApplicationDbContext db,
+        Guid competitionId,
+        IReadOnlyCollection<Guid> submissionIds,
+        CancellationToken ct)
+    {
+        if (submissionIds.Count == 0)
+            return;
+
+        var submissionIdText = submissionIds.Select(id => id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var tasks = await db.BackgroundTasks
+            .IgnoreQueryFilters()
+            .Where(t => t.CompetitionId == competitionId && t.Type == "awdp.patch.validation")
+            .ToListAsync(ct);
+        db.BackgroundTasks.RemoveRange(tasks.Where(t =>
+            submissionIdText.Any(id => t.PayloadJson.Contains(id, StringComparison.OrdinalIgnoreCase))));
     }
 }

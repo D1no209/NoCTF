@@ -88,7 +88,7 @@ public class GetPenetrationTemplateTopologyEndpoint(
     public override void Configure()
     {
         Get("/api/admin/challenges/{templateId}/penetration-topology");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
     }
 
     public override async Task HandleAsync(PenetrationTemplateTopologyRequest req, CancellationToken ct)
@@ -130,7 +130,7 @@ public class UpdatePenetrationTemplateTopologyEndpoint(
     public override void Configure()
     {
         Put("/api/admin/challenges/{templateId}/penetration-topology");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
     }
 
     public override async Task HandleAsync(CancellationToken ct)

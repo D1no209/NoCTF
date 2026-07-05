@@ -23,12 +23,26 @@ internal static class RunnerImagePolicy
             .ToArray();
     }
 
-    public static void ValidateContainerConfig(ContainerConfig config)
+    public static string[] ReadAllowedNetworks(IConfiguration configuration)
+    {
+        var values = configuration.GetSection("Runner:AllowedNetworks").Get<string[]>() ?? [];
+        var raw = configuration["Runner:AllowedNetworks"];
+        return values
+            .Concat(string.IsNullOrWhiteSpace(raw) ? [] : [raw])
+            .SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public static void ValidateContainerConfig(
+        ContainerConfig config,
+        IReadOnlyCollection<string>? allowedNetworks = null)
     {
         if (string.IsNullOrWhiteSpace(config.Image))
             throw new InvalidOperationException("Container image is required.");
 
-        ValidateNetworkName(config.NetworkName);
+        ValidateNetworkName(config.NetworkName, allowedNetworks ?? []);
         ValidateNetworkAliases(config.NetworkAliases);
         ValidateSecurityPolicy(config.SecurityPolicy);
         ValidateResourceLimits(config.ResourceLimits);
@@ -48,7 +62,7 @@ internal static class RunnerImagePolicy
         return null;
     }
 
-    private static void ValidateNetworkName(string? networkName)
+    private static void ValidateNetworkName(string? networkName, IReadOnlyCollection<string> allowedNetworks)
     {
         if (string.IsNullOrWhiteSpace(networkName))
             return;
@@ -61,6 +75,9 @@ internal static class RunnerImagePolicy
         {
             throw new InvalidOperationException("Container network mode is not allowed.");
         }
+
+        if (allowedNetworks.Any(allowed => value.Equals(allowed, StringComparison.OrdinalIgnoreCase)))
+            return;
 
         if (!NetworkNamePattern.IsMatch(value) ||
             (!value.StartsWith("noctf-", StringComparison.OrdinalIgnoreCase) &&

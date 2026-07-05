@@ -109,6 +109,16 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+    options.AddPolicy("auth-register", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
     options.AddPolicy("flag-submit", httpContext =>
     {
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -282,14 +292,9 @@ app.MapGet("/api/files/{**filePath}", (string filePath, HttpContext httpContext,
             signature,
             configuration["StorageProvider:Local:UrlSigningKey"] ?? configuration["JwtSettings:Secret"],
             DateTimeOffset.UtcNow);
-    var isPatchArchive = normalized.StartsWith("patches/", StringComparison.OrdinalIgnoreCase);
-    if (isPatchArchive && !hasValidSignature)
+    if (!hasValidSignature)
     {
         return Results.NotFound();
-    }
-    else if (!hasValidSignature && httpContext.User.Identity?.IsAuthenticated != true)
-    {
-        return Results.Unauthorized();
     }
 
     return Results.File(fullPath, "application/octet-stream", Path.GetFileName(fullPath));

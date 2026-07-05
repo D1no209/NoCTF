@@ -242,7 +242,13 @@ public class GetCompetitionViewEndpoint(ApplicationDbContext db, ICompetitionMod
             teamId = await db.TeamMembers
                 .IgnoreQueryFilters()
                 .Where(tm => tm.CompetitionId == competitionId && tm.UserId == userId.Value)
-                .Select(tm => (Guid?)tm.TeamId)
+                .Join(db.Teams.IgnoreQueryFilters().Where(t =>
+                        t.CompetitionId == competitionId &&
+                        t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                        !t.IsBanned),
+                    tm => tm.TeamId,
+                    t => t.Id,
+                    (_, t) => (Guid?)t.Id)
                 .FirstOrDefaultAsync(ct);
         }
 

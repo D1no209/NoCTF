@@ -185,6 +185,17 @@ public class BanCompetitionTeamEndpoint(
             "team_banned",
             ct);
 
+        db.AwdFlags.RemoveRange(await db.AwdFlags
+            .IgnoreQueryFilters()
+            .Where(f => f.CompetitionId == competitionId && f.TeamId == team.Id)
+            .ToListAsync(ct));
+        var activeKohRecords = await db.KohControlRecords
+            .IgnoreQueryFilters()
+            .Where(r => r.CompetitionId == competitionId && r.TeamId == team.Id && r.EndTime == null)
+            .ToListAsync(ct);
+        foreach (var record in activeKohRecords)
+            record.EndTime = DateTime.UtcNow;
+
         CompetitionLogWriter.Add(
             db,
             competitionId,

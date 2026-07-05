@@ -178,6 +178,44 @@ public class PenetrationInstanceMaintenanceServiceTests
         Assert.Equal("penetration.instance.maintenance_timeout", await db.CompetitionLogs.IgnoreQueryFilters().Select(l => l.EventType).SingleAsync());
     }
 
+    [Fact]
+    public async Task MaintainAsync_MarksStuckBusyInstanceFailedWhenComposeDownFails()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var instanceId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedChallenge(db, competitionId, challengeId);
+        db.TeamChallengeInstances.Add(new TeamChallengeInstance
+        {
+            Id = instanceId,
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            Status = PenetrationInstanceStatus.Destroying,
+            ComposeProjectName = "range-destroying",
+            RenderedComposeYaml = "services:\n  web:\n    image: nginx:alpine\n",
+            EntryPort = 32080,
+            EntryUrl = "http://ctf.local:32080",
+            LastActionAt = DateTime.UtcNow.AddMinutes(-20),
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            CreatedAt = DateTime.UtcNow.AddMinutes(-20),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-20)
+        });
+        await db.SaveChangesAsync();
+
+        var manager = new FakeComposeContainerManager { ThrowOnComposeDown = true };
+        var result = await CreateService(db, manager).MaintainAsync();
+
+        var instance = await db.TeamChallengeInstances.IgnoreQueryFilters().SingleAsync(i => i.Id == instanceId);
+        Assert.Equal(new InstanceMaintenanceResult(0, 0, 1), result);
+        Assert.Equal(PenetrationInstanceStatus.Failed, instance.Status);
+        Assert.Contains("Destroying", instance.LastError);
+        Assert.Contains("cleanup failed", instance.LastError);
+        Assert.Equal(1, manager.ComposeDownCalls);
+    }
+
     private static PenetrationInstanceMaintenanceService CreateService(ApplicationDbContext db, IContainerManager manager)
         => new(
             db,
@@ -227,6 +265,7 @@ public class PenetrationInstanceMaintenanceServiceTests
     {
         public ComposeStatus Status { get; set; } = new("range", "not_found", []);
         public int ComposeDownCalls { get; private set; }
+        public bool ThrowOnComposeDown { get; init; }
 
         public Task<ContainerInstance> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
@@ -243,6 +282,8 @@ public class PenetrationInstanceMaintenanceServiceTests
         public Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken cancellationToken = default)
         {
             ComposeDownCalls++;
+            if (ThrowOnComposeDown)
+                throw new InvalidOperationException("compose down failed");
             return Task.CompletedTask;
         }
 

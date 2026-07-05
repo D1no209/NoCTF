@@ -408,9 +408,14 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             ? new Dictionary<int, int> { [exposedPort.Value] = 0 }
             : null;
 
-        var env = dynamicFlag is null
-            ? null
-            : new Dictionary<string, string> { [dynamicFlag.EnvironmentVariable] = FormatFlag(challenge, dynamicFlag.FlagUuid) };
+        var env = spec.Environment.Count > 0
+            ? new Dictionary<string, string>(spec.Environment, StringComparer.Ordinal)
+            : null;
+        if (dynamicFlag is not null)
+        {
+            env ??= new Dictionary<string, string>(StringComparer.Ordinal);
+            env[dynamicFlag.EnvironmentVariable] = FormatFlag(challenge, dynamicFlag.FlagUuid);
+        }
 
         return new ContainerConfig(
             Image: image,
@@ -510,6 +515,14 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         }
 
         ChallengeInstanceRuntime.ClearContainer(box);
+        var dynamicFlags = await dbContext.CtfDynamicFlags
+            .IgnoreQueryFilters()
+            .Where(f =>
+                f.CompetitionId == box.CompetitionId &&
+                f.TeamId == box.TeamId &&
+                f.ChallengeId == box.ChallengeId)
+            .ToListAsync(ct);
+        dbContext.CtfDynamicFlags.RemoveRange(dynamicFlags);
         if (updateCooldown) box.LastInstanceActionAt = DateTime.UtcNow;
     }
 

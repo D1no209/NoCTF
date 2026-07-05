@@ -15,6 +15,7 @@ namespace NoCTF.Plugins.AWD;
 public class AwdScoreEngine(
     ApplicationDbContext db,
     ILeaderboardService leaderboardService,
+    IRedisLeaderboardCache leaderboardCache,
     IHubNotifierService hubNotifier,
     IScoreSignalEmitter scoreSignalEmitter,
     ILogger<AwdScoreEngine> logger)
@@ -103,6 +104,7 @@ public class AwdScoreEngine(
         try
         {
             var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
+            await leaderboardCache.UpdateAsync(competitionId, entries, ct);
             var payload = entries.Select(e => new LeaderboardEntryPayload(e.Rank, e.TeamId, e.TeamName, e.TotalScore, e.SolvedCount));
             await hubNotifier.NotifyLeaderboardSnapshotAsync(competitionId, payload, ct);
         }

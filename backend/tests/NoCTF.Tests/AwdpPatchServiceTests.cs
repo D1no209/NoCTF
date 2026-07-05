@@ -342,10 +342,10 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_CheckEnvironmentIncludesTargetAndPatchMetadata()
+    public async Task ValidatePatchAsync_CheckEnvironmentIncludesTargetOnly()
     {
         var (db, service, competitionId, teamId, challengeId, containerManager) =
-            await CreateValidationScenarioAsync([0, 0]);
+            await CreateValidationScenarioAsync([0, 0], exposedPort: 9999);
         await using (db)
         {
             var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
@@ -358,11 +358,149 @@ public class AwdpPatchServiceTests
             Assert.Equal(
                 $"gamebox-{teamId:N}"[..16] + $"-{challengeId:N}"[..9],
                 checkConfig.EnvironmentVariables?["TARGET_HOST"]);
-            Assert.Equal("80", checkConfig.EnvironmentVariables?["TARGET_PORT"]);
+            Assert.Equal("9999", checkConfig.EnvironmentVariables?["TARGET_PORT"]);
             Assert.Equal(teamId.ToString(), checkConfig.EnvironmentVariables?["TEAM_ID"]);
-            Assert.Equal("http://storage/fix.tar.gz", checkConfig.EnvironmentVariables?["PATCH_URL"]);
-            Assert.Equal("fix.tar.gz", checkConfig.EnvironmentVariables?["PATCH_FILE_NAME"]);
-            Assert.Equal("fix.sh", checkConfig.EnvironmentVariables?["FIX_ENTRY"]);
+            Assert.False(checkConfig.EnvironmentVariables?.ContainsKey("PATCH_URL") ?? true);
+            Assert.False(checkConfig.EnvironmentVariables?.ContainsKey("PATCH_FILE_NAME") ?? true);
+            Assert.False(checkConfig.EnvironmentVariables?.ContainsKey("FIX_ENTRY") ?? true);
+        }
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_RelativePatchUrlUsesConfiguredPublicBaseUrl()
+    {
+        var (db, service, competitionId, teamId, challengeId, containerManager) =
+            await CreateValidationScenarioAsync([0, 0]);
+        await using (db)
+        {
+            var submissionId = await CreatePendingSubmission(
+                db,
+                competitionId,
+                teamId,
+                challengeId,
+                "/api/files/patches/fix.tar.gz?sig=test");
+
+            await service.ValidatePatchAsync(submissionId);
+
+            Assert.Equal(
+                "http://api.local/api/files/patches/fix.tar.gz?sig=test",
+                containerManager.RunConfigs[0].EnvironmentVariables?["PATCH_URL"]);
+            Assert.Equal(
+                "http://api.local/api/files/patches/fix.tar.gz?sig=test",
+                containerManager.CreateConfigs.Single().EnvironmentVariables?["PATCH_URL"]);
+            Assert.False(containerManager.RunConfigs[1].EnvironmentVariables?.ContainsKey("PATCH_URL") ?? true);
+        }
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_PatchedContainerPreservesDynamicFlagEnvironment()
+    {
+        var (db, service, competitionId, teamId, challengeId, containerManager) =
+            await CreateValidationScenarioAsync([0, 0]);
+        await using (db)
+        {
+            var challenge = await db.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId);
+            challenge.OrchestrationJson = OrchestrationSpecSerializer.Write(new OrchestrationSpec
+            {
+                Environment = new Dictionary<string, string>
+                {
+                    ["GLIBC_TUNABLES"] = "glibc.cpu.hwcaps=-SHSTK,-IBT"
+                }
+            });
+            db.CtfDynamicFlags.Add(new CtfDynamicFlag
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                ChallengeId = challengeId,
+                FlagUuid = "d3adbeef-1111-4222-8333-aabbccddeeff",
+                EnvironmentVariable = "FLAG",
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+            await service.ValidatePatchAsync(submissionId);
+
+            var patchedConfig = containerManager.CreateConfigs.Single();
+            Assert.Equal("glibc.cpu.hwcaps=-SHSTK,-IBT", patchedConfig.EnvironmentVariables?["GLIBC_TUNABLES"]);
+            Assert.Equal("flag{d3adbeef-1111-4222-8333-aabbccddeeff}", patchedConfig.EnvironmentVariables?["FLAG"]);
+            Assert.Equal("http://storage/fix.tar.gz", patchedConfig.EnvironmentVariables?["PATCH_URL"]);
+            Assert.False(patchedConfig.Labels?.ContainsKey("noctf.host-gateway") ?? false);
+        }
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_CheckFailureRollbackPreservesDynamicFlagEnvironment()
+    {
+        var (db, service, competitionId, teamId, challengeId, containerManager) =
+            await CreateValidationScenarioAsync([0, 1]);
+        await using (db)
+        {
+            var challenge = await db.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId);
+            challenge.OrchestrationJson = OrchestrationSpecSerializer.Write(new OrchestrationSpec
+            {
+                Environment = new Dictionary<string, string>
+                {
+                    ["GLIBC_TUNABLES"] = "glibc.cpu.hwcaps=-SHSTK,-IBT"
+                }
+            });
+            db.CtfDynamicFlags.Add(new CtfDynamicFlag
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                ChallengeId = challengeId,
+                FlagUuid = "d3adbeef-1111-4222-8333-aabbccddeeff",
+                EnvironmentVariable = "FLAG",
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+            await service.ValidatePatchAsync(submissionId);
+
+            Assert.Equal(2, containerManager.CreateConfigs.Count);
+            var restoredConfig = containerManager.CreateConfigs[1];
+            Assert.Equal("glibc.cpu.hwcaps=-SHSTK,-IBT", restoredConfig.EnvironmentVariables?["GLIBC_TUNABLES"]);
+            Assert.Equal("flag{d3adbeef-1111-4222-8333-aabbccddeeff}", restoredConfig.EnvironmentVariables?["FLAG"]);
+            Assert.False(restoredConfig.EnvironmentVariables?.ContainsKey("PATCH_URL") ?? false);
+        }
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_CheckFailureRollbackRestoresPreviousVerifiedPatch()
+    {
+        var (db, service, competitionId, teamId, challengeId, containerManager) =
+            await CreateValidationScenarioAsync([0, 1]);
+        await using (db)
+        {
+            db.AwdpPatchSubmissions.Add(new AwdpPatchSubmission
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                ChallengeId = challengeId,
+                PatchArchiveUrl = "http://storage/previous.tar.gz",
+                Status = AwdpPatchStatus.Verified,
+                FixStatus = AwdpFixStatus.FixSuccess,
+                AttemptNumber = 1,
+                FileName = "previous.tar.gz",
+                FixEntry = "fix.sh",
+                SubmittedAt = DateTime.UtcNow.AddMinutes(-10),
+                ValidatedAt = DateTime.UtcNow.AddMinutes(-9)
+            });
+            await db.SaveChangesAsync();
+            var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+            await service.ValidatePatchAsync(submissionId);
+
+            Assert.Equal(2, containerManager.CreateConfigs.Count);
+            var restoredConfig = containerManager.CreateConfigs[1];
+            Assert.Equal("http://storage/previous.tar.gz", restoredConfig.EnvironmentVariables?["PATCH_URL"]);
+            Assert.Equal("previous.tar.gz", restoredConfig.EnvironmentVariables?["PATCH_FILE_NAME"]);
+            Assert.Equal("fix.sh", restoredConfig.EnvironmentVariables?["FIX_ENTRY"]);
+            Assert.Equal("container-2", (await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync()).ContainerInstanceId);
         }
     }
 
@@ -388,13 +526,13 @@ public class AwdpPatchServiceTests
     }
 
     private static async Task<(ApplicationDbContext Db, AwdpPatchService Service, Guid CompetitionId, Guid TeamId, Guid ChallengeId, SequencedContainerManager ContainerManager)>
-        CreateValidationScenarioAsync(int[] exitCodes)
+        CreateValidationScenarioAsync(int[] exitCodes, int exposedPort = 80)
     {
         var competitionId = Guid.NewGuid();
         var teamId = Guid.NewGuid();
         var db = CreateDb(competitionId);
         SeedCompetition(db, competitionId);
-        var challengeId = SeedChallenge(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId, exposedPort: exposedPort);
         SeedGameBox(db, competitionId, teamId, challengeId);
         await db.SaveChangesAsync();
         var containerManager = new SequencedContainerManager(exitCodes);
@@ -430,7 +568,8 @@ public class AwdpPatchServiceTests
         Guid competitionId,
         string? checkerImage = "checker:latest",
         int defensePoints = 150,
-        int maxDefenseAttempts = 3)
+        int maxDefenseAttempts = 3,
+        int exposedPort = 80)
     {
         var id = Guid.NewGuid();
         db.Challenges.Add(new Challenge
@@ -441,7 +580,7 @@ public class AwdpPatchServiceTests
             TypeId = "awdp",
             PointsConfig = new PointsConfig(),
             ContainerImage = "vuln-service:latest",
-            ExposedPort = 80,
+            ExposedPort = exposedPort,
             AwdpDefenseScorePerRound = defensePoints,
             AwdpMaxDefenseAttempts = maxDefenseAttempts,
             AwdpFixEntry = "fix.sh",
@@ -491,7 +630,8 @@ public class AwdpPatchServiceTests
         ApplicationDbContext db,
         Guid competitionId,
         Guid teamId,
-        Guid challengeId)
+        Guid challengeId,
+        string patchArchiveUrl = "http://storage/fix.tar.gz")
     {
         var submission = new AwdpPatchSubmission
         {
@@ -499,7 +639,7 @@ public class AwdpPatchServiceTests
             CompetitionId = competitionId,
             TeamId = teamId,
             ChallengeId = challengeId,
-            PatchArchiveUrl = "http://storage/fix.tar.gz",
+            PatchArchiveUrl = patchArchiveUrl,
             Status = AwdpPatchStatus.Pending,
             FixStatus = AwdpFixStatus.FixUploading,
             AttemptNumber = 1,

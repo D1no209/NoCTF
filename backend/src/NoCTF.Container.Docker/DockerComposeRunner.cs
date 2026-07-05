@@ -66,6 +66,9 @@ public static class DockerComposeRunner
         if (string.IsNullOrWhiteSpace(composeYaml))
             throw new InvalidOperationException("Compose YAML cannot be empty.");
 
+        if (composeYaml.Contains("${", StringComparison.Ordinal))
+            throw new InvalidOperationException("Compose YAML variable interpolation is not allowed.");
+
         if (composeYaml.Contains("/var/run/docker.sock", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Compose YAML contains forbidden Docker socket mount.");
 
@@ -243,8 +246,8 @@ public static class DockerComposeRunner
             return false;
         }
 
-        return !string.IsNullOrWhiteSpace(ScalarValue(GetValue(limits, "cpus"))) &&
-               !string.IsNullOrWhiteSpace(ScalarValue(GetValue(limits, "memory")));
+        return IsValidCpuLimit(ScalarValue(GetValue(limits, "cpus"))) &&
+               IsValidMemoryLimit(ScalarValue(GetValue(limits, "memory")));
     }
 
     private static bool HasValidPidsLimit(YamlMappingNode service)
@@ -392,11 +395,64 @@ public static class DockerComposeRunner
                 if (key.Equals("name", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("Compose top-level network names are controlled by NoCTF.");
 
-                if (!key.Equals("driver", StringComparison.OrdinalIgnoreCase) &&
-                    !key.Equals("labels", StringComparison.OrdinalIgnoreCase))
+                if (key.Equals("driver", StringComparison.OrdinalIgnoreCase))
+                {
+                    var driver = ScalarValue(GetValue(network, key));
+                    if (!string.IsNullOrWhiteSpace(driver) && !driver.Equals("bridge", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Compose top-level networks may only use the bridge driver.");
+                    continue;
+                }
+
+                if (!key.Equals("labels", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException($"Compose top-level network directive is not supported: {key}");
             }
         }
+    }
+
+    private static bool IsValidCpuLimit(string value)
+        => double.TryParse(
+               value,
+               System.Globalization.NumberStyles.Float,
+               System.Globalization.CultureInfo.InvariantCulture,
+               out var cpus) &&
+           cpus is > 0 and <= 2;
+
+    private static bool IsValidMemoryLimit(string value)
+    {
+        value = value.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            value,
+            @"^(?<number>\d+(?:\.\d+)?)(?<unit>b|k|kb|m|mb|g|gb|ki|kib|mi|mib|gi|gib)?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!match.Success ||
+            !double.TryParse(
+                match.Groups["number"].Value,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var number) ||
+            number <= 0)
+        {
+            return false;
+        }
+
+        var unit = match.Groups["unit"].Value.ToLowerInvariant();
+        var multiplier = unit switch
+        {
+            "" or "b" => 1D,
+            "k" or "kb" => 1000D,
+            "ki" or "kib" => 1024D,
+            "m" or "mb" => 1000D * 1000D,
+            "mi" or "mib" => 1024D * 1024D,
+            "g" or "gb" => 1000D * 1000D * 1000D,
+            "gi" or "gib" => 1024D * 1024D * 1024D,
+            _ => 0D
+        };
+
+        var bytes = number * multiplier;
+        return bytes is > 0 and <= 2D * 1024D * 1024D * 1024D;
     }
 
     private static bool IsUnsafeVolumeSource(string value)
@@ -478,6 +534,19 @@ public static class DockerComposeRunner
             CreateNoWindow = true,
         };
 
+        var inheritedEnvironment = new Dictionary<string, string?>(startInfo.Environment, StringComparer.OrdinalIgnoreCase);
+        startInfo.Environment.Clear();
+        foreach (var key in new[]
+                 {
+                     "PATH", "Path", "SystemRoot", "WINDIR", "DOCKER_HOST", "DOCKER_CONFIG",
+                     "HOME", "USERPROFILE", "TMP", "TEMP", "TMPDIR"
+                 })
+        {
+            if (inheritedEnvironment.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                startInfo.Environment[key] = value;
+        }
+        startInfo.Environment["COMPOSE_DISABLE_ENV_FILE"] = "1";
+
         if (environmentVariables is not null)
         {
             foreach (var (key, value) in environmentVariables)
@@ -490,7 +559,15 @@ public static class DockerComposeRunner
         var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
-        await process.WaitForExitAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            TryKillProcessTree(process);
+            throw;
+        }
         var stdout = await stdoutTask;
         var stderr = await stderrTask;
 
@@ -498,6 +575,19 @@ public static class DockerComposeRunner
             throw new InvalidOperationException($"docker {arguments} failed with exit code {process.ExitCode}: {stderr}");
 
         return stdout;
+    }
+
+    private static void TryKillProcessTree(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            // Cancellation cleanup must not hide the original cancellation.
+        }
     }
 
     private static void AppendQuoted(StringBuilder builder, string value)

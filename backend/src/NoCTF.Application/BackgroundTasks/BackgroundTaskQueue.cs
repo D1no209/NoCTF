@@ -54,6 +54,46 @@ public class BackgroundTaskQueue(ApplicationDbContext dbContext) : IBackgroundTa
         CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
+        if (dbContext.Database.IsRelational())
+        {
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                var candidateId = await dbContext.BackgroundTasks
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Where(t =>
+                        (t.Status == BackgroundTaskStatus.Pending || t.Status == BackgroundTaskStatus.Retrying) &&
+                        (t.LockedUntil == null || t.LockedUntil < now))
+                    .OrderBy(t => t.CreatedAt)
+                    .Select(t => (Guid?)t.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (candidateId is null)
+                    return null;
+
+                var updated = await dbContext.BackgroundTasks
+                    .IgnoreQueryFilters()
+                    .Where(t =>
+                        t.Id == candidateId.Value &&
+                        (t.Status == BackgroundTaskStatus.Pending || t.Status == BackgroundTaskStatus.Retrying) &&
+                        (t.LockedUntil == null || t.LockedUntil < now))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(t => t.Status, BackgroundTaskStatus.Running)
+                        .SetProperty(t => t.AttemptCount, t => t.AttemptCount + 1)
+                        .SetProperty(t => t.LockedUntil, now.Add(lockDuration))
+                        .SetProperty(t => t.UpdatedAt, now), cancellationToken);
+
+                if (updated == 1)
+                {
+                    return await dbContext.BackgroundTasks
+                        .IgnoreQueryFilters()
+                        .FirstAsync(t => t.Id == candidateId.Value, cancellationToken);
+                }
+            }
+
+            return null;
+        }
+
         var task = await dbContext.BackgroundTasks
             .IgnoreQueryFilters()
             .Where(t =>

@@ -65,6 +65,46 @@ public class ChallengeInstanceRuntimeTests
         Assert.Equal($"flag{{{flagUuid}}}", config.EnvironmentVariables["NOCTF_FLAG_UUID"]);
     }
 
+    [Fact]
+    public void BuildContainerConfig_MergesOrchestrationEnvironmentWithDynamicFlag()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var flagUuid = "8481bb12-baa8-43e5-b878-307a5896e831";
+        var challenge = new Challenge
+        {
+            Id = challengeId,
+            CompetitionId = competitionId,
+            ContainerImage = "registry/challenge:latest",
+            ExposedPort = 9999,
+            FlagPrefix = "flag",
+            FlagEnvironmentVariable = "FLAG",
+            OrchestrationJson = OrchestrationSpecSerializer.Write(new OrchestrationSpec
+            {
+                Environment = new Dictionary<string, string>
+                {
+                    ["GLIBC_TUNABLES"] = "glibc.cpu.hwcaps=-SHSTK,-IBT",
+                    ["FLAG"] = "placeholder"
+                }
+            })
+        };
+        var dynamicFlag = new CtfDynamicFlag
+        {
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            TeamId = teamId,
+            EnvironmentVariable = "FLAG",
+            FlagUuid = flagUuid
+        };
+
+        var config = InvokeBuildContainerConfig(challenge, teamId, dynamicFlag);
+
+        Assert.NotNull(config.EnvironmentVariables);
+        Assert.Equal("glibc.cpu.hwcaps=-SHSTK,-IBT", config.EnvironmentVariables["GLIBC_TUNABLES"]);
+        Assert.Equal($"flag{{{flagUuid}}}", config.EnvironmentVariables["FLAG"]);
+    }
+
     private static ContainerConfig InvokeBuildContainerConfig(
         Challenge challenge,
         Guid teamId,

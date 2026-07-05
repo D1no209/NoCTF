@@ -66,12 +66,13 @@ services:
       Database__AutoMigrate: "true"
       SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
-      SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:-Admin@123456}
+      SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
       StorageProvider__Local__BasePath: /app/uploads
       StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
       Runner__BaseUrl: http://runner:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
       Runner__ApiKey: ${RUNNER_API_KEY:-dev-runner-token-change-me}
+      Runner__UtilityNetwork: ${RUNNER_UTILITY_NETWORK:-deploy_default}
       InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
     volumes:
       - backend_uploads:/app/uploads
@@ -104,6 +105,7 @@ services:
       Runner__BaseUrl: http://runner:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
       Runner__ApiKey: ${RUNNER_API_KEY:-dev-runner-token-change-me}
+      Runner__UtilityNetwork: ${RUNNER_UTILITY_NETWORK:-deploy_default}
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
@@ -129,6 +131,7 @@ services:
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
       Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
       Runner__AllowedRegistries: ${RUNNER_ALLOWED_REGISTRIES:-docker.io,ghcr.io,quay.io,registry.k8s.io,localhost}
+      Runner__AllowedNetworks: ${RUNNER_ALLOWED_NETWORKS:-deploy_default}
       Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       K8s__PublicEntry: ${K8S_PUBLIC_ENTRY:-}
       K8s__IngressBaseDomain: ${K8S_INGRESS_BASE_DOMAIN:-}

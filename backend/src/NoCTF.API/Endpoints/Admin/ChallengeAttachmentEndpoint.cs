@@ -24,7 +24,7 @@ public class UploadChallengeAttachmentEndpoint(
     public override void Configure()
     {
         Post("/api/admin/challenges/{id}/attachment");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
         AllowFileUploads();
     }
 
@@ -78,7 +78,7 @@ public class UploadChallengePatchTemplateEndpoint(
     public override void Configure()
     {
         Post("/api/admin/challenges/{id}/patch-template");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
         AllowFileUploads();
     }
 

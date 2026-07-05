@@ -29,7 +29,7 @@ public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateC
     public override void Configure()
     {
         Post("/api/admin/challenges");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
     }
 
     public override async Task HandleAsync(CreateChallengeRequest req, CancellationToken ct)

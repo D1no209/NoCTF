@@ -14,6 +14,7 @@ namespace NoCTF.Plugins.KoH;
 public class KohScoreEngine(
     ApplicationDbContext db,
     ILeaderboardService leaderboard,
+    IRedisLeaderboardCache leaderboardCache,
     IHubNotifierService hubNotifier,
     IScoreSignalEmitter scoreSignalEmitter)
 {
@@ -29,6 +30,20 @@ public class KohScoreEngine(
         int controlPointsPerInterval,
         CancellationToken ct = default)
     {
+        if (newControllerTeamId.HasValue)
+        {
+            var isActiveTeam = await db.Teams
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .AnyAsync(t =>
+                    t.Id == newControllerTeamId.Value &&
+                    t.CompetitionId == competitionId &&
+                    t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                    !t.IsBanned, ct);
+            if (!isActiveTeam)
+                newControllerTeamId = null;
+        }
+
         var activeRecord = await db.KohControlRecords
             .IgnoreQueryFilters()
             .Where(r => r.CompetitionId == competitionId
@@ -51,7 +66,8 @@ public class KohScoreEngine(
                     SubjectId: challengeId,
                     PayloadJson: ScoringJson.Serialize(new { source = "poll" }),
                     OccurredAt: now), ct);
-                await leaderboard.CalculateLeaderboardAsync(competitionId, ct);
+                var entries = await leaderboard.CalculateLeaderboardAsync(competitionId, ct);
+                await leaderboardCache.UpdateAsync(competitionId, entries, ct);
             }
         }
         else
@@ -75,7 +91,8 @@ public class KohScoreEngine(
 
             await db.SaveChangesAsync(ct);
             await hubNotifier.NotifyKohUpdateAsync(competitionId, challengeId, newControllerTeamId, now, ct);
-            await leaderboard.CalculateLeaderboardAsync(competitionId, ct);
+            var entries = await leaderboard.CalculateLeaderboardAsync(competitionId, ct);
+            await leaderboardCache.UpdateAsync(competitionId, entries, ct);
         }
     }
 }

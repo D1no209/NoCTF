@@ -52,7 +52,7 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
             ExposedPorts = BuildExposedPorts(networkedConfig),
             HostConfig = DockerHostConfigFactory.Create(
                 networkedConfig,
-                networkedConfig.PortMappings is null || networkedConfig.PortMappings.Count == 0,
+                publishAllPorts: false,
                 BuildPortBindings(networkedConfig)),
             NetworkingConfig = BuildNetworkingConfig(networkName, networkedConfig.NetworkAliases)
         };

@@ -25,6 +25,7 @@ public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<Registe
     {
         Post("/api/auth/register");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("auth-register"));
     }
 
     public override async Task HandleAsync(RegisterRequest req, CancellationToken ct)
