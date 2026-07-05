@@ -87,7 +87,10 @@ public class GetPatchSubmissionsEndpoint(ApplicationDbContext db)
 
         return await db.TeamMembers
             .AsNoTracking()
-            .Join(db.Teams.IgnoreQueryFilters().Where(t => t.CompetitionId == competitionId),
+            .Join(db.Teams.IgnoreQueryFilters().Where(t =>
+                    t.CompetitionId == competitionId &&
+                    t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                    !t.IsBanned),
                 tm => tm.TeamId,
                 t => t.Id,
                 (tm, t) => new { tm.UserId, TeamId = t.Id })

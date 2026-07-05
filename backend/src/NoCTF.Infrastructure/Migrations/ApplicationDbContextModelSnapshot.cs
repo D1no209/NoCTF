@@ -58,6 +58,10 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("CompetitionId", "RoundNumber")
                         .HasDatabaseName("ix_awdattackrecords_competition_round");
 
+                    b.HasIndex("CompetitionId", "AttackerTeamId", "VictimTeamId", "ChallengeId", "RoundNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awdattackrecords_unique_attack");
+
                     b.ToTable("AwdAttackRecords");
                 });
 

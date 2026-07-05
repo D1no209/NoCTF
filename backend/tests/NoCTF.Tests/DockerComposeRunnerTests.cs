@@ -97,6 +97,7 @@ volumes:
     [InlineData("external: true")]
     [InlineData("ipam:\n      config:\n        - subnet: 172.16.0.0/16")]
     [InlineData("name: shared-network")]
+    [InlineData("driver: macvlan")]
     public void ValidateComposeYaml_RejectsUnsafeTopLevelNetworks(string directive)
     {
         var yaml = $"""
@@ -106,6 +107,59 @@ services:
 networks:
   default:
     {directive}
+""";
+
+        Assert.Throws<InvalidOperationException>(() => DockerComposeRunner.ValidateComposeYaml(yaml));
+    }
+
+    [Fact]
+    public void ValidateComposeYaml_RejectsVariableInterpolation()
+    {
+        var yaml = """
+services:
+  web:
+    image: registry/challenge:latest
+    environment:
+      RUNNER_TOKEN: ${Runner__ApiKey}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    read_only: true
+    pids_limit: 128
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "256M"
+""";
+
+        Assert.Throws<InvalidOperationException>(() => DockerComposeRunner.ValidateComposeYaml(yaml));
+    }
+
+    [Theory]
+    [InlineData("3.0", "256M")]
+    [InlineData("0.50", "3GiB")]
+    [InlineData("not-a-number", "256M")]
+    public void ValidateComposeYaml_RejectsInvalidResourceLimits(string cpus, string memory)
+    {
+        var yaml = $"""
+services:
+  web:
+    image: registry/challenge:latest
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    read_only: true
+    pids_limit: 128
+    deploy:
+      resources:
+        limits:
+          cpus: "{cpus}"
+          memory: "{memory}"
 """;
 
         Assert.Throws<InvalidOperationException>(() => DockerComposeRunner.ValidateComposeYaml(yaml));

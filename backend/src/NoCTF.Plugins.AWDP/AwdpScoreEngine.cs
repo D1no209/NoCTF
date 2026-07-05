@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
@@ -12,6 +13,7 @@ public class AwdpScoreEngine(
     ApplicationDbContext db,
     IScoreEventWriter scoreEventWriter,
     ILeaderboardService leaderboardService,
+    IRedisLeaderboardCache leaderboardCache,
     IHubNotifierService hubNotifier,
     AwdpConfigResolver configResolver,
     ILogger<AwdpScoreEngine> logger)
@@ -65,17 +67,37 @@ public class AwdpScoreEngine(
         {
             foreach (var challenge in challenges)
             {
-                var exists = await db.AwdpRoundScores
+                var idempotencyKey = $"awdp:round:{roundNumber}:{team.Id:N}:{challenge.Id:N}";
+                var existingRoundScore = await db.AwdpRoundScores
                     .IgnoreQueryFilters()
                     .AsNoTracking()
-                    .AnyAsync(s =>
+                    .FirstOrDefaultAsync(s =>
                         s.CompetitionId == competitionId &&
                         s.RoundNumber == roundNumber &&
                         s.TeamId == team.Id &&
                         s.ChallengeId == challenge.Id, ct);
 
-                if (exists)
+                if (existingRoundScore is not null)
+                {
+                    var eventExists = await db.ScoreEvents
+                        .IgnoreQueryFilters()
+                        .AsNoTracking()
+                        .AnyAsync(e => e.CompetitionId == competitionId && e.IdempotencyKey == idempotencyKey, ct);
+                    if (!eventExists)
+                    {
+                        await scoreEventWriter.WriteAsync(BuildScoreEvent(
+                            existingRoundScore,
+                            idempotencyKey,
+                            ScoringJson.Serialize(new
+                            {
+                                existingRoundScore.AttackScoreDelta,
+                                existingRoundScore.DefenseScoreDelta,
+                                existingRoundScore.PenaltyDelta,
+                                restored = true
+                            })), ct);
+                    }
                     continue;
+                }
 
                 stateMap.TryGetValue((team.Id, challenge.Id), out var state);
                 var config = await configResolver.ResolveAsync(competitionId, challenge.Id, ct);
@@ -146,19 +168,13 @@ public class AwdpScoreEngine(
                 };
 
                 db.AwdpRoundScores.Add(roundScore);
+                await using var transaction = await BeginTransactionIfSupportedAsync(ct);
                 await db.SaveChangesAsync(ct);
 
-                await scoreEventWriter.WriteAsync(new ScoreEventCreate(
-                    CompetitionId: competitionId,
-                    TeamId: team.Id,
-                    ScoringKey: ScoringKeys.AwdpRound,
-                    EventType: "awdp.round",
-                    PointsDelta: roundDelta,
-                    IdempotencyKey: $"awdp:round:{roundNumber}:{team.Id:N}:{challenge.Id:N}",
-                    ChallengeId: challenge.Id,
-                    Reason: roundScore.Reason,
-                    RoundNumber: roundNumber,
-                    MetadataJson: ScoringJson.Serialize(new
+                await scoreEventWriter.WriteAsync(BuildScoreEvent(
+                    roundScore,
+                    idempotencyKey,
+                    ScoringJson.Serialize(new
                     {
                         attackDelta,
                         defenseDelta,
@@ -168,8 +184,9 @@ public class AwdpScoreEngine(
                         breakStatus = state?.BreakStatus.ToString() ?? AwdpBreakStatus.BreakNotStarted.ToString(),
                         fixStatus = state?.FixStatus.ToString() ?? AwdpFixStatus.FixNotStarted.ToString(),
                         serviceStatus = state?.ServiceStatus.ToString() ?? AwdpServiceStatus.ServiceUnknown.ToString()
-                    }),
-                    Timestamp: roundScore.CreatedAt), ct);
+                    })), ct);
+                if (transaction is not null)
+                    await transaction.CommitAsync(ct);
             }
         }
 
@@ -181,6 +198,7 @@ public class AwdpScoreEngine(
         try
         {
             var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
+            await leaderboardCache.UpdateAsync(competitionId, entries, ct);
             var payload = entries.Select(e => new LeaderboardEntryPayload(
                 e.Rank,
                 e.TeamId,
@@ -194,6 +212,28 @@ public class AwdpScoreEngine(
             logger.LogWarning(ex, "Failed to push AWDP leaderboard snapshot after round {Round}.", roundNumber);
         }
     }
+
+    private async Task<IDbContextTransaction?> BeginTransactionIfSupportedAsync(CancellationToken ct)
+        => db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
+
+    private static ScoreEventCreate BuildScoreEvent(
+        AwdpRoundScore roundScore,
+        string idempotencyKey,
+        string metadataJson)
+        => new(
+            CompetitionId: roundScore.CompetitionId,
+            TeamId: roundScore.TeamId,
+            ScoringKey: ScoringKeys.AwdpRound,
+            EventType: "awdp.round",
+            PointsDelta: roundScore.RoundScoreDelta,
+            IdempotencyKey: idempotencyKey,
+            ChallengeId: roundScore.ChallengeId,
+            Reason: roundScore.Reason,
+            RoundNumber: roundScore.RoundNumber,
+            MetadataJson: metadataJson,
+            Timestamp: roundScore.CreatedAt);
 
     private static bool IsViolationStatus(AwdpFixStatus status)
         => status is AwdpFixStatus.AuditFailed

@@ -25,6 +25,7 @@ public class AwdpScoreEngineTests
             db,
             new ScoreEventWriter(db),
             new NullLeaderboardServiceAwdp(),
+            new NullRedisLeaderboardCache(),
             new NullHubNotifierAwdp(),
             new AwdpConfigResolver(db),
             NullLogger<AwdpScoreEngine>.Instance);

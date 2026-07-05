@@ -82,6 +82,15 @@ public class ExpiredInstanceCleanupService(
             box.PortMappingsJson = "{}";
             box.ExpiresAt = null;
 
+            var dynamicFlags = await db.CtfDynamicFlags
+                .IgnoreQueryFilters()
+                .Where(f =>
+                    f.CompetitionId == box.CompetitionId &&
+                    f.TeamId == box.TeamId &&
+                    f.ChallengeId == box.ChallengeId)
+                .ToListAsync(ct);
+            db.CtfDynamicFlags.RemoveRange(dynamicFlags);
+
             db.CompetitionLogs.Add(new CompetitionLog
             {
                 Id = Guid.NewGuid(),

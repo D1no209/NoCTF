@@ -14,7 +14,7 @@ public class DeleteChallengeEndpoint(ApplicationDbContext db) : Endpoint<DeleteC
     public override void Configure()
     {
         Delete("/api/admin/challenges/{id}");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
     }
 
     public override async Task HandleAsync(DeleteChallengeRequest req, CancellationToken ct)

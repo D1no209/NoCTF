@@ -238,14 +238,25 @@ public class PenetrationInstanceMaintenanceService(
     private async Task MarkStuckInstanceFailedAsync(TeamChallengeInstance instance, CancellationToken ct)
     {
         await DeactivateDynamicFlagsAsync(instance, ct);
-        await DownBestEffortAsync(instance, ct);
         var previousStatus = instance.Status.ToString();
+        string? cleanupError = null;
+        try
+        {
+            await DownBestEffortAsync(instance, ct);
+        }
+        catch (Exception ex)
+        {
+            cleanupError = ex.Message;
+        }
+
         instance.Status = PenetrationInstanceStatus.Failed;
         instance.EntryPort = null;
         instance.EntryUrl = null;
         instance.ContainerIdsJson = "[]";
         instance.PortMappingsJson = "{}";
-        instance.LastError = $"Instance maintenance timed out while {previousStatus}.";
+        instance.LastError = cleanupError is null
+            ? $"Instance maintenance timed out while {previousStatus}."
+            : $"Instance maintenance timed out while {previousStatus}; cleanup failed: {cleanupError}";
         instance.UpdatedAt = DateTime.UtcNow;
 
         AddCompetitionLog(

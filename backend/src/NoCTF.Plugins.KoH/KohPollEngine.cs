@@ -94,7 +94,10 @@ public sealed class KohPollEngine(
 
         var teams = await db.Teams
             .IgnoreQueryFilters()
-            .Where(t => t.CompetitionId == competition.Id)
+            .Where(t =>
+                t.CompetitionId == competition.Id &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned)
             .ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
         int controlPoints = competition.ControlPointsPerInterval ?? 10;
@@ -130,4 +133,3 @@ public sealed class KohPollEngine(
         }
     }
 }
-

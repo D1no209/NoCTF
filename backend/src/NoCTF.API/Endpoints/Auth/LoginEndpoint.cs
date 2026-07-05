@@ -31,8 +31,9 @@ public class LoginEndpoint(ApplicationDbContext dbContext, JwtTokenService jwtSe
 
     public override async Task HandleAsync(LoginRequest req, CancellationToken ct)
     {
+        var email = req.Email.Trim().ToLowerInvariant();
         var user = await dbContext.Users
-            .FirstOrDefaultAsync(u => u.Email == req.Email, ct);
+            .FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
         {

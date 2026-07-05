@@ -58,12 +58,19 @@ public class AwdpGameMode(
         if (challenge is null)
             return SubmissionResult.WrongFlag;
 
+        await using var stateLock = await AwdpPatchStateLock.AcquireAsync(db, context.TeamId, context.ChallengeId, cancellationToken);
         var config = await configResolver.ResolveAsync(context.CompetitionId, context.ChallengeId, cancellationToken);
         var state = await stateService.GetOrCreateAsync(
             context.CompetitionId,
             context.TeamId,
             context.ChallengeId,
             cancellationToken);
+        async Task SaveAndCommitAsync()
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await stateLock.CommitAsync(cancellationToken);
+        }
+
         var gameBox = await db.AwdGameBoxes
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -76,7 +83,7 @@ public class AwdpGameMode(
         {
             state.InstanceStatus = AwdpInstanceStatus.InstanceNotCreated;
             state.UpdatedAt = now;
-            await db.SaveChangesAsync(cancellationToken);
+            await SaveAndCommitAsync();
             return SubmissionResult.InstanceRequired;
         }
 
@@ -84,7 +91,7 @@ public class AwdpGameMode(
         {
             state.InstanceStatus = AwdpInstanceStatus.InstanceExpired;
             state.UpdatedAt = now;
-            await db.SaveChangesAsync(cancellationToken);
+            await SaveAndCommitAsync();
             return SubmissionResult.InstanceExpired;
         }
 
@@ -97,7 +104,7 @@ public class AwdpGameMode(
         {
             state.BreakStatus = AwdpBreakStatus.AttackAttemptsExhausted;
             state.UpdatedAt = now;
-            await db.SaveChangesAsync(cancellationToken);
+            await SaveAndCommitAsync();
             return SubmissionResult.AttemptsExhausted;
         }
 
@@ -165,7 +172,7 @@ public class AwdpGameMode(
 
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await SaveAndCommitAsync();
         }
         catch (DbUpdateException)
         {

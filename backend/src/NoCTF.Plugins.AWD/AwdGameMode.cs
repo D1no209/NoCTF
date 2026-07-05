@@ -81,6 +81,19 @@ public class AwdGameMode : IGameMode
         if (flag.TeamId == context.TeamId)
             return SubmissionResult.WrongFlag;
 
+        var activeTeamIds = await _db.Teams
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(t =>
+                t.CompetitionId == context.CompetitionId &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned &&
+                (t.Id == context.TeamId || t.Id == flag.TeamId))
+            .Select(t => t.Id)
+            .ToListAsync(cancellationToken);
+        if (!activeTeamIds.Contains(context.TeamId) || !activeTeamIds.Contains(flag.TeamId))
+            return SubmissionResult.WrongFlag;
+
         // Get the current (latest) round number
         var latestRound = await _db.AwdRounds
             .IgnoreQueryFilters()
@@ -125,7 +138,14 @@ public class AwdGameMode : IGameMode
             Timestamp = DateTime.UtcNow
         });
 
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return SubmissionResult.WrongFlag;
+        }
 
         await _scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
             CompetitionId: context.CompetitionId,
@@ -137,6 +157,18 @@ public class AwdGameMode : IGameMode
             ActorUserId: context.UserId,
             RoundNumber: flag.RoundNumber,
             PayloadJson: ScoringJson.Serialize(new { victimTeamId = flag.TeamId }),
+            OccurredAt: DateTime.UtcNow), cancellationToken);
+
+        await _scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+            CompetitionId: context.CompetitionId,
+            TeamId: flag.TeamId,
+            SignalType: ScoreSignalTypes.ServiceAttacked,
+            IdempotencyKey: $"awd:{flag.RoundNumber}:{flag.TeamId:N}:{flag.ChallengeId:N}:been-attacked",
+            SubjectType: "challenge",
+            SubjectId: flag.ChallengeId,
+            ActorUserId: context.UserId,
+            RoundNumber: flag.RoundNumber,
+            PayloadJson: ScoringJson.Serialize(new { attackerTeamId = context.TeamId }),
             OccurredAt: DateTime.UtcNow), cancellationToken);
 
         // Broadcast attack log via SignalR — look up names for the notification

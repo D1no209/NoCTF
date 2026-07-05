@@ -212,7 +212,15 @@ public class PenetrationInstanceService(
         instance.Status = PenetrationInstanceStatus.Stopping;
         instance.LastActionAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await DownBestEffortAsync(instance, ct);
+        try
+        {
+            await DownBestEffortAsync(instance, ct);
+        }
+        catch (Exception ex)
+        {
+            await MarkOperationFailedAsync(instance, ex, ct);
+            throw;
+        }
         await DeactivateDynamicFlagsAsync(instance, ct);
         instance.Status = PenetrationInstanceStatus.Stopped;
         instance.EntryPort = null;
@@ -252,7 +260,15 @@ public class PenetrationInstanceService(
         instance.LastActionAt = DateTime.UtcNow;
         instance.ResetCount += 1;
         await db.SaveChangesAsync(ct);
-        await DownBestEffortAsync(instance, ct);
+        try
+        {
+            await DownBestEffortAsync(instance, ct);
+        }
+        catch (Exception ex)
+        {
+            await MarkOperationFailedAsync(instance, ex, ct);
+            throw;
+        }
         instance.Status = PenetrationInstanceStatus.Stopped;
         instance.LastActionAt = null;
         await db.SaveChangesAsync(ct);
@@ -278,7 +294,15 @@ public class PenetrationInstanceService(
         instance.Status = PenetrationInstanceStatus.Destroying;
         instance.LastActionAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await DownBestEffortAsync(instance, ct);
+        try
+        {
+            await DownBestEffortAsync(instance, ct);
+        }
+        catch (Exception ex)
+        {
+            await MarkOperationFailedAsync(instance, ex, ct);
+            throw;
+        }
         await DeactivateDynamicFlagsAsync(instance, ct);
 
         instance.Status = PenetrationInstanceStatus.Destroyed;
@@ -452,6 +476,15 @@ public class PenetrationInstanceService(
         }
     }
 
+    private async Task MarkOperationFailedAsync(TeamChallengeInstance instance, Exception ex, CancellationToken ct)
+    {
+        instance.Status = PenetrationInstanceStatus.Failed;
+        instance.LastError = ex.Message;
+        instance.LastActionAt = null;
+        instance.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
     private async Task DeactivateDynamicFlagsAsync(TeamChallengeInstance instance, CancellationToken ct)
     {
         var flags = await db.DynamicFlagInstances
@@ -573,7 +606,7 @@ public class PenetrationInstanceService(
     }
 
     private static string BuildProjectName(Guid competitionId, Guid challengeId, Guid teamId)
-        => $"noctf-pen-{ShortId(competitionId)}-{ShortId(challengeId)}-{ShortId(teamId)}-{ShortId(Guid.NewGuid())}";
+        => $"noctf-pen-{ShortId(competitionId)}-{ShortId(challengeId)}-{ShortId(teamId)}";
 
     private static string ShortId(Guid id)
         => id.ToString("N")[..8];

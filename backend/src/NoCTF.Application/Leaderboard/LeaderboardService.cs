@@ -108,9 +108,18 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
     public async Task<IReadOnlyList<ScoreboardRow>> BuildAsync(Guid competitionId, CancellationToken ct = default)
     {
         var entries = await CalculateLeaderboardAsync(competitionId, ct);
+        var activeChallengeIds = await db.Challenges
+            .IgnoreQueryFilters()
+            .Where(c => c.CompetitionId == competitionId)
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+        var activeTeamIds = entries.Select(e => e.TeamId).ToList();
         var scoreEvents = await db.ScoreEvents
             .IgnoreQueryFilters()
-            .Where(e => e.CompetitionId == competitionId)
+            .Where(e =>
+                e.CompetitionId == competitionId &&
+                activeTeamIds.Contains(e.TeamId) &&
+                (!e.ChallengeId.HasValue || activeChallengeIds.Contains(e.ChallengeId.Value)))
             .GroupBy(e => new { e.TeamId, e.ScoringKey })
             .Select(g => new { g.Key.TeamId, g.Key.ScoringKey, Points = g.Sum(e => (long)e.PointsDelta) })
             .ToListAsync(ct);

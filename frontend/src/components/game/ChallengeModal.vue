@@ -151,6 +151,8 @@ const instanceCreating = ref(false)
 const instanceDestroying = ref(false)
 const instanceExtending = ref(false)
 const instanceLoading = ref(false)
+const destroyConfirmOpen = ref(false)
+const destroyConfirmText = ref('')
 const instance = ref<InstanceResponse | null>(null)
 const instanceError = ref<string | null>(null)
 const nowMs = ref(Date.now())
@@ -227,6 +229,10 @@ const hasInstanceOperation = computed(
     instanceExtending.value ||
     instanceLoading.value,
 )
+const destroyConfirmLabel = computed(() => props.challenge?.title ?? '')
+const destroyConfirmed = computed(
+  () => destroyConfirmLabel.value.length > 0 && destroyConfirmText.value.trim() === destroyConfirmLabel.value,
+)
 const canUploadPatch = computed(() =>
   Boolean(
     props.isAwdMode &&
@@ -294,6 +300,8 @@ function onOpenChange(v: boolean) {
     submitError.value = null
     patchFile.value = null
     instanceError.value = null
+    destroyConfirmOpen.value = false
+    destroyConfirmText.value = ''
     stopInstancePolling()
     stopClock()
   }
@@ -372,7 +380,13 @@ async function refreshInstance() {
 }
 
 async function destroyInstance() {
-  if (!props.challenge || !runningInstance.value || !canOperateInstance.value) return
+  if (
+    !props.challenge ||
+    !runningInstance.value ||
+    !canOperateInstance.value ||
+    !destroyConfirmed.value
+  )
+    return
   instanceDestroying.value = true
   instanceError.value = null
   try {
@@ -381,6 +395,8 @@ async function destroyInstance() {
       props.challenge.id,
     )
     toast.success(t('challenges.instanceDestroyed'))
+    destroyConfirmOpen.value = false
+    destroyConfirmText.value = ''
   } catch (error) {
     const detail = getApiErrorDetail(error)
     instanceError.value = detail
@@ -390,6 +406,17 @@ async function destroyInstance() {
   } finally {
     instanceDestroying.value = false
   }
+}
+
+function openDestroyConfirm() {
+  if (!props.challenge || !runningInstance.value || !canOperateInstance.value) return
+  destroyConfirmOpen.value = true
+  destroyConfirmText.value = ''
+}
+
+function cancelDestroyConfirm() {
+  destroyConfirmOpen.value = false
+  destroyConfirmText.value = ''
 }
 
 async function extendInstance() {
@@ -672,6 +699,52 @@ function getApiErrorDetail(error: unknown) {
                     variant="destructive"
                     size="sm"
                     :disabled="hasInstanceOperation || !canOperateInstance"
+                    @click="openDestroyConfirm"
+                  >
+                    <Loader2 v-if="instanceDestroying" class="size-4 animate-spin" />
+                    <Trash2 v-else class="size-4" />
+                    {{ t('challenges.destroyInstance') }}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div
+              v-if="runningInstance && destroyConfirmOpen"
+              class="rounded-lg border border-destructive/35 bg-destructive/5 p-3"
+            >
+              <div class="space-y-2 text-sm">
+                <p class="font-medium text-destructive">
+                  {{ t('challenges.destroyConfirmTitle') }}
+                </p>
+                <p class="text-muted-foreground">
+                  {{ t('challenges.destroyConfirmDescription') }}
+                </p>
+                <div class="space-y-1.5">
+                  <Label class="text-xs text-muted-foreground">
+                    {{ t('challenges.destroyConfirmLabel') }}
+                    <span class="font-mono text-foreground">{{ destroyConfirmLabel }}</span>
+                  </Label>
+                  <Input
+                    v-model="destroyConfirmText"
+                    class="font-mono text-xs"
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    :disabled="instanceDestroying"
+                    @click="cancelDestroyConfirm"
+                  >
+                    {{ t('common.cancel') }}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    :disabled="instanceDestroying || !destroyConfirmed"
                     @click="destroyInstance"
                   >
                     <Loader2 v-if="instanceDestroying" class="size-4 animate-spin" />
@@ -682,7 +755,7 @@ function getApiErrorDetail(error: unknown) {
               </div>
             </div>
             <Button
-              v-else
+              v-if="!runningInstance"
               type="button"
               variant="outline"
               class="justify-start"

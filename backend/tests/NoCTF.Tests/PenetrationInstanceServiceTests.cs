@@ -117,6 +117,53 @@ public class PenetrationInstanceServiceTests
         Assert.DoesNotContain("flag{", (await db.TeamChallengeInstances.IgnoreQueryFilters().SingleAsync(i => i.Id == instanceId)).RenderedComposeYaml);
     }
 
+    [Fact]
+    public async Task StopAsync_ComposeDownFailureMarksInstanceFailedInsteadOfBusy()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var instanceId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        SeedChallenge(db, competitionId, challengeId);
+        db.TeamChallengeInstances.Add(new TeamChallengeInstance
+        {
+            Id = instanceId,
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            Status = PenetrationInstanceStatus.Running,
+            ComposeProjectName = "range-failing",
+            RenderedComposeYaml = "services:\n  web:\n    image: nginx:alpine\n",
+            LastActionAt = DateTime.UtcNow.AddMinutes(-5),
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-5)
+        });
+        await db.SaveChangesAsync();
+
+        var fakeManager = new FakeComposeContainerManager(Guid.NewGuid())
+        {
+            ThrowOnComposeDown = true
+        };
+        var service = new PenetrationInstanceService(
+            db,
+            fakeManager,
+            new ConfigurationBuilder().Build(),
+            new PenetrationComposeBuilder(),
+            new PenetrationFlagService(db));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.StopAsync(competitionId, challengeId, teamId, userId, CancellationToken.None));
+
+        var instance = await db.TeamChallengeInstances.IgnoreQueryFilters().SingleAsync(i => i.Id == instanceId);
+        Assert.Equal("compose down failed", ex.Message);
+        Assert.Equal(PenetrationInstanceStatus.Failed, instance.Status);
+        Assert.Null(instance.LastActionAt);
+        Assert.Equal("compose down failed", instance.LastError);
+    }
+
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -162,6 +209,7 @@ public class PenetrationInstanceServiceTests
     {
         public int ComposeUpCalls { get; private set; }
         public int ComposeDownCalls { get; private set; }
+        public bool ThrowOnComposeDown { get; init; }
 
         public Task<ContainerInstance> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
@@ -190,6 +238,8 @@ public class PenetrationInstanceServiceTests
         public Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken cancellationToken = default)
         {
             ComposeDownCalls++;
+            if (ThrowOnComposeDown)
+                throw new InvalidOperationException("compose down failed");
             return Task.CompletedTask;
         }
 

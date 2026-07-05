@@ -259,6 +259,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(a => new { a.CompetitionId, a.RoundNumber })
             .HasDatabaseName("ix_awdattackrecords_competition_round");
 
+        modelBuilder.Entity<AwdAttackRecord>()
+            .HasIndex(a => new { a.CompetitionId, a.AttackerTeamId, a.VictimTeamId, a.ChallengeId, a.RoundNumber })
+            .IsUnique()
+            .HasDatabaseName("ix_awdattackrecords_unique_attack");
+
         modelBuilder.Entity<AwdFlag>()
             .HasIndex(f => f.CompetitionId)
             .HasDatabaseName("ix_awdflags_competition");

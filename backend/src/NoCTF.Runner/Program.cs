@@ -17,6 +17,7 @@ else
 }
 
 var allowedRegistries = RunnerImagePolicy.ReadAllowedRegistries(builder.Configuration);
+var allowedNetworks = RunnerImagePolicy.ReadAllowedNetworks(builder.Configuration);
 if (!builder.Environment.IsDevelopment() && allowedRegistries.Length == 0)
     throw new InvalidOperationException("Runner:AllowedRegistries must be configured outside Development.");
 var runnerApiKey = builder.Configuration["Runner:ApiKey"];
@@ -37,6 +38,7 @@ app.MapGet("/runner/info", (HttpRequest request, IServiceProvider services) =>
     {
         ["provider"] = runnerProvider,
         ["allowedRegistries"] = allowedRegistries,
+        ["allowedNetworks"] = allowedNetworks,
     };
     if (services.GetService<NoCTF.Container.K8s.KubernetesProvider>() is { } k8sProvider)
     {
@@ -71,7 +73,7 @@ app.MapPost("/runner/containers", async (
 
     try
     {
-        RunnerImagePolicy.ValidateContainerConfig(config);
+        RunnerImagePolicy.ValidateContainerConfig(config, allowedNetworks);
         var disallowed = RunnerImagePolicy.FindDisallowedContainerImage(config, allowedRegistries);
         if (!string.IsNullOrWhiteSpace(disallowed))
             return Results.BadRequest(new { code = "image_registry_not_allowed", image = disallowed });
@@ -108,7 +110,7 @@ app.MapPost("/runner/jobs/one-shot", async (
 
     try
     {
-        RunnerImagePolicy.ValidateContainerConfig(config);
+        RunnerImagePolicy.ValidateContainerConfig(config, allowedNetworks);
         var disallowed = RunnerImagePolicy.FindDisallowedContainerImage(config, allowedRegistries);
         if (!string.IsNullOrWhiteSpace(disallowed))
             return Results.BadRequest(new { code = "image_registry_not_allowed", image = disallowed });

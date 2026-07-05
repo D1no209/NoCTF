@@ -31,7 +31,7 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
     public override void Configure()
     {
         Put("/api/admin/challenges/{id}");
-        Roles("Admin", "Organizer");
+        Roles("Admin");
     }
 
     public override async Task HandleAsync(UpdateChallengeRequest req, CancellationToken ct)

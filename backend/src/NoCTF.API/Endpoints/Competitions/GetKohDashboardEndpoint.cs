@@ -84,7 +84,7 @@ public class GetKohDashboardEndpoint(ApplicationDbContext dbContext)
 
         var controlRecords = await dbContext.KohControlRecords
             .IgnoreQueryFilters()
-            .Where(r => r.CompetitionId == req.Id)
+            .Where(r => r.CompetitionId == req.Id && teamIds.Keys.Contains(r.TeamId))
             .OrderBy(r => r.StartTime)
             .ToListAsync(ct);
 

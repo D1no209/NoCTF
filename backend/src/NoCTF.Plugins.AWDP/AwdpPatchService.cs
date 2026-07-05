@@ -26,6 +26,7 @@ public class AwdpPatchService(
     ILogger<AwdpPatchService> logger) : IAwdpPatchService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const string HostGatewayLabel = "noctf.host-gateway";
 
     public async Task<AwdpPatchSubmitResult> SubmitPatchAsync(
         Guid competitionId,
@@ -188,7 +189,23 @@ public class AwdpPatchService(
             now);
 
         db.AwdpPatchSubmissions.Add(submission);
-        await SaveAndCommitAsync();
+        try
+        {
+            await SaveAndCommitAsync();
+        }
+        catch
+        {
+            try
+            {
+                await storageProvider.DeleteAsync(storageKey, CancellationToken.None);
+            }
+            catch (Exception cleanupEx)
+            {
+                logger.LogWarning(cleanupEx, "Failed to delete orphaned AWDP FixScript archive {StorageKey}.", storageKey);
+            }
+
+            throw;
+        }
 
         logger.LogInformation(
             "AWDP FixScript submitted: submission={SubmissionId} team={TeamId} challenge={ChallengeId} attempt={Attempt}/{MaxAttempts}",
@@ -329,7 +346,7 @@ public class AwdpPatchService(
         var checkResult = await RunCheckAsync(challenge, submission, gameBox, ct);
         if (checkResult.FixStatus != AwdpFixStatus.FixSuccess)
         {
-            await RollbackAsync(challenge, gameBox, patchedContainer, ct);
+            await RollbackAsync(challenge, gameBox, patchedContainer, submission, ct);
             await CompleteValidationAsync(
                 submission,
                 state,
@@ -367,9 +384,11 @@ public class AwdpPatchService(
             Image: challenge.ContainerImage!,
             Command: BuildFixScriptCommand(),
             EnvironmentVariables: env,
-            Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
+            Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId, allowHostGateway: true),
+            NetworkName: ResolveUtilityNetwork(),
             Ttl: timeout,
-            Entrypoint: ["/bin/sh", "-c"]);
+            Entrypoint: ["/bin/sh", "-c"],
+            OrchestrationJson: TrustedUtilityOrchestrationJson());
 
         try
         {
@@ -401,15 +420,59 @@ public class AwdpPatchService(
         AwdpPatchSubmission submission,
         CancellationToken ct)
     {
+        var environment = await BuildRuntimeEnvironmentAsync(
+            challenge,
+            submission.CompetitionId,
+            submission.TeamId,
+            submission.ChallengeId,
+            submission,
+            ct);
         var patchedContainerConfig = new ContainerConfig(
             Image: challenge.ContainerImage!,
-            EnvironmentVariables: BuildPatchEnvironment(submission),
+            EnvironmentVariables: environment,
             Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
             PortMappings: BuildPortMappings(challenge),
             OrchestrationJson: challenge.OrchestrationJson,
             NetworkAliases: [BuildGameBoxAlias(submission.TeamId, submission.ChallengeId)]);
 
         return await containerManager.CreateContainerAsync(patchedContainerConfig, ct);
+    }
+
+    private async Task<Dictionary<string, string>> BuildRuntimeEnvironmentAsync(
+        Challenge challenge,
+        Guid competitionId,
+        Guid teamId,
+        Guid challengeId,
+        AwdpPatchSubmission? patch,
+        CancellationToken ct)
+    {
+        var environment = BuildChallengeEnvironment(challenge);
+        if (patch is not null)
+        {
+            foreach (var (key, value) in BuildPatchEnvironment(patch))
+                environment[key] = value;
+        }
+
+        var dynamicFlag = await db.CtfDynamicFlags
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(f =>
+                f.CompetitionId == competitionId &&
+                f.TeamId == teamId &&
+                f.ChallengeId == challengeId,
+                ct);
+
+        if (dynamicFlag is not null)
+        {
+            var envName = string.IsNullOrWhiteSpace(dynamicFlag.EnvironmentVariable)
+                ? string.IsNullOrWhiteSpace(challenge.FlagEnvironmentVariable)
+                    ? "NOCTF_FLAG_UUID"
+                    : challenge.FlagEnvironmentVariable.Trim()
+                : dynamicFlag.EnvironmentVariable.Trim();
+            environment[envName] = FormatFlag(challenge, dynamicFlag.FlagUuid);
+        }
+
+        return environment;
     }
 
     private async Task<CheckOutcome> RunCheckAsync(
@@ -430,20 +493,38 @@ public class AwdpPatchService(
         var checkConfig = new ContainerConfig(
             Image: challenge.CheckerConfig.Image,
             Command: challenge.CheckerConfig.Command,
-            EnvironmentVariables: BuildCheckEnvironment(submission),
+            EnvironmentVariables: BuildCheckEnvironment(challenge, submission),
+            Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId, allowHostGateway: true),
             NetworkName: gameBox.OrchestrationNamespace,
             Ttl: timeout);
 
+        var deadline = DateTime.UtcNow.Add(timeout);
+        CheckOutcome? lastOutcome = null;
         try
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(timeout.Add(TimeSpan.FromSeconds(10)));
-            var result = await containerManager.RunContainerAsync(checkConfig, cts.Token);
-            logger.LogDebug(
-                "AWDP check container for submission {SubmissionId}: exit={ExitCode}.",
-                submission.Id, result.ExitCode);
+            do
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(TimeSpan.FromSeconds(Math.Clamp((deadline - DateTime.UtcNow).TotalSeconds + 5, 5, 15)));
+                var result = await containerManager.RunContainerAsync(checkConfig, cts.Token);
+                logger.LogDebug(
+                    "AWDP check container for submission {SubmissionId}: exit={ExitCode}.",
+                    submission.Id, result.ExitCode);
 
-            return MapCheckExitCode(result.ExitCode, result.StdErr);
+                lastOutcome = MapCheckExitCode(result.ExitCode, result.StdErr);
+                if (lastOutcome.FixStatus != AwdpFixStatus.FixServiceError)
+                    return lastOutcome;
+
+                if (DateTime.UtcNow < deadline && IsRetryableCheckError(result))
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                else
+                    return lastOutcome;
+            } while (DateTime.UtcNow < deadline);
+
+            return lastOutcome ?? new CheckOutcome(
+                AwdpFixStatus.FixServiceError,
+                AwdpServiceStatus.ServiceError,
+                "Check failed before producing a result.");
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -467,19 +548,19 @@ public class AwdpPatchService(
         Challenge challenge,
         AwdGameBox gameBox,
         ContainerInstance patchedContainer,
+        AwdpPatchSubmission rejectedSubmission,
         CancellationToken ct)
     {
-        try
-        {
-            await containerManager.DestroyContainerAsync(patchedContainer, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to destroy rejected patched AWDP container {ContainerId}.", patchedContainer.ContainerId);
-        }
-
+        var previousPatch = await FindPreviousSuccessfulPatchAsync(rejectedSubmission, ct);
         var originalConfig = new ContainerConfig(
             Image: challenge.ContainerImage!,
+            EnvironmentVariables: await BuildRuntimeEnvironmentAsync(
+                challenge,
+                gameBox.CompetitionId,
+                gameBox.TeamId,
+                gameBox.ChallengeId,
+                previousPatch,
+                ct),
             Labels: BuildLabels(gameBox.CompetitionId, gameBox.TeamId, gameBox.ChallengeId),
             PortMappings: BuildPortMappings(challenge),
             OrchestrationJson: challenge.OrchestrationJson,
@@ -491,10 +572,14 @@ public class AwdpPatchService(
             ApplyContainerMetadata(gameBox, restored);
             gameBox.LastInstanceActionAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
+            await DestroyContainerBestEffortAsync(patchedContainer);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to restore original AWDP container for challenge {ChallengeId}.", gameBox.ChallengeId);
+            await DestroyContainerBestEffortAsync(patchedContainer);
+            ClearContainerMetadata(gameBox);
+            await db.SaveChangesAsync(ct);
         }
     }
 
@@ -592,19 +677,19 @@ public class AwdpPatchService(
             SubmittedAt = now
         };
 
-    private static Dictionary<string, string> BuildPatchEnvironment(AwdpPatchSubmission submission)
+    private Dictionary<string, string> BuildPatchEnvironment(AwdpPatchSubmission submission)
         => new()
         {
-            ["PATCH_URL"] = submission.PatchArchiveUrl,
+            ["PATCH_URL"] = ResolveDownloadUrl(submission.PatchArchiveUrl),
             ["PATCH_FILE_NAME"] = submission.FileName,
             ["FIX_ENTRY"] = submission.FixEntry
         };
 
-    private static Dictionary<string, string> BuildProbeEnvironment(AwdpPatchSubmission submission)
+    private static Dictionary<string, string> BuildProbeEnvironment(Challenge challenge, AwdpPatchSubmission submission)
         => new()
         {
             ["TARGET_HOST"] = BuildGameBoxAlias(submission.TeamId, submission.ChallengeId),
-            ["TARGET_PORT"] = "80",
+            ["TARGET_PORT"] = ResolveTargetPort(challenge).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["TEAM_ID"] = submission.TeamId.ToString()
         };
 
@@ -614,13 +699,8 @@ public class AwdpPatchService(
     private static string ShortId(Guid id)
         => id.ToString("N")[..8];
 
-    private static Dictionary<string, string> BuildCheckEnvironment(AwdpPatchSubmission submission)
-    {
-        var env = BuildProbeEnvironment(submission);
-        foreach (var (key, value) in BuildPatchEnvironment(submission))
-            env[key] = value;
-        return env;
-    }
+    private Dictionary<string, string> BuildCheckEnvironment(Challenge challenge, AwdpPatchSubmission submission)
+        => BuildProbeEnvironment(challenge, submission);
 
     private static CheckOutcome MapCheckExitCode(int exitCode, string? stderr)
     {
@@ -653,23 +733,93 @@ public class AwdpPatchService(
         };
     }
 
-    private static Dictionary<string, string> BuildLabels(Guid competitionId, Guid teamId, Guid challengeId)
-        => new()
+    private static bool IsRetryableCheckError(ContainerRunResult result)
+    {
+        if (result.ExitCode != 3)
+            return false;
+
+        var output = $"{result.StdErr}\n{result.StdOut}";
+        return output.Contains("unreachable", StringComparison.OrdinalIgnoreCase) ||
+               output.Contains("connection refused", StringComparison.OrdinalIgnoreCase) ||
+               output.Contains("timed out", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Dictionary<string, string> BuildLabels(
+        Guid competitionId,
+        Guid teamId,
+        Guid challengeId,
+        bool allowHostGateway = false)
+    {
+        var labels = new Dictionary<string, string>
         {
             ["competitionId"] = competitionId.ToString(),
             ["teamId"] = teamId.ToString(),
             ["challengeId"] = challengeId.ToString()
         };
+        if (allowHostGateway)
+            labels[HostGatewayLabel] = bool.TrueString;
+
+        return labels;
+    }
+
+    private async Task<AwdpPatchSubmission?> FindPreviousSuccessfulPatchAsync(
+        AwdpPatchSubmission rejectedSubmission,
+        CancellationToken ct)
+        => await db.AwdpPatchSubmissions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(s =>
+                s.CompetitionId == rejectedSubmission.CompetitionId &&
+                s.TeamId == rejectedSubmission.TeamId &&
+                s.ChallengeId == rejectedSubmission.ChallengeId &&
+                s.Id != rejectedSubmission.Id &&
+                s.Status == AwdpPatchStatus.Verified &&
+                s.FixStatus == AwdpFixStatus.FixSuccess)
+            .OrderByDescending(s => s.ValidatedAt ?? s.SubmittedAt)
+            .FirstOrDefaultAsync(ct);
+
+    private static void ClearContainerMetadata(AwdGameBox gameBox)
+    {
+        gameBox.ContainerInstanceId = null;
+        gameBox.ProviderType = "unknown";
+        gameBox.PublicHost = null;
+        gameBox.EntryUrl = null;
+        gameBox.OrchestrationNamespace = null;
+        gameBox.PortMappingsJson = "{}";
+        gameBox.ExpiresAt = null;
+        gameBox.LastInstanceActionAt = DateTime.UtcNow;
+    }
+
+    private static string TrustedUtilityOrchestrationJson()
+    {
+        var spec = new OrchestrationSpec
+        {
+            Kubernetes = new KubernetesOrchestrationSpec
+            {
+                NetworkMode = OrchestrationNetworkMode.Open
+            }
+        };
+
+        return OrchestrationSpecSerializer.Write(spec);
+    }
 
     private string ResolveDownloadUrl(string url)
     {
-        if (Uri.TryCreate(url, UriKind.Absolute, out _))
+        if (string.IsNullOrWhiteSpace(url))
+            return url;
+
+        if (!url.StartsWith("/", StringComparison.Ordinal) &&
+            Uri.TryCreate(url, UriKind.Absolute, out _))
             return url;
 
         var publicBaseUrl = FirstNonBlank(
             configuration["StorageProvider:PublicBaseUrl"],
             configuration["App:PublicBaseUrl"],
-            configuration["NoCTF:PublicBaseUrl"]);
+            configuration["NoCTF:PublicBaseUrl"],
+            Environment.GetEnvironmentVariable("NOCTF_STORAGE_PUBLIC_BASE_URL"));
+        if (publicBaseUrl is null && IsRunningInContainer())
+            publicBaseUrl = "http://backend:8080";
+
         if (publicBaseUrl is null)
         {
             logger.LogWarning(
@@ -680,6 +830,17 @@ public class AwdpPatchService(
 
         return $"{publicBaseUrl.TrimEnd('/')}/{url.TrimStart('/')}";
     }
+
+    private string? ResolveUtilityNetwork()
+        => FirstNonBlank(
+            configuration["Runner:UtilityNetwork"],
+            configuration["Docker:UtilityNetwork"]);
+
+    private static bool IsRunningInContainer()
+        => string.Equals(
+            Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
 
     private static string? FirstNonBlank(params string?[] values)
     {
@@ -694,11 +855,43 @@ public class AwdpPatchService(
 
     private static Dictionary<int, int>? BuildPortMappings(Challenge challenge)
     {
-        var spec = OrchestrationSpecSerializer.Read(challenge.OrchestrationJson);
-        var exposedPort = spec.ExposedPort is > 0 ? spec.ExposedPort : challenge.ExposedPort;
+        var exposedPort = ResolveConfiguredPort(challenge);
         return exposedPort is > 0
             ? new Dictionary<int, int> { [exposedPort.Value] = 0 }
             : null;
+    }
+
+    private static int ResolveTargetPort(Challenge challenge)
+        => ResolveConfiguredPort(challenge) ?? 80;
+
+    private static int? ResolveConfiguredPort(Challenge challenge)
+    {
+        var spec = OrchestrationSpecSerializer.Read(challenge.OrchestrationJson);
+        return spec.ExposedPort is > 0 ? spec.ExposedPort : challenge.ExposedPort;
+    }
+
+    private static Dictionary<string, string> BuildChallengeEnvironment(Challenge challenge)
+    {
+        var spec = OrchestrationSpecSerializer.Read(challenge.OrchestrationJson);
+        return spec.Environment.Count > 0
+            ? new Dictionary<string, string>(spec.Environment, StringComparer.Ordinal)
+            : [];
+    }
+
+    private static string FormatFlag(Challenge challenge, string content)
+    {
+        var prefix = string.IsNullOrWhiteSpace(challenge.FlagPrefix) ? "flag" : challenge.FlagPrefix.Trim();
+        if (prefix.Contains("{0}", StringComparison.Ordinal))
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, prefix, content);
+
+        if (prefix.Contains("{}", StringComparison.Ordinal))
+            return prefix.Replace("{}", $"{{{content}}}", StringComparison.Ordinal);
+
+        var braceIndex = prefix.IndexOf('{', StringComparison.Ordinal);
+        if (braceIndex >= 0)
+            prefix = prefix[..braceIndex].Trim();
+
+        return $"{prefix}{{{content}}}";
     }
 
     private static Dictionary<int, int> ReadPorts(string? portsJson)
@@ -721,12 +914,17 @@ public class AwdpPatchService(
            set -eu
            archive=/tmp/noctf-fix-archive
            work=/tmp/noctf-fix
+           download_url="$PATCH_URL"
+           case "$download_url" in
+             http://*|https://*) ;;
+             /*) download_url="${NOCTF_PATCH_BASE_URL:-http://backend:8080}$download_url" ;;
+           esac
            rm -rf "$work"
            mkdir -p "$work"
            if command -v curl >/dev/null 2>&1; then
-             curl -fsSL "$PATCH_URL" -o "$archive"
+             curl -fsSL "$download_url" -o "$archive"
            elif command -v wget >/dev/null 2>&1; then
-             wget -q "$PATCH_URL" -O "$archive"
+             wget -q "$download_url" -O "$archive"
            else
              echo "curl or wget is required to fetch FixScript archive" >&2
              exit 127
@@ -796,9 +994,13 @@ internal sealed class AwdpPatchStateLock : IAsyncDisposable
             return new AwdpPatchStateLock(null);
 
         var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock({AdvisoryLockKey(teamId, challengeId)})",
-            ct);
+        if (db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({AdvisoryLockKey(teamId, challengeId)})",
+                ct);
+        }
+
         return new AwdpPatchStateLock(transaction);
     }
 

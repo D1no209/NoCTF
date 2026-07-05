@@ -97,6 +97,72 @@ public class CtfGameModeTests
         Assert.Equal(challengeId, submission.ChallengeId);
     }
 
+    [Fact]
+    public async Task ProcessSubmissionAsync_DynamicFlagWithoutActiveInstance_RequiresInstance()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddHours(1));
+        SeedChallenge(db, competitionId, challengeId, "[UUID]");
+        db.CtfDynamicFlags.Add(new CtfDynamicFlag
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            FlagUuid = "d3adbeef-1111-4222-8333-aabbccddeeff",
+            EnvironmentVariable = "FLAG",
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await CreateMode(db).ProcessSubmissionAsync(
+            CreateContext(competitionId, teamId, challengeId, "flag{d3adbeef-1111-4222-8333-aabbccddeeff}"));
+
+        Assert.Equal(SubmissionResult.InstanceRequired, result);
+        Assert.Empty(await db.Submissions.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
+    public async Task ProcessSubmissionAsync_DynamicFlagWithActiveInstance_AcceptsFlag()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddHours(1));
+        SeedChallenge(db, competitionId, challengeId, "[UUID]");
+        db.CtfDynamicFlags.Add(new CtfDynamicFlag
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            FlagUuid = "d3adbeef-1111-4222-8333-aabbccddeeff",
+            EnvironmentVariable = "FLAG",
+            CreatedAt = DateTime.UtcNow
+        });
+        db.AwdGameBoxes.Add(new AwdGameBox
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            ContainerInstanceId = "container-123",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await CreateMode(db).ProcessSubmissionAsync(
+            CreateContext(competitionId, teamId, challengeId, "flag{d3adbeef-1111-4222-8333-aabbccddeeff}"));
+
+        Assert.Equal(SubmissionResult.Accepted, result);
+        Assert.True((await db.Submissions.IgnoreQueryFilters().SingleAsync()).IsCorrect);
+    }
+
     private static CtfGameMode CreateMode(ApplicationDbContext db)
         => new(
             db,

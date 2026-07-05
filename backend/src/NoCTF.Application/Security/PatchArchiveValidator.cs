@@ -21,6 +21,9 @@ public record PatchArchiveValidationResult(bool IsValid, string? Error)
 
 public class PatchArchiveValidator : IPatchArchiveValidator
 {
+    private const int MaxEntries = 256;
+    private const long MaxExpandedBytes = 20 * 1024 * 1024;
+
     public async Task<PatchArchiveValidationResult> ValidateAsync(Stream archive, CancellationToken ct = default)
         => await ValidateTarGzAsync(archive, requiredEntry: null, ct);
 
@@ -61,8 +64,14 @@ public class PatchArchiveValidator : IPatchArchiveValidator
 
         TarEntry? entry;
         var hasRequiredEntry = requiredEntry is null;
+        var entryCount = 0;
+        long totalSize = 0;
         while ((entry = await reader.GetNextEntryAsync(copyData: false, ct)) is not null)
         {
+            entryCount++;
+            if (entryCount > MaxEntries)
+                return PatchArchiveValidationResult.Invalid("Archive contains too many entries.");
+
             var normalizedName = NormalizePath(entry.Name);
             if (normalizedName is null)
                 return PatchArchiveValidationResult.Invalid($"Archive contains unsafe path '{entry.Name}'.");
@@ -73,8 +82,18 @@ public class PatchArchiveValidator : IPatchArchiveValidator
                 return PatchArchiveValidationResult.Invalid($"Archive contains unsupported entry '{entry.Name}'.");
             }
 
-            if (IsRegularFile(entry.EntryType) && string.Equals(normalizedName, requiredEntry, StringComparison.Ordinal))
-                hasRequiredEntry = true;
+            if (IsRegularFile(entry.EntryType))
+            {
+                var entrySize = Math.Max(0, entry.Length);
+                if (entrySize > MaxExpandedBytes || totalSize > MaxExpandedBytes - entrySize)
+                    return PatchArchiveValidationResult.Invalid("Archive expands beyond the allowed size.");
+                totalSize += entrySize;
+                if (totalSize > MaxExpandedBytes)
+                    return PatchArchiveValidationResult.Invalid("Archive expands beyond the allowed size.");
+
+                if (string.Equals(normalizedName, requiredEntry, StringComparison.Ordinal))
+                    hasRequiredEntry = true;
+            }
         }
 
         return hasRequiredEntry
@@ -89,6 +108,8 @@ public class PatchArchiveValidator : IPatchArchiveValidator
     {
         using var zip = new ZipArchive(archive, ZipArchiveMode.Read, leaveOpen: true);
         var hasRequiredEntry = requiredEntry is null;
+        var entryCount = 0;
+        long totalSize = 0;
 
         foreach (var entry in zip.Entries)
         {
@@ -96,9 +117,23 @@ public class PatchArchiveValidator : IPatchArchiveValidator
             if (entry.FullName.EndsWith("/", StringComparison.Ordinal))
                 continue;
 
+            entryCount++;
+            if (entryCount > MaxEntries)
+                return PatchArchiveValidationResult.Invalid("Archive contains too many entries.");
+
             var normalizedName = NormalizePath(entry.FullName);
             if (normalizedName is null)
                 return PatchArchiveValidationResult.Invalid($"Archive contains unsafe path '{entry.FullName}'.");
+
+            if (IsZipSymlink(entry))
+                return PatchArchiveValidationResult.Invalid($"Archive contains unsupported entry '{entry.FullName}'.");
+
+            var entrySize = Math.Max(0, entry.Length);
+            if (entrySize > MaxExpandedBytes || totalSize > MaxExpandedBytes - entrySize)
+                return PatchArchiveValidationResult.Invalid("Archive expands beyond the allowed size.");
+            totalSize += entrySize;
+            if (totalSize > MaxExpandedBytes)
+                return PatchArchiveValidationResult.Invalid("Archive expands beyond the allowed size.");
 
             if (string.Equals(normalizedName, requiredEntry, StringComparison.Ordinal))
                 hasRequiredEntry = true;
@@ -114,6 +149,14 @@ public class PatchArchiveValidator : IPatchArchiveValidator
         => entryType is TarEntryType.RegularFile
             or TarEntryType.V7RegularFile
             or TarEntryType.ContiguousFile;
+
+    private static bool IsZipSymlink(ZipArchiveEntry entry)
+    {
+        const int unixFileTypeMask = 0xF000;
+        const int unixSymlinkFileType = 0xA000;
+        var mode = (entry.ExternalAttributes >> 16) & unixFileTypeMask;
+        return mode == unixSymlinkFileType;
+    }
 
     private static string? NormalizePath(string? path)
     {

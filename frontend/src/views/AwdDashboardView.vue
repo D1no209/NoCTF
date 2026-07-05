@@ -3,7 +3,7 @@ import type { AttackLogDto } from '@/components/game/AttackLogFeed.vue'
 import type { AwdAwarenessEvent } from '@/components/game/AwdBattlefieldCore.vue'
 import type { ServiceStatus } from '@/components/game/ServiceStatusGrid.vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { CheckCircle2, Loader2, Upload } from 'lucide-vue-next'
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, Upload } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Alert } from '@/components/ui/alert'
 import {
   Select,
   SelectContent,
@@ -74,26 +75,43 @@ interface PatchSubmissionStatus {
   validationLog?: string
 }
 
-const { data: dashboard, refetch: refetchDashboard } = useQuery({
+const {
+  data: dashboard,
+  refetch: refetchDashboard,
+  isLoading: dashboardLoading,
+  isError: dashboardError,
+} = useQuery({
   queryKey: computed(() => queryKeys.awdDashboard(competitionId.value)),
   queryFn: () => competitionApi.awdDashboard<AwdDashboardResponse>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
   refetchInterval: 10_000,
 })
 
-const { data: teams } = useQuery({
+const {
+  data: teams,
+  refetch: refetchTeams,
+  isError: teamsError,
+} = useQuery({
   queryKey: computed(() => queryKeys.teams(competitionId.value)),
   queryFn: () => competitionApi.teams<Team[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
-const { data: challenges } = useQuery({
+const {
+  data: challenges,
+  refetch: refetchChallenges,
+  isError: challengesError,
+} = useQuery({
   queryKey: computed(() => queryKeys.challenges(competitionId.value)),
   queryFn: () => competitionApi.challenges<Challenge[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
-const { data: patchSubmissions } = useQuery({
+const {
+  data: patchSubmissions,
+  refetch: refetchPatchSubmissions,
+  isError: patchSubmissionsError,
+} = useQuery({
   queryKey: computed(() => queryKeys.patchSubmissions(competitionId.value)),
   queryFn: () => competitionApi.patchSubmissions<PatchSubmissionStatus[]>(competitionId.value),
   enabled: computed(() => !!competitionId.value && isAwdp.value),
@@ -136,6 +154,16 @@ const patchFile = ref<File | null>(null)
 const patchLoading = ref(false)
 const isDragOver = ref(false)
 const patchStatuses = computed(() => patchSubmissions.value ?? [])
+const controlDataError = computed(() => teamsError.value || challengesError.value)
+
+async function refetchAwdData() {
+  await Promise.all([
+    refetchDashboard(),
+    refetchTeams(),
+    refetchChallenges(),
+    isAwdp.value ? refetchPatchSubmissions() : Promise.resolve(),
+  ])
+}
 
 function onPatchFileChange(e: Event) {
   const input = e.target as HTMLInputElement
@@ -222,7 +250,24 @@ function enqueueAttackFailed(reason: string) {
 
 <template>
   <div class="noctf-page-wide">
-    <div class="noctf-panel rounded-xl p-5">
+    <div v-if="dashboardError" class="noctf-state-box py-12">
+      <AlertCircle class="size-8 text-destructive" />
+      <div class="space-y-1 text-center">
+        <p class="font-medium">{{ t('awd.dashboardLoadFailed') }}</p>
+        <p class="text-sm text-muted-foreground">{{ t('awd.dashboardLoadFailedDetail') }}</p>
+      </div>
+      <Button type="button" variant="outline" size="sm" @click="refetchAwdData">
+        <RefreshCw class="size-4" />
+        {{ t('common.refresh') }}
+      </Button>
+    </div>
+
+    <div v-else-if="dashboardLoading" class="noctf-state-box py-12 text-muted-foreground">
+      <Loader2 class="size-8 animate-spin" />
+      <p class="text-sm">{{ t('common.loading') }}</p>
+    </div>
+
+    <div v-else class="noctf-panel rounded-xl p-5">
       <RoundTimer
         :round="round"
         :remaining-seconds="remainingSeconds"
@@ -231,6 +276,7 @@ function enqueueAttackFailed(reason: string) {
     </div>
 
     <AwdBattlefieldCore
+      v-if="!dashboardError"
       :round="round"
       :services="services"
       :attack-logs="attackLogs"
@@ -258,6 +304,9 @@ function enqueueAttackFailed(reason: string) {
             </CardTitle>
           </CardHeader>
           <CardContent class="space-y-4">
+            <Alert v-if="controlDataError" variant="destructive">
+              {{ t('awd.controlDataLoadFailed') }}
+            </Alert>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="space-y-2">
                 <label class="noctf-label">{{ t('awd.victimTeam') }}</label>
@@ -422,6 +471,9 @@ function enqueueAttackFailed(reason: string) {
             </CardContent>
           </Card>
         </transition>
+        <Alert v-if="isAwdp && patchSubmissionsError" variant="destructive">
+          {{ t('awd.patchStatusLoadFailed') }}
+        </Alert>
       </div>
 
       <!-- Right: Attack Log -->
