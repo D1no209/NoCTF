@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { AlertCircle, ArrowRight, Copy, Inbox, KeyRound, Loader2, Lock, LogOut, Plus, ShieldAlert, Users } from 'lucide-vue-next'
+import {
+  AlertCircle,
+  ArrowRight,
+  Copy,
+  Inbox,
+  KeyRound,
+  Loader2,
+  Lock,
+  LogOut,
+  Plus,
+  ShieldAlert,
+  Users,
+} from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
@@ -61,7 +73,12 @@ interface CompetitionDetail {
   trackNames: string[]
 }
 
-const { data: teams, isLoading, isError, refetch } = useQuery({
+const {
+  data: teams,
+  isLoading,
+  isError,
+  refetch,
+} = useQuery({
   queryKey: queryKeys.myTeams,
   queryFn: () => teamApi.mine<MyTeam[]>(),
 })
@@ -77,24 +94,25 @@ const { data: selectedCompetitionDetail, isLoading: loadingSelectedCompetition }
   enabled: computed(() => !!selectedCompetitionId.value),
 })
 
-const activeTeams = computed(() => (teams.value ?? []).filter(team => !team.isBanned))
-const bannedTeams = computed(() => (teams.value ?? []).filter(team => team.isBanned))
+const activeTeams = computed(() => (teams.value ?? []).filter((team) => !team.isBanned))
+const bannedTeams = computed(() => (teams.value ?? []).filter((team) => team.isBanned))
 const availableCompetitions = computed(() => competitions.value ?? [])
-const selectedCompetitionRequiresTrack = computed(() => Boolean(selectedCompetitionDetail.value?.tracksEnabled))
+const selectedCompetitionRequiresTrack = computed(() =>
+  Boolean(selectedCompetitionDetail.value?.tracksEnabled),
+)
 const canCreateTeam = computed(() => {
-  if (!selectedCompetitionId.value || !newTeamName.value.trim())
-    return false
-  if (selectedCompetitionRequiresTrack.value && !selectedTrackName.value)
-    return false
+  if (!selectedCompetitionId.value || !newTeamName.value.trim()) return false
+  if (selectedCompetitionRequiresTrack.value && !selectedTrackName.value) return false
   return true
 })
 
 const createTeamMutation = useMutation({
-  mutationFn: () => teamApi.create<MyTeam>({
-    competitionId: selectedCompetitionId.value,
-    name: newTeamName.value.trim(),
-    trackName: selectedCompetitionRequiresTrack.value ? selectedTrackName.value : undefined,
-  }),
+  mutationFn: () =>
+    teamApi.create<MyTeam>({
+      competitionId: selectedCompetitionId.value,
+      name: newTeamName.value.trim(),
+      trackName: selectedCompetitionRequiresTrack.value ? selectedTrackName.value : undefined,
+    }),
   onSuccess: (team) => {
     newTeamName.value = ''
     selectedTrackName.value = ''
@@ -157,9 +175,16 @@ async function copyToken(token: string) {
             </CardTitle>
           </CardHeader>
           <CardContent class="space-y-3">
-            <Select v-model="selectedCompetitionId" :disabled="loadingCompetitions || availableCompetitions.length === 0">
+            <Select
+              v-model="selectedCompetitionId"
+              :disabled="loadingCompetitions || availableCompetitions.length === 0"
+            >
               <SelectTrigger>
-                <SelectValue :placeholder="loadingCompetitions ? t('common.loading') : t('teams.selectCompetition')" />
+                <SelectValue
+                  :placeholder="
+                    loadingCompetitions ? t('common.loading') : t('teams.selectCompetition')
+                  "
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -180,7 +205,11 @@ async function copyToken(token: string) {
               :disabled="loadingSelectedCompetition"
             >
               <SelectTrigger>
-                <SelectValue :placeholder="loadingSelectedCompetition ? t('common.loading') : t('teams.selectTrack')" />
+                <SelectValue
+                  :placeholder="
+                    loadingSelectedCompetition ? t('common.loading') : t('teams.selectTrack')
+                  "
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -195,14 +224,21 @@ async function copyToken(token: string) {
 
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p class="text-xs text-muted-foreground">
-                {{ availableCompetitions.length === 0 ? t('teams.noCompetitionsToCreate') : t('teams.createTeamDescription') }}
+                {{
+                  availableCompetitions.length === 0
+                    ? t('teams.noCompetitionsToCreate')
+                    : t('teams.createTeamDescription')
+                }}
               </p>
               <Button
                 class="shrink-0"
                 :disabled="!canCreateTeam || createTeamMutation.isPending.value"
                 @click="createTeamMutation.mutate()"
               >
-                <Loader2 v-if="createTeamMutation.isPending.value" class="mr-2 size-4 animate-spin" />
+                <Loader2
+                  v-if="createTeamMutation.isPending.value"
+                  class="mr-2 size-4 animate-spin"
+                />
                 {{ t('teams.createTeam') }}
               </Button>
             </div>
@@ -224,7 +260,10 @@ async function copyToken(token: string) {
                 :disabled="!joinToken.trim() || joinByTokenMutation.isPending.value"
                 @click="joinByTokenMutation.mutate()"
               >
-                <Loader2 v-if="joinByTokenMutation.isPending.value" class="mr-2 size-4 animate-spin" />
+                <Loader2
+                  v-if="joinByTokenMutation.isPending.value"
+                  class="mr-2 size-4 animate-spin"
+                />
                 {{ t('teams.joinByToken') }}
               </Button>
             </div>
@@ -267,12 +306,19 @@ async function copyToken(token: string) {
             </Badge>
           </div>
 
-          <div v-if="activeTeams.length === 0" class="noctf-state-box text-sm text-muted-foreground">
+          <div
+            v-if="activeTeams.length === 0"
+            class="noctf-state-box text-sm text-muted-foreground"
+          >
             {{ t('teams.noActiveTeams') }}
           </div>
 
           <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Card v-for="team in activeTeams" :key="team.id" class="overflow-hidden transition-colors hover:border-primary/30">
+            <Card
+              v-for="team in activeTeams"
+              :key="team.id"
+              class="overflow-hidden transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:border-primary/30"
+            >
               <CardHeader class="space-y-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -300,7 +346,9 @@ async function copyToken(token: string) {
                 </div>
               </CardHeader>
               <CardContent class="space-y-4">
-                <div class="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+                <div
+                  class="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+                >
                   <code class="truncate text-xs">{{ team.inviteToken }}</code>
                   <Button variant="ghost" size="icon-sm" @click="copyToken(team.inviteToken)">
                     <Copy class="size-4" />

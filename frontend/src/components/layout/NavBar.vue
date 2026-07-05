@@ -32,7 +32,7 @@ async function handleLogout() {
       <div class="flex min-w-0 items-center gap-4 lg:gap-6">
         <RouterLink
           to="/"
-          class="flex min-w-0 items-center gap-2 text-lg font-bold tracking-tight transition-all hover:opacity-80 active:scale-95"
+          class="flex min-w-0 items-center gap-2 text-lg font-bold tracking-tight transition-[opacity,transform] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:opacity-80 active:scale-[0.985]"
         >
           <span class="noctf-logo size-8" />
           <span class="truncate">NoCTF</span>
@@ -40,7 +40,7 @@ async function handleLogout() {
         <nav class="hidden items-center gap-2 text-sm font-medium sm:flex">
           <RouterLink
             to="/"
-            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent hover:text-foreground"
             active-class="bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           >
             <Home class="size-4" />
@@ -48,14 +48,14 @@ async function handleLogout() {
           </RouterLink>
           <RouterLink
             to="/competitions"
-            class="relative rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            class="relative rounded-lg px-3 py-2 text-muted-foreground transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent hover:text-foreground"
             active-class="bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           >
             {{ t('nav.competitions') }}
           </RouterLink>
           <RouterLink
             to="/teams"
-            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent hover:text-foreground"
             active-class="bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           >
             <Users class="size-4" />
@@ -64,7 +64,7 @@ async function handleLogout() {
           <RouterLink
             v-if="canManage"
             to="/admin"
-            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            class="relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-muted-foreground transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent hover:text-foreground"
             active-class="bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           >
             <LayoutDashboard class="size-4" />
@@ -115,26 +115,26 @@ async function handleLogout() {
             <div class="flex flex-col gap-1 py-6">
               <RouterLink
                 to="/"
-                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-colors hover:bg-accent hover:text-primary"
+                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-[background-color,color] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent hover:text-primary"
               >
                 {{ t('nav.home') }}
               </RouterLink>
               <RouterLink
                 to="/competitions"
-                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-colors hover:bg-accent hover:text-primary"
+                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-[background-color,color] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent hover:text-primary"
               >
                 {{ t('nav.competitions') }}
               </RouterLink>
               <RouterLink
                 to="/teams"
-                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-colors hover:bg-accent hover:text-primary"
+                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-[background-color,color] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent hover:text-primary"
               >
                 {{ t('nav.teams') }}
               </RouterLink>
               <RouterLink
                 v-if="canManage"
                 to="/admin"
-                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-colors hover:bg-accent hover:text-primary"
+                class="flex min-h-11 items-center rounded-md px-2 text-base font-medium transition-[background-color,color] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent hover:text-primary"
               >
                 {{ t('nav.admin') }}
               </RouterLink>

@@ -237,7 +237,7 @@ const table = useVueTable({
             <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody v-auto-animate>
+        <TableBody v-auto-animate="{ duration: 140, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }">
           <TableRow v-if="isLoading">
             <TableCell :colspan="columns.length + 1" class="h-24 text-center">
               <div class="flex items-center justify-center gap-2 text-muted-foreground">
@@ -265,7 +265,7 @@ const table = useVueTable({
             v-else
             v-for="row in table.getRowModel().rows"
             :key="row.id"
-            class="group transition-colors hover:bg-muted/50"
+            class="group transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
               <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
@@ -355,7 +355,7 @@ const table = useVueTable({
             <li
               v-for="m in teamMembers"
               :key="m.userId"
-              class="flex items-center justify-between rounded-lg border bg-muted/30 p-3 transition-colors hover:bg-muted/50"
+              class="flex items-center justify-between rounded-lg border bg-muted/30 p-3 transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/50"
             >
               <div class="flex items-center gap-3">
                 <div

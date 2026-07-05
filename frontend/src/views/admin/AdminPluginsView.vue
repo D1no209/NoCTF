@@ -69,11 +69,15 @@ function getPluginIcon(type: string) {
       <Skeleton v-for="i in 8" :key="i" class="h-16 rounded-none" />
     </div>
 
-    <div v-else v-auto-animate class="noctf-workbench divide-y divide-border/80">
+    <div
+      v-else
+      v-auto-animate="{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }"
+      class="noctf-workbench divide-y divide-border/80"
+    >
       <div
         v-for="plugin in plugins"
         :key="plugin.name"
-        class="grid gap-3 p-4 transition-colors hover:bg-muted/35 md:grid-cols-[minmax(0,1fr)_auto]"
+        class="grid gap-3 p-4 transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/35 md:grid-cols-[minmax(0,1fr)_auto]"
       >
         <div class="flex min-w-0 items-center gap-3">
           <div

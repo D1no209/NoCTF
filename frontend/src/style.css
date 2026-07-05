@@ -66,6 +66,13 @@
 
 :root {
   --radius: 0.625rem;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-instant: 120ms;
+  --motion-fast: 160ms;
+  --motion-standard: 220ms;
+  --motion-slow: 320ms;
   --background: oklch(0.984 0.006 255);
   --foreground: oklch(0.18 0.04 260);
   --card: oklch(0.992 0.004 255);
@@ -196,6 +203,18 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-delay: 0ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {
@@ -255,7 +274,7 @@
   }
 
   .noctf-top-tab {
-    @apply relative -mb-px inline-flex min-h-10 items-center border-b-2 border-transparent px-1 pb-3 pt-1 text-sm font-semibold transition-colors;
+    @apply relative -mb-px inline-flex min-h-10 items-center border-b-2 border-transparent px-1 pb-3 pt-1 text-sm font-semibold transition-[border-color,color] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)];
   }
 
   .noctf-top-tab-active {
@@ -303,7 +322,7 @@
   }
 
   .noctf-segmented-button {
-    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-all hover:text-foreground;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-[background-color,color,box-shadow,transform] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:text-foreground active:scale-[0.985];
   }
 
   .noctf-segmented-button-active {
@@ -406,6 +425,35 @@
 
   .noctf-scrollbar::-webkit-scrollbar-thumb:hover {
     background: color-mix(in oklch, var(--muted-foreground) 36%, transparent);
+  }
+
+  .noctf-skeleton {
+    animation: noctf-skeleton-pulse 1.35s var(--ease-out-quart) infinite;
+  }
+
+  .noctf-live-update {
+    animation: noctf-live-update var(--motion-standard) var(--ease-out-expo) both;
+  }
+
+  @keyframes noctf-skeleton-pulse {
+    0%,
+    100% {
+      opacity: 0.72;
+    }
+    50% {
+      opacity: 0.42;
+    }
+  }
+
+  @keyframes noctf-live-update {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   @media (max-width: 640px) {

@@ -11,10 +11,7 @@ const route = useRoute()
     <main class="flex-1 flex flex-col">
       <slot>
         <router-view v-slot="{ Component }">
-          <transition
-            name="fade"
-            mode="out-in"
-          >
+          <transition name="fade" mode="out-in">
             <component :is="Component" :key="route.fullPath" />
           </transition>
         </router-view>
@@ -26,11 +23,18 @@ const route = useRoute()
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition:
+    opacity var(--motion-fast) var(--ease-out-quint),
+    transform var(--motion-fast) var(--ease-out-quint);
 }
 
-.fade-enter-from,
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
 .fade-leave-to {
   opacity: 0;
+  transform: translateY(-2px);
 }
 </style>

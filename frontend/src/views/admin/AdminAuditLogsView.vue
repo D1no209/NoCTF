@@ -111,15 +111,13 @@ function applyFilters() {
 }
 
 function previousPage() {
-  if (page.value <= 1)
-    return
+  if (page.value <= 1) return
   page.value -= 1
   refetch()
 }
 
 function nextPage() {
-  if (page.value >= totalPages.value)
-    return
+  if (page.value >= totalPages.value) return
   page.value += 1
   refetch()
 }
@@ -282,11 +280,21 @@ const table = useVueTable({
       </div>
       <div class="space-y-2">
         <label class="noctf-label ml-1">{{ t('admin.auditLogs.action') }}</label>
-        <Input v-model="filterAction" :placeholder="t('admin.auditLogs.filterAction')" class="h-9" @keyup.enter="applyFilters" />
+        <Input
+          v-model="filterAction"
+          :placeholder="t('admin.auditLogs.filterAction')"
+          class="h-9"
+          @keyup.enter="applyFilters"
+        />
       </div>
       <div class="space-y-2">
         <label class="noctf-label ml-1">{{ t('admin.auditLogs.entityType') }}</label>
-        <Input v-model="filterEntityType" :placeholder="t('admin.auditLogs.filterEntity')" class="h-9" @keyup.enter="applyFilters" />
+        <Input
+          v-model="filterEntityType"
+          :placeholder="t('admin.auditLogs.filterEntity')"
+          class="h-9"
+          @keyup.enter="applyFilters"
+        />
       </div>
       <Button class="h-9" @click="applyFilters">{{ t('common.search') }}</Button>
     </div>
@@ -316,7 +324,7 @@ const table = useVueTable({
             <TableHead class="w-[60px] text-right px-4"></TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody v-auto-animate>
+        <TableBody v-auto-animate="{ duration: 140, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }">
           <TableRow v-if="isLoading">
             <TableCell :colspan="columns.length + 1" class="h-24 text-center">
               <Loader2 class="size-5 animate-spin mx-auto text-muted-foreground" />
@@ -334,7 +342,7 @@ const table = useVueTable({
             v-else
             v-for="row in table.getRowModel().rows"
             :key="row.id"
-            class="group hover:bg-muted/50 transition-colors"
+            class="group transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
               <component :is="() => cell.renderValue()" />
@@ -361,14 +369,12 @@ const table = useVueTable({
         {{ t('admin.auditLogs.pageTotal', { page, totalPages, total }) }}
       </p>
       <div class="flex items-center gap-2">
-        <Button size="sm" variant="outline" :disabled="page <= 1" @click="previousPage">{{ t('common.previous') }}</Button>
-        <Button
-          size="sm"
-          variant="outline"
-          :disabled="page >= totalPages"
-          @click="nextPage"
-          >{{ t('common.next') }}</Button
-        >
+        <Button size="sm" variant="outline" :disabled="page <= 1" @click="previousPage">{{
+          t('common.previous')
+        }}</Button>
+        <Button size="sm" variant="outline" :disabled="page >= totalPages" @click="nextPage">{{
+          t('common.next')
+        }}</Button>
       </div>
     </div>
 
@@ -442,7 +448,8 @@ const table = useVueTable({
               </div>
               <pre
                 class="max-h-60 overflow-auto rounded-md border bg-sidebar p-4 font-mono text-[11px] text-sidebar-foreground"
-                >{{ formatJson(selectedLog.diff) }}</pre>
+                >{{ formatJson(selectedLog.diff) }}</pre
+              >
             </div>
 
             <div v-if="selectedLog.newValues" class="space-y-2">
@@ -451,7 +458,8 @@ const table = useVueTable({
               }}</span>
               <pre
                 class="max-h-60 overflow-auto rounded-md border bg-sidebar p-4 font-mono text-[11px] text-sidebar-foreground"
-                >{{ formatJson(selectedLog.newValues) }}</pre>
+                >{{ formatJson(selectedLog.newValues) }}</pre
+              >
             </div>
 
             <div v-if="selectedLog.oldValues" class="space-y-2">
@@ -460,7 +468,8 @@ const table = useVueTable({
               }}</span>
               <pre
                 class="max-h-60 overflow-auto rounded-md border bg-sidebar p-4 font-mono text-[11px] text-sidebar-foreground"
-                >{{ formatJson(selectedLog.oldValues) }}</pre>
+                >{{ formatJson(selectedLog.oldValues) }}</pre
+              >
             </div>
           </div>
         </div>

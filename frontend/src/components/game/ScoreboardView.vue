@@ -726,7 +726,7 @@ onUnmounted(() => {
         <span
           v-for="(series, index) in visibleTrend"
           :key="series.teamId"
-          class="inline-flex cursor-default items-center gap-1.5 rounded-full px-2 py-1 transition-colors"
+          class="inline-flex cursor-default items-center gap-1.5 rounded-full px-2 py-1 transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)]"
           :class="
             hoveredTeamId === series.teamId
               ? 'bg-muted text-foreground'
@@ -776,7 +776,7 @@ onUnmounted(() => {
           <TableRow
             v-for="entry in sortedEntries"
             :key="entry.teamId ?? entry.rank"
-            class="cursor-pointer transition-colors hover:bg-muted/60"
+            class="cursor-pointer transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/60"
             :class="entry.teamId && hoveredTeamId === entry.teamId ? 'bg-muted/70' : ''"
             @mouseenter="hoveredTeamId = entry.teamId ?? null"
             @mouseleave="hoveredTeamId = null"

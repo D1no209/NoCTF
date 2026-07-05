@@ -214,7 +214,7 @@ const table = useVueTable({
             <TableHead class="w-[60px] text-right px-4"></TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody v-auto-animate>
+        <TableBody v-auto-animate="{ duration: 140, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }">
           <TableRow v-if="isLoading">
             <TableCell :colspan="columns.length + 1" class="h-24 text-center">
               <Loader2 class="size-5 animate-spin mx-auto text-muted-foreground" />
@@ -232,7 +232,7 @@ const table = useVueTable({
             v-else
             v-for="row in table.getRowModel().rows"
             :key="row.id"
-            class="group hover:bg-muted/50 transition-colors"
+            class="group transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
               <component :is="() => cell.renderValue()" />

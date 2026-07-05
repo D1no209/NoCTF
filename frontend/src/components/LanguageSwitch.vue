@@ -23,7 +23,7 @@ watch(selected, (val) => {
     <Globe2 class="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
     <select
       v-model="selected"
-      class="h-10 cursor-pointer appearance-none rounded-md border border-input bg-background/80 py-0 pl-9 pr-8 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-accent focus:border-primary focus:ring-4 focus:ring-primary/15 max-sm:h-11"
+      class="h-10 cursor-pointer appearance-none rounded-md border border-input bg-background/80 py-0 pl-9 pr-8 text-sm font-medium text-foreground shadow-none outline-none transition-[background-color,border-color,box-shadow,color] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-accent focus:border-primary focus:ring-4 focus:ring-primary/15 max-sm:h-11"
     >
       <option v-for="opt in options" :key="opt.value" :value="opt.value">
         {{ opt.label }}

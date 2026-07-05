@@ -16,12 +16,12 @@ import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -48,15 +48,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
-import { 
-  Search, 
-  MoreHorizontal, 
-  UserCog, 
-  KeyRound, 
-  ShieldAlert, 
+import {
+  Search,
+  MoreHorizontal,
+  UserCog,
+  KeyRound,
+  ShieldAlert,
   User as UserIcon,
   Loader2,
-  Lock
+  Lock,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
@@ -82,7 +82,12 @@ const selectedUser = ref<UserDto | null>(null)
 const newRole = ref('user')
 const newPassword = ref('')
 
-const { data: users, isLoading, isError, refetch } = useQuery({
+const {
+  data: users,
+  isLoading,
+  isError,
+  refetch,
+} = useQuery({
   queryKey: queryKeys.adminUsers,
   queryFn: () => adminApi.users<UserDto[]>(),
 })
@@ -96,7 +101,9 @@ const changeRoleMutation = useMutation({
     roleDialog.value = false
     toast.success(t('admin.users.roleUpdateSuccess', 'User role updated.'))
   },
-  onError: () => { toast.error(t('admin.users.actionErrorRole')) },
+  onError: () => {
+    toast.error(t('admin.users.actionErrorRole'))
+  },
 })
 
 const resetPasswordMutation = useMutation({
@@ -108,7 +115,9 @@ const resetPasswordMutation = useMutation({
     newPassword.value = ''
     toast.success(t('admin.users.passwordResetSuccess', 'Password reset successfully.'))
   },
-  onError: () => { toast.error(t('admin.users.actionErrorPassword')) },
+  onError: () => {
+    toast.error(t('admin.users.actionErrorPassword'))
+  },
 })
 
 function openRoleDialog(user: UserDto) {
@@ -126,17 +135,18 @@ function openPasswordDialog(user: UserDto) {
 const columnHelper = createColumnHelper<UserDto>()
 
 const columns = [
-  columnHelper.accessor('userName', { 
-    header: t('admin.users.username'), 
+  columnHelper.accessor('userName', {
+    header: t('admin.users.username'),
     enableSorting: true,
-    cell: (info) => h('div', { class: 'flex items-center gap-2' }, [
-      h(UserIcon, { class: 'size-3.5 text-muted-foreground' }),
-      h('span', { class: 'font-medium' }, info.getValue())
-    ])
+    cell: (info) =>
+      h('div', { class: 'flex items-center gap-2' }, [
+        h(UserIcon, { class: 'size-3.5 text-muted-foreground' }),
+        h('span', { class: 'font-medium' }, info.getValue()),
+      ]),
   }),
-  columnHelper.accessor('email', { 
-    header: t('admin.users.email'), 
-    enableSorting: true 
+  columnHelper.accessor('email', {
+    header: t('admin.users.email'),
+    enableSorting: true,
   }),
   columnHelper.accessor('role', {
     header: t('admin.users.role'),
@@ -145,13 +155,21 @@ const columns = [
 ]
 
 const table = useVueTable({
-  get data() { return users.value ?? [] },
+  get data() {
+    return users.value ?? []
+  },
   columns,
   state: {
-    get globalFilter() { return globalFilter.value },
-    get sorting() { return sorting.value },
+    get globalFilter() {
+      return globalFilter.value
+    },
+    get sorting() {
+      return sorting.value
+    },
   },
-  onGlobalFilterChange: (v) => { globalFilter.value = v },
+  onGlobalFilterChange: (v) => {
+    globalFilter.value = v
+  },
   onSortingChange: (updater) => {
     sorting.value = typeof updater === 'function' ? updater(sorting.value) : updater
   },
@@ -168,7 +186,10 @@ const table = useVueTable({
       <div class="space-y-1">
         <div class="flex items-center gap-2">
           <h2 class="text-2xl font-bold tracking-tight">{{ t('admin.users.title') }}</h2>
-          <Badge variant="destructive" class="text-[10px] uppercase font-black tracking-widest px-1.5 h-4">
+          <Badge
+            variant="destructive"
+            class="text-[10px] uppercase font-black tracking-widest px-1.5 h-4"
+          >
             {{ t('admin.users.adminOnly') }}
           </Badge>
         </div>
@@ -179,7 +200,11 @@ const table = useVueTable({
     <div class="noctf-filter-bar md:grid-cols-[minmax(0,24rem)]">
       <div class="relative w-full max-w-sm">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="globalFilter" :placeholder="t('admin.users.searchPlaceholder')" class="pl-10" />
+        <Input
+          v-model="globalFilter"
+          :placeholder="t('admin.users.searchPlaceholder')"
+          class="pl-10"
+        />
       </div>
     </div>
 
@@ -198,14 +223,16 @@ const table = useVueTable({
                 <div class="flex items-center gap-2">
                   <span>{{ header.column.columnDef.header as string }}</span>
                   <span v-if="header.column.getIsSorted() === 'asc'" class="text-[10px]">▲</span>
-                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]">▼</span>
+                  <span v-else-if="header.column.getIsSorted() === 'desc'" class="text-[10px]"
+                    >▼</span
+                  >
                 </div>
               </template>
             </TableHead>
             <TableHead class="w-[80px] text-right px-4">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody v-auto-animate>
+        <TableBody v-auto-animate="{ duration: 140, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }">
           <TableRow v-if="isLoading">
             <TableCell :colspan="columns.length + 1" class="h-24 text-center">
               <div class="flex items-center justify-center gap-2 text-muted-foreground">
@@ -218,7 +245,9 @@ const table = useVueTable({
             <TableCell :colspan="columns.length + 1" class="h-32 text-center">
               <div class="flex flex-col items-center justify-center gap-3 text-muted-foreground">
                 <span>{{ t('admin.users.loadError', t('errors.loadFailed')) }}</span>
-                <Button variant="outline" size="sm" @click="refetch()">{{ t('common.refresh') }}</Button>
+                <Button variant="outline" size="sm" @click="refetch()">{{
+                  t('common.refresh')
+                }}</Button>
               </div>
             </TableCell>
           </TableRow>
@@ -227,11 +256,11 @@ const table = useVueTable({
               {{ t('admin.users.empty') }}
             </TableCell>
           </TableRow>
-          <TableRow 
-            v-else 
-            v-for="row in table.getRowModel().rows" 
+          <TableRow
+            v-else
+            v-for="row in table.getRowModel().rows"
             :key="row.id"
-            class="group transition-colors hover:bg-muted/50"
+            class="group transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-muted/50"
           >
             <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-4 py-3">
               <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
@@ -263,13 +292,28 @@ const table = useVueTable({
 
     <div class="noctf-table-footer">
       <p class="text-xs text-muted-foreground">
-        {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: table.getPageCount() }) }}
+        {{
+          t('common.pageOf', {
+            page: table.getState().pagination.pageIndex + 1,
+            total: table.getPageCount(),
+          })
+        }}
       </p>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="!table.getCanPreviousPage()"
+          @click="table.previousPage()"
+        >
           {{ t('common.previous') }}
         </Button>
-        <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="!table.getCanNextPage()"
+          @click="table.nextPage()"
+        >
           {{ t('common.next') }}
         </Button>
       </div>
@@ -279,7 +323,9 @@ const table = useVueTable({
     <Dialog v-model:open="roleDialog">
       <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>{{ t('admin.users.dialogChangeRole', { name: selectedUser?.userName }) }}</DialogTitle>
+          <DialogTitle>{{
+            t('admin.users.dialogChangeRole', { name: selectedUser?.userName })
+          }}</DialogTitle>
           <DialogDescription>{{ t('admin.users.roleDialogDescription') }}</DialogDescription>
         </DialogHeader>
         <div class="py-4 space-y-4">
@@ -296,8 +342,11 @@ const table = useVueTable({
               </SelectContent>
             </Select>
           </div>
-          
-          <div v-if="newRole === 'admin'" class="p-3 rounded-lg bg-danger-muted/70 border border-danger/25 flex gap-3">
+
+          <div
+            v-if="newRole === 'admin'"
+            class="p-3 rounded-lg bg-danger-muted/70 border border-danger/25 flex gap-3"
+          >
             <ShieldAlert class="size-5 text-danger shrink-0" />
             <p class="text-xs text-danger font-medium leading-tight">
               {{ t('admin.users.adminRoleWarning') }}
@@ -321,7 +370,9 @@ const table = useVueTable({
     <Dialog v-model:open="passwordDialog">
       <DialogContent class="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>{{ t('admin.users.dialogResetPassword', { name: selectedUser?.userName }) }}</DialogTitle>
+          <DialogTitle>{{
+            t('admin.users.dialogResetPassword', { name: selectedUser?.userName })
+          }}</DialogTitle>
           <DialogDescription>{{ t('admin.users.passwordDialogDescription') }}</DialogDescription>
         </DialogHeader>
         <div class="py-4 space-y-4">
@@ -329,9 +380,9 @@ const table = useVueTable({
             <Label>{{ t('admin.users.newPassword') }}</Label>
             <div class="relative">
               <Lock class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input 
-                v-model="newPassword" 
-                type="password" 
+              <Input
+                v-model="newPassword"
+                type="password"
                 class="pl-10"
                 :placeholder="t('validation.passwordMin')"
               />
@@ -339,12 +390,19 @@ const table = useVueTable({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="passwordDialog = false">{{ t('common.cancel') }}</Button>
+          <Button variant="outline" @click="passwordDialog = false">{{
+            t('common.cancel')
+          }}</Button>
           <Button
-            :disabled="resetPasswordMutation.isPending.value || !newPassword || newPassword.length < 8"
+            :disabled="
+              resetPasswordMutation.isPending.value || !newPassword || newPassword.length < 8
+            "
             @click="resetPasswordMutation.mutate({ id: selectedUser!.id, password: newPassword })"
           >
-            <Loader2 v-if="resetPasswordMutation.isPending.value" class="mr-2 size-4 animate-spin" />
+            <Loader2
+              v-if="resetPasswordMutation.isPending.value"
+              class="mr-2 size-4 animate-spin"
+            />
             {{ t('common.reset') }}
           </Button>
         </DialogFooter>

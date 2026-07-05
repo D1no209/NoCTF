@@ -144,7 +144,7 @@ onMounted(async () => {
           <button
             v-for="lvl in ['All', 'Information', 'Warning', 'Error']"
             :key="lvl"
-            class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-tighter rounded transition-all"
+            class="rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-tighter transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)]"
             :class="
               levelFilter === lvl
                 ? 'bg-background text-foreground'
@@ -218,7 +218,7 @@ onMounted(async () => {
         <div
           v-for="(entry, i) in filteredLogs"
           :key="i"
-          class="flex gap-4 rounded-sm px-2 py-0.5 transition-colors hover:bg-sidebar-foreground/5"
+          class="flex gap-4 rounded-sm px-2 py-0.5 transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:bg-sidebar-foreground/5"
         >
           <span class="shrink-0 w-20 select-none text-status-neutral">{{
             formatTime(entry.timestamp)
