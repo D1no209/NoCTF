@@ -71,6 +71,12 @@ public interface IScoreEventWriter
     Task<ScoreEvent?> WriteAsync(ScoreEventCreate scoreEvent, CancellationToken ct = default);
 }
 
+public interface ICtfScoreRebuilder
+{
+    Task RebuildCompetitionAsync(Guid competitionId, CancellationToken ct = default);
+    Task RebuildChallengeAsync(Guid competitionId, Guid challengeId, CancellationToken ct = default);
+}
+
 public interface IScoringStrategy
 {
     string ScoringKey { get; }

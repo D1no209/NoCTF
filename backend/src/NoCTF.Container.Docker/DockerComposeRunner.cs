@@ -6,6 +6,9 @@ namespace NoCTF.Container.Docker;
 
 public static class DockerComposeRunner
 {
+    private static readonly System.Text.RegularExpressions.Regex ProjectNamePattern =
+        new("^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private static readonly HashSet<string> AllowedRootKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "name",
@@ -101,6 +104,12 @@ public static class DockerComposeRunner
 
         ValidateTopLevelVolumes(TryGetMapping(root, "volumes"));
         ValidateTopLevelNetworks(TryGetMapping(root, "networks"));
+    }
+
+    public static void ValidateProjectName(string projectName)
+    {
+        if (string.IsNullOrWhiteSpace(projectName) || !ProjectNamePattern.IsMatch(projectName))
+            throw new InvalidOperationException("Compose project name is invalid.");
     }
 
     private static void ValidateRoot(YamlMappingNode root)

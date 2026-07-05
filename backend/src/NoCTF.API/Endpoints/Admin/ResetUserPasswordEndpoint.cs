@@ -35,6 +35,7 @@ public class ResetUserPasswordEndpoint(ApplicationDbContext dbContext) : Endpoin
 
         var hasher = new PasswordHasher<object>();
         user.PasswordHash = hasher.HashPassword(null!, req.NewPassword);
+        user.TokenVersion++;
         user.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(ct);
 

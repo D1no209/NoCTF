@@ -11,7 +11,7 @@ internal static class DockerHostConfigFactory
     {
         var limits = config.ResourceLimits ?? new ContainerResourceLimits();
         var policy = config.SecurityPolicy ?? new ContainerSecurityPolicy();
-        var capDrop = policy.CapDrop?.ToList() ?? [];
+        var capDrop = policy.CapDrop?.ToList() ?? ["ALL"];
         var capAdd = policy.CapAdd?.ToList() ?? [];
         var securityOpt = policy.NoNewPrivileges ? ["no-new-privileges:true"] : new List<string>();
 

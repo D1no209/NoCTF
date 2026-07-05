@@ -18,6 +18,7 @@ public sealed class KohPollEngine(
     ILogger<KohPollEngine> logger) : BackgroundService
 {
     private const int PollingIntervalSeconds = 5;
+    private readonly Dictionary<Guid, DateTime> _lastPollByCompetition = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -63,9 +64,17 @@ public sealed class KohPollEngine(
 
         foreach (var competition in competitions)
         {
+            var interval = TimeSpan.FromSeconds(Math.Clamp(competition.PollIntervalSeconds ?? 30, 5, 3600));
+            if (_lastPollByCompetition.TryGetValue(competition.Id, out var lastPoll) &&
+                now - lastPoll < interval)
+            {
+                continue;
+            }
+
             try
             {
-                await PollCompetitionAsync(db, agentClient, scoreEngine, competition, now, ct);
+                await PollCompetitionAsync(scope.ServiceProvider, db, agentClient, scoreEngine, competition, now, ct);
+                _lastPollByCompetition[competition.Id] = now;
             }
             catch (Exception ex)
             {
@@ -75,6 +84,7 @@ public sealed class KohPollEngine(
     }
 
     private async Task PollCompetitionAsync(
+        IServiceProvider scopedServices,
         ApplicationDbContext db,
         KohAgentClient agentClient,
         KohScoreEngine scoreEngine,
@@ -86,6 +96,23 @@ public sealed class KohPollEngine(
             .IgnoreQueryFilters()
             .Where(c => c.CompetitionId == competition.Id)
             .ToListAsync(ct);
+
+        var existingBoxCount = await db.AwdGameBoxes
+            .IgnoreQueryFilters()
+            .CountAsync(g => g.CompetitionId == competition.Id, ct);
+        if (existingBoxCount < challenges.Count)
+        {
+            var gameMode = scopedServices.GetRequiredService<KohGameMode>();
+            await gameMode.InitializeAsync(new GameContext(
+                CompetitionId: competition.Id,
+                GameMode: GameModeType.Koh,
+                StartTime: competition.StartTime,
+                EndTime: competition.EndTime,
+                Configuration: new Dictionary<string, string>
+                {
+                    ["PollIntervalSeconds"] = (competition.PollIntervalSeconds ?? 30).ToString()
+                }), ct);
+        }
 
         var gameBoxes = await db.AwdGameBoxes
             .IgnoreQueryFilters()

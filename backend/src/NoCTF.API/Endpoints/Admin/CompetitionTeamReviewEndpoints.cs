@@ -5,6 +5,7 @@ using NoCTF.API;
 using NoCTF.API.Permissions;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -72,6 +73,7 @@ public class ApproveCompetitionTeamEndpoint(
     ICompetitionPermissionService permissions,
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
+    ICtfScoreRebuilder ctfScoreRebuilder,
     IHubNotifierService hubNotifier)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
@@ -118,6 +120,7 @@ public class ApproveCompetitionTeamEndpoint(
             competitionId,
             leaderboardService,
             leaderboardCache,
+            ctfScoreRebuilder,
             hubNotifier,
             ct);
         await SendAsync(await ToDto(team.Id, dbContext, ct), cancellation: ct);
@@ -152,6 +155,7 @@ public class RejectCompetitionTeamEndpoint(
     ICompetitionPermissionService permissions,
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
+    ICtfScoreRebuilder ctfScoreRebuilder,
     IHubNotifierService hubNotifier)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
@@ -196,6 +200,7 @@ public class RejectCompetitionTeamEndpoint(
             competitionId,
             leaderboardService,
             leaderboardCache,
+            ctfScoreRebuilder,
             hubNotifier,
             ct);
         await SendAsync(await ApproveCompetitionTeamEndpoint.ToDto(team.Id, dbContext, ct), cancellation: ct);
@@ -208,9 +213,11 @@ internal static class TeamReviewLeaderboardRefresh
         Guid competitionId,
         ILeaderboardService leaderboardService,
         IRedisLeaderboardCache leaderboardCache,
+        ICtfScoreRebuilder ctfScoreRebuilder,
         IHubNotifierService hubNotifier,
         CancellationToken ct)
     {
+        await ctfScoreRebuilder.RebuildCompetitionAsync(competitionId, ct);
         var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
         await leaderboardCache.UpdateAsync(competitionId, entries, ct);
         await hubNotifier.NotifyLeaderboardSnapshotAsync(

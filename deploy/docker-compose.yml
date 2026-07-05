@@ -137,6 +137,13 @@ services:
       K8s__IngressBaseDomain: ${K8S_INGRESS_BASE_DOMAIN:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
     expose:
       - "8080"
 

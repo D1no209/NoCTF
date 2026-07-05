@@ -6,6 +6,8 @@ namespace NoCTF.API.Endpoints.Admin;
 
 internal static class ChallengeTemplateRequestRules
 {
+    private const int MaxJsonBytes = 64 * 1024;
+
     public static bool UsesRuntimeContainer(ChallengeDeploymentType deploymentType)
         => deploymentType is ChallengeDeploymentType.DynamicContainer or ChallengeDeploymentType.StaticContainer;
 
@@ -64,6 +66,9 @@ internal static class ChallengeTemplateRequestRules
     {
         if (string.IsNullOrWhiteSpace(json))
             return true;
+
+        if (System.Text.Encoding.UTF8.GetByteCount(json) > MaxJsonBytes)
+            return false;
 
         try
         {

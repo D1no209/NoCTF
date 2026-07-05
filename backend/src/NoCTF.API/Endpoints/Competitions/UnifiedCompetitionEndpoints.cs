@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Application.Scoring;
@@ -84,8 +85,10 @@ public class CompetitionActionResponse
 }
 
 public class PostCompetitionActionEndpoint(ApplicationDbContext db, ICompetitionModeRegistry modeRegistry)
-    : EndpointWithoutRequest<CompetitionActionResponse>
+    : EndpointWithoutRequest<CompetitionActionResponse>, IAuditableEndpoint
 {
+    private const int MaxActionPayloadBytes = 64 * 1024;
+
     public override void Configure()
     {
         Post("/api/competitions/{id}/actions/{actionKey}");
@@ -159,8 +162,33 @@ public class PostCompetitionActionEndpoint(ApplicationDbContext db, ICompetition
             return;
         }
 
-        using var document = await JsonDocument.ParseAsync(HttpContext.Request.Body, cancellationToken: ct);
-        var payloadJson = document.RootElement.GetRawText();
+        if (HttpContext.Request.ContentLength is > MaxActionPayloadBytes)
+        {
+            await SendAsync(new CompetitionActionResponse
+            {
+                Success = false,
+                Code = "payload_too_large"
+            }, 413, ct);
+            return;
+        }
+
+        string payloadJson;
+        try
+        {
+            using var document = await JsonDocument.ParseAsync(HttpContext.Request.Body, cancellationToken: ct);
+            payloadJson = document.RootElement.ValueKind == JsonValueKind.Object
+                ? document.RootElement.GetRawText()
+                : "{}";
+        }
+        catch (JsonException)
+        {
+            await SendAsync(new CompetitionActionResponse
+            {
+                Success = false,
+                Code = "invalid_json"
+            }, 400, ct);
+            return;
+        }
         var modeKey = string.IsNullOrWhiteSpace(competition.ModeKey)
             ? competition.GameModeType.ToString().ToLowerInvariant()
             : competition.ModeKey.Trim().ToLowerInvariant();

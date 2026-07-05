@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.API.Permissions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -15,6 +16,7 @@ public class DeleteTeamEndpoint(
     IContainerManager containerManager,
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
+    ICtfScoreRebuilder ctfScoreRebuilder,
     IHubNotifierService hubNotifier) : Endpoint<EmptyRequest>, IAuditableEndpoint
 {
     public override void Configure()
@@ -55,6 +57,7 @@ public class DeleteTeamEndpoint(
         await DeleteTeamArtifactsAsync(dbContext, team.CompetitionId, id, ct);
         dbContext.Teams.Remove(team);
         await dbContext.SaveChangesAsync(ct);
+        await ctfScoreRebuilder.RebuildCompetitionAsync(team.CompetitionId, ct);
         await RefreshLeaderboardAsync(team.CompetitionId, ct);
 
         await SendNoContentAsync(ct);

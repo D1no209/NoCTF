@@ -65,7 +65,17 @@ public class KohGameMode(
             {
                 try
                 {
-                    var config = new ContainerConfig(Image: challenge.ContainerImage);
+                    var config = new ContainerConfig(
+                        Image: challenge.ContainerImage,
+                        Labels: new Dictionary<string, string>
+                        {
+                            ["competitionId"] = context.CompetitionId.ToString(),
+                            ["challengeId"] = challenge.Id.ToString()
+                        },
+                        PortMappings: challenge.ExposedPort is > 0
+                            ? new Dictionary<int, int> { [challenge.ExposedPort.Value] = 0 }
+                            : null,
+                        OrchestrationJson: challenge.OrchestrationJson);
                     var instance = await containerManager.CreateContainerAsync(config, cancellationToken);
                     containerId = instance.ContainerId;
                 }

@@ -68,14 +68,21 @@ public static class ChallengeInstanceRuntime
         var configured = configuration["InstanceAccess:PublicHost"];
         if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim();
 
-        if (!configuration.GetValue("InstanceAccess:TrustRequestHost", false))
-            return "127.0.0.1";
-
         var requestHost = httpContext.Request.Host.Host;
+        if (!configuration.GetValue("InstanceAccess:TrustRequestHost", false) &&
+            !string.IsNullOrWhiteSpace(requestHost))
+        {
+            return requestHost;
+        }
+
         if (!string.IsNullOrWhiteSpace(requestHost) &&
             !IPAddress.IsLoopback(IPAddress.TryParse(requestHost, out var parsed) ? parsed : IPAddress.None) &&
             !requestHost.Equals("localhost", StringComparison.OrdinalIgnoreCase))
             return requestHost;
+
+        var environment = configuration["ASPNETCORE_ENVIRONMENT"];
+        if (!string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
 
         return requestHost.Equals("localhost", StringComparison.OrdinalIgnoreCase) ? "localhost" : requestHost;
     }
@@ -95,7 +102,9 @@ public static class ChallengeInstanceRuntime
             : null;
         var addresses = entryUrl is not null
             ? [entryUrl]
-            : ports.Values
+            : string.IsNullOrWhiteSpace(host)
+                ? []
+                : ports.Values
                 .Where(port => port > 0)
                 .Select(port => $"{FormatHost(host)}:{port}")
                 .ToList();

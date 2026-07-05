@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICompetitionScoringProfileResolver, CompetitionScoringProfileResolver>();
         services.AddScoped<IScoreSignalEmitter, ScoreSignalEmitter>();
         services.AddScoped<IScoreEventWriter, ScoreEventWriter>();
+        services.AddScoped<ICtfScoreRebuilder, CtfScoreRebuilder>();
         services.AddScoped<IScoringStrategy, DecaySolveScoringStrategy>();
         services.AddScoped<IScoringStrategy, BloodBonusScoringStrategy>();
         services.AddScoped<IScoringStrategy, RoundAccumulationScoringStrategy>();

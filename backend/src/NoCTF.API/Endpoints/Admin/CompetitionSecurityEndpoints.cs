@@ -4,6 +4,7 @@ using NoCTF.API;
 using NoCTF.API.Permissions;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 
@@ -142,6 +143,7 @@ public class BanCompetitionTeamEndpoint(
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
     IHubNotifierService hubNotifier,
+    ICtfScoreRebuilder ctfScoreRebuilder,
     IContainerManager containerManager)
     : Endpoint<TeamBanRequest, TeamAdminDto>, IAuditableEndpoint
 {
@@ -206,6 +208,7 @@ public class BanCompetitionTeamEndpoint(
             userId: team.BannedById,
             metadata: new { team.BannedReason });
         await db.SaveChangesAsync(ct);
+        await ctfScoreRebuilder.RebuildCompetitionAsync(competitionId, ct);
         await RefreshLeaderboardAsync(competitionId, ct);
         await SendAsync(await ApproveCompetitionTeamEndpoint.ToDto(team.Id, db, ct), cancellation: ct);
     }
@@ -231,6 +234,7 @@ public class UnbanCompetitionTeamEndpoint(
     ICompetitionPermissionService permissions,
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
+    ICtfScoreRebuilder ctfScoreRebuilder,
     IHubNotifierService hubNotifier)
     : EndpointWithoutRequest<TeamAdminDto>, IAuditableEndpoint
 {
@@ -270,6 +274,7 @@ public class UnbanCompetitionTeamEndpoint(
             $"Team {team.Name} was unbanned for this competition.",
             teamId: team.Id);
         await db.SaveChangesAsync(ct);
+        await ctfScoreRebuilder.RebuildCompetitionAsync(competitionId, ct);
         await RefreshLeaderboardAsync(competitionId, ct);
         await SendAsync(await ApproveCompetitionTeamEndpoint.ToDto(team.Id, db, ct), cancellation: ct);
     }

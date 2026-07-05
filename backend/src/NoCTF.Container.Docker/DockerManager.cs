@@ -39,6 +39,7 @@ public class DockerManager(DockerProvider provider) : IContainerManager
 
     public async Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
     {
+        config = config with { Labels = DockerProvider.WithManagedLabels(config.Labels) };
         var client = provider.CreateClient();
 
         var createParams = new CreateContainerParameters
@@ -154,6 +155,7 @@ public class DockerManager(DockerProvider provider) : IContainerManager
 
     public async Task<ComposeDeployment> ComposeUpAsync(ComposeConfig config, CancellationToken cancellationToken = default)
     {
+        DockerComposeRunner.ValidateProjectName(config.ProjectName);
         DockerComposeRunner.ValidateComposeYaml(config.ComposeYaml);
 
         await DockerComposeRunner.RunAsync(
@@ -179,6 +181,10 @@ public class DockerManager(DockerProvider provider) : IContainerManager
 
     public async Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken cancellationToken = default)
     {
+        DockerComposeRunner.ValidateProjectName(deployment.ProjectName);
+        if (!deployment.ProjectName.StartsWith("noctf-", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Refusing to destroy unmanaged compose project '{deployment.ProjectName}'.");
+
         await DockerComposeRunner.RunAsync(
             deployment.ComposeYaml,
             deployment.ProjectName,

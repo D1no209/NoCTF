@@ -104,6 +104,10 @@ public class AwdGameMode : IGameMode
         if (latestRound is null)
             return SubmissionResult.WrongFlag;
 
+        var totalRounds = competition.TotalRounds ?? 10;
+        if (latestRound.Status != AwdRoundStatus.Running || latestRound.RoundNumber > totalRounds)
+            return SubmissionResult.CompetitionEnded;
+
         int currentRound = latestRound.RoundNumber;
 
         // Flag validity window check

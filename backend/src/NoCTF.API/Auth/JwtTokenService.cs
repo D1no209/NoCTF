@@ -25,6 +25,7 @@ public class JwtTokenService(IConfiguration configuration)
             new Claim(ClaimTypes.Name, user.UserName),
             new Claim("role", user.Role.ToString()),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim("token_version", user.TokenVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

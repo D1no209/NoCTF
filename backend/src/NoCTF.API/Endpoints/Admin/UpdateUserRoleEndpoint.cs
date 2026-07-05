@@ -40,6 +40,7 @@ public class UpdateUserRoleEndpoint(ApplicationDbContext dbContext) : Endpoint<U
         }
 
         user.Role = newRole;
+        user.TokenVersion++;
         user.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(ct);
 

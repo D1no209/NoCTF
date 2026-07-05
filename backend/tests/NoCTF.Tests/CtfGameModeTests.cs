@@ -168,6 +168,7 @@ public class CtfGameModeTests
             db,
             new NoopSubmissionEventHandler(),
             new NoopScoreSignalEmitter(),
+            new NoopCtfScoreRebuilder(),
             new ChallengeSubmissionHandlerRegistry([]));
 
     private static SubmissionContext CreateContext(
@@ -244,6 +245,15 @@ public class CtfGameModeTests
                 PayloadJson = signal.PayloadJson,
                 IdempotencyKey = signal.IdempotencyKey
             });
+    }
+
+    private sealed class NoopCtfScoreRebuilder : ICtfScoreRebuilder
+    {
+        public Task RebuildCompetitionAsync(Guid competitionId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task RebuildChallengeAsync(Guid competitionId, Guid challengeId, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }
 
