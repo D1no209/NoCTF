@@ -49,7 +49,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { competitionStatusVariant, registrationStatusVariant, runtimeStatusVariant } from '@/lib/statusTones'
+import {
+  competitionStatusVariant,
+  registrationStatusVariant,
+  runtimeStatusVariant,
+} from '@/lib/statusTones'
 
 interface PointsConfigDto {
   initialPoints: number
@@ -475,8 +479,7 @@ const filteredCompetitionChallenges = computed(() => {
   const direction = challengeDirectionFilter.value.toLowerCase()
 
   return (competitionChallenges.value ?? []).filter((challenge) => {
-    const matchesDirection =
-      direction === 'all' || challenge.typeId?.toLowerCase() === direction
+    const matchesDirection = direction === 'all' || challenge.typeId?.toLowerCase() === direction
     const matchesKeyword =
       !keyword ||
       challenge.title.toLowerCase().includes(keyword) ||
@@ -1044,7 +1047,7 @@ function sectionRoute(section: CompetitionDetailSection) {
 <template>
   <div class="noctf-admin-page">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div class="space-y-2">
+      <div class="min-w-0 space-y-2">
         <Button
           variant="ghost"
           size="sm"
@@ -1055,18 +1058,22 @@ function sectionRoute(section: CompetitionDetailSection) {
           {{ t('admin.competitions.title') }}
         </Button>
         <div>
-          <h2 class="text-2xl font-bold tracking-tight">
+          <h2 class="break-words text-2xl font-bold tracking-tight">
             {{ competition?.title ?? t('admin.competitionDetail.fallbackTitle') }}
           </h2>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
         <Button v-if="canOpenAwdpScreen" variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'awdp-screen', params: { gameId: competitionId } }">
             {{ t('awdp.screenEntry') }}
           </RouterLink>
         </Button>
-        <Badge v-if="competition?.status" :variant="competitionStatusVariant(competition.status)" class="capitalize">
+        <Badge
+          v-if="competition?.status"
+          :variant="competitionStatusVariant(competition.status)"
+          class="capitalize"
+        >
           {{ competition.status }}
         </Badge>
       </div>
@@ -1162,37 +1169,37 @@ function sectionRoute(section: CompetitionDetailSection) {
               </div>
               <div class="grid gap-0 md:grid-cols-2">
                 <div class="space-y-3 p-4">
-                  <div class="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 text-sm">
+                  <div class="grid gap-1 text-sm sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3">
                     <span class="text-muted-foreground">{{
                       t('admin.competitions.gameMode')
                     }}</span>
                     <span class="font-medium">{{ competition?.gameModeType ?? '-' }}</span>
                   </div>
-                  <div class="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 text-sm">
+                  <div class="grid gap-1 text-sm sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3">
                     <span class="text-muted-foreground">{{
                       t('admin.competitions.startTime')
                     }}</span>
                     <span class="font-medium">{{ formatDate(competition?.startTime) }}</span>
                   </div>
-                  <div class="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 text-sm">
+                  <div class="grid gap-1 text-sm sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3">
                     <span class="text-muted-foreground">{{ t('admin.competitions.endTime') }}</span>
                     <span class="font-medium">{{ formatDate(competition?.endTime) }}</span>
                   </div>
                 </div>
                 <div class="space-y-3 border-t border-border/80 p-4 md:border-l md:border-t-0">
-                  <div class="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 text-sm">
+                  <div class="grid gap-1 text-sm sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3">
                     <span class="text-muted-foreground">{{
                       t('admin.competitionDetail.minimumPoints')
                     }}</span>
                     <span class="font-medium">{{ competitionForm.minimumPoints }}</span>
                   </div>
-                  <div class="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 text-sm">
+                  <div class="grid gap-1 text-sm sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3">
                     <span class="text-muted-foreground">{{
                       t('admin.competitionDetail.initialPoints')
                     }}</span>
                     <span class="font-medium">{{ competitionForm.initialPoints }}</span>
                   </div>
-                  <div class="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 text-sm">
+                  <div class="grid gap-1 text-sm sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3">
                     <span class="text-muted-foreground">{{
                       t('admin.competitionDetail.difficultyCoefficient')
                     }}</span>

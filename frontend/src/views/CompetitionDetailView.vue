@@ -395,20 +395,23 @@ function withChallengeProgress(challenge: Challenge): Challenge {
     </div>
     <div
       v-else-if="competition"
-      class="noctf-panel flex flex-col justify-between gap-6 rounded-xl p-6 md:flex-row md:items-center"
+      class="noctf-panel flex flex-col justify-between gap-5 rounded-lg p-4 sm:gap-6 sm:p-6 md:flex-row md:items-center"
     >
-      <div class="flex items-start gap-5">
-        <div class="noctf-logo size-16 rounded-2xl" />
+      <div class="flex min-w-0 items-start gap-3 sm:gap-5">
+        <div class="noctf-logo size-12 rounded-xl sm:size-16 sm:rounded-2xl" />
         <PageHeader :title="competition.title" :description="competition.description">
           <template #actions>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
               <Badge
                 :variant="competitionStatusVariant(competition.status)"
                 class="px-2.5 py-1 text-sm font-semibold"
               >
                 {{ competition.status }}
               </Badge>
-              <Badge :variant="gameModeVariant(competition.gameModeType)" class="px-2.5 py-1 text-sm">
+              <Badge
+                :variant="gameModeVariant(competition.gameModeType)"
+                class="px-2.5 py-1 text-sm"
+              >
                 {{ competition.gameModeType }}
               </Badge>
               <Button v-if="isAwdpMode" variant="outline" size="sm" as-child>
@@ -423,13 +426,13 @@ function withChallengeProgress(challenge: Challenge): Challenge {
       </div>
 
       <div class="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-        <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
+        <div class="flex min-w-0 items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 sm:px-4">
           <Calendar class="size-4 text-primary" />
-          <span
+          <span class="min-w-0 break-words"
             >{{ formatDate(competition.startTime) }} ~ {{ formatDate(competition.endTime) }}</span
           >
         </div>
-        <div class="flex items-center gap-2 rounded-lg bg-muted/60 px-4 py-2">
+        <div class="flex min-w-0 items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 sm:px-4">
           <CheckCircle2 class="size-4 text-success" />
           <span
             >{{ solvedIds.size }} / {{ challenges?.length || 0 }} {{ t('challenges.solved') }}</span
@@ -484,12 +487,14 @@ function withChallengeProgress(challenge: Challenge): Challenge {
             <div class="mb-3 px-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               {{ t('challenges.directions') }}
             </div>
-            <div class="space-y-1">
+            <div
+              class="noctf-scrollbar flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0"
+            >
               <button
                 v-for="item in directionOptions"
                 :key="item.direction"
                 type="button"
-                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                class="flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted lg:w-full"
                 :class="
                   activeDirection === item.direction
                     ? 'bg-primary text-primary-foreground hover:bg-primary'
@@ -505,7 +510,7 @@ function withChallengeProgress(challenge: Challenge): Challenge {
             </div>
             <button
               type="button"
-              class="mt-4 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+              class="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-muted lg:mt-4"
               :class="
                 hideSolved ? 'border-primary/50 bg-primary/5 text-primary' : 'text-muted-foreground'
               "

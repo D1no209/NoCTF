@@ -78,7 +78,9 @@ async function handleLogout() {
           <div
             class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden"
           >
-            <span class="truncate text-xl font-bold tracking-tight text-sidebar-foreground">NoCTF</span>
+            <span class="truncate text-xl font-bold tracking-tight text-sidebar-foreground"
+              >NoCTF</span
+            >
             <span
               class="mt-0.5 inline-flex w-fit rounded-md bg-sidebar-foreground/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/75"
               >{{ t('nav.admin') }}</span
@@ -104,7 +106,9 @@ async function handleLogout() {
         class="space-y-4 border-t border-sidebar-foreground/10 p-4 group-data-[collapsible=icon]:p-2"
       >
         <div class="group-data-[collapsible=icon]:hidden">
-          <div class="mb-3 rounded-lg border border-sidebar-foreground/10 bg-sidebar-foreground/5 p-3">
+          <div
+            class="mb-3 rounded-lg border border-sidebar-foreground/10 bg-sidebar-foreground/5 p-3"
+          >
             <div class="flex items-center gap-3">
               <div
                 class="flex size-9 items-center justify-center rounded-full bg-sidebar-foreground text-sidebar font-semibold"
@@ -144,23 +148,23 @@ async function handleLogout() {
 
     <SidebarInset>
       <header
-        class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 px-4"
+        class="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-1 border-b bg-background/95 px-3 sm:h-16 sm:gap-2 sm:px-4"
       >
         <SidebarTrigger class="-ml-1" />
-        <div class="h-4 w-px bg-border mx-2" />
+        <div class="mx-1 hidden h-4 w-px bg-border sm:block md:mx-2" />
         <div class="flex min-w-0 flex-1 items-center gap-3">
-          <h1 class="truncate text-xl font-bold tracking-tight">
+          <h1 class="truncate text-lg font-bold tracking-tight sm:text-xl">
             {{ navItems.find((i) => i.to === route.path)?.label || 'Admin' }}
           </h1>
           <span
             v-if="isAdmin"
-            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold noctf-status-danger"
+            class="hidden items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold noctf-status-danger sm:inline-flex"
           >
             <BadgeCheck class="size-3.5" />
             {{ t('nav.admin') }}
           </span>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex shrink-0 items-center gap-2 sm:gap-4">
           <RouterLink
             to="/competitions"
             class="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:inline"
@@ -172,7 +176,7 @@ async function handleLogout() {
         </div>
       </header>
 
-      <main class="flex-1 p-4 md:p-6 lg:p-8">
+      <main class="flex-1 p-3 sm:p-4 md:p-6 lg:p-8">
         <RouterView v-slot="{ Component }">
           <transition name="fade" mode="out-in">
             <component :is="Component" />

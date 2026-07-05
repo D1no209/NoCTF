@@ -407,4 +407,83 @@
   .noctf-scrollbar::-webkit-scrollbar-thumb:hover {
     background: color-mix(in oklch, var(--muted-foreground) 36%, transparent);
   }
+
+  @media (max-width: 640px) {
+    .noctf-page,
+    .noctf-page-wide {
+      @apply space-y-4 px-3 py-4;
+    }
+
+    .noctf-admin-page {
+      @apply space-y-4;
+    }
+
+    .noctf-section {
+      @apply p-4;
+    }
+
+    .noctf-workbench,
+    .noctf-surface,
+    .noctf-surface-plain,
+    .noctf-table-shell,
+    .noctf-status-strip,
+    .noctf-filter-bar,
+    .noctf-toolbar,
+    .noctf-live-card {
+      @apply rounded-md;
+    }
+
+    .noctf-state-box {
+      @apply min-h-32 px-3 py-6;
+    }
+
+    .noctf-kpi,
+    .noctf-fieldset,
+    .noctf-row-panel,
+    .noctf-danger-panel {
+      @apply p-3;
+    }
+
+    .noctf-status-item {
+      @apply p-3;
+    }
+
+    .noctf-top-tabs {
+      @apply flex-nowrap items-stretch gap-4 overflow-x-auto pb-px;
+      margin-inline: -0.25rem;
+      padding-inline: 0.25rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .noctf-top-tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .noctf-top-tab {
+      @apply min-h-11 shrink-0 whitespace-nowrap pb-3 pt-2;
+    }
+
+    .noctf-segmented {
+      @apply w-full;
+    }
+
+    .noctf-segmented-button {
+      @apply min-h-11 px-2;
+    }
+
+    .noctf-table-shell {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .noctf-table-shell table {
+      min-width: 42rem;
+    }
+
+    .noctf-table-shell th,
+    .noctf-table-shell td {
+      padding-inline: 0.75rem;
+    }
+  }
 }

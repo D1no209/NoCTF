@@ -74,9 +74,9 @@ function statusVariant(status: string): 'success' | 'warning' | 'destructive' {
 function isHealthResponse(value: unknown): value is HealthResponse {
   return Boolean(
     value &&
-      typeof value === 'object' &&
-      typeof (value as HealthResponse).status === 'string' &&
-      Array.isArray((value as HealthResponse).checks),
+    typeof value === 'object' &&
+    typeof (value as HealthResponse).status === 'string' &&
+    Array.isArray((value as HealthResponse).checks),
   )
 }
 
@@ -112,7 +112,7 @@ function getServiceIcon(name: string) {
 
 <template>
   <div class="noctf-admin-page">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
       <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">
           {{ t('admin.health.title') }}
@@ -121,7 +121,7 @@ function getServiceIcon(name: string) {
           {{ t('admin.health.subtitle') }}
         </p>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
         <div
           v-if="lastUpdated"
           class="flex items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
@@ -147,11 +147,7 @@ function getServiceIcon(name: string) {
       >
         <div
           class="flex size-11 shrink-0 items-center justify-center rounded-md"
-          :class="
-            overallHealthy
-              ? 'bg-success-muted text-success'
-              : 'bg-danger-muted text-danger'
-          "
+          :class="overallHealthy ? 'bg-success-muted text-success' : 'bg-danger-muted text-danger'"
         >
           <HeartPulse class="size-5" />
         </div>
@@ -249,7 +245,12 @@ function getServiceIcon(name: string) {
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
-              <path d="M7.1 14.6h.1" stroke="var(--info-foreground)" stroke-width="2" stroke-linecap="round" />
+              <path
+                d="M7.1 14.6h.1"
+                stroke="var(--info-foreground)"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
             </svg>
             <component v-else :is="getServiceIcon(check.name)" class="size-4" />
           </div>
@@ -261,10 +262,7 @@ function getServiceIcon(name: string) {
           </div>
         </div>
         <div class="flex items-center gap-2 md:justify-end">
-          <Badge
-            :variant="statusVariant(check.status)"
-            class="uppercase"
-          >
+          <Badge :variant="statusVariant(check.status)" class="uppercase">
             {{ check.status }}
           </Badge>
           <span class="text-xs text-muted-foreground">

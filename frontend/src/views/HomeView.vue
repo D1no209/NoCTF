@@ -10,7 +10,11 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { competitionStatusVariant, gameModeVariant, registrationStatusVariant } from '@/lib/statusTones'
+import {
+  competitionStatusVariant,
+  gameModeVariant,
+  registrationStatusVariant,
+} from '@/lib/statusTones'
 import { ArrowRight, Calendar, LayoutDashboard, Trophy, Users } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -93,7 +97,7 @@ function formatDate(iso: string) {
     <div class="noctf-page">
       <section class="noctf-workbench">
         <div class="grid lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div class="border-b border-border/80 p-5 md:p-6 lg:border-b-0 lg:border-r">
+          <div class="border-b border-border/80 p-4 md:p-6 lg:border-b-0 lg:border-r">
             <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
               <div class="max-w-3xl space-y-3">
                 <p class="noctf-label">{{ t('home.badge') }}</p>
@@ -104,20 +108,25 @@ function formatDate(iso: string) {
                   {{ t('home.subtitle') }}
                 </p>
               </div>
-              <div class="flex flex-wrap gap-2">
-                <Button as-child>
+              <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Button class="justify-start sm:justify-center" as-child>
                   <RouterLink to="/competitions">
                     <Trophy class="size-4" />
                     {{ t('home.browseCompetitions') }}
                   </RouterLink>
                 </Button>
-                <Button variant="outline" as-child>
+                <Button variant="outline" class="justify-start sm:justify-center" as-child>
                   <RouterLink to="/teams">
                     <Users class="size-4" />
                     {{ t('home.manageTeams') }}
                   </RouterLink>
                 </Button>
-                <Button v-if="canManage" variant="secondary" as-child>
+                <Button
+                  v-if="canManage"
+                  variant="secondary"
+                  class="justify-start sm:justify-center"
+                  as-child
+                >
                   <RouterLink to="/admin">
                     <LayoutDashboard class="size-4" />
                     {{ t('nav.admin') }}
@@ -131,7 +140,7 @@ function formatDate(iso: string) {
             <div class="border-b border-border/80 px-4 py-3">
               <h2 class="text-sm font-semibold">{{ t('home.statusTitle') }}</h2>
             </div>
-            <div class="grid grid-cols-3 divide-x divide-border/80">
+            <div class="grid divide-y divide-border/80 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               <div class="p-4">
                 <div class="text-2xl font-bold tabular-nums">{{ teams?.length ?? 0 }}</div>
                 <div class="mt-1 text-xs text-muted-foreground">{{ t('home.joinedTeams') }}</div>
@@ -186,7 +195,9 @@ function formatDate(iso: string) {
                   <Badge :variant="competitionStatusVariant(competition.status)">{{
                     competition.status
                   }}</Badge>
-                  <Badge :variant="gameModeVariant(competition.gameModeType)">{{ competition.gameModeType || 'CTF' }}</Badge>
+                  <Badge :variant="gameModeVariant(competition.gameModeType)">{{
+                    competition.gameModeType || 'CTF'
+                  }}</Badge>
                 </div>
                 <div class="flex items-center gap-2 text-xs text-muted-foreground">
                   <Calendar class="size-3.5" />
@@ -196,7 +207,7 @@ function formatDate(iso: string) {
                   >
                 </div>
               </div>
-              <div class="flex flex-wrap gap-2">
+              <div class="grid gap-2 sm:flex sm:flex-wrap">
                 <Button size="sm" variant="outline" as-child>
                   <RouterLink :to="`/competitions/${competition.id}/register`">
                     {{ t('teams.registerForCompetition') }}

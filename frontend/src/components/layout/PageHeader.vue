@@ -22,13 +22,18 @@ defineProps<{
         {{ backLabel }}
       </RouterLink>
       <div>
-        <h1 class="truncate text-2xl font-bold tracking-tight md:text-3xl">{{ title }}</h1>
+        <h1 class="break-words text-2xl font-bold tracking-tight sm:truncate md:text-3xl">
+          {{ title }}
+        </h1>
         <p v-if="description" class="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
           {{ description }}
         </p>
       </div>
     </div>
-    <div v-if="$slots.actions" class="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+    <div
+      v-if="$slots.actions"
+      class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end"
+    >
       <slot name="actions" />
     </div>
   </header>
