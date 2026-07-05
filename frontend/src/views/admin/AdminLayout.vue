@@ -80,7 +80,7 @@ async function handleLogout() {
           >
             <span class="truncate text-xl font-bold tracking-tight text-white">NoCTF</span>
             <span
-              class="mt-0.5 inline-flex w-fit rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300"
+              class="mt-0.5 inline-flex w-fit rounded-md bg-sidebar-foreground/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/75"
               >{{ t('nav.admin') }}</span
             >
           </div>
@@ -115,7 +115,7 @@ async function handleLogout() {
                 <div class="truncate text-sm font-semibold text-white">
                   {{ auth.user?.userName ?? 'Admin' }}
                 </div>
-                <div class="text-xs text-slate-400">
+                <div class="text-xs text-sidebar-foreground/60">
                   {{ auth.userRole }}
                 </div>
               </div>
@@ -154,7 +154,7 @@ async function handleLogout() {
           </h1>
           <span
             v-if="isAdmin"
-            class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-600"
+            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold noctf-status-danger"
           >
             <BadgeCheck class="size-3.5" />
             {{ t('nav.admin') }}

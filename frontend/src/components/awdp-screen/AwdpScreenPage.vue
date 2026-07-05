@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import AwdpAtmosphereCanvas from '@/components/awdp-screen/AwdpAtmosphereCanvas.vue'
 import AwdpBattleMapPanel from '@/components/awdp-screen/AwdpBattleMapPanel.vue'
 import AwdpChallengeMatrixPanel from '@/components/awdp-screen/AwdpChallengeMatrixPanel.vue'
 import AwdpEventStreamPanel from '@/components/awdp-screen/AwdpEventStreamPanel.vue'
@@ -25,6 +26,7 @@ const {
   scoreboard,
   challenges,
   recentEvents,
+  animationEvents,
   roundTimeline,
   remainingSeconds,
   isLoading,
@@ -46,6 +48,12 @@ const {
   />
   <main v-else-if="game && stats" class="awdp-screen-shell">
     <div class="awdp-screen-bg" />
+    <AwdpAtmosphereCanvas
+      :events="animationEvents.length ? animationEvents : recentEvents"
+      :teams="scoreboard"
+      :challenges="challenges"
+      :connection-status="connectionStatus"
+    />
     <div class="awdp-screen-frame">
       <AwdpScreenHeader
         :game="game"
@@ -104,6 +112,7 @@ const {
 .awdp-screen-bg {
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
   background:
     linear-gradient(var(--awdp-screen-grid) 1px, transparent 1px),
@@ -115,10 +124,10 @@ const {
 .awdp-screen-frame,
 .awdp-screen-frame > * {
   position: relative;
-  z-index: 1;
 }
 
 .awdp-screen-frame {
+  z-index: 1;
   display: grid;
   gap: clamp(0.42rem, 0.62vw, 0.75rem);
   width: min(100%, calc(100vw - 1.8rem), calc((100dvh - 1.8rem) * 16 / 9));

@@ -76,10 +76,10 @@ function openDestroy(c: ContainerDto) {
   destroyDialog.value = true
 }
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusVariant(status: string): 'default' | 'success' | 'warning' | 'destructive' | 'outline' {
   const s = status.toLowerCase()
-  if (s === 'running' || s === 'active') return 'default'
-  if (s === 'created' || s === 'paused') return 'secondary'
+  if (s === 'running' || s === 'active') return 'success'
+  if (s === 'created' || s === 'paused') return 'warning'
   if (s === 'exited' || s === 'dead') return 'destructive'
   return 'outline'
 }
@@ -171,7 +171,7 @@ const table = useVueTable({
         </div>
       </div>
       <div class="noctf-status-item border-b lg:border-b-0 lg:border-r">
-        <div class="rounded-md bg-emerald-500/10 p-2 text-emerald-600">
+        <div class="rounded-md bg-success-muted p-2 text-success">
           <Activity class="size-5" />
         </div>
         <div class="min-w-0">

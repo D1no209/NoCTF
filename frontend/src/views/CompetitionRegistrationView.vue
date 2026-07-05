@@ -181,7 +181,7 @@ async function copyToken(token: string) {
               </div>
 
               <div v-else-if="currentTeam" class="space-y-5">
-                <div class="rounded-xl border border-slate-900/10 bg-background/75 p-5">
+                <div class="rounded-xl border border-border/90 bg-background/75 p-5">
                   <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div class="space-y-2">
                       <div class="flex flex-wrap items-center gap-2">
@@ -224,7 +224,7 @@ async function copyToken(token: string) {
               </div>
 
               <div v-else class="grid gap-6 xl:grid-cols-2">
-                <div class="space-y-3 rounded-xl border border-slate-900/10 bg-background/75 p-4">
+                <div class="space-y-3 rounded-xl border border-border/90 bg-background/75 p-4">
                   <div class="flex items-center gap-2 font-semibold">
                     <UserPlus class="size-4 text-primary" />
                     {{ t('teams.createForCompetition') }}
@@ -248,7 +248,7 @@ async function copyToken(token: string) {
                   </Button>
                 </div>
 
-                <div class="space-y-3 rounded-xl border border-slate-900/10 bg-background/75 p-4">
+                <div class="space-y-3 rounded-xl border border-border/90 bg-background/75 p-4">
                   <div class="flex items-center gap-2 font-semibold">
                     <KeyRound class="size-4 text-primary" />
                     {{ t('teams.joinExistingTeam') }}

@@ -366,9 +366,9 @@ function enqueueAttackFailed(reason: string) {
 
         <!-- Upload Patch (AWDP) -->
         <transition name="slide-up">
-          <Card v-if="isAwdp" class="noctf-panel border-blue-500/10">
+          <Card v-if="isAwdp" class="noctf-panel border-info/20">
             <CardHeader>
-              <CardTitle class="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+              <CardTitle class="flex items-center gap-2 text-info">
                 <Upload class="size-5" />
                 {{ t('awd.uploadPatch') }}
               </CardTitle>
@@ -425,7 +425,7 @@ function enqueueAttackFailed(reason: string) {
 
               <Button
                 variant="secondary"
-                class="w-full bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+                class="w-full bg-info text-info-foreground hover:bg-info/90"
                 :disabled="patchLoading || !patchFile || !patchChallenge"
                 @click="submitPatch"
               >

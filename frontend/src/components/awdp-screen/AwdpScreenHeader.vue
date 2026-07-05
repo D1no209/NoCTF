@@ -55,22 +55,22 @@ const timeText = computed(() => {
 
     <div class="header-metrics">
       <div class="awdp-header-metric">
-        <Clock3 class="size-4 text-slate-300" />
+        <Clock3 class="size-4 text-sidebar-foreground/75" />
         <span>Round</span>
         <strong>{{ game.currentRound }} / {{ game.totalRounds }}</strong>
       </div>
       <div class="awdp-header-metric">
-        <Users class="size-4 text-slate-300" />
+        <Users class="size-4 text-sidebar-foreground/75" />
         <span>Teams</span>
         <strong>{{ stats.teamCount }}</strong>
       </div>
       <div class="awdp-header-metric">
-        <Flag class="size-4 text-slate-300" />
+        <Flag class="size-4 text-sidebar-foreground/75" />
         <span>Challenges</span>
         <strong>{{ stats.challengeCount }}</strong>
       </div>
       <div class="awdp-header-metric">
-        <Swords class="size-4 text-slate-300" />
+        <Swords class="size-4 text-sidebar-foreground/75" />
         <span>Break</span>
         <strong>{{ stats.totalAttackCount }}</strong>
       </div>

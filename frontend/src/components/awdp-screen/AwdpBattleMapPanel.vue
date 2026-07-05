@@ -148,10 +148,10 @@ function modeIcon(mode?: SenseMode) {
   <section class="awdp-panel sense-panel" :class="panelClass">
     <div class="sense-header">
       <div>
-        <h2 class="text-sm font-semibold text-slate-100">
+        <h2 class="text-sm font-semibold text-sidebar-foreground">
           Center realtime sensing
         </h2>
-        <p class="text-xs text-slate-500">
+        <p class="text-xs text-sidebar-foreground/45">
           Break, fix, and service results only
         </p>
       </div>

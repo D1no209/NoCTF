@@ -101,11 +101,11 @@ function statusLabel(status: string) {
 
 function statusToneClass(status: string) {
   const key = status.toLowerCase()
-  if (key === 'running' || key === 'active') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  if (key === 'published' || key === 'upcoming') return 'border-blue-200 bg-blue-50 text-blue-700'
-  if (key === 'paused' || key === 'pending') return 'border-amber-200 bg-amber-50 text-amber-700'
-  if (key === 'finished' || key === 'ended') return 'border-slate-200 bg-slate-50 text-slate-600'
-  return 'border-violet-200 bg-violet-50 text-violet-700'
+  if (key === 'running' || key === 'active') return 'noctf-status-badge-success'
+  if (key === 'published' || key === 'upcoming') return 'noctf-status-badge-info'
+  if (key === 'paused' || key === 'pending') return 'noctf-status-badge-warning'
+  if (key === 'finished' || key === 'ended') return 'noctf-status-badge-neutral'
+  return 'noctf-status-badge-info'
 }
 
 function formatDate(iso: string) {
