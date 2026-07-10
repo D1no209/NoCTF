@@ -218,8 +218,9 @@ internal static class TeamReviewLeaderboardRefresh
         CancellationToken ct)
     {
         await ctfScoreRebuilder.RebuildCompetitionAsync(competitionId, ct);
+        var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(competitionId, ct);
         var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
-        await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+        await leaderboardCache.UpdateAsync(competitionId, entries, cacheVersion, ct);
         await hubNotifier.NotifyLeaderboardSnapshotAsync(
             competitionId,
             entries.Select(e => new LeaderboardEntryPayload(

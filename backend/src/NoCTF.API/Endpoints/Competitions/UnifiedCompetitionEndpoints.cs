@@ -36,6 +36,7 @@ public class GetCompetitionCapabilitiesEndpoint(
     {
         Get("/api/competitions/{id}/capabilities");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetCompetitionCapabilitiesRequest req, CancellationToken ct)
@@ -233,6 +234,7 @@ public class GetCompetitionViewEndpoint(ApplicationDbContext db, ICompetitionMod
     {
         Get("/api/competitions/{id}/views/{viewKey}");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(CancellationToken ct)
@@ -308,6 +310,7 @@ public class GetCompetitionScoreboardEndpoint(ILeaderboardProjectionBuilder proj
     {
         Get("/api/competitions/{id}/scoreboard");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetCompetitionScoreboardRequest req, CancellationToken ct)

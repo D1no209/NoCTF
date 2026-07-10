@@ -76,7 +76,35 @@ public class UpdateCompetitionEndpoint(
             return;
         }
 
-        competition.Title = req.Title;
+        foreach (var error in CompetitionRequestRules.Validate(
+                     req.Title,
+                     req.StartTime,
+                     req.EndTime,
+                     req.DefaultPointsConfig,
+                     req.MaxTeamMembers,
+                     req.RoundDurationSeconds,
+                     req.TotalRounds,
+                     req.AwdpMaxAttackAttempts,
+                     req.AwdpMaxDefenseAttempts,
+                     req.AwdpFixTimeoutSeconds,
+                     req.AttackPoints,
+                     req.ServiceOnlinePoints,
+                     req.ServiceDownPenalty,
+                     req.BeenAttackedPenalty,
+                     req.AwdpAttackScorePerRound,
+                     req.AwdpDefenseScorePerRound,
+                     req.AwdpServicePenaltyPerRound,
+                     req.AwdpViolationPenalty))
+        {
+            AddError(error);
+        }
+        if (ValidationFailed)
+        {
+            await SendErrorsAsync(400, ct);
+            return;
+        }
+
+        competition.Title = req.Title.Trim();
         competition.Description = req.Description;
         competition.StartTime = req.StartTime;
         competition.EndTime = req.EndTime;

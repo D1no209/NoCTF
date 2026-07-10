@@ -53,7 +53,10 @@ public class UpdateCompetitionChallengeRequest
     public List<string> Hints { get; set; } = [];
 }
 
-public class GetCompetitionChallengesAdminEndpoint(ApplicationDbContext db, ICompetitionPermissionService permissions)
+public class GetCompetitionChallengesAdminEndpoint(
+    ApplicationDbContext db,
+    ICompetitionPermissionService permissions,
+    IStorageProvider storageProvider)
     : EndpointWithoutRequest<List<CompetitionChallengeAdminDto>>
 {
     public override void Configure()
@@ -85,13 +88,23 @@ public class GetCompetitionChallengesAdminEndpoint(ApplicationDbContext db, ICom
             .Where(h => h.CompetitionId == competitionId && challengeIds.Contains(h.ChallengeId))
             .ToListAsync(ct);
 
-        await SendAsync(challenges
-            .Select(c => ChallengeAdminMapping.ToCompetitionDto(c, hints.Where(h => h.ChallengeId == c.Id)))
-            .ToList(), cancellation: ct);
+        var response = new List<CompetitionChallengeAdminDto>(challenges.Count);
+        foreach (var challenge in challenges)
+        {
+            var dto = ChallengeAdminMapping.ToCompetitionDto(
+                challenge, hints.Where(h => h.ChallengeId == challenge.Id));
+            await StorageUrlResolver.ResolveAsync(dto, storageProvider, challenge, ct);
+            response.Add(dto);
+        }
+        await SendAsync(response, cancellation: ct);
     }
 }
 
-public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChallengeAdminFeatureRegistry adminFeatureRegistry, ICompetitionPermissionService permissions)
+public class BindCompetitionChallengeEndpoint(
+    ApplicationDbContext db,
+    IChallengeAdminFeatureRegistry adminFeatureRegistry,
+    ICompetitionPermissionService permissions,
+    IStorageProvider storageProvider)
     : Endpoint<BindCompetitionChallengeRequest, CompetitionChallengeAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -177,6 +190,8 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChalleng
                 : template.FlagEnvironmentVariable,
             AttachmentUrl = template.AttachmentUrl,
             PatchTemplateUrl = template.PatchTemplateUrl,
+            AttachmentStorageKey = template.AttachmentStorageKey,
+            PatchTemplateStorageKey = template.PatchTemplateStorageKey,
             DeploymentType = template.DeploymentType,
             ExposedPort = template.ExposedPort,
             PointsConfig = new PointsConfig(points.InitialPoints, points.MinimumPoints, points.DecayFactor, points.DecayFunction),
@@ -226,7 +241,9 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChalleng
 
         await transaction.CommitAsync(ct);
 
-        await SendAsync(ChallengeAdminMapping.ToCompetitionDto(challenge, hints), 201, ct);
+        var response = ChallengeAdminMapping.ToCompetitionDto(challenge, hints);
+        await StorageUrlResolver.ResolveAsync(response, storageProvider, challenge, ct);
+        await SendAsync(response, 201, ct);
     }
 
     private static List<ChallengeHint> BuildHints(Guid competitionId, Guid challengeId, IEnumerable<string> hints)
@@ -247,7 +264,8 @@ public class BindCompetitionChallengeEndpoint(ApplicationDbContext db, IChalleng
 public class UpdateCompetitionChallengeEndpoint(
     ApplicationDbContext db,
     ICompetitionPermissionService permissions,
-    ICtfScoreRebuilder ctfScoreRebuilder)
+    ICtfScoreRebuilder ctfScoreRebuilder,
+    IStorageProvider storageProvider)
     : Endpoint<UpdateCompetitionChallengeRequest, CompetitionChallengeAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -324,7 +342,9 @@ public class UpdateCompetitionChallengeEndpoint(
 
         await db.SaveChangesAsync(ct);
         await ctfScoreRebuilder.RebuildChallengeAsync(competitionId, challengeId, ct);
-        await SendAsync(ChallengeAdminMapping.ToCompetitionDto(challenge, hints), cancellation: ct);
+        var response = ChallengeAdminMapping.ToCompetitionDto(challenge, hints);
+        await StorageUrlResolver.ResolveAsync(response, storageProvider, challenge, ct);
+        await SendAsync(response, cancellation: ct);
     }
 }
 
@@ -334,7 +354,8 @@ public class DeleteCompetitionChallengeEndpoint(
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
     IHubNotifierService hubNotifier,
-    IContainerManager containerManager)
+    IContainerManager containerManager,
+    IStorageProvider storageProvider)
     : EndpointWithoutRequest, IAuditableEndpoint
 {
     public override void Configure()
@@ -368,8 +389,10 @@ public class DeleteCompetitionChallengeEndpoint(
 
         await DeleteChallengeArtifactsAsync(db, containerManager, challenge, HttpContext, userId, ct);
 
+        var storageKeys = new[] { challenge.AttachmentStorageKey, challenge.PatchTemplateStorageKey };
         db.Challenges.Remove(challenge);
         await db.SaveChangesAsync(ct);
+        await StorageObjectCleanup.DeleteUnreferencedAsync(db, storageProvider, storageKeys, ct);
         await RefreshLeaderboardAsync(competitionId, ct);
         await SendNoContentAsync(ct);
     }
@@ -547,8 +570,9 @@ public class DeleteCompetitionChallengeEndpoint(
 
     private async Task RefreshLeaderboardAsync(Guid competitionId, CancellationToken ct)
     {
+        var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(competitionId, ct);
         var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
-        await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+        await leaderboardCache.UpdateAsync(competitionId, entries, cacheVersion, ct);
         await hubNotifier.NotifyLeaderboardSnapshotAsync(
             competitionId,
             entries.Select(e => new LeaderboardEntryPayload(

@@ -24,6 +24,8 @@ var runnerApiKey = builder.Configuration["Runner:ApiKey"];
 var requireRunnerAuth = !builder.Environment.IsDevelopment() || !string.IsNullOrWhiteSpace(runnerApiKey);
 if (requireRunnerAuth && string.IsNullOrWhiteSpace(runnerApiKey))
     throw new InvalidOperationException("Runner:ApiKey must be configured outside Development.");
+if (!builder.Environment.IsDevelopment())
+    SecretValueValidator.RequireSafe("Runner:ApiKey", runnerApiKey, 24);
 
 var app = builder.Build();
 

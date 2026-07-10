@@ -38,8 +38,9 @@ public class RebuildScoreboardEndpoint(
         }
 
         await ctfScoreRebuilder.RebuildCompetitionAsync(req.Id, ct);
+        var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(req.Id, ct);
         var entries = await leaderboardService.CalculateLeaderboardAsync(req.Id, ct);
-        await leaderboardCache.UpdateAsync(req.Id, entries, ct);
+        await leaderboardCache.UpdateAsync(req.Id, entries, cacheVersion, ct);
 
         await SendAsync(new RebuildScoreboardResponse
         {

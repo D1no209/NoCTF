@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -185,7 +186,7 @@ public static class ChallengeAdminMapping
     };
 }
 
-public class GetChallengesAdminEndpoint(ApplicationDbContext db) : Endpoint<EmptyRequest, List<ChallengeTemplateAdminDto>>
+public class GetChallengesAdminEndpoint(ApplicationDbContext db, IStorageProvider storageProvider) : Endpoint<EmptyRequest, List<ChallengeTemplateAdminDto>>
 {
     public override void Configure()
     {
@@ -205,6 +206,17 @@ public class GetChallengesAdminEndpoint(ApplicationDbContext db) : Endpoint<Empt
                                    User.FindFirst(ClaimTypes.Role)?.Value,
                                    UserRole.Admin.ToString(),
                                    StringComparison.OrdinalIgnoreCase);
-        await SendAsync(challenges.Select(c => ChallengeAdminMapping.ToTemplateDto(c, includeSensitive)).ToList(), cancellation: ct);
+        var response = new List<ChallengeTemplateAdminDto>(challenges.Count);
+        foreach (var challenge in challenges)
+        {
+            var dto = ChallengeAdminMapping.ToTemplateDto(challenge, includeSensitive);
+            dto.AttachmentUrl = await StorageUrlResolver.ResolveAsync(
+                storageProvider, challenge.AttachmentStorageKey, dto.AttachmentUrl, ct);
+            dto.PatchTemplateUrl = await StorageUrlResolver.ResolveAsync(
+                storageProvider, challenge.PatchTemplateStorageKey, dto.PatchTemplateUrl, ct);
+            response.Add(dto);
+        }
+
+        await SendAsync(response, cancellation: ct);
     }
 }

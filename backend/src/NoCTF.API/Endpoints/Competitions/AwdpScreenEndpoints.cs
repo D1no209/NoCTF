@@ -4,6 +4,7 @@ using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 using System.Text.Json;
+using System.Collections.Concurrent;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -123,18 +124,19 @@ public class AwdpScreenRoundStatDto
     public int ActiveTeamCount { get; set; }
 }
 
-public class AwdpScreenSnapshotEndpoint(ApplicationDbContext db)
+public class AwdpScreenSnapshotEndpoint(AwdpScreenSnapshotCache snapshotCache)
     : Endpoint<AwdpScreenRequest, AwdpScreenSnapshotDto>
 {
     public override void Configure()
     {
         Get("/api/awdp/screen/snapshot");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(AwdpScreenRequest req, CancellationToken ct)
     {
-        var snapshot = await AwdpScreenSnapshotBuilder.BuildAsync(db, req.GameId, ct);
+        var snapshot = await snapshotCache.GetAsync(req.GameId, ct);
         if (snapshot is null)
         {
             await SendNotFoundAsync(ct);
@@ -145,18 +147,19 @@ public class AwdpScreenSnapshotEndpoint(ApplicationDbContext db)
     }
 }
 
-public class AwdpScreenEventsEndpoint(ApplicationDbContext db)
+public class AwdpScreenEventsEndpoint(AwdpScreenSnapshotCache snapshotCache)
     : Endpoint<AwdpScreenRequest>
 {
     public override void Configure()
     {
         Get("/api/awdp/screen/events");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-stream"));
     }
 
     public override async Task HandleAsync(AwdpScreenRequest req, CancellationToken ct)
     {
-        var firstSnapshot = await AwdpScreenSnapshotBuilder.BuildAsync(db, req.GameId, ct);
+        var firstSnapshot = await snapshotCache.GetAsync(req.GameId, ct);
         if (firstSnapshot is null)
         {
             await SendNotFoundAsync(ct);
@@ -176,7 +179,7 @@ public class AwdpScreenEventsEndpoint(ApplicationDbContext db)
             try
             {
                 await Task.Delay(TimeSpan.FromSeconds(3), ct);
-                var snapshot = await AwdpScreenSnapshotBuilder.BuildAsync(db, req.GameId, ct);
+                var snapshot = await snapshotCache.GetAsync(req.GameId, ct);
                 if (snapshot is null)
                     return;
 
@@ -194,6 +197,45 @@ public class AwdpScreenEventsEndpoint(ApplicationDbContext db)
         var payload = JsonSerializer.Serialize(new { snapshot }, AwdpScreenSnapshotBuilder.JsonOptions);
         await HttpContext.Response.WriteAsync($"data: {payload}\n\n", ct);
         await HttpContext.Response.Body.FlushAsync(ct);
+    }
+}
+
+public sealed class AwdpScreenSnapshotCache(IServiceScopeFactory scopeFactory)
+{
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(3);
+    private readonly ConcurrentDictionary<Guid, CacheEntry> _entries = new();
+
+    public async Task<AwdpScreenSnapshotDto?> GetAsync(Guid competitionId, CancellationToken ct)
+    {
+        var entry = _entries.GetOrAdd(competitionId, _ => new CacheEntry());
+        var now = DateTime.UtcNow;
+        if (entry.ExpiresAt > now)
+            return entry.Snapshot;
+
+        await entry.Gate.WaitAsync(ct);
+        try
+        {
+            now = DateTime.UtcNow;
+            if (entry.ExpiresAt > now)
+                return entry.Snapshot;
+
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            entry.Snapshot = await AwdpScreenSnapshotBuilder.BuildAsync(db, competitionId, ct);
+            entry.ExpiresAt = now.Add(CacheDuration);
+            return entry.Snapshot;
+        }
+        finally
+        {
+            entry.Gate.Release();
+        }
+    }
+
+    private sealed class CacheEntry
+    {
+        public SemaphoreSlim Gate { get; } = new(1, 1);
+        public AwdpScreenSnapshotDto? Snapshot { get; set; }
+        public DateTime ExpiresAt { get; set; }
     }
 }
 
@@ -493,7 +535,7 @@ internal static class AwdpScreenSnapshotBuilder
                 ChallengeName = challengeNames.GetValueOrDefault(state.ChallengeId),
                 ChallengeCategory = challengeCategories.GetValueOrDefault(state.ChallengeId),
                 Level = "danger",
-                Message = state.LastValidationDetail ?? string.Empty,
+                Message = "Challenge service is temporarily unavailable.",
                 CreatedAt = LastActivityAt(state) ?? (state.UpdatedAt == default ? DateTime.UtcNow : state.UpdatedAt)
             };
         }
@@ -512,7 +554,9 @@ internal static class AwdpScreenSnapshotBuilder
                 ChallengeName = log.ChallengeId is { } challengeId ? challengeNames.GetValueOrDefault(challengeId) : null,
                 ChallengeCategory = log.ChallengeId is { } categoryId ? challengeCategories.GetValueOrDefault(categoryId) : null,
                 Level = MapEventLevel(log.Level, log.EventType),
-                Message = log.Message,
+                Message = string.Equals(log.Level, "error", StringComparison.OrdinalIgnoreCase)
+                    ? "A competition service error occurred."
+                    : log.Message,
                 CreatedAt = log.CreatedAt
             };
         }

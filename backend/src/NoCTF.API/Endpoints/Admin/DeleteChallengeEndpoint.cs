@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Infrastructure;
+using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -9,7 +10,7 @@ public class DeleteChallengeRequest
     public Guid Id { get; set; }
 }
 
-public class DeleteChallengeEndpoint(ApplicationDbContext db) : Endpoint<DeleteChallengeRequest>, IAuditableEndpoint
+public class DeleteChallengeEndpoint(ApplicationDbContext db, IStorageProvider storageProvider) : Endpoint<DeleteChallengeRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -37,8 +38,10 @@ public class DeleteChallengeEndpoint(ApplicationDbContext db) : Endpoint<DeleteC
             return;
         }
 
+        var storageKeys = new[] { challenge.AttachmentStorageKey, challenge.PatchTemplateStorageKey };
         db.ChallengeTemplates.Remove(challenge);
         await db.SaveChangesAsync(ct);
+        await StorageObjectCleanup.DeleteUnreferencedAsync(db, storageProvider, storageKeys, ct);
         await SendNoContentAsync(ct);
     }
 }

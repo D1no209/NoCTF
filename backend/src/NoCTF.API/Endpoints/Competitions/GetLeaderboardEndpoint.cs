@@ -121,6 +121,7 @@ public class GetLeaderboardEndpoint(
     {
         Get("/api/competitions/{competitionId}/leaderboard");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetLeaderboardRequest req, CancellationToken ct)
@@ -162,10 +163,11 @@ public class GetLeaderboardEndpoint(
         }
 
         // Cache miss — calculate from DB
+        var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(req.CompetitionId, ct);
         var entries = await leaderboardService.CalculateLeaderboardAsync(req.CompetitionId, ct);
 
         // Populate cache for next request (fire-and-forget, don't block response)
-        _ = leaderboardCache.UpdateAsync(req.CompetitionId, entries, CancellationToken.None);
+        await leaderboardCache.UpdateAsync(req.CompetitionId, entries, cacheVersion, ct);
 
         await SendAsync(new GetLeaderboardResponse
         {
@@ -194,6 +196,7 @@ public class GetLeaderboardTrendEndpoint(ILeaderboardInsightService insightServi
     {
         Get("/api/competitions/{competitionId}/leaderboard/trend");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetLeaderboardTrendRequest req, CancellationToken ct)
@@ -247,6 +250,7 @@ public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insight
     {
         Get("/api/competitions/{competitionId}/leaderboard/teams/{teamId}");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetLeaderboardTeamDetailRequest req, CancellationToken ct)
@@ -276,6 +280,22 @@ public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insight
             return;
         }
 
+        var canViewMembers = User.IsInRole(UserRole.Admin.ToString());
+        var userIdValue = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!canViewMembers && Guid.TryParse(userIdValue, out var userId))
+        {
+            canViewMembers = await db.TeamMembers.AsNoTracking().AnyAsync(m =>
+                                 m.CompetitionId == req.CompetitionId &&
+                                 m.TeamId == req.TeamId &&
+                                 m.UserId == userId, ct) ||
+                             await db.Competitions.IgnoreQueryFilters().AsNoTracking().AnyAsync(c =>
+                                 c.Id == req.CompetitionId && c.OwnerId == userId, ct) ||
+                             await db.CompetitionCollaborators.IgnoreQueryFilters().AsNoTracking().AnyAsync(c =>
+                                 c.CompetitionId == req.CompetitionId &&
+                                 c.UserId == userId &&
+                                 c.Role == CollaboratorRole.Manager, ct);
+        }
+
         await SendAsync(new LeaderboardTeamDetailDto
         {
             TeamId = result.TeamId,
@@ -301,7 +321,7 @@ public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insight
                 BloodRank = s.BloodRank,
                 SolvedAt = s.SolvedAt
             }).ToList(),
-            Members = result.Members.Select(m => new LeaderboardMemberHistoryDto
+            Members = canViewMembers ? result.Members.Select(m => new LeaderboardMemberHistoryDto
             {
                 UserId = m.UserId,
                 UserName = m.UserName,
@@ -312,7 +332,7 @@ public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insight
                     Direction = s.Direction,
                     SubmittedAt = s.SubmittedAt
                 }).ToList()
-            }).ToList()
+            }).ToList() : []
         }, cancellation: ct);
     }
 }

@@ -28,9 +28,9 @@ public class ResetUserPasswordEndpoint(ApplicationDbContext dbContext) : Endpoin
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 6)
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 8)
         {
-            ThrowError("Password must be at least 6 characters.");
+            ThrowError("Password must be at least 8 characters.");
         }
 
         var hasher = new PasswordHasher<object>();
