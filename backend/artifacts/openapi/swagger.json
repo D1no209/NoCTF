@@ -11,6 +11,27 @@
     }
   ],
   "paths": {
+    "/api/files": {
+      "get": {
+        "operationId": "GetApiFiles",
+        "parameters": [
+          {
+            "name": "filePath",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/teams/mine": {
       "get": {
         "tags": [
@@ -643,6 +664,39 @@
             "Bearer": []
           }
         ]
+      }
+    },
+    "/api/competitions/{id}/teams": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsCompetitionsGetCompetitionTeamsEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionTeamListDto"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/competitions/{id}/teams/mine": {
@@ -2006,14 +2060,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -2056,14 +2108,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -2879,14 +2929,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -3014,12 +3062,14 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin"
+              "Admin",
+              "Organizer"
             ]
           },
           {
             "Bearer": [
-              "Admin"
+              "Admin",
+              "Organizer"
             ]
           }
         ]
@@ -3056,14 +3106,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -3118,14 +3166,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -3392,14 +3438,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -3543,6 +3587,44 @@
             "Bearer": [
               "Admin",
               "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/infrastructure": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetInfrastructureEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdminInfrastructureDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
             ]
           }
         ]
@@ -3761,14 +3843,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -3802,14 +3882,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -4332,14 +4410,12 @@
         "security": [
           {
             "JWTBearerAuth": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           },
           {
             "Bearer": [
-              "Admin",
-              "Organizer"
+              "Admin"
             ]
           }
         ]
@@ -4397,6 +4473,26 @@
             ]
           }
         ]
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "operationId": "GetApiHealthLive",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "operationId": "GetApiHealthReady",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
       }
     },
     "/api/health": {
@@ -4971,6 +5067,10 @@
             "type": "string",
             "nullable": true
           },
+          "entryUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "accessHost": {
             "type": "string"
           },
@@ -4996,6 +5096,27 @@
       "NoCTFAPIEndpointsCompetitionsChallengeInstanceRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsCompetitionTeamListDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "trackName": {
+            "type": "string",
+            "nullable": true
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       },
       "NoCTFAPIEndpointsCompetitionsMyCompetitionTeamDto": {
         "type": "object",
@@ -6166,6 +6287,9 @@
             "type": "string",
             "nullable": true
           },
+          "orchestrationJson": {
+            "type": "string"
+          },
           "attachmentUrl": {
             "type": "string",
             "nullable": true
@@ -6402,6 +6526,10 @@
             "format": "int32",
             "nullable": true
           },
+          "orchestrationJson": {
+            "type": "string",
+            "nullable": true
+          },
           "hints": {
             "type": "array",
             "items": {
@@ -6467,6 +6595,10 @@
           "awdpFixTimeoutSeconds": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "orchestrationJson": {
+            "type": "string",
             "nullable": true
           },
           "hints": {
@@ -6687,6 +6819,9 @@
             "type": "string",
             "nullable": true
           },
+          "orchestrationJson": {
+            "type": "string"
+          },
           "attachmentUrl": {
             "type": "string",
             "nullable": true
@@ -6753,6 +6888,10 @@
             "nullable": true
           },
           "composeProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "orchestrationJson": {
             "type": "string",
             "nullable": true
           },
@@ -7273,9 +7412,40 @@
             "type": "string",
             "format": "guid"
           },
+          "providerType": {
+            "type": "string"
+          },
+          "publicHost": {
+            "type": "string",
+            "nullable": true
+          },
+          "entryUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "status": {
             "type": "string"
           }
+        }
+      },
+      "NoCTFAPIEndpointsAdminInfrastructureDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "runnerProvider": {
+            "type": "string"
+          },
+          "runnerBaseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "runnerReachable": {
+            "type": "boolean"
+          },
+          "runnerInfo": {
+            "nullable": true
+          },
+          "kubernetes": {}
         }
       },
       "NoCTFAPIEndpointsAdminPluginDto": {
@@ -7415,6 +7585,10 @@
             "nullable": true
           },
           "composeProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "orchestrationJson": {
             "type": "string",
             "nullable": true
           },

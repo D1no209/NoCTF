@@ -85,4 +85,23 @@ public class StorageProviderTests
 
         Directory.Delete(basePath, true);
     }
+
+    [Theory]
+    [InlineData("../outside.txt")]
+    [InlineData("nested/../../outside.txt")]
+    [InlineData("%2e%2e/outside.txt")]
+    [InlineData("nested/%2E%2E/outside.txt")]
+    [InlineData("/absolute/path.txt")]
+    [InlineData("C:\\absolute\\path.txt")]
+    public async Task LocalFileStorageProvider_Rejects_PathTraversal(string key)
+    {
+        var basePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var provider = new LocalFileStorageProvider(basePath);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            provider.UploadAsync(key, new MemoryStream([1, 2, 3]), "application/octet-stream"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.DownloadAsync(key));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.DeleteAsync(key));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.GetUrlAsync(key));
+    }
 }

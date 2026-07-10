@@ -44,6 +44,7 @@ public class GetKohDashboardEndpoint(ApplicationDbContext dbContext)
     {
         Get("/api/competitions/{id}/koh-dashboard");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetKohDashboardRequest req, CancellationToken ct)

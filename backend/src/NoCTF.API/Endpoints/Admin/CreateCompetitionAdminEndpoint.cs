@@ -58,6 +58,34 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
 
     public override async Task HandleAsync(CreateCompetitionAdminRequest req, CancellationToken ct)
     {
+        foreach (var error in CompetitionRequestRules.Validate(
+                     req.Title,
+                     req.StartTime,
+                     req.EndTime,
+                     req.DefaultPointsConfig,
+                     req.MaxTeamMembers,
+                     req.RoundDurationSeconds,
+                     req.TotalRounds,
+                     req.AwdpMaxAttackAttempts,
+                     req.AwdpMaxDefenseAttempts,
+                     req.AwdpFixTimeoutSeconds,
+                     req.AttackPoints,
+                     req.ServiceOnlinePoints,
+                     req.ServiceDownPenalty,
+                     req.BeenAttackedPenalty,
+                     req.AwdpAttackScorePerRound,
+                     req.AwdpDefenseScorePerRound,
+                     req.AwdpServicePenaltyPerRound,
+                     req.AwdpViolationPenalty))
+        {
+            AddError(error);
+        }
+        if (ValidationFailed)
+        {
+            await SendErrorsAsync(400, ct);
+            return;
+        }
+
         var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         Guid.TryParse(userIdClaim, out var userId);
 
@@ -72,7 +100,7 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
         var competition = new Competition
         {
             Id = Guid.NewGuid(),
-            Title = req.Title,
+            Title = req.Title.Trim(),
             Description = req.Description,
             GameModeType = mode,
             ModeKey = CompetitionModeDefaults.GetModeKey(mode),

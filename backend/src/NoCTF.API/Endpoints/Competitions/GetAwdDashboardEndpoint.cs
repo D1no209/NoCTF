@@ -38,6 +38,7 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
     {
         Get("/api/competitions/{id}/awd-dashboard");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetAwdDashboardRequest req, CancellationToken ct)

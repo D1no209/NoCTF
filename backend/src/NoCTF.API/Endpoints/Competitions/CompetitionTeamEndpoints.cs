@@ -39,6 +39,7 @@ public class GetCompetitionTeamsEndpoint(ApplicationDbContext dbContext)
     {
         Get("/api/competitions/{id}/teams");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(CancellationToken ct)

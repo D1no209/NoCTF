@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.PluginBase;
+using System.Security.Cryptography;
 
 namespace NoCTF.API.Plugins;
 
@@ -42,6 +43,16 @@ public static class PluginLoader
                     continue;
                 }
 
+                if (!BuiltInPluginAssemblies.Contains(fileName))
+                {
+                    var expectedDigest = configuration[$"Plugins:AssemblySha256:{fileName}"];
+                    if (string.IsNullOrWhiteSpace(expectedDigest) || !HasExpectedDigest(dll, expectedDigest))
+                    {
+                        Console.WriteLine($"[Plugins] Skipped external plugin {fileName}: SHA-256 digest is missing or invalid.");
+                        continue;
+                    }
+                }
+
                 var context = new PluginLoadContext(dll);
                 var assembly = context.LoadFromAssemblyPath(Path.GetFullPath(dll));
 
@@ -50,6 +61,8 @@ public static class PluginLoader
 
                 if (moduleType == null)
                 {
+                    if (BuiltInPluginAssemblies.Contains(fileName))
+                        throw new InvalidOperationException($"Built-in plugin {fileName} does not expose an IPluginModule.");
                     Console.WriteLine($"[Plugins] No IPluginModule found in {Path.GetFileName(dll)}");
                     continue;
                 }
@@ -63,7 +76,22 @@ public static class PluginLoader
             catch (Exception ex)
             {
                 Console.WriteLine($"[Plugins] Failed to load {Path.GetFileName(dll)}: {ex.Message}");
+                if (BuiltInPluginAssemblies.Contains(Path.GetFileName(dll)))
+                    throw new InvalidOperationException(
+                        $"Required built-in plugin {Path.GetFileName(dll)} failed to load.", ex);
             }
         }
+    }
+
+    private static bool HasExpectedDigest(string path, string expectedDigest)
+    {
+        var expected = expectedDigest.Trim().Replace("-", string.Empty, StringComparison.Ordinal);
+        if (expected.Length != 64)
+            return false;
+
+        var actual = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+        var expectedBytes = System.Text.Encoding.ASCII.GetBytes(expected.ToUpperInvariant());
+        var actualBytes = System.Text.Encoding.ASCII.GetBytes(actual);
+        return CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
     }
 }

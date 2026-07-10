@@ -53,17 +53,20 @@ public class UploadChallengeAttachmentEndpoint(
         }
 
         var safeName = Path.GetFileName(file.FileName);
-        var storagePath = $"challenge-attachments/{challenge.Id:N}/{DateTime.UtcNow:yyyyMMddHHmmss}-{safeName}";
+        var storagePath = $"challenge-attachments/{challenge.Id:N}/{Guid.NewGuid():N}-{safeName}";
         await using var stream = file.OpenReadStream();
         var key = await storageProvider.UploadAsync(storagePath, stream, file.ContentType, ct);
         var url = await storageProvider.GetUrlAsync(key, ct);
 
+        var previousKey = challenge.AttachmentStorageKey;
         challenge.AttachmentUrl = url;
+        challenge.AttachmentStorageKey = key;
         challenge.DeploymentType = challenge.DeploymentType == NoCTF.Core.ChallengeDeploymentType.NoAttachment
             ? NoCTF.Core.ChallengeDeploymentType.StaticAttachment
             : challenge.DeploymentType;
         challenge.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+        await StorageObjectCleanup.DeleteUnreferencedAsync(db, storageProvider, [previousKey], ct);
 
         await SendAsync(new ChallengeAttachmentResponse { AttachmentUrl = url }, cancellation: ct);
     }
@@ -107,14 +110,17 @@ public class UploadChallengePatchTemplateEndpoint(
         }
 
         var safeName = Path.GetFileName(file.FileName);
-        var storagePath = $"challenge-patch-templates/{challenge.Id:N}/{DateTime.UtcNow:yyyyMMddHHmmss}-{safeName}";
+        var storagePath = $"challenge-patch-templates/{challenge.Id:N}/{Guid.NewGuid():N}-{safeName}";
         await using var stream = file.OpenReadStream();
         var key = await storageProvider.UploadAsync(storagePath, stream, file.ContentType, ct);
         var url = await storageProvider.GetUrlAsync(key, ct);
 
+        var previousKey = challenge.PatchTemplateStorageKey;
         challenge.PatchTemplateUrl = url;
+        challenge.PatchTemplateStorageKey = key;
         challenge.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+        await StorageObjectCleanup.DeleteUnreferencedAsync(db, storageProvider, [previousKey], ct);
 
         await SendAsync(new ChallengePatchTemplateResponse { PatchTemplateUrl = url }, cancellation: ct);
     }

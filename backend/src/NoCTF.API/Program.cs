@@ -1,6 +1,7 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using System.Security.Claims;
+using System.Net;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,6 +19,7 @@ using NoCTF.API.Plugins;
 using NoCTF.API.SignalR;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using NoCTF.Application;
 using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.Events;
@@ -31,33 +33,64 @@ using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    foreach (var proxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
+    {
+        if (IPAddress.TryParse(proxy, out var address))
+            options.KnownProxies.Add(address);
+    }
+    if (builder.Configuration.GetValue("ForwardedHeaders:TrustAll", false))
+    {
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    }
+});
+
 // CORS — must be before SignalR so the policy is available
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins(
-                  "http://localhost:5173",
-                  "http://127.0.0.1:5173",
-                  "http://localhost:4173",
-                  "http://127.0.0.1:4173")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials(); // required for SignalR WebSocket/SSE
+        var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+        var origins = configuredOrigins
+            .Where(origin => Uri.TryCreate(origin, UriKind.Absolute, out _))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (builder.Environment.IsDevelopment() && origins.Length == 0)
+        {
+            origins =
+            [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:4173",
+                "http://127.0.0.1:4173"
+            ];
+        }
+        if (origins.Length > 0)
+            policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
     });
 });
 
 // JWT Configuration
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var jwtSecret = jwtSettings.GetValue<string>("Secret")!;
-if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+if (builder.Environment.IsDevelopment())
 {
-    throw new InvalidOperationException("JwtSettings:Secret must be configured and at least 32 characters long.");
+    if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+        throw new InvalidOperationException("JwtSettings:Secret must be configured and at least 32 characters long.");
 }
-if (!builder.Environment.IsDevelopment() &&
-    jwtSecret.Equals("your-super-secret-key-must-be-at-least-32-characters-long!", StringComparison.Ordinal))
+else
 {
-    throw new InvalidOperationException("JwtSettings:Secret must be replaced before running outside Development.");
+    SecretValueValidator.RequireSafe("JwtSettings:Secret", jwtSecret, 32);
+    var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (SecretValueValidator.IsConnectionStringUnsafe(defaultConnection))
+        throw new InvalidOperationException("ConnectionStrings:DefaultConnection contains a missing, weak, or placeholder value.");
+    var configuredSeedPassword = builder.Configuration["SeedAdmin:Password"];
+    if (!string.IsNullOrWhiteSpace(configuredSeedPassword))
+        SecretValueValidator.RequireSafe("SeedAdmin:Password", configuredSeedPassword, 12);
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -159,6 +192,24 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             });
     });
+    options.AddPolicy("public-read", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy("public-stream", httpContext =>
+        RateLimitPartition.GetConcurrencyLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new ConcurrencyLimiterOptions
+            {
+                PermitLimit = 3,
+                QueueLimit = 0
+            }));
 });
 
 // SignalR with Redis backplane
@@ -191,6 +242,7 @@ builder.Services.AddSingleton<IRedisLeaderboardCache, RedisLeaderboardCache>();
 builder.Services.AddScoped<ISubmissionEventHandler, LeaderboardSyncHandler>();
 builder.Services.AddScoped<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddScoped<IPatchArchiveValidator, PatchArchiveValidator>();
+builder.Services.AddSingleton<NoCTF.API.Endpoints.Competitions.AwdpScreenSnapshotCache>();
 
 builder.Services.AddFastEndpoints();
 builder.Services.SwaggerDocument(o =>
@@ -229,9 +281,13 @@ builder.Services.AddScoped<ITeamPermissionService, TeamPermissionService>();
 var runnerBaseUrl = builder.Configuration["Runner:BaseUrl"];
 if (!string.IsNullOrWhiteSpace(runnerBaseUrl))
 {
+    if (!builder.Environment.IsDevelopment())
+        SecretValueValidator.RequireSafe("Runner:ApiKey", builder.Configuration["Runner:ApiKey"], 24);
     builder.Services.AddHttpClient<IRunnerClient, HttpRunnerClient>(client =>
     {
         client.BaseAddress = new Uri(runnerBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(Math.Clamp(
+            builder.Configuration.GetValue("Runner:TimeoutSeconds", 900), 30, 3600));
         var runnerApiKey = builder.Configuration["Runner:ApiKey"];
         if (!string.IsNullOrWhiteSpace(runnerApiKey))
             client.DefaultRequestHeaders.Add("X-Runner-Token", runnerApiKey);
@@ -255,19 +311,29 @@ builder.Services.AddHealthChecks()
     .AddCheck<DockerHealthCheck>("docker");
 
 var app = builder.Build();
+var migrateOnly = args.Any(arg => string.Equals(arg, "--migrate-only", StringComparison.OrdinalIgnoreCase));
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    var autoMigrate = builder.Configuration.GetValue("Database:AutoMigrate", !app.Environment.IsDevelopment());
+    var autoMigrate = builder.Configuration.GetValue("Database:AutoMigrate", false);
 
-    if (autoMigrate)
+    if (migrateOnly || autoMigrate)
     {
         await db.Database.MigrateAsync();
     }
 
-    await DataSeeder.SeedAsync(db, builder.Configuration, allowDefaultAdminCredentials: app.Environment.IsDevelopment());
+    if (migrateOnly || autoMigrate || app.Environment.IsDevelopment())
+    {
+        await DataSeeder.SeedAsync(
+            db,
+            builder.Configuration,
+            allowDefaultAdminCredentials: app.Environment.IsDevelopment());
+    }
 }
+
+if (migrateOnly)
+    return;
 
 // Wire hub context into LogBuffer so it can broadcast log entries via SignalR
 var logBuffer = app.Services.GetRequiredService<LogBuffer>();
@@ -282,6 +348,13 @@ if (!app.Environment.IsDevelopment())
 {
     var spaFileProvider = new PhysicalFileProvider(Path.Combine(Environment.CurrentDirectory, "wwwroot"));
     app.UseSpaStaticFiles(new StaticFileOptions { FileProvider = spaFileProvider });
+}
+
+app.UseForwardedHeaders();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
 app.UseCors("Frontend");
@@ -341,9 +414,10 @@ app.UseFastEndpoints(c =>
         }
     };
 });
-app.UseSwaggerGen();
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue("Swagger:Enabled", false))
+    app.UseSwaggerGen();
 
-app.MapGet("/api/health", async (HealthCheckService healthCheckService) =>
+static async Task<IResult> ReadinessResponse(HealthCheckService healthCheckService)
 {
     var report = await healthCheckService.CheckHealthAsync();
     var result = new
@@ -353,12 +427,16 @@ app.MapGet("/api/health", async (HealthCheckService healthCheckService) =>
         {
             name = e.Key,
             status = e.Value.Status.ToString(),
-            description = e.Value.Description
+            description = e.Value.Status == HealthStatus.Healthy ? null : "dependency_unavailable"
         })
     };
     var statusCode = report.Status == HealthStatus.Healthy ? 200 : 503;
     return Results.Json(result, statusCode: statusCode);
-}).AllowAnonymous();
+}
+
+app.MapGet("/api/health/live", () => Results.Ok(new { status = "Healthy" })).AllowAnonymous();
+app.MapGet("/api/health/ready", ReadinessResponse).AllowAnonymous();
+app.MapGet("/api/health", ReadinessResponse).AllowAnonymous();
 
 // SignalR hub endpoints
 app.MapHub<LeaderboardHub>("/hubs/leaderboard");

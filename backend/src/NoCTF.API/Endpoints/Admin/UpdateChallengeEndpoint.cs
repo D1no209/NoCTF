@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -26,7 +27,7 @@ public class UpdateChallengeRequest
     public string? PenetrationConfigJson { get; set; }
 }
 
-public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateChallengeRequest, ChallengeTemplateAdminDto>, IAuditableEndpoint
+public class UpdateChallengeEndpoint(ApplicationDbContext db, IStorageProvider storageProvider) : Endpoint<UpdateChallengeRequest, ChallengeTemplateAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -76,6 +77,7 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
             return;
         }
 
+        var previousStorageKeys = new[] { challenge.AttachmentStorageKey, challenge.PatchTemplateStorageKey };
         challenge.Title = req.Title.Trim();
         challenge.Description = ChallengeTemplateRequestRules.CleanOptional(req.Description);
         challenge.TypeId = string.IsNullOrWhiteSpace(req.TypeId) ? "ctf" : req.TypeId.Trim();
@@ -90,6 +92,8 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
             : req.FlagEnvironmentVariable.Trim();
         challenge.AttachmentUrl = attachmentUrl;
         challenge.PatchTemplateUrl = ChallengeTemplateRequestRules.CleanOptional(req.PatchTemplateUrl);
+        challenge.AttachmentStorageKey = null;
+        challenge.PatchTemplateStorageKey = null;
         challenge.DeploymentType = deploymentType;
         challenge.ExposedPort = usesRuntimeContainer ? req.ExposedPort : null;
         challenge.UpdatedAt = DateTime.UtcNow;
@@ -108,6 +112,7 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db) : Endpoint<UpdateC
             : "{}";
 
         await db.SaveChangesAsync(ct);
+        await StorageObjectCleanup.DeleteUnreferencedAsync(db, storageProvider, previousStorageKeys, ct);
 
         await SendAsync(ChallengeAdminMapping.ToTemplateDto(challenge), cancellation: ct);
     }

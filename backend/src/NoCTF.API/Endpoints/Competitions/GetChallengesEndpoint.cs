@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -33,12 +34,13 @@ public class ChallengeDto
 /// <summary>
 /// GET /api/competitions/{id}/challenges — returns all challenges for a competition.
 /// </summary>
-public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<GetChallengesRequest, List<ChallengeDto>>
+public class GetChallengesEndpoint(ApplicationDbContext dbContext, IStorageProvider storageProvider) : Endpoint<GetChallengesRequest, List<ChallengeDto>>
 {
     public override void Configure()
     {
         Get("/api/competitions/{id}/challenges");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetChallengesRequest req, CancellationToken ct)
@@ -84,6 +86,8 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
                 },
                 c.PointsConfig,
                 c.DifficultyCoefficient,
+                c.AttachmentStorageKey,
+                c.PatchTemplateStorageKey,
                 IsPenetration = c.TypeId.ToLower() == "penetration"
             })
             .ToListAsync(ct);
@@ -110,6 +114,16 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext) : Endpoint<Ge
         {
             challenge.SolveCount = solveCounts.GetValueOrDefault(challenge.Id);
             var scoring = challengeRows.First(row => row.Challenge.Id == challenge.Id);
+            challenge.AttachmentUrl = await StorageUrlResolver.ResolveAsync(
+                storageProvider,
+                scoring.AttachmentStorageKey,
+                challenge.AttachmentUrl,
+                ct);
+            challenge.PatchTemplateUrl = await StorageUrlResolver.ResolveAsync(
+                storageProvider,
+                scoring.PatchTemplateStorageKey,
+                challenge.PatchTemplateUrl,
+                ct);
             if (scoring.IsPenetration && penetrationScores.TryGetValue(challenge.Id, out var penetrationScore))
             {
                 challenge.TotalStageCount = penetrationScore.StageCount;

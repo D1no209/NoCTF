@@ -25,12 +25,9 @@ public static class DataSeeder
             var existingAdmin = await db.Users.FirstOrDefaultAsync(u => u.Email == adminEmail);
             if (existingAdmin is not null)
             {
-                // If admin@noctf.local exists but is not Admin, promote it
                 if (existingAdmin.Role != UserRole.Admin)
-                {
-                    existingAdmin.Role = UserRole.Admin;
-                    await db.SaveChangesAsync();
-                }
+                    throw new SeedConfigurationException(
+                        "SeedAdmin:Email belongs to an existing non-admin user; automatic promotion is forbidden.");
                 return;
             }
 
@@ -69,10 +66,6 @@ public static class DataSeeder
         catch (SeedConfigurationException)
         {
             throw;
-        }
-        catch
-        {
-            // Ignore seeding errors (e.g., database not yet migrated)
         }
     }
 }

@@ -34,6 +34,7 @@ public class GetCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<G
     {
         Get("/api/competitions/{id}");
         AllowAnonymous();
+        Options(builder => builder.RequireRateLimiting("public-read"));
     }
 
     public override async Task HandleAsync(GetCompetitionRequest req, CancellationToken ct)

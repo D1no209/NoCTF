@@ -11,6 +11,13 @@ using NoCTF.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+if (!builder.Environment.IsDevelopment())
+{
+    var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (SecretValueValidator.IsConnectionStringUnsafe(defaultConnection))
+        throw new InvalidOperationException("ConnectionStrings:DefaultConnection contains a missing, weak, or placeholder value.");
+}
+
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -21,9 +28,13 @@ builder.Services.AddSingleton<IStorageProvider>(StorageProviderFactory.Create(bu
 var runnerBaseUrl = builder.Configuration["Runner:BaseUrl"];
 if (!string.IsNullOrWhiteSpace(runnerBaseUrl))
 {
+    if (!builder.Environment.IsDevelopment())
+        SecretValueValidator.RequireSafe("Runner:ApiKey", builder.Configuration["Runner:ApiKey"], 24);
     builder.Services.AddHttpClient<IRunnerClient, HttpRunnerClient>(client =>
     {
         client.BaseAddress = new Uri(runnerBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(Math.Clamp(
+            builder.Configuration.GetValue("Runner:TimeoutSeconds", 900), 30, 3600));
         var runnerApiKey = builder.Configuration["Runner:ApiKey"];
         if (!string.IsNullOrWhiteSpace(runnerApiKey))
             client.DefaultRequestHeaders.Add("X-Runner-Token", runnerApiKey);

@@ -192,6 +192,13 @@ export type NoCtfapiEndpointsCompetitionsChallengeInstanceRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsCompetitionsCompetitionTeamListDto = {
+    id?: string;
+    name?: string;
+    trackName?: string | null;
+    memberCount?: number;
+};
+
 export type NoCtfapiEndpointsCompetitionsMyCompetitionTeamDto = {
     id?: string;
     competitionId?: string;
@@ -591,6 +598,7 @@ export type NoCtfapiEndpointsAdminCompetitionChallengeAdminDto = {
     containerMode?: NoCtfCoreChallengeContainerMode;
     composeYaml?: string | null;
     composeProjectName?: string | null;
+    orchestrationJson?: string;
     attachmentUrl?: string | null;
     patchTemplateUrl?: string | null;
     deploymentType?: NoCtfCoreChallengeDeploymentType;
@@ -650,6 +658,7 @@ export type NoCtfapiEndpointsAdminBindCompetitionChallengeRequest = {
     awdpMaxDefenseAttempts?: number | null;
     awdpFixEntry?: string | null;
     awdpFixTimeoutSeconds?: number | null;
+    orchestrationJson?: string | null;
     hints?: Array<string>;
 };
 
@@ -666,6 +675,7 @@ export type NoCtfapiEndpointsAdminUpdateCompetitionChallengeRequest = {
     awdpMaxDefenseAttempts?: number | null;
     awdpFixEntry?: string | null;
     awdpFixTimeoutSeconds?: number | null;
+    orchestrationJson?: string | null;
     hints?: Array<string>;
 };
 
@@ -733,6 +743,7 @@ export type NoCtfapiEndpointsAdminChallengeTemplateAdminDto = {
     containerMode?: NoCtfCoreChallengeContainerMode;
     composeYaml?: string | null;
     composeProjectName?: string | null;
+    orchestrationJson?: string;
     attachmentUrl?: string | null;
     patchTemplateUrl?: string | null;
     deploymentType?: NoCtfCoreChallengeDeploymentType;
@@ -752,6 +763,7 @@ export type NoCtfapiEndpointsAdminCreateChallengeRequest = {
     containerMode?: NoCtfCoreChallengeContainerMode;
     composeYaml?: string | null;
     composeProjectName?: string | null;
+    orchestrationJson?: string | null;
     flagSecret?: string | null;
     flagEnvironmentVariable?: string | null;
     attachmentUrl?: string | null;
@@ -895,7 +907,18 @@ export type NoCtfapiEndpointsAdminContainerDto = {
     competitionId?: string;
     teamId?: string;
     challengeId?: string;
+    providerType?: string;
+    publicHost?: string | null;
+    entryUrl?: string | null;
     status?: string;
+};
+
+export type NoCtfapiEndpointsAdminInfrastructureDto = {
+    runnerProvider?: string;
+    runnerBaseUrl?: string | null;
+    runnerReachable?: boolean;
+    runnerInfo?: unknown;
+    kubernetes?: unknown;
 };
 
 export type NoCtfapiEndpointsAdminPluginDto = {
@@ -963,6 +986,7 @@ export type NoCtfapiEndpointsAdminUpdateChallengeRequest = {
     containerMode?: NoCtfCoreChallengeContainerMode;
     composeYaml?: string | null;
     composeProjectName?: string | null;
+    orchestrationJson?: string | null;
     flagSecret?: string | null;
     flagEnvironmentVariable?: string | null;
     attachmentUrl?: string | null;
@@ -1014,6 +1038,19 @@ export type NoCtfapiEndpointsAdminUpdateCompetitionAdminRequest = {
 
 export type NoCtfapiEndpointsAdminUpdateUserRoleRequest = {
     role?: string;
+};
+
+export type GetApiFilesData = {
+    body?: never;
+    path: {
+        filePath: string;
+    };
+    query?: never;
+    url: '/api/files';
+};
+
+export type GetApiFilesResponses = {
+    200: unknown;
 };
 
 export type NoCtfapiEndpointsTeamsGetMyTeamsEndpointData = {
@@ -1394,6 +1431,24 @@ export type NoCtfapiEndpointsCompetitionsExtendChallengeInstanceEndpointResponse
 };
 
 export type NoCtfapiEndpointsCompetitionsExtendChallengeInstanceEndpointResponse = NoCtfapiEndpointsCompetitionsExtendChallengeInstanceEndpointResponses[keyof NoCtfapiEndpointsCompetitionsExtendChallengeInstanceEndpointResponses];
+
+export type NoCtfapiEndpointsCompetitionsGetCompetitionTeamsEndpointData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/competitions/{id}/teams';
+};
+
+export type NoCtfapiEndpointsCompetitionsGetCompetitionTeamsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: Array<NoCtfapiEndpointsCompetitionsCompetitionTeamListDto>;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetCompetitionTeamsEndpointResponse = NoCtfapiEndpointsCompetitionsGetCompetitionTeamsEndpointResponses[keyof NoCtfapiEndpointsCompetitionsGetCompetitionTeamsEndpointResponses];
 
 export type NoCtfapiEndpointsCompetitionsGetMyCompetitionTeamsEndpointData = {
     body?: never;
@@ -2993,6 +3048,33 @@ export type NoCtfapiEndpointsAdminGetContainersEndpointResponses = {
 
 export type NoCtfapiEndpointsAdminGetContainersEndpointResponse = NoCtfapiEndpointsAdminGetContainersEndpointResponses[keyof NoCtfapiEndpointsAdminGetContainersEndpointResponses];
 
+export type NoCtfapiEndpointsAdminGetInfrastructureEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/infrastructure';
+};
+
+export type NoCtfapiEndpointsAdminGetInfrastructureEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminGetInfrastructureEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdminInfrastructureDto;
+};
+
+export type NoCtfapiEndpointsAdminGetInfrastructureEndpointResponse = NoCtfapiEndpointsAdminGetInfrastructureEndpointResponses[keyof NoCtfapiEndpointsAdminGetInfrastructureEndpointResponses];
+
 export type NoCtfapiEndpointsAdminGetPluginsEndpointData = {
     body?: never;
     path?: never;
@@ -3488,6 +3570,28 @@ export type NoCtfapiEndpointsAdminUpdateUserRoleEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsAdminUpdateUserRoleEndpointResponse = NoCtfapiEndpointsAdminUpdateUserRoleEndpointResponses[keyof NoCtfapiEndpointsAdminUpdateUserRoleEndpointResponses];
+
+export type GetApiHealthLiveData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/health/live';
+};
+
+export type GetApiHealthLiveResponses = {
+    200: unknown;
+};
+
+export type GetApiHealthReadyData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/health/ready';
+};
+
+export type GetApiHealthReadyResponses = {
+    200: unknown;
+};
 
 export type GetApiHealthData = {
     body?: never;

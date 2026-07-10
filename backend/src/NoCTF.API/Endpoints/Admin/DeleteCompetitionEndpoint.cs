@@ -11,7 +11,8 @@ public class DeleteCompetitionEndpoint(
     ApplicationDbContext dbContext,
     ICompetitionPermissionService permissions,
     IContainerManager containerManager,
-    IRedisLeaderboardCache leaderboardCache) : Endpoint<EmptyRequest>, IAuditableEndpoint
+    IRedisLeaderboardCache leaderboardCache,
+    IStorageProvider storageProvider) : Endpoint<EmptyRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -48,9 +49,20 @@ public class DeleteCompetitionEndpoint(
             "competition_deleted",
             ct);
 
+        var storageKeys = await dbContext.Challenges
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.CompetitionId == id)
+            .Select(c => new { c.AttachmentStorageKey, c.PatchTemplateStorageKey })
+            .ToListAsync(ct);
         await DeleteCompetitionArtifactsAsync(dbContext, id, ct);
         dbContext.Competitions.Remove(competition);
         await dbContext.SaveChangesAsync(ct);
+        await StorageObjectCleanup.DeleteUnreferencedAsync(
+            dbContext,
+            storageProvider,
+            storageKeys.SelectMany(k => new[] { k.AttachmentStorageKey, k.PatchTemplateStorageKey }),
+            ct);
         await leaderboardCache.InvalidateAsync(id, ct);
         await SendNoContentAsync(ct);
     }

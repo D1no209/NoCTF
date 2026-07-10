@@ -1,0 +1,52 @@
+namespace NoCTF.PluginBase;
+
+using System.Data.Common;
+
+public static class SecretValueValidator
+{
+    private static readonly string[] PlaceholderFragments =
+    [
+        "replace-with",
+        "change-me",
+        "changeme",
+        "your-super-secret",
+        "example-secret",
+        "default-password",
+        "noctf_password",
+        "admin@123456",
+        "minioadmin",
+        "dev-runner-token"
+    ];
+
+    public static bool IsUnsafe(string? value, int minimumLength = 16)
+        => string.IsNullOrWhiteSpace(value) ||
+           value.Length < minimumLength ||
+           PlaceholderFragments.Any(fragment =>
+               value.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+
+    public static void RequireSafe(string name, string? value, int minimumLength = 16)
+    {
+        if (IsUnsafe(value, minimumLength))
+            throw new InvalidOperationException($"{name} must be configured with a non-placeholder secret of at least {minimumLength} characters.");
+    }
+
+    public static bool IsConnectionStringUnsafe(string? connectionString, int minimumPasswordLength = 16)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return true;
+        try
+        {
+            var values = new DbConnectionStringBuilder { ConnectionString = connectionString };
+            var password = values.ContainsKey("Password")
+                ? values["Password"]?.ToString()
+                : values.ContainsKey("Pwd")
+                    ? values["Pwd"]?.ToString()
+                    : null;
+            return IsUnsafe(password, minimumPasswordLength);
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+    }
+}
