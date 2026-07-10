@@ -36,20 +36,62 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '9.0.306'
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: '1.3.14'
 
       - name: Restore backend
-        run: dotnet restore backend/NoCTF.slnx
+        run: dotnet restore backend/NoCTF.slnx --locked-mode
+
+      - name: Audit backend dependencies
+        shell: bash
+        run: |
+          dotnet list backend/NoCTF.slnx package --vulnerable --include-transitive --format json > vulnerable.json
+          if grep -q '"vulnerabilities"' vulnerable.json; then
+            cat vulnerable.json
+            exit 1
+          fi
+          dotnet list backend/NoCTF.slnx package --deprecated --include-transitive --format json > deprecated.json
+          if grep -q '"deprecationReasons"' deprecated.json; then
+            cat deprecated.json
+            exit 1
+          fi
 
       - name: Build backend
-        run: dotnet build backend/NoCTF.slnx --no-restore
+        run: dotnet build backend/NoCTF.slnx --configuration Release --no-restore
 
       - name: Test backend
-        run: dotnet test backend/NoCTF.slnx --no-build
+        env:
+          NOCTF_REDIS_INTEGRATION: 127.0.0.1:6379,abortConnect=false
+        run: dotnet test backend/NoCTF.slnx --configuration Release --no-build
+
+      - name: Verify analyzers and migration model
+        shell: bash
+        run: |
+          dotnet format backend/NoCTF.slnx analyzers --verify-no-changes --no-restore --severity warn
+          dotnet tool install --global dotnet-ef --version 8.0.11
+          dotnet ef migrations has-pending-model-changes \
+            --project backend/src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj \
+            --startup-project backend/src/NoCTF.API/NoCTF.API.csproj \
+            --configuration Release --no-build
+
+      - name: Validate Kubernetes manifests
+        run: >-
+          docker run --rm
+          -v "$PWD/deploy/k8s:/manifests:ro"
+          ghcr.io/yannh/kubeconform@sha256:85dbef6b4b312b99133decc9c6fc9495e9fc5f92293d4ff3b7e1b30f5611823c
+          -strict -summary /manifests
+
+      - name: Validate Compose deployment
+        env:
+          POSTGRES_PASSWORD: ci-postgres-password-123456
+          JWT_SECRET: ci-jwt-secret-value-with-at-least-32-characters
+          SEED_ADMIN_PASSWORD: ci-admin-password-123456
+          RUNNER_API_KEY: ci-runner-api-key-value-123456789
+          MINIO_ROOT_PASSWORD: ci-minio-password-123456
+        run: docker compose -f deploy/docker-compose.yml config -q
 
       - name: Install frontend dependencies
         working-directory: frontend

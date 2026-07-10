@@ -466,3 +466,68 @@ spec:
           protocol: TCP
         - port: 6443
           protocol: TCP
+
+---
+# 12. Allow the migration job to reach PostgreSQL.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: migration-to-postgres
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: migration
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+          protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-migration-to-postgres
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: migration
+      ports:
+        - port: 5432
+          protocol: TCP
+
+---
+# 13. Allow the backend to poll plugin agents in Runner-managed namespaces.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-to-runner-namespaces
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/managed-by: noctf-runner
