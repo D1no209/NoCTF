@@ -23,6 +23,14 @@ kubectl create secret generic noctf-secrets \
   --from-literal=minio-secret-key='your-minio-secret-key'
 ```
 
+Apply generated secret output with `--dry-run=client -o yaml | kubectl apply -f -`
+when the empty Secret manifest has already been installed. Create the TLS secret
+before exposing the Ingress:
+
+```bash
+kubectl create secret tls noctf-tls --namespace noctf --cert=tls.crt --key=tls.key
+```
+
 ## Building Images
 
 ```bash
@@ -74,7 +82,9 @@ kubectl apply -f runner-rbac.yaml
 kubectl apply -f runner-deployment.yaml
 kubectl apply -f runner-service.yaml
 
-# 5. Application
+# 5. Database migration and application
+kubectl apply -f migration-job.yaml
+kubectl wait --for=condition=complete job/noctf-db-migrate -n noctf --timeout=300s
 kubectl apply -f backend-deployment.yaml
 kubectl apply -f backend-service.yaml
 kubectl apply -f worker-deployment.yaml

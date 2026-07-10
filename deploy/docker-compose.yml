@@ -63,7 +63,7 @@ services:
       JwtSettings__Secret: ${JWT_SECRET}
       JwtSettings__Issuer: ${JWT_ISSUER:-NoCTF}
       JwtSettings__Audience: ${JWT_AUDIENCE:-NoCTF}
-      Database__AutoMigrate: "true"
+      Database__AutoMigrate: "false"
       SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
       SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
@@ -71,7 +71,7 @@ services:
       StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
       Runner__BaseUrl: http://runner:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
-      Runner__ApiKey: ${RUNNER_API_KEY:-dev-runner-token-change-me}
+      Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
       Runner__UtilityNetwork: ${RUNNER_UTILITY_NETWORK:-deploy_default}
       InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
     volumes:
@@ -83,6 +83,8 @@ services:
         condition: service_healthy
       runner:
         condition: service_started
+      migration:
+        condition: service_completed_successfully
     ports:
       - "80:8080"
 
@@ -104,10 +106,42 @@ services:
       StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
       Runner__BaseUrl: http://runner:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
-      Runner__ApiKey: ${RUNNER_API_KEY:-dev-runner-token-change-me}
+      Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
       Runner__UtilityNetwork: ${RUNNER_UTILITY_NETWORK:-deploy_default}
     volumes:
       - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      runner:
+        condition: service_started
+      migration:
+        condition: service_completed_successfully
+
+  migration:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: api
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
+    command: ["--migrate-only"]
+    restart: "no"
+    environment:
+      ConnectionStrings__DefaultConnection: >-
+        Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      JwtSettings__Secret: ${JWT_SECRET:?set JWT_SECRET}
+      SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
+      SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
+      SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
+      StorageProvider__Local__BasePath: /app/uploads
+      Runner__BaseUrl: http://runner:8080
+      Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy

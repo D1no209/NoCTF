@@ -1,33 +1,31 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: batch/v1
+kind: Job
 metadata:
-  name: worker
+  name: noctf-db-migrate
   namespace: noctf
   labels:
-    app: worker
+    app: migration
     app.kubernetes.io/part-of: noctf
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: worker
+  backoffLimit: 3
   template:
     metadata:
       labels:
-        app: worker
+        app: migration
     spec:
+      restartPolicy: OnFailure
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
-        fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: worker
-          image: noctf-worker:latest
+        - name: migrate
+          image: noctf-backend:latest
           imagePullPolicy: IfNotPresent
+          command: ["dotnet", "NoCTF.API.dll", "--migrate-only"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -44,6 +42,16 @@ spec:
                   key: db-password
             - name: ConnectionStrings__DefaultConnection
               value: "Host=postgres;Port=5432;Database=noctf;Username=postgres;Password=$(DB_PASSWORD)"
+            - name: JwtSettings__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: jwt-secret
+            - name: SeedAdmin__Password
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: seed-admin-password
             - name: Runner__ApiKey
               valueFrom:
                 secretKeyRef:
@@ -64,7 +72,7 @@ spec:
               cpu: "100m"
               memory: "128Mi"
             limits:
-              cpu: "1"
+              cpu: "500m"
               memory: "512Mi"
           volumeMounts:
             - name: tmp
@@ -72,4 +80,4 @@ spec:
       volumes:
         - name: tmp
           emptyDir:
-            sizeLimit: 256Mi
+            sizeLimit: 128Mi

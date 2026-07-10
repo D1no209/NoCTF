@@ -17,10 +17,22 @@ spec:
         app: backend
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: backend
           image: noctf-backend:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
           envFrom:
@@ -68,23 +80,30 @@ spec:
               memory: "1Gi"
           readinessProbe:
             httpGet:
-              path: /api/health
+              path: /api/health/ready
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /api/health
+              path: /api/health/live
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 15
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           # AWD challenge mode requires Docker socket access for container orchestration.
           # Kubernetes-backed Runner is the recommended production boundary.
           # Uncomment the Docker socket volumeMount and volume below only for Docker-backed Runner testing.
           # volumeMounts:
           #   - name: docker-sock
           #     mountPath: /var/run/docker.sock
-      # volumes:
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+      # Docker-backed testing may add this volume:
       #   - name: docker-sock
       #     hostPath:
       #       path: /var/run/docker.sock
