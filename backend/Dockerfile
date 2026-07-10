@@ -1,5 +1,5 @@
 # Frontend build stage
-FROM oven/bun:1 AS frontend-build
+FROM oven/bun:1.3.14 AS frontend-build
 WORKDIR /src/frontend
 
 COPY frontend/package.json frontend/bun.lock ./
@@ -9,7 +9,7 @@ COPY frontend/ ./
 RUN bun run build
 
 # Backend build stage
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0.422 AS build
 WORKDIR /src/backend
 
 # Copy solution and project files for layer caching
@@ -52,7 +52,7 @@ RUN mkdir -p /app/api/plugins /app/worker /app/runner && \
     dotnet publish src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj -c Release -o /app/api/plugins --no-restore
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS api
+FROM mcr.microsoft.com/dotnet/aspnet:8.0.28 AS api
 WORKDIR /app
 
 COPY --from=build /app/api .
@@ -62,14 +62,14 @@ EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "NoCTF.API.dll"]
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS worker
+FROM mcr.microsoft.com/dotnet/aspnet:8.0.28 AS worker
 WORKDIR /app
 
 COPY --from=build /app/worker .
 
 ENTRYPOINT ["dotnet", "NoCTF.Worker.dll"]
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runner
+FROM mcr.microsoft.com/dotnet/aspnet:8.0.28 AS runner
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg && \
