@@ -3,10 +3,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
+using System.Text.Json;
 
 namespace NoCTF.Plugins.KoH;
 
@@ -18,7 +20,6 @@ public sealed class KohPollEngine(
     ILogger<KohPollEngine> logger) : BackgroundService
 {
     private const int PollingIntervalSeconds = 5;
-    private readonly Dictionary<Guid, DateTime> _lastPollByCompetition = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -51,6 +52,7 @@ public sealed class KohPollEngine(
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var agentClient = scope.ServiceProvider.GetRequiredService<KohAgentClient>();
         var scoreEngine = scope.ServiceProvider.GetRequiredService<KohScoreEngine>();
+        var executionLease = scope.ServiceProvider.GetRequiredService<ICompetitionExecutionLease>();
 
         var now = DateTime.UtcNow;
 
@@ -65,16 +67,32 @@ public sealed class KohPollEngine(
         foreach (var competition in competitions)
         {
             var interval = TimeSpan.FromSeconds(Math.Clamp(competition.PollIntervalSeconds ?? 30, 5, 3600));
-            if (_lastPollByCompetition.TryGetValue(competition.Id, out var lastPoll) &&
-                now - lastPoll < interval)
-            {
+            await using var lease = await executionLease.TryAcquireAsync(db, "koh-poll", competition.Id, ct);
+            if (lease is null)
                 continue;
-            }
+
+            var state = await db.CompetitionEngineStates
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(s =>
+                    s.CompetitionId == competition.Id && s.EngineKey == "koh-poll", ct);
+            if (state?.LastExecutedAt is { } lastPoll && now - lastPoll < interval)
+                continue;
+
+            state ??= new CompetitionEngineState
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competition.Id,
+                EngineKey = "koh-poll"
+            };
+            if (db.Entry(state).State == EntityState.Detached)
+                db.CompetitionEngineStates.Add(state);
+            state.LastExecutedAt = now;
+            state.UpdatedAt = now;
+            await db.SaveChangesAsync(ct);
 
             try
             {
                 await PollCompetitionAsync(scope.ServiceProvider, db, agentClient, scoreEngine, competition, now, ct);
-                _lastPollByCompetition[competition.Id] = now;
             }
             catch (Exception ex)
             {
@@ -137,9 +155,22 @@ public sealed class KohPollEngine(
             var gameBox = gameBoxes.FirstOrDefault(g => g.ChallengeId == challenge.Id);
             if (gameBox is null) continue;
 
-            var host = gameBox.ContainerInstanceId ?? "localhost";
+            var internalPorts = ReadPorts(gameBox.InternalPortMappingsJson);
+            var publishedPorts = ReadPorts(gameBox.PortMappingsJson);
+            var host = gameBox.InternalHost ?? gameBox.PublicHost;
+            var reachablePort = gameBox.InternalHost is not null
+                ? internalPorts.GetValueOrDefault(agentPort, agentPort)
+                : publishedPorts.GetValueOrDefault(agentPort, agentPort);
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                logger.LogWarning(
+                    "KoH game box {GameBoxId} has no routable endpoint for challenge {ChallengeId}.",
+                    gameBox.Id,
+                    challenge.Id);
+                continue;
+            }
 
-            var status = await agentClient.GetStatusAsync(host, agentPort, apiKey, ct);
+            var status = await agentClient.GetStatusAsync(host, reachablePort, apiKey, ct);
             var controllerIdentifier = status?.Success == true ? status.Data?.Identifier : null;
 
             Guid? controllerTeamId = null;
@@ -157,6 +188,20 @@ public sealed class KohPollEngine(
             await scoreEngine.UpdateControlAsync(
                 competition.Id, challenge.Id,
                 controllerTeamId, now, controlPoints, ct);
+        }
+    }
+
+    private static Dictionary<int, int> ReadPorts(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return [];
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<int, int>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
         }
     }
 }

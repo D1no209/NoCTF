@@ -14,6 +14,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChallengeFeatureRegistry, ChallengeFeatureRegistry>();
         services.AddScoped<IChallengeAdminFeatureRegistry, ChallengeAdminFeatureRegistry>();
         services.AddScoped<ICompetitionJobRegistry, CompetitionJobRegistry>();
+        services.AddScoped<ICompetitionJobHandler, CtfScoreRebuildJobHandler>();
+        services.AddSingleton<ICompetitionExecutionLease, CompetitionExecutionLease>();
         services.AddScoped<ICompetitionScoringProfileResolver, CompetitionScoringProfileResolver>();
         services.AddScoped<IScoreSignalEmitter, ScoreSignalEmitter>();
         services.AddScoped<IScoreEventWriter, ScoreEventWriter>();

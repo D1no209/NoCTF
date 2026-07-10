@@ -45,7 +45,9 @@ internal static class ContainerCleanupRuntime
             .IgnoreQueryFilters()
             .Where(g => g.CompetitionId == competitionId && (!teamId.HasValue || g.TeamId == teamId.Value))
             .ToListAsync(ct);
-        foreach (var box in boxes.Where(box => !string.IsNullOrWhiteSpace(box.ContainerInstanceId)))
+        foreach (var box in boxes.Where(box =>
+                     !string.IsNullOrWhiteSpace(box.ContainerInstanceId) ||
+                     !string.IsNullOrWhiteSpace(box.ComposeProjectName)))
         {
             try
             {

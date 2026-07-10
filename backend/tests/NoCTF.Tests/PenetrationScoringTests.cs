@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -9,6 +11,58 @@ namespace NoCTF.Tests;
 
 public class PenetrationScoringTests
 {
+    [Fact]
+    public async Task CtfRebuild_DelegatesPenetrationChallengesAndRestoresStageBloodScores()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var flagId = Guid.NewGuid();
+        var firstTeam = Guid.NewGuid();
+        var bannedTeam = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        db.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            CompetitionId = competitionId,
+            Title = "CTF",
+            OwnerId = Guid.NewGuid(),
+            GameModeType = GameModeType.Ctf,
+            ModeKey = "ctf",
+            Status = CompetitionStatus.Running,
+            StartTime = DateTime.UtcNow.AddHours(-1),
+            EndTime = DateTime.UtcNow.AddHours(1),
+            FirstBloodBonusPercent = 20
+        });
+        db.Challenges.Add(new Challenge
+        {
+            Id = challengeId,
+            CompetitionId = competitionId,
+            Title = "Range",
+            TypeId = PenetrationConstants.TypeId,
+            EnableBloodBonus = true,
+            CreatedAt = DateTime.UtcNow
+        });
+        db.PenetrationFlags.Add(Flag(competitionId, challengeId, flagId, 200));
+        SeedTeam(db, competitionId, firstTeam, "First");
+        SeedTeam(db, competitionId, bannedTeam, "Banned", isBanned: true);
+        SeedSubmission(db, competitionId, firstTeam, challengeId, flagId, DateTime.UtcNow.AddMinutes(-2));
+        SeedSubmission(db, competitionId, bannedTeam, challengeId, flagId, DateTime.UtcNow.AddMinutes(-1));
+        await db.SaveChangesAsync();
+
+        var rebuilder = new CtfScoreRebuilder(
+            db,
+            [new PenetrationHandlerStub()],
+            [new PenetrationScoreRebuildContributor(db)]);
+        await rebuilder.RebuildCompetitionAsync(competitionId);
+
+        var events = await db.ScoreEvents.IgnoreQueryFilters().ToListAsync();
+        Assert.Equal(2, events.Count);
+        Assert.DoesNotContain(events, e => e.TeamId == bannedTeam);
+        Assert.Contains(events, e => e.ScoringKey == ScoringKeys.PenetrationStage && e.PointsDelta == 200);
+        Assert.Contains(events, e => e.ScoringKey == ScoringKeys.PenetrationBloodBonus && e.PointsDelta == 40);
+        Assert.DoesNotContain(events, e => e.ScoringKey == ScoringKeys.DecaySolve);
+    }
+
     [Fact]
     public async Task StageStrategy_WritesOneScoreEventForStageSolve()
     {
@@ -95,6 +149,7 @@ public class PenetrationScoringTests
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
         return new ApplicationDbContext(options, new PenetrationScoringTenantContext(competitionId));
     }
@@ -158,6 +213,17 @@ public class PenetrationScoringTests
             SubmittedAt = submittedAt,
             IpAddress = "127.0.0.1"
         });
+
+    private sealed class PenetrationHandlerStub : IChallengeSubmissionHandler
+    {
+        public string TypeId => PenetrationConstants.TypeId;
+
+        public Task<ChallengeSubmissionResult> ProcessSubmissionAsync(
+            SubmissionContext context,
+            Challenge challenge,
+            CancellationToken ct = default)
+            => Task.FromResult(new ChallengeSubmissionResult(SubmissionResult.WrongFlag));
+    }
 }
 
 file class PenetrationScoringTenantContext(Guid competitionId) : ITenantContext

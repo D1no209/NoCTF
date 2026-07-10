@@ -6,6 +6,9 @@ using NoCTF.Application;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Events;
 using NoCTF.Application.Scoring;
+using NoCTF.Application.BackgroundTasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -23,6 +26,8 @@ public class CtfGameMode : IGameMode
     private readonly IScoreSignalEmitter _scoreSignalEmitter;
     private readonly ICtfScoreRebuilder _scoreRebuilder;
     private readonly IChallengeSubmissionHandlerRegistry _challengeSubmissionHandlers;
+    private readonly IBackgroundTaskQueue? _backgroundTasks;
+    private readonly ILogger<CtfGameMode> _logger;
 
     public GameModeType Type => GameModeType.Ctf;
 
@@ -31,13 +36,17 @@ public class CtfGameMode : IGameMode
         ISubmissionEventHandler submissionEventHandler,
         IScoreSignalEmitter scoreSignalEmitter,
         ICtfScoreRebuilder scoreRebuilder,
-        IChallengeSubmissionHandlerRegistry challengeSubmissionHandlers)
+        IChallengeSubmissionHandlerRegistry challengeSubmissionHandlers,
+        IBackgroundTaskQueue? backgroundTasks = null,
+        ILogger<CtfGameMode>? logger = null)
     {
         _db = db;
         _submissionEventHandler = submissionEventHandler;
         _scoreSignalEmitter = scoreSignalEmitter;
         _scoreRebuilder = scoreRebuilder;
         _challengeSubmissionHandlers = challengeSubmissionHandlers;
+        _backgroundTasks = backgroundTasks;
+        _logger = logger ?? NullLogger<CtfGameMode>.Instance;
     }
 
     public Task InitializeAsync(GameContext context, CancellationToken cancellationToken = default)
@@ -215,7 +224,40 @@ public class CtfGameMode : IGameMode
             OccurredAt: submission.SubmittedAt), cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
-        await _scoreRebuilder.RebuildChallengeAsync(context.CompetitionId, context.ChallengeId, cancellationToken);
+        try
+        {
+            await _scoreRebuilder.RebuildChallengeAsync(
+                context.CompetitionId,
+                context.ChallengeId,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to schedule score rebuild for competition {CompetitionId}, challenge {ChallengeId}.",
+                context.CompetitionId,
+                context.ChallengeId);
+            if (_backgroundTasks is not null)
+            {
+                try
+                {
+                    await _backgroundTasks.EnqueueAsync(
+                        context.CompetitionId,
+                        CtfScoreRebuildJobHandler.JobType,
+                        new CtfScoreRebuildPayload(context.ChallengeId),
+                        CancellationToken.None);
+                }
+                catch (Exception enqueueException)
+                {
+                    _logger.LogError(
+                        enqueueException,
+                        "Failed to enqueue fallback score rebuild for competition {CompetitionId}, challenge {ChallengeId}.",
+                        context.CompetitionId,
+                        context.ChallengeId);
+                }
+            }
+        }
 
         // Load team name for notification
         var team = await _db.Teams
@@ -236,14 +278,24 @@ public class CtfGameMode : IGameMode
             .SumAsync(e => e.PointsDelta, cancellationToken);
 
         // Fire post-solve event: updates leaderboard cache + SignalR notifications
-        await _submissionEventHandler.HandleAsync(new SubmissionSolvedEvent(
-            CompetitionId: context.CompetitionId,
-            ChallengeId: context.ChallengeId,
-            ChallengeName: challenge.Title,
-            TeamId: context.TeamId,
-            TeamName: teamName,
-            IsFirstBlood: isFirstBlood,
-            PointsAwarded: pointsAwarded), cancellationToken);
+        try
+        {
+            await _submissionEventHandler.HandleAsync(new SubmissionSolvedEvent(
+                CompetitionId: context.CompetitionId,
+                ChallengeId: context.ChallengeId,
+                ChallengeName: challenge.Title,
+                TeamId: context.TeamId,
+                TeamName: teamName,
+                IsFirstBlood: isFirstBlood,
+                PointsAwarded: pointsAwarded), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Post-solve notification failed for submission {SubmissionId}; the accepted solve remains committed.",
+                submission.Id);
+        }
 
         return SubmissionResult.Accepted;
     }

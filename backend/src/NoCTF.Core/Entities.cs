@@ -142,6 +142,8 @@ public class Challenge : ITenantEntity
     public bool EnableBloodBonus { get; set; }
     public string? AttachmentUrl { get; set; }
     public string? PatchTemplateUrl { get; set; }
+    public string? AttachmentStorageKey { get; set; }
+    public string? PatchTemplateStorageKey { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public string FlagPrefix { get; set; } = "flag";
@@ -172,6 +174,8 @@ public class ChallengeTemplate
     public string TypeId { get; set; } = "ctf";
     public string? AttachmentUrl { get; set; }
     public string? PatchTemplateUrl { get; set; }
+    public string? AttachmentStorageKey { get; set; }
+    public string? PatchTemplateStorageKey { get; set; }
     public ChallengeDeploymentType DeploymentType { get; set; } = ChallengeDeploymentType.NoAttachment;
     public int? ExposedPort { get; set; }
     public string FlagEnvironmentVariable { get; set; } = "NOCTF_FLAG_UUID";
@@ -528,6 +532,11 @@ public class AwdGameBox : ITenantEntity
     public string? EntryUrl { get; set; }
     public string? OrchestrationNamespace { get; set; }
     public string PortMappingsJson { get; set; } = "{}";
+    public string RuntimeKind { get; set; } = "container";
+    public string? ComposeProjectName { get; set; }
+    public string? ComposeYaml { get; set; }
+    public string? InternalHost { get; set; }
+    public string InternalPortMappingsJson { get; set; } = "{}";
     public DateTime? ExpiresAt { get; set; }
     public DateTime? LastInstanceActionAt { get; set; }
     public DateTime? LastFlagRefreshedAt { get; set; }
@@ -724,6 +733,17 @@ public class BackgroundTaskItem : ITenantEntity
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? LockedUntil { get; set; }
+    public string? LockOwner { get; set; }
+}
+
+/// <summary>Durable scheduling state for a plugin-owned competition engine.</summary>
+public class CompetitionEngineState : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public string EngineKey { get; set; } = string.Empty;
+    public DateTime? LastExecutedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 public static class AwdpPlayerDefenseResult

@@ -4,10 +4,14 @@ using Microsoft.EntityFrameworkCore.Storage;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
+using NoCTF.Application.CompetitionModes;
 
 namespace NoCTF.Application.Scoring;
 
-public sealed class CtfScoreRebuilder(ApplicationDbContext db) : ICtfScoreRebuilder
+public sealed class CtfScoreRebuilder(
+    ApplicationDbContext db,
+    IEnumerable<IChallengeSubmissionHandler>? customSubmissionHandlers = null,
+    IEnumerable<IScoreRebuildContributor>? contributors = null) : ICtfScoreRebuilder
 {
     private sealed record RankedSolve(Guid TeamId, DateTime SubmittedAt, int Rank, Guid? SignalId);
 
@@ -49,19 +53,25 @@ public sealed class CtfScoreRebuilder(ApplicationDbContext db) : ICtfScoreRebuil
             return;
         }
 
-        var challenges = await db.Challenges
+        var allChallenges = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(c => c.CompetitionId == competitionId && challengeIds.Contains(c.Id))
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(ct);
-        if (challenges.Count == 0 && !removeAllCompetitionCtfEvents)
+        if (allChallenges.Count == 0 && !removeAllCompetitionCtfEvents)
         {
             await rebuildLock.CommitAsync(ct);
             return;
         }
 
-        var activeChallengeIds = challenges.Select(c => c.Id).ToHashSet();
+        var activeChallengeIds = allChallenges.Select(c => c.Id).ToHashSet();
+        var customTypeIds = (customSubmissionHandlers ?? [])
+            .Select(handler => handler.TypeId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var challenges = allChallenges
+            .Where(challenge => !customTypeIds.Contains(challenge.TypeId))
+            .ToList();
         var staleQuery = db.ScoreEvents
             .IgnoreQueryFilters()
             .Where(e =>
@@ -159,6 +169,16 @@ public sealed class CtfScoreRebuilder(ApplicationDbContext db) : ICtfScoreRebuil
 
         db.ScoreEvents.AddRange(events);
         await db.SaveChangesAsync(ct);
+
+        foreach (var contributor in contributors ?? [])
+        {
+            await contributor.RebuildAsync(
+                competition,
+                activeChallengeIds,
+                removeAllCompetitionCtfEvents,
+                ct);
+        }
+
         await rebuildLock.CommitAsync(ct);
     }
 

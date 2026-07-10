@@ -5,11 +5,59 @@ using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 using NoCTF.Plugins.Penetration;
+using NoCTF.Application.BackgroundTasks;
 
 namespace NoCTF.Tests;
 
 public class PenetrationInstanceServiceTests
 {
+    [Fact]
+    public async Task ConcurrentTransitions_OnlyOneOperationOwnsTheInstanceLease()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        SeedChallenge(db, competitionId, challengeId);
+        db.TeamChallengeInstances.Add(new TeamChallengeInstance
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            Status = PenetrationInstanceStatus.Running,
+            ComposeProjectName = "range-concurrent",
+            RenderedComposeYaml = "services:\n  web:\n    image: nginx:alpine\n",
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-5)
+        });
+        await db.SaveChangesAsync();
+
+        var manager = new FakeComposeContainerManager(Guid.NewGuid())
+        {
+            ComposeDownGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
+        };
+        var service = new PenetrationInstanceService(
+            db,
+            manager,
+            new ConfigurationBuilder().Build(),
+            new PenetrationComposeBuilder(),
+            new PenetrationFlagService(db),
+            new CompetitionExecutionLease());
+
+        var stopTask = service.StopAsync(competitionId, challengeId, teamId, Guid.NewGuid(), CancellationToken.None);
+        await manager.ComposeDownEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.DestroyAsync(competitionId, challengeId, teamId, Guid.NewGuid(), false, CancellationToken.None));
+        Assert.Equal("instance_busy", error.Message);
+
+        manager.ComposeDownGate.SetResult();
+        var stopped = await stopTask;
+        Assert.Equal("Stopped", stopped.Status);
+        Assert.Equal(1, manager.ComposeDownCalls);
+    }
+
     [Fact]
     public async Task ResetAsync_RestartsImmediatelyAfterResetAndRegeneratesDynamicFlags()
     {
@@ -210,6 +258,8 @@ public class PenetrationInstanceServiceTests
         public int ComposeUpCalls { get; private set; }
         public int ComposeDownCalls { get; private set; }
         public bool ThrowOnComposeDown { get; init; }
+        public TaskCompletionSource? ComposeDownGate { get; init; }
+        public TaskCompletionSource ComposeDownEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task<ContainerInstance> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
@@ -235,12 +285,14 @@ public class PenetrationInstanceServiceTests
                 DateTime.UtcNow));
         }
 
-        public Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken cancellationToken = default)
+        public async Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken cancellationToken = default)
         {
             ComposeDownCalls++;
+            ComposeDownEntered.TrySetResult();
             if (ThrowOnComposeDown)
                 throw new InvalidOperationException("compose down failed");
-            return Task.CompletedTask;
+            if (ComposeDownGate is not null)
+                await ComposeDownGate.Task.WaitAsync(cancellationToken);
         }
 
         public Task<ComposeStatus> GetComposeStatusAsync(

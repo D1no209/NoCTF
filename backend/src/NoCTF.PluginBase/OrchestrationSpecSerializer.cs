@@ -19,9 +19,9 @@ public static class OrchestrationSpecSerializer
         {
             return JsonSerializer.Deserialize<OrchestrationSpec>(json, JsonOptions) ?? new OrchestrationSpec();
         }
-        catch
+        catch (JsonException ex)
         {
-            return new OrchestrationSpec();
+            throw new InvalidOperationException("Orchestration JSON is invalid.", ex);
         }
     }
 

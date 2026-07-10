@@ -62,7 +62,11 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
                 ExpectedStopAt: config.Ttl.HasValue ? DateTime.UtcNow.Add(config.Ttl.Value) : null,
                 PublicHost: publicHost,
                 EntryUrl: entryUrl,
-                OrchestrationNamespace: namespaceName);
+                OrchestrationNamespace: namespaceName,
+                InternalHost: port is > 0 ? $"{name}.{namespaceName}.svc.cluster.local" : null,
+                InternalPortMappings: port is > 0
+                    ? new Dictionary<int, int> { [port.Value] = port.Value }
+                    : null);
         }
         catch
         {
@@ -285,7 +289,15 @@ public sealed class KubernetesManager(KubernetesProvider provider, ILogger<Kuber
                 NodeId: Guid.TryParse(nodeIdValue, out var nodeId) ? nodeId : null,
                 PublishedPorts: ports,
                 PublicHost: publicHost,
-                EntryUrl: entryUrl));
+                EntryUrl: entryUrl,
+                InternalHost: service is null ? null : $"{serviceName}.{namespaceName}.svc.cluster.local",
+                InternalPortMappings: service is null
+                    ? null
+                    : service.Spec.Ports
+                        .Where(p => p.Port > 0)
+                        .ToDictionary(
+                            p => int.TryParse(p.TargetPort?.Value, out var target) && target > 0 ? target : p.Port,
+                            p => p.Port)));
         }
 
         var status = result.Count == 0

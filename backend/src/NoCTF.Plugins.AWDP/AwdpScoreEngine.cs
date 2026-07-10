@@ -197,8 +197,9 @@ public class AwdpScoreEngine(
     {
         try
         {
+            var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(competitionId, ct);
             var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
-            await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+            await leaderboardCache.UpdateAsync(competitionId, entries, cacheVersion, ct);
             var payload = entries.Select(e => new LeaderboardEntryPayload(
                 e.Rank,
                 e.TeamId,

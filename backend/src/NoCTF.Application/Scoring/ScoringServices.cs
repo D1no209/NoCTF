@@ -106,7 +106,23 @@ public class ScoreSignalEmitter(
         if (existing is null)
         {
             db.ScoreSignals.Add(entity);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                db.Entry(entity).State = EntityState.Detached;
+                var concurrent = await db.ScoreSignals
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(s =>
+                        s.CompetitionId == signal.CompetitionId &&
+                        s.IdempotencyKey == signal.IdempotencyKey, ct);
+                if (concurrent is null)
+                    throw;
+                entity = concurrent;
+                existing = entity;
+            }
         }
 
         var profile = await profileResolver.ResolveAsync(signal.CompetitionId, ct);
@@ -165,7 +181,22 @@ public class ScoreEventWriter(ApplicationDbContext db) : IScoreEventWriter
         };
 
         db.ScoreEvents.Add(entity);
-        await db.SaveChangesAsync(ct);
-        return entity;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return entity;
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(entity).State = EntityState.Detached;
+            var concurrent = await db.ScoreEvents
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(e =>
+                    e.CompetitionId == scoreEvent.CompetitionId &&
+                    e.IdempotencyKey == scoreEvent.IdempotencyKey, ct);
+            if (concurrent is null)
+                throw;
+            return concurrent;
+        }
     }
 }
