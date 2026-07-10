@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
+using NoCTF.Application.BackgroundTasks;
 
 namespace NoCTF.Plugins.Penetration;
 
@@ -12,7 +13,8 @@ public class PenetrationInstanceService(
     IContainerManager containerManager,
     IConfiguration configuration,
     PenetrationComposeBuilder composeBuilder,
-    PenetrationFlagService flagService)
+    PenetrationFlagService flagService,
+    ICompetitionExecutionLease? executionLease = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly PenetrationInstanceStatus[] BusyStatuses =
@@ -68,6 +70,18 @@ public class PenetrationInstanceService(
     }
 
     public async Task<PenetrationInstanceDto> StartAsync(
+        Guid competitionId,
+        Guid challengeId,
+        Guid teamId,
+        Guid userId,
+        CancellationToken ct)
+    {
+        await using var transitionLease = await AcquireTransitionLeaseAsync(
+            competitionId, challengeId, teamId, ct);
+        return await StartCoreAsync(competitionId, challengeId, teamId, userId, ct);
+    }
+
+    private async Task<PenetrationInstanceDto> StartCoreAsync(
         Guid competitionId,
         Guid challengeId,
         Guid teamId,
@@ -203,6 +217,8 @@ public class PenetrationInstanceService(
         Guid userId,
         CancellationToken ct)
     {
+        await using var transitionLease = await AcquireTransitionLeaseAsync(
+            competitionId, challengeId, teamId, ct);
         var challenge = await LoadChallengeAsync(competitionId, challengeId, ct);
         var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, ct);
         var config = PenetrationTopologyService.ReadConfig(challenge);
@@ -241,6 +257,8 @@ public class PenetrationInstanceService(
         bool adminOverride,
         CancellationToken ct)
     {
+        await using var transitionLease = await AcquireTransitionLeaseAsync(
+            competitionId, challengeId, teamId, ct);
         var challenge = await LoadChallengeAsync(competitionId, challengeId, ct);
         var config = PenetrationTopologyService.ReadConfig(challenge);
         if (!adminOverride)
@@ -274,7 +292,7 @@ public class PenetrationInstanceService(
         await db.SaveChangesAsync(ct);
         AddCompetitionLog(db, competitionId, adminOverride ? "penetration.admin.instance_reset" : "penetration.instance.reset", "Penetration range instance was reset.", teamId: teamId, userId: userId, challengeId: challengeId, metadata: new { instanceId = instance.Id, instance.ResetCount });
         await db.SaveChangesAsync(ct);
-        return await StartAsync(competitionId, challengeId, teamId, userId, ct);
+        return await StartCoreAsync(competitionId, challengeId, teamId, userId, ct);
     }
 
     public async Task<PenetrationInstanceDto> DestroyAsync(
@@ -285,6 +303,8 @@ public class PenetrationInstanceService(
         bool adminOverride,
         CancellationToken ct)
     {
+        await using var transitionLease = await AcquireTransitionLeaseAsync(
+            competitionId, challengeId, teamId, ct);
         var challenge = await LoadChallengeAsync(competitionId, challengeId, ct);
         var config = PenetrationTopologyService.ReadConfig(challenge);
         var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, ct);
@@ -474,6 +494,21 @@ public class PenetrationInstanceService(
             instance.UpdatedAt = DateTime.UtcNow;
             throw;
         }
+    }
+
+    private async Task<IAsyncDisposable> AcquireTransitionLeaseAsync(
+        Guid competitionId,
+        Guid challengeId,
+        Guid teamId,
+        CancellationToken ct)
+    {
+        var leaseService = executionLease ?? new CompetitionExecutionLease();
+        return await leaseService.TryAcquireAsync(
+                   db,
+                   $"penetration-instance:{teamId:N}:{challengeId:N}",
+                   competitionId,
+                   ct)
+               ?? throw new InvalidOperationException("instance_busy");
     }
 
     private async Task MarkOperationFailedAsync(TeamChallengeInstance instance, Exception ex, CancellationToken ct)

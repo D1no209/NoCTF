@@ -177,9 +177,8 @@ public class AwdFlagServiceTests
     {
         // For unit tests we don't need IContainerManager (RefreshFlagsAsync not tested here)
         var containerManager = new NullContainerManager();
-        var challengeTypes = Enumerable.Empty<NoCTF.PluginBase.IChallengeType>();
         var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<AwdFlagService>.Instance;
-        return new AwdFlagService(db, containerManager, challengeTypes, logger);
+        return new AwdFlagService(db, containerManager, new AwdChallengeRuntimeConfigProvider(), logger);
     }
 
     private static void SeedCompetition(ApplicationDbContext db, Guid competitionId)

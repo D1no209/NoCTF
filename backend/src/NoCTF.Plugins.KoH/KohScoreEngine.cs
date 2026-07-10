@@ -66,8 +66,9 @@ public class KohScoreEngine(
                     SubjectId: challengeId,
                     PayloadJson: ScoringJson.Serialize(new { source = "poll" }),
                     OccurredAt: now), ct);
+                var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(competitionId, ct);
                 var entries = await leaderboard.CalculateLeaderboardAsync(competitionId, ct);
-                await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+                await leaderboardCache.UpdateAsync(competitionId, entries, cacheVersion, ct);
             }
         }
         else
@@ -91,8 +92,9 @@ public class KohScoreEngine(
 
             await db.SaveChangesAsync(ct);
             await hubNotifier.NotifyKohUpdateAsync(competitionId, challengeId, newControllerTeamId, now, ct);
+            var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(competitionId, ct);
             var entries = await leaderboard.CalculateLeaderboardAsync(competitionId, ct);
-            await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+            await leaderboardCache.UpdateAsync(competitionId, entries, cacheVersion, ct);
         }
     }
 }

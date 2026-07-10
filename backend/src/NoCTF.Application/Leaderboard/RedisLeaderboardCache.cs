@@ -6,6 +6,10 @@ namespace NoCTF.Application.Leaderboard;
 public interface IRedisLeaderboardCache
 {
     Task UpdateAsync(Guid competitionId, IReadOnlyList<LeaderboardEntry> entries, CancellationToken ct = default);
+    Task<long> ReserveUpdateVersionAsync(Guid competitionId, CancellationToken ct = default)
+        => Task.FromResult(DateTime.UtcNow.Ticks);
+    Task UpdateAsync(Guid competitionId, IReadOnlyList<LeaderboardEntry> entries, long version, CancellationToken ct = default)
+        => UpdateAsync(competitionId, entries, ct);
     Task<IReadOnlyList<LeaderboardEntry>?> GetAsync(Guid competitionId, CancellationToken ct = default);
     Task InvalidateAsync(Guid competitionId, CancellationToken ct = default);
 }
@@ -25,15 +29,49 @@ public class RedisLeaderboardCache(IConnectionMultiplexer redis) : IRedisLeaderb
 
     private static string SortedSetKey(Guid competitionId) => $"noctf:leaderboard:{competitionId}";
     private static string DataHashKey(Guid competitionId) => $"noctf:leaderboard:data:{competitionId}";
+    private static string VersionCounterKey(Guid competitionId) => $"noctf:leaderboard:version-counter:{competitionId}";
+    private static string AppliedVersionKey(Guid competitionId) => $"noctf:leaderboard:applied-version:{competitionId}";
+
+    private const string AtomicReplaceScript = """
+        local current = tonumber(redis.call('GET', KEYS[3]) or '0')
+        local incoming = tonumber(ARGV[1])
+        if incoming <= current then
+            return 0
+        end
+        redis.call('DEL', KEYS[1], KEYS[2])
+        local index = 2
+        while index <= #ARGV do
+            redis.call('ZADD', KEYS[1], ARGV[index + 1], ARGV[index])
+            redis.call('HSET', KEYS[2], ARGV[index], ARGV[index + 2])
+            index = index + 3
+        end
+        redis.call('SET', KEYS[3], incoming)
+        return 1
+        """;
 
     public async Task UpdateAsync(Guid competitionId, IReadOnlyList<LeaderboardEntry> entries, CancellationToken ct = default)
+    {
+        var version = await ReserveUpdateVersionAsync(competitionId, ct);
+        await UpdateAsync(competitionId, entries, version, ct);
+    }
+
+    public async Task<long> ReserveUpdateVersionAsync(Guid competitionId, CancellationToken ct = default)
+    {
+        var value = await redis.GetDatabase().StringIncrementAsync(VersionCounterKey(competitionId));
+        return value;
+    }
+
+    public async Task UpdateAsync(
+        Guid competitionId,
+        IReadOnlyList<LeaderboardEntry> entries,
+        long version,
+        CancellationToken ct = default)
     {
         var db = redis.GetDatabase();
         var ssKey = SortedSetKey(competitionId);
         var dataKey = DataHashKey(competitionId);
-
-        var sortedSetEntries = new SortedSetEntry[entries.Count];
-        var hashEntries = new HashEntry[entries.Count];
+        var values = new RedisValue[1 + entries.Count * 3];
+        values[0] = version;
 
         for (int i = 0; i < entries.Count; i++)
         {
@@ -42,20 +80,15 @@ public class RedisLeaderboardCache(IConnectionMultiplexer redis) : IRedisLeaderb
             // Composite score: higher is better. totalScore * 1_000_000 + tie-breaker
             double compositeScore = entry.TotalScore * 1_000_000.0 + tieBreakerOffset;
 
-            sortedSetEntries[i] = new SortedSetEntry(entry.TeamId.ToString(), compositeScore);
-            hashEntries[i] = new HashEntry(entry.TeamId.ToString(), JsonSerializer.Serialize(entry));
+            var offset = 1 + i * 3;
+            values[offset] = entry.TeamId.ToString();
+            values[offset + 1] = compositeScore;
+            values[offset + 2] = JsonSerializer.Serialize(entry);
         }
-
-        await db.KeyDeleteAsync([ssKey, dataKey]);
-
-        if (entries.Count == 0)
-            return;
-
-        var batch = db.CreateBatch();
-        var ssTask = batch.SortedSetAddAsync(ssKey, sortedSetEntries, CommandFlags.None);
-        var hashTask = batch.HashSetAsync(dataKey, hashEntries);
-        batch.Execute();
-        await Task.WhenAll(ssTask, hashTask);
+        await db.ScriptEvaluateAsync(
+            AtomicReplaceScript,
+            [ssKey, dataKey, AppliedVersionKey(competitionId)],
+            values);
     }
 
     public async Task<IReadOnlyList<LeaderboardEntry>?> GetAsync(Guid competitionId, CancellationToken ct = default)
@@ -88,7 +121,11 @@ public class RedisLeaderboardCache(IConnectionMultiplexer redis) : IRedisLeaderb
     public async Task InvalidateAsync(Guid competitionId, CancellationToken ct = default)
     {
         var db = redis.GetDatabase();
-        await db.KeyDeleteAsync([SortedSetKey(competitionId), DataHashKey(competitionId)]);
+        await db.KeyDeleteAsync([
+            SortedSetKey(competitionId),
+            DataHashKey(competitionId),
+            VersionCounterKey(competitionId),
+            AppliedVersionKey(competitionId)]);
     }
 
     private static double ComputeTieBreakerOffset(DateTime? firstSolveAt)

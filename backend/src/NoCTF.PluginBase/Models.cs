@@ -43,7 +43,9 @@ public record ContainerInstance(
     DateTime? ExpectedStopAt = null,
     string? PublicHost = null,
     string? EntryUrl = null,
-    string? OrchestrationNamespace = null
+    string? OrchestrationNamespace = null,
+    string? InternalHost = null,
+    Dictionary<int, int>? InternalPortMappings = null
 );
 
 public record ContainerRunResult(
@@ -87,7 +89,9 @@ public record ComposeServiceInstance(
     Guid? NodeId,
     Dictionary<int, int> PublishedPorts,
     string? PublicHost = null,
-    string? EntryUrl = null
+    string? EntryUrl = null,
+    string? InternalHost = null,
+    Dictionary<int, int>? InternalPortMappings = null
 );
 
 public record ComposeStatus(

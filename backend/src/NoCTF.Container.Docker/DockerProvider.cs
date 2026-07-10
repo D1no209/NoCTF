@@ -47,7 +47,7 @@ public class DockerProvider : IContainerProvider<DockerClient, DockerContainerMe
                 ? null
                 : networkedConfig.Entrypoint is { Count: > 0 }
                     ? [networkedConfig.Command]
-                    : networkedConfig.Command.Split(' '),
+                    : ["/bin/sh", "-c", networkedConfig.Command],
             Entrypoint = networkedConfig.Entrypoint?.ToList(),
             Env = networkedConfig.EnvironmentVariables?.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList() ?? [],
             Labels = networkedConfig.Labels ?? new Dictionary<string, string>(),

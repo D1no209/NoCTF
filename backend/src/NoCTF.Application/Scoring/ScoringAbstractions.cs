@@ -77,6 +77,19 @@ public interface ICtfScoreRebuilder
     Task RebuildChallengeAsync(Guid competitionId, Guid challengeId, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Allows a challenge plugin to rebuild the score events it owns while the
+/// competition-wide rebuild lock is held by the application layer.
+/// </summary>
+public interface IScoreRebuildContributor
+{
+    Task RebuildAsync(
+        Competition competition,
+        IReadOnlyCollection<Guid> challengeIds,
+        bool rebuildEntireCompetition,
+        CancellationToken ct = default);
+}
+
 public interface IScoringStrategy
 {
     string ScoringKey { get; }

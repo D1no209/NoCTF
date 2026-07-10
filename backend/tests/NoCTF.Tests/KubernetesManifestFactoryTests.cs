@@ -14,8 +14,8 @@ public class KubernetesManifestFactoryTests
         Assert.Contains(policies, p => p.Metadata.Name == "default-deny");
         var allow = Assert.Single(policies, p => p.Metadata.Name == "allow-same-instance");
         Assert.Equal(2, allow.Spec.Egress.Count);
-        var dnsRule = Assert.Single(allow.Spec.Egress.Where(rule =>
-            rule.Ports?.Any(port => port.Port.Value == "53") == true));
+        var dnsRule = Assert.Single(allow.Spec.Egress, rule =>
+            rule.Ports?.Any(port => port.Port.Value == "53") == true);
         var dnsPeer = Assert.Single(dnsRule.To);
         Assert.Equal("kube-system", dnsPeer.NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"]);
         Assert.Equal("kube-dns", dnsPeer.PodSelector.MatchLabels["k8s-app"]);

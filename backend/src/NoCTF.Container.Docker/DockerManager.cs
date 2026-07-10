@@ -21,7 +21,9 @@ public class DockerManager(DockerProvider provider) : IContainerManager
             Status: metadata.Status,
             StartedAt: DateTime.UtcNow,
             ExpectedStopAt: config.Ttl.HasValue ? DateTime.UtcNow.Add(config.Ttl.Value) : null,
-            OrchestrationNamespace: metadata.NetworkName
+            OrchestrationNamespace: metadata.NetworkName,
+            InternalHost: "127.0.0.1",
+            InternalPortMappings: metadata.Ports
         );
     }
 
@@ -236,7 +238,9 @@ public class DockerManager(DockerProvider provider) : IContainerManager
                 ContainerId: container.ID,
                 Status: container.State,
                 NodeId: nodeId,
-                PublishedPorts: ports);
+                PublishedPorts: ports,
+                InternalHost: "127.0.0.1",
+                InternalPortMappings: ports);
         }).ToList();
 
         var status = services.Count == 0

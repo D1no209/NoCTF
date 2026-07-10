@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
+using System.Text.Json;
 
 namespace NoCTF.Plugins.AWD;
 
@@ -16,18 +17,18 @@ public class AwdFlagService
 {
     private readonly ApplicationDbContext _db;
     private readonly IContainerManager _containerManager;
-    private readonly IEnumerable<IChallengeType> _challengeTypes;
+    private readonly AwdChallengeRuntimeConfigProvider _runtimeConfigProvider;
     private readonly ILogger<AwdFlagService> _logger;
 
     public AwdFlagService(
         ApplicationDbContext db,
         IContainerManager containerManager,
-        IEnumerable<IChallengeType> challengeTypes,
+        AwdChallengeRuntimeConfigProvider runtimeConfigProvider,
         ILogger<AwdFlagService> logger)
     {
         _db = db;
         _containerManager = containerManager;
-        _challengeTypes = challengeTypes;
+        _runtimeConfigProvider = runtimeConfigProvider;
         _logger = logger;
     }
 
@@ -170,21 +171,7 @@ public class AwdFlagService
             if (!challengeMap.TryGetValue(flag.ChallengeId, out var challenge))
                 continue;
 
-            var challengeType = _challengeTypes.FirstOrDefault(ct2 => ct2.TypeId == challenge.TypeId);
-            if (challengeType is null)
-            {
-                _logger.LogWarning(
-                    "RefreshFlagsAsync: no IChallengeType found for TypeId={TypeId}.", challenge.TypeId);
-                continue;
-            }
-
-            var challengeContext = new ChallengeContext(
-                ChallengeId: challenge.Id,
-                CompetitionId: competitionId,
-                FlagSecret: challenge.FlagSecret ?? string.Empty,
-                Configuration: new Dictionary<string, string>());
-
-            var containerConfig = challengeType.GetContainerConfig(challengeContext);
+            var containerConfig = _runtimeConfigProvider.Build(challenge);
             if (containerConfig is null)
             {
                 _logger.LogDebug(
@@ -200,7 +187,17 @@ public class AwdFlagService
                 ["NOCTF_FLAG"] = flag.FlagContent
             };
 
-            var newConfig = containerConfig with { EnvironmentVariables = envVars };
+            var newConfig = containerConfig with
+            {
+                EnvironmentVariables = envVars,
+                Labels = new Dictionary<string, string>
+                {
+                    ["competitionId"] = competitionId.ToString(),
+                    ["teamId"] = flag.TeamId.ToString(),
+                    ["challengeId"] = flag.ChallengeId.ToString(),
+                    ["app"] = "awd-challenge"
+                }
+            };
 
             // Find or create game box
             if (!gameBoxMap.TryGetValue((flag.TeamId, flag.ChallengeId), out var gameBox))
@@ -255,6 +252,11 @@ public class AwdFlagService
                 gameBox.PublicHost = newInstance.PublicHost;
                 gameBox.EntryUrl = newInstance.EntryUrl;
                 gameBox.OrchestrationNamespace = newInstance.OrchestrationNamespace;
+                gameBox.PortMappingsJson = JsonSerializer.Serialize(newInstance.PortMappings);
+                gameBox.RuntimeKind = "container";
+                gameBox.InternalHost = newInstance.InternalHost;
+                gameBox.InternalPortMappingsJson = JsonSerializer.Serialize(newInstance.InternalPortMappings ?? []);
+                gameBox.ExpiresAt = newInstance.ExpectedStopAt;
                 gameBox.LastFlagRefreshedAt = DateTime.UtcNow;
 
                 _logger.LogInformation(

@@ -33,4 +33,13 @@ public class OrchestrationSpecSerializerTests
         Assert.Equal("{}", new PenetrationNode().OrchestrationJson);
         Assert.Equal("docker", new AwdGameBox().ProviderType);
     }
+
+    [Fact]
+    public void Read_InvalidJson_IsRejected()
+    {
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            OrchestrationSpecSerializer.Read("{not-json}"));
+
+        Assert.Equal("Orchestration JSON is invalid.", error.Message);
+    }
 }

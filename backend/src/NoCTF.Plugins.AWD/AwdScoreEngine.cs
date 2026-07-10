@@ -103,8 +103,9 @@ public class AwdScoreEngine(
         // Refresh leaderboard and push snapshot
         try
         {
+            var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(competitionId, ct);
             var entries = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
-            await leaderboardCache.UpdateAsync(competitionId, entries, ct);
+            await leaderboardCache.UpdateAsync(competitionId, entries, cacheVersion, ct);
             var payload = entries.Select(e => new LeaderboardEntryPayload(e.Rank, e.TeamId, e.TeamName, e.TotalScore, e.SolvedCount));
             await hubNotifier.NotifyLeaderboardSnapshotAsync(competitionId, payload, ct);
         }

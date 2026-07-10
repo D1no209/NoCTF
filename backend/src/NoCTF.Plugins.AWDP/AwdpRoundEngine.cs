@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -44,6 +45,7 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
     {
         await using var scope = serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var executionLease = scope.ServiceProvider.GetRequiredService<ICompetitionExecutionLease>();
         var now = DateTime.UtcNow;
 
         var competitions = await db.Competitions
@@ -57,6 +59,10 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
 
         foreach (var competition in competitions)
         {
+            await using var lease = await executionLease.TryAcquireAsync(db, "awdp-round", competition.Id, ct);
+            if (lease is null)
+                continue;
+
             await TickCompetitionAsync(scope.ServiceProvider, db, competition, now, ct);
         }
     }
@@ -101,7 +107,11 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
             await db.SaveChangesAsync(ct);
 
             if (latestRound.RoundNumber >= totalRounds)
+            {
+                competition.Status = CompetitionStatus.Finished;
+                await db.SaveChangesAsync(ct);
                 return;
+            }
 
             await StartRoundAsync(
                 scopedServices,

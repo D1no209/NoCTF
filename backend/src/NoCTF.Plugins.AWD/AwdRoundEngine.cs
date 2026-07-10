@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -59,6 +60,7 @@ public sealed class AwdRoundEngine : BackgroundService
         await using var scope = _serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var hubNotifier = scope.ServiceProvider.GetRequiredService<IHubNotifierService>();
+        var executionLease = scope.ServiceProvider.GetRequiredService<ICompetitionExecutionLease>();
 
         var now = DateTime.UtcNow;
 
@@ -73,11 +75,14 @@ public sealed class AwdRoundEngine : BackgroundService
 
         foreach (var competition in competitions)
         {
-            await TickCompetitionAsync(scope.ServiceProvider, db, hubNotifier, competition, now, ct);
-        }
+            await using var lease = await executionLease.TryAcquireAsync(db, "awd-round", competition.Id, ct);
+            if (lease is null)
+                continue;
 
-        if (db.ChangeTracker.HasChanges())
-            await db.SaveChangesAsync(ct);
+            await TickCompetitionAsync(scope.ServiceProvider, db, hubNotifier, competition, now, ct);
+            if (db.ChangeTracker.HasChanges())
+                await db.SaveChangesAsync(ct);
+        }
     }
 
     private async Task TickCompetitionAsync(

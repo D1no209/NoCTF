@@ -26,5 +26,6 @@ public class PenetrationModule : IPluginModule
         services.AddScoped<IScoringProfileContributor, PenetrationScoringProfileContributor>();
         services.AddScoped<IScoringStrategy, PenetrationStageScoringStrategy>();
         services.AddScoped<IScoringStrategy, PenetrationBloodBonusStrategy>();
+        services.AddScoped<IScoreRebuildContributor, PenetrationScoreRebuildContributor>();
     }
 }

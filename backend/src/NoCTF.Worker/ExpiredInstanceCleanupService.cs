@@ -57,17 +57,40 @@ public class ExpiredInstanceCleanupService(
 
             try
             {
-                await containerManager.DestroyContainerAsync(new ContainerInstance(
-                    Guid.NewGuid(),
-                    box.CompetitionId,
-                    box.TeamId,
-                    box.ChallengeId,
-                    box.ProviderType,
-                    containerId,
-                    ReadPorts(box.PortMappingsJson),
-                    "running",
-                    DateTime.UtcNow,
-                    OrchestrationNamespace: box.OrchestrationNamespace), ct);
+                if (string.Equals(box.RuntimeKind, "compose", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(box.ComposeProjectName))
+                {
+                    await containerManager.ComposeDownAsync(new ComposeDeployment(
+                        Guid.NewGuid(),
+                        box.CompetitionId,
+                        box.TeamId,
+                        box.ChallengeId,
+                        box.ProviderType,
+                        box.ComposeProjectName,
+                        string.IsNullOrWhiteSpace(box.ComposeYaml)
+                            ? "services:\n  cleanup:\n    image: scratch\n"
+                            : box.ComposeYaml,
+                        "running",
+                        box.CreatedAt,
+                        box.ExpiresAt,
+                        box.PublicHost,
+                        box.EntryUrl,
+                        box.OrchestrationNamespace), ct);
+                }
+                else
+                {
+                    await containerManager.DestroyContainerAsync(new ContainerInstance(
+                        Guid.NewGuid(),
+                        box.CompetitionId,
+                        box.TeamId,
+                        box.ChallengeId,
+                        box.ProviderType,
+                        containerId,
+                        ReadPorts(box.PortMappingsJson),
+                        "running",
+                        DateTime.UtcNow,
+                        OrchestrationNamespace: box.OrchestrationNamespace), ct);
+                }
             }
             catch (Exception ex)
             {
@@ -80,6 +103,11 @@ public class ExpiredInstanceCleanupService(
             box.EntryUrl = null;
             box.OrchestrationNamespace = null;
             box.PortMappingsJson = "{}";
+            box.RuntimeKind = "container";
+            box.ComposeProjectName = null;
+            box.ComposeYaml = null;
+            box.InternalHost = null;
+            box.InternalPortMappingsJson = "{}";
             box.ExpiresAt = null;
 
             var dynamicFlags = await db.CtfDynamicFlags

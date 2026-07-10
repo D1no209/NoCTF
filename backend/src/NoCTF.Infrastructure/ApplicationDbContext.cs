@@ -40,6 +40,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AwdpPatchSubmission> AwdpPatchSubmissions => Set<AwdpPatchSubmission>();
     public DbSet<KohControlRecord> KohControlRecords => Set<KohControlRecord>();
     public DbSet<BackgroundTaskItem> BackgroundTasks => Set<BackgroundTaskItem>();
+    public DbSet<CompetitionEngineState> CompetitionEngineStates => Set<CompetitionEngineState>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -70,6 +71,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<Submission>()
             .HasIndex(s => new { s.CompetitionId, s.TeamId })
             .HasDatabaseName("ix_submissions_competition_team");
+
+        modelBuilder.Entity<Submission>()
+            .HasIndex(s => new { s.CompetitionId, s.TeamId, s.ChallengeId, s.SubmittedAt })
+            .HasDatabaseName("ix_submissions_rate_limit_window");
 
         modelBuilder.Entity<Submission>()
             .HasIndex(s => new { s.CompetitionId, s.TeamId, s.ChallengeId })
@@ -347,11 +352,40 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<BackgroundTaskItem>()
             .HasIndex(t => new { t.CompetitionId, t.Type })
             .HasDatabaseName("ix_backgroundtasks_competition_type");
+
+        modelBuilder.Entity<CompetitionEngineState>()
+            .HasIndex(s => new { s.CompetitionId, s.EngineKey })
+            .IsUnique()
+            .HasDatabaseName("ux_competitionenginestates_competition_engine");
+
+        modelBuilder.Entity<TeamChallengeInstance>()
+            .Property(i => i.UpdatedAt)
+            .IsConcurrencyToken();
+
+        ConfigureCompetitionOwnership<Team>(modelBuilder);
+        ConfigureCompetitionOwnership<TeamMember>(modelBuilder);
+        ConfigureCompetitionOwnership<Challenge>(modelBuilder);
+        ConfigureCompetitionOwnership<ChallengeHint>(modelBuilder);
+        ConfigureCompetitionOwnership<Submission>(modelBuilder);
+        ConfigureCompetitionOwnership<ScoreEvent>(modelBuilder);
+        ConfigureCompetitionOwnership<ScoreSignal>(modelBuilder);
+        ConfigureCompetitionOwnership<BackgroundTaskItem>(modelBuilder);
+        ConfigureCompetitionOwnership<CompetitionEngineState>(modelBuilder);
     }
 
     private static void SetTenantQueryFilter<TEntity>(ModelBuilder builder, ITenantContext tenantContext)
         where TEntity : class, ITenantEntity
     {
         builder.Entity<TEntity>().HasQueryFilter(e => e.CompetitionId == tenantContext.CompetitionId);
+    }
+
+    private static void ConfigureCompetitionOwnership<TEntity>(ModelBuilder builder)
+        where TEntity : class
+    {
+        builder.Entity<TEntity>()
+            .HasOne<Competition>()
+            .WithMany()
+            .HasForeignKey("CompetitionId")
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

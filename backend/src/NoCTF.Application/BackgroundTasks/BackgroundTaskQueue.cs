@@ -17,8 +17,9 @@ public interface IBackgroundTaskQueue
         TimeSpan lockDuration,
         CancellationToken cancellationToken = default);
 
-    Task MarkSucceededAsync(Guid taskId, CancellationToken cancellationToken = default);
-    Task MarkFailedAsync(Guid taskId, Exception exception, CancellationToken cancellationToken = default);
+    Task<bool> RenewLeaseAsync(Guid taskId, string lockOwner, TimeSpan lockDuration, CancellationToken cancellationToken = default);
+    Task MarkSucceededAsync(Guid taskId, string lockOwner, CancellationToken cancellationToken = default);
+    Task MarkFailedAsync(Guid taskId, string lockOwner, Exception exception, CancellationToken cancellationToken = default);
     Task<int> RecoverExpiredRunningTasksAsync(TimeSpan lockTimeout, CancellationToken cancellationToken = default);
 }
 
@@ -54,6 +55,7 @@ public class BackgroundTaskQueue(ApplicationDbContext dbContext) : IBackgroundTa
         CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
+        var lockOwner = Guid.NewGuid().ToString("N");
         if (dbContext.Database.IsRelational())
         {
             for (var attempt = 0; attempt < 5; attempt++)
@@ -80,6 +82,7 @@ public class BackgroundTaskQueue(ApplicationDbContext dbContext) : IBackgroundTa
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(t => t.Status, BackgroundTaskStatus.Running)
                         .SetProperty(t => t.AttemptCount, t => t.AttemptCount + 1)
+                        .SetProperty(t => t.LockOwner, lockOwner)
                         .SetProperty(t => t.LockedUntil, now.Add(lockDuration))
                         .SetProperty(t => t.UpdatedAt, now), cancellationToken);
 
@@ -107,29 +110,70 @@ public class BackgroundTaskQueue(ApplicationDbContext dbContext) : IBackgroundTa
 
         task.Status = BackgroundTaskStatus.Running;
         task.AttemptCount += 1;
+        task.LockOwner = lockOwner;
         task.LockedUntil = now.Add(lockDuration);
         task.UpdatedAt = now;
         await dbContext.SaveChangesAsync(cancellationToken);
         return task;
     }
 
-    public async Task MarkSucceededAsync(Guid taskId, CancellationToken cancellationToken = default)
+    public async Task<bool> RenewLeaseAsync(
+        Guid taskId,
+        string lockOwner,
+        TimeSpan lockDuration,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        if (!dbContext.Database.IsRelational())
+        {
+            var task = await dbContext.BackgroundTasks
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(t =>
+                    t.Id == taskId &&
+                    t.Status == BackgroundTaskStatus.Running &&
+                    t.LockOwner == lockOwner, cancellationToken);
+            if (task is null)
+                return false;
+            task.LockedUntil = now.Add(lockDuration);
+            task.UpdatedAt = now;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        var updated = await dbContext.BackgroundTasks
+            .IgnoreQueryFilters()
+            .Where(t =>
+                t.Id == taskId &&
+                t.Status == BackgroundTaskStatus.Running &&
+                t.LockOwner == lockOwner)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(t => t.LockedUntil, now.Add(lockDuration))
+                .SetProperty(t => t.UpdatedAt, now), cancellationToken);
+        return updated == 1;
+    }
+
+    public async Task MarkSucceededAsync(Guid taskId, string lockOwner, CancellationToken cancellationToken = default)
     {
         var task = await dbContext.BackgroundTasks
             .IgnoreQueryFilters()
-            .FirstAsync(t => t.Id == taskId, cancellationToken);
+            .FirstAsync(t => t.Id == taskId && t.LockOwner == lockOwner, cancellationToken);
 
         task.Status = BackgroundTaskStatus.Succeeded;
         task.LockedUntil = null;
+        task.LockOwner = null;
         task.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task MarkFailedAsync(Guid taskId, Exception exception, CancellationToken cancellationToken = default)
+    public async Task MarkFailedAsync(
+        Guid taskId,
+        string lockOwner,
+        Exception exception,
+        CancellationToken cancellationToken = default)
     {
         var task = await dbContext.BackgroundTasks
             .IgnoreQueryFilters()
-            .FirstAsync(t => t.Id == taskId, cancellationToken);
+            .FirstAsync(t => t.Id == taskId && t.LockOwner == lockOwner, cancellationToken);
 
         task.LastError = exception.Message;
         task.Status = task.AttemptCount < task.MaxAttempts
@@ -138,6 +182,7 @@ public class BackgroundTaskQueue(ApplicationDbContext dbContext) : IBackgroundTa
         task.LockedUntil = task.Status == BackgroundTaskStatus.Retrying
             ? DateTime.UtcNow.AddSeconds(Math.Min(300, 10 * task.AttemptCount))
             : null;
+        task.LockOwner = null;
         task.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -159,6 +204,7 @@ public class BackgroundTaskQueue(ApplicationDbContext dbContext) : IBackgroundTa
                 ? BackgroundTaskStatus.Retrying
                 : BackgroundTaskStatus.Failed;
             task.LockedUntil = null;
+            task.LockOwner = null;
             task.UpdatedAt = now;
             task.LastError ??= "Recovered expired running task.";
         }

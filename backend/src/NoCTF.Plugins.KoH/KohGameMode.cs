@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
+using System.Text.Json;
 
 namespace NoCTF.Plugins.KoH;
 
@@ -35,7 +36,7 @@ public class KohGameMode(
 
             if (exists) continue;
 
-            string? containerId = null;
+            AwdGameBox? gameBox = null;
             if (challenge.ContainerMode == ChallengeContainerMode.DockerCompose && !string.IsNullOrWhiteSpace(challenge.ComposeYaml))
             {
                 try
@@ -53,7 +54,35 @@ public class KohGameMode(
                             ["challengeId"] = challenge.Id.ToString()
                         }), cancellationToken);
 
-                    containerId = deployment.ProjectName;
+                    var labels = new Dictionary<string, string>
+                    {
+                        ["competitionId"] = context.CompetitionId.ToString(),
+                        ["challengeId"] = challenge.Id.ToString()
+                    };
+                    var status = await containerManager.GetComposeStatusAsync(deployment.ProjectName, labels, cancellationToken);
+                    var service = status.Services.FirstOrDefault(s =>
+                        s.InternalPortMappings?.ContainsKey(challenge.KohAgentConfig?.Port ?? 8080) == true)
+                        ?? status.Services.FirstOrDefault();
+
+                    gameBox = new AwdGameBox
+                    {
+                        Id = Guid.NewGuid(),
+                        CompetitionId = context.CompetitionId,
+                        TeamId = Guid.Empty,
+                        ChallengeId = challenge.Id,
+                        RuntimeKind = "compose",
+                        ProviderType = deployment.ProviderType,
+                        ContainerInstanceId = service?.ContainerId,
+                        ComposeProjectName = deployment.ProjectName,
+                        ComposeYaml = deployment.ComposeYaml,
+                        OrchestrationNamespace = deployment.OrchestrationNamespace,
+                        PublicHost = service?.PublicHost ?? deployment.PublicHost,
+                        EntryUrl = service?.EntryUrl ?? deployment.EntryUrl,
+                        PortMappingsJson = JsonSerializer.Serialize(service?.PublishedPorts ?? []),
+                        InternalHost = service?.InternalHost,
+                        InternalPortMappingsJson = JsonSerializer.Serialize(service?.InternalPortMappings ?? []),
+                        CreatedAt = DateTime.UtcNow
+                    };
                 }
                 catch (Exception ex)
                 {
@@ -77,7 +106,24 @@ public class KohGameMode(
                             : null,
                         OrchestrationJson: challenge.OrchestrationJson);
                     var instance = await containerManager.CreateContainerAsync(config, cancellationToken);
-                    containerId = instance.ContainerId;
+                    gameBox = new AwdGameBox
+                    {
+                        Id = Guid.NewGuid(),
+                        CompetitionId = context.CompetitionId,
+                        TeamId = Guid.Empty,
+                        ChallengeId = challenge.Id,
+                        RuntimeKind = "container",
+                        ProviderType = instance.ProviderType,
+                        ContainerInstanceId = instance.ContainerId,
+                        OrchestrationNamespace = instance.OrchestrationNamespace,
+                        PublicHost = instance.PublicHost,
+                        EntryUrl = instance.EntryUrl,
+                        PortMappingsJson = JsonSerializer.Serialize(instance.PortMappings),
+                        InternalHost = instance.InternalHost,
+                        InternalPortMappingsJson = JsonSerializer.Serialize(instance.InternalPortMappings ?? []),
+                        ExpiresAt = instance.ExpectedStopAt,
+                        CreatedAt = DateTime.UtcNow
+                    };
                 }
                 catch (Exception ex)
                 {
@@ -86,15 +132,8 @@ public class KohGameMode(
                 }
             }
 
-            db.AwdGameBoxes.Add(new AwdGameBox
-            {
-                Id = Guid.NewGuid(),
-                CompetitionId = context.CompetitionId,
-                TeamId = Guid.Empty, // KoH hill has no owning team
-                ChallengeId = challenge.Id,
-                ContainerInstanceId = containerId,
-                CreatedAt = DateTime.UtcNow
-            });
+            if (gameBox is not null)
+                db.AwdGameBoxes.Add(gameBox);
         }
 
         await db.SaveChangesAsync(cancellationToken);

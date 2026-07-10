@@ -21,6 +21,7 @@ public class AwdModule : IPluginModule
 
         // Flag service (scoped — uses DbContext)
         services.AddScoped<AwdFlagService>();
+        services.AddScoped<AwdChallengeRuntimeConfigProvider>();
 
         // Checker service (scoped — uses DbContext)
         services.AddScoped<AwdCheckerService>();

@@ -98,6 +98,30 @@ public class CtfGameModeTests
     }
 
     [Fact]
+    public async Task ProcessSubmissionAsync_NotificationFailure_DoesNotRollbackAcceptedSolve()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddHours(1));
+        SeedChallenge(db, competitionId, challengeId, "flag{durable}");
+        await db.SaveChangesAsync();
+        var mode = new CtfGameMode(
+            db,
+            new ThrowingSubmissionEventHandler(),
+            new NoopScoreSignalEmitter(),
+            new NoopCtfScoreRebuilder(),
+            new ChallengeSubmissionHandlerRegistry([]));
+
+        var result = await mode.ProcessSubmissionAsync(
+            CreateContext(competitionId, teamId, challengeId, "flag{durable}"));
+
+        Assert.Equal(SubmissionResult.Accepted, result);
+        Assert.True((await db.Submissions.IgnoreQueryFilters().SingleAsync()).IsCorrect);
+    }
+
+    [Fact]
     public async Task ProcessSubmissionAsync_DynamicFlagWithoutActiveInstance_RequiresInstance()
     {
         var competitionId = Guid.NewGuid();
@@ -226,6 +250,12 @@ public class CtfGameModeTests
     {
         public Task HandleAsync(SubmissionSolvedEvent solvedEvent, CancellationToken ct = default)
             => Task.CompletedTask;
+    }
+
+    private sealed class ThrowingSubmissionEventHandler : ISubmissionEventHandler
+    {
+        public Task HandleAsync(SubmissionSolvedEvent solvedEvent, CancellationToken ct = default)
+            => throw new InvalidOperationException("notification unavailable");
     }
 
     private sealed class NoopScoreSignalEmitter : IScoreSignalEmitter

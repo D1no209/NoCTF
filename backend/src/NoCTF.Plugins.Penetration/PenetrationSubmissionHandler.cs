@@ -5,6 +5,8 @@ using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace NoCTF.Plugins.Penetration;
 
@@ -12,7 +14,8 @@ public class PenetrationSubmissionHandler(
     ApplicationDbContext db,
     PenetrationFlagService flagService,
     IScoreSignalEmitter scoreSignalEmitter,
-    ISubmissionEventHandler submissionEventHandler)
+    ISubmissionEventHandler submissionEventHandler,
+    ILogger<PenetrationSubmissionHandler>? logger = null)
     : IChallengeSubmissionHandler
 {
     public string TypeId => PenetrationConstants.TypeId;
@@ -145,14 +148,24 @@ public class PenetrationSubmissionHandler(
                  e.ScoringKey == ScoringKeys.PenetrationBloodBonus))
             .SumAsync(e => e.PointsDelta, ct);
 
-        await submissionEventHandler.HandleAsync(new SubmissionSolvedEvent(
-            CompetitionId: context.CompetitionId,
-            ChallengeId: context.ChallengeId,
-            ChallengeName: challenge.Title,
-            TeamId: context.TeamId,
-            TeamName: team?.Name ?? context.TeamId.ToString(),
-            IsFirstBlood: flag.SolvedCount == 0,
-            PointsAwarded: awarded), ct);
+        try
+        {
+            await submissionEventHandler.HandleAsync(new SubmissionSolvedEvent(
+                CompetitionId: context.CompetitionId,
+                ChallengeId: context.ChallengeId,
+                ChallengeName: challenge.Title,
+                TeamId: context.TeamId,
+                TeamName: team?.Name ?? context.TeamId.ToString(),
+                IsFirstBlood: flag.SolvedCount == 0,
+                PointsAwarded: awarded), ct);
+        }
+        catch (Exception ex)
+        {
+            (logger ?? NullLogger<PenetrationSubmissionHandler>.Instance).LogError(
+                ex,
+                "Post-solve notification failed for penetration submission {SubmissionId}; the accepted stage remains committed.",
+                submission.Id);
+        }
 
         return new ChallengeSubmissionResult(SubmissionResult.Accepted, BuildResultData(flag, false));
     }
@@ -224,19 +237,26 @@ public class PenetrationSubmissionHandler(
 
     private async Task<bool> IsRateLimitedAsync(SubmissionContext context, DateTime now, CancellationToken ct)
     {
-        var recentWrong = await db.Submissions
+        var oneMinuteAgo = now.AddMinutes(-1);
+        var stats = await db.Submissions
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s =>
                 s.CompetitionId == context.CompetitionId &&
                 s.TeamId == context.TeamId &&
                 s.ChallengeId == context.ChallengeId &&
-                !s.IsCorrect)
-            .Select(s => s.SubmittedAt)
-            .ToListAsync(ct);
+                !s.IsCorrect &&
+                s.SubmittedAt >= oneMinuteAgo)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                Count = group.Count(),
+                Latest = group.Max(s => s.SubmittedAt)
+            })
+            .FirstOrDefaultAsync(ct);
 
-        return recentWrong.Count(t => t >= now.AddSeconds(-5)) >= 1 ||
-               recentWrong.Count(t => t >= now.AddMinutes(-1)) >= 10;
+        return stats is not null &&
+               (stats.Latest >= now.AddSeconds(-5) || stats.Count >= 10);
     }
 
     private void AddCompetitionLog(

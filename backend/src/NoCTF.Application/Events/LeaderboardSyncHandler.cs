@@ -24,10 +24,11 @@ public class LeaderboardSyncHandler(
             ct);
 
         // 2. Recalculate full leaderboard from DB
+        var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(solvedEvent.CompetitionId, ct);
         var entries = await leaderboardService.CalculateLeaderboardAsync(solvedEvent.CompetitionId, ct);
 
         // 3. Update Redis cache
-        await leaderboardCache.UpdateAsync(solvedEvent.CompetitionId, entries, ct);
+        await leaderboardCache.UpdateAsync(solvedEvent.CompetitionId, entries, cacheVersion, ct);
 
         // 4. Push leaderboard snapshot to all clients in the competition group
         var payloads = entries.Select(e => new LeaderboardEntryPayload(
