@@ -17,6 +17,42 @@ internal static class StorageUrlResolver
             : await storage.GetUrlAsync(storageKey, ct);
     }
 
+    public static async Task<bool> ReferencesObjectAsync(
+        IStorageProvider storage,
+        string? storageKey,
+        string? requestedUrl,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(storageKey) || string.IsNullOrWhiteSpace(requestedUrl))
+            return false;
+
+        var currentUrl = await storage.GetUrlAsync(storageKey, ct);
+        return IsSameResourceUrl(currentUrl, requestedUrl);
+    }
+
+    internal static bool IsSameResourceUrl(string left, string right)
+    {
+        if (Uri.TryCreate(left, UriKind.Absolute, out var leftAbsolute) &&
+            Uri.TryCreate(right, UriKind.Absolute, out var rightAbsolute))
+        {
+            return string.Equals(leftAbsolute.Scheme, rightAbsolute.Scheme, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(leftAbsolute.IdnHost, rightAbsolute.IdnHost, StringComparison.OrdinalIgnoreCase) &&
+                   leftAbsolute.Port == rightAbsolute.Port &&
+                   string.Equals(leftAbsolute.AbsolutePath, rightAbsolute.AbsolutePath, StringComparison.Ordinal);
+        }
+
+        if (Uri.TryCreate(left, UriKind.Absolute, out _) || Uri.TryCreate(right, UriKind.Absolute, out _))
+            return false;
+
+        return string.Equals(ResourcePath(left), ResourcePath(right), StringComparison.Ordinal);
+    }
+
+    private static string ResourcePath(string value)
+    {
+        var end = value.IndexOfAny(['?', '#']);
+        return end < 0 ? value : value[..end];
+    }
+
     public static async Task ResolveAsync(
         Endpoints.Admin.CompetitionChallengeAdminDto dto,
         IStorageProvider storage,

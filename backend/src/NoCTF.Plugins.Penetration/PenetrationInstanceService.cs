@@ -566,7 +566,9 @@ public class PenetrationInstanceService(
             ExpiresAt = instance.ExpiresAt,
             CooldownUntil = instance.LastActionAt?.AddSeconds(Math.Max(0, config.ActionCooldownSeconds)),
             ServerTime = DateTime.UtcNow,
-            LastError = instance.LastError,
+            LastError = string.IsNullOrWhiteSpace(instance.LastError)
+                ? null
+                : "instance_operation_failed",
             ContainerIds = ReadStringArray(instance.ContainerIdsJson),
             Ports = ReadPortMap(instance.PortMappingsJson),
         };

@@ -78,6 +78,17 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db, IStorageProvider s
         }
 
         var previousStorageKeys = new[] { challenge.AttachmentStorageKey, challenge.PatchTemplateStorageKey };
+        var preserveAttachmentKey = await StorageUrlResolver.ReferencesObjectAsync(
+            storageProvider,
+            challenge.AttachmentStorageKey,
+            attachmentUrl,
+            ct);
+        var patchTemplateUrl = ChallengeTemplateRequestRules.CleanOptional(req.PatchTemplateUrl);
+        var preservePatchTemplateKey = await StorageUrlResolver.ReferencesObjectAsync(
+            storageProvider,
+            challenge.PatchTemplateStorageKey,
+            patchTemplateUrl,
+            ct);
         challenge.Title = req.Title.Trim();
         challenge.Description = ChallengeTemplateRequestRules.CleanOptional(req.Description);
         challenge.TypeId = string.IsNullOrWhiteSpace(req.TypeId) ? "ctf" : req.TypeId.Trim();
@@ -91,9 +102,9 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db, IStorageProvider s
             ? "NOCTF_FLAG_UUID"
             : req.FlagEnvironmentVariable.Trim();
         challenge.AttachmentUrl = attachmentUrl;
-        challenge.PatchTemplateUrl = ChallengeTemplateRequestRules.CleanOptional(req.PatchTemplateUrl);
-        challenge.AttachmentStorageKey = null;
-        challenge.PatchTemplateStorageKey = null;
+        challenge.PatchTemplateUrl = patchTemplateUrl;
+        challenge.AttachmentStorageKey = preserveAttachmentKey ? challenge.AttachmentStorageKey : null;
+        challenge.PatchTemplateStorageKey = preservePatchTemplateKey ? challenge.PatchTemplateStorageKey : null;
         challenge.DeploymentType = deploymentType;
         challenge.ExposedPort = usesRuntimeContainer ? req.ExposedPort : null;
         challenge.UpdatedAt = DateTime.UtcNow;

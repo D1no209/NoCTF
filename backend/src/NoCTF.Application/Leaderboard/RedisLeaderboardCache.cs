@@ -49,6 +49,13 @@ public class RedisLeaderboardCache(IConnectionMultiplexer redis) : IRedisLeaderb
         return 1
         """;
 
+    private const string AtomicInvalidateScript = """
+        local version = redis.call('INCR', KEYS[3])
+        redis.call('DEL', KEYS[1], KEYS[2])
+        redis.call('SET', KEYS[4], version)
+        return version
+        """;
+
     public async Task UpdateAsync(Guid competitionId, IReadOnlyList<LeaderboardEntry> entries, CancellationToken ct = default)
     {
         var version = await ReserveUpdateVersionAsync(competitionId, ct);
@@ -121,11 +128,14 @@ public class RedisLeaderboardCache(IConnectionMultiplexer redis) : IRedisLeaderb
     public async Task InvalidateAsync(Guid competitionId, CancellationToken ct = default)
     {
         var db = redis.GetDatabase();
-        await db.KeyDeleteAsync([
-            SortedSetKey(competitionId),
-            DataHashKey(competitionId),
-            VersionCounterKey(competitionId),
-            AppliedVersionKey(competitionId)]);
+        await db.ScriptEvaluateAsync(
+            AtomicInvalidateScript,
+            [
+                SortedSetKey(competitionId),
+                DataHashKey(competitionId),
+                VersionCounterKey(competitionId),
+                AppliedVersionKey(competitionId)
+            ]);
     }
 
     private static double ComputeTieBreakerOffset(DateTime? firstSolveAt)

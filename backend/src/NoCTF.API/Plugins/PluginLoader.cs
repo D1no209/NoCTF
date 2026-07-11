@@ -20,12 +20,10 @@ public static class PluginLoader
     {
         var pluginsDir = Path.Combine(AppContext.BaseDirectory, "plugins");
         if (!Directory.Exists(pluginsDir))
-        {
-            Console.WriteLine($"[Plugins] Directory not found: {pluginsDir}");
-            return;
-        }
+            throw new InvalidOperationException($"Required plugins directory was not found: {pluginsDir}");
 
         var dlls = Directory.GetFiles(pluginsDir, "NoCTF.Plugins.*.dll");
+        EnsureBuiltInPluginsPresent(dlls);
         var allowedExternal = configuration.GetSection("Plugins:AllowedAssemblies").Get<string[]>() ?? [];
         var allowedExternalSet = allowedExternal.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var allowAllExternal = configuration.GetValue("Plugins:AllowUnlistedExternalPlugins", false);
@@ -80,6 +78,24 @@ public static class PluginLoader
                     throw new InvalidOperationException(
                         $"Required built-in plugin {Path.GetFileName(dll)} failed to load.", ex);
             }
+        }
+    }
+
+    internal static void EnsureBuiltInPluginsPresent(IEnumerable<string> pluginPaths)
+    {
+        var available = pluginPaths
+            .Select(Path.GetFileName)
+            .Where(fileName => !string.IsNullOrWhiteSpace(fileName))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missing = BuiltInPluginAssemblies
+            .Where(fileName => !available.Contains(fileName))
+            .OrderBy(fileName => fileName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (missing.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Required built-in plugins are missing: {string.Join(", ", missing)}");
         }
     }
 

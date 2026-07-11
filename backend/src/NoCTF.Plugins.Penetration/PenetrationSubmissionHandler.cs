@@ -7,6 +7,8 @@ using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using NoCTF.Application.BackgroundTasks;
 
 namespace NoCTF.Plugins.Penetration;
 
@@ -15,6 +17,8 @@ public class PenetrationSubmissionHandler(
     PenetrationFlagService flagService,
     IScoreSignalEmitter scoreSignalEmitter,
     ISubmissionEventHandler submissionEventHandler,
+    IServiceProvider serviceProvider,
+    IBackgroundTaskQueue? backgroundTasks = null,
     ILogger<PenetrationSubmissionHandler>? logger = null)
     : IChallengeSubmissionHandler
 {
@@ -132,6 +136,42 @@ public class PenetrationSubmissionHandler(
             OccurredAt: now), ct);
 
         await transaction.CommitAsync(ct);
+
+        try
+        {
+            var scoreRebuilder = serviceProvider.GetRequiredService<ICtfScoreRebuilder>();
+            await scoreRebuilder.RebuildChallengeAsync(
+                context.CompetitionId,
+                context.ChallengeId,
+                ct);
+        }
+        catch (Exception ex)
+        {
+            (logger ?? NullLogger<PenetrationSubmissionHandler>.Instance).LogError(
+                ex,
+                "Failed to rebuild penetration scores for competition {CompetitionId}, challenge {ChallengeId}.",
+                context.CompetitionId,
+                context.ChallengeId);
+            if (backgroundTasks is not null)
+            {
+                try
+                {
+                    await backgroundTasks.EnqueueAsync(
+                        context.CompetitionId,
+                        CtfScoreRebuildJobHandler.JobType,
+                        new CtfScoreRebuildPayload(context.ChallengeId),
+                        CancellationToken.None);
+                }
+                catch (Exception enqueueException)
+                {
+                    (logger ?? NullLogger<PenetrationSubmissionHandler>.Instance).LogError(
+                        enqueueException,
+                        "Failed to enqueue fallback penetration score rebuild for competition {CompetitionId}, challenge {ChallengeId}.",
+                        context.CompetitionId,
+                        context.ChallengeId);
+                }
+            }
+        }
 
         var team = await db.Teams
             .IgnoreQueryFilters()

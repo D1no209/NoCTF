@@ -87,8 +87,16 @@ internal static class PenetrationEndpointRuntime
             "instance_cooldown" or "flag_rate_limited" => 429,
             "instance_busy" or "reset_limit_exceeded" or "active_instances_exist" => 409,
             "competition_not_started" or "competition_ended" or "competition_paused" => 403,
-            _ => 400
+            _ when IsPublicErrorCode(ex.Message) => 400,
+            _ => 500
         };
+
+    public static string ErrorCodeFromException(InvalidOperationException ex)
+        => IsPublicErrorCode(ex.Message) ? ex.Message : "instance_operation_failed";
+
+    private static bool IsPublicErrorCode(string message)
+        => message.Length is > 0 and <= 64 &&
+           message.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '_');
 }
 
 internal readonly record struct PlayerChallengeError(string Message, int StatusCode);
@@ -142,7 +150,10 @@ public class GetPenetrationChallengeEndpoint(
         }
         catch (InvalidOperationException ex)
         {
-            await SendStringAsync(ex.Message, PenetrationEndpointRuntime.StatusFromException(ex), cancellation: ct);
+            await SendStringAsync(
+                PenetrationEndpointRuntime.ErrorCodeFromException(ex),
+                PenetrationEndpointRuntime.StatusFromException(ex),
+                cancellation: ct);
         }
     }
 }

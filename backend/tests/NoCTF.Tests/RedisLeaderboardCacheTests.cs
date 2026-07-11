@@ -28,6 +28,30 @@ public class RedisLeaderboardCacheTests
         await cache.InvalidateAsync(competitionId);
     }
 
+    [Fact]
+    public async Task InvalidateAsync_AdvancesVersionSoInFlightSnapshotCannotRepopulateCache()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("NOCTF_REDIS_INTEGRATION");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return;
+
+        await using var redis = await ConnectionMultiplexer.ConnectAsync(connectionString);
+        var cache = new RedisLeaderboardCache(redis);
+        var competitionId = Guid.NewGuid();
+        var staleVersion = await cache.ReserveUpdateVersionAsync(competitionId);
+        var teamId = Guid.NewGuid();
+
+        await cache.InvalidateAsync(competitionId);
+        await cache.UpdateAsync(competitionId, [Entry(teamId, "stale", 100)], staleVersion);
+
+        Assert.Null(await cache.GetAsync(competitionId));
+
+        var freshVersion = await cache.ReserveUpdateVersionAsync(competitionId);
+        await cache.UpdateAsync(competitionId, [Entry(teamId, "fresh", 200)], freshVersion);
+        Assert.Equal("fresh", Assert.Single((await cache.GetAsync(competitionId))!).TeamName);
+        await cache.InvalidateAsync(competitionId);
+    }
+
     private static LeaderboardEntry Entry(Guid teamId, string name, long score)
         => new(1, teamId, name, null, score, 1, DateTime.UtcNow);
 }
