@@ -76,8 +76,16 @@ internal static class PenetrationAdminEndpointRuntime
             "challenge_template_not_found" or "challenge_not_found" or "instance_not_found" => 404,
             "instance_cooldown" => 429,
             "active_instances_exist" or "instance_busy" or "reset_limit_exceeded" => 409,
-            _ => 400
+            _ when IsPublicErrorCode(ex.Message) => 400,
+            _ => 500
         };
+
+    public static string ErrorCodeFromException(InvalidOperationException ex)
+        => IsPublicErrorCode(ex.Message) ? ex.Message : "operation_failed";
+
+    private static bool IsPublicErrorCode(string message)
+        => message.Length is > 0 and <= 64 &&
+           message.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '_');
 }
 
 public class GetPenetrationTemplateTopologyEndpoint(
@@ -117,7 +125,7 @@ public class GetPenetrationTemplateTopologyEndpoint(
         }
         catch (InvalidOperationException ex)
         {
-            await SendStringAsync(ex.Message, PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
+            await SendStringAsync(PenetrationAdminEndpointRuntime.ErrorCodeFromException(ex), PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
         }
     }
 }
@@ -163,7 +171,7 @@ public class UpdatePenetrationTemplateTopologyEndpoint(
         }
         catch (InvalidOperationException ex)
         {
-            await SendStringAsync(ex.Message, PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
+            await SendStringAsync(PenetrationAdminEndpointRuntime.ErrorCodeFromException(ex), PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
         }
     }
 }
@@ -220,7 +228,7 @@ public class GetPenetrationCompetitionTopologyEndpoint(
         }
         catch (InvalidOperationException ex)
         {
-            await SendStringAsync(ex.Message, PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
+            await SendStringAsync(PenetrationAdminEndpointRuntime.ErrorCodeFromException(ex), PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
         }
     }
 }
@@ -289,7 +297,7 @@ public class ListPenetrationAdminInstancesEndpoint(
         }
         catch (InvalidOperationException ex)
         {
-            await SendStringAsync(ex.Message, PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
+            await SendStringAsync(PenetrationAdminEndpointRuntime.ErrorCodeFromException(ex), PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
         }
     }
 }
@@ -337,7 +345,7 @@ public class GetPenetrationAdminInstanceEndpoint(
         }
         catch (InvalidOperationException ex)
         {
-            await SendStringAsync(ex.Message, PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
+            await SendStringAsync(PenetrationAdminEndpointRuntime.ErrorCodeFromException(ex), PenetrationAdminEndpointRuntime.StatusFromException(ex), cancellation: ct);
         }
     }
 }

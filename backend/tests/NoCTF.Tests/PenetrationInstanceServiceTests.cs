@@ -210,6 +210,14 @@ public class PenetrationInstanceServiceTests
         Assert.Equal(PenetrationInstanceStatus.Failed, instance.Status);
         Assert.Null(instance.LastActionAt);
         Assert.Equal("compose down failed", instance.LastError);
+
+        var playerView = await service.GetInstanceAsync(
+            competitionId,
+            challengeId,
+            teamId,
+            CancellationToken.None);
+        Assert.Equal("instance_operation_failed", playerView.LastError);
+        Assert.DoesNotContain("compose down failed", playerView.LastError, StringComparison.Ordinal);
     }
 
     private static ApplicationDbContext CreateDb(Guid competitionId)
