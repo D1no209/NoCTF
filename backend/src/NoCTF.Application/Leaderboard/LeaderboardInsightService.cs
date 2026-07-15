@@ -8,7 +8,11 @@ namespace NoCTF.Application.Leaderboard;
 public interface ILeaderboardInsightService
 {
     Task<LeaderboardTrendResult> BuildTrendAsync(Guid competitionId, int limit = 10, CancellationToken ct = default);
-    Task<LeaderboardTeamDetailResult?> BuildTeamDetailAsync(Guid competitionId, Guid teamId, CancellationToken ct = default);
+    Task<LeaderboardTeamDetailResult?> BuildTeamDetailAsync(
+        Guid competitionId,
+        Guid teamId,
+        CancellationToken ct = default,
+        bool includeMembers = true);
 }
 
 public sealed record LeaderboardTrendPoint(DateTime Timestamp, long Score);
@@ -64,6 +68,16 @@ public class LeaderboardInsightService(
     ApplicationDbContext db,
     ILeaderboardService leaderboardService) : ILeaderboardInsightService
 {
+    private const int MaxTrendTeams = 25;
+    private const int MaxTrendSourceEventsPerTeam = 2048;
+    private const int MaxTrendPointsPerTeam = 256;
+
+    internal sealed record TrendScoreEvent(Guid TeamId, Guid Id, DateTime Timestamp, int PointsDelta);
+
+    private sealed record AggregatedScoreEvent(Guid? ChallengeId, string ScoringKey, long Points);
+
+    internal sealed record ChallengeSolveRank(Guid ChallengeId, int Rank);
+
     private sealed record ChallengeInfo(
         Guid Id,
         string Title,
@@ -76,7 +90,7 @@ public class LeaderboardInsightService(
         var leaderboard = await leaderboardService.CalculateLeaderboardAsync(competitionId, ct);
         var topTeams = leaderboard
             .OrderBy(e => e.Rank)
-            .Take(Math.Max(1, limit))
+            .Take(Math.Clamp(limit, 1, MaxTrendTeams))
             .ToList();
 
         if (topTeams.Count == 0)
@@ -99,51 +113,69 @@ public class LeaderboardInsightService(
         if (timelineEnd <= startTime)
             timelineEnd = startTime.AddMinutes(1);
 
-        var activeChallengeIds = await db.Challenges
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(c => c.CompetitionId == competitionId)
-            .Select(c => c.Id)
-            .ToListAsync(ct);
-
-        var events = await db.ScoreEvents
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(e =>
-                e.CompetitionId == competitionId &&
-                teamIds.Contains(e.TeamId) &&
-                (!e.ChallengeId.HasValue || activeChallengeIds.Contains(e.ChallengeId.Value)))
-            .OrderBy(e => e.Timestamp)
-            .Select(e => new { e.TeamId, e.Timestamp, e.PointsDelta })
-            .ToListAsync(ct);
-
-        var eventsByTeam = events.GroupBy(e => e.TeamId).ToDictionary(g => g.Key, g => g.ToList());
-        var series = topTeams.Select(team =>
+        // Correlating each selected team with its bounded event tail translates
+        // to one lateral query on PostgreSQL. This avoids one database round trip
+        // per team while keeping the source history bounded independently.
+        List<TrendScoreEvent> recentEvents;
+        if (string.Equals(
+                db.Database.ProviderName,
+                "Microsoft.EntityFrameworkCore.InMemory",
+                StringComparison.Ordinal))
         {
-            long total = 0;
-            var points = new List<LeaderboardTrendPoint> { new(startTime, 0) };
+            // The EF InMemory provider does not implement correlated SelectMany.
+            // Keep its test/development path single-query, then apply the same
+            // per-team tail bound before building the timeline.
+            recentEvents = (await BuildEligibleTrendEventsQuery(
+                    db,
+                    competitionId,
+                    teamIds,
+                    startTime,
+                    timelineEnd)
+                .ToListAsync(ct))
+                .GroupBy(scoreEvent => scoreEvent.TeamId)
+                .SelectMany(group => group
+                    .OrderByDescending(scoreEvent => scoreEvent.Timestamp)
+                    .ThenByDescending(scoreEvent => scoreEvent.Id)
+                    .Take(MaxTrendSourceEventsPerTeam))
+                .ToList();
+        }
+        else
+        {
+            recentEvents = await BuildRecentTrendEventsQuery(
+                    db,
+                    competitionId,
+                    teamIds,
+                    startTime,
+                    timelineEnd)
+                .ToListAsync(ct);
+        }
+        var eventLookup = recentEvents.ToLookup(scoreEvent => scoreEvent.TeamId);
+        var eventsByTeam = teamIds.ToDictionary(
+            teamId => teamId,
+            teamId => (IReadOnlyList<TrendScoreEvent>)eventLookup[teamId]
+                .OrderBy(scoreEvent => scoreEvent.Timestamp)
+                .ThenBy(scoreEvent => scoreEvent.Id)
+                .ToList());
 
-            if (eventsByTeam.TryGetValue(team.TeamId, out var teamEvents))
-            {
-                foreach (var scoreEvent in teamEvents)
-                {
-                    total += scoreEvent.PointsDelta;
-                    points.Add(new LeaderboardTrendPoint(scoreEvent.Timestamp, total));
-                }
-            }
-
-            if (points[^1].Timestamp < timelineEnd)
-                points.Add(new LeaderboardTrendPoint(timelineEnd, team.TotalScore));
-            else if (points[^1].Score != team.TotalScore)
-                points.Add(new LeaderboardTrendPoint(points[^1].Timestamp, team.TotalScore));
-
-            return new LeaderboardTeamSeries(team.TeamId, team.TeamName, points);
-        }).ToList();
+        var series = topTeams
+            .Select(team => new LeaderboardTeamSeries(
+                team.TeamId,
+                team.TeamName,
+                BuildTrendPoints(
+                    eventsByTeam.GetValueOrDefault(team.TeamId) ?? [],
+                    startTime,
+                    timelineEnd,
+                    team.TotalScore)))
+            .ToList();
 
         return new LeaderboardTrendResult(competitionId, series, now);
     }
 
-    public async Task<LeaderboardTeamDetailResult?> BuildTeamDetailAsync(Guid competitionId, Guid teamId, CancellationToken ct = default)
+    public async Task<LeaderboardTeamDetailResult?> BuildTeamDetailAsync(
+        Guid competitionId,
+        Guid teamId,
+        CancellationToken ct = default,
+        bool includeMembers = true)
     {
         var team = await db.Teams
             .IgnoreQueryFilters()
@@ -155,17 +187,10 @@ public class LeaderboardInsightService(
         if (team is null || team.RegistrationStatus != TeamRegistrationStatus.Approved || team.IsBanned)
             return null;
 
-        var scoreEvents = await db.ScoreEvents
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(e => e.CompetitionId == competitionId && e.TeamId == teamId)
-            .Select(e => new { e.ChallengeId, e.PointsDelta, e.ScoringKey })
-            .ToListAsync(ct);
-
         var allChallenges = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(c => c.CompetitionId == competitionId)
+            .Where(c => c.CompetitionId == competitionId && !c.IsDeleting)
             .Select(c => new ChallengeInfo(
                 c.Id,
                 c.Title,
@@ -176,64 +201,55 @@ public class LeaderboardInsightService(
             .ToListAsync(ct);
 
         var challengeMap = allChallenges.ToDictionary(c => c.Id);
-        scoreEvents = scoreEvents
-            .Where(e => !e.ChallengeId.HasValue || challengeMap.ContainsKey(e.ChallengeId.Value))
-            .ToList();
-
-        var correctSubmissions = await db.Submissions
+        var activeChallengeIds = challengeMap.Keys.ToArray();
+        var scoreEvents = await db.ScoreEvents
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(s => s.CompetitionId == competitionId && s.IsCorrect)
-            .Join(
-                db.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
-                    t.CompetitionId == competitionId &&
-                    t.RegistrationStatus == TeamRegistrationStatus.Approved &&
-                    !t.IsBanned),
-                s => s.TeamId,
-                t => t.Id,
-                (s, _) => s)
+            .Where(e =>
+                e.CompetitionId == competitionId &&
+                e.TeamId == teamId &&
+                (!e.ChallengeId.HasValue || activeChallengeIds.Contains(e.ChallengeId.Value)))
+            .GroupBy(e => new { e.ChallengeId, e.ScoringKey })
+            .Select(group => new AggregatedScoreEvent(
+                group.Key.ChallengeId,
+                group.Key.ScoringKey,
+                group.Sum(e => (long)e.PointsDelta)))
+            .ToListAsync(ct);
+
+        var approvedCorrectSubmissions = BuildApprovedCorrectSubmissionsQuery(
+            db,
+            competitionId,
+            activeChallengeIds);
+
+        // Keep the result proportional to the challenge count. The previous implementation
+        // materialized one row for every (challenge, team) solve pair in the competition.
+        var currentSolveCounts = await approvedCorrectSubmissions
+            .GroupBy(s => s.ChallengeId)
+            .Select(group => new
+            {
+                ChallengeId = group.Key,
+                Count = group.Select(s => s.TeamId).Distinct().Count()
+            })
+            .ToDictionaryAsync(row => row.ChallengeId, row => row.Count, ct);
+
+        // Compute only this team's ranks. The correlated earlier-solve count stays in SQL, so at
+        // most one row per challenge solved by the requested team crosses the DB boundary.
+        var challengeSolveRanks = await BuildChallengeSolveRanksQuery(
+                approvedCorrectSubmissions,
+                teamId)
+            .ToDictionaryAsync(row => row.ChallengeId, row => row.Rank, ct);
+
+        var teamCorrectSubmissions = await db.Submissions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                s.TeamId == teamId &&
+                s.IsCorrect &&
+                activeChallengeIds.Contains(s.ChallengeId))
             .OrderBy(s => s.SubmittedAt)
-            .Select(s => new { s.TeamId, s.UserId, s.ChallengeId, s.SubmittedAt })
+            .Select(s => new { s.UserId, s.ChallengeId, s.SubmittedAt })
             .ToListAsync(ct);
-        correctSubmissions = correctSubmissions
-            .Where(s => challengeMap.ContainsKey(s.ChallengeId))
-            .ToList();
-
-        var teamCorrectSubmissions = correctSubmissions
-            .Where(s => s.TeamId == teamId)
-            .ToList();
-
-        var challengeSolveRanks = correctSubmissions
-            .GroupBy(s => s.ChallengeId)
-            .ToDictionary(
-                g => g.Key,
-                g => g
-                    .GroupBy(s => s.TeamId)
-                    .Select(teamGroup => new { TeamId = teamGroup.Key, SubmittedAt = teamGroup.Min(s => s.SubmittedAt) })
-                    .OrderBy(s => s.SubmittedAt)
-                    .Select((solve, index) => new { solve.TeamId, Rank = index + 1 })
-                    .ToDictionary(s => s.TeamId, s => s.Rank));
-
-        var currentSolveRows = await db.Submissions
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(s => s.CompetitionId == competitionId && s.IsCorrect)
-            .Join(
-                db.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
-                    t.CompetitionId == competitionId &&
-                    t.RegistrationStatus == TeamRegistrationStatus.Approved &&
-                    !t.IsBanned),
-                s => s.TeamId,
-                t => t.Id,
-                (s, _) => new { s.ChallengeId, s.TeamId })
-            .Distinct()
-            .ToListAsync(ct);
-
-        var currentSolveCounts = currentSolveRows
-            .Where(s => challengeMap.ContainsKey(s.ChallengeId))
-            .Distinct()
-            .GroupBy(s => s.ChallengeId)
-            .ToDictionary(g => g.Key, g => g.Count());
 
         var directionScores = scoreEvents
             .Where(e => e.ChallengeId.HasValue && challengeMap.ContainsKey(e.ChallengeId.Value))
@@ -244,7 +260,7 @@ public class LeaderboardInsightService(
             })
             .Select(g => new LeaderboardDirectionScore(
                 g.Key,
-                g.Sum(e => (long)e.PointsDelta),
+                g.Sum(e => e.Points),
                 teamCorrectSubmissions
                     .Where(s => challengeMap.TryGetValue(s.ChallengeId, out var c) && NormalizeDirection(c.TypeId) == g.Key)
                     .Select(s => s.ChallengeId)
@@ -258,30 +274,33 @@ public class LeaderboardInsightService(
             .GroupBy(s => s.ChallengeId)
             .ToDictionary(g => g.Key, g => (DateTime?)g.Min(s => s.SubmittedAt));
 
+        var scoreEventsByChallenge = scoreEvents
+            .Where(e => e.ChallengeId.HasValue)
+            .GroupBy(e => e.ChallengeId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
         var challengeScores = allChallenges
             .OrderBy(c => NormalizeDirection(c.TypeId))
             .ThenBy(c => c.Title)
             .Select(c =>
             {
-                var baseScore = scoreEvents
+                scoreEventsByChallenge.TryGetValue(c.Id, out var challengeEvents);
+                challengeEvents ??= [];
+                var baseScore = challengeEvents
                     .Where(e =>
-                        e.ChallengeId.HasValue &&
-                        e.ChallengeId.Value == c.Id &&
-                        e.PointsDelta != 0 &&
-                        e.ScoringKey == ScoringKeys.DecaySolve)
-                    .Sum(e => (long)e.PointsDelta);
-                var bonusScore = scoreEvents
+                        e.Points != 0 &&
+                        !IsBonusScoringKey(e.ScoringKey))
+                    .Sum(e => e.Points);
+                var bonusScore = challengeEvents
                     .Where(e =>
-                        e.ChallengeId.HasValue &&
-                        e.ChallengeId.Value == c.Id &&
-                        e.PointsDelta != 0 &&
-                        e.ScoringKey == ScoringKeys.BloodBonus)
-                    .Sum(e => (long)e.PointsDelta);
+                        e.Points != 0 &&
+                        IsBonusScoringKey(e.ScoringKey))
+                    .Sum(e => e.Points);
                 currentSolveCounts.TryGetValue(c.Id, out var solveCount);
                 var currentPoints = CtfScoreCalculator.CalculateChallengePoints(solveCount, c.PointsConfig, c.DifficultyCoefficient);
                 teamSolvedAt.TryGetValue(c.Id, out var solvedAt);
                 int? bloodRank = null;
-                if (challengeSolveRanks.TryGetValue(c.Id, out var ranks) && ranks.TryGetValue(teamId, out var rank) && rank <= 3)
+                if (challengeSolveRanks.TryGetValue(c.Id, out var rank) && rank <= 3)
                     bloodRank = rank;
 
                 return new LeaderboardChallengeScore(
@@ -297,52 +316,51 @@ public class LeaderboardInsightService(
             })
             .ToList();
 
-        var memberIds = await db.TeamMembers
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(m => m.CompetitionId == competitionId && m.TeamId == teamId)
-            .Select(m => m.UserId)
-            .ToListAsync(ct);
+        IReadOnlyList<LeaderboardMemberHistory> members = [];
+        if (includeMembers)
+        {
+            var users = await db.TeamMembers
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(member => member.CompetitionId == competitionId && member.TeamId == teamId)
+                .Join(
+                    db.Users.AsNoTracking(),
+                    member => member.UserId,
+                    user => user.Id,
+                    (_, user) => new { user.Id, user.UserName })
+                .ToListAsync(ct);
 
-        var users = await db.Users
-            .AsNoTracking()
-            .Where(u => memberIds.Contains(u.Id))
-            .Select(u => new { u.Id, u.UserName })
-            .ToListAsync(ct);
+            var solvesByUser = teamCorrectSubmissions
+                .GroupBy(s => s.UserId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(s =>
+                    {
+                        challengeMap.TryGetValue(s.ChallengeId, out var challenge);
+                        return new LeaderboardMemberSolve(
+                            s.ChallengeId,
+                            challenge?.Title ?? s.ChallengeId.ToString(),
+                            NormalizeDirection(challenge?.TypeId),
+                            s.SubmittedAt);
+                    }).ToList());
 
-        var solvesByUser = teamCorrectSubmissions
-            .GroupBy(s => s.UserId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Select(s =>
-                {
-                    challengeMap.TryGetValue(s.ChallengeId, out var challenge);
-                    return new LeaderboardMemberSolve(
-                        s.ChallengeId,
-                        challenge?.Title ?? s.ChallengeId.ToString(),
-                        NormalizeDirection(challenge?.TypeId),
-                        s.SubmittedAt);
-                }).ToList());
-
-        var members = users
-            .OrderBy(u => u.UserName)
-            .Select(u => new LeaderboardMemberHistory(
-                u.Id,
-                u.UserName,
-                solvesByUser.TryGetValue(u.Id, out var solves)
-                    ? solves
-                    : []))
-            .ToList();
-
-        var entry = (await leaderboardService.CalculateLeaderboardAsync(competitionId, ct))
-            .FirstOrDefault(e => e.TeamId == teamId);
+            members = users
+                .OrderBy(u => u.UserName)
+                .Select(u => new LeaderboardMemberHistory(
+                    u.Id,
+                    u.UserName,
+                    solvesByUser.TryGetValue(u.Id, out var solves)
+                        ? solves
+                        : []))
+                .ToList();
+        }
 
         return new LeaderboardTeamDetailResult(
             team.Id,
             team.Name,
             team.TrackName,
-            entry?.TotalScore ?? scoreEvents.Sum(e => (long)e.PointsDelta),
-            entry?.SolvedCount ?? teamCorrectSubmissions.Select(s => s.ChallengeId).Distinct().Count(),
+            scoreEvents.Sum(e => e.Points),
+            teamCorrectSubmissions.Select(s => s.ChallengeId).Distinct().Count(),
             directionScores,
             challengeScores,
             members);
@@ -350,4 +368,161 @@ public class LeaderboardInsightService(
 
     private static string NormalizeDirection(string? value)
         => string.IsNullOrWhiteSpace(value) ? "GENERAL" : value.Trim().ToUpperInvariant();
+
+    private static bool IsBonusScoringKey(string scoringKey)
+        => string.Equals(scoringKey, ScoringKeys.BloodBonus, StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(scoringKey, ScoringKeys.PenetrationBloodBonus, StringComparison.OrdinalIgnoreCase);
+
+    internal static IQueryable<Submission> BuildApprovedCorrectSubmissionsQuery(
+        ApplicationDbContext context,
+        Guid competitionId,
+        IReadOnlyCollection<Guid> activeChallengeIds)
+        => context.Submissions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(s =>
+                s.CompetitionId == competitionId &&
+                s.IsCorrect &&
+                activeChallengeIds.Contains(s.ChallengeId))
+            .Join(
+                context.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
+                    t.CompetitionId == competitionId &&
+                    t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                    !t.IsBanned),
+                submission => submission.TeamId,
+                approvedTeam => approvedTeam.Id,
+                (submission, _) => submission);
+
+    internal static IQueryable<TrendScoreEvent> BuildRecentTrendEventsQuery(
+        ApplicationDbContext context,
+        Guid competitionId,
+        IReadOnlyCollection<Guid> teamIds,
+        DateTime startTime,
+        DateTime timelineEnd)
+    {
+        var selectedTeams = context.Teams
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(team =>
+                team.CompetitionId == competitionId &&
+                teamIds.Contains(team.Id))
+            .Select(team => team.Id);
+
+        return selectedTeams.SelectMany(teamId => context.ScoreEvents
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(scoreEvent =>
+                scoreEvent.CompetitionId == competitionId &&
+                scoreEvent.TeamId == teamId &&
+                scoreEvent.Timestamp >= startTime &&
+                scoreEvent.Timestamp <= timelineEnd &&
+                (!scoreEvent.ChallengeId.HasValue || context.Challenges
+                    .IgnoreQueryFilters()
+                    .Any(challenge =>
+                        challenge.CompetitionId == competitionId &&
+                        challenge.Id == scoreEvent.ChallengeId.Value &&
+                        !challenge.IsDeleting)))
+            .OrderByDescending(scoreEvent => scoreEvent.Timestamp)
+            .ThenByDescending(scoreEvent => scoreEvent.Id)
+            .Take(MaxTrendSourceEventsPerTeam)
+            .Select(scoreEvent => new TrendScoreEvent(
+                scoreEvent.TeamId,
+                scoreEvent.Id,
+                scoreEvent.Timestamp,
+                scoreEvent.PointsDelta)));
+    }
+
+    private static IQueryable<TrendScoreEvent> BuildEligibleTrendEventsQuery(
+        ApplicationDbContext context,
+        Guid competitionId,
+        IReadOnlyCollection<Guid> teamIds,
+        DateTime startTime,
+        DateTime timelineEnd)
+        => context.ScoreEvents
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(scoreEvent =>
+                scoreEvent.CompetitionId == competitionId &&
+                teamIds.Contains(scoreEvent.TeamId) &&
+                scoreEvent.Timestamp >= startTime &&
+                scoreEvent.Timestamp <= timelineEnd &&
+                (!scoreEvent.ChallengeId.HasValue || context.Challenges
+                    .IgnoreQueryFilters()
+                    .Any(challenge =>
+                        challenge.CompetitionId == competitionId &&
+                        challenge.Id == scoreEvent.ChallengeId.Value &&
+                        !challenge.IsDeleting)))
+            .Select(scoreEvent => new TrendScoreEvent(
+                scoreEvent.TeamId,
+                scoreEvent.Id,
+                scoreEvent.Timestamp,
+                scoreEvent.PointsDelta));
+
+    internal static IQueryable<ChallengeSolveRank> BuildChallengeSolveRanksQuery(
+        IQueryable<Submission> approvedCorrectSubmissions,
+        Guid teamId)
+    {
+        var targetFirstSolves = approvedCorrectSubmissions
+            .Where(s => s.TeamId == teamId)
+            .GroupBy(s => s.ChallengeId)
+            .Select(group => new
+            {
+                ChallengeId = group.Key,
+                SubmittedAt = group.Min(s => s.SubmittedAt)
+            });
+
+        return targetFirstSolves.Select(targetSolve => new ChallengeSolveRank(
+            targetSolve.ChallengeId,
+            1 + approvedCorrectSubmissions
+                .Where(solve =>
+                    solve.ChallengeId == targetSolve.ChallengeId &&
+                    solve.SubmittedAt < targetSolve.SubmittedAt)
+                .Select(solve => solve.TeamId)
+                .Distinct()
+                .Count()));
+    }
+
+    private static IReadOnlyList<LeaderboardTrendPoint> BuildTrendPoints(
+        IReadOnlyList<TrendScoreEvent> events,
+        DateTime startTime,
+        DateTime timelineEnd,
+        long finalScore)
+    {
+        // Events omitted by the bounded tail query are represented by the baseline. This
+        // preserves the exact final score without loading an unbounded history.
+        var visibleDelta = events.Sum(scoreEvent => (long)scoreEvent.PointsDelta);
+        var total = finalScore - visibleDelta;
+        var points = new List<LeaderboardTrendPoint>(MaxTrendPointsPerTeam)
+        {
+            new(startTime, total)
+        };
+
+        var maxEventPoints = MaxTrendPointsPerTeam - 2;
+        var bucketSize = Math.Max(1, (int)Math.Ceiling(events.Count / (double)maxEventPoints));
+        for (var start = 0; start < events.Count; start += bucketSize)
+        {
+            var end = Math.Min(start + bucketSize, events.Count);
+            for (var index = start; index < end; index++)
+                total += events[index].PointsDelta;
+
+            AddOrReplaceTrendPoint(points, events[end - 1].Timestamp, total);
+        }
+
+        AddOrReplaceTrendPoint(points, timelineEnd, finalScore);
+        return points;
+    }
+
+    private static void AddOrReplaceTrendPoint(
+        List<LeaderboardTrendPoint> points,
+        DateTime timestamp,
+        long score)
+    {
+        if (points[^1].Timestamp == timestamp)
+        {
+            points[^1] = new LeaderboardTrendPoint(timestamp, score);
+            return;
+        }
+
+        points.Add(new LeaderboardTrendPoint(timestamp, score));
+    }
 }

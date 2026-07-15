@@ -1,0 +1,32 @@
+<Project>
+  <Target Name="CopyNoCtfPluginAssemblies"
+          AfterTargets="Build"
+          Condition="'@(NoCtfPluginProject)' != ''">
+    <MSBuild Projects="@(NoCtfPluginProject)"
+             Targets="GetTargetPath"
+             BuildInParallel="true"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)">
+      <Output TaskParameter="TargetOutputs" ItemName="_NoCtfPluginAssemblies" />
+    </MSBuild>
+    <MakeDir Directories="$(TargetDir)plugins" />
+    <Copy SourceFiles="@(_NoCtfPluginAssemblies)"
+          DestinationFolder="$(TargetDir)plugins/"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="IncludeNoCtfPluginAssembliesInPublish"
+          AfterTargets="ComputeFilesToPublish"
+          Condition="'@(NoCtfPluginProject)' != ''">
+    <MSBuild Projects="@(NoCtfPluginProject)"
+             Targets="GetTargetPath"
+             BuildInParallel="true"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)">
+      <Output TaskParameter="TargetOutputs" ItemName="_NoCtfPluginPublishAssemblies" />
+    </MSBuild>
+    <ItemGroup>
+      <ResolvedFileToPublish Include="@(_NoCtfPluginPublishAssemblies)"
+                             RelativePath="plugins/%(Filename)%(Extension)"
+                             CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>

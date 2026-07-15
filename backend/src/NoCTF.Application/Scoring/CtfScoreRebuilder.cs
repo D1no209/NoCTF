@@ -14,13 +14,21 @@ public sealed class CtfScoreRebuilder(
     IEnumerable<IScoreRebuildContributor>? contributors = null) : ICtfScoreRebuilder
 {
     private sealed record RankedSolve(Guid TeamId, DateTime SubmittedAt, int Rank, Guid? SignalId);
+    private readonly IChallengeSubmissionHandler[] _customSubmissionHandlers =
+        ProviderRegistry.BuildUnique(
+                customSubmissionHandlers ?? [],
+                handler => handler.TypeId,
+                "challenge submission")
+            .Values
+            .ToArray();
+    private readonly IScoreRebuildContributor[] _contributors = ValidateContributors(contributors ?? []);
 
     public async Task RebuildCompetitionAsync(Guid competitionId, CancellationToken ct = default)
     {
         var challengeIds = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(c => c.CompetitionId == competitionId)
+            .Where(c => c.CompetitionId == competitionId && !c.IsDeleting)
             .Select(c => c.Id)
             .ToListAsync(ct);
 
@@ -56,7 +64,10 @@ public sealed class CtfScoreRebuilder(
         var allChallenges = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(c => c.CompetitionId == competitionId && challengeIds.Contains(c.Id))
+            .Where(c =>
+                c.CompetitionId == competitionId &&
+                challengeIds.Contains(c.Id) &&
+                !c.IsDeleting)
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(ct);
         if (allChallenges.Count == 0 && !removeAllCompetitionCtfEvents)
@@ -66,9 +77,14 @@ public sealed class CtfScoreRebuilder(
         }
 
         var activeChallengeIds = allChallenges.Select(c => c.Id).ToHashSet();
-        var customTypeIds = (customSubmissionHandlers ?? [])
+        var customTypeIds = _customSubmissionHandlers
             .Select(handler => handler.TypeId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var contributor in _contributors)
+        {
+            foreach (var typeId in contributor.OwnedChallengeTypeIds)
+                customTypeIds.Add(typeId);
+        }
         var challenges = allChallenges
             .Where(challenge => !customTypeIds.Contains(challenge.TypeId))
             .ToList();
@@ -84,15 +100,25 @@ public sealed class CtfScoreRebuilder(
                 activeChallengeIds.Contains(e.ChallengeId.Value));
         }
 
-        var staleEvents = await staleQuery.ToListAsync(ct);
-        db.ScoreEvents.RemoveRange(staleEvents);
-        await db.SaveChangesAsync(ct);
+        if (db.Database.IsRelational())
+        {
+            await staleQuery.ExecuteDeleteAsync(ct);
+        }
+        else
+        {
+            var staleEvents = await staleQuery.ToListAsync(ct);
+            db.ScoreEvents.RemoveRange(staleEvents);
+            await db.SaveChangesAsync(ct);
+        }
 
         var events = new List<ScoreEvent>();
+        var rankedSolvesByChallenge = await GetRankedSolvesAsync(
+            competitionId,
+            challenges.Select(challenge => challenge.Id).ToArray(),
+            ct);
         foreach (var challenge in challenges)
         {
-            var solves = await GetRankedSolvesAsync(competitionId, challenge.Id, ct);
-            if (solves.Count == 0)
+            if (!rankedSolvesByChallenge.TryGetValue(challenge.Id, out var solves) || solves.Count == 0)
                 continue;
 
             var currentPoints = CtfScoreCalculator.CalculateChallengePoints(
@@ -170,7 +196,7 @@ public sealed class CtfScoreRebuilder(
         db.ScoreEvents.AddRange(events);
         await db.SaveChangesAsync(ct);
 
-        foreach (var contributor in contributors ?? [])
+        foreach (var contributor in _contributors)
         {
             await contributor.RebuildAsync(
                 competition,
@@ -182,17 +208,43 @@ public sealed class CtfScoreRebuilder(
         await rebuildLock.CommitAsync(ct);
     }
 
-    private async Task<List<RankedSolve>> GetRankedSolvesAsync(
+    private static IScoreRebuildContributor[] ValidateContributors(
+        IEnumerable<IScoreRebuildContributor> contributors)
+    {
+        var result = contributors.ToArray();
+        var owners = new Dictionary<string, IScoreRebuildContributor>(StringComparer.OrdinalIgnoreCase);
+        foreach (var contributor in result)
+        {
+            foreach (var configuredTypeId in contributor.OwnedChallengeTypeIds)
+            {
+                var typeId = configuredTypeId?.Trim();
+                if (string.IsNullOrWhiteSpace(typeId))
+                    throw new InvalidOperationException("A score rebuild contributor owns an empty challenge type.");
+                if (!owners.TryAdd(typeId, contributor))
+                {
+                    throw new InvalidOperationException(
+                        $"Multiple score rebuild contributors own challenge type '{typeId}'.");
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private async Task<Dictionary<Guid, List<RankedSolve>>> GetRankedSolvesAsync(
         Guid competitionId,
-        Guid challengeId,
+        IReadOnlyCollection<Guid> challengeIds,
         CancellationToken ct)
     {
+        if (challengeIds.Count == 0)
+            return [];
+
         var submissions = await db.Submissions
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s =>
                 s.CompetitionId == competitionId &&
-                s.ChallengeId == challengeId &&
+                challengeIds.Contains(s.ChallengeId) &&
                 s.IsCorrect)
             .Join(
                 db.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
@@ -201,35 +253,53 @@ public sealed class CtfScoreRebuilder(
                     !t.IsBanned),
                 s => s.TeamId,
                 t => t.Id,
-                (s, _) => new { s.TeamId, s.SubmittedAt })
-            .GroupBy(s => s.TeamId)
-            .Select(g => new { TeamId = g.Key, SubmittedAt = g.Min(s => s.SubmittedAt) })
-            .OrderBy(s => s.SubmittedAt)
+                (s, _) => new { s.ChallengeId, s.TeamId, s.SubmittedAt })
+            .GroupBy(s => new { s.ChallengeId, s.TeamId })
+            .Select(g => new
+            {
+                g.Key.ChallengeId,
+                g.Key.TeamId,
+                SubmittedAt = g.Min(s => s.SubmittedAt)
+            })
             .ToListAsync(ct);
 
         if (submissions.Count == 0)
             return [];
 
         var teamIds = submissions.Select(s => s.TeamId).ToHashSet();
-        var signalMap = await db.ScoreSignals
+        var signalRows = await db.ScoreSignals
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s =>
                 s.CompetitionId == competitionId &&
-                s.SubjectId == challengeId &&
+                s.SubjectId.HasValue &&
+                challengeIds.Contains(s.SubjectId.Value) &&
                 s.SignalType == ScoreSignalTypes.SolveAccepted &&
                 teamIds.Contains(s.TeamId))
-            .GroupBy(s => s.TeamId)
-            .Select(g => new { TeamId = g.Key, SignalId = g.OrderBy(s => s.OccurredAt).Select(s => s.Id).FirstOrDefault() })
-            .ToDictionaryAsync(s => s.TeamId, s => (Guid?)s.SignalId, ct);
+            .GroupBy(s => new { ChallengeId = s.SubjectId!.Value, s.TeamId })
+            .Select(g => new
+            {
+                g.Key.ChallengeId,
+                g.Key.TeamId,
+                SignalId = g.OrderBy(s => s.OccurredAt).Select(s => s.Id).FirstOrDefault()
+            })
+            .ToListAsync(ct);
+        var signalMap = signalRows.ToDictionary(
+            signal => (signal.ChallengeId, signal.TeamId),
+            signal => (Guid?)signal.SignalId);
 
         return submissions
-            .Select((solve, index) => new RankedSolve(
-                solve.TeamId,
-                solve.SubmittedAt,
-                index + 1,
-                signalMap.GetValueOrDefault(solve.TeamId)))
-            .ToList();
+            .GroupBy(solve => solve.ChallengeId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(solve => solve.SubmittedAt)
+                    .Select((solve, index) => new RankedSolve(
+                        solve.TeamId,
+                        solve.SubmittedAt,
+                        index + 1,
+                        signalMap.GetValueOrDefault((solve.ChallengeId, solve.TeamId))))
+                    .ToList());
     }
 }
 
@@ -252,14 +322,41 @@ internal sealed class CtfScoreRebuildLock : IAsyncDisposable
         if (!db.Database.IsRelational())
             return new CtfScoreRebuildLock(null);
 
-        var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        if (db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+        // Destructive workflows may already own a serializable transaction.
+        // Participate in it instead of attempting an illegal nested EF
+        // transaction; only a transaction created here is committed/disposed by
+        // this lock wrapper.
+        if (db.Database.CurrentTransaction is not null)
         {
-            var lockKey = AdvisoryLockKey(competitionId, Guid.Empty);
-            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", ct);
+            await AcquirePostgresAdvisoryLockAsync(db, competitionId, ct);
+            return new CtfScoreRebuildLock(null);
         }
 
-        return new CtfScoreRebuildLock(transaction);
+        var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        try
+        {
+            await AcquirePostgresAdvisoryLockAsync(db, competitionId, ct);
+            return new CtfScoreRebuildLock(transaction);
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
+    }
+
+    private static async Task AcquirePostgresAdvisoryLockAsync(
+        ApplicationDbContext db,
+        Guid competitionId,
+        CancellationToken ct)
+    {
+        if (db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) != true)
+            return;
+
+        var lockKey = AdvisoryLockKey(competitionId, Guid.Empty);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({lockKey})",
+            ct);
     }
 
     public async Task CommitAsync(CancellationToken ct)

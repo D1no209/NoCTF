@@ -16,6 +16,7 @@ public class LeaderboardServiceTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
@@ -240,7 +241,7 @@ public class LeaderboardServiceTests
         await using var db = CreateDb(competitionId);
 
         SeedTeam(db, competitionId, teamId, "Alpha");
-        db.Users.Add(new User
+        var player = new User
         {
             Id = userId,
             UserName = "player",
@@ -249,7 +250,10 @@ public class LeaderboardServiceTests
             Role = UserRole.User,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
-        });
+        };
+        db.Users.Add(player);
+        db.Entry(player).Property<string>("NormalizedUserName").CurrentValue = "player";
+        db.Entry(player).Property<string>("NormalizedEmail").CurrentValue = "player@example.com";
         db.TeamMembers.Add(new TeamMember
         {
             Id = Guid.NewGuid(),
@@ -307,6 +311,48 @@ public class LeaderboardServiceTests
     }
 
     [Fact]
+    public async Task BuildTeamDetail_WhenMembersAreNotRequested_SkipsMemberProjection()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedTeam(db, competitionId, teamId, "Alpha");
+        var privateMember = new User
+        {
+            Id = userId,
+            UserName = "private-member",
+            Email = "private-member@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.User,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        db.Users.Add(privateMember);
+        db.Entry(privateMember).Property<string>("NormalizedUserName").CurrentValue = "private-member";
+        db.Entry(privateMember).Property<string>("NormalizedEmail").CurrentValue = "private-member@example.com";
+        db.TeamMembers.Add(new TeamMember
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            UserId = userId,
+            Role = TeamMemberRole.Member,
+            JoinedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        var insight = new LeaderboardInsightService(db, new LeaderboardService(db));
+
+        var result = await insight.BuildTeamDetailAsync(
+            competitionId,
+            teamId,
+            includeMembers: false);
+
+        Assert.NotNull(result);
+        Assert.Empty(result!.Members);
+    }
+
+    [Fact]
     public async Task BuildTrend_ExtendsTimelineToEndedCompetitionEnd()
     {
         var competitionId = Guid.NewGuid();
@@ -341,6 +387,150 @@ public class LeaderboardServiceTests
         Assert.Equal(startTime, points[0].Timestamp);
         Assert.Equal(endTime, points[^1].Timestamp);
         Assert.Equal(500, points[^1].Score);
+    }
+
+    [Fact]
+    public async Task BuildTeamDetail_AggregatesPluginScoringKeys_AndComputesOnlyTargetRanks()
+    {
+        var competitionId = Guid.NewGuid();
+        var targetTeamId = Guid.NewGuid();
+        var earlierTeamId = Guid.NewGuid();
+        var laterTeamId = Guid.NewGuid();
+        var bannedTeamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var targetSolvedAt = new DateTime(2026, 7, 4, 12, 0, 0, DateTimeKind.Utc);
+        await using var db = CreateDb(competitionId);
+
+        SeedTeam(db, competitionId, targetTeamId, "Target");
+        SeedTeam(db, competitionId, earlierTeamId, "Earlier");
+        SeedTeam(db, competitionId, laterTeamId, "Later");
+        SeedTeam(db, competitionId, bannedTeamId, "Banned", isBanned: true);
+        SeedChallenge(db, competitionId, challengeId);
+
+        SeedCorrectSubmission(db, competitionId, earlierTeamId, challengeId, targetSolvedAt.AddMinutes(-1));
+        SeedCorrectSubmission(db, competitionId, targetTeamId, challengeId, targetSolvedAt);
+        SeedCorrectSubmission(db, competitionId, laterTeamId, challengeId, targetSolvedAt.AddMinutes(1));
+        SeedCorrectSubmission(db, competitionId, bannedTeamId, challengeId, targetSolvedAt.AddMinutes(-2));
+
+        SeedChallengeScoreEvent(db, competitionId, targetTeamId, challengeId, ScoringKeys.DecaySolve, 300, targetSolvedAt);
+        SeedChallengeScoreEvent(db, competitionId, targetTeamId, challengeId, ScoringKeys.BloodBonus, 50, targetSolvedAt);
+        SeedChallengeScoreEvent(db, competitionId, targetTeamId, challengeId, ScoringKeys.PenetrationStage, 200, targetSolvedAt);
+        SeedChallengeScoreEvent(db, competitionId, targetTeamId, challengeId, ScoringKeys.PenetrationBloodBonus, 75, targetSolvedAt);
+        SeedChallengeScoreEvent(db, competitionId, targetTeamId, challengeId, ScoringKeys.RoundAccumulation, -25, targetSolvedAt);
+        await db.SaveChangesAsync();
+
+        var insight = new LeaderboardInsightService(db, new LeaderboardService(db));
+        var result = await insight.BuildTeamDetailAsync(
+            competitionId,
+            targetTeamId,
+            includeMembers: false);
+
+        Assert.NotNull(result);
+        Assert.Equal(600, result!.TotalScore);
+        var challengeScore = Assert.Single(result.ChallengeScores);
+        Assert.Equal(475, challengeScore.BaseScore);
+        Assert.Equal(125, challengeScore.BonusScore);
+        Assert.Equal(600, challengeScore.TotalScore);
+        Assert.Equal(2, challengeScore.BloodRank);
+        Assert.Equal(targetSolvedAt, challengeScore.SolvedAt);
+        Assert.Equal(
+            CtfScoreCalculator.CalculateChallengePoints(
+                3,
+                new PointsConfig(InitialPoints: 500, MinimumPoints: 100, DecayFactor: 450),
+                1),
+            challengeScore.CurrentPoints);
+    }
+
+    [Fact]
+    public void BuildTeamDetail_RankAndSolveCountQueries_TranslateForPostgres()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql("Host=localhost;Database=noctf-query-translation;Username=noctf;Password=noctf")
+            .Options;
+        using var db = new ApplicationDbContext(options, new FixedTenantContext(competitionId));
+
+        var approvedSubmissions = LeaderboardInsightService.BuildApprovedCorrectSubmissionsQuery(
+            db,
+            competitionId,
+            [Guid.NewGuid(), Guid.NewGuid()]);
+        var countSql = approvedSubmissions
+            .GroupBy(solve => solve.ChallengeId)
+            .Select(group => new
+            {
+                ChallengeId = group.Key,
+                Count = group.Select(solve => solve.TeamId).Distinct().Count()
+            })
+            .ToQueryString();
+        var rankSql = LeaderboardInsightService
+            .BuildChallengeSolveRanksQuery(approvedSubmissions, teamId)
+            .ToQueryString();
+
+        Assert.Contains("GROUP BY", countSql);
+        Assert.Contains("GROUP BY", rankSql);
+        Assert.Contains("count", rankSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildTrend_GroupedTopNQuery_TranslatesForPostgres()
+    {
+        var competitionId = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql("Host=localhost;Database=noctf-query-translation;Username=noctf;Password=noctf")
+            .Options;
+        using var db = new ApplicationDbContext(options, new FixedTenantContext(competitionId));
+
+        var sql = LeaderboardInsightService.BuildRecentTrendEventsQuery(
+                db,
+                competitionId,
+                [Guid.NewGuid(), Guid.NewGuid()],
+                DateTime.UtcNow.AddHours(-1),
+                DateTime.UtcNow)
+            .ToQueryString();
+
+        Assert.Contains("ROW_NUMBER", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PARTITION BY", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BuildTrend_LargeHistory_IsBoundedAndDeterministic()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var startTime = new DateTime(2026, 7, 4, 10, 0, 0, DateTimeKind.Utc);
+        var endTime = startTime.AddHours(1);
+        await using var db = CreateDb(competitionId);
+
+        SeedCompetition(db, competitionId, startTime, endTime);
+        SeedTeam(db, competitionId, teamId, "Alpha");
+        SeedChallenge(db, competitionId, challengeId);
+        for (var index = 1; index <= 2500; index++)
+        {
+            SeedChallengeScoreEvent(
+                db,
+                competitionId,
+                teamId,
+                challengeId,
+                ScoringKeys.RoundAccumulation,
+                1,
+                startTime.AddSeconds(index));
+        }
+        await db.SaveChangesAsync();
+
+        var insight = new LeaderboardInsightService(db, new LeaderboardService(db));
+        var first = Assert.Single((await insight.BuildTrendAsync(competitionId)).Series);
+        var second = Assert.Single((await insight.BuildTrendAsync(competitionId)).Series);
+
+        Assert.InRange(first.Points.Count, 2, 256);
+        Assert.Equal(startTime, first.Points[0].Timestamp);
+        Assert.Equal(452, first.Points[0].Score);
+        Assert.Equal(endTime, first.Points[^1].Timestamp);
+        Assert.Equal(2500, first.Points[^1].Score);
+        Assert.Equal(first.Points, second.Points);
+        Assert.True(first.Points.Zip(first.Points.Skip(1)).All(pair =>
+            pair.First.Timestamp <= pair.Second.Timestamp));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -395,6 +585,28 @@ public class LeaderboardServiceTests
             EventType = "FlagSolved",
             PointsDelta = points,
             Timestamp = DateTime.UtcNow
+        });
+    }
+
+    private static void SeedChallengeScoreEvent(
+        ApplicationDbContext db,
+        Guid competitionId,
+        Guid teamId,
+        Guid challengeId,
+        string scoringKey,
+        int points,
+        DateTime timestamp)
+    {
+        db.ScoreEvents.Add(new ScoreEvent
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            ScoringKey = scoringKey,
+            EventType = "test.score",
+            PointsDelta = points,
+            Timestamp = timestamp
         });
     }
 

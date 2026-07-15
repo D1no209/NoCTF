@@ -24,9 +24,13 @@ public interface IChallengeSubmissionHandlerRegistry
 public class ChallengeSubmissionHandlerRegistry(IEnumerable<IChallengeSubmissionHandler> handlers)
     : IChallengeSubmissionHandlerRegistry
 {
+    private readonly IReadOnlyDictionary<string, IChallengeSubmissionHandler> _handlers =
+        ProviderRegistry.BuildUnique(handlers, handler => handler.TypeId, "challenge submission");
+
     public IChallengeSubmissionHandler? FindHandler(string typeId)
-        => handlers.FirstOrDefault(handler =>
-            string.Equals(handler.TypeId, typeId, StringComparison.OrdinalIgnoreCase));
+        => string.IsNullOrWhiteSpace(typeId)
+            ? null
+            : _handlers.GetValueOrDefault(typeId.Trim());
 }
 
 public sealed record ChallengeFeatureContext(
@@ -71,15 +75,44 @@ public interface IChallengeAdminFeatureRegistry
 
 public class ChallengeFeatureRegistry(IEnumerable<IChallengeFeatureProvider> providers) : IChallengeFeatureRegistry
 {
+    private readonly IReadOnlyDictionary<string, IChallengeFeatureProvider> _providers =
+        ProviderRegistry.BuildUnique(providers, provider => provider.TypeId, "challenge feature");
+
     public IChallengeFeatureProvider? FindProvider(string typeId)
-        => providers.FirstOrDefault(provider =>
-            string.Equals(provider.TypeId, typeId, StringComparison.OrdinalIgnoreCase));
+        => string.IsNullOrWhiteSpace(typeId)
+            ? null
+            : _providers.GetValueOrDefault(typeId.Trim());
 }
 
 public class ChallengeAdminFeatureRegistry(IEnumerable<IChallengeAdminFeatureProvider> providers)
     : IChallengeAdminFeatureRegistry
 {
+    private readonly IReadOnlyDictionary<string, IChallengeAdminFeatureProvider> _providers =
+        ProviderRegistry.BuildUnique(providers, provider => provider.TypeId, "challenge admin feature");
+
     public IChallengeAdminFeatureProvider? FindProvider(string typeId)
-        => providers.FirstOrDefault(provider =>
-            string.Equals(provider.TypeId, typeId, StringComparison.OrdinalIgnoreCase));
+        => string.IsNullOrWhiteSpace(typeId)
+            ? null
+            : _providers.GetValueOrDefault(typeId.Trim());
+}
+
+internal static class ProviderRegistry
+{
+    public static IReadOnlyDictionary<string, TProvider> BuildUnique<TProvider>(
+        IEnumerable<TProvider> providers,
+        Func<TProvider, string> keySelector,
+        string providerKind)
+    {
+        var result = new Dictionary<string, TProvider>(StringComparer.OrdinalIgnoreCase);
+        foreach (var provider in providers)
+        {
+            var key = keySelector(provider)?.Trim();
+            if (string.IsNullOrWhiteSpace(key))
+                throw new InvalidOperationException($"A {providerKind} provider has an empty key.");
+            if (!result.TryAdd(key, provider))
+                throw new InvalidOperationException($"Duplicate {providerKind} provider key '{key}'.");
+        }
+
+        return result;
+    }
 }

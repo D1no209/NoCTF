@@ -46,9 +46,39 @@ public interface IStorageProvider
     Task<string> GetUrlAsync(string fileName, CancellationToken cancellationToken = default);
 }
 
+public interface ITemporaryUrlStorageProvider : IStorageProvider
+{
+    Task<string> GetUrlAsync(
+        string fileName,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IPluginModule
 {
     string Name { get; }
     string Version { get; }
     void ConfigureServices(IServiceCollection services);
+}
+
+/// <summary>
+/// Identifies the process that is composing a plugin. Plugins can use this to
+/// keep request-facing capabilities in the API and durable/background work in
+/// the Worker.
+/// </summary>
+public enum PluginHostRole
+{
+    Api,
+    Worker
+}
+
+/// <summary>
+/// Optional additive contract for plugins that have host-specific
+/// capabilities. The default implementation deliberately delegates to the
+/// legacy registration method so existing plugin behavior remains compatible.
+/// </summary>
+public interface IHostAwarePluginModule : IPluginModule
+{
+    void ConfigureServices(IServiceCollection services, PluginHostRole hostRole)
+        => ConfigureServices(services);
 }

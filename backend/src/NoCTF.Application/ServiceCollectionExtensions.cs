@@ -10,6 +10,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddNoCtfApplicationCore(this IServiceCollection services)
     {
         services.AddScoped<ICompetitionModeRegistry, CompetitionModeRegistry>();
+        services.AddScoped<ICompetitionFileActionRegistry, CompetitionFileActionRegistry>();
         services.AddScoped<IChallengeSubmissionHandlerRegistry, ChallengeSubmissionHandlerRegistry>();
         services.AddScoped<IChallengeFeatureRegistry, ChallengeFeatureRegistry>();
         services.AddScoped<IChallengeAdminFeatureRegistry, ChallengeAdminFeatureRegistry>();

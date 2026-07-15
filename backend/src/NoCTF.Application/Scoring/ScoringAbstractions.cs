@@ -64,11 +64,47 @@ public sealed record ScoreboardRow(
 public interface IScoreSignalEmitter
 {
     Task<ScoreSignal> EmitAsync(ScoreSignalCreate signal, CancellationToken ct = default);
+
+    // Persist-only is used by workflows that rebuild the complete score
+    // projection immediately afterwards. The default preserves compatibility
+    // with external emitters that only implement EmitAsync.
+    Task<ScoreSignal> PersistAsync(ScoreSignalCreate signal, CancellationToken ct = default)
+        => EmitAsync(signal, ct);
+
+    async Task<IReadOnlyList<ScoreSignal>> EmitBatchAsync(
+        IReadOnlyCollection<ScoreSignalCreate> signals,
+        CancellationToken ct = default)
+    {
+        var emitted = new List<ScoreSignal>(signals.Count);
+        foreach (var signal in signals)
+            emitted.Add(await EmitAsync(signal, ct));
+        return emitted;
+    }
+
+    async Task<IReadOnlyList<ScoreSignal>> PersistBatchAsync(
+        IReadOnlyCollection<ScoreSignalCreate> signals,
+        CancellationToken ct = default)
+    {
+        var persisted = new List<ScoreSignal>(signals.Count);
+        foreach (var signal in signals)
+            persisted.Add(await PersistAsync(signal, ct));
+        return persisted;
+    }
 }
 
 public interface IScoreEventWriter
 {
     Task<ScoreEvent?> WriteAsync(ScoreEventCreate scoreEvent, CancellationToken ct = default);
+
+    async Task<IReadOnlyList<ScoreEvent?>> WriteBatchAsync(
+        IReadOnlyCollection<ScoreEventCreate> scoreEvents,
+        CancellationToken ct = default)
+    {
+        var written = new List<ScoreEvent?>(scoreEvents.Count);
+        foreach (var scoreEvent in scoreEvents)
+            written.Add(await WriteAsync(scoreEvent, ct));
+        return written;
+    }
 }
 
 public interface ICtfScoreRebuilder
@@ -83,6 +119,9 @@ public interface ICtfScoreRebuilder
 /// </summary>
 public interface IScoreRebuildContributor
 {
+    IReadOnlySet<string> OwnedChallengeTypeIds
+        => new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     Task RebuildAsync(
         Competition competition,
         IReadOnlyCollection<Guid> challengeIds,
@@ -95,6 +134,16 @@ public interface IScoringStrategy
     string ScoringKey { get; }
     bool CanHandle(ScoreSignal signal);
     Task HandleAsync(ScoreSignal signal, CancellationToken ct = default);
+}
+
+/// <summary>
+/// Optional additive capability for strategies that can process a set of facts
+/// without issuing database work per signal. Strategies that only implement
+/// <see cref="IScoringStrategy"/> continue to be invoked one signal at a time.
+/// </summary>
+public interface IBatchScoringStrategy : IScoringStrategy
+{
+    Task HandleBatchAsync(IReadOnlyCollection<ScoreSignal> signals, CancellationToken ct = default);
 }
 
 public interface ICompetitionScoringProfileResolver

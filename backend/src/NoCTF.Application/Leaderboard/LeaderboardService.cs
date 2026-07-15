@@ -27,9 +27,18 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
     {
         var activeChallengeIds = await db.Challenges
             .IgnoreQueryFilters()
-            .Where(c => c.CompetitionId == competitionId)
+            .Where(c => c.CompetitionId == competitionId && !c.IsDeleting)
             .Select(c => c.Id)
             .ToListAsync(ct);
+
+        return await CalculateLeaderboardAsync(competitionId, activeChallengeIds, ct);
+    }
+
+    private async Task<IReadOnlyList<LeaderboardEntry>> CalculateLeaderboardAsync(
+        Guid competitionId,
+        IReadOnlyCollection<Guid> activeChallengeIds,
+        CancellationToken ct)
+    {
 
         // Aggregate total score per team from ScoreEvents
         // IgnoreQueryFilters: we filter by competitionId explicitly; avoids tenant context dependency
@@ -75,44 +84,27 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
         {
             scoreMap.TryGetValue(t.Id, out var totalScore);
             solveMap.TryGetValue(t.Id, out var stats);
-            return new
-            {
-                TeamId = t.Id,
-                TeamName = t.Name,
-                t.TrackName,
-                TotalScore = totalScore,
-                SolvedCount = stats?.SolvedCount ?? 0,
-                FirstSolveAt = stats?.FirstSolveAt
-            };
+            return new LeaderboardEntry(
+                Rank: 0,
+                TeamId: t.Id,
+                TeamName: t.Name,
+                TrackName: t.TrackName,
+                TotalScore: totalScore,
+                SolvedCount: stats?.SolvedCount ?? 0,
+                FirstSolveAt: stats?.FirstSolveAt);
         }).ToList();
 
-        // Sort: descending score, then solved challenges, then ascending first-solve time.
-        var sorted = entries
-            .OrderByDescending(e => e.TotalScore)
-            .ThenByDescending(e => e.SolvedCount)
-            .ThenBy(e => e.FirstSolveAt ?? DateTime.MaxValue)
-            .ThenBy(e => e.TeamName)
-            .ToList();
-
-        return sorted.Select((e, i) => new LeaderboardEntry(
-            Rank: i + 1,
-            TeamId: e.TeamId,
-            TeamName: e.TeamName,
-            TrackName: e.TrackName,
-            TotalScore: e.TotalScore,
-            SolvedCount: e.SolvedCount,
-            FirstSolveAt: e.FirstSolveAt
-        )).ToList();
+        return LeaderboardOrdering.SortAndRank(entries);
     }
 
     public async Task<IReadOnlyList<ScoreboardRow>> BuildAsync(Guid competitionId, CancellationToken ct = default)
     {
-        var entries = await CalculateLeaderboardAsync(competitionId, ct);
         var activeChallengeIds = await db.Challenges
             .IgnoreQueryFilters()
-            .Where(c => c.CompetitionId == competitionId)
+            .Where(c => c.CompetitionId == competitionId && !c.IsDeleting)
             .Select(c => c.Id)
             .ToListAsync(ct);
+        var entries = await CalculateLeaderboardAsync(competitionId, activeChallengeIds, ct);
         var activeTeamIds = entries.Select(e => e.TeamId).ToList();
         var scoreEvents = await db.ScoreEvents
             .IgnoreQueryFilters()
@@ -150,4 +142,18 @@ public class LeaderboardService(ApplicationDbContext db) : ILeaderboardService, 
                 });
         }).ToList();
     }
+}
+
+internal static class LeaderboardOrdering
+{
+    public static IReadOnlyList<LeaderboardEntry> SortAndRank(
+        IEnumerable<LeaderboardEntry> entries)
+        => entries
+            .OrderByDescending(entry => entry.TotalScore)
+            .ThenByDescending(entry => entry.SolvedCount)
+            .ThenBy(entry => entry.FirstSolveAt is null)
+            .ThenBy(entry => entry.FirstSolveAt)
+            .ThenBy(entry => entry.TeamName, StringComparer.Ordinal)
+            .Select((entry, index) => entry with { Rank = index + 1 })
+            .ToList();
 }
