@@ -1,6 +1,7 @@
 namespace NoCTF.PluginBase;
 
 using System.Data.Common;
+using System.Text;
 
 public static class SecretValueValidator
 {
@@ -9,6 +10,7 @@ public static class SecretValueValidator
         "replace-with",
         "change-me",
         "changeme",
+        "your-",
         "your-super-secret",
         "example-secret",
         "default-password",
@@ -18,11 +20,21 @@ public static class SecretValueValidator
         "dev-runner-token"
     ];
 
+    private static readonly string[] NormalizedPlaceholderFragments = PlaceholderFragments
+        .Select(NormalizeForPlaceholderComparison)
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
     public static bool IsUnsafe(string? value, int minimumLength = 16)
-        => string.IsNullOrWhiteSpace(value) ||
-           value.Length < minimumLength ||
-           PlaceholderFragments.Any(fragment =>
-               value.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < minimumLength)
+            return true;
+
+        var normalized = NormalizeForPlaceholderComparison(value);
+        return normalized.Trim('-').Length == 0 ||
+               NormalizedPlaceholderFragments.Any(fragment =>
+                   normalized.Contains(fragment, StringComparison.Ordinal));
+    }
 
     public static void RequireSafe(string name, string? value, int minimumLength = 16)
     {
@@ -48,5 +60,26 @@ public static class SecretValueValidator
         {
             return true;
         }
+    }
+
+    private static string NormalizeForPlaceholderComparison(string value)
+    {
+        var result = new StringBuilder(value.Length);
+        var previousWasSeparator = false;
+        foreach (var character in value)
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                result.Append(char.ToLowerInvariant(character));
+                previousWasSeparator = false;
+            }
+            else if (!previousWasSeparator)
+            {
+                result.Append('-');
+                previousWasSeparator = true;
+            }
+        }
+
+        return result.ToString();
     }
 }

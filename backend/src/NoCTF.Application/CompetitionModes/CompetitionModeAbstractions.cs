@@ -59,6 +59,11 @@ public interface ICompetitionFileActionProvider
     Task<CompetitionActionResult> HandleFileActionAsync(CompetitionFileActionContext context, CancellationToken ct = default);
 }
 
+public interface ICompetitionFileActionRegistry
+{
+    ICompetitionFileActionProvider? FindProvider(string modeKey, string actionKey);
+}
+
 public interface ICompetitionModeRegistry
 {
     ICompetitionModeProvider GetRequiredProvider(string modeKey);
@@ -66,11 +71,39 @@ public interface ICompetitionModeRegistry
 
 public class CompetitionModeRegistry(IEnumerable<ICompetitionModeProvider> providers) : ICompetitionModeRegistry
 {
+    private readonly IReadOnlyDictionary<string, ICompetitionModeProvider> _providers =
+        ProviderRegistry.BuildUnique(providers, provider => provider.ModeKey, "competition mode");
+
     public ICompetitionModeProvider GetRequiredProvider(string modeKey)
     {
-        var provider = providers.FirstOrDefault(p =>
-            string.Equals(p.ModeKey, modeKey, StringComparison.OrdinalIgnoreCase));
+        ArgumentException.ThrowIfNullOrWhiteSpace(modeKey);
+        return _providers.TryGetValue(modeKey.Trim(), out var provider)
+            ? provider
+            : throw new NotSupportedException($"Unknown competition mode '{modeKey}'.");
+    }
+}
 
-        return provider ?? throw new NotSupportedException($"Unknown competition mode '{modeKey}'.");
+public sealed class CompetitionFileActionRegistry(
+    IEnumerable<ICompetitionFileActionProvider> providers) : ICompetitionFileActionRegistry
+{
+    private readonly ICompetitionFileActionProvider[] _providers = providers.ToArray();
+
+    public ICompetitionFileActionProvider? FindProvider(string modeKey, string actionKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(modeKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
+        var matches = _providers
+            .Where(provider =>
+                string.Equals(provider.ModeKey, modeKey.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                provider.CanHandleFileAction(actionKey))
+            .Take(2)
+            .ToArray();
+        return matches.Length switch
+        {
+            0 => null,
+            1 => matches[0],
+            _ => throw new InvalidOperationException(
+                $"Multiple file-action providers handle mode '{modeKey}' and action '{actionKey}'.")
+        };
     }
 }

@@ -13,7 +13,8 @@ public record ContainerConfig(
     ContainerSecurityPolicy? SecurityPolicy = null,
     IReadOnlyList<string>? Entrypoint = null,
     string? OrchestrationJson = null,
-    IReadOnlyList<string>? NetworkAliases = null
+    IReadOnlyList<string>? NetworkAliases = null,
+    Guid? OperationId = null
 );
 
 public record ContainerResourceLimits(
@@ -63,7 +64,8 @@ public record ComposeConfig(
     Dictionary<string, string>? EnvironmentVariables = null,
     Dictionary<string, string>? Labels = null,
     TimeSpan? Ttl = null,
-    string? OrchestrationJson = null
+    string? OrchestrationJson = null,
+    Guid? OperationId = null
 );
 
 public record ComposeDeployment(

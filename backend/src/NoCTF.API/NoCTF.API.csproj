@@ -29,17 +29,14 @@
     <ProjectReference Include="../NoCTF.Runner.Client/NoCTF.Runner.Client.csproj" />
   </ItemGroup>
 
-  <Target Name="CopyPlugins" AfterTargets="Build">
-    <MakeDir Directories="$(TargetDir)plugins" />
-    <ItemGroup>
-      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.CTF/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.CTF.dll" Condition="Exists('$(SolutionDir)src/NoCTF.Plugins.CTF/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.CTF.dll')" />
-      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.AWD/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.AWD.dll" Condition="Exists('$(SolutionDir)src/NoCTF.Plugins.AWD/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.AWD.dll')" />
-      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.AWDP/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.AWDP.dll" Condition="Exists('$(SolutionDir)src/NoCTF.Plugins.AWDP/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.AWDP.dll')" />
-      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.KoH/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.KoH.dll" Condition="Exists('$(SolutionDir)src/NoCTF.Plugins.KoH/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.KoH.dll')" />
-      <PluginDlls Include="$(SolutionDir)src/NoCTF.Plugins.Penetration/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.Penetration.dll" Condition="Exists('$(SolutionDir)src/NoCTF.Plugins.Penetration/bin/$(Configuration)/$(TargetFramework)/NoCTF.Plugins.Penetration.dll')" />
-    </ItemGroup>
-    <Copy SourceFiles="@(PluginDlls)" DestinationFolder="$(TargetDir)plugins/" SkipUnchangedFiles="true" />
-  </Target>
+  <ItemGroup>
+    <NoCtfPluginProject Include="../NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj" />
+    <NoCtfPluginProject Include="../NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
+    <NoCtfPluginProject Include="../NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
+    <NoCtfPluginProject Include="../NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
+    <NoCtfPluginProject Include="../NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
+    <ProjectReference Include="@(NoCtfPluginProject)" ReferenceOutputAssembly="false" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FastEndpoints" Version="5.33.0" />
