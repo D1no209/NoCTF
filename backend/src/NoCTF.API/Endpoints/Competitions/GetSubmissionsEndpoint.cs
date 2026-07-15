@@ -113,46 +113,49 @@ public class GetSubmissionsEndpoint(ApplicationDbContext dbContext) : Endpoint<G
             return;
         }
 
-        var correctSubmissions = await dbContext.Submissions
+        var activeChallengeIds = await dbContext.Challenges
             .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == req.Id
-                     && s.TeamId == teamMember.Id
-                     && s.IsCorrect)
             .AsNoTracking()
+            .Where(challenge =>
+                challenge.CompetitionId == req.Id &&
+                !challenge.IsDeleting)
+            .Select(challenge => challenge.Id)
             .ToListAsync(ct);
 
-        var solvedFlags = await dbContext.PenetrationFlags
+        var correctSubmissions = await dbContext.Submissions
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(f => f.CompetitionId == req.Id)
-            .Join(
-                dbContext.Submissions.IgnoreQueryFilters().AsNoTracking().Where(s =>
-                    s.CompetitionId == req.Id &&
-                    s.TeamId == teamMember.Id &&
-                    s.IsCorrect &&
-                    s.PenetrationFlagId != null),
-                f => f.Id,
-                s => s.PenetrationFlagId!.Value,
-                (f, s) => new SolvedFlagDto
-                {
-                    ChallengeId = f.ChallengeId,
-                    FlagId = f.Id,
-                    Stage = f.Stage,
-                    Score = f.Score,
-                    SolvedAt = s.SubmittedAt
-                })
+            .Where(s => s.CompetitionId == req.Id
+                     && s.TeamId == teamMember.Id
+                     && s.IsCorrect
+                     && activeChallengeIds.Contains(s.ChallengeId))
+            .Select(s => new { s.ChallengeId, s.PenetrationFlagId, s.SubmittedAt })
+            .ToListAsync(ct);
+
+        var solvedFlags = await BuildVisibleSolvedFlagsQuery(
+                dbContext,
+                req.Id,
+                teamMember.Id,
+                activeChallengeIds)
             .ToListAsync(ct);
 
         var penetrationChallengeIds = await dbContext.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(c => c.CompetitionId == req.Id && c.TypeId.ToLower() == "penetration")
+            .Where(c =>
+                c.CompetitionId == req.Id &&
+                activeChallengeIds.Contains(c.Id) &&
+                c.TypeId.ToLower() == "penetration" &&
+                !c.IsDeleting)
             .Select(c => c.Id)
             .ToListAsync(ct);
         var visibleFlagCounts = await dbContext.PenetrationFlags
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(f => f.CompetitionId == req.Id && f.Visible)
+            .Where(f =>
+                f.CompetitionId == req.Id &&
+                f.Visible &&
+                activeChallengeIds.Contains(f.ChallengeId))
             .GroupBy(f => f.ChallengeId)
             .Select(g => new { ChallengeId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ChallengeId, x => x.Count, ct);
@@ -167,9 +170,10 @@ public class GetSubmissionsEndpoint(ApplicationDbContext dbContext) : Endpoint<G
             })
             .ToList();
 
+        var solvedFlagsByChallenge = solvedFlags.ToLookup(flag => flag.ChallengeId);
         foreach (var challengeId in penetrationChallengeIds)
         {
-            var solvedForChallenge = solvedFlags.Where(f => f.ChallengeId == challengeId).ToList();
+            var solvedForChallenge = solvedFlagsByChallenge[challengeId].ToList();
             var requiredCount = visibleFlagCounts.GetValueOrDefault(challengeId);
             if (requiredCount > 0 && solvedForChallenge.Count >= requiredCount)
             {
@@ -190,4 +194,33 @@ public class GetSubmissionsEndpoint(ApplicationDbContext dbContext) : Endpoint<G
             SolvedFlags = solvedFlags
         }, cancellation: ct);
     }
+
+    internal static IQueryable<SolvedFlagDto> BuildVisibleSolvedFlagsQuery(
+        ApplicationDbContext dbContext,
+        Guid competitionId,
+        Guid teamId,
+        IReadOnlyCollection<Guid> activeChallengeIds)
+        => dbContext.PenetrationFlags
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(flag =>
+                flag.CompetitionId == competitionId &&
+                flag.Visible &&
+                activeChallengeIds.Contains(flag.ChallengeId))
+            .Join(
+                dbContext.Submissions.IgnoreQueryFilters().AsNoTracking().Where(submission =>
+                    submission.CompetitionId == competitionId &&
+                    submission.TeamId == teamId &&
+                    submission.IsCorrect &&
+                    submission.PenetrationFlagId != null),
+                flag => flag.Id,
+                submission => submission.PenetrationFlagId!.Value,
+                (flag, submission) => new SolvedFlagDto
+                {
+                    ChallengeId = flag.ChallengeId,
+                    FlagId = flag.Id,
+                    Stage = flag.Stage,
+                    Score = flag.Score,
+                    SolvedAt = submission.SubmittedAt
+                });
 }

@@ -18,7 +18,7 @@ public class CompetitionListItemDto
 }
 
 /// <summary>
-/// GET /api/competitions — returns all published/running competitions.
+/// GET /api/competitions — returns all public competitions, including paused and finished events.
 /// </summary>
 public class GetCompetitionsEndpoint(ApplicationDbContext dbContext) : Endpoint<EmptyRequest, List<CompetitionListItemDto>>
 {
@@ -33,8 +33,10 @@ public class GetCompetitionsEndpoint(ApplicationDbContext dbContext) : Endpoint<
     {
         var competitions = await dbContext.Competitions
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(c => c.Status == CompetitionStatus.Published
                      || c.Status == CompetitionStatus.Running
+                     || c.Status == CompetitionStatus.Paused
                      || c.Status == CompetitionStatus.Finished)
             .OrderByDescending(c => c.StartTime)
             .Select(c => new CompetitionListItemDto

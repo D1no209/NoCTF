@@ -9,6 +9,8 @@ namespace NoCTF.API.Endpoints.Competitions;
 public class GetPatchSubmissionsRequest
 {
     public Guid Id { get; set; }
+    public DateTime? Before { get; set; }
+    public int? Limit { get; set; }
 }
 
 public class GetPatchSubmissionRequest
@@ -53,8 +55,16 @@ public class GetPatchSubmissionsEndpoint(ApplicationDbContext db)
 
         var submissions = await db.AwdpPatchSubmissions
             .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == req.Id && s.TeamId == teamId.Value)
+            .Where(s =>
+                s.CompetitionId == req.Id &&
+                s.TeamId == teamId.Value &&
+                db.Challenges.IgnoreQueryFilters().Any(challenge =>
+                    challenge.Id == s.ChallengeId &&
+                    challenge.CompetitionId == req.Id &&
+                    !challenge.IsDeleting) &&
+                (!req.Before.HasValue || s.SubmittedAt < req.Before.Value))
             .OrderByDescending(s => s.SubmittedAt)
+            .Take(Math.Clamp(req.Limit ?? 100, 1, 200))
             .Select(s => new PatchSubmissionDto
             {
                 Id = s.Id,
@@ -120,7 +130,14 @@ public class GetPatchSubmissionEndpoint(ApplicationDbContext db)
 
         var submission = await db.AwdpPatchSubmissions
             .IgnoreQueryFilters()
-            .Where(s => s.Id == req.SubmissionId && s.CompetitionId == req.Id && s.TeamId == teamId.Value)
+            .Where(s =>
+                s.Id == req.SubmissionId &&
+                s.CompetitionId == req.Id &&
+                s.TeamId == teamId.Value &&
+                db.Challenges.IgnoreQueryFilters().Any(challenge =>
+                    challenge.Id == s.ChallengeId &&
+                    challenge.CompetitionId == req.Id &&
+                    !challenge.IsDeleting))
             .Select(s => new PatchSubmissionDto
             {
                 Id = s.Id,

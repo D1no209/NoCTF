@@ -33,7 +33,7 @@ public class LoginEndpoint(ApplicationDbContext dbContext, JwtTokenService jwtSe
     {
         var email = req.Email.Trim().ToLowerInvariant();
         var user = await dbContext.Users
-            .FirstOrDefaultAsync(u => u.Email == email, ct);
+            .FirstOrDefaultAsync(u => EF.Property<string>(u, "NormalizedEmail") == email, ct);
 
         if (user is null)
         {

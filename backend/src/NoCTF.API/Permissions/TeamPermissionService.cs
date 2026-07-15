@@ -15,6 +15,7 @@ public class TeamPermissionService(ApplicationDbContext dbContext) : ITeamPermis
     public async Task<bool> IsCaptainAsync(Guid userId, Guid teamId, CancellationToken cancellationToken = default)
     {
         var member = await dbContext.TeamMembers
+            .IgnoreQueryFilters()
             .Join(dbContext.Teams.IgnoreQueryFilters().Where(t => t.Id == teamId),
                 tm => new { tm.TeamId, tm.CompetitionId },
                 t => new { TeamId = t.Id, t.CompetitionId },
@@ -26,6 +27,7 @@ public class TeamPermissionService(ApplicationDbContext dbContext) : ITeamPermis
     public async Task<bool> IsTeamMemberAsync(Guid userId, Guid teamId, CancellationToken cancellationToken = default)
     {
         return await dbContext.TeamMembers
+            .IgnoreQueryFilters()
             .Join(dbContext.Teams.IgnoreQueryFilters().Where(t => t.Id == teamId),
                 tm => new { tm.TeamId, tm.CompetitionId },
                 t => new { TeamId = t.Id, t.CompetitionId },

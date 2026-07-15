@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using Npgsql;
 
 namespace NoCTF.API.Endpoints.Auth;
 
@@ -30,20 +31,32 @@ public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<Registe
 
     public override async Task HandleAsync(RegisterRequest req, CancellationToken ct)
     {
-        var userName = req.UserName.Trim();
-        var email = req.Email.Trim().ToLowerInvariant();
+        var userName = req.UserName?.Trim() ?? string.Empty;
+        var email = req.Email?.Trim().ToLowerInvariant() ?? string.Empty;
+        var password = req.Password ?? string.Empty;
+        var normalizedUserName = userName.ToLowerInvariant();
 
-        if (userName.Length < 3)
+        if (userName.Length < UserInputLimits.UserNameMinLength)
         {
             AddError(r => r.UserName, "User name must be at least 3 characters.");
         }
+        else if (userName.Length > UserInputLimits.UserNameMaxLength)
+        {
+            AddError(r => r.UserName, $"User name must be at most {UserInputLimits.UserNameMaxLength} characters.");
+        }
 
-        if (passwordTooShort(req.Password))
+        if (password.Length < UserInputLimits.PasswordMinLength)
         {
             AddError(r => r.Password, "Password must be at least 8 characters.");
         }
+        else if (password.Length > UserInputLimits.PasswordMaxLength)
+        {
+            AddError(r => r.Password, $"Password must be at most {UserInputLimits.PasswordMaxLength} characters.");
+        }
 
-        if (!email.Contains('@'))
+        if (email.Length > UserInputLimits.EmailMaxLength ||
+            email.Length < 3 ||
+            !email.Contains('@'))
         {
             AddError(r => r.Email, "Email is invalid.");
         }
@@ -54,9 +67,14 @@ public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<Registe
             return;
         }
 
-        var exists = await dbContext.Users.AnyAsync(
-            u => u.Email.ToLower() == email || u.UserName.ToLower() == userName.ToLower(),
-            ct);
+        var exists = dbContext.Database.IsRelational()
+            ? await dbContext.Users.AnyAsync(
+                u => EF.Property<string>(u, "NormalizedEmail") == email ||
+                     EF.Property<string>(u, "NormalizedUserName") == normalizedUserName,
+                ct)
+            : await dbContext.Users.AnyAsync(
+                u => u.Email.ToLower() == email || u.UserName.ToLower() == normalizedUserName,
+                ct);
         if (exists)
         {
             AddError("A user with the same email or user name already exists.");
@@ -70,17 +88,40 @@ public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<Registe
             Id = Guid.NewGuid(),
             UserName = userName,
             Email = email,
-            PasswordHash = hasher.HashPassword(null!, req.Password),
+            PasswordHash = hasher.HashPassword(null!, password),
             Role = UserRole.User,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         dbContext.Users.Add(user);
-        await dbContext.SaveChangesAsync(ct);
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUserUniquenessConflict(ex))
+        {
+            dbContext.Entry(user).State = EntityState.Detached;
+            AddError("A user with the same email or user name already exists.");
+            await SendErrorsAsync(409, ct);
+            return;
+        }
 
         await SendAsync(new RegisterResponse { Id = user.Id, UserName = user.UserName }, 201, ct);
     }
 
-    private static bool passwordTooShort(string password) => password.Length < 8;
+    internal static bool IsUserUniquenessConflict(DbUpdateException exception)
+    {
+        if (exception.InnerException is not PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: { } constraintName
+            })
+        {
+            return false;
+        }
+
+        return constraintName.Equals("ix_users_email", StringComparison.Ordinal) ||
+               constraintName.Equals("ix_users_username", StringComparison.Ordinal);
+    }
 }

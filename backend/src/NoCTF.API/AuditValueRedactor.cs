@@ -41,7 +41,9 @@ public static class AuditValueRedactor
         }
         catch
         {
-            return json;
+            // Redaction is a security boundary. If an unexpected parser error
+            // occurs, retaining the original payload could persist credentials.
+            return JsonSerializer.Serialize("[REDACTED]");
         }
     }
 

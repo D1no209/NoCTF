@@ -22,8 +22,10 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using NoCTF.Application;
 using NoCTF.Application.BackgroundTasks;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Events;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Scoring;
 using NoCTF.Application.Security;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Storage;
@@ -32,6 +34,12 @@ using NoCTF.Runner.Client;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+var usesLocalStorage = StorageProviderFactory.UsesLocalStorage(builder.Configuration);
+builder.Services.AddHttpClient();
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = RequestBodyLimits.MaximumMultipartBodyLength(builder.Configuration);
+});
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -56,7 +64,7 @@ builder.Services.AddCors(options =>
     {
         var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
         var origins = configuredOrigins
-            .Where(origin => Uri.TryCreate(origin, UriKind.Absolute, out _))
+            .Select(NormalizeCorsOrigin)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (builder.Environment.IsDevelopment() && origins.Length == 0)
@@ -91,6 +99,7 @@ else
     var configuredSeedPassword = builder.Configuration["SeedAdmin:Password"];
     if (!string.IsNullOrWhiteSpace(configuredSeedPassword))
         SecretValueValidator.RequireSafe("SeedAdmin:Password", configuredSeedPassword, 12);
+    StorageProviderFactory.ValidateLocalUrlSigningKey(builder.Configuration);
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -105,6 +114,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = jwtSettings.GetValue<string>("Issuer") ?? "NoCTF",
             ValidAudience = jwtSettings.GetValue<string>("Audience") ?? "NoCTF",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ClockSkew = TimeSpan.FromSeconds(30),
             NameClaimType = ClaimTypes.Name,
             RoleClaimType = ClaimTypes.Role
         };
@@ -143,11 +153,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 }
 
                 var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
-                var currentVersion = await db.Users
-                    .AsNoTracking()
-                    .Where(u => u.Id == userId)
-                    .Select(u => (int?)u.TokenVersion)
-                    .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+                var tokenVersionCache = context.HttpContext.RequestServices
+                    .GetRequiredService<IUserTokenVersionCache>();
+                var currentVersion = await tokenVersionCache.GetAsync(
+                    userId,
+                    db,
+                    context.HttpContext.RequestAborted);
                 if (currentVersion is null || currentVersion.Value != tokenVersion)
                     context.Fail("Token has been revoked.");
             }
@@ -178,7 +189,21 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
-    options.AddPolicy("flag-submit", httpContext =>
+    options.AddPolicy("auth-refresh", httpContext =>
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var partition = $"{userId}:{httpContext.Connection.RemoteIpAddress}";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partition,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+    options.AddPolicy("competition-submit", httpContext =>
     {
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var partition = $"{userId ?? "anonymous"}:{httpContext.Connection.RemoteIpAddress}";
@@ -210,10 +235,33 @@ builder.Services.AddRateLimiter(options =>
                 PermitLimit = 3,
                 QueueLimit = 0
             }));
+    options.AddPolicy("hub-connect", httpContext =>
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        var partition = $"{userId}:{httpContext.Connection.RemoteIpAddress}";
+        return RateLimitPartition.GetConcurrencyLimiter(
+            partition,
+            _ => new ConcurrencyLimiterOptions
+            {
+                PermitLimit = 10,
+                QueueLimit = 0
+            });
+    });
+    options.AddPolicy("health-read", httpContext =>
+        RateLimitPartition.GetConcurrencyLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new ConcurrencyLimiterOptions
+            {
+                PermitLimit = 4,
+                QueueLimit = 0
+            }));
 });
 
 // SignalR with Redis backplane
-var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(redisConnection))
+    throw new InvalidOperationException("ConnectionStrings:Redis must be configured outside Development.");
+redisConnection ??= "localhost:6379";
 builder.Services.AddSignalR()
     .AddStackExchangeRedis(redisConnection, options =>
     {
@@ -221,8 +269,12 @@ builder.Services.AddSignalR()
             "NoCTF", StackExchange.Redis.RedisChannel.PatternMode.Literal);
     });
 
-// Hub notifier service (singleton — IHubContext is thread-safe)
-builder.Services.AddSingleton<IHubNotifierService, HubNotifierService>();
+// Direct API notifications use SignalR. Worker notifications are persisted to
+// a Redis Stream and relayed by one API replica from the shared consumer group.
+builder.Services.AddSingleton<HubNotifierService>();
+builder.Services.AddSingleton<IHubNotifierService>(sp => sp.GetRequiredService<HubNotifierService>());
+builder.Services.AddSingleton<IHubNotificationRelayTarget>(sp => sp.GetRequiredService<HubNotifierService>());
+builder.Services.AddHostedService<RedisHubNotificationRelay>();
 
 // Log buffer (singleton) + custom logger provider
 builder.Services.AddSingleton<LogBuffer>();
@@ -230,7 +282,12 @@ builder.Services.AddSingleton<ILoggerProvider, LogStreamerLoggerProvider>();
 
 // Redis IConnectionMultiplexer (shared instance for leaderboard cache)
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
-    ConnectionMultiplexer.Connect(redisConnection));
+{
+    var options = ConfigurationOptions.Parse(redisConnection);
+    options.AbortOnConnectFail = builder.Environment.IsProduction();
+    return ConnectionMultiplexer.Connect(options);
+});
+builder.Services.AddSingleton<IUserTokenVersionCache, RedisUserTokenVersionCache>();
 
 builder.Services.AddNoCtfApplicationCore();
 
@@ -268,7 +325,7 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
     options.UseNpgsql(connectionString);
 });
 
-builder.Services.AddSingleton<IStorageProvider>(StorageProviderFactory.Create(builder.Configuration));
+builder.Services.AddSingleton<IStorageProvider>(_ => StorageProviderFactory.Create(builder.Configuration));
 
 // JWT token service
 builder.Services.AddScoped<JwtTokenService>();
@@ -279,13 +336,23 @@ builder.Services.AddScoped<ITeamPermissionService, TeamPermissionService>();
 
 // Container manager. Production deployments should use the Runner boundary; direct Docker remains a local fallback.
 var runnerBaseUrl = builder.Configuration["Runner:BaseUrl"];
+if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(runnerBaseUrl))
+    throw new InvalidOperationException("Runner:BaseUrl must be configured outside Development.");
+Uri? runnerBaseUri = null;
+if (!string.IsNullOrWhiteSpace(runnerBaseUrl) &&
+    (!Uri.TryCreate(runnerBaseUrl, UriKind.Absolute, out runnerBaseUri) ||
+     (runnerBaseUri.Scheme != Uri.UriSchemeHttp && runnerBaseUri.Scheme != Uri.UriSchemeHttps) ||
+     !string.IsNullOrEmpty(runnerBaseUri.UserInfo)))
+{
+    throw new InvalidOperationException("Runner:BaseUrl must be an absolute HTTP(S) URL without embedded credentials.");
+}
 if (!string.IsNullOrWhiteSpace(runnerBaseUrl))
 {
     if (!builder.Environment.IsDevelopment())
         SecretValueValidator.RequireSafe("Runner:ApiKey", builder.Configuration["Runner:ApiKey"], 24);
     builder.Services.AddHttpClient<IRunnerClient, HttpRunnerClient>(client =>
     {
-        client.BaseAddress = new Uri(runnerBaseUrl);
+        client.BaseAddress = runnerBaseUri;
         client.Timeout = TimeSpan.FromSeconds(Math.Clamp(
             builder.Configuration.GetValue("Runner:TimeoutSeconds", 900), 30, 3600));
         var runnerApiKey = builder.Configuration["Runner:ApiKey"];
@@ -302,7 +369,7 @@ else
 }
 
 // Cold-load plugins from plugins/ directory
-PluginLoader.LoadAndRegisterAll(builder.Services, builder.Configuration);
+PluginLoader.LoadAndRegisterAll(builder.Services, builder.Configuration, PluginHostRole.Api);
 
 // Health checks
 builder.Services.AddHealthChecks()
@@ -315,7 +382,8 @@ var migrateOnly = args.Any(arg => string.Equals(arg, "--migrate-only", StringCom
 
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var services = scope.ServiceProvider;
+    var db = services.GetRequiredService<ApplicationDbContext>();
     var autoMigrate = builder.Configuration.GetValue("Database:AutoMigrate", false);
 
     if (migrateOnly || autoMigrate)
@@ -330,6 +398,21 @@ using (var scope = app.Services.CreateScope())
             builder.Configuration,
             allowDefaultAdminCredentials: app.Environment.IsDevelopment());
     }
+
+    if (!migrateOnly)
+    {
+        // Materialize every plugin-owned registry before accepting traffic.
+        // Invalid duplicate keys or overlapping score-rebuild ownership must
+        // fail deterministically, not on the first request that uses it.
+        _ = services.GetRequiredService<ICompetitionModeRegistry>();
+        _ = services.GetRequiredService<ICompetitionFileActionRegistry>();
+        _ = services.GetRequiredService<IChallengeSubmissionHandlerRegistry>();
+        _ = services.GetRequiredService<IChallengeFeatureRegistry>();
+        _ = services.GetRequiredService<IChallengeAdminFeatureRegistry>();
+        _ = services.GetRequiredService<ICompetitionJobRegistry>().Jobs;
+        _ = services.GetRequiredService<IScoreSignalEmitter>();
+        _ = services.GetRequiredService<ICtfScoreRebuilder>();
+    }
 }
 
 if (migrateOnly)
@@ -341,7 +424,7 @@ var monitorHubContext = app.Services.GetRequiredService<IHubContext<MonitorHub, 
 logBuffer.SetHubContext(monitorHubContext);
 
 var localBasePath = builder.Configuration["StorageProvider:Local:BasePath"] ?? "uploads";
-if (!Directory.Exists(localBasePath))
+if (usesLocalStorage && !Directory.Exists(localBasePath))
     Directory.CreateDirectory(localBasePath);
 
 if (!app.Environment.IsDevelopment())
@@ -362,42 +445,48 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+app.UseMiddleware<RequestBodyLimitMiddleware>();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
-app.MapGet("/api/files/{**filePath}", (string filePath, HttpContext httpContext, IConfiguration configuration) =>
+if (usesLocalStorage)
 {
-    var normalized = filePath.TrimStart('/').Replace("\\", "/", StringComparison.Ordinal);
-    if (string.IsNullOrWhiteSpace(normalized) ||
-        normalized.Contains("..", StringComparison.Ordinal) ||
-        Path.IsPathRooted(normalized))
+    app.MapGet("/api/files/{**filePath}", async (
+        string filePath,
+        HttpContext httpContext,
+        IConfiguration configuration,
+        IStorageProvider storageProvider,
+        CancellationToken ct) =>
     {
-        return Results.NotFound();
-    }
+        var normalized = filePath.TrimStart('/').Replace("\\", "/", StringComparison.Ordinal);
+        var signature = httpContext.Request.Query["sig"].ToString();
+        var hasValidSignature =
+            long.TryParse(httpContext.Request.Query["expires"].ToString(), out var expires) &&
+            LocalFileUrlSigner.Validate(
+                normalized,
+                expires,
+                signature,
+                configuration["StorageProvider:Local:UrlSigningKey"] ?? configuration["JwtSettings:Secret"],
+                DateTimeOffset.UtcNow);
+        if (!hasValidSignature)
+        {
+            return Results.NotFound();
+        }
 
-    var fullBasePath = Path.GetFullPath(localBasePath);
-    var fullPath = Path.GetFullPath(Path.Combine(fullBasePath, normalized));
-    if (!fullPath.StartsWith(fullBasePath, StringComparison.OrdinalIgnoreCase) ||
-        !System.IO.File.Exists(fullPath))
-    {
-        return Results.NotFound();
-    }
-
-    var signature = httpContext.Request.Query["sig"].ToString();
-    var hasValidSignature =
-        long.TryParse(httpContext.Request.Query["expires"].ToString(), out var expires) &&
-        LocalFileUrlSigner.Validate(
-            normalized,
-            expires,
-            signature,
-            configuration["StorageProvider:Local:UrlSigningKey"] ?? configuration["JwtSettings:Secret"],
-            DateTimeOffset.UtcNow);
-    if (!hasValidSignature)
-    {
-        return Results.NotFound();
-    }
-
-    return Results.File(fullPath, "application/octet-stream", Path.GetFileName(fullPath));
-});
+        try
+        {
+            var stream = await storageProvider.DownloadAsync(normalized, ct);
+            return Results.File(
+                stream,
+                "application/octet-stream",
+                Path.GetFileName(normalized),
+                enableRangeProcessing: true);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            return Results.NotFound();
+        }
+    }).RequireRateLimiting("public-stream");
+}
 
 app.UseFastEndpoints(c =>
 {
@@ -417,9 +506,23 @@ app.UseFastEndpoints(c =>
 if (app.Environment.IsDevelopment() || builder.Configuration.GetValue("Swagger:Enabled", false))
     app.UseSwaggerGen();
 
-static async Task<IResult> ReadinessResponse(HealthCheckService healthCheckService)
+static async Task<IResult> ReadinessResponse(
+    HttpContext context,
+    HealthCheckService healthCheckService)
 {
-    var report = await healthCheckService.CheckHealthAsync();
+    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+    timeout.CancelAfter(TimeSpan.FromSeconds(5));
+    HealthReport report;
+    try
+    {
+        report = await healthCheckService.CheckHealthAsync(timeout.Token);
+    }
+    catch (OperationCanceledException) when (!context.RequestAborted.IsCancellationRequested)
+    {
+        return Results.Json(
+            new { status = "Unhealthy", checks = new { timeout = "Unhealthy" } },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
     var result = new
     {
         status = report.Status.ToString(),
@@ -435,13 +538,17 @@ static async Task<IResult> ReadinessResponse(HealthCheckService healthCheckServi
 }
 
 app.MapGet("/api/health/live", () => Results.Ok(new { status = "Healthy" })).AllowAnonymous();
-app.MapGet("/api/health/ready", ReadinessResponse).AllowAnonymous();
-app.MapGet("/api/health", ReadinessResponse).AllowAnonymous();
+app.MapGet("/api/health/ready", ReadinessResponse)
+    .AllowAnonymous()
+    .RequireRateLimiting("health-read");
+app.MapGet("/api/health", ReadinessResponse)
+    .AllowAnonymous()
+    .RequireRateLimiting("health-read");
 
 // SignalR hub endpoints
-app.MapHub<LeaderboardHub>("/hubs/leaderboard");
-app.MapHub<GameHub>("/hubs/game");
-app.MapHub<MonitorHub>("/hubs/monitor");
+app.MapHub<LeaderboardHub>("/hubs/leaderboard").RequireRateLimiting("hub-connect");
+app.MapHub<GameHub>("/hubs/game").RequireRateLimiting("hub-connect");
+app.MapHub<MonitorHub>("/hubs/monitor").RequireRateLimiting("hub-connect");
 
 app.MapFallback("/api/{**path}", () => Results.NotFound(new
 {
@@ -477,3 +584,20 @@ else
 }
 
 app.Run();
+
+static string NormalizeCorsOrigin(string configuredOrigin)
+{
+    if (!Uri.TryCreate(configuredOrigin, UriKind.Absolute, out var origin) ||
+        (origin.Scheme != Uri.UriSchemeHttp && origin.Scheme != Uri.UriSchemeHttps) ||
+        string.IsNullOrWhiteSpace(origin.Host) ||
+        !string.IsNullOrEmpty(origin.UserInfo) ||
+        origin.AbsolutePath != "/" ||
+        !string.IsNullOrEmpty(origin.Query) ||
+        !string.IsNullOrEmpty(origin.Fragment))
+    {
+        throw new InvalidOperationException(
+            $"Cors:AllowedOrigins contains an invalid HTTP(S) origin: '{configuredOrigin}'.");
+    }
+
+    return origin.GetLeftPart(UriPartial.Authority);
+}

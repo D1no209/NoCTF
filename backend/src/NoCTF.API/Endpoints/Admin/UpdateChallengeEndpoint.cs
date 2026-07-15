@@ -122,8 +122,8 @@ public class UpdateChallengeEndpoint(ApplicationDbContext db, IStorageProvider s
             ? req.PenetrationConfigJson
             : "{}";
 
+        await StorageObjectCleanup.EnqueueAsync(db, previousStorageKeys, ct);
         await db.SaveChangesAsync(ct);
-        await StorageObjectCleanup.DeleteUnreferencedAsync(db, storageProvider, previousStorageKeys, ct);
 
         await SendAsync(ChallengeAdminMapping.ToTemplateDto(challenge), cancellation: ct);
     }

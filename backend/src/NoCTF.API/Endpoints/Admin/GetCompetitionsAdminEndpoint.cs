@@ -69,6 +69,7 @@ public class GetCompetitionsAdminEndpoint(ApplicationDbContext dbContext, ICompe
         var manageableIds = await permissions.GetManageableCompetitionIdsAsync(userId, ct);
         var competitions = await dbContext.Competitions
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(c => manageableIds.Contains(c.Id))
             .ToListAsync(ct);
 

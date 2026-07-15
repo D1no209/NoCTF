@@ -50,7 +50,7 @@ public class GetAuditLogsEndpoint(ApplicationDbContext db) : Endpoint<GetAuditLo
 
     public override async Task HandleAsync(GetAuditLogsRequest req, CancellationToken ct)
     {
-        var query = db.AuditLogs.AsQueryable();
+        var query = db.AuditLogs.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(req.UserName))
             query = query.Where(l => l.UserName != null && l.UserName.Contains(req.UserName));
@@ -70,10 +70,11 @@ public class GetAuditLogsEndpoint(ApplicationDbContext db) : Endpoint<GetAuditLo
         var total = await query.CountAsync(ct);
         var page = Math.Max(1, req.Page);
         var pageSize = Math.Clamp(req.PageSize, 1, 200);
+        var offset = CalculateOffset(page, pageSize);
 
         var items = await query
             .OrderByDescending(l => l.Timestamp)
-            .Skip((page - 1) * pageSize)
+            .Skip(offset)
             .Take(pageSize)
             .Select(l => new AuditLogDto
             {
@@ -101,4 +102,9 @@ public class GetAuditLogsEndpoint(ApplicationDbContext db) : Endpoint<GetAuditLo
             PageSize = pageSize
         }, cancellation: ct);
     }
+
+    internal static int CalculateOffset(int page, int pageSize)
+        => (int)Math.Min(
+            (long)(Math.Max(1, page) - 1) * Math.Max(1, pageSize),
+            int.MaxValue);
 }

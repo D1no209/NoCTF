@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.API.Permissions;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using Npgsql;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -29,7 +30,21 @@ public class AddCollaboratorEndpoint(ApplicationDbContext dbContext, ICompetitio
             return;
         }
 
+        var targetsExist = await dbContext.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(competition =>
+                competition.Id == competitionId &&
+                dbContext.Users.Any(user => user.Id == req.UserId), ct);
+        if (!targetsExist)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
         var exists = await dbContext.CompetitionCollaborators
+            .IgnoreQueryFilters()
+            .AsNoTracking()
             .AnyAsync(cc => cc.CompetitionId == competitionId && cc.UserId == req.UserId, ct);
 
         if (exists)
@@ -50,8 +65,25 @@ public class AddCollaboratorEndpoint(ApplicationDbContext dbContext, ICompetitio
         };
 
         dbContext.CompetitionCollaborators.Add(collaborator);
-        await dbContext.SaveChangesAsync(ct);
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException exception) when (IsCollaboratorConflict(exception))
+        {
+            dbContext.Entry(collaborator).State = EntityState.Detached;
+            AddError("User is already a collaborator.");
+            await SendErrorsAsync(409, ct);
+            return;
+        }
 
         await SendCreatedAtAsync<GetCollaboratorsEndpoint>(new { id = competitionId }, null, cancellation: ct);
     }
+
+    internal static bool IsCollaboratorConflict(DbUpdateException exception)
+        => exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "ix_competitioncollaborators_competition_user"
+        };
 }

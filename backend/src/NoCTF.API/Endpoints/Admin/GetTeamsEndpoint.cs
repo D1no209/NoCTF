@@ -53,7 +53,8 @@ public class GetTeamsEndpoint(ApplicationDbContext dbContext, ICompetitionPermis
                     .Select(u => u.UserName)
                     .FirstOrDefault() ?? string.Empty,
                 MemberCount = dbContext.TeamMembers
-                    .Count(tm => tm.TeamId == t.Id),
+                    .IgnoreQueryFilters()
+                    .Count(tm => tm.CompetitionId == t.CompetitionId && tm.TeamId == t.Id),
                 CompetitionTitle = dbContext.Competitions
                     .IgnoreQueryFilters()
                     .Where(c => c.Id == t.CompetitionId)

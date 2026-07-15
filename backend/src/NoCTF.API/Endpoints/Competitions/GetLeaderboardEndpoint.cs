@@ -114,7 +114,8 @@ public class LeaderboardMemberSolveDto
 public class GetLeaderboardEndpoint(
     IRedisLeaderboardCache leaderboardCache,
     ILeaderboardService leaderboardService,
-    ApplicationDbContext db)
+    ApplicationDbContext db,
+    ILogger<GetLeaderboardEndpoint> logger)
     : Endpoint<GetLeaderboardRequest, GetLeaderboardResponse>
 {
     public override void Configure()
@@ -150,7 +151,20 @@ public class GetLeaderboardEndpoint(
         }
 
         // Try Redis cache first
-        var cached = await leaderboardCache.GetAsync(req.CompetitionId, ct);
+        IReadOnlyList<LeaderboardEntry>? cached = null;
+        try
+        {
+            cached = await leaderboardCache.GetAsync(req.CompetitionId, ct);
+        }
+        catch (Exception exception) when (!ct.IsCancellationRequested)
+        {
+            // The cache is an acceleration layer for this read. Keep the public
+            // scoreboard available from PostgreSQL during a transient Redis outage.
+            logger.LogWarning(
+                exception,
+                "Leaderboard cache read failed for competition {CompetitionId}; using the database projection.",
+                req.CompetitionId);
+        }
         if (cached is not null)
         {
             await SendAsync(new GetLeaderboardResponse
@@ -162,12 +176,37 @@ public class GetLeaderboardEndpoint(
             return;
         }
 
+        // Reserve before reading PostgreSQL. If a mutation invalidates or
+        // refreshes the cache while this projection is running, its newer
+        // version must win even when this older calculation finishes last.
+        long? cacheVersion = null;
+        try
+        {
+            cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(req.CompetitionId, ct);
+        }
+        catch (Exception exception) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                exception,
+                "Leaderboard cache version reservation failed for competition {CompetitionId}; returning the database projection.",
+                req.CompetitionId);
+        }
+
         // Cache miss — calculate from DB
-        var cacheVersion = await leaderboardCache.ReserveUpdateVersionAsync(req.CompetitionId, ct);
         var entries = await leaderboardService.CalculateLeaderboardAsync(req.CompetitionId, ct);
 
-        // Populate cache for next request (fire-and-forget, don't block response)
-        await leaderboardCache.UpdateAsync(req.CompetitionId, entries, cacheVersion, ct);
+        try
+        {
+            if (cacheVersion.HasValue)
+                await leaderboardCache.UpdateAsync(req.CompetitionId, entries, cacheVersion.Value, ct);
+        }
+        catch (Exception exception) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                exception,
+                "Leaderboard cache update failed for competition {CompetitionId}; returning the database projection.",
+                req.CompetitionId);
+        }
 
         await SendAsync(new GetLeaderboardResponse
         {
@@ -273,27 +312,46 @@ public class GetLeaderboardTeamDetailEndpoint(ILeaderboardInsightService insight
             return;
         }
 
-        var result = await insightService.BuildTeamDetailAsync(req.CompetitionId, req.TeamId, ct);
-        if (result is null)
-        {
-            await SendNotFoundAsync(ct);
-            return;
-        }
-
         var canViewMembers = User.IsInRole(UserRole.Admin.ToString());
         var userIdValue = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (!canViewMembers && Guid.TryParse(userIdValue, out var userId))
         {
-            canViewMembers = await db.TeamMembers.AsNoTracking().AnyAsync(m =>
-                                 m.CompetitionId == req.CompetitionId &&
-                                 m.TeamId == req.TeamId &&
-                                 m.UserId == userId, ct) ||
-                             await db.Competitions.IgnoreQueryFilters().AsNoTracking().AnyAsync(c =>
-                                 c.Id == req.CompetitionId && c.OwnerId == userId, ct) ||
-                             await db.CompetitionCollaborators.IgnoreQueryFilters().AsNoTracking().AnyAsync(c =>
-                                 c.CompetitionId == req.CompetitionId &&
-                                 c.UserId == userId &&
-                                 c.Role == CollaboratorRole.Manager, ct);
+            var memberAccess = db.TeamMembers
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(member =>
+                    member.CompetitionId == req.CompetitionId &&
+                    member.TeamId == req.TeamId &&
+                    member.UserId == userId)
+                .Select(_ => 1);
+            var ownerAccess = db.Competitions
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(c => c.Id == req.CompetitionId && c.OwnerId == userId)
+                .Select(_ => 1);
+            var managerAccess = db.CompetitionCollaborators
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(collaborator =>
+                    collaborator.CompetitionId == req.CompetitionId &&
+                    collaborator.UserId == userId &&
+                    collaborator.Role == CollaboratorRole.Manager)
+                .Select(_ => 1);
+            canViewMembers = await memberAccess
+                .Concat(ownerAccess)
+                .Concat(managerAccess)
+                .AnyAsync(ct);
+        }
+
+        var result = await insightService.BuildTeamDetailAsync(
+            req.CompetitionId,
+            req.TeamId,
+            ct,
+            includeMembers: canViewMembers);
+        if (result is null)
+        {
+            await SendNotFoundAsync(ct);
+            return;
         }
 
         await SendAsync(new LeaderboardTeamDetailDto

@@ -8,7 +8,10 @@ namespace NoCTF.API.Endpoints.Competitions;
 internal static class PublicCompetitionGuard
 {
     public static bool IsPublic(CompetitionStatus status)
-        => status is CompetitionStatus.Published or CompetitionStatus.Running or CompetitionStatus.Finished;
+        => status is CompetitionStatus.Published
+            or CompetitionStatus.Running
+            or CompetitionStatus.Paused
+            or CompetitionStatus.Finished;
 
     public static string? ResolvePlayBlockReason(Competition competition, DateTime now)
     {
@@ -38,6 +41,7 @@ internal static class PublicCompetitionGuard
         return await query.AnyAsync(c =>
             c.Status == CompetitionStatus.Published ||
             c.Status == CompetitionStatus.Running ||
+            c.Status == CompetitionStatus.Paused ||
             c.Status == CompetitionStatus.Finished, ct);
     }
 }
