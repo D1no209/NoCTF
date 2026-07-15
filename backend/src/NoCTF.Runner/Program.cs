@@ -1,18 +1,83 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Threading.RateLimiting;
+using k8s;
+using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.PluginBase;
 using NoCTF.Runner;
 
 var builder = WebApplication.CreateBuilder(args);
 
+const string MutationPolicy = "runner-mutations";
+var maximumRequestBodyBytes = Math.Clamp(
+    builder.Configuration.GetValue<long>("Runner:MaxRequestBodyBytes", 4 * 1024 * 1024),
+    64 * 1024,
+    16 * 1024 * 1024);
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = maximumRequestBodyBytes;
+});
+var concurrentOperations = Math.Clamp(
+    builder.Configuration.GetValue("Runner:Concurrency:PermitLimit", 8),
+    1,
+    256);
+var queuedOperations = Math.Clamp(
+    builder.Configuration.GetValue("Runner:Concurrency:QueueLimit", 64),
+    0,
+    4_096);
+var operationReceiptRetention = TimeSpan.FromMinutes(Math.Clamp(
+    builder.Configuration.GetValue("Runner:OperationReceiptMinutes", 30),
+    1,
+    1_440));
+var maxOperationDuration = TimeSpan.FromSeconds(Math.Clamp(
+    builder.Configuration.GetValue("Runner:MaxOperationSeconds", 1_800),
+    30,
+    7_200));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddConcurrencyLimiter(MutationPolicy, limiter =>
+    {
+        limiter.PermitLimit = concurrentOperations;
+        limiter.QueueLimit = queuedOperations;
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+});
+builder.Services.AddSingleton(services => new RunnerOperationCoordinator(
+    retention: operationReceiptRetention,
+    maxEntries: Math.Clamp(
+        builder.Configuration.GetValue("Runner:OperationReceiptLimit", 512),
+        128,
+        65_536),
+    maxConcurrentOperations: concurrentOperations,
+    maxQueuedOperations: queuedOperations,
+    operationCancellationToken: services
+        .GetRequiredService<IHostApplicationLifetime>()
+        .ApplicationStopping,
+    maxOperationDuration: maxOperationDuration));
+
 var runnerProvider = builder.Configuration["Runner:Provider"] ?? "Docker";
 if (runnerProvider.Equals("Kubernetes", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton(_ => new NoCTF.Container.K8s.KubernetesProvider(builder.Configuration));
-    builder.Services.AddScoped<IContainerManager, NoCTF.Container.K8s.KubernetesManager>();
+    builder.Services.AddScoped<NoCTF.Container.K8s.KubernetesManager>();
+    builder.Services.AddScoped<IContainerManager>(services =>
+        services.GetRequiredService<NoCTF.Container.K8s.KubernetesManager>());
+    builder.Services.AddHostedService<KubernetesRunReceiptCleanupService>();
 }
 else
 {
     builder.Services.AddSingleton(
-        _ => new NoCTF.Container.Docker.DockerProvider(builder.Configuration["Docker:Host"]));
+        _ => new NoCTF.Container.Docker.DockerProvider(
+            builder.Configuration["Docker:Host"],
+            builder.Configuration["Docker:PublishedHost"],
+            operationReceiptRetention,
+            TimeSpan.FromHours(Math.Clamp(
+                builder.Configuration.GetValue("Docker:RuntimeOrphanGraceHours", 168),
+                1,
+                720))));
+    builder.Services.AddHostedService<DockerRunReceiptCleanupService>();
     builder.Services.AddScoped<IContainerManager, NoCTF.Container.Docker.DockerManager>();
 }
 
@@ -28,8 +93,39 @@ if (!builder.Environment.IsDevelopment())
     SecretValueValidator.RequireSafe("Runner:ApiKey", runnerApiKey, 24);
 
 var app = builder.Build();
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next(context);
+    }
+    catch (RunnerOperationRejectedException)
+    {
+        context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.Response.WriteAsJsonAsync(
+            new { code = "runner_overloaded" },
+            CancellationToken.None);
+    }
+    catch (RunnerOperationConflictException)
+    {
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        await context.Response.WriteAsJsonAsync(
+            new { code = "operation_id_conflict" },
+            CancellationToken.None);
+    }
+    catch (RunnerOperationTimeoutException)
+    {
+        context.Response.StatusCode = StatusCodes.Status504GatewayTimeout;
+        await context.Response.WriteAsJsonAsync(
+            new { code = "operation_timeout" },
+            CancellationToken.None);
+    }
+});
+app.UseRateLimiter();
 
-app.MapGet("/runner/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/runner/health/live", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/runner/health/ready", CheckRunnerReadinessAsync);
+app.MapGet("/runner/health", CheckRunnerReadinessAsync);
 
 app.MapGet("/runner/info", (HttpRequest request, IServiceProvider services) =>
 {
@@ -68,6 +164,7 @@ app.MapPost("/runner/containers", async (
     HttpRequest request,
     ContainerConfig config,
     IContainerManager manager,
+    RunnerOperationCoordinator operations,
     CancellationToken ct) =>
 {
     if (RequireRunnerAuth(request, runnerApiKey, requireRunnerAuth) is { } authFailure)
@@ -85,7 +182,13 @@ app.MapPost("/runner/containers", async (
         return Results.BadRequest(new { code = "invalid_container_config", message = ex.Message });
     }
 
-    return Results.Ok(await manager.CreateContainerAsync(config, ct));
+    var result = await operations.ExecuteAsync(
+        "container.create",
+        config.OperationId,
+        ComputeRequestFingerprint(config),
+        token => manager.CreateContainerAsync(config, token),
+        ct);
+    return Results.Ok(result);
 });
 
 app.MapPost("/runner/containers/destroy", async (
@@ -99,12 +202,13 @@ app.MapPost("/runner/containers/destroy", async (
 
     await manager.DestroyContainerAsync(container, ct);
     return Results.NoContent();
-});
+}).RequireRateLimiting(MutationPolicy);
 
 app.MapPost("/runner/jobs/one-shot", async (
     HttpRequest request,
     ContainerConfig config,
     IContainerManager manager,
+    RunnerOperationCoordinator operations,
     CancellationToken ct) =>
 {
     if (RequireRunnerAuth(request, runnerApiKey, requireRunnerAuth) is { } authFailure)
@@ -122,13 +226,20 @@ app.MapPost("/runner/jobs/one-shot", async (
         return Results.BadRequest(new { code = "invalid_container_config", message = ex.Message });
     }
 
-    return Results.Ok(await manager.RunContainerAsync(config, ct));
+    var result = await operations.ExecuteAsync(
+        "container.run",
+        config.OperationId,
+        ComputeRequestFingerprint(config),
+        token => manager.RunContainerAsync(config, token),
+        ct);
+    return Results.Ok(result);
 });
 
 app.MapPost("/runner/compose/up", async (
     HttpRequest request,
     ComposeConfig config,
     IContainerManager manager,
+    RunnerOperationCoordinator operations,
     CancellationToken ct) =>
 {
     if (RequireRunnerAuth(request, runnerApiKey, requireRunnerAuth) is { } authFailure)
@@ -145,7 +256,13 @@ app.MapPost("/runner/compose/up", async (
         return Results.BadRequest(new { code = "invalid_compose_yaml", message = ex.Message });
     }
 
-    return Results.Ok(await manager.ComposeUpAsync(config, ct));
+    var result = await operations.ExecuteAsync(
+        "compose.up",
+        config.OperationId,
+        ComputeRequestFingerprint(config),
+        token => manager.ComposeUpAsync(config, token),
+        ct);
+    return Results.Ok(result);
 });
 
 app.MapPost("/runner/compose/down", async (
@@ -159,7 +276,7 @@ app.MapPost("/runner/compose/down", async (
 
     await manager.ComposeDownAsync(deployment, ct);
     return Results.NoContent();
-});
+}).RequireRateLimiting(MutationPolicy);
 
 app.MapGet("/runner/compose/{projectName}/status", async (
     HttpRequest request,
@@ -180,14 +297,54 @@ app.MapGet("/runner/compose/{projectName}/status", async (
 
 await app.RunAsync();
 
+static async Task<IResult> CheckRunnerReadinessAsync(
+    IServiceProvider services,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        if (services.GetService<NoCTF.Container.Docker.DockerProvider>() is { } dockerProvider)
+            await dockerProvider.CreateClient().System.GetVersionAsync(timeout.Token);
+        else if (services.GetService<NoCTF.Container.K8s.KubernetesProvider>() is { } kubernetesProvider)
+            await kubernetesProvider.Client.Version.GetCodeAsync(timeout.Token);
+        else
+            return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+
+        return Results.Ok(new { status = "healthy" });
+    }
+    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch
+    {
+        return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}
+
 static IResult? RequireRunnerAuth(HttpRequest request, string? apiKey, bool required)
 {
     if (!required)
         return null;
 
     var provided = request.Headers["X-Runner-Token"].FirstOrDefault();
-    if (string.IsNullOrWhiteSpace(provided) || !string.Equals(provided, apiKey, StringComparison.Ordinal))
+    if (string.IsNullOrWhiteSpace(provided) ||
+        string.IsNullOrWhiteSpace(apiKey) ||
+        !FixedTimeEquals(provided, apiKey))
         return Results.Unauthorized();
 
     return null;
 }
+
+static bool FixedTimeEquals(string provided, string expected)
+{
+    var providedHash = SHA256.HashData(Encoding.UTF8.GetBytes(provided));
+    var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
+    return CryptographicOperations.FixedTimeEquals(providedHash, expectedHash);
+}
+
+static string ComputeRequestFingerprint<TRequest>(TRequest request)
+    => Convert.ToHexString(SHA256.HashData(
+        JsonSerializer.SerializeToUtf8Bytes(request, new JsonSerializerOptions(JsonSerializerDefaults.Web))));

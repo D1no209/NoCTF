@@ -282,6 +282,38 @@ services:
     }
 
     [Fact]
+    public void ComposeParser_AcceptsBoundedPidsLimit()
+    {
+        var yaml = """
+services:
+  web:
+    image: nginx:alpine
+    pids_limit: 128
+""";
+
+        var service = Assert.Single(KubernetesComposeParser.Parse(yaml, new OrchestrationSpec()));
+
+        Assert.Equal("web", service.Name);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("513")]
+    [InlineData("not-a-number")]
+    public void ComposeParser_RejectsInvalidPidsLimit(string pidsLimit)
+    {
+        var yaml = $"""
+services:
+  web:
+    image: nginx:alpine
+    pids_limit: {pidsLimit}
+""";
+
+        Assert.Throws<InvalidOperationException>(() =>
+            KubernetesComposeParser.Parse(yaml, new OrchestrationSpec()));
+    }
+
+    [Fact]
     public void ComposeParser_AppliesPerServiceOrchestrationOverrides()
     {
         var yaml = """

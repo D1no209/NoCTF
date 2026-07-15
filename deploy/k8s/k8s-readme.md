@@ -68,6 +68,7 @@ kubectl apply -f configmap.yaml
 
 # 3. Storage
 kubectl apply -f postgres-pvc.yaml
+kubectl apply -f redis-pvc.yaml
 kubectl apply -f minio-pvc.yaml
 
 # 4. Stateful services

@@ -17,21 +17,24 @@ public class HttpRunnerClient(HttpClient httpClient) : IRunnerClient
 {
     public async Task<ContainerInstance> CreateContainerAsync(ContainerConfig config, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/runner/containers", config, ct);
+        config = EnsureOperationId(config);
+        using var response = await httpClient.PostAsJsonAsync("/runner/containers", config, ct);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ContainerInstance>(cancellationToken: ct)
+        var container = await response.Content.ReadFromJsonAsync<ContainerInstance>(cancellationToken: ct)
             ?? throw new InvalidOperationException("Runner returned an empty container response.");
+        return NormalizeRunnerLocalEndpoint(container);
     }
 
     public async Task DestroyContainerAsync(ContainerInstance container, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/runner/containers/destroy", container, ct);
+        using var response = await httpClient.PostAsJsonAsync("/runner/containers/destroy", container, ct);
         response.EnsureSuccessStatusCode();
     }
 
     public async Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/runner/jobs/one-shot", config, ct);
+        config = EnsureOperationId(config);
+        using var response = await httpClient.PostAsJsonAsync("/runner/jobs/one-shot", config, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ContainerRunResult>(cancellationToken: ct)
             ?? throw new InvalidOperationException("Runner returned an empty job response.");
@@ -39,7 +42,8 @@ public class HttpRunnerClient(HttpClient httpClient) : IRunnerClient
 
     public async Task<ComposeDeployment> ComposeUpAsync(ComposeConfig config, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/runner/compose/up", config, ct);
+        config = EnsureOperationId(config);
+        using var response = await httpClient.PostAsJsonAsync("/runner/compose/up", config, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ComposeDeployment>(cancellationToken: ct)
             ?? throw new InvalidOperationException("Runner returned an empty compose response.");
@@ -47,7 +51,7 @@ public class HttpRunnerClient(HttpClient httpClient) : IRunnerClient
 
     public async Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/runner/compose/down", deployment, ct);
+        using var response = await httpClient.PostAsJsonAsync("/runner/compose/down", deployment, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -57,11 +61,48 @@ public class HttpRunnerClient(HttpClient httpClient) : IRunnerClient
             ? string.Empty
             : "?" + string.Join("&", labels.Select(kvp =>
                 $"label={Uri.EscapeDataString($"{kvp.Key}={kvp.Value}")}"));
-        var response = await httpClient.GetAsync($"/runner/compose/{Uri.EscapeDataString(projectName)}/status{query}", ct);
+        using var response = await httpClient.GetAsync($"/runner/compose/{Uri.EscapeDataString(projectName)}/status{query}", ct);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ComposeStatus>(cancellationToken: ct)
+        var status = await response.Content.ReadFromJsonAsync<ComposeStatus>(cancellationToken: ct)
             ?? throw new InvalidOperationException("Runner returned an empty compose status response.");
+        return status with
+        {
+            Services = status.Services
+                .Select(service => service with
+                {
+                    InternalHost = NormalizeRunnerLocalHost(service.InternalHost)
+                })
+                .ToArray()
+        };
     }
+
+    private static ContainerConfig EnsureOperationId(ContainerConfig config)
+        => config.OperationId.HasValue
+            ? config
+            : config with { OperationId = Guid.NewGuid() };
+
+    private static ComposeConfig EnsureOperationId(ComposeConfig config)
+        => config.OperationId.HasValue
+            ? config
+            : config with { OperationId = Guid.NewGuid() };
+
+    private ContainerInstance NormalizeRunnerLocalEndpoint(ContainerInstance container)
+        => container with { InternalHost = NormalizeRunnerLocalHost(container.InternalHost) };
+
+    private string? NormalizeRunnerLocalHost(string? host)
+    {
+        if (!IsLoopbackHost(host))
+            return host;
+
+        // Docker reports published ports as reachable on its own loopback. When
+        // Runner is remote, the caller must use Runner's host with those ports.
+        return httpClient.BaseAddress?.Host ?? host;
+    }
+
+    private static bool IsLoopbackHost(string? host)
+        => string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(host, "127.0.0.1", StringComparison.Ordinal) ||
+           string.Equals(host, "::1", StringComparison.Ordinal);
 }
 
 public class RunnerBackedContainerManager(IRunnerClient runnerClient) : IContainerManager

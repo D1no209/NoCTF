@@ -17,6 +17,17 @@ public sealed class KubernetesProvider : IDisposable
                 : "default";
     }
 
+    internal KubernetesProvider(IKubernetes client, KubernetesRunnerOptions options)
+    {
+        Client = client;
+        Options = options;
+        ClientConfiguration = new KubernetesClientConfiguration
+        {
+            Host = "http://localhost"
+        };
+        ConnectionMode = "injected";
+    }
+
     public IKubernetes Client { get; }
     public KubernetesClientConfiguration ClientConfiguration { get; }
     public KubernetesRunnerOptions Options { get; }

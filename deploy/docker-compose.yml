@@ -19,8 +19,11 @@ services:
   redis:
     image: redis:7
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
     ports:
       - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -68,6 +71,7 @@ services:
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
       SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
       StorageProvider__Local__BasePath: /app/uploads
+      StorageProvider__Local__UrlSigningKey: ${LOCAL_STORAGE_URL_SIGNING_KEY:?set LOCAL_STORAGE_URL_SIGNING_KEY}
       StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
       Runner__BaseUrl: http://runner:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
@@ -76,6 +80,15 @@ services:
       InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
     volumes:
       - backend_uploads:/app/uploads
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,13 +116,28 @@ services:
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
       StorageProvider__Local__BasePath: /app/uploads
+      StorageProvider__Local__UrlSigningKey: ${LOCAL_STORAGE_URL_SIGNING_KEY:?set LOCAL_STORAGE_URL_SIGNING_KEY}
       StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
       Runner__BaseUrl: http://runner:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
       Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
       Runner__UtilityNetwork: ${RUNNER_UTILITY_NETWORK:-deploy_default}
+      InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
+      Worker__Concurrency: ${WORKER_CONCURRENCY:-4}
+      Worker__LongRunningConcurrency: ${WORKER_LONG_RUNNING_CONCURRENCY:-1}
+      Awd__MaxConcurrentContainerRefreshes: ${AWD_CONTAINER_REFRESH_CONCURRENCY:-4}
+      Koh__MaxConcurrentPolls: ${KOH_POLL_CONCURRENCY:-8}
     volumes:
       - backend_uploads:/app/uploads
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,8 +168,16 @@ services:
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
       SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
       StorageProvider__Local__BasePath: /app/uploads
+      StorageProvider__Local__UrlSigningKey: ${LOCAL_STORAGE_URL_SIGNING_KEY:?set LOCAL_STORAGE_URL_SIGNING_KEY}
       Runner__BaseUrl: http://runner:8080
       Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
     depends_on:
       postgres:
         condition: service_healthy
@@ -166,9 +202,18 @@ services:
       Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
       Runner__AllowedRegistries: ${RUNNER_ALLOWED_REGISTRIES:-docker.io,ghcr.io,quay.io,registry.k8s.io,localhost}
       Runner__AllowedNetworks: ${RUNNER_ALLOWED_NETWORKS:-deploy_default}
+      Runner__Concurrency__PermitLimit: ${RUNNER_CONCURRENCY_LIMIT:-8}
+      Runner__Concurrency__QueueLimit: ${RUNNER_QUEUE_LIMIT:-64}
+      Runner__OperationReceiptMinutes: ${RUNNER_RECEIPT_MINUTES:-30}
+      Runner__OperationReceiptLimit: ${RUNNER_RECEIPT_LIMIT:-512}
+      Runner__MaxOperationSeconds: ${RUNNER_MAX_OPERATION_SECONDS:-1800}
+      Runner__MaxRequestBodyBytes: ${RUNNER_MAX_REQUEST_BODY_BYTES:-4194304}
       Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      Docker__PublishedHost: ${DOCKER_PUBLISHED_HOST:-host.docker.internal}
+      Docker__RuntimeOrphanGraceHours: ${DOCKER_RUNTIME_ORPHAN_GRACE_HOURS:-168}
       K8s__PublicEntry: ${K8S_PUBLIC_ENTRY:-}
       K8s__IngressBaseDomain: ${K8S_INGRESS_BASE_DOMAIN:-}
+      K8s__RuntimeOrphanGraceSeconds: ${K8S_RUNTIME_ORPHAN_GRACE_SECONDS:-604800}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     security_opt:
@@ -183,5 +228,6 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   minio_data:
   backend_uploads:

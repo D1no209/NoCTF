@@ -17,13 +17,25 @@ spec:
         app: redis
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: redis
           image: redis:7-alpine
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 6379
-          command: ["redis-server", "--appendonly", "yes"]
+          command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               cpu: "100m"
@@ -41,3 +53,15 @@ spec:
               command: ["redis-cli", "ping"]
             initialDelaySeconds: 15
             periodSeconds: 10
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+            - name: redis-tmp
+              mountPath: /tmp
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+        - name: redis-tmp
+          emptyDir:
+            sizeLimit: 64Mi
