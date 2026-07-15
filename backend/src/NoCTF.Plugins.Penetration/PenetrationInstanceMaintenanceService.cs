@@ -13,7 +13,8 @@ public class PenetrationInstanceMaintenanceService(
     ApplicationDbContext db,
     IContainerManager containerManager,
     IConfiguration configuration,
-    ILogger<PenetrationInstanceMaintenanceService> logger) : IInstanceMaintenanceService
+    ILogger<PenetrationInstanceMaintenanceService> logger,
+    ICompetitionExecutionLease? executionLease = null) : IInstanceMaintenanceService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private const int ExpiredBatchSize = 20;
@@ -47,10 +48,25 @@ public class PenetrationInstanceMaintenanceService(
         var failedCount = 0;
         foreach (var instance in expired)
         {
-            if (await ExpireAsync(instance, ct))
+            await using var lease = await TryAcquireTransitionLeaseAsync(instance, ct);
+            if (lease is null)
+                continue;
+            using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lease.LostToken);
+            var leaseCt = leaseCts.Token;
+            await db.Entry(instance).ReloadAsync(leaseCt);
+            if (db.Entry(instance).State == EntityState.Detached)
+                continue;
+            if (instance.ExpiresAt is null || instance.ExpiresAt > DateTime.UtcNow ||
+                instance.Status is PenetrationInstanceStatus.Expired or PenetrationInstanceStatus.Destroyed)
+            {
+                continue;
+            }
+
+            if (await ExpireAsync(instance, leaseCt))
                 expiredCount++;
             else
                 failedCount++;
+            await db.SaveChangesAsync(leaseCt);
         }
 
         var syncCandidates = await db.TeamChallengeInstances
@@ -63,14 +79,34 @@ public class PenetrationInstanceMaintenanceService(
             .OrderBy(i => i.UpdatedAt)
             .Take(SyncBatchSize)
             .ToListAsync(ct);
+        var syncMetadata = await LoadSyncMetadataAsync(syncCandidates, ct);
 
         var syncedCount = 0;
         foreach (var instance in syncCandidates)
         {
-            if (await SyncStatusAsync(instance, ct))
+            await using var lease = await TryAcquireTransitionLeaseAsync(instance, ct);
+            if (lease is null)
+                continue;
+            using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lease.LostToken);
+            var leaseCt = leaseCts.Token;
+            await db.Entry(instance).ReloadAsync(leaseCt);
+            if (db.Entry(instance).State == EntityState.Detached)
+                continue;
+            if (instance.Status != PenetrationInstanceStatus.Running ||
+                instance.ExpiresAt is null || instance.ExpiresAt <= DateTime.UtcNow ||
+                string.IsNullOrWhiteSpace(instance.ComposeProjectName))
+            {
+                continue;
+            }
+
+            syncMetadata.TryGetValue(instance.Id, out var metadata);
+            if (metadata?.TopologyId != instance.TopologyId)
+                metadata = null;
+            if (await SyncStatusAsync(instance, metadata, leaseCt))
                 syncedCount++;
             else
                 failedCount++;
+            await db.SaveChangesAsync(leaseCt);
         }
 
         var stuckBefore = now.Subtract(BusyTimeout);
@@ -86,15 +122,38 @@ public class PenetrationInstanceMaintenanceService(
 
         foreach (var instance in stuck)
         {
-            await MarkStuckInstanceFailedAsync(instance, ct);
-            failedCount++;
-        }
+            await using var lease = await TryAcquireTransitionLeaseAsync(instance, ct);
+            if (lease is null)
+                continue;
+            using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lease.LostToken);
+            var leaseCt = leaseCts.Token;
+            await db.Entry(instance).ReloadAsync(leaseCt);
+            if (db.Entry(instance).State == EntityState.Detached)
+                continue;
+            var currentStuckBefore = DateTime.UtcNow.Subtract(BusyTimeout);
+            if (!BusyStatuses.Contains(instance.Status) ||
+                (instance.LastActionAt is not null && instance.LastActionAt > currentStuckBefore) ||
+                instance.UpdatedAt > currentStuckBefore)
+            {
+                continue;
+            }
 
-        if (expiredCount > 0 || syncedCount > 0 || failedCount > 0)
-            await db.SaveChangesAsync(ct);
+            await MarkStuckInstanceFailedAsync(instance, leaseCt);
+            failedCount++;
+            await db.SaveChangesAsync(leaseCt);
+        }
 
         return new InstanceMaintenanceResult(expiredCount, syncedCount, failedCount);
     }
+
+    private Task<IExecutionLease?> TryAcquireTransitionLeaseAsync(
+        TeamChallengeInstance instance,
+        CancellationToken ct)
+        => (executionLease ?? new CompetitionExecutionLease()).TryAcquireAsync(
+            db,
+            $"penetration-instance:{instance.TeamId:N}:{instance.ChallengeId:N}",
+            instance.CompetitionId,
+            ct);
 
     private async Task<bool> ExpireAsync(TeamChallengeInstance instance, CancellationToken ct)
     {
@@ -105,6 +164,7 @@ public class PenetrationInstanceMaintenanceService(
 
             var now = DateTime.UtcNow;
             instance.Status = PenetrationInstanceStatus.Expired;
+            instance.RuntimeOperationId = null;
             instance.EntryPort = null;
             instance.EntryUrl = null;
             instance.ContainerIdsJson = "[]";
@@ -146,13 +206,16 @@ public class PenetrationInstanceMaintenanceService(
         {
             logger.LogWarning(ex, "Failed to expire penetration instance {InstanceId}.", instance.Id);
             instance.Status = PenetrationInstanceStatus.Failed;
-            instance.LastError = ex.Message;
+            instance.LastError = "instance_expiration_failed";
             instance.UpdatedAt = DateTime.UtcNow;
             return false;
         }
     }
 
-    private async Task<bool> SyncStatusAsync(TeamChallengeInstance instance, CancellationToken ct)
+    private async Task<bool> SyncStatusAsync(
+        TeamChallengeInstance instance,
+        SyncMetadata? metadata,
+        CancellationToken ct)
     {
         try
         {
@@ -172,6 +235,7 @@ public class PenetrationInstanceMaintenanceService(
             {
                 await DeactivateDynamicFlagsAsync(instance, ct);
                 instance.Status = PenetrationInstanceStatus.Failed;
+                instance.RuntimeOperationId = null;
                 instance.EntryPort = null;
                 instance.EntryUrl = null;
                 instance.PortMappingsJson = "{}";
@@ -184,6 +248,7 @@ public class PenetrationInstanceMaintenanceService(
             {
                 await DeactivateDynamicFlagsAsync(instance, ct);
                 instance.Status = PenetrationInstanceStatus.Stopped;
+                instance.RuntimeOperationId = null;
                 instance.EntryPort = null;
                 instance.EntryUrl = null;
                 instance.PortMappingsJson = "{}";
@@ -192,35 +257,47 @@ public class PenetrationInstanceMaintenanceService(
                 return true;
             }
 
-            var challenge = await db.Challenges
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.CompetitionId == instance.CompetitionId && c.Id == instance.ChallengeId, ct);
-            if (challenge is null)
+            if (metadata is null)
                 return true;
 
-            var entryNode = await db.PenetrationNodes
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .Where(n => n.CompetitionId == instance.CompetitionId && n.TopologyId == instance.TopologyId && n.IsEntry)
-                .OrderBy(n => n.DisplayOrder)
-                .FirstOrDefaultAsync(ct);
+            var entryNode = metadata.EntryNode;
             if (entryNode is not null)
             {
-                var entryContainerPort = PenetrationComposeBuilder.GetPrimaryContainerPort(entryNode, challenge.ExposedPort);
+                var entryContainerPort = PenetrationComposeBuilder.GetPrimaryContainerPort(
+                    entryNode,
+                    metadata.ExposedPort);
                 var entryService = status.Services.FirstOrDefault(s => s.NodeId == entryNode.Id);
                 var hostPort = entryService?.PublishedPorts.GetValueOrDefault(entryContainerPort) ?? 0;
                 if (hostPort > 0)
                 {
-                    instance.EntryHost = !string.IsNullOrWhiteSpace(entryService?.PublicHost)
+                    var resolvedHost = !string.IsNullOrWhiteSpace(entryService?.PublicHost)
                         ? entryService.PublicHost
                         : ResolveAccessHost();
+                    if (!string.IsNullOrWhiteSpace(resolvedHost))
+                        instance.EntryHost = resolvedHost;
+
                     instance.EntryPort = hostPort;
-                    instance.EntryUrl = !string.IsNullOrWhiteSpace(entryService?.EntryUrl)
+                    var resolvedEntryUrl = !string.IsNullOrWhiteSpace(entryService?.EntryUrl)
                         ? entryService.EntryUrl
-                        : BuildEntryUrl(instance.EntryHost, hostPort, await ReadEntryConfigJsonAsync(instance, ct));
+                        : !string.IsNullOrWhiteSpace(resolvedHost)
+                            ? BuildEntryUrl(resolvedHost, hostPort, metadata.EntryConfigJson)
+                            : null;
+                    if (!string.IsNullOrWhiteSpace(resolvedEntryUrl))
+                        instance.EntryUrl = resolvedEntryUrl;
+
                     instance.PortMappingsJson = JsonSerializer.Serialize(new Dictionary<int, int> { [entryContainerPort] = hostPort }, JsonOptions);
                 }
+                else
+                {
+                    // The runtime snapshot is authoritative: once the entry
+                    // service loses its published port, never expose the prior
+                    // port/URL which may already have been reassigned.
+                    ClearEntryEndpoint(instance);
+                }
+            }
+            else
+            {
+                ClearEntryEndpoint(instance);
             }
 
             instance.Status = PenetrationInstanceStatus.Running;
@@ -239,24 +316,26 @@ public class PenetrationInstanceMaintenanceService(
     {
         await DeactivateDynamicFlagsAsync(instance, ct);
         var previousStatus = instance.Status.ToString();
-        string? cleanupError = null;
+        var cleanupFailed = false;
         try
         {
             await DownBestEffortAsync(instance, ct);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            cleanupError = ex.Message;
+            cleanupFailed = true;
         }
 
         instance.Status = PenetrationInstanceStatus.Failed;
+        if (!cleanupFailed)
+            instance.RuntimeOperationId = null;
         instance.EntryPort = null;
         instance.EntryUrl = null;
         instance.ContainerIdsJson = "[]";
         instance.PortMappingsJson = "{}";
-        instance.LastError = cleanupError is null
+        instance.LastError = !cleanupFailed
             ? $"Instance maintenance timed out while {previousStatus}."
-            : $"Instance maintenance timed out while {previousStatus}; cleanup failed: {cleanupError}";
+            : $"Instance maintenance timed out while {previousStatus}; cleanup failed.";
         instance.UpdatedAt = DateTime.UtcNow;
 
         AddCompetitionLog(
@@ -271,7 +350,7 @@ public class PenetrationInstanceMaintenanceService(
 
     private async Task DownBestEffortAsync(TeamChallengeInstance instance, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(instance.ComposeProjectName) || string.IsNullOrWhiteSpace(instance.RenderedComposeYaml))
+        if (string.IsNullOrWhiteSpace(instance.ComposeProjectName))
             return;
 
         try
@@ -283,14 +362,16 @@ public class PenetrationInstanceMaintenanceService(
                 ChallengeId: instance.ChallengeId,
                 ProviderType: "docker-compose",
                 ProjectName: instance.ComposeProjectName,
-                ComposeYaml: instance.RenderedComposeYaml,
+                ComposeYaml: string.IsNullOrWhiteSpace(instance.RenderedComposeYaml)
+                    ? "services:\n  cleanup:\n    image: scratch\n"
+                    : instance.RenderedComposeYaml,
                 Status: instance.Status.ToString(),
                 StartedAt: instance.CreatedAt), ct);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Compose down failed for penetration instance {InstanceId}. Runtime state is preserved for retry.", instance.Id);
-            instance.LastError = ex.Message;
+            instance.LastError = "instance_cleanup_failed";
             instance.UpdatedAt = DateTime.UtcNow;
             throw;
         }
@@ -298,31 +379,118 @@ public class PenetrationInstanceMaintenanceService(
 
     private async Task DeactivateDynamicFlagsAsync(TeamChallengeInstance instance, CancellationToken ct)
     {
-        var flags = await db.DynamicFlagInstances
+        var activeFlags = db.DynamicFlagInstances
             .IgnoreQueryFilters()
             .Where(f =>
                 f.CompetitionId == instance.CompetitionId &&
                 f.TeamId == instance.TeamId &&
                 f.ChallengeId == instance.ChallengeId &&
                 f.InstanceId == instance.Id &&
-                f.IsActive)
-            .ToListAsync(ct);
+                f.IsActive);
+        if (db.Database.IsRelational())
+        {
+            await activeFlags.ExecuteUpdateAsync(
+                setters => setters.SetProperty(flag => flag.IsActive, false),
+                ct);
+            foreach (var entry in db.ChangeTracker.Entries<DynamicFlagInstance>().Where(entry =>
+                         entry.Entity.InstanceId == instance.Id && entry.Entity.IsActive))
+            {
+                entry.Entity.IsActive = false;
+            }
+            return;
+        }
 
+        var flags = await activeFlags.ToListAsync(ct);
         foreach (var flag in flags)
             flag.IsActive = false;
     }
 
-    private async Task<string> ReadEntryConfigJsonAsync(TeamChallengeInstance instance, CancellationToken ct)
+    private async Task<Dictionary<Guid, SyncMetadata>> LoadSyncMetadataAsync(
+        IReadOnlyCollection<TeamChallengeInstance> instances,
+        CancellationToken ct)
     {
-        if (instance.TopologyId is null)
-            return "{}";
+        if (instances.Count == 0)
+            return [];
 
-        var topology = await db.PenetrationTopologies
+        var competitionIds = instances.Select(instance => instance.CompetitionId).Distinct().ToArray();
+        var challengeIds = instances.Select(instance => instance.ChallengeId).Distinct().ToArray();
+        var challenges = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.CompetitionId == instance.CompetitionId && t.Id == instance.TopologyId.Value, ct);
+            .Where(challenge =>
+                competitionIds.Contains(challenge.CompetitionId) &&
+                challengeIds.Contains(challenge.Id) &&
+                !challenge.IsDeleting)
+            .Select(challenge => new
+            {
+                challenge.CompetitionId,
+                challenge.Id,
+                challenge.ExposedPort
+            })
+            .ToListAsync(ct);
+        var challengeMap = challenges.ToDictionary(
+            challenge => (challenge.CompetitionId, challenge.Id));
 
-        return topology?.EntryConfigJson ?? "{}";
+        var topologyIds = instances
+            .Where(instance => instance.TopologyId.HasValue)
+            .Select(instance => instance.TopologyId!.Value)
+            .Distinct()
+            .ToArray();
+        var entryNodes = await db.PenetrationNodes
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(node =>
+                competitionIds.Contains(node.CompetitionId) &&
+                topologyIds.Contains(node.TopologyId) &&
+                node.IsEntry)
+            .OrderBy(node => node.DisplayOrder)
+            .ToListAsync(ct);
+        var entryNodeMap = entryNodes
+            .GroupBy(node => (node.CompetitionId, node.TopologyId))
+            .ToDictionary(group => group.Key, group => group.First());
+        var topologies = await db.PenetrationTopologies
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(topology =>
+                competitionIds.Contains(topology.CompetitionId) &&
+                topologyIds.Contains(topology.Id))
+            .Select(topology => new
+            {
+                topology.CompetitionId,
+                topology.Id,
+                topology.EntryConfigJson
+            })
+            .ToListAsync(ct);
+        var topologyMap = topologies.ToDictionary(
+            topology => (topology.CompetitionId, topology.Id));
+
+        var result = new Dictionary<Guid, SyncMetadata>(instances.Count);
+        foreach (var instance in instances)
+        {
+            if (!challengeMap.TryGetValue(
+                    (instance.CompetitionId, instance.ChallengeId),
+                    out var challenge))
+            {
+                continue;
+            }
+
+            PenetrationNode? entryNode = null;
+            var entryConfigJson = "{}";
+            if (instance.TopologyId is { } topologyId)
+            {
+                entryNodeMap.TryGetValue((instance.CompetitionId, topologyId), out entryNode);
+                if (topologyMap.TryGetValue((instance.CompetitionId, topologyId), out var topology))
+                    entryConfigJson = topology.EntryConfigJson;
+            }
+
+            result[instance.Id] = new SyncMetadata(
+                instance.TopologyId,
+                entryNode,
+                challenge.ExposedPort,
+                entryConfigJson);
+        }
+
+        return result;
     }
 
     private string? ResolveAccessHost()
@@ -363,6 +531,13 @@ public class PenetrationInstanceMaintenanceService(
         }
     }
 
+    private static void ClearEntryEndpoint(TeamChallengeInstance instance)
+    {
+        instance.EntryPort = null;
+        instance.EntryUrl = null;
+        instance.PortMappingsJson = "{}";
+    }
+
     private static Dictionary<string, string> BuildLabels(TeamChallengeInstance instance)
         => new()
         {
@@ -395,4 +570,10 @@ public class PenetrationInstanceMaintenanceService(
             CreatedAt = DateTime.UtcNow,
         });
     }
+
+    private sealed record SyncMetadata(
+        Guid? TopologyId,
+        PenetrationNode? EntryNode,
+        int? ExposedPort,
+        string EntryConfigJson);
 }

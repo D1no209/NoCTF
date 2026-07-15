@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
@@ -15,19 +16,27 @@ public class AwdpScoreEngineTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new FixedTenantContextAwdpScore(competitionId));
     }
 
+    private static CountingApplicationDbContext CreateCountingDb(Guid competitionId)
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        return new CountingApplicationDbContext(options, new FixedTenantContextAwdpScore(competitionId));
+    }
+
     private static AwdpScoreEngine CreateEngine(ApplicationDbContext db)
         => new(
             db,
-            new ScoreEventWriter(db),
             new NullLeaderboardServiceAwdp(),
             new NullRedisLeaderboardCache(),
             new NullHubNotifierAwdp(),
-            new AwdpConfigResolver(db),
             NullLogger<AwdpScoreEngine>.Instance);
 
     [Fact]
@@ -227,6 +236,175 @@ public class AwdpScoreEngineTests
         Assert.Contains("fix_success_next_round", lateScore.Reason);
     }
 
+    [Fact]
+    public async Task CalculateRoundScoreAsync_MultipleCells_PersistsInOneBatchAndIsIdempotent()
+    {
+        var competitionId = Guid.NewGuid();
+        var roundStart = DateTime.UtcNow;
+        await using var db = CreateCountingDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamIds = new[] { SeedTeam(db, competitionId), SeedTeam(db, competitionId) };
+        var challengeIds = new[]
+        {
+            SeedChallenge(db, competitionId, 70, 130),
+            SeedChallenge(db, competitionId, 80, 120)
+        };
+        SeedRound(db, competitionId, 1, roundStart);
+        foreach (var teamId in teamIds)
+            foreach (var challengeId in challengeIds)
+            {
+                db.AwdpTeamChallengeStates.Add(new AwdpTeamChallengeState
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = competitionId,
+                    TeamId = teamId,
+                    ChallengeId = challengeId,
+                    BreakStatus = AwdpBreakStatus.BreakSuccess,
+                    FixStatus = AwdpFixStatus.FixSuccess,
+                    BreakSucceededAt = roundStart.AddSeconds(-1),
+                    FixSucceededAt = roundStart.AddSeconds(-1),
+                    CreatedAt = roundStart.AddMinutes(-1),
+                    UpdatedAt = roundStart.AddSeconds(-1)
+                });
+            }
+        await db.SaveChangesAsync();
+        db.ResetSaveCount();
+
+        var engine = CreateEngine(db);
+        await engine.CalculateRoundScoreAsync(competitionId, 1);
+
+        Assert.Equal(1, db.SaveCount);
+        Assert.Equal(4, await db.AwdpRoundScores.IgnoreQueryFilters().CountAsync());
+        Assert.Equal(4, await db.ScoreEvents.IgnoreQueryFilters().CountAsync());
+
+        db.ResetSaveCount();
+        await engine.CalculateRoundScoreAsync(competitionId, 1);
+        Assert.Equal(0, db.SaveCount);
+        Assert.Equal(4, await db.AwdpRoundScores.IgnoreQueryFilters().CountAsync());
+        Assert.Equal(4, await db.ScoreEvents.IgnoreQueryFilters().CountAsync());
+    }
+
+    [Fact]
+    public async Task CalculateRoundScoreAsync_ExistingRoundScoreWithoutEvent_RepairsEvent()
+    {
+        var competitionId = Guid.NewGuid();
+        var roundStart = DateTime.UtcNow;
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamId = SeedTeam(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedRound(db, competitionId, 1, roundStart);
+        db.AwdpRoundScores.Add(new AwdpRoundScore
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            RoundNumber = 1,
+            AttackScoreDelta = 70,
+            DefenseScoreDelta = 130,
+            RoundScoreDelta = 200,
+            Reason = "break_success,fix_success",
+            CreatedAt = roundStart
+        });
+        await db.SaveChangesAsync();
+
+        var engine = CreateEngine(db);
+        await engine.CalculateRoundScoreAsync(competitionId, 1);
+
+        Assert.Single(await db.AwdpRoundScores.IgnoreQueryFilters().ToListAsync());
+        var scoreEvent = await db.ScoreEvents.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal(200, scoreEvent.PointsDelta);
+        Assert.Contains("\"restored\":true", scoreEvent.MetadataJson);
+    }
+
+    [Fact]
+    public async Task RoundEngine_RoundScoringState_ResumesAndFinishesCompetition()
+    {
+        var competitionId = Guid.NewGuid();
+        var roundStart = DateTime.UtcNow.AddMinutes(-10);
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var competition = db.Competitions.Local.Single();
+        competition.TotalRounds = 1;
+        var teamId = SeedTeam(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedRound(db, competitionId, 1, roundStart);
+        var round = db.AwdpRounds.Local.Single();
+        round.Status = AwdpRoundStatus.RoundScoring;
+        round.EndTime = roundStart.AddMinutes(5);
+        db.AwdpTeamChallengeStates.Add(new AwdpTeamChallengeState
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            BreakStatus = AwdpBreakStatus.BreakSuccess,
+            BreakSucceededAt = roundStart.AddSeconds(-1),
+            CreatedAt = roundStart.AddMinutes(-1),
+            UpdatedAt = roundStart
+        });
+        await db.SaveChangesAsync();
+
+        var scoreEngine = CreateEngine(db);
+        using var services = new ServiceCollection()
+            .AddSingleton(scoreEngine)
+            .AddSingleton<IHubNotifierService>(new NullHubNotifierAwdp())
+            .BuildServiceProvider();
+        var roundEngine = new AwdpRoundEngine(services, NullLogger<AwdpRoundEngine>.Instance);
+
+        await roundEngine.TickCompetitionAsync(services, db, competition, DateTime.UtcNow, CancellationToken.None);
+
+        Assert.Equal(AwdpRoundStatus.RoundFinished, round.Status);
+        Assert.Equal(CompetitionStatus.Finished, competition.Status);
+        Assert.Single(await db.AwdpRoundScores.IgnoreQueryFilters().ToListAsync());
+        Assert.Single(await db.ScoreEvents.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
+    public async Task RoundEngine_EndedDuringOutage_SettlesCurrentRoundWithoutStartingAnother()
+    {
+        var competitionId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var roundStart = now.AddMinutes(-10);
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var competition = db.Competitions.Local.Single();
+        competition.TotalRounds = 5;
+        competition.EndTime = now.AddMinutes(-1);
+        var teamId = SeedTeam(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedRound(db, competitionId, 1, roundStart);
+        var round = db.AwdpRounds.Local.Single();
+        db.AwdpTeamChallengeStates.Add(new AwdpTeamChallengeState
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            BreakStatus = AwdpBreakStatus.BreakSuccess,
+            BreakSucceededAt = roundStart.AddSeconds(-1),
+            CreatedAt = roundStart.AddMinutes(-1),
+            UpdatedAt = roundStart
+        });
+        await db.SaveChangesAsync();
+
+        var scoreEngine = CreateEngine(db);
+        using var services = new ServiceCollection()
+            .AddSingleton(scoreEngine)
+            .AddSingleton<IHubNotifierService>(new NullHubNotifierAwdp())
+            .BuildServiceProvider();
+
+        await new AwdpRoundEngine(services, NullLogger<AwdpRoundEngine>.Instance)
+            .TickCompetitionAsync(services, db, competition, now, CancellationToken.None);
+
+        Assert.Equal(AwdpRoundStatus.RoundFinished, round.Status);
+        Assert.Equal(competition.EndTime, round.EndTime);
+        Assert.Equal(CompetitionStatus.Finished, competition.Status);
+        Assert.Single(await db.AwdpRounds.IgnoreQueryFilters().ToListAsync());
+        Assert.Single(await db.AwdpRoundScores.IgnoreQueryFilters().ToListAsync());
+    }
+
     private static void SeedCompetition(
         ApplicationDbContext db,
         Guid competitionId)
@@ -313,6 +491,21 @@ public class AwdpScoreEngineTests
         public Task NotifyRoundStartedAsync(Guid competitionId, int roundNumber, CancellationToken ct = default) => Task.CompletedTask;
         public Task NotifyAttackLogAsync(Guid competitionId, Guid attackerTeamId, string attackerTeamName, Guid victimTeamId, string victimTeamName, Guid challengeId, string challengeName, int roundNumber, CancellationToken ct = default) => Task.CompletedTask;
         public Task NotifyKohUpdateAsync(Guid competitionId, Guid challengeId, Guid? controllerTeamId, DateTime timestamp, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class CountingApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        ITenantContext tenantContext) : ApplicationDbContext(options, tenantContext)
+    {
+        public int SaveCount { get; private set; }
+
+        public void ResetSaveCount() => SaveCount = 0;
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            SaveCount++;
+            return base.SaveChangesAsync(cancellationToken);
+        }
     }
 }
 

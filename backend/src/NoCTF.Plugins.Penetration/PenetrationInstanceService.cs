@@ -78,7 +78,8 @@ public class PenetrationInstanceService(
     {
         await using var transitionLease = await AcquireTransitionLeaseAsync(
             competitionId, challengeId, teamId, ct);
-        return await StartCoreAsync(competitionId, challengeId, teamId, userId, ct);
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+        return await StartCoreAsync(competitionId, challengeId, teamId, userId, leaseCts.Token);
     }
 
     private async Task<PenetrationInstanceDto> StartCoreAsync(
@@ -104,41 +105,83 @@ public class PenetrationInstanceService(
             throw new InvalidOperationException("instance_busy");
         if (IsCoolingDown(instance, config, now))
             throw new InvalidOperationException("instance_cooldown");
-        if (instance is not null && instance.ComposeProjectName is not null && instance.Status != PenetrationInstanceStatus.Destroyed)
-            await DownBestEffortAsync(instance, ct);
-
-        instance ??= new TeamChallengeInstance
+        if (instance is not null &&
+            instance.ComposeProjectName is not null &&
+            instance.Status is not (
+                PenetrationInstanceStatus.Stopped or
+                PenetrationInstanceStatus.Expired or
+                PenetrationInstanceStatus.Destroyed))
         {
-            Id = Guid.NewGuid(),
-            CompetitionId = competitionId,
-            TeamId = teamId,
-            ChallengeId = challengeId,
-            TopologyId = topology.Id,
-            CreatedAt = now,
-        };
+            await DownBestEffortAsync(instance, ct);
+        }
 
-        instance.Status = PenetrationInstanceStatus.Starting;
-        instance.TopologyId = topology.Id;
-        instance.ComposeProjectName = BuildProjectName(competitionId, challengeId, teamId);
-        instance.LastActionAt = now;
-        instance.UpdatedAt = now;
-        instance.LastError = null;
-        if (db.Entry(instance).State == EntityState.Detached)
-            db.TeamChallengeInstances.Add(instance);
-        await db.SaveChangesAsync(ct);
+        var leaseService = executionLease ?? new CompetitionExecutionLease();
+        await using (var preparationLease = await leaseService.TryAcquireAsync(
+            db,
+            CompetitionExecutionLeaseKeys.RuntimePreparation,
+            competitionId,
+            ct))
+        {
+            if (preparationLease is null)
+                throw new InvalidOperationException("runtime_preparation_in_progress");
+
+            using var preparationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                preparationLease.LostToken);
+            var preparationCt = preparationCts.Token;
+
+            // Re-read deletion/admission state under the short preparation
+            // barrier before making the runtime operation durable.
+            challenge = await LoadChallengeAsync(competitionId, challengeId, preparationCt);
+            config = PenetrationTopologyService.ReadConfig(challenge);
+            await EnsureCompetitionAllowsInstanceActionsAsync(competitionId, preparationCt);
+            await EnsureTeamAllowsInstanceActionsAsync(competitionId, teamId, preparationCt);
+
+            var reuseFailedOperation = instance?.Status == PenetrationInstanceStatus.Failed &&
+                                       instance.RuntimeOperationId.HasValue;
+            instance ??= new TeamChallengeInstance
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                ChallengeId = challengeId,
+                TopologyId = topology.Id,
+                CreatedAt = now,
+            };
+
+            instance.Status = PenetrationInstanceStatus.Starting;
+            if (!reuseFailedOperation)
+                instance.RuntimeOperationId = Guid.NewGuid();
+            instance.TopologyId = topology.Id;
+            instance.ComposeProjectName = BuildProjectName(competitionId, challengeId, teamId);
+            instance.LastActionAt = now;
+            instance.UpdatedAt = now;
+            instance.LastError = null;
+            if (db.Entry(instance).State == EntityState.Detached)
+                db.TeamChallengeInstances.Add(instance);
+            await db.SaveChangesAsync(preparationCt);
+        }
 
         try
         {
             var dynamicFlags = await flagService.RegenerateDynamicFlagsAsync(challenge, instance, flags, ct);
             var build = composeBuilder.Build(challenge, instance, nodes, flags, dynamicFlags);
             instance.RenderedComposeYaml = build.RedactedComposeYaml;
+            instance.UpdatedAt = DateTime.UtcNow;
+
+            // Persist cleanup identity before dispatching ComposeUp. If the
+            // process dies after Runner accepts the operation, maintenance can
+            // now deterministically tear down the project instead of leaking it
+            // because the durable row still had an empty compose document.
+            await db.SaveChangesAsync(ct);
 
             await containerManager.ComposeUpAsync(new ComposeConfig(
                 ProjectName: instance.ComposeProjectName!,
                 ComposeYaml: build.ComposeYaml,
                 Labels: BuildLabels(challenge, instance),
                 OrchestrationJson: challenge.OrchestrationJson,
-                Ttl: TimeSpan.FromSeconds(config.InstanceTtlSeconds)), ct);
+                Ttl: TimeSpan.FromSeconds(config.InstanceTtlSeconds),
+                OperationId: instance.RuntimeOperationId), ct);
 
             var composeStatus = await containerManager.GetComposeStatusAsync(
                 instance.ComposeProjectName!,
@@ -181,19 +224,23 @@ public class PenetrationInstanceService(
             await db.SaveChangesAsync(ct);
             return ToDto(instance, config);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
+            var cleanupSucceeded = false;
             try
             {
                 await DownBestEffortAsync(instance, ct);
+                cleanupSucceeded = true;
             }
-            catch (Exception cleanupEx)
+            catch (Exception)
             {
-                instance.LastError = $"Start failed: {ex.Message}; cleanup failed: {cleanupEx.Message}";
+                instance.LastError = "instance_start_and_cleanup_failed";
             }
             await DeactivateDynamicFlagsAsync(instance, ct);
             instance.Status = PenetrationInstanceStatus.Failed;
-            instance.LastError ??= ex.Message;
+            if (cleanupSucceeded)
+                instance.RuntimeOperationId = null;
+            instance.LastError ??= "instance_start_failed";
             instance.UpdatedAt = DateTime.UtcNow;
             AddCompetitionLog(
                 db,
@@ -204,7 +251,7 @@ public class PenetrationInstanceService(
                 teamId,
                 userId,
                 challengeId,
-                metadata: new { instanceId = instance.Id, error = ex.Message });
+                metadata: new { instanceId = instance.Id, error = "instance_start_failed" });
             await db.SaveChangesAsync(ct);
             throw;
         }
@@ -219,33 +266,36 @@ public class PenetrationInstanceService(
     {
         await using var transitionLease = await AcquireTransitionLeaseAsync(
             competitionId, challengeId, teamId, ct);
-        var challenge = await LoadChallengeAsync(competitionId, challengeId, ct);
-        var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, ct);
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+        var leaseCt = leaseCts.Token;
+        var challenge = await LoadChallengeAsync(competitionId, challengeId, leaseCt);
+        var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, leaseCt);
         var config = PenetrationTopologyService.ReadConfig(challenge);
         if (instance is null) return ToDto(null, config);
         if (BusyStatuses.Contains(instance.Status)) throw new InvalidOperationException("instance_busy");
 
         instance.Status = PenetrationInstanceStatus.Stopping;
         instance.LastActionAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(leaseCt);
         try
         {
-            await DownBestEffortAsync(instance, ct);
+            await DownBestEffortAsync(instance, leaseCt);
         }
         catch (Exception ex)
         {
-            await MarkOperationFailedAsync(instance, ex, ct);
+            await MarkOperationFailedAsync(instance, ex, leaseCt);
             throw;
         }
-        await DeactivateDynamicFlagsAsync(instance, ct);
+        await DeactivateDynamicFlagsAsync(instance, leaseCt);
         instance.Status = PenetrationInstanceStatus.Stopped;
+        instance.RuntimeOperationId = null;
         instance.EntryPort = null;
         instance.EntryUrl = null;
         instance.ContainerIdsJson = "[]";
         instance.PortMappingsJson = "{}";
         instance.UpdatedAt = DateTime.UtcNow;
         AddCompetitionLog(db, competitionId, "penetration.instance.stopped", "Penetration range instance was stopped.", teamId: teamId, userId: userId, challengeId: challengeId, metadata: new { instanceId = instance.Id });
-        await db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(leaseCt);
         return ToDto(instance, config);
     }
 
@@ -259,14 +309,16 @@ public class PenetrationInstanceService(
     {
         await using var transitionLease = await AcquireTransitionLeaseAsync(
             competitionId, challengeId, teamId, ct);
-        var challenge = await LoadChallengeAsync(competitionId, challengeId, ct);
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+        var leaseCt = leaseCts.Token;
+        var challenge = await LoadChallengeAsync(competitionId, challengeId, leaseCt);
         var config = PenetrationTopologyService.ReadConfig(challenge);
         if (!adminOverride)
-            await EnsureCompetitionAllowsInstanceActionsAsync(competitionId, ct);
+            await EnsureCompetitionAllowsInstanceActionsAsync(competitionId, leaseCt);
         if (!config.AllowReset && !adminOverride)
             throw new InvalidOperationException("reset_not_allowed");
 
-        var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, ct)
+        var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, leaseCt)
             ?? throw new InvalidOperationException("instance_not_found");
         if (BusyStatuses.Contains(instance.Status)) throw new InvalidOperationException("instance_busy");
         if (!adminOverride && instance.ResetCount >= config.MaxResetCount)
@@ -277,22 +329,23 @@ public class PenetrationInstanceService(
         instance.Status = PenetrationInstanceStatus.Resetting;
         instance.LastActionAt = DateTime.UtcNow;
         instance.ResetCount += 1;
-        await db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(leaseCt);
         try
         {
-            await DownBestEffortAsync(instance, ct);
+            await DownBestEffortAsync(instance, leaseCt);
         }
         catch (Exception ex)
         {
-            await MarkOperationFailedAsync(instance, ex, ct);
+            await MarkOperationFailedAsync(instance, ex, leaseCt);
             throw;
         }
         instance.Status = PenetrationInstanceStatus.Stopped;
+        instance.RuntimeOperationId = null;
         instance.LastActionAt = null;
-        await db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(leaseCt);
         AddCompetitionLog(db, competitionId, adminOverride ? "penetration.admin.instance_reset" : "penetration.instance.reset", "Penetration range instance was reset.", teamId: teamId, userId: userId, challengeId: challengeId, metadata: new { instanceId = instance.Id, instance.ResetCount });
-        await db.SaveChangesAsync(ct);
-        return await StartCoreAsync(competitionId, challengeId, teamId, userId, ct);
+        await db.SaveChangesAsync(leaseCt);
+        return await StartCoreAsync(competitionId, challengeId, teamId, userId, leaseCt);
     }
 
     public async Task<PenetrationInstanceDto> DestroyAsync(
@@ -305,34 +358,37 @@ public class PenetrationInstanceService(
     {
         await using var transitionLease = await AcquireTransitionLeaseAsync(
             competitionId, challengeId, teamId, ct);
-        var challenge = await LoadChallengeAsync(competitionId, challengeId, ct);
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+        var leaseCt = leaseCts.Token;
+        var challenge = await LoadChallengeAsync(competitionId, challengeId, leaseCt);
         var config = PenetrationTopologyService.ReadConfig(challenge);
-        var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, ct);
+        var instance = await LoadInstanceAsync(competitionId, challengeId, teamId, leaseCt);
         if (instance is null) return ToDto(null, config);
         if (BusyStatuses.Contains(instance.Status)) throw new InvalidOperationException("instance_busy");
 
         instance.Status = PenetrationInstanceStatus.Destroying;
         instance.LastActionAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(leaseCt);
         try
         {
-            await DownBestEffortAsync(instance, ct);
+            await DownBestEffortAsync(instance, leaseCt);
         }
         catch (Exception ex)
         {
-            await MarkOperationFailedAsync(instance, ex, ct);
+            await MarkOperationFailedAsync(instance, ex, leaseCt);
             throw;
         }
-        await DeactivateDynamicFlagsAsync(instance, ct);
+        await DeactivateDynamicFlagsAsync(instance, leaseCt);
 
         instance.Status = PenetrationInstanceStatus.Destroyed;
+        instance.RuntimeOperationId = null;
         instance.EntryPort = null;
         instance.EntryUrl = null;
         instance.ContainerIdsJson = "[]";
         instance.PortMappingsJson = "{}";
         instance.UpdatedAt = DateTime.UtcNow;
         AddCompetitionLog(db, competitionId, adminOverride ? "penetration.admin.instance_destroy" : "penetration.instance.destroyed", "Penetration range instance was destroyed.", teamId: teamId, userId: userId, challengeId: challengeId, metadata: new { instanceId = instance.Id });
-        await db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(leaseCt);
         return ToDto(instance, config);
     }
 
@@ -347,7 +403,9 @@ public class PenetrationInstanceService(
                 i => i.TeamId,
                 t => t.Id,
                 (i, t) => new { Instance = i, TeamName = t.Name })
-            .Join(db.Challenges.IgnoreQueryFilters().AsNoTracking().Where(c => c.CompetitionId == competitionId),
+            .Join(db.Challenges.IgnoreQueryFilters().AsNoTracking().Where(c =>
+                    c.CompetitionId == competitionId &&
+                    !c.IsDeleting),
                 row => row.Instance.ChallengeId,
                 c => c.Id,
                 (row, c) => new
@@ -405,12 +463,16 @@ public class PenetrationInstanceService(
                 s.PenetrationFlagId != null)
             .Select(s => new { FlagId = s.PenetrationFlagId!.Value, s.SubmittedAt })
             .ToListAsync(ct);
+        var solvedAtByFlag = solved
+            .GroupBy(submission => submission.FlagId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Min(submission => submission.SubmittedAt));
 
         foreach (var flag in dto.Flags)
         {
-            var solvedFlag = solved.FirstOrDefault(s => s.FlagId == flag.Id);
-            flag.Solved = solvedFlag is not null;
-            flag.SolvedAt = solvedFlag?.SubmittedAt;
+            flag.Solved = solvedAtByFlag.TryGetValue(flag.Id, out var solvedAt);
+            flag.SolvedAt = flag.Solved ? solvedAt : null;
         }
 
         return dto;
@@ -420,7 +482,12 @@ public class PenetrationInstanceService(
     {
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.CompetitionId == competitionId && c.Id == challengeId, ct)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c =>
+                c.CompetitionId == competitionId &&
+                c.Id == challengeId &&
+                !c.IsDeleting,
+                ct)
             ?? throw new InvalidOperationException("challenge_not_found");
         if (!string.Equals(challenge.TypeId, PenetrationConstants.TypeId, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("not_penetration_challenge");
@@ -462,6 +529,22 @@ public class PenetrationInstanceService(
         if (competition.Status == CompetitionStatus.Paused) throw new InvalidOperationException("competition_paused");
     }
 
+    private async Task EnsureTeamAllowsInstanceActionsAsync(
+        Guid competitionId,
+        Guid teamId,
+        CancellationToken ct)
+    {
+        var team = await db.Teams
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.CompetitionId == competitionId && t.Id == teamId, ct)
+            ?? throw new InvalidOperationException("team_not_found");
+        if (team.RegistrationStatus != TeamRegistrationStatus.Approved)
+            throw new InvalidOperationException("team_not_approved");
+        if (team.IsBanned)
+            throw new InvalidOperationException("team_banned");
+    }
+
     private async Task EnsureCompetitionAllowsPlayerViewAsync(Guid competitionId, CancellationToken ct)
     {
         var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(c => c.Id == competitionId, ct)
@@ -473,7 +556,7 @@ public class PenetrationInstanceService(
 
     private async Task DownBestEffortAsync(TeamChallengeInstance instance, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(instance.ComposeProjectName) || string.IsNullOrWhiteSpace(instance.RenderedComposeYaml))
+        if (string.IsNullOrWhiteSpace(instance.ComposeProjectName))
             return;
         try
         {
@@ -484,19 +567,21 @@ public class PenetrationInstanceService(
                 ChallengeId: instance.ChallengeId,
                 ProviderType: "docker-compose",
                 ProjectName: instance.ComposeProjectName,
-                ComposeYaml: instance.RenderedComposeYaml,
+                ComposeYaml: string.IsNullOrWhiteSpace(instance.RenderedComposeYaml)
+                    ? "services:\n  cleanup:\n    image: scratch\n"
+                    : instance.RenderedComposeYaml,
                 Status: instance.Status.ToString(),
                 StartedAt: instance.CreatedAt), ct);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            instance.LastError = ex.Message;
+            instance.LastError = "instance_cleanup_failed";
             instance.UpdatedAt = DateTime.UtcNow;
             throw;
         }
     }
 
-    private async Task<IAsyncDisposable> AcquireTransitionLeaseAsync(
+    private async Task<IExecutionLease> AcquireTransitionLeaseAsync(
         Guid competitionId,
         Guid challengeId,
         Guid teamId,
@@ -505,7 +590,7 @@ public class PenetrationInstanceService(
         var leaseService = executionLease ?? new CompetitionExecutionLease();
         return await leaseService.TryAcquireAsync(
                    db,
-                   $"penetration-instance:{teamId:N}:{challengeId:N}",
+                   CompetitionExecutionLeaseKeys.ChallengeInstance(teamId, challengeId),
                    competitionId,
                    ct)
                ?? throw new InvalidOperationException("instance_busy");
@@ -514,7 +599,7 @@ public class PenetrationInstanceService(
     private async Task MarkOperationFailedAsync(TeamChallengeInstance instance, Exception ex, CancellationToken ct)
     {
         instance.Status = PenetrationInstanceStatus.Failed;
-        instance.LastError = ex.Message;
+        instance.LastError = "instance_operation_failed";
         instance.LastActionAt = null;
         instance.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -522,15 +607,28 @@ public class PenetrationInstanceService(
 
     private async Task DeactivateDynamicFlagsAsync(TeamChallengeInstance instance, CancellationToken ct)
     {
-        var flags = await db.DynamicFlagInstances
+        var activeFlags = db.DynamicFlagInstances
             .IgnoreQueryFilters()
             .Where(f =>
                 f.CompetitionId == instance.CompetitionId &&
                 f.TeamId == instance.TeamId &&
                 f.ChallengeId == instance.ChallengeId &&
                 f.InstanceId == instance.Id &&
-                f.IsActive)
-            .ToListAsync(ct);
+                f.IsActive);
+        if (db.Database.IsRelational())
+        {
+            await activeFlags.ExecuteUpdateAsync(
+                setters => setters.SetProperty(flag => flag.IsActive, false),
+                ct);
+            foreach (var entry in db.ChangeTracker.Entries<DynamicFlagInstance>().Where(entry =>
+                         entry.Entity.InstanceId == instance.Id && entry.Entity.IsActive))
+            {
+                entry.Entity.IsActive = false;
+            }
+            return;
+        }
+
+        var flags = await activeFlags.ToListAsync(ct);
         foreach (var flag in flags)
             flag.IsActive = false;
     }
@@ -554,13 +652,14 @@ public class PenetrationInstanceService(
             };
         }
 
+        var runtimeVisible = IsRunning(instance, DateTime.UtcNow);
         return new PenetrationInstanceDto
         {
             Id = instance.Id,
             Status = instance.Status.ToString(),
-            EntryHost = instance.EntryHost,
-            EntryPort = instance.EntryPort,
-            EntryUrl = config.VisibleEntryAfterStart ? instance.EntryUrl : null,
+            EntryHost = runtimeVisible ? instance.EntryHost : null,
+            EntryPort = runtimeVisible ? instance.EntryPort : null,
+            EntryUrl = runtimeVisible && config.VisibleEntryAfterStart ? instance.EntryUrl : null,
             ResetCount = instance.ResetCount,
             ResetLimit = config.MaxResetCount,
             ExpiresAt = instance.ExpiresAt,
@@ -569,8 +668,8 @@ public class PenetrationInstanceService(
             LastError = string.IsNullOrWhiteSpace(instance.LastError)
                 ? null
                 : "instance_operation_failed",
-            ContainerIds = ReadStringArray(instance.ContainerIdsJson),
-            Ports = ReadPortMap(instance.PortMappingsJson),
+            ContainerIds = runtimeVisible ? ReadStringArray(instance.ContainerIdsJson) : [],
+            Ports = runtimeVisible ? ReadPortMap(instance.PortMappingsJson) : [],
         };
     }
 

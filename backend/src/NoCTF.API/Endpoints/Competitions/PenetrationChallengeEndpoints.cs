@@ -57,7 +57,11 @@ internal static class PenetrationEndpointRuntime
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.CompetitionId == competitionId && c.Id == challengeId, ct);
+            .FirstOrDefaultAsync(c =>
+                c.CompetitionId == competitionId &&
+                c.Id == challengeId &&
+                !c.IsDeleting,
+                ct);
         if (challenge is null) return PlayerChallengeContext.Fail("challenge_not_found", 404);
 
         return new PlayerChallengeContext(userId, team, challenge, null);
@@ -178,6 +182,7 @@ public class StartPenetrationInstanceEndpoint(ApplicationDbContext db, IChalleng
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/penetration/instance/start");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(PenetrationChallengeRequest req, CancellationToken ct)
@@ -191,6 +196,7 @@ public class StopPenetrationInstanceEndpoint(ApplicationDbContext db, IChallenge
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/penetration/instance/stop");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(PenetrationChallengeRequest req, CancellationToken ct)
@@ -204,6 +210,7 @@ public class ResetPenetrationInstanceEndpoint(ApplicationDbContext db, IChalleng
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/penetration/instance/reset");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(PenetrationChallengeRequest req, CancellationToken ct)
@@ -217,6 +224,7 @@ public class DestroyPenetrationInstanceEndpoint(ApplicationDbContext db, IChalle
     {
         Delete("/api/competitions/{id}/challenges/{challengeId}/penetration/instance");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(PenetrationChallengeRequest req, CancellationToken ct)
@@ -225,17 +233,28 @@ public class DestroyPenetrationInstanceEndpoint(ApplicationDbContext db, IChalle
 
 public class SubmitPenetrationFlagEndpoint(
     ApplicationDbContext db,
-    IChallengeSubmissionHandlerRegistry registry)
+    IChallengeSubmissionHandlerRegistry registry,
+    IConfiguration configuration)
     : Endpoint<PenetrationFlagSubmitRequest, PenetrationFlagSubmitResponse>
 {
     public override void Configure()
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/penetration/flags/submit");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(PenetrationFlagSubmitRequest req, CancellationToken ct)
     {
+        var submittedFlag = req.Flag?.Trim() ?? string.Empty;
+        var maxFlagLength = configuration.GetValue("Submissions:MaxFlagLength", 1024);
+        if (submittedFlag.Length == 0 || submittedFlag.Length > maxFlagLength)
+        {
+            await SendAsync(new PenetrationFlagSubmitResponse { Result = "invalid_flag_format" }, 400, ct);
+            return;
+        }
+        req.Flag = submittedFlag;
+
         var context = await PenetrationEndpointRuntime.LoadPlayerContextAsync(db, req.Id, req.ChallengeId, User, ct);
         if (context.Error is not null)
         {

@@ -2,13 +2,18 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API;
 using NoCTF.API.Permissions;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 
 namespace NoCTF.API.Endpoints.Admin;
 
-public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbContext, IContainerManager containerManager, ICompetitionPermissionService permissions)
+public class RestartStaticChallengeContainerEndpoint(
+    ApplicationDbContext dbContext,
+    IContainerManager containerManager,
+    ICompetitionPermissionService permissions,
+    ICompetitionExecutionLease executionLease)
     : EndpointWithoutRequest<Competitions.ChallengeInstanceResponse>, IAuditableEndpoint
 {
     public override void Configure()
@@ -30,7 +35,11 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
         var challenge = await dbContext.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == challengeId && c.CompetitionId == competitionId, ct);
+            .FirstOrDefaultAsync(c =>
+                c.Id == challengeId &&
+                c.CompetitionId == competitionId &&
+                !c.IsDeleting,
+                ct);
         if (challenge is null)
         {
             await SendNotFoundAsync(ct);
@@ -42,6 +51,19 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
             await SendStringAsync("not_static_container", 400, cancellation: ct);
             return;
         }
+
+        await using var transitionLease = await executionLease.TryAcquireAsync(
+            dbContext,
+            CompetitionExecutionLeaseKeys.ChallengeInstance(Guid.Empty, challengeId),
+            competitionId,
+            ct);
+        if (transitionLease is null)
+        {
+            await SendStringAsync("instance_transition_in_progress", 409, cancellation: ct);
+            return;
+        }
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+        ct = leaseCts.Token;
 
         var box = await dbContext.AwdGameBoxes
             .IgnoreQueryFilters()
@@ -70,26 +92,99 @@ public class RestartStaticChallengeContainerEndpoint(ApplicationDbContext dbCont
                     reason = "static_container_restart"
                 });
             await Competitions.CreateChallengeInstanceEndpoint.DestroyBoxAsync(box, containerManager, ct);
-            dbContext.AwdGameBoxes.Remove(box);
+            Competitions.ChallengeInstanceRuntime.ClearContainer(box);
+            box.LastInstanceActionAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(ct);
         }
 
-        var instance = await containerManager.CreateContainerAsync(
-            Competitions.CreateChallengeInstanceEndpoint.BuildContainerConfig(challenge, Guid.Empty),
-            ct);
-        dbContext.AwdGameBoxes.Add(new AwdGameBox
+        DateTime competitionEnd;
+        await using (var preparationLease = await executionLease.TryAcquireAsync(
+            dbContext,
+            CompetitionExecutionLeaseKeys.RuntimePreparation,
+            competitionId,
+            ct))
         {
-            Id = Guid.NewGuid(),
-            CompetitionId = competitionId,
-            TeamId = Guid.Empty,
-            ChallengeId = challengeId,
-            ContainerInstanceId = instance.ContainerId,
-            ProviderType = instance.ProviderType,
-            PublicHost = instance.PublicHost,
-            EntryUrl = instance.EntryUrl,
-            OrchestrationNamespace = instance.OrchestrationNamespace,
-            PortMappingsJson = Competitions.ChallengeInstanceRuntime.WritePorts(instance.PortMappings),
-            CreatedAt = DateTime.UtcNow,
-        });
+            if (preparationLease is null)
+            {
+                await SendStringAsync("runtime_preparation_in_progress", 409, cancellation: ct);
+                return;
+            }
+
+            using var preparationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                preparationLease.LostToken);
+            var preparationCt = preparationCts.Token;
+            challenge = await dbContext.Challenges
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c =>
+                    c.Id == challengeId &&
+                    c.CompetitionId == competitionId &&
+                    !c.IsDeleting,
+                    preparationCt);
+            if (challenge is null)
+            {
+                await SendNotFoundAsync(preparationCt);
+                return;
+            }
+
+            var competition = await dbContext.Competitions
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == competitionId, preparationCt);
+            if (competition is null ||
+                competition.Status == CompetitionStatus.Finished ||
+                competition.EndTime <= DateTime.UtcNow)
+            {
+                await SendStringAsync("competition_ended", 409, cancellation: preparationCt);
+                return;
+            }
+            competitionEnd = competition.EndTime;
+
+            box ??= new AwdGameBox
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = Guid.Empty,
+                ChallengeId = challengeId,
+                CreatedAt = DateTime.UtcNow
+            };
+            if (dbContext.Entry(box).State == EntityState.Detached)
+                dbContext.AwdGameBoxes.Add(box);
+            box.RuntimeOperationId ??= Guid.NewGuid();
+            await dbContext.SaveChangesAsync(preparationCt);
+        }
+
+        var remaining = competitionEnd - DateTime.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            box.RuntimeOperationId = null;
+            await dbContext.SaveChangesAsync(ct);
+            await SendStringAsync("competition_ended", 409, cancellation: ct);
+            return;
+        }
+        var containerConfig = Competitions.CreateChallengeInstanceEndpoint
+            .BuildContainerConfig(challenge, Guid.Empty, operationId: box.RuntimeOperationId) with
+        {
+            Ttl = remaining
+        };
+        var instance = await containerManager.CreateContainerAsync(
+            containerConfig,
+            ct);
+        box.ContainerInstanceId = instance.ContainerId;
+        box.ProviderType = instance.ProviderType;
+        box.PublicHost = instance.PublicHost;
+        box.EntryUrl = instance.EntryUrl;
+        box.OrchestrationNamespace = instance.OrchestrationNamespace;
+        box.PortMappingsJson = Competitions.ChallengeInstanceRuntime.WritePorts(instance.PortMappings);
+        box.RuntimeKind = "container";
+        box.ComposeProjectName = null;
+        box.ComposeYaml = null;
+        box.InternalHost = instance.InternalHost;
+        box.InternalPortMappingsJson = Competitions.ChallengeInstanceRuntime.WritePorts(
+            instance.InternalPortMappings ?? []);
+        box.ExpiresAt = competitionEnd;
+        box.LastInstanceActionAt = DateTime.UtcNow;
         CompetitionLogWriter.Add(
             dbContext,
             competitionId,

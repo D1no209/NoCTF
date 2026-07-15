@@ -45,7 +45,9 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
     {
         var competition = await dbContext.Competitions
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(c => c.Id == req.Id)
+            .Select(c => new { c.Status, c.StartTime, c.RoundDurationSeconds })
             .FirstOrDefaultAsync(ct);
 
         if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
@@ -71,6 +73,7 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
         // Current running round
         var currentRound = await dbContext.AwdRounds
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(r => r.CompetitionId == req.Id && r.Status == AwdRoundStatus.Running)
             .OrderByDescending(r => r.RoundNumber)
             .FirstOrDefaultAsync(ct);
@@ -86,6 +89,7 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
 
         var teams = await dbContext.Teams
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(t =>
                 t.CompetitionId == req.Id &&
                 t.RegistrationStatus == TeamRegistrationStatus.Approved &&
@@ -96,24 +100,57 @@ public class GetAwdDashboardEndpoint(ApplicationDbContext dbContext)
         // Service statuses: for each active GameBox, find latest CheckResult for current round
         var gameBoxes = await dbContext.AwdGameBoxes
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(gb => gb.CompetitionId == req.Id && activeTeamIds.Contains(gb.TeamId))
+            .Join(
+                dbContext.Challenges.IgnoreQueryFilters().Where(challenge =>
+                    challenge.CompetitionId == req.Id &&
+                    !challenge.IsDeleting),
+                gameBox => gameBox.ChallengeId,
+                challenge => challenge.Id,
+                (gameBox, challenge) => new
+                {
+                    gameBox.TeamId,
+                    gameBox.ChallengeId,
+                    ChallengeTitle = challenge.Title
+                })
             .ToListAsync(ct);
 
         var challengeIds = gameBoxes.Select(gb => gb.ChallengeId).Distinct().ToList();
-
-        var challenges = await dbContext.Challenges
-            .IgnoreQueryFilters()
-            .Where(c => challengeIds.Contains(c.Id))
-            .ToDictionaryAsync(c => c.Id, c => c.Title, ct);
+        var challenges = gameBoxes
+            .GroupBy(gameBox => gameBox.ChallengeId)
+            .ToDictionary(group => group.Key, group => group.First().ChallengeTitle);
 
         // Latest check results for current round (or most recent round if none running)
-        var checkResults = roundNumber > 0
-            ? await dbContext.AwdCheckResults
+        var roundCheckResults = dbContext.AwdCheckResults
                 .IgnoreQueryFilters()
+                .AsNoTracking()
                 .Where(cr =>
                     cr.CompetitionId == req.Id &&
                     cr.RoundNumber == roundNumber &&
-                    activeTeamIds.Contains(cr.TeamId))
+                    activeTeamIds.Contains(cr.TeamId) &&
+                    challengeIds.Contains(cr.ChallengeId));
+        var latestCheckTimes = roundCheckResults
+            .GroupBy(result => new { result.TeamId, result.ChallengeId })
+            .Select(group => new
+            {
+                group.Key.TeamId,
+                group.Key.ChallengeId,
+                CheckedAt = group.Max(result => result.CheckedAt)
+            });
+        var checkResults = roundNumber > 0
+            ? await roundCheckResults
+                .Join(
+                    latestCheckTimes,
+                    result => new { result.TeamId, result.ChallengeId, result.CheckedAt },
+                    latest => new { latest.TeamId, latest.ChallengeId, latest.CheckedAt },
+                    (result, _) => new
+                    {
+                        result.TeamId,
+                        result.ChallengeId,
+                        result.Status,
+                        result.CheckedAt
+                    })
                 .ToListAsync(ct)
             : [];
 

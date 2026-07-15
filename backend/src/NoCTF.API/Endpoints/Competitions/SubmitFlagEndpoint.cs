@@ -36,7 +36,7 @@ public class SubmitFlagEndpoint(
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/submit");
         Claims(ClaimTypes.NameIdentifier);
-        Options(builder => builder.RequireRateLimiting("flag-submit"));
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(SubmitFlagRequest req, CancellationToken ct)
@@ -76,7 +76,7 @@ public class SubmitFlagEndpoint(
         var challengeExists = await dbContext.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .AnyAsync(c => c.Id == req.ChallengeId && c.CompetitionId == req.Id, ct);
+            .AnyAsync(c => c.Id == req.ChallengeId && c.CompetitionId == req.Id && !c.IsDeleting, ct);
         if (!challengeExists)
         {
             await SendNotFoundAsync(ct);

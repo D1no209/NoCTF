@@ -8,9 +8,7 @@ namespace NoCTF.Plugins.AWDP;
 
 public class AwdpModeProvider(
     ApplicationDbContext db,
-    AwdpConfigResolver configResolver,
-    IAwdpPatchService patchService,
-    IBackgroundTaskQueue backgroundTaskQueue) : ICompetitionModeProvider, ICompetitionFileActionProvider
+    IAwdpPatchService patchService) : ICompetitionModeProvider, ICompetitionFileActionProvider
 {
     private const string ChallengeStateView = "challenge-state";
     private const string SubmitPatchAction = "submit-patch";
@@ -59,12 +57,6 @@ public class AwdpModeProvider(
                 result.MaxDefenseAttempts
             });
         }
-
-        await backgroundTaskQueue.EnqueueAsync(
-            context.CompetitionId,
-            AwdpBackgroundTaskTypes.PatchValidation,
-            new AwdpPatchValidationPayload(result.SubmissionId.Value),
-            ct);
 
         return new CompetitionActionResult(true, result.Code, new
         {
@@ -116,18 +108,25 @@ public class AwdpModeProvider(
         var challenges = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(c => c.CompetitionId == context.CompetitionId)
+            .Where(c => c.CompetitionId == context.CompetitionId && !c.IsDeleting)
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(ct);
+        var activeChallengeIds = challenges.Select(challenge => challenge.Id).ToArray();
         var states = await db.AwdpTeamChallengeStates
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(s => s.CompetitionId == context.CompetitionId && s.TeamId == teamId)
+            .Where(s =>
+                s.CompetitionId == context.CompetitionId &&
+                s.TeamId == teamId &&
+                activeChallengeIds.Contains(s.ChallengeId))
             .ToListAsync(ct);
         var boxes = await db.AwdGameBoxes
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(g => g.CompetitionId == context.CompetitionId && g.TeamId == teamId)
+            .Where(g =>
+                g.CompetitionId == context.CompetitionId &&
+                g.TeamId == teamId &&
+                activeChallengeIds.Contains(g.ChallengeId))
             .ToListAsync(ct);
         var roundNumber = currentRound?.RoundNumber;
         var roundScores = roundNumber is null
@@ -138,6 +137,7 @@ public class AwdpModeProvider(
                 .Where(s =>
                     s.CompetitionId == context.CompetitionId &&
                     s.TeamId == teamId &&
+                    activeChallengeIds.Contains(s.ChallengeId) &&
                     s.RoundNumber == roundNumber.Value)
                 .ToListAsync(ct);
 
@@ -151,7 +151,7 @@ public class AwdpModeProvider(
             stateMap.TryGetValue(challenge.Id, out var state);
             boxMap.TryGetValue(challenge.Id, out var box);
             scoreMap.TryGetValue(challenge.Id, out var roundScore);
-            var config = await configResolver.ResolveAsync(context.CompetitionId, challenge.Id, ct);
+            var config = AwdpConfigResolver.Resolve(competition, challenge);
             var instanceStatus = ResolveInstanceStatus(box, now);
             var breakStatus = state?.BreakStatus ?? AwdpBreakStatus.BreakNotStarted;
             var fixStatus = state?.FixStatus ?? AwdpFixStatus.FixNotStarted;
@@ -203,7 +203,7 @@ public class AwdpModeProvider(
                 allowDefenseAfterFixSuccess = config.AllowDefenseAfterFixSuccess,
                 fixEntry = config.FixEntry,
                 lastValidationDetail = AwdpPlayerDefenseResult.ToVisibleDetail(fixStatus),
-                cooldownUntil = box?.LastInstanceActionAt?.Add(TimeSpan.FromSeconds(5))
+                cooldownUntil = box?.LastInstanceActionAt?.Add(AwdpPatchService.ContainerOperationCooldown)
             });
         }
 

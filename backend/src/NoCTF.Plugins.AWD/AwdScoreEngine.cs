@@ -22,83 +22,133 @@ public class AwdScoreEngine(
 {
     public async Task CalculateRoundScoreAsync(Guid competitionId, int roundNumber, CancellationToken ct = default)
     {
-        var competition = await db.Competitions
-            .IgnoreQueryFilters()
-            .FirstAsync(c => c.Id == competitionId, ct);
-
         var teams = await db.Teams
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(t =>
                 t.CompetitionId == competitionId &&
                 t.RegistrationStatus == TeamRegistrationStatus.Approved &&
                 !t.IsBanned)
+            .Select(t => t.Id)
             .ToListAsync(ct);
 
         var challenges = await db.Challenges
             .IgnoreQueryFilters()
-            .Where(c => c.CompetitionId == competitionId)
+            .AsNoTracking()
+            .Where(c => c.CompetitionId == competitionId && !c.IsDeleting)
+            .Select(c => c.Id)
             .ToListAsync(ct);
+
+        var activeTeamIds = teams.ToHashSet();
+        var activeChallengeIds = challenges.ToHashSet();
+        var checkRows = await db.AwdCheckResults
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(result =>
+                result.CompetitionId == competitionId &&
+                result.RoundNumber == roundNumber &&
+                activeTeamIds.Contains(result.TeamId) &&
+                activeChallengeIds.Contains(result.ChallengeId))
+            .Select(result => new
+            {
+                result.TeamId,
+                result.ChallengeId,
+                result.Status,
+                result.CheckedAt
+            })
+            .ToListAsync(ct);
+        var latestChecks = checkRows
+            .GroupBy(result => (result.TeamId, result.ChallengeId))
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(result => result.CheckedAt).First());
+        var attacks = await db.AwdAttackRecords
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(attack =>
+                attack.CompetitionId == competitionId &&
+                attack.RoundNumber == roundNumber &&
+                activeTeamIds.Contains(attack.VictimTeamId) &&
+                activeChallengeIds.Contains(attack.ChallengeId))
+            .Select(attack => new
+            {
+                attack.AttackerTeamId,
+                attack.VictimTeamId,
+                attack.ChallengeId,
+                attack.Timestamp
+            })
+            .ToListAsync(ct);
+        var attackedPairs = attacks
+            .Select(attack => (TeamId: attack.VictimTeamId, attack.ChallengeId))
+            .ToHashSet();
+
+        var signals = new List<ScoreSignalCreate>(teams.Count * challenges.Count * 2 + attacks.Count);
+
+        // Attack records are the authoritative acceptance facts. Re-emitting
+        // their deterministic keys makes round scoring a projection rebuilder
+        // as well as a calculator, repairing a missing signal/event after an
+        // interrupted or ambiguously committed API request.
+        foreach (var attack in attacks.Where(attack => activeTeamIds.Contains(attack.AttackerTeamId)))
+        {
+            signals.Add(new ScoreSignalCreate(
+                CompetitionId: competitionId,
+                TeamId: attack.AttackerTeamId,
+                SignalType: ScoreSignalTypes.AttackAccepted,
+                IdempotencyKey: $"awd:{roundNumber}:{attack.AttackerTeamId:N}:{attack.VictimTeamId:N}:{attack.ChallengeId:N}:attack",
+                SubjectType: "challenge",
+                SubjectId: attack.ChallengeId,
+                RoundNumber: roundNumber,
+                PayloadJson: ScoringJson.Serialize(new { victimTeamId = attack.VictimTeamId }),
+                OccurredAt: attack.Timestamp));
+        }
 
         foreach (var team in teams)
         {
             foreach (var challenge in challenges)
             {
-                // Service health
-                var check = await db.AwdCheckResults
-                    .IgnoreQueryFilters()
-                    .Where(r => r.CompetitionId == competitionId
-                             && r.TeamId == team.Id
-                             && r.ChallengeId == challenge.Id
-                             && r.RoundNumber == roundNumber)
-                    .OrderByDescending(r => r.CheckedAt)
-                    .FirstOrDefaultAsync(ct);
+                latestChecks.TryGetValue((team, challenge), out var check);
 
                 if (check?.Status == AwdCheckStatus.Healthy)
                 {
-                    await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+                    signals.Add(new ScoreSignalCreate(
                         CompetitionId: competitionId,
-                        TeamId: team.Id,
+                        TeamId: team,
                         SignalType: ScoreSignalTypes.ServiceCheckPassed,
-                        IdempotencyKey: $"awd:{roundNumber}:{team.Id:N}:{challenge.Id:N}:service:passed",
+                        IdempotencyKey: $"awd:{roundNumber}:{team:N}:{challenge:N}:service:passed",
                         SubjectType: "challenge",
-                        SubjectId: challenge.Id,
+                        SubjectId: challenge,
                         RoundNumber: roundNumber,
-                        OccurredAt: check.CheckedAt), ct);
+                        OccurredAt: check.CheckedAt));
                 }
                 else if (check?.Status == AwdCheckStatus.Down)
                 {
-                    await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+                    signals.Add(new ScoreSignalCreate(
                         CompetitionId: competitionId,
-                        TeamId: team.Id,
+                        TeamId: team,
                         SignalType: ScoreSignalTypes.ServiceCheckFailed,
-                        IdempotencyKey: $"awd:{roundNumber}:{team.Id:N}:{challenge.Id:N}:service:failed",
+                        IdempotencyKey: $"awd:{roundNumber}:{team:N}:{challenge:N}:service:failed",
                         SubjectType: "challenge",
-                        SubjectId: challenge.Id,
+                        SubjectId: challenge,
                         RoundNumber: roundNumber,
-                        OccurredAt: check.CheckedAt), ct);
+                        OccurredAt: check.CheckedAt));
                 }
 
-                // Been attacked penalty (any unique attacker this round for this team+challenge)
-                var wasAttacked = await db.AwdAttackRecords
-                    .IgnoreQueryFilters()
-                    .AnyAsync(a => a.CompetitionId == competitionId
-                               && a.VictimTeamId == team.Id
-                               && a.ChallengeId == challenge.Id
-                               && a.RoundNumber == roundNumber, ct);
-
-                if (wasAttacked)
+                if (attackedPairs.Contains((team, challenge)))
                 {
-                    await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
+                    signals.Add(new ScoreSignalCreate(
                         CompetitionId: competitionId,
-                        TeamId: team.Id,
+                        TeamId: team,
                         SignalType: ScoreSignalTypes.ServiceAttacked,
-                        IdempotencyKey: $"awd:{roundNumber}:{team.Id:N}:{challenge.Id:N}:been-attacked",
+                        IdempotencyKey: $"awd:{roundNumber}:{team:N}:{challenge:N}:been-attacked",
                         SubjectType: "challenge",
-                        SubjectId: challenge.Id,
-                        RoundNumber: roundNumber), ct);
+                        SubjectId: challenge,
+                        RoundNumber: roundNumber));
                 }
             }
         }
+
+        if (signals.Count > 0)
+            await scoreSignalEmitter.EmitBatchAsync(signals, ct);
 
         // Refresh leaderboard and push snapshot
         try

@@ -144,7 +144,8 @@ public class BanCompetitionTeamEndpoint(
     IRedisLeaderboardCache leaderboardCache,
     IHubNotifierService hubNotifier,
     ICtfScoreRebuilder ctfScoreRebuilder,
-    IContainerManager containerManager)
+    IContainerManager containerManager,
+    NoCTF.Application.BackgroundTasks.ICompetitionExecutionLease executionLease)
     : Endpoint<TeamBanRequest, TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -171,15 +172,36 @@ public class BanCompetitionTeamEndpoint(
             return;
         }
 
-        team.IsBanned = true;
-        team.BannedAt = DateTime.UtcNow;
-        team.BannedReason = string.IsNullOrWhiteSpace(req.Reason) ? "cheat_suspected" : req.Reason.Trim();
-        if (Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId))
-            team.BannedById = userId;
+        await using (var preparationLease = await executionLease.TryAcquireAsync(
+            db,
+            NoCTF.Application.BackgroundTasks.CompetitionExecutionLeaseKeys.RuntimePreparation,
+            competitionId,
+            ct))
+        {
+            if (preparationLease is null)
+            {
+                await SendStringAsync("runtime_preparation_in_progress", 409, cancellation: ct);
+                return;
+            }
+
+            using var preparationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                preparationLease.LostToken);
+            team.IsBanned = true;
+            team.BannedAt = DateTime.UtcNow;
+            team.BannedReason = string.IsNullOrWhiteSpace(req.Reason) ? "cheat_suspected" : req.Reason.Trim();
+            if (Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId))
+                team.BannedById = userId;
+
+            // Persist the admission tombstone while runtime candidates are
+            // prevented from crossing their durable-preparation boundary.
+            await db.SaveChangesAsync(preparationCts.Token);
+        }
 
         await ContainerCleanupRuntime.CleanupTeamAsync(
             db,
             containerManager,
+            executionLease,
             competitionId,
             team.Id,
             HttpContext,

@@ -1,11 +1,15 @@
+using NoCTF.PluginBase;
+
 namespace NoCTF.Plugins.AWDP;
 
 public static class AwdpBackgroundTaskTypes
 {
     public const string PatchValidation = "awdp.patch.validation";
+    public const string ContainerCleanup = "awdp.container.cleanup";
 }
 
 public record AwdpPatchValidationPayload(Guid SubmissionId);
+public record AwdpContainerCleanupPayload(ContainerInstance Container);
 
 public interface IAwdpPatchService
 {

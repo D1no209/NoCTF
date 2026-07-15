@@ -141,6 +141,156 @@ public class PenetrationInstanceMaintenanceServiceTests
     }
 
     [Fact]
+    public async Task MaintainAsync_PreservesPublicAddressWhenRuntimeDoesNotReturnOne()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var topologyId = Guid.NewGuid();
+        var nodeId = Guid.NewGuid();
+        var instanceId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedChallenge(db, competitionId, challengeId);
+        db.PenetrationTopologies.Add(new PenetrationTopology
+        {
+            Id = topologyId,
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            Name = "Range",
+            EntryConfigJson = "{\"scheme\":\"http\"}",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.PenetrationNodes.Add(new PenetrationNode
+        {
+            Id = nodeId,
+            CompetitionId = competitionId,
+            TopologyId = topologyId,
+            Name = "web",
+            Image = "nginx:alpine",
+            PortsJson = "[8080]",
+            IsEntry = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.TeamChallengeInstances.Add(new TeamChallengeInstance
+        {
+            Id = instanceId,
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            TopologyId = topologyId,
+            Status = PenetrationInstanceStatus.Running,
+            ComposeProjectName = "range-running",
+            RenderedComposeYaml = "services:\n  web:\n    image: nginx:alpine\n",
+            EntryHost = "existing.example.test",
+            EntryPort = 32080,
+            EntryUrl = "https://existing.example.test/range",
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-10)
+        });
+        await db.SaveChangesAsync();
+
+        var manager = new FakeComposeContainerManager
+        {
+            Status = new ComposeStatus(
+                "range-running",
+                "running",
+                [
+                    new ComposeServiceInstance(
+                        "web",
+                        "container-1",
+                        "running",
+                        nodeId,
+                        new Dictionary<int, int> { [8080] = 32080 })
+                ])
+        };
+
+        var result = await CreateService(db, manager, publicHost: null).MaintainAsync();
+
+        var instance = await db.TeamChallengeInstances.IgnoreQueryFilters().SingleAsync(i => i.Id == instanceId);
+        Assert.Equal(new InstanceMaintenanceResult(0, 1, 0), result);
+        Assert.Equal("existing.example.test", instance.EntryHost);
+        Assert.Equal("https://existing.example.test/range", instance.EntryUrl);
+        Assert.Equal(32080, instance.EntryPort);
+    }
+
+    [Fact]
+    public async Task MaintainAsync_RunningServiceWithoutPublishedPort_ClearsStaleEndpoint()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var topologyId = Guid.NewGuid();
+        var nodeId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedChallenge(db, competitionId, challengeId);
+        db.PenetrationTopologies.Add(new PenetrationTopology
+        {
+            Id = topologyId,
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            Name = "Range",
+            EntryConfigJson = "{\"scheme\":\"http\"}",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.PenetrationNodes.Add(new PenetrationNode
+        {
+            Id = nodeId,
+            CompetitionId = competitionId,
+            TopologyId = topologyId,
+            Name = "web",
+            Image = "nginx:alpine",
+            PortsJson = "[8080]",
+            IsEntry = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.TeamChallengeInstances.Add(new TeamChallengeInstance
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = Guid.NewGuid(),
+            ChallengeId = challengeId,
+            TopologyId = topologyId,
+            Status = PenetrationInstanceStatus.Running,
+            ComposeProjectName = "range-running",
+            RenderedComposeYaml = "services:\n  web:\n    image: nginx:alpine\n",
+            EntryHost = "stale.example.test",
+            EntryPort = 32080,
+            EntryUrl = "http://stale.example.test:32080",
+            PortMappingsJson = "{\"8080\":32080}",
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-10)
+        });
+        await db.SaveChangesAsync();
+        var manager = new FakeComposeContainerManager
+        {
+            Status = new ComposeStatus(
+                "range-running",
+                "running",
+                [
+                    new ComposeServiceInstance(
+                        "web",
+                        "container-1",
+                        "running",
+                        nodeId,
+                        new Dictionary<int, int>())
+                ])
+        };
+
+        var result = await CreateService(db, manager).MaintainAsync();
+
+        var instance = await db.TeamChallengeInstances.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal(new InstanceMaintenanceResult(0, 1, 0), result);
+        Assert.Null(instance.EntryPort);
+        Assert.Null(instance.EntryUrl);
+        Assert.Equal("{}", instance.PortMappingsJson);
+    }
+
+    [Fact]
     public async Task MaintainAsync_MarksStuckBusyInstanceFailed()
     {
         var competitionId = Guid.NewGuid();
@@ -157,7 +307,7 @@ public class PenetrationInstanceMaintenanceServiceTests
             ChallengeId = challengeId,
             Status = PenetrationInstanceStatus.Starting,
             ComposeProjectName = "range-starting",
-            RenderedComposeYaml = "services:\n  web:\n    image: nginx:alpine\n",
+            RenderedComposeYaml = string.Empty,
             EntryPort = 32080,
             EntryUrl = "http://ctf.local:32080",
             LastActionAt = DateTime.UtcNow.AddMinutes(-20),
@@ -216,21 +366,64 @@ public class PenetrationInstanceMaintenanceServiceTests
         Assert.Equal(1, manager.ComposeDownCalls);
     }
 
-    private static PenetrationInstanceMaintenanceService CreateService(ApplicationDbContext db, IContainerManager manager)
-        => new(
+    [Fact]
+    public async Task MaintainAsync_SkipsInstanceOwnedByConcurrentTransition()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedChallenge(db, competitionId, challengeId);
+        db.TeamChallengeInstances.Add(new TeamChallengeInstance
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            TeamId = teamId,
+            Status = PenetrationInstanceStatus.Running,
+            ComposeProjectName = "noctf-range",
+            RenderedComposeYaml = "services: {}",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(-1),
+            CreatedAt = DateTime.UtcNow.AddHours(-1),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-5)
+        });
+        await db.SaveChangesAsync();
+        var manager = new FakeComposeContainerManager();
+
+        var result = await CreateService(
             db,
             manager,
-            new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["InstanceAccess:PublicHost"] = "ctf.local"
-                })
-                .Build(),
-            NullLogger<PenetrationInstanceMaintenanceService>.Instance);
+            executionLease: new UnavailableExecutionLease()).MaintainAsync();
+
+        Assert.Equal(new InstanceMaintenanceResult(0, 0, 0), result);
+        Assert.Equal(0, manager.ComposeDownCalls);
+        Assert.Equal(
+            PenetrationInstanceStatus.Running,
+            (await db.TeamChallengeInstances.IgnoreQueryFilters().SingleAsync()).Status);
+    }
+
+    private static PenetrationInstanceMaintenanceService CreateService(
+        ApplicationDbContext db,
+        IContainerManager manager,
+        string? publicHost = "ctf.local",
+        ICompetitionExecutionLease? executionLease = null)
+    {
+        var values = new Dictionary<string, string?>();
+        if (publicHost is not null)
+            values["InstanceAccess:PublicHost"] = publicHost;
+
+        return new PenetrationInstanceMaintenanceService(
+            db,
+            manager,
+            new ConfigurationBuilder().AddInMemoryCollection(values).Build(),
+            NullLogger<PenetrationInstanceMaintenanceService>.Instance,
+            executionLease);
+    }
 
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new PenetrationMaintenanceTenantContext(competitionId));
@@ -292,6 +485,16 @@ public class PenetrationInstanceMaintenanceServiceTests
             Dictionary<string, string>? labels = null,
             CancellationToken cancellationToken = default)
             => Task.FromResult(Status with { ProjectName = projectName });
+    }
+
+    private sealed class UnavailableExecutionLease : ICompetitionExecutionLease
+    {
+        public Task<IExecutionLease?> TryAcquireAsync(
+            ApplicationDbContext db,
+            string engineKey,
+            Guid competitionId,
+            CancellationToken ct = default)
+            => Task.FromResult<IExecutionLease?>(null);
     }
 }
 

@@ -170,7 +170,9 @@ public class PenetrationTopologyService(ApplicationDbContext db)
         Guid challengeId,
         CancellationToken ct)
     {
-        var challenge = await db.Challenges.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == challengeId, ct)
+        var challenge = await db.Challenges.IgnoreQueryFilters().FirstOrDefaultAsync(
+                c => c.Id == challengeId && !c.IsDeleting,
+                ct)
             ?? throw new InvalidOperationException("challenge_not_found");
         EnsurePenetrationType(challenge.TypeId);
 
@@ -281,7 +283,11 @@ public class PenetrationTopologyService(ApplicationDbContext db)
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.CompetitionId == competitionId && c.Id == challengeId, ct);
+            .FirstOrDefaultAsync(c =>
+                c.CompetitionId == competitionId &&
+                c.Id == challengeId &&
+                !c.IsDeleting,
+                ct);
         var topology = await db.PenetrationTopologies
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -324,7 +330,12 @@ public class PenetrationTopologyService(ApplicationDbContext db)
                 ct);
         if (activeInstances) throw new InvalidOperationException("active_instances_exist");
 
-        var challenge = await db.Challenges.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == challengeId && c.CompetitionId == competitionId, ct)
+        var challenge = await db.Challenges.IgnoreQueryFilters().FirstOrDefaultAsync(
+                c =>
+                    c.Id == challengeId &&
+                    c.CompetitionId == competitionId &&
+                    !c.IsDeleting,
+                ct)
             ?? throw new InvalidOperationException("challenge_not_found");
         EnsurePenetrationType(challenge.TypeId);
         Validate(document);

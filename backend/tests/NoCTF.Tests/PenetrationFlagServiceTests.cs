@@ -79,6 +79,7 @@ public class PenetrationFlagServiceTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new PenetrationFlagTenantContext(competitionId));

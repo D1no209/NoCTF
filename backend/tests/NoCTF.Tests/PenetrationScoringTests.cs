@@ -51,8 +51,8 @@ public class PenetrationScoringTests
 
         var rebuilder = new CtfScoreRebuilder(
             db,
-            [new PenetrationHandlerStub()],
-            [new PenetrationScoreRebuildContributor(db)]);
+            customSubmissionHandlers: null,
+            contributors: [new PenetrationScoreRebuildContributor(db)]);
         await rebuilder.RebuildCompetitionAsync(competitionId);
 
         var events = await db.ScoreEvents.IgnoreQueryFilters().ToListAsync();
@@ -148,6 +148,7 @@ public class PenetrationScoringTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider(ignoreTransactionWarnings: true)
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;

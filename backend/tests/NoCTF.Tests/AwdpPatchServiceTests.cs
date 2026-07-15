@@ -1,9 +1,12 @@
 using System.Formats.Tar;
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.Security;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -14,9 +17,12 @@ namespace NoCTF.Tests;
 
 public class AwdpPatchServiceTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new FixedTenantContextAwdp(competitionId));
@@ -25,7 +31,8 @@ public class AwdpPatchServiceTests
     private static AwdpPatchService CreateService(
         ApplicationDbContext db,
         IContainerManager containerManager,
-        IStorageProvider? storageProvider = null)
+        IStorageProvider? storageProvider = null,
+        ICompetitionExecutionLease? executionLease = null)
         => new(
             db,
             containerManager,
@@ -39,7 +46,8 @@ public class AwdpPatchServiceTests
                     ["StorageProvider:PublicBaseUrl"] = "http://api.local"
                 })
                 .Build(),
-            NullLogger<AwdpPatchService>.Instance);
+            NullLogger<AwdpPatchService>.Instance,
+            executionLease);
 
     [Fact]
     public async Task SubmitPatchAsync_CreatesPendingSubmissionAndCountsDefenseAttempt()
@@ -79,6 +87,81 @@ public class AwdpPatchServiceTests
         Assert.Equal(1, state.DefenseAttempts);
         Assert.Equal(AwdpFixStatus.FixUploading, state.FixStatus);
         Assert.Equal(1, storage.UploadCount);
+        var validationTask = Assert.Single(await db.BackgroundTasks.IgnoreQueryFilters().ToListAsync());
+        Assert.Equal(AwdpBackgroundTaskTypes.PatchValidation, validationTask.Type);
+        var payload = JsonSerializer.Deserialize<AwdpPatchValidationPayload>(validationTask.PayloadJson, JsonOptions);
+        Assert.Equal(submission.Id, payload?.SubmissionId);
+    }
+
+    [Fact]
+    public async Task SubmitPatchAsync_RejectsContainerOperationDuringThirtySecondCooldown()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+        var box = await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync();
+        box.LastInstanceActionAt = DateTime.UtcNow.AddSeconds(-29);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, new NullContainerManager());
+        await using var patchContent = CreateFixArchive();
+        var result = await service.SubmitPatchAsync(
+            competitionId, teamId, challengeId, patchContent, "fix.tar.gz");
+
+        Assert.False(result.Success);
+        Assert.Equal("instance_cooldown", result.Code);
+        Assert.Equal(0, result.DefenseAttempts);
+        Assert.Empty(await db.AwdpPatchSubmissions.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Theory]
+    [InlineData(29, true)]
+    [InlineData(30, false)]
+    [InlineData(31, false)]
+    public void IsContainerOperationCoolingDown_UsesThirtySecondBoundary(int elapsedSeconds, bool expected)
+    {
+        var now = new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc);
+
+        var coolingDown = AwdpPatchService.IsContainerOperationCoolingDown(
+            now.AddSeconds(-elapsedSeconds),
+            now);
+
+        Assert.Equal(expected, coolingDown);
+    }
+
+    [Fact]
+    public async Task SubmitPatchAsync_SaveFailure_DurablyQueuesUploadWithoutDirectDeletion()
+    {
+        var competitionId = Guid.NewGuid();
+        var interceptor = new FailNextSaveInterceptor();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .AddInterceptors(interceptor)
+            .Options;
+        await using var db = new ApplicationDbContext(options, new FixedTenantContextAwdp(competitionId));
+        SeedCompetition(db, competitionId);
+        var teamId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+
+        var storage = new RecordingStorageProvider();
+        var service = CreateService(db, new NullContainerManager(), storage);
+        interceptor.FailNextSave = true;
+        await using var patchContent = CreateFixArchive();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SubmitPatchAsync(
+            competitionId, teamId, challengeId, patchContent, "fix.tar.gz"));
+
+        var uploadedKey = Assert.Single(storage.UploadedKeys);
+        Assert.Empty(storage.DeletedKeys);
+        var cleanup = await db.StorageCleanupItems.AsNoTracking().SingleAsync();
+        Assert.Equal(uploadedKey, cleanup.StorageKey);
     }
 
     [Fact]
@@ -138,6 +221,29 @@ public class AwdpPatchServiceTests
             .FirstAsync(s => s.Id == result.SubmissionId);
         Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
         Assert.Equal(AwdpFixStatus.AuditFailed, submission.FixStatus);
+        Assert.Empty(await db.BackgroundTasks.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
+    public async Task SubmitPatchAsync_RejectsAnotherNonTerminalPatchWithoutConsumingAttempt()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+        var service = CreateService(db, new NullContainerManager());
+        await using var patchContent = CreateFixArchive();
+        var result = await service.SubmitPatchAsync(
+            competitionId, teamId, challengeId, patchContent, "fix.tar.gz");
+
+        Assert.False(result.Success);
+        Assert.Equal("patch_in_progress", result.Code);
+        Assert.Equal(0, result.DefenseAttempts);
+        Assert.Single(await db.AwdpPatchSubmissions.IgnoreQueryFilters().ToListAsync());
     }
 
     [Fact]
@@ -159,6 +265,31 @@ public class AwdpPatchServiceTests
             Assert.Equal(AwdpFixStatus.FixScriptError, state.FixStatus);
             Assert.Contains("FixScript exited", submission.ValidationDetail);
             Assert.Equal(0, containerManager.CreateCount);
+        }
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_TombstonedChallenge_CancelsQueuedValidation()
+    {
+        var (db, service, competitionId, teamId, challengeId, containerManager) =
+            await CreateValidationScenarioAsync([0, 0]);
+        await using (db)
+        {
+            var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+            var challenge = await db.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId);
+            challenge.IsDeleting = true;
+            await db.SaveChangesAsync();
+
+            await service.ValidatePatchAsync(submissionId);
+
+            var submission = await db.AwdpPatchSubmissions
+                .IgnoreQueryFilters()
+                .SingleAsync(item => item.Id == submissionId);
+            Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
+            Assert.Equal(AwdpFixStatus.FixServiceError, submission.FixStatus);
+            Assert.Contains("no longer available", submission.ValidationDetail);
+            Assert.Empty(containerManager.RunConfigs);
+            Assert.Empty(containerManager.CreateConfigs);
         }
     }
 
@@ -185,7 +316,7 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_StoresRunnerMetadataAndDestroysOriginalInstance()
+    public async Task ValidatePatchAsync_StoresRunnerMetadataAndQueuesOriginalInstanceCleanup()
     {
         var competitionId = Guid.NewGuid();
         var teamId = Guid.NewGuid();
@@ -217,14 +348,18 @@ public class AwdpPatchServiceTests
         Assert.Equal("http://host-1.test", gameBox.EntryUrl);
         Assert.Equal("ns-1", gameBox.OrchestrationNamespace);
         Assert.Equal("""{"80":30001}""", gameBox.PortMappingsJson);
-        var destroyed = Assert.Single(containerManager.DestroyedContainers);
-        Assert.Equal("container-123", destroyed.ContainerId);
-        Assert.Equal("old-ns", destroyed.OrchestrationNamespace);
-        Assert.Equal("kubernetes", destroyed.ProviderType);
+        Assert.Empty(containerManager.DestroyedContainers);
+        var cleanup = Assert.Single(await db.BackgroundTasks.IgnoreQueryFilters()
+            .Where(task => task.Type == AwdpBackgroundTaskTypes.ContainerCleanup)
+            .ToListAsync());
+        var payload = JsonSerializer.Deserialize<AwdpContainerCleanupPayload>(cleanup.PayloadJson, JsonOptions);
+        Assert.Equal("container-123", payload?.Container.ContainerId);
+        Assert.Equal("old-ns", payload?.Container.OrchestrationNamespace);
+        Assert.Equal("kubernetes", payload?.Container.ProviderType);
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_DestroyOriginalFails_RejectsAndDestroysPatchedContainer()
+    public async Task ValidatePatchAsync_OldCleanupIsDeferredAndCannotRejectVerifiedCandidate()
     {
         var competitionId = Guid.NewGuid();
         var teamId = Guid.NewGuid();
@@ -244,12 +379,16 @@ public class AwdpPatchServiceTests
         var state = await db.AwdpTeamChallengeStates.IgnoreQueryFilters().FirstAsync(s => s.TeamId == teamId);
         var gameBox = await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync(g => g.TeamId == teamId);
 
-        Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
-        Assert.Equal(AwdpFixStatus.FixServiceError, submission.FixStatus);
-        Assert.Equal(AwdpServiceStatus.ServiceError, state.ServiceStatus);
-        Assert.Equal("container-123", gameBox.ContainerInstanceId);
-        Assert.Contains(containerManager.DestroyedContainers, c => c.ContainerId == "container-123");
-        Assert.Contains(containerManager.DestroyedContainers, c => c.ContainerId == "container-1");
+        Assert.Equal(AwdpPatchStatus.Verified, submission.Status);
+        Assert.Equal(AwdpFixStatus.FixSuccess, submission.FixStatus);
+        Assert.Equal(AwdpServiceStatus.ServiceOk, state.ServiceStatus);
+        Assert.Equal("container-1", gameBox.ContainerInstanceId);
+        Assert.Empty(containerManager.DestroyedContainers);
+        var cleanup = Assert.Single(await db.BackgroundTasks.IgnoreQueryFilters()
+            .Where(task => task.Type == AwdpBackgroundTaskTypes.ContainerCleanup)
+            .ToListAsync());
+        var payload = JsonSerializer.Deserialize<AwdpContainerCleanupPayload>(cleanup.PayloadJson, JsonOptions);
+        Assert.Equal("container-123", payload?.Container.ContainerId);
     }
 
     [Fact]
@@ -270,7 +409,11 @@ public class AwdpPatchServiceTests
             Assert.Equal(AwdpFixStatus.FixFailed, submission.FixStatus);
             Assert.Equal(AwdpServiceStatus.ServiceOk, state.ServiceStatus);
             Assert.Empty(await db.ScoreEvents.IgnoreQueryFilters().ToListAsync());
-            Assert.Equal(2, containerManager.CreateCount);
+            Assert.Equal(1, containerManager.CreateCount);
+            Assert.Equal("container-123", (await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync()).ContainerInstanceId);
+            Assert.Single(await db.BackgroundTasks.IgnoreQueryFilters()
+                .Where(task => task.Type == AwdpBackgroundTaskTypes.ContainerCleanup)
+                .ToListAsync());
         }
     }
 
@@ -431,7 +574,7 @@ public class AwdpPatchServiceTests
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_CheckFailureRollbackPreservesDynamicFlagEnvironment()
+    public async Task ValidatePatchAsync_CheckFailureLeavesOriginalRuntimeAndQueuesCandidateCleanup()
     {
         var (db, service, competitionId, teamId, challengeId, containerManager) =
             await CreateValidationScenarioAsync([0, 1]);
@@ -460,16 +603,18 @@ public class AwdpPatchServiceTests
 
             await service.ValidatePatchAsync(submissionId);
 
-            Assert.Equal(2, containerManager.CreateConfigs.Count);
-            var restoredConfig = containerManager.CreateConfigs[1];
-            Assert.Equal("glibc.cpu.hwcaps=-SHSTK,-IBT", restoredConfig.EnvironmentVariables?["GLIBC_TUNABLES"]);
-            Assert.Equal("flag{d3adbeef-1111-4222-8333-aabbccddeeff}", restoredConfig.EnvironmentVariables?["FLAG"]);
-            Assert.False(restoredConfig.EnvironmentVariables?.ContainsKey("PATCH_URL") ?? false);
+            var candidateConfig = Assert.Single(containerManager.CreateConfigs);
+            Assert.Equal("glibc.cpu.hwcaps=-SHSTK,-IBT", candidateConfig.EnvironmentVariables?["GLIBC_TUNABLES"]);
+            Assert.Equal("flag{d3adbeef-1111-4222-8333-aabbccddeeff}", candidateConfig.EnvironmentVariables?["FLAG"]);
+            Assert.Equal("container-123", (await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync()).ContainerInstanceId);
+            Assert.Single(await db.BackgroundTasks.IgnoreQueryFilters()
+                .Where(task => task.Type == AwdpBackgroundTaskTypes.ContainerCleanup)
+                .ToListAsync());
         }
     }
 
     [Fact]
-    public async Task ValidatePatchAsync_CheckFailureRollbackRestoresPreviousVerifiedPatch()
+    public async Task ValidatePatchAsync_CheckFailurePreservesPreviousVerifiedRuntimeState()
     {
         var (db, service, competitionId, teamId, challengeId, containerManager) =
             await CreateValidationScenarioAsync([0, 1]);
@@ -495,17 +640,16 @@ public class AwdpPatchServiceTests
 
             await service.ValidatePatchAsync(submissionId);
 
-            Assert.Equal(2, containerManager.CreateConfigs.Count);
-            var restoredConfig = containerManager.CreateConfigs[1];
-            Assert.Equal("http://storage/previous.tar.gz", restoredConfig.EnvironmentVariables?["PATCH_URL"]);
-            Assert.Equal("previous.tar.gz", restoredConfig.EnvironmentVariables?["PATCH_FILE_NAME"]);
-            Assert.Equal("fix.sh", restoredConfig.EnvironmentVariables?["FIX_ENTRY"]);
-            Assert.Equal("container-2", (await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync()).ContainerInstanceId);
+            Assert.Single(containerManager.CreateConfigs);
+            Assert.Equal("container-123", (await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync()).ContainerInstanceId);
             var rejectedSubmission = await db.AwdpPatchSubmissions.IgnoreQueryFilters().FirstAsync(s => s.Id == submissionId);
             var state = await db.AwdpTeamChallengeStates.IgnoreQueryFilters().SingleAsync(s => s.TeamId == teamId);
             Assert.Equal(AwdpPatchStatus.Rejected, rejectedSubmission.Status);
             Assert.Equal(AwdpFixStatus.FixSuccess, state.FixStatus);
             Assert.Equal(AwdpServiceStatus.ServiceOk, state.ServiceStatus);
+            Assert.Single(await db.BackgroundTasks.IgnoreQueryFilters()
+                .Where(task => task.Type == AwdpBackgroundTaskTypes.ContainerCleanup)
+                .ToListAsync());
         }
     }
 
@@ -528,6 +672,107 @@ public class AwdpPatchServiceTests
         var submission = await db.AwdpPatchSubmissions.IgnoreQueryFilters().FirstAsync(s => s.Id == submissionId);
         Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
         Assert.Equal(AwdpFixStatus.FixRuleViolation, submission.FixStatus);
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_AcquiresPatchThenChallengeInstanceLeaseForRuntimeSwap()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+
+        var executionLease = new RecordingExecutionLease();
+        var service = CreateService(db, new SequencedContainerManager([0, 0]), executionLease: executionLease);
+        var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+        await service.ValidatePatchAsync(submissionId);
+
+        Assert.Equal(
+            [
+                $"awdp-patch:{teamId:N}:{challengeId:N}",
+                CompetitionExecutionLeaseKeys.ChallengeInstance(teamId, challengeId),
+                CompetitionExecutionLeaseKeys.RuntimePreparation,
+                CompetitionExecutionLeaseKeys.ChallengeInstance(teamId, challengeId),
+                CompetitionExecutionLeaseKeys.RuntimePreparation
+            ],
+            executionLease.AcquiredKeys);
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_InstanceChangedBeforeSwap_PreservesReplacementAndCleansCandidate()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+
+        var instanceLeaseAcquisitions = 0;
+        var executionLease = new RecordingExecutionLease(async (key, leaseDb) =>
+        {
+            if (key != CompetitionExecutionLeaseKeys.ChallengeInstance(teamId, challengeId))
+                return;
+            instanceLeaseAcquisitions++;
+            if (instanceLeaseAcquisitions != 2)
+                return;
+
+            var box = await leaseDb.AwdGameBoxes.IgnoreQueryFilters().SingleAsync();
+            box.ContainerInstanceId = "replacement-container";
+            box.ExpiresAt = DateTime.UtcNow.AddHours(1);
+            await leaseDb.SaveChangesAsync();
+        });
+        var service = CreateService(
+            db,
+            new SequencedContainerManager([0, 0]),
+            executionLease: executionLease);
+        var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+        await service.ValidatePatchAsync(submissionId);
+
+        var box = await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync();
+        var submission = await db.AwdpPatchSubmissions.IgnoreQueryFilters()
+            .SingleAsync(item => item.Id == submissionId);
+        Assert.Equal("replacement-container", box.ContainerInstanceId);
+        Assert.Equal(AwdpPatchStatus.Rejected, submission.Status);
+        Assert.Equal(AwdpFixStatus.FixServiceError, submission.FixStatus);
+        Assert.Single(await db.BackgroundTasks.IgnoreQueryFilters()
+            .Where(task => task.Type == AwdpBackgroundTaskTypes.ContainerCleanup)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task ValidatePatchAsync_InstanceLeaseUnavailable_DoesNotCreateCandidate()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+
+        var instanceKey = CompetitionExecutionLeaseKeys.ChallengeInstance(teamId, challengeId);
+        var executionLease = new RecordingExecutionLease(unavailableKey: instanceKey);
+        var service = CreateService(
+            db,
+            new SequencedContainerManager([0, 0]),
+            executionLease: executionLease);
+        var submissionId = await CreatePendingSubmission(db, competitionId, teamId, challengeId);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ValidatePatchAsync(submissionId));
+
+        var box = await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync();
+        var safeguards = await db.BackgroundTasks.IgnoreQueryFilters()
+            .Where(task => task.Type == AwdpBackgroundTaskTypes.ContainerCleanup)
+            .ToListAsync();
+        Assert.Equal("container-123", box.ContainerInstanceId);
+        Assert.Empty(safeguards);
     }
 
     private static async Task<(ApplicationDbContext Db, AwdpPatchService Service, Guid CompetitionId, Guid TeamId, Guid ChallengeId, SequencedContainerManager ContainerManager)>
@@ -614,6 +859,15 @@ public class AwdpPatchServiceTests
         string? orchestrationNamespace = null,
         string portsJson = "{}")
     {
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = competitionId,
+            Name = $"Team {teamId:N}",
+            CaptainId = Guid.NewGuid(),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            CreatedAt = DateTime.UtcNow
+        });
         db.AwdGameBoxes.Add(new AwdGameBox
         {
             Id = Guid.NewGuid(),
@@ -769,10 +1023,13 @@ public class AwdpPatchServiceTests
     private sealed class RecordingStorageProvider : IStorageProvider
     {
         public int UploadCount { get; private set; }
+        public List<string> UploadedKeys { get; } = [];
+        public List<string> DeletedKeys { get; } = [];
 
         public Task<string> UploadAsync(string fileName, Stream content, string contentType, CancellationToken ct = default)
         {
             UploadCount++;
+            UploadedKeys.Add(fileName);
             return Task.FromResult(fileName);
         }
 
@@ -780,10 +1037,60 @@ public class AwdpPatchServiceTests
             => Task.FromResult<Stream>(new MemoryStream());
 
         public Task DeleteAsync(string fileName, CancellationToken ct = default)
-            => Task.CompletedTask;
+        {
+            DeletedKeys.Add(fileName);
+            return Task.CompletedTask;
+        }
 
         public Task<string> GetUrlAsync(string fileName, CancellationToken ct = default)
             => Task.FromResult($"/api/files/{fileName}");
+    }
+
+    private sealed class FailNextSaveInterceptor : SaveChangesInterceptor
+    {
+        public bool FailNextSave { get; set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (FailNextSave)
+            {
+                FailNextSave = false;
+                throw new InvalidOperationException("Simulated database write failure.");
+            }
+
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
+    private sealed class RecordingExecutionLease(
+        Func<string, ApplicationDbContext, Task>? beforeAcquire = null,
+        string? unavailableKey = null) : ICompetitionExecutionLease
+    {
+        public List<string> AcquiredKeys { get; } = [];
+
+        public async Task<IExecutionLease?> TryAcquireAsync(
+            ApplicationDbContext db,
+            string engineKey,
+            Guid competitionId,
+            CancellationToken ct = default)
+        {
+            AcquiredKeys.Add(engineKey);
+            if (beforeAcquire is not null)
+                await beforeAcquire(engineKey, db);
+            if (engineKey == unavailableKey)
+                return null;
+            return new RecordingLease();
+        }
+
+        private sealed class RecordingLease : IExecutionLease
+        {
+            public CancellationToken LostToken => CancellationToken.None;
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
     }
 }
 

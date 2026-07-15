@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
@@ -20,6 +21,7 @@ public class AwdScoreEngineTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new FixedTenantContextScoring(competitionId));
@@ -28,8 +30,10 @@ public class AwdScoreEngineTests
     private static AwdScoreEngine CreateScoreEngine(ApplicationDbContext db)
         => new(db, new NullLeaderboardService(), new NullRedisLeaderboardCache(), new NullHubNotifier(), CreateScoreSignalEmitter(db), NullLogger<AwdScoreEngine>.Instance);
 
-    private static AwdGameMode CreateGameMode(ApplicationDbContext db)
-        => new(db, new NullHubNotifier(), CreateScoreSignalEmitter(db));
+    private static AwdGameMode CreateGameMode(
+        ApplicationDbContext db,
+        ICompetitionExecutionLease? executionLease = null)
+        => new(db, new NullHubNotifier(), CreateScoreSignalEmitter(db), executionLease: executionLease);
 
     private static IScoreSignalEmitter CreateScoreSignalEmitter(ApplicationDbContext db)
     {
@@ -221,8 +225,8 @@ public class AwdScoreEngineTests
         var events = await db.ScoreEvents.IgnoreQueryFilters().ToListAsync();
         // Victim: +100 (healthy) - 50 (attacked) = +50 across two scoring facts
         Assert.Equal(50, events.Where(e => e.TeamId == victimTeamId).Sum(e => e.PointsDelta));
-        // Attacker: +100 (healthy), no penalty
-        Assert.Equal(100, events.Where(e => e.TeamId == attackerTeamId).Sum(e => e.PointsDelta));
+        // Attacker: +100 (healthy) + 50 (attack record rebuilt)
+        Assert.Equal(150, events.Where(e => e.TeamId == attackerTeamId).Sum(e => e.PointsDelta));
     }
 
     [Fact]
@@ -269,6 +273,74 @@ public class AwdScoreEngineTests
         Assert.All(events, scoreEvent => Assert.Equal(25, scoreEvent.PointsDelta));
     }
 
+    [Fact]
+    public async Task CalculateRoundScoreAsync_MultipleCells_UsesOneBatchWithLatestChecks()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var firstTeamId = SeedTeam(db, competitionId, "First");
+        var secondTeamId = SeedTeam(db, competitionId, "Second");
+        var challengeId = SeedChallenge(db, competitionId);
+        var now = DateTime.UtcNow;
+        db.AwdCheckResults.AddRange(
+            new AwdCheckResult
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = firstTeamId,
+                ChallengeId = challengeId,
+                RoundNumber = 1,
+                Status = AwdCheckStatus.Healthy,
+                CheckedAt = now.AddSeconds(-10)
+            },
+            new AwdCheckResult
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = firstTeamId,
+                ChallengeId = challengeId,
+                RoundNumber = 1,
+                Status = AwdCheckStatus.Down,
+                CheckedAt = now
+            },
+            new AwdCheckResult
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = secondTeamId,
+                ChallengeId = challengeId,
+                RoundNumber = 1,
+                Status = AwdCheckStatus.Healthy,
+                CheckedAt = now
+            });
+        SeedAttackRecord(db, competitionId, firstTeamId, secondTeamId, challengeId, round: 1);
+        await db.SaveChangesAsync();
+
+        var emitter = new RecordingBatchSignalEmitter();
+        var engine = new AwdScoreEngine(
+            db,
+            new NullLeaderboardService(),
+            new NullRedisLeaderboardCache(),
+            new NullHubNotifier(),
+            emitter,
+            NullLogger<AwdScoreEngine>.Instance);
+
+        await engine.CalculateRoundScoreAsync(competitionId, roundNumber: 1);
+
+        Assert.Equal(1, emitter.BatchCalls);
+        Assert.Equal(0, emitter.SingleCalls);
+        Assert.Equal(4, emitter.Signals.Count);
+        Assert.Contains(emitter.Signals, signal =>
+            signal.TeamId == firstTeamId && signal.SignalType == ScoreSignalTypes.AttackAccepted);
+        Assert.Contains(emitter.Signals, signal =>
+            signal.TeamId == firstTeamId && signal.SignalType == ScoreSignalTypes.ServiceCheckFailed);
+        Assert.DoesNotContain(emitter.Signals, signal =>
+            signal.TeamId == firstTeamId && signal.SignalType == ScoreSignalTypes.ServiceCheckPassed);
+        Assert.Contains(emitter.Signals, signal =>
+            signal.TeamId == secondTeamId && signal.SignalType == ScoreSignalTypes.ServiceAttacked);
+    }
+
     // ── ProcessSubmissionAsync tests ──────────────────────────────────────────
 
     [Fact]
@@ -303,7 +375,7 @@ public class AwdScoreEngineTests
     }
 
     [Fact]
-    public async Task ProcessSubmissionAsync_DuplicateAttack_NoDoublePoints()
+    public async Task ProcessSubmissionAsync_DuplicateAttack_RepairsMissingScoreWithoutDoublePoints()
     {
         var competitionId = Guid.NewGuid();
         await using var db = CreateDb(competitionId);
@@ -322,11 +394,67 @@ public class AwdScoreEngineTests
         var gameMode = CreateGameMode(db);
         var ctx = new SubmissionContext(competitionId, attackerTeamId, challengeId, Guid.NewGuid(), flagContent, "127.0.0.1");
         var result = await gameMode.ProcessSubmissionAsync(ctx);
+        var secondResult = await gameMode.ProcessSubmissionAsync(ctx);
 
         Assert.Equal(SubmissionResult.WrongFlag, result);
+        Assert.Equal(SubmissionResult.WrongFlag, secondResult);
 
         var scoreEvents = await db.ScoreEvents.IgnoreQueryFilters().ToListAsync();
-        Assert.Empty(scoreEvents);
+        Assert.Equal(2, scoreEvents.Count);
+        Assert.Equal(50, scoreEvents.Single(e => e.TeamId == attackerTeamId).PointsDelta);
+        Assert.Equal(-50, scoreEvents.Single(e => e.TeamId == victimTeamId).PointsDelta);
+    }
+
+    [Fact]
+    public async Task ProcessSubmissionAsync_SignalFailure_IsRepairableByIdempotentRetry()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId, attackPoints: 50);
+        var attackerTeamId = SeedTeam(db, competitionId, "Attacker");
+        var victimTeamId = SeedTeam(db, competitionId, "Victim");
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedRound(db, competitionId, roundNumber: 1);
+        const string flagContent = "flag{recoverable}";
+        SeedFlag(db, competitionId, victimTeamId, challengeId, round: 1, flagContent);
+        await db.SaveChangesAsync();
+
+        var emitter = new FailOnceBatchSignalEmitter(CreateScoreSignalEmitter(db));
+        var gameMode = new AwdGameMode(db, new NullHubNotifier(), emitter);
+        var context = new SubmissionContext(
+            competitionId, attackerTeamId, challengeId, Guid.NewGuid(), flagContent, "127.0.0.1");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => gameMode.ProcessSubmissionAsync(context));
+        Assert.Single(await db.AwdAttackRecords.IgnoreQueryFilters().ToListAsync());
+
+        var retryResult = await gameMode.ProcessSubmissionAsync(context);
+
+        Assert.Equal(SubmissionResult.WrongFlag, retryResult);
+        Assert.Equal(2, await db.ScoreSignals.IgnoreQueryFilters().CountAsync());
+        Assert.Equal(2, await db.ScoreEvents.IgnoreQueryFilters().CountAsync());
+    }
+
+    [Fact]
+    public async Task ProcessSubmissionAsync_NotificationFailure_DoesNotLoseAttackOrScoring()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId, attackPoints: 50);
+        var attackerTeamId = SeedTeam(db, competitionId, "Attacker");
+        var victimTeamId = SeedTeam(db, competitionId, "Victim");
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedRound(db, competitionId, roundNumber: 1);
+        const string flagContent = "flag{notify-down}";
+        SeedFlag(db, competitionId, victimTeamId, challengeId, round: 1, flagContent);
+        await db.SaveChangesAsync();
+
+        var gameMode = new AwdGameMode(db, new ThrowingAttackHubNotifier(), CreateScoreSignalEmitter(db));
+        var result = await gameMode.ProcessSubmissionAsync(new SubmissionContext(
+            competitionId, attackerTeamId, challengeId, Guid.NewGuid(), flagContent, "127.0.0.1"));
+
+        Assert.Equal(SubmissionResult.Accepted, result);
+        Assert.Single(await db.AwdAttackRecords.IgnoreQueryFilters().ToListAsync());
+        Assert.Equal(2, await db.ScoreEvents.IgnoreQueryFilters().CountAsync());
     }
 
     [Fact]
@@ -419,6 +547,71 @@ public class AwdScoreEngineTests
         Assert.Equal(SubmissionResult.WrongFlag, result);
     }
 
+    [Fact]
+    public async Task ProcessSubmissionAsync_TombstonedChallenge_RejectsWithoutAttackOrScore()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var attackerTeamId = SeedTeam(db, competitionId, "Attacker");
+        var victimTeamId = SeedTeam(db, competitionId, "Victim");
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedRound(db, competitionId, roundNumber: 1);
+        const string flagContent = "flag{deleting-challenge}";
+        SeedFlag(db, competitionId, victimTeamId, challengeId, round: 1, flagContent);
+        await db.SaveChangesAsync();
+        var challenge = await db.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId);
+        challenge.IsDeleting = true;
+        await db.SaveChangesAsync();
+
+        var result = await CreateGameMode(db).ProcessSubmissionAsync(new SubmissionContext(
+            competitionId,
+            attackerTeamId,
+            challengeId,
+            Guid.NewGuid(),
+            flagContent,
+            "127.0.0.1"));
+
+        Assert.Equal(SubmissionResult.WrongFlag, result);
+        Assert.Empty(await db.AwdAttackRecords.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreSignals.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreEvents.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
+    public async Task ProcessSubmissionAsync_ChallengeTombstonedAfterFlagPreRead_DoesNotRecreateAttackOrScore()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var attackerTeamId = SeedTeam(db, competitionId, "Attacker");
+        var victimTeamId = SeedTeam(db, competitionId, "Victim");
+        var challengeId = SeedChallenge(db, competitionId);
+        SeedRound(db, competitionId, roundNumber: 1);
+        const string flagContent = "flag{teardown-race}";
+        SeedFlag(db, competitionId, victimTeamId, challengeId, round: 1, flagContent);
+        await db.SaveChangesAsync();
+        var lease = new MutatingExecutionLease(async (leaseDb, ct) =>
+        {
+            var challenge = await leaseDb.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId, ct);
+            challenge.IsDeleting = true;
+            await leaseDb.SaveChangesAsync(ct);
+        });
+
+        var result = await CreateGameMode(db, lease).ProcessSubmissionAsync(new SubmissionContext(
+            competitionId,
+            attackerTeamId,
+            challengeId,
+            Guid.NewGuid(),
+            flagContent,
+            "127.0.0.1"));
+
+        Assert.Equal(SubmissionResult.WrongFlag, result);
+        Assert.Empty(await db.AwdAttackRecords.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreSignals.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreEvents.IgnoreQueryFilters().ToListAsync());
+    }
+
     // ── Null stubs ────────────────────────────────────────────────────────────
 
     private sealed class NullLeaderboardService : ILeaderboardService
@@ -428,7 +621,82 @@ public class AwdScoreEngineTests
             => Task.FromResult<IReadOnlyList<LeaderboardEntry>>(Array.Empty<LeaderboardEntry>());
     }
 
-    private sealed class NullHubNotifier : IHubNotifierService
+    private sealed class RecordingBatchSignalEmitter : IScoreSignalEmitter
+    {
+        public int SingleCalls { get; private set; }
+        public int BatchCalls { get; private set; }
+        public List<ScoreSignalCreate> Signals { get; } = [];
+
+        public Task<ScoreSignal> EmitAsync(ScoreSignalCreate signal, CancellationToken ct = default)
+        {
+            SingleCalls++;
+            return Task.FromResult(ToEntity(signal));
+        }
+
+        public Task<IReadOnlyList<ScoreSignal>> EmitBatchAsync(
+            IReadOnlyCollection<ScoreSignalCreate> signals,
+            CancellationToken ct = default)
+        {
+            BatchCalls++;
+            Signals.AddRange(signals);
+            return Task.FromResult<IReadOnlyList<ScoreSignal>>(signals.Select(ToEntity).ToList());
+        }
+
+        private static ScoreSignal ToEntity(ScoreSignalCreate signal)
+            => new()
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = signal.CompetitionId,
+                TeamId = signal.TeamId,
+                SignalType = signal.SignalType,
+                IdempotencyKey = signal.IdempotencyKey,
+                SubjectType = signal.SubjectType,
+                SubjectId = signal.SubjectId,
+                RoundNumber = signal.RoundNumber,
+                OccurredAt = signal.OccurredAt ?? DateTime.UtcNow,
+                PayloadJson = signal.PayloadJson
+            };
+    }
+
+    private sealed class FailOnceBatchSignalEmitter(IScoreSignalEmitter inner) : IScoreSignalEmitter
+    {
+        private int _fail = 1;
+
+        public Task<ScoreSignal> EmitAsync(ScoreSignalCreate signal, CancellationToken ct = default)
+            => inner.EmitAsync(signal, ct);
+
+        public Task<IReadOnlyList<ScoreSignal>> EmitBatchAsync(
+            IReadOnlyCollection<ScoreSignalCreate> signals,
+            CancellationToken ct = default)
+        {
+            if (Interlocked.Exchange(ref _fail, 0) == 1)
+                throw new InvalidOperationException("simulated scoring outage");
+            return inner.EmitBatchAsync(signals, ct);
+        }
+    }
+
+    private sealed class MutatingExecutionLease(
+        Func<ApplicationDbContext, CancellationToken, Task> mutation) : ICompetitionExecutionLease
+    {
+        public async Task<IExecutionLease?> TryAcquireAsync(
+            ApplicationDbContext db,
+            string engineKey,
+            Guid competitionId,
+            CancellationToken ct = default)
+        {
+            Assert.Equal(CompetitionExecutionLeaseKeys.RuntimePreparation, engineKey);
+            await mutation(db, ct);
+            return new NoopExecutionLease();
+        }
+    }
+
+    private sealed class NoopExecutionLease : IExecutionLease
+    {
+        public CancellationToken LostToken => CancellationToken.None;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private class NullHubNotifier : IHubNotifierService
     {
         public Task NotifyScoreUpdateAsync(Guid competitionId, Guid teamId, string teamName, long newScore, int newRank, CancellationToken ct = default) => Task.CompletedTask;
         public Task NotifyLeaderboardSnapshotAsync(Guid competitionId, IEnumerable<LeaderboardEntryPayload> entries, CancellationToken ct = default) => Task.CompletedTask;
@@ -439,8 +707,14 @@ public class AwdScoreEngineTests
         public Task NotifyContainerEventAsync(Guid competitionId, Guid containerId, Guid challengeId, Guid teamId, string eventType, CancellationToken ct = default) => Task.CompletedTask;
         public Task NotifySystemAlertAsync(Guid competitionId, string level, string message, CancellationToken ct = default) => Task.CompletedTask;
         public Task NotifyRoundStartedAsync(Guid competitionId, int roundNumber, CancellationToken ct = default) => Task.CompletedTask;
-        public Task NotifyAttackLogAsync(Guid competitionId, Guid attackerTeamId, string attackerTeamName, Guid victimTeamId, string victimTeamName, Guid challengeId, string challengeName, int roundNumber, CancellationToken ct = default) => Task.CompletedTask;
+        public virtual Task NotifyAttackLogAsync(Guid competitionId, Guid attackerTeamId, string attackerTeamName, Guid victimTeamId, string victimTeamName, Guid challengeId, string challengeName, int roundNumber, CancellationToken ct = default) => Task.CompletedTask;
         public Task NotifyKohUpdateAsync(Guid competitionId, Guid challengeId, Guid? controllerTeamId, DateTime timestamp, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class ThrowingAttackHubNotifier : NullHubNotifier
+    {
+        public override Task NotifyAttackLogAsync(Guid competitionId, Guid attackerTeamId, string attackerTeamName, Guid victimTeamId, string victimTeamName, Guid challengeId, string challengeName, int roundNumber, CancellationToken ct = default)
+            => throw new InvalidOperationException("simulated notification outage");
     }
 }
 

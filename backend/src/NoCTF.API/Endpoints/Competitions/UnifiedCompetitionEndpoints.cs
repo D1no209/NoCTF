@@ -59,7 +59,16 @@ public class GetCompetitionCapabilitiesEndpoint(
         }
 
         var modeKey = ResolveModeKey(competition.ModeKey, competition.GameModeType.ToString());
-        var provider = modeRegistry.GetRequiredProvider(modeKey);
+        ICompetitionModeProvider provider;
+        try
+        {
+            provider = modeRegistry.GetRequiredProvider(modeKey);
+        }
+        catch (NotSupportedException)
+        {
+            await SendStringAsync("competition_mode_plugin_unavailable", 503, cancellation: ct);
+            return;
+        }
         var capabilities = provider.GetCapabilities();
         var scoringProfile = await scoringProfileResolver.ResolveAsync(req.Id, ct);
 
@@ -94,6 +103,7 @@ public class PostCompetitionActionEndpoint(ApplicationDbContext db, ICompetition
     {
         Post("/api/competitions/{id}/actions/{actionKey}");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(CancellationToken ct)
@@ -194,7 +204,20 @@ public class PostCompetitionActionEndpoint(ApplicationDbContext db, ICompetition
             ? competition.GameModeType.ToString().ToLowerInvariant()
             : competition.ModeKey.Trim().ToLowerInvariant();
 
-        var provider = modeRegistry.GetRequiredProvider(modeKey);
+        ICompetitionModeProvider provider;
+        try
+        {
+            provider = modeRegistry.GetRequiredProvider(modeKey);
+        }
+        catch (NotSupportedException)
+        {
+            await SendAsync(new CompetitionActionResponse
+            {
+                Success = false,
+                Code = "competition_mode_plugin_unavailable"
+            }, 503, ct);
+            return;
+        }
         if (!provider.CanHandleAction(actionKey))
         {
             await SendAsync(new CompetitionActionResponse
@@ -286,7 +309,19 @@ public class GetCompetitionViewEndpoint(ApplicationDbContext db, ICompetitionMod
             ? competition.GameModeType.ToString().ToLowerInvariant()
             : competition.ModeKey.Trim().ToLowerInvariant();
 
-        var provider = modeRegistry.GetRequiredProvider(modeKey);
+        ICompetitionModeProvider provider;
+        try
+        {
+            provider = modeRegistry.GetRequiredProvider(modeKey);
+        }
+        catch (NotSupportedException)
+        {
+            await SendAsync(
+                new CompetitionViewResult(viewKey, new { code = "competition_mode_plugin_unavailable" }),
+                503,
+                ct);
+            return;
+        }
         if (!provider.CanProvideView(viewKey))
         {
             await SendAsync(new CompetitionViewResult(viewKey, new { code = "unsupported_view" }), 404, ct);

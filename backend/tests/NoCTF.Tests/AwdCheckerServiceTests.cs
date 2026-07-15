@@ -17,6 +17,7 @@ public class AwdCheckerServiceTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new FixedTenantContext3(competitionId));
@@ -125,6 +126,27 @@ public class AwdCheckerServiceTests
         Assert.Equal(teamId, results[0].TeamId);
         Assert.Equal(challengeId, results[0].ChallengeId);
         Assert.Equal(1, results[0].RoundNumber);
+    }
+
+    [Fact]
+    public async Task RunCheckerAsync_ReplayedRound_SkipsCompletedCheckerPair()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamId = SeedTeam(db, competitionId);
+        var challengeId = SeedChallengeWithChecker(db, competitionId);
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+
+        var containerManager = new RecordingContainerManager(exitCode: 0);
+        var service = CreateService(db, containerManager);
+
+        await service.RunCheckerAsync(competitionId, roundNumber: 7);
+        await service.RunCheckerAsync(competitionId, roundNumber: 7);
+
+        Assert.Equal(1, containerManager.RunCount);
+        Assert.Single(await db.AwdCheckResults.IgnoreQueryFilters().ToListAsync());
     }
 
     [Fact]
@@ -292,6 +314,31 @@ public class AwdCheckerServiceTests
         Assert.Equal(teamId.ToString(), env["TEAM_ID"]);
         Assert.Contains("TARGET_HOST", env.Keys);
         Assert.Contains("TARGET_PORT", env.Keys);
+    }
+
+    [Fact]
+    public async Task RunCheckerAsync_UsesOrchestrationExposedPortForTarget()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+
+        SeedCompetition(db, competitionId);
+        var teamId = SeedTeam(db, competitionId);
+        var challengeId = SeedChallengeWithChecker(db, competitionId);
+        await db.SaveChangesAsync();
+        var challenge = await db.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId);
+        challenge.ExposedPort = 8080;
+        challenge.OrchestrationJson = OrchestrationSpecSerializer.Write(new OrchestrationSpec
+        {
+            ExposedPort = 9999
+        });
+        SeedGameBox(db, competitionId, teamId, challengeId);
+        await db.SaveChangesAsync();
+
+        var containerManager = new RecordingContainerManager(exitCode: 0);
+        await CreateService(db, containerManager).RunCheckerAsync(competitionId, roundNumber: 1);
+
+        Assert.Equal("9999", Assert.Single(containerManager.Configs).EnvironmentVariables!["TARGET_PORT"]);
     }
 
     // ── Mock container managers ───────────────────────────────────────────────

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -17,9 +18,16 @@ namespace NoCTF.Plugins.KoH;
 /// </summary>
 public sealed class KohPollEngine(
     IServiceProvider serviceProvider,
-    ILogger<KohPollEngine> logger) : BackgroundService
+    ILogger<KohPollEngine> logger,
+    IConfiguration configuration) : BackgroundService
 {
     private const int PollingIntervalSeconds = 5;
+    private const string ScheduleEngineKey = "koh-poll";
+    private const string CompletionEngineKey = "koh-poll:completed";
+    private readonly int _maxConcurrentPolls = Math.Clamp(
+        configuration.GetValue("Koh:MaxConcurrentPolls", 8),
+        1,
+        64);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -60,8 +68,7 @@ public sealed class KohPollEngine(
             .IgnoreQueryFilters()
             .Where(c => c.GameModeType == GameModeType.Koh
                      && c.Status == CompetitionStatus.Running
-                     && c.StartTime <= now
-                     && c.EndTime > now)
+                     && c.StartTime <= now)
             .ToListAsync(ct);
 
         foreach (var competition in competitions)
@@ -71,28 +78,73 @@ public sealed class KohPollEngine(
             if (lease is null)
                 continue;
 
-            var state = await db.CompetitionEngineStates
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(s =>
-                    s.CompetitionId == competition.Id && s.EngineKey == "koh-poll", ct);
-            if (state?.LastExecutedAt is { } lastPoll && now - lastPoll < interval)
-                continue;
+            using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lease.LostToken);
+            var leaseCt = leaseCts.Token;
 
-            state ??= new CompetitionEngineState
+            var engineStates = await db.CompetitionEngineStates
+                .IgnoreQueryFilters()
+                .Where(s =>
+                    s.CompetitionId == competition.Id &&
+                    (s.EngineKey == ScheduleEngineKey || s.EngineKey == CompletionEngineKey))
+                .ToListAsync(leaseCt);
+            var scheduleState = engineStates.FirstOrDefault(state => state.EngineKey == ScheduleEngineKey);
+            var completionState = engineStates.FirstOrDefault(state => state.EngineKey == CompletionEngineKey);
+            DateTime pollTimestamp;
+            if (scheduleState?.LastExecutedAt is { } scheduledAt &&
+                (completionState?.LastExecutedAt is null || completionState.LastExecutedAt < scheduledAt))
             {
-                Id = Guid.NewGuid(),
-                CompetitionId = competition.Id,
-                EngineKey = "koh-poll"
-            };
-            if (db.Entry(state).State == EntityState.Detached)
-                db.CompetitionEngineStates.Add(state);
-            state.LastExecutedAt = now;
-            state.UpdatedAt = now;
-            await db.SaveChangesAsync(ct);
+                // Resume the exact logical poll slot. KoH scoring keys include
+                // this timestamp, so a crash after a partial commit is replayed
+                // idempotently instead of losing or double-awarding an interval.
+                pollTimestamp = scheduledAt;
+            }
+            else
+            {
+                if (competition.EndTime <= now)
+                    continue;
+                if (scheduleState?.LastExecutedAt is { } lastPoll && now - lastPoll < interval)
+                    continue;
+
+                scheduleState ??= new CompetitionEngineState
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = competition.Id,
+                    EngineKey = ScheduleEngineKey
+                };
+                if (db.Entry(scheduleState).State == EntityState.Detached)
+                    db.CompetitionEngineStates.Add(scheduleState);
+                pollTimestamp = now;
+                scheduleState.LastExecutedAt = pollTimestamp;
+                scheduleState.UpdatedAt = now;
+                await db.SaveChangesAsync(leaseCt);
+            }
 
             try
             {
-                await PollCompetitionAsync(scope.ServiceProvider, db, agentClient, scoreEngine, competition, now, ct);
+                await PollCompetitionAsync(
+                    scope.ServiceProvider,
+                    db,
+                    agentClient,
+                    scoreEngine,
+                    competition,
+                    pollTimestamp,
+                    leaseCt);
+
+                completionState ??= new CompetitionEngineState
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = competition.Id,
+                    EngineKey = CompletionEngineKey
+                };
+                if (db.Entry(completionState).State == EntityState.Detached)
+                    db.CompetitionEngineStates.Add(completionState);
+                completionState.LastExecutedAt = pollTimestamp;
+                completionState.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(leaseCt);
+            }
+            catch (OperationCanceledException) when (leaseCt.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -101,7 +153,7 @@ public sealed class KohPollEngine(
         }
     }
 
-    private async Task PollCompetitionAsync(
+    internal async Task PollCompetitionAsync(
         IServiceProvider scopedServices,
         ApplicationDbContext db,
         KohAgentClient agentClient,
@@ -112,13 +164,23 @@ public sealed class KohPollEngine(
     {
         var challenges = await db.Challenges
             .IgnoreQueryFilters()
-            .Where(c => c.CompetitionId == competition.Id)
+            .Where(c => c.CompetitionId == competition.Id && !c.IsDeleting)
             .ToListAsync(ct);
 
-        var existingBoxCount = await db.AwdGameBoxes
+        var gameBoxes = await db.AwdGameBoxes
             .IgnoreQueryFilters()
-            .CountAsync(g => g.CompetitionId == competition.Id, ct);
-        if (existingBoxCount < challenges.Count)
+            .Where(g => g.CompetitionId == competition.Id && g.TeamId == Guid.Empty)
+            .ToListAsync(ct);
+        var readyChallengeIds = gameBoxes
+            .Where(gameBox =>
+                gameBox.ContainerInstanceId is not null &&
+                (gameBox.InternalHost is not null || gameBox.PublicHost is not null))
+            .Select(gameBox => gameBox.ChallengeId)
+            .ToHashSet();
+        var requiresInitialization = challenges.Any(challenge =>
+            HasRuntimeConfiguration(challenge) &&
+            !readyChallengeIds.Contains(challenge.Id));
+        if (requiresInitialization)
         {
             var gameMode = scopedServices.GetRequiredService<KohGameMode>();
             await gameMode.InitializeAsync(new GameContext(
@@ -130,12 +192,11 @@ public sealed class KohPollEngine(
                 {
                     ["PollIntervalSeconds"] = (competition.PollIntervalSeconds ?? 30).ToString()
                 }), ct);
+            gameBoxes = await db.AwdGameBoxes
+                .IgnoreQueryFilters()
+                .Where(g => g.CompetitionId == competition.Id && g.TeamId == Guid.Empty)
+                .ToListAsync(ct);
         }
-
-        var gameBoxes = await db.AwdGameBoxes
-            .IgnoreQueryFilters()
-            .Where(g => g.CompetitionId == competition.Id)
-            .ToListAsync(ct);
 
         var teams = await db.Teams
             .IgnoreQueryFilters()
@@ -147,12 +208,16 @@ public sealed class KohPollEngine(
 
         int controlPoints = competition.ControlPointsPerInterval ?? 10;
 
+        var boxesByChallenge = gameBoxes
+            .GroupBy(box => box.ChallengeId)
+            .ToDictionary(group => group.Key, group => group.First());
+        var pollTargets = new List<PollTarget>(challenges.Count);
         foreach (var challenge in challenges)
         {
             var agentPort = challenge.KohAgentConfig?.Port ?? 8080;
             var apiKey = challenge.KohAgentConfig?.ApiKey;
 
-            var gameBox = gameBoxes.FirstOrDefault(g => g.ChallengeId == challenge.Id);
+            var gameBox = boxesByChallenge.GetValueOrDefault(challenge.Id);
             if (gameBox is null) continue;
 
             var internalPorts = ReadPorts(gameBox.InternalPortMappingsJson);
@@ -170,25 +235,60 @@ public sealed class KohPollEngine(
                 continue;
             }
 
-            var status = await agentClient.GetStatusAsync(host, reachablePort, apiKey, ct);
-            var controllerIdentifier = status?.Success == true ? status.Data?.Identifier : null;
+            pollTargets.Add(new PollTarget(challenge.Id, host, reachablePort, apiKey));
+        }
 
-            Guid? controllerTeamId = null;
-            if (!string.IsNullOrEmpty(controllerIdentifier))
+        var pollResults = new System.Collections.Concurrent.ConcurrentDictionary<Guid, PollResult>();
+        await Parallel.ForEachAsync(
+            pollTargets,
+            new ParallelOptions { MaxDegreeOfParallelism = _maxConcurrentPolls, CancellationToken = ct },
+            async (target, token) =>
             {
-                if (Guid.TryParse(controllerIdentifier, out var parsedId) && teams.ContainsKey(parsedId))
-                    controllerTeamId = parsedId;
-                else
-                    controllerTeamId = teams.FirstOrDefault(t => t.Value == controllerIdentifier).Key;
+                var status = await agentClient.PollStatusAsync(target.Host, target.Port, target.ApiKey, token);
+                pollResults[target.ChallengeId] = new PollResult(
+                    status.IsAuthoritative,
+                    ResolveControllerTeamId(status.Identifier, teams));
+            });
 
-                if (controllerTeamId == Guid.Empty)
-                    controllerTeamId = null;
+        var authoritativeUpdates = new List<KohScoreEngine.ControlUpdate>(pollTargets.Count);
+        foreach (var target in pollTargets)
+        {
+            if (!pollResults.TryGetValue(target.ChallengeId, out var pollResult) ||
+                !pollResult.IsAuthoritative)
+            {
+                logger.LogDebug(
+                    "KoH agent poll for challenge {ChallengeId} was not authoritative; preserving current controller.",
+                    target.ChallengeId);
+                continue;
             }
 
-            await scoreEngine.UpdateControlAsync(
-                competition.Id, challenge.Id,
-                controllerTeamId, now, controlPoints, ct);
+            authoritativeUpdates.Add(new KohScoreEngine.ControlUpdate(
+                target.ChallengeId,
+                pollResult.ControllerTeamId));
         }
+
+        if (!await scoreEngine.UpdateControlsAsync(
+            competition.Id,
+            authoritativeUpdates,
+            now,
+            controlPoints,
+            ct,
+            refreshLeaderboard: true,
+            validateControllers: true))
+        {
+            throw new InvalidOperationException("KoH control update lease was unavailable.");
+        }
+    }
+
+    private static Guid? ResolveControllerTeamId(string? identifier, IReadOnlyDictionary<Guid, string> teams)
+    {
+        if (string.IsNullOrEmpty(identifier))
+            return null;
+        if (Guid.TryParse(identifier, out var parsedId) && teams.ContainsKey(parsedId))
+            return parsedId;
+
+        var match = teams.FirstOrDefault(team => team.Value == identifier).Key;
+        return match == Guid.Empty ? null : match;
     }
 
     private static Dictionary<int, int> ReadPorts(string? json)
@@ -204,4 +304,12 @@ public sealed class KohPollEngine(
             return [];
         }
     }
+
+    private static bool HasRuntimeConfiguration(Challenge challenge)
+        => (challenge.ContainerMode == ChallengeContainerMode.DockerCompose &&
+            !string.IsNullOrWhiteSpace(challenge.ComposeYaml)) ||
+           !string.IsNullOrWhiteSpace(challenge.ContainerImage);
+
+    private sealed record PollTarget(Guid ChallengeId, string Host, int Port, string? ApiKey);
+    private sealed record PollResult(bool IsAuthoritative, Guid? ControllerTeamId);
 }

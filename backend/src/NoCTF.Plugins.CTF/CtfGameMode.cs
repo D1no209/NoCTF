@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -28,6 +29,7 @@ public class CtfGameMode : IGameMode
     private readonly IChallengeSubmissionHandlerRegistry _challengeSubmissionHandlers;
     private readonly IBackgroundTaskQueue? _backgroundTasks;
     private readonly ILogger<CtfGameMode> _logger;
+    private readonly ICompetitionExecutionLease _executionLease;
 
     public GameModeType Type => GameModeType.Ctf;
 
@@ -38,7 +40,8 @@ public class CtfGameMode : IGameMode
         ICtfScoreRebuilder scoreRebuilder,
         IChallengeSubmissionHandlerRegistry challengeSubmissionHandlers,
         IBackgroundTaskQueue? backgroundTasks = null,
-        ILogger<CtfGameMode>? logger = null)
+        ILogger<CtfGameMode>? logger = null,
+        ICompetitionExecutionLease? executionLease = null)
     {
         _db = db;
         _submissionEventHandler = submissionEventHandler;
@@ -47,6 +50,7 @@ public class CtfGameMode : IGameMode
         _challengeSubmissionHandlers = challengeSubmissionHandlers;
         _backgroundTasks = backgroundTasks;
         _logger = logger ?? NullLogger<CtfGameMode>.Instance;
+        _executionLease = executionLease ?? new CompetitionExecutionLease();
     }
 
     public Task InitializeAsync(GameContext context, CancellationToken cancellationToken = default)
@@ -64,7 +68,8 @@ public class CtfGameMode : IGameMode
             .AsNoTracking()
             .FirstOrDefaultAsync(c =>
                 c.Id == context.ChallengeId &&
-                c.CompetitionId == context.CompetitionId,
+                c.CompetitionId == context.CompetitionId &&
+                !c.IsDeleting,
                 cancellationToken);
 
         if (challenge is null)
@@ -126,104 +131,144 @@ public class CtfGameMode : IGameMode
         if (alreadySolved && stolenFlag is null)
             return SubmissionResult.AlreadySolved;
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-
-        var redactedSubmittedFlag = RedactSubmittedFlag(context.FlagContent);
-
-        // Record submission regardless of correctness
-        var submission = new Submission
+        Submission submission;
+        bool isFirstBlood;
+        await using (var preparationLease = await SubmissionMutationGuard.TryAcquireAsync(
+                         _executionLease,
+                         _db,
+                         context.CompetitionId,
+                         cancellationToken))
         {
-            Id = Guid.NewGuid(),
-            CompetitionId = context.CompetitionId,
-            TeamId = context.TeamId,
-            ChallengeId = context.ChallengeId,
-            UserId = context.UserId,
-            FlagContent = redactedSubmittedFlag,
-            IsCorrect = isCorrect,
-            SubmittedAt = DateTime.UtcNow,
-            IpAddress = context.IpAddress
-        };
+            if (preparationLease is null)
+                return SubmissionResult.WrongFlag;
 
-        _db.Submissions.Add(submission);
-        _db.CompetitionLogs.Add(new CompetitionLog
-        {
-            Id = Guid.NewGuid(),
-            CompetitionId = context.CompetitionId,
-            Level = isCorrect ? "info" : stolenFlag is null ? "warning" : "error",
-            EventType = isCorrect ? "flag.accepted" : stolenFlag is null ? "flag.rejected" : "flag.suspected_cheat",
-            Message = isCorrect
-                ? $"Team submitted a correct flag for challenge {challenge.Title}."
-                : stolenFlag is null
-                    ? $"Team submitted a wrong flag for challenge {challenge.Title}."
-                    : $"Team submitted another team's dynamic flag for challenge {challenge.Title}.",
-            TeamId = context.TeamId,
-            UserId = context.UserId,
-            ChallengeId = context.ChallengeId,
-            MetadataJson = stolenFlag is null ? "{}" : ScoringJson.Serialize(new { victimTeamId = stolenFlag.TeamId }),
-            CreatedAt = submission.SubmittedAt,
-        });
+            using var preparationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                preparationLease.LostToken);
+            var mutationCt = preparationCts.Token;
+            var guard = await SubmissionMutationGuard.ValidateAsync(
+                _db,
+                context.CompetitionId,
+                context.ChallengeId,
+                [context.TeamId],
+                DateTime.UtcNow,
+                mutationCt,
+                expectedGameMode: GameModeType.Ctf);
+            if (!guard.IsAllowed)
+                return guard.Rejection!.Value;
+            challenge = guard.Challenge!;
 
-        if (stolenFlag is not null)
-        {
-            _db.CheatIncidents.Add(new CheatIncident
+            await using var transaction = await _db.Database.BeginTransactionAsync(mutationCt);
+
+            var redactedSubmittedFlag = RedactSubmittedFlag(context.FlagContent);
+            submission = new Submission
             {
                 Id = Guid.NewGuid(),
                 CompetitionId = context.CompetitionId,
-                SuspectTeamId = context.TeamId,
-                VictimTeamId = stolenFlag.TeamId,
+                TeamId = context.TeamId,
                 ChallengeId = context.ChallengeId,
                 UserId = context.UserId,
-                SubmittedFlag = redactedSubmittedFlag,
-                Reason = "submitted_other_team_dynamic_flag",
+                FlagContent = redactedSubmittedFlag,
+                IsCorrect = isCorrect,
+                SubmittedAt = DateTime.UtcNow,
+                IpAddress = context.IpAddress
+            };
+
+            _db.Submissions.Add(submission);
+            _db.CompetitionLogs.Add(new CompetitionLog
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = context.CompetitionId,
+                Level = isCorrect ? "info" : stolenFlag is null ? "warning" : "error",
+                EventType = isCorrect ? "flag.accepted" : stolenFlag is null ? "flag.rejected" : "flag.suspected_cheat",
+                Message = isCorrect
+                    ? $"Team submitted a correct flag for challenge {challenge.Title}."
+                    : stolenFlag is null
+                        ? $"Team submitted a wrong flag for challenge {challenge.Title}."
+                        : $"Team submitted another team's dynamic flag for challenge {challenge.Title}.",
+                TeamId = context.TeamId,
+                UserId = context.UserId,
+                ChallengeId = context.ChallengeId,
+                MetadataJson = stolenFlag is null ? "{}" : ScoringJson.Serialize(new { victimTeamId = stolenFlag.TeamId }),
                 CreatedAt = submission.SubmittedAt,
             });
+
+            if (stolenFlag is not null)
+            {
+                _db.CheatIncidents.Add(new CheatIncident
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = context.CompetitionId,
+                    SuspectTeamId = context.TeamId,
+                    VictimTeamId = stolenFlag.TeamId,
+                    ChallengeId = context.ChallengeId,
+                    UserId = context.UserId,
+                    SubmittedFlag = redactedSubmittedFlag,
+                    Reason = "submitted_other_team_dynamic_flag",
+                    CreatedAt = submission.SubmittedAt,
+                });
+            }
+
+            if (!isCorrect)
+            {
+                await _db.SaveChangesAsync(mutationCt);
+                await transaction.CommitAsync(mutationCt);
+                return SubmissionResult.WrongFlag;
+            }
+
+            await using (await CtfFirstBloodLock.AcquireAsync(
+                             _db,
+                             context.CompetitionId,
+                             context.ChallengeId,
+                             mutationCt))
+            {
+                // RuntimePreparation is always acquired before the challenge
+                // lock/transaction boundary, matching destructive lifecycle
+                // lock ordering and preventing cross-lock deadlocks.
+                var solveCount = await _db.Submissions
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .CountAsync(s =>
+                        s.CompetitionId == context.CompetitionId &&
+                        s.ChallengeId == context.ChallengeId &&
+                        s.IsCorrect,
+                        mutationCt);
+                isFirstBlood = solveCount == 0;
+
+                try
+                {
+                    await _db.SaveChangesAsync(mutationCt);
+                }
+                catch (DbUpdateException)
+                {
+                    // PostgreSQL aborts the transaction after any database error,
+                    // so it cannot be queried until the failed transaction has
+                    // been rolled back. Clear the failed submission/log entities
+                    // as well, otherwise the endpoint's later audit save retries
+                    // those Added entries on the same scoped DbContext.
+                    await transaction.RollbackAsync(CancellationToken.None);
+                    _db.ChangeTracker.Clear();
+
+                    if (await HasCorrectSolveAsync(context, mutationCt))
+                        return SubmissionResult.AlreadySolved;
+
+                    throw;
+                }
+
+                await _scoreSignalEmitter.PersistAsync(new ScoreSignalCreate(
+                    CompetitionId: context.CompetitionId,
+                    TeamId: context.TeamId,
+                    SignalType: ScoreSignalTypes.SolveAccepted,
+                    IdempotencyKey: $"ctf:{context.TeamId:N}:{context.ChallengeId:N}:solve",
+                    SubjectType: "challenge",
+                    SubjectId: context.ChallengeId,
+                    ActorUserId: context.UserId,
+                    PayloadJson: ScoringJson.Serialize(new { submissionId = submission.Id }),
+                    OccurredAt: submission.SubmittedAt), mutationCt);
+
+                await transaction.CommitAsync(mutationCt);
+            }
         }
-
-        if (!isCorrect)
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return SubmissionResult.WrongFlag;
-        }
-
-        // Count existing correct solves for first blood notification only.
-        var solveCount = await _db.Submissions
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .CountAsync(s =>
-                s.CompetitionId == context.CompetitionId &&
-                s.ChallengeId == context.ChallengeId &&
-                s.IsCorrect,
-                cancellationToken);
-
-        // Check if this is first blood (no prior correct solves)
-        var isFirstBlood = solveCount == 0;
-
-        try
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException)
-        {
-            if (!await HasCorrectSolveAsync(context, cancellationToken))
-                throw;
-
-            await transaction.RollbackAsync(cancellationToken);
-            return SubmissionResult.AlreadySolved;
-        }
-
-        await _scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
-            CompetitionId: context.CompetitionId,
-            TeamId: context.TeamId,
-            SignalType: ScoreSignalTypes.SolveAccepted,
-            IdempotencyKey: $"ctf:{context.TeamId:N}:{context.ChallengeId:N}:solve",
-            SubjectType: "challenge",
-            SubjectId: context.ChallengeId,
-            ActorUserId: context.UserId,
-            PayloadJson: ScoringJson.Serialize(new { submissionId = submission.Id }),
-            OccurredAt: submission.SubmittedAt), cancellationToken);
-
-        await transaction.CommitAsync(cancellationToken);
         try
         {
             await _scoreRebuilder.RebuildChallengeAsync(
@@ -295,6 +340,25 @@ public class CtfGameMode : IGameMode
                 ex,
                 "Post-solve notification failed for submission {SubmissionId}; the accepted solve remains committed.",
                 submission.Id);
+            if (_backgroundTasks is not null)
+            {
+                try
+                {
+                    await _backgroundTasks.EnqueueAsync(
+                        context.CompetitionId,
+                        CtfScoreRebuildJobHandler.JobType,
+                        new CtfScoreRebuildPayload(context.ChallengeId),
+                        CancellationToken.None);
+                }
+                catch (Exception enqueueException)
+                {
+                    _logger.LogError(
+                        enqueueException,
+                        "Failed to enqueue leaderboard recovery for competition {CompetitionId}, challenge {ChallengeId}.",
+                        context.CompetitionId,
+                        context.ChallengeId);
+                }
+            }
         }
 
         return SubmissionResult.Accepted;
@@ -351,18 +415,65 @@ public class CtfGameMode : IGameMode
         SubmissionContext context,
         CancellationToken cancellationToken)
     {
-        var flags = await _db.CtfDynamicFlags
+        var candidates = SubmittedFlagCandidates(challenge, context.FlagContent)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return await _db.CtfDynamicFlags
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(f =>
                 f.CompetitionId == context.CompetitionId &&
                 f.ChallengeId == context.ChallengeId &&
-                f.TeamId != context.TeamId)
-            .ToListAsync(cancellationToken);
+                f.TeamId != context.TeamId &&
+                candidates.Contains(f.FlagUuid))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 
-        return flags.FirstOrDefault(f =>
-            FlagValidator.IsMatch(context.FlagContent, FormatFlag(challenge, f.FlagUuid)) ||
-            FlagValidator.IsMatch(context.FlagContent, f.FlagUuid));
+    private static IEnumerable<string> SubmittedFlagCandidates(Challenge challenge, string submittedFlag)
+    {
+        yield return submittedFlag;
+
+        var configuredPrefix = string.IsNullOrWhiteSpace(challenge.FlagPrefix)
+            ? "flag"
+            : challenge.FlagPrefix.Trim();
+        if (configuredPrefix.Contains("{0}", StringComparison.Ordinal))
+        {
+            var parts = configuredPrefix.Split("{0}", StringSplitOptions.None);
+            if (parts.Length == 2 &&
+                submittedFlag.StartsWith(parts[0], StringComparison.Ordinal) &&
+                submittedFlag.EndsWith(parts[1], StringComparison.Ordinal) &&
+                submittedFlag.Length >= parts[0].Length + parts[1].Length)
+            {
+                yield return submittedFlag[parts[0].Length..^parts[1].Length];
+            }
+        }
+        else if (configuredPrefix.Contains("{}", StringComparison.Ordinal))
+        {
+            var parts = configuredPrefix.Split("{}", StringSplitOptions.None);
+            if (parts.Length == 2)
+            {
+                var before = $"{parts[0]}{{";
+                var after = $"}}{parts[1]}";
+                if (submittedFlag.StartsWith(before, StringComparison.Ordinal) &&
+                    submittedFlag.EndsWith(after, StringComparison.Ordinal) &&
+                    submittedFlag.Length >= before.Length + after.Length)
+                {
+                    yield return submittedFlag[before.Length..^after.Length];
+                }
+            }
+        }
+        else
+        {
+            var braceIndex = configuredPrefix.IndexOf('{', StringComparison.Ordinal);
+            var prefix = braceIndex >= 0 ? configuredPrefix[..braceIndex].Trim() : configuredPrefix;
+            var before = $"{prefix}{{";
+            if (submittedFlag.StartsWith(before, StringComparison.Ordinal) &&
+                submittedFlag.EndsWith("}", StringComparison.Ordinal) &&
+                submittedFlag.Length > before.Length + 1)
+            {
+                yield return submittedFlag[before.Length..^1];
+            }
+        }
     }
 
     private static string FormatFlag(Challenge challenge, string content)
@@ -388,5 +499,122 @@ public class CtfGameMode : IGameMode
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(submittedFlag));
         return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()};len:{submittedFlag.Length}";
+    }
+}
+
+internal sealed class CtfFirstBloodLock : IAsyncDisposable
+{
+    private static readonly ConcurrentDictionary<(Guid CompetitionId, Guid ChallengeId), LocalLockState> LocalLocks = new();
+    private readonly (Guid CompetitionId, Guid ChallengeId) _localKey;
+    private readonly LocalLockState? _localLock;
+    private int _disposed;
+
+    private CtfFirstBloodLock(
+        (Guid CompetitionId, Guid ChallengeId) localKey,
+        LocalLockState? localLock)
+    {
+        _localKey = localKey;
+        _localLock = localLock;
+    }
+
+    public static async Task<CtfFirstBloodLock> AcquireAsync(
+        ApplicationDbContext db,
+        Guid competitionId,
+        Guid challengeId,
+        CancellationToken ct)
+    {
+        if (db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var lockKey = AdvisoryLockKey(competitionId, challengeId);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({lockKey})",
+                ct);
+            return new CtfFirstBloodLock(default, null);
+        }
+
+        var localKey = (competitionId, challengeId);
+        while (true)
+        {
+            var state = LocalLocks.GetOrAdd(localKey, static _ => new LocalLockState());
+            if (!state.TryAddReference())
+            {
+                LocalLocks.TryRemove(new KeyValuePair<(Guid, Guid), LocalLockState>(localKey, state));
+                continue;
+            }
+
+            try
+            {
+                await state.Semaphore.WaitAsync(ct);
+                return new CtfFirstBloodLock(localKey, state);
+            }
+            catch
+            {
+                ReleaseReference(localKey, state);
+                throw;
+            }
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        if (_localLock is null || Interlocked.Exchange(ref _disposed, 1) != 0)
+            return ValueTask.CompletedTask;
+
+        _localLock.Semaphore.Release();
+        ReleaseReference(_localKey, _localLock);
+        return ValueTask.CompletedTask;
+    }
+
+    internal static bool HasLocalLock(Guid competitionId, Guid challengeId)
+        => LocalLocks.ContainsKey((competitionId, challengeId));
+
+    private static void ReleaseReference(
+        (Guid CompetitionId, Guid ChallengeId) key,
+        LocalLockState state)
+    {
+        if (state.ReleaseReference())
+            LocalLocks.TryRemove(new KeyValuePair<(Guid, Guid), LocalLockState>(key, state));
+    }
+
+    private sealed class LocalLockState
+    {
+        private readonly object _sync = new();
+        private int _references;
+        private bool _retired;
+
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        public bool TryAddReference()
+        {
+            lock (_sync)
+            {
+                if (_retired)
+                    return false;
+                _references++;
+                return true;
+            }
+        }
+
+        public bool ReleaseReference()
+        {
+            lock (_sync)
+            {
+                _references--;
+                if (_references != 0)
+                    return false;
+                _retired = true;
+                return true;
+            }
+        }
+    }
+
+    private static long AdvisoryLockKey(Guid competitionId, Guid challengeId)
+    {
+        Span<byte> input = stackalloc byte[32];
+        competitionId.TryWriteBytes(input);
+        challengeId.TryWriteBytes(input[16..]);
+        Span<byte> hash = stackalloc byte[32];
+        SHA256.HashData(input, hash);
+        return BitConverter.ToInt64(hash);
     }
 }

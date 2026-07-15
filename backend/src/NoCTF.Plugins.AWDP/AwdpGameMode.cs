@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.BackgroundTasks;
+using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -16,7 +18,8 @@ namespace NoCTF.Plugins.AWDP;
 public class AwdpGameMode(
     ApplicationDbContext db,
     AwdpConfigResolver configResolver,
-    AwdpStateService stateService) : IGameMode
+    AwdpStateService stateService,
+    ICompetitionExecutionLease? executionLease = null) : IGameMode
 {
     public GameModeType Type => GameModeType.Awdp;
 
@@ -53,22 +56,57 @@ public class AwdpGameMode(
             .AsNoTracking()
             .FirstOrDefaultAsync(c =>
                 c.CompetitionId == context.CompetitionId &&
-                c.Id == context.ChallengeId, cancellationToken);
+                c.Id == context.ChallengeId &&
+                !c.IsDeleting, cancellationToken);
 
         if (challenge is null)
             return SubmissionResult.WrongFlag;
 
-        await using var stateLock = await AwdpPatchStateLock.AcquireAsync(db, context.TeamId, context.ChallengeId, cancellationToken);
-        var config = await configResolver.ResolveAsync(context.CompetitionId, context.ChallengeId, cancellationToken);
+        var leaseProvider = executionLease ?? new CompetitionExecutionLease();
+        await using var preparationLease = await SubmissionMutationGuard.TryAcquireAsync(
+            leaseProvider,
+            db,
+            context.CompetitionId,
+            cancellationToken);
+        if (preparationLease is null)
+            return SubmissionResult.WrongFlag;
+
+        using var preparationCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            preparationLease.LostToken);
+        var mutationCt = preparationCts.Token;
+        now = DateTime.UtcNow;
+        var guard = await SubmissionMutationGuard.ValidateAsync(
+            db,
+            context.CompetitionId,
+            context.ChallengeId,
+            [context.TeamId],
+            now,
+            mutationCt,
+            expectedGameMode: GameModeType.Awdp,
+            expectedChallengeType: "awdp");
+        if (!guard.IsAllowed)
+            return guard.Rejection!.Value;
+        challenge = guard.Challenge!;
+
+        // RuntimePreparation is acquired before the patch-state transaction.
+        // Lifecycle cleanup takes only RuntimePreparation, so this one-way lock
+        // order cannot form a cycle with challenge or competition deletion.
+        await using var stateLock = await AwdpPatchStateLock.AcquireAsync(
+            db,
+            context.TeamId,
+            context.ChallengeId,
+            mutationCt);
+        var config = await configResolver.ResolveAsync(context.CompetitionId, context.ChallengeId, mutationCt);
         var state = await stateService.GetOrCreateAsync(
             context.CompetitionId,
             context.TeamId,
             context.ChallengeId,
-            cancellationToken);
+            mutationCt);
         async Task SaveAndCommitAsync()
         {
-            await db.SaveChangesAsync(cancellationToken);
-            await stateLock.CommitAsync(cancellationToken);
+            await db.SaveChangesAsync(mutationCt);
+            await stateLock.CommitAsync(mutationCt);
         }
 
         var gameBox = await db.AwdGameBoxes
@@ -77,7 +115,7 @@ public class AwdpGameMode(
             .FirstOrDefaultAsync(g =>
                 g.CompetitionId == context.CompetitionId &&
                 g.TeamId == context.TeamId &&
-                g.ChallengeId == context.ChallengeId, cancellationToken);
+                g.ChallengeId == context.ChallengeId, mutationCt);
 
         if (gameBox?.ContainerInstanceId is null)
         {
@@ -98,7 +136,11 @@ public class AwdpGameMode(
         state.InstanceStatus = AwdpInstanceStatus.InstanceRunning;
 
         if (state.BreakStatus == AwdpBreakStatus.BreakSuccess && !config.AllowAttackAfterBreakSuccess)
+        {
+            state.UpdatedAt = now;
+            await SaveAndCommitAsync();
             return SubmissionResult.AlreadySolved;
+        }
 
         if (state.AttackAttempts >= config.MaxAttackAttempts)
         {
@@ -108,21 +150,25 @@ public class AwdpGameMode(
             return SubmissionResult.AttemptsExhausted;
         }
 
+        var expectedFlag = await ResolveExpectedFlagAsync(challenge, context.TeamId, mutationCt);
+        if (expectedFlag is null)
+        {
+            state.UpdatedAt = now;
+            await SaveAndCommitAsync();
+            return SubmissionResult.InstanceRequired;
+        }
+
         state.AttackAttempts += 1;
         state.LastBreakSubmittedAt = now;
         state.BreakStatus = AwdpBreakStatus.BreakSubmitted;
         state.UpdatedAt = now;
-
-        var expectedFlag = await ResolveExpectedFlagAsync(challenge, context.TeamId, cancellationToken);
-        if (expectedFlag is null)
-            return SubmissionResult.InstanceRequired;
 
         var isCorrect = IsMatch(context.FlagContent, expectedFlag);
 
         if (!isCorrect && LooksLikeLegacyFullFlag(challenge.FlagSecret ?? string.Empty))
             isCorrect = IsMatch(context.FlagContent, challenge.FlagSecret ?? string.Empty);
 
-        var hasPriorCorrectBreak = isCorrect && await HasCorrectBreakAsync(context, cancellationToken);
+        var hasPriorCorrectBreak = isCorrect && await HasCorrectBreakAsync(context, mutationCt);
         var submission = new Submission
         {
             Id = Guid.NewGuid(),
@@ -176,7 +222,9 @@ public class AwdpGameMode(
         }
         catch (DbUpdateException)
         {
-            if (!await HasCorrectBreakAsync(context, cancellationToken))
+            await stateLock.RollbackAsync(CancellationToken.None);
+            db.ChangeTracker.Clear();
+            if (!await HasCorrectBreakAsync(context, mutationCt))
                 throw;
 
             return SubmissionResult.AlreadySolved;

@@ -28,7 +28,7 @@ public class SubmitPatchResponse
 /// </summary>
 public class SubmitPatchEndpoint(
     ApplicationDbContext dbContext,
-    IEnumerable<ICompetitionFileActionProvider> fileActionProviders,
+    ICompetitionFileActionRegistry fileActionRegistry,
     IConfiguration configuration)
     : Endpoint<SubmitPatchRequest, SubmitPatchResponse>, IAuditableEndpoint
 {
@@ -46,6 +46,7 @@ public class SubmitPatchEndpoint(
         Post("/api/competitions/{id}/challenges/{challengeId}/patch");
         Claims(ClaimTypes.NameIdentifier);
         AllowFileUploads();
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(SubmitPatchRequest req, CancellationToken ct)
@@ -94,6 +95,19 @@ public class SubmitPatchEndpoint(
             return;
         }
 
+        if (!await dbContext.Challenges
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .AnyAsync(challenge =>
+                    challenge.CompetitionId == req.Id &&
+                    challenge.Id == req.ChallengeId &&
+                    !challenge.IsDeleting,
+                    ct))
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
         var timingResult = PublicCompetitionGuard.ResolvePlayBlockReason(competition, DateTime.UtcNow);
         if (timingResult is not null)
         {
@@ -104,9 +118,7 @@ public class SubmitPatchEndpoint(
         var modeKey = string.IsNullOrWhiteSpace(competition.ModeKey)
             ? competition.GameModeType.ToString()
             : competition.ModeKey;
-        var provider = fileActionProviders.FirstOrDefault(p =>
-            string.Equals(p.ModeKey, modeKey, StringComparison.OrdinalIgnoreCase) &&
-            p.CanHandleFileAction("submit-patch"));
+        var provider = fileActionRegistry.FindProvider(modeKey, "submit-patch");
         if (provider is null)
         {
             await SendAsync(new SubmitPatchResponse { Status = "unsupported_patch_action" }, 404, ct);
@@ -142,9 +154,7 @@ public class SubmitPatchEndpoint(
             return;
         }
 
-        await using var stream = new MemoryStream();
-        await file.CopyToAsync(stream, ct);
-        stream.Position = 0;
+        await using var stream = file.OpenReadStream();
         var result = await provider.HandleFileActionAsync(
             new CompetitionFileActionContext(
                 req.Id,

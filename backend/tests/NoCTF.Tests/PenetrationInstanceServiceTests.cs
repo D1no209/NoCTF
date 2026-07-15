@@ -72,6 +72,14 @@ public class PenetrationInstanceServiceTests
         await using var db = CreateDb(competitionId);
         SeedCompetition(db, competitionId);
         SeedChallenge(db, competitionId, challengeId);
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = competitionId,
+            Name = "approved-team",
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            CreatedAt = DateTime.UtcNow
+        });
         db.PenetrationTopologies.Add(new PenetrationTopology
         {
             Id = topologyId,
@@ -158,7 +166,7 @@ public class PenetrationInstanceServiceTests
         Assert.Equal(1, dto.ResetCount);
         Assert.Equal("http://ctf.local:32080", dto.EntryUrl);
         Assert.True(fakeManager.ComposeUpCalls >= 1);
-        Assert.True(fakeManager.ComposeDownCalls >= 1);
+        Assert.Equal(1, fakeManager.ComposeDownCalls);
         Assert.False(await db.DynamicFlagInstances.IgnoreQueryFilters().Where(f => f.ValueSecret == "old").Select(f => f.IsActive).SingleAsync());
         Assert.Equal(1, await db.DynamicFlagInstances.IgnoreQueryFilters().CountAsync(f => f.TeamId == teamId && f.IsActive));
         Assert.All(await db.DynamicFlagInstances.IgnoreQueryFilters().Where(f => f.TeamId == teamId && f.IsActive).ToListAsync(), f => Assert.Equal("[REDACTED]", f.ValueSecret));
@@ -209,7 +217,7 @@ public class PenetrationInstanceServiceTests
         Assert.Equal("compose down failed", ex.Message);
         Assert.Equal(PenetrationInstanceStatus.Failed, instance.Status);
         Assert.Null(instance.LastActionAt);
-        Assert.Equal("compose down failed", instance.LastError);
+        Assert.Equal("instance_operation_failed", instance.LastError);
 
         var playerView = await service.GetInstanceAsync(
             competitionId,
@@ -223,6 +231,7 @@ public class PenetrationInstanceServiceTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new PenetrationInstanceTenantContext(competitionId));

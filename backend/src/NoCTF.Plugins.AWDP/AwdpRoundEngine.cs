@@ -53,8 +53,7 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
             .Where(c =>
                 c.GameModeType == GameModeType.Awdp &&
                 c.Status == CompetitionStatus.Running &&
-                c.StartTime <= now &&
-                c.EndTime > now)
+                c.StartTime <= now)
             .ToListAsync(ct);
 
         foreach (var competition in competitions)
@@ -63,11 +62,12 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
             if (lease is null)
                 continue;
 
-            await TickCompetitionAsync(scope.ServiceProvider, db, competition, now, ct);
+            using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lease.LostToken);
+            await TickCompetitionAsync(scope.ServiceProvider, db, competition, now, leaseCts.Token);
         }
     }
 
-    private async Task TickCompetitionAsync(
+    internal async Task TickCompetitionAsync(
         IServiceProvider scopedServices,
         ApplicationDbContext db,
         Competition competition,
@@ -83,6 +83,53 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
             .OrderByDescending(r => r.RoundNumber)
             .FirstOrDefaultAsync(ct);
 
+        // Keep ended competitions schedulable until their durable scoring phase
+        // has completed. A host outage across EndTime must not strand a round in
+        // Running/Scoring forever.
+        if (now >= competition.EndTime)
+        {
+            if (latestRound is null)
+            {
+                competition.Status = CompetitionStatus.Finished;
+                await db.SaveChangesAsync(ct);
+                return;
+            }
+
+            if (latestRound.Status == AwdpRoundStatus.RoundRunning)
+            {
+                latestRound.Status = AwdpRoundStatus.RoundScoring;
+                latestRound.EndTime = competition.EndTime;
+                await db.SaveChangesAsync(ct);
+            }
+
+            if (latestRound.Status == AwdpRoundStatus.RoundScoring)
+            {
+                await CompleteScoringAsync(
+                    scopedServices,
+                    db,
+                    competition,
+                    latestRound,
+                    totalRounds,
+                    competition.EndTime,
+                    ct,
+                    startNextRound: false);
+                return;
+            }
+
+            if (latestRound.Status == AwdpRoundStatus.RoundPending)
+            {
+                latestRound.Status = AwdpRoundStatus.RoundFinished;
+                latestRound.EndTime = competition.EndTime;
+            }
+            else if (latestRound.Status == AwdpRoundStatus.RoundFinished)
+            {
+                latestRound.EndTime ??= competition.EndTime;
+            }
+            competition.Status = CompetitionStatus.Finished;
+            await db.SaveChangesAsync(ct);
+            return;
+        }
+
         if (latestRound is null)
         {
             await StartRoundAsync(scopedServices, db, competition, 1, totalRounds, now, ct);
@@ -97,19 +144,30 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
             latestRound.Status = AwdpRoundStatus.RoundScoring;
             latestRound.EndTime = now;
             await db.SaveChangesAsync(ct);
+        }
 
-            await scopedServices
-                .GetRequiredService<AwdpScoreEngine>()
-                .CalculateRoundScoreAsync(competition.Id, latestRound.RoundNumber, ct);
+        if (latestRound.Status == AwdpRoundStatus.RoundScoring)
+        {
+            await CompleteScoringAsync(
+                scopedServices,
+                db,
+                competition,
+                latestRound,
+                totalRounds,
+                now,
+                ct);
+            return;
+        }
 
-            latestRound.Status = AwdpRoundStatus.RoundFinished;
-            latestRound.EndTime = now;
-            await db.SaveChangesAsync(ct);
-
+        if (latestRound.Status == AwdpRoundStatus.RoundFinished)
+        {
             if (latestRound.RoundNumber >= totalRounds)
             {
-                competition.Status = CompetitionStatus.Finished;
-                await db.SaveChangesAsync(ct);
+                if (competition.Status != CompetitionStatus.Finished)
+                {
+                    competition.Status = CompetitionStatus.Finished;
+                    await db.SaveChangesAsync(ct);
+                }
                 return;
             }
 
@@ -121,17 +179,36 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
                 totalRounds,
                 now,
                 ct);
-            return;
         }
+    }
 
-        if (latestRound.Status == AwdpRoundStatus.RoundFinished &&
-            latestRound.RoundNumber < totalRounds)
+    private async Task CompleteScoringAsync(
+        IServiceProvider scopedServices,
+        ApplicationDbContext db,
+        Competition competition,
+        AwdpRound round,
+        int totalRounds,
+        DateTime now,
+        CancellationToken ct,
+        bool startNextRound = true)
+    {
+        await scopedServices
+            .GetRequiredService<AwdpScoreEngine>()
+            .CalculateRoundScoreAsync(competition.Id, round.RoundNumber, ct);
+
+        round.Status = AwdpRoundStatus.RoundFinished;
+        round.EndTime ??= now;
+        if (!startNextRound || round.RoundNumber >= totalRounds)
+            competition.Status = CompetitionStatus.Finished;
+        await db.SaveChangesAsync(ct);
+
+        if (startNextRound && round.RoundNumber < totalRounds)
         {
             await StartRoundAsync(
                 scopedServices,
                 db,
                 competition,
-                latestRound.RoundNumber + 1,
+                round.RoundNumber + 1,
                 totalRounds,
                 now,
                 ct);
@@ -166,6 +243,23 @@ public sealed class AwdpRoundEngine(IServiceProvider serviceProvider, ILogger<Aw
             totalRounds);
 
         var hubNotifier = scopedServices.GetRequiredService<IHubNotifierService>();
-        await hubNotifier.NotifyRoundStartedAsync(competition.Id, roundNumber, ct);
+        try
+        {
+            await hubNotifier.NotifyRoundStartedAsync(competition.Id, roundNumber, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // The durable round transition is authoritative; a transient
+            // realtime failure must not stop the round engine from recovering.
+            logger.LogWarning(
+                ex,
+                "Competition {CompetitionId}: AWDP round {RoundNumber} notification failed.",
+                competition.Id,
+                roundNumber);
+        }
     }
 }
