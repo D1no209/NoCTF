@@ -2,6 +2,7 @@
 import {
   Activity,
   BadgeCheck,
+  Bot,
   ClipboardList,
   Container,
   FileText,
@@ -59,6 +60,7 @@ const navItems = computed(() => {
       label: t('admin.nav.infrastructure'),
       icon: Network,
     })
+    items.splice(7, 0, { to: '/admin/qqbot', label: t('admin.nav.qqBot'), icon: Bot })
   }
   return items
 })

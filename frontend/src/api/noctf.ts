@@ -809,6 +809,45 @@ export const adminApi = {
       'Failed to load plugins',
     )
   },
+  async qqBotOverview<T = unknown>() {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/qqbot' }), 'Failed to load QQBot settings')
+  },
+  async updateQqBotSettings<T = unknown>(body: unknown) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/qqbot/settings', body }), 'Failed to update QQBot settings')
+  },
+  async upsertQqBotAgent<T = unknown>(body: unknown) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/qqbot/agents', body }), 'Failed to update QQBot agent')
+  },
+  async authorizeQqBotGroup<T = unknown>(groupId: string, isAuthorized: boolean) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/qqbot/groups/{groupId}/authorization', path: { groupId }, body: { isAuthorized } }), 'Failed to authorize QQ group')
+  },
+  async competitionQqBot<T = unknown>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot', path: { competitionId } }), 'Failed to load competition QQBot settings')
+  },
+  async updateCompetitionQqBot<T = unknown>(competitionId: string, body: unknown) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot', path: { competitionId }, body }), 'Failed to update competition QQBot settings')
+  },
+  async availableQqBotGroups<T = unknown[]>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot/groups/available', path: { competitionId } }), 'Failed to load available QQ groups')
+  },
+  async competitionQqBotTemplates<T = unknown[]>(competitionId: string) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot/templates', path: { competitionId } }), 'Failed to load QQBot templates')
+  },
+  async upsertCompetitionQqBotTemplate<T = unknown>(competitionId: string, body: unknown) {
+    return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot/templates', path: { competitionId }, body }), 'Failed to update QQBot template')
+  },
+  async previewQqBot<T = unknown>(competitionId: string, body: unknown) {
+    return unwrap(await client.post<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot/preview', path: { competitionId }, body }), 'Failed to preview QQBot message')
+  },
+  async sendQqBotNotification<T = unknown>(competitionId: string, body: unknown) {
+    return unwrap(await client.post<{ 200: T; 202: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot/notifications', path: { competitionId }, body }), 'Failed to queue QQBot notification')
+  },
+  async qqBotLogs<T = unknown>(competitionId: string, query: Record<string, unknown> = {}) {
+    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot/logs', path: { competitionId }, query }), 'Failed to load QQBot logs')
+  },
+  async retryQqBotDelivery<T = unknown>(competitionId: string, deliveryId: string) {
+    return unwrap(await client.post<{ 200: T; 202: T }, unknown, false>({ url: '/api/admin/competitions/{competitionId}/qqbot/deliveries/{deliveryId}/retry', path: { competitionId, deliveryId } }), 'Failed to retry QQBot delivery')
+  },
   async infrastructure<T = unknown>() {
     return unwrap(
       await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/infrastructure' }),

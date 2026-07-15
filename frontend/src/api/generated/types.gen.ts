@@ -4,6 +4,71 @@ export type ClientOptions = {
     baseUrl: string;
 };
 
+export type NoCtfApplicationQqBotQqBotAgentOperationResult = {
+    succeeded?: boolean;
+    status?: string;
+    errorCode?: string | null;
+};
+
+export type NoCtfApplicationQqBotQqBotHeartbeatRequest = {
+    qqOnline?: boolean;
+    botUin?: number | null;
+    botNickname?: string | null;
+    implementationName?: string | null;
+    implementationVersion?: string | null;
+    milkyVersion?: string | null;
+    errorCode?: string | null;
+    errorSummary?: string | null;
+};
+
+export type NoCtfApplicationQqBotQqBotGroupSyncResult = {
+    seenGroups?: number;
+    authorizedGroups?: number;
+};
+
+export type NoCtfApplicationQqBotQqBotGroupSyncRequest = {
+    groups?: Array<NoCtfApplicationQqBotQqBotGroupSyncItem>;
+};
+
+export type NoCtfApplicationQqBotQqBotGroupSyncItem = {
+    groupId?: number;
+    groupName?: string;
+};
+
+export type NoCtfApplicationQqBotQqBotLeaseResponse = {
+    delivery?: NoCtfApplicationQqBotQqBotDeliveryLease | null;
+    retryAfterMilliseconds?: number;
+};
+
+export type NoCtfApplicationQqBotQqBotDeliveryLease = {
+    deliveryId?: string;
+    leaseToken?: string;
+    groupId?: number;
+    segmentsJson?: string;
+    lockedUntil?: string;
+    attempt?: number;
+    maxAttempts?: number;
+};
+
+export type NoCtfApplicationQqBotQqBotLeaseRequest = {
+    waitSeconds?: number;
+};
+
+export type NoCtfApplicationQqBotQqBotDeliveryAckRequest = {
+    deliveryId?: string;
+    leaseToken?: string;
+    messageSequence?: number | null;
+    remoteSentAt?: string | null;
+    safeRemoteSummary?: string | null;
+};
+
+export type NoCtfApplicationQqBotQqBotDeliveryFailureRequest = {
+    deliveryId?: string;
+    leaseToken?: string;
+    errorCode?: string;
+    safeSummary?: string | null;
+};
+
 export type NoCtfapiEndpointsTeamsMyTeamDto = NoCtfapiEndpointsTeamsTeamDto & {
     competitionTitle?: string;
     competitionStatus?: string;
@@ -956,6 +1021,233 @@ export type NoCtfapiEndpointsAdminPenetrationAdminInstanceRequest = {
     [key: string]: never;
 };
 
+export type NoCtfApplicationQqBotQqBotAdminOverview = {
+    pluginAvailable?: boolean;
+    connectionType?: string;
+    settings?: NoCtfApplicationQqBotQqBotGlobalSettingsView;
+    agents?: Array<NoCtfApplicationQqBotQqBotAgentView>;
+    groups?: Array<NoCtfApplicationQqBotQqBotGroupView>;
+};
+
+export type NoCtfApplicationQqBotQqBotGlobalSettingsView = {
+    enabled?: boolean;
+    longPollSeconds?: number;
+    deliveryLeaseSeconds?: number;
+    maxDeliveryAttempts?: number;
+    maxMessageLength?: number;
+    maxPendingDeliveries?: number;
+    groupCooldownMilliseconds?: number;
+    competitionCooldownMilliseconds?: number;
+    manualNotificationCooldownSeconds?: number;
+    updatedAt?: string;
+};
+
+export type NoCtfApplicationQqBotQqBotAgentView = {
+    id?: string;
+    name?: string;
+    enabled?: boolean;
+    hasPublicKey?: boolean;
+    hasPreviousPublicKey?: boolean;
+    previousKeyValidUntil?: string | null;
+    lastHeartbeatAt?: string | null;
+    apiReachable?: boolean;
+    qqOnline?: boolean;
+    botUin?: number | null;
+    botNickname?: string | null;
+    implementationName?: string | null;
+    implementationVersion?: string | null;
+    milkyVersion?: string | null;
+    lastErrorCode?: string | null;
+    lastErrorSummary?: string | null;
+    pendingDeliveries?: number;
+    recentSucceeded?: number;
+    recentFailed?: number;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type NoCtfApplicationQqBotQqBotGroupView = {
+    id?: string;
+    agentId?: string;
+    groupId?: number;
+    groupName?: string;
+    isPresent?: boolean;
+    isAuthorized?: boolean;
+    lastSeenAt?: string;
+};
+
+export type NoCtfApplicationQqBotQqBotGlobalSettingsUpdate = {
+    enabled?: boolean;
+    longPollSeconds?: number;
+    deliveryLeaseSeconds?: number;
+    maxDeliveryAttempts?: number;
+    maxMessageLength?: number;
+    maxPendingDeliveries?: number;
+    groupCooldownMilliseconds?: number;
+    competitionCooldownMilliseconds?: number;
+    manualNotificationCooldownSeconds?: number;
+};
+
+export type NoCtfApplicationQqBotQqBotAgentUpdate = {
+    id?: string | null;
+    name?: string;
+    enabled?: boolean;
+    publicKeyPem?: string;
+    previousKeyOverlapMinutes?: number;
+};
+
+export type NoCtfApplicationQqBotQqBotGroupAuthorizationUpdate = {
+    isAuthorized?: boolean;
+};
+
+export type NoCtfApplicationQqBotCompetitionQqBotConfigurationView = {
+    competitionId?: string;
+    globalEnabled?: boolean;
+    hasOnlineAgent?: boolean;
+    enabled?: boolean;
+    allowMessages?: boolean;
+    allowManualNotifications?: boolean;
+    stopNormalEventsAfterFinished?: boolean;
+    mentionAll?: boolean;
+    showTeamName?: boolean;
+    showUserName?: boolean;
+    showChallengeCategory?: boolean;
+    includeCompetitionLink?: boolean;
+    includeChallengeLink?: boolean;
+    hidePenaltyDetails?: boolean;
+    eventRules?: Array<NoCtfApplicationQqBotQqBotEventRuleView>;
+    groupBindings?: Array<NoCtfApplicationQqBotQqBotGroupBindingView>;
+    warnings?: Array<string>;
+    updatedAt?: string | null;
+};
+
+export type NoCtfApplicationQqBotQqBotEventRuleView = {
+    eventType?: NoCtfCoreQqBotEventType;
+    enabled?: boolean;
+    templateId?: string | null;
+};
+
+export type NoCtfCoreQqBotEventType = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type NoCtfApplicationQqBotQqBotGroupBindingView = {
+    id?: string | null;
+    agentId?: string;
+    groupId?: string;
+    qqGroupId?: number;
+    groupName?: string;
+    isDefault?: boolean;
+    eventTypes?: Array<NoCtfCoreQqBotEventType>;
+};
+
+export type NoCtfApplicationQqBotCompetitionQqBotConfigurationUpdate = {
+    enabled?: boolean;
+    allowMessages?: boolean;
+    allowManualNotifications?: boolean;
+    stopNormalEventsAfterFinished?: boolean;
+    mentionAll?: boolean;
+    showTeamName?: boolean;
+    showUserName?: boolean;
+    showChallengeCategory?: boolean;
+    includeCompetitionLink?: boolean;
+    includeChallengeLink?: boolean;
+    hidePenaltyDetails?: boolean;
+    eventRules?: Array<NoCtfApplicationQqBotQqBotEventRuleView>;
+    groupBindings?: Array<NoCtfApplicationQqBotQqBotGroupBindingView>;
+};
+
+export type NoCtfApplicationQqBotQqBotTemplateView = {
+    id?: string | null;
+    competitionId?: string | null;
+    eventType?: NoCtfCoreQqBotEventType;
+    name?: string;
+    content?: string;
+    isDefault?: boolean;
+    isBuiltIn?: boolean;
+    allowedVariables?: Array<string>;
+    updatedAt?: string | null;
+};
+
+export type NoCtfApplicationQqBotQqBotTemplateUpdate = {
+    id?: string | null;
+    eventType?: NoCtfCoreQqBotEventType;
+    name?: string;
+    content?: string;
+    isDefault?: boolean;
+};
+
+export type NoCtfApplicationQqBotQqBotPreviewResult = {
+    renderedText?: string;
+    segmentsJson?: string;
+    characterCount?: number;
+    warnings?: Array<string>;
+};
+
+export type NoCtfApplicationQqBotQqBotPreviewRequest = {
+    eventType?: NoCtfCoreQqBotEventType;
+    templateId?: string | null;
+    announcementTitle?: string | null;
+    announcementContent?: string | null;
+};
+
+export type NoCtfApplicationQqBotQqBotQueuedNotification = {
+    eventId?: string;
+    targetGroupCount?: number;
+    status?: string;
+};
+
+export type NoCtfApplicationQqBotQqBotManualNotificationRequest = {
+    title?: string;
+    content?: string;
+    groupIds?: Array<string>;
+    templateId?: string | null;
+    isTest?: boolean;
+};
+
+export type NoCtfApplicationQqBotQqBotDeliveryLogPage = {
+    items?: Array<NoCtfApplicationQqBotQqBotDeliveryLogView>;
+    page?: number;
+    pageSize?: number;
+    total?: number;
+};
+
+export type NoCtfApplicationQqBotQqBotDeliveryLogView = {
+    id?: string;
+    competitionId?: string;
+    competitionName?: string;
+    eventId?: string;
+    eventType?: NoCtfCoreQqBotEventType;
+    source?: NoCtfCoreQqBotDeliverySource;
+    qqGroupId?: number;
+    groupName?: string;
+    status?: NoCtfCoreQqBotDeliveryStatus;
+    attemptCount?: number;
+    maxAttempts?: number;
+    messageSummary?: string;
+    messageDigest?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    sentAt?: string | null;
+    lastErrorCode?: string | null;
+    lastErrorSummary?: string | null;
+    remoteMessageSequence?: number | null;
+    remoteSentAt?: string | null;
+    retriedByUserId?: string | null;
+};
+
+export type NoCtfCoreQqBotDeliverySource = 0 | 1 | 2 | 3;
+
+export type NoCtfCoreQqBotDeliveryStatus = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type NoCtfapiEndpointsAdminQqBotLogRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationQqBotQqBotRetryResult = {
+    eventId?: string;
+    parentDeliveryId?: string;
+    status?: string;
+};
+
 export type NoCtfapiEndpointsAdminRebuildScoreboardResponse = {
     competitionId?: string;
     rows?: number;
@@ -1052,6 +1344,86 @@ export type GetApiFilesData = {
 export type GetApiFilesResponses = {
     200: unknown;
 };
+
+export type NoCtfapiEndpointsQqBotAgentHeartbeatEndpointData = {
+    body: NoCtfApplicationQqBotQqBotHeartbeatRequest;
+    path?: never;
+    query?: never;
+    url: '/api/integrations/qqbot/v1/heartbeat';
+};
+
+export type NoCtfapiEndpointsQqBotAgentHeartbeatEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotAgentOperationResult;
+};
+
+export type NoCtfapiEndpointsQqBotAgentHeartbeatEndpointResponse = NoCtfapiEndpointsQqBotAgentHeartbeatEndpointResponses[keyof NoCtfapiEndpointsQqBotAgentHeartbeatEndpointResponses];
+
+export type NoCtfapiEndpointsQqBotAgentGroupSyncEndpointData = {
+    body: NoCtfApplicationQqBotQqBotGroupSyncRequest;
+    path?: never;
+    query?: never;
+    url: '/api/integrations/qqbot/v1/groups/sync';
+};
+
+export type NoCtfapiEndpointsQqBotAgentGroupSyncEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotGroupSyncResult;
+};
+
+export type NoCtfapiEndpointsQqBotAgentGroupSyncEndpointResponse = NoCtfapiEndpointsQqBotAgentGroupSyncEndpointResponses[keyof NoCtfapiEndpointsQqBotAgentGroupSyncEndpointResponses];
+
+export type NoCtfapiEndpointsQqBotAgentLeaseEndpointData = {
+    body: NoCtfApplicationQqBotQqBotLeaseRequest;
+    path?: never;
+    query?: never;
+    url: '/api/integrations/qqbot/v1/deliveries/lease';
+};
+
+export type NoCtfapiEndpointsQqBotAgentLeaseEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotLeaseResponse;
+};
+
+export type NoCtfapiEndpointsQqBotAgentLeaseEndpointResponse = NoCtfapiEndpointsQqBotAgentLeaseEndpointResponses[keyof NoCtfapiEndpointsQqBotAgentLeaseEndpointResponses];
+
+export type NoCtfapiEndpointsQqBotAgentAckEndpointData = {
+    body: NoCtfApplicationQqBotQqBotDeliveryAckRequest;
+    path?: never;
+    query?: never;
+    url: '/api/integrations/qqbot/v1/deliveries/ack';
+};
+
+export type NoCtfapiEndpointsQqBotAgentAckEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotAgentOperationResult;
+};
+
+export type NoCtfapiEndpointsQqBotAgentAckEndpointResponse = NoCtfapiEndpointsQqBotAgentAckEndpointResponses[keyof NoCtfapiEndpointsQqBotAgentAckEndpointResponses];
+
+export type NoCtfapiEndpointsQqBotAgentFailEndpointData = {
+    body: NoCtfApplicationQqBotQqBotDeliveryFailureRequest;
+    path?: never;
+    query?: never;
+    url: '/api/integrations/qqbot/v1/deliveries/fail';
+};
+
+export type NoCtfapiEndpointsQqBotAgentFailEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotAgentOperationResult;
+};
+
+export type NoCtfapiEndpointsQqBotAgentFailEndpointResponse = NoCtfapiEndpointsQqBotAgentFailEndpointResponses[keyof NoCtfapiEndpointsQqBotAgentFailEndpointResponses];
 
 export type NoCtfapiEndpointsTeamsGetMyTeamsEndpointData = {
     body?: never;
@@ -3427,6 +3799,385 @@ export type NoCtfapiEndpointsAdminResetPenetrationAdminInstanceEndpointResponses
 };
 
 export type NoCtfapiEndpointsAdminResetPenetrationAdminInstanceEndpointResponse = NoCtfapiEndpointsAdminResetPenetrationAdminInstanceEndpointResponses[keyof NoCtfapiEndpointsAdminResetPenetrationAdminInstanceEndpointResponses];
+
+export type NoCtfapiEndpointsAdminGetQqBotOverviewEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/qqbot';
+};
+
+export type NoCtfapiEndpointsAdminGetQqBotOverviewEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminGetQqBotOverviewEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotAdminOverview;
+};
+
+export type NoCtfapiEndpointsAdminGetQqBotOverviewEndpointResponse = NoCtfapiEndpointsAdminGetQqBotOverviewEndpointResponses[keyof NoCtfapiEndpointsAdminGetQqBotOverviewEndpointResponses];
+
+export type NoCtfapiEndpointsAdminUpdateQqBotSettingsEndpointData = {
+    body: NoCtfApplicationQqBotQqBotGlobalSettingsUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/admin/qqbot/settings';
+};
+
+export type NoCtfapiEndpointsAdminUpdateQqBotSettingsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminUpdateQqBotSettingsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotGlobalSettingsView;
+};
+
+export type NoCtfapiEndpointsAdminUpdateQqBotSettingsEndpointResponse = NoCtfapiEndpointsAdminUpdateQqBotSettingsEndpointResponses[keyof NoCtfapiEndpointsAdminUpdateQqBotSettingsEndpointResponses];
+
+export type NoCtfapiEndpointsAdminUpsertQqBotAgentEndpointData = {
+    body: NoCtfApplicationQqBotQqBotAgentUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/admin/qqbot/agents';
+};
+
+export type NoCtfapiEndpointsAdminUpsertQqBotAgentEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminUpsertQqBotAgentEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotAgentView;
+};
+
+export type NoCtfapiEndpointsAdminUpsertQqBotAgentEndpointResponse = NoCtfapiEndpointsAdminUpsertQqBotAgentEndpointResponses[keyof NoCtfapiEndpointsAdminUpsertQqBotAgentEndpointResponses];
+
+export type NoCtfapiEndpointsAdminAuthorizeQqBotGroupEndpointData = {
+    body: NoCtfApplicationQqBotQqBotGroupAuthorizationUpdate;
+    path: {
+        groupId: string;
+    };
+    query?: never;
+    url: '/api/admin/qqbot/groups/{groupId}/authorization';
+};
+
+export type NoCtfapiEndpointsAdminAuthorizeQqBotGroupEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminAuthorizeQqBotGroupEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotGroupView;
+};
+
+export type NoCtfapiEndpointsAdminAuthorizeQqBotGroupEndpointResponse = NoCtfapiEndpointsAdminAuthorizeQqBotGroupEndpointResponses[keyof NoCtfapiEndpointsAdminAuthorizeQqBotGroupEndpointResponses];
+
+export type NoCtfapiEndpointsAdminGetAvailableQqBotGroupsEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/admin/competitions/{competitionId}/qqbot/groups/available';
+};
+
+export type NoCtfapiEndpointsAdminGetAvailableQqBotGroupsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminGetAvailableQqBotGroupsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: Array<NoCtfApplicationQqBotQqBotGroupView>;
+};
+
+export type NoCtfapiEndpointsAdminGetAvailableQqBotGroupsEndpointResponse = NoCtfapiEndpointsAdminGetAvailableQqBotGroupsEndpointResponses[keyof NoCtfapiEndpointsAdminGetAvailableQqBotGroupsEndpointResponses];
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotConfigEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/admin/competitions/{competitionId}/qqbot';
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotConfigEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotConfigEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotCompetitionQqBotConfigurationView;
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotConfigEndpointResponse = NoCtfapiEndpointsAdminGetCompetitionQqBotConfigEndpointResponses[keyof NoCtfapiEndpointsAdminGetCompetitionQqBotConfigEndpointResponses];
+
+export type NoCtfapiEndpointsAdminUpdateCompetitionQqBotConfigEndpointData = {
+    body: NoCtfApplicationQqBotCompetitionQqBotConfigurationUpdate;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/admin/competitions/{competitionId}/qqbot';
+};
+
+export type NoCtfapiEndpointsAdminUpdateCompetitionQqBotConfigEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminUpdateCompetitionQqBotConfigEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotCompetitionQqBotConfigurationView;
+};
+
+export type NoCtfapiEndpointsAdminUpdateCompetitionQqBotConfigEndpointResponse = NoCtfapiEndpointsAdminUpdateCompetitionQqBotConfigEndpointResponses[keyof NoCtfapiEndpointsAdminUpdateCompetitionQqBotConfigEndpointResponses];
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotTemplatesEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/admin/competitions/{competitionId}/qqbot/templates';
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotTemplatesEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotTemplatesEndpointResponses = {
+    /**
+     * Success
+     */
+    200: Array<NoCtfApplicationQqBotQqBotTemplateView>;
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotTemplatesEndpointResponse = NoCtfapiEndpointsAdminGetCompetitionQqBotTemplatesEndpointResponses[keyof NoCtfapiEndpointsAdminGetCompetitionQqBotTemplatesEndpointResponses];
+
+export type NoCtfapiEndpointsAdminUpsertCompetitionQqBotTemplateEndpointData = {
+    body: NoCtfApplicationQqBotQqBotTemplateUpdate;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/admin/competitions/{competitionId}/qqbot/templates';
+};
+
+export type NoCtfapiEndpointsAdminUpsertCompetitionQqBotTemplateEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminUpsertCompetitionQqBotTemplateEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotTemplateView;
+};
+
+export type NoCtfapiEndpointsAdminUpsertCompetitionQqBotTemplateEndpointResponse = NoCtfapiEndpointsAdminUpsertCompetitionQqBotTemplateEndpointResponses[keyof NoCtfapiEndpointsAdminUpsertCompetitionQqBotTemplateEndpointResponses];
+
+export type NoCtfapiEndpointsAdminPreviewCompetitionQqBotMessageEndpointData = {
+    body: NoCtfApplicationQqBotQqBotPreviewRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/admin/competitions/{competitionId}/qqbot/preview';
+};
+
+export type NoCtfapiEndpointsAdminPreviewCompetitionQqBotMessageEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminPreviewCompetitionQqBotMessageEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotPreviewResult;
+};
+
+export type NoCtfapiEndpointsAdminPreviewCompetitionQqBotMessageEndpointResponse = NoCtfapiEndpointsAdminPreviewCompetitionQqBotMessageEndpointResponses[keyof NoCtfapiEndpointsAdminPreviewCompetitionQqBotMessageEndpointResponses];
+
+export type NoCtfapiEndpointsAdminSendCompetitionQqBotNotificationEndpointData = {
+    body: NoCtfApplicationQqBotQqBotManualNotificationRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/admin/competitions/{competitionId}/qqbot/notifications';
+};
+
+export type NoCtfapiEndpointsAdminSendCompetitionQqBotNotificationEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminSendCompetitionQqBotNotificationEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotQueuedNotification;
+};
+
+export type NoCtfapiEndpointsAdminSendCompetitionQqBotNotificationEndpointResponse = NoCtfapiEndpointsAdminSendCompetitionQqBotNotificationEndpointResponses[keyof NoCtfapiEndpointsAdminSendCompetitionQqBotNotificationEndpointResponses];
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotLogsEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        eventType?: NoCtfCoreQqBotEventType | null;
+        status?: NoCtfCoreQqBotDeliveryStatus | null;
+        from?: string | null;
+        to?: string | null;
+        page: number;
+        pageSize: number;
+    };
+    url: '/api/admin/competitions/{competitionId}/qqbot/logs';
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotLogsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotLogsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotDeliveryLogPage;
+};
+
+export type NoCtfapiEndpointsAdminGetCompetitionQqBotLogsEndpointResponse = NoCtfapiEndpointsAdminGetCompetitionQqBotLogsEndpointResponses[keyof NoCtfapiEndpointsAdminGetCompetitionQqBotLogsEndpointResponses];
+
+export type NoCtfapiEndpointsAdminRetryCompetitionQqBotDeliveryEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        deliveryId: string;
+    };
+    query?: never;
+    url: '/api/admin/competitions/{competitionId}/qqbot/deliveries/{deliveryId}/retry';
+};
+
+export type NoCtfapiEndpointsAdminRetryCompetitionQqBotDeliveryEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminRetryCompetitionQqBotDeliveryEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationQqBotQqBotRetryResult;
+};
+
+export type NoCtfapiEndpointsAdminRetryCompetitionQqBotDeliveryEndpointResponse = NoCtfapiEndpointsAdminRetryCompetitionQqBotDeliveryEndpointResponses[keyof NoCtfapiEndpointsAdminRetryCompetitionQqBotDeliveryEndpointResponses];
 
 export type NoCtfapiEndpointsAdminRebuildScoreboardEndpointData = {
     body?: never;
