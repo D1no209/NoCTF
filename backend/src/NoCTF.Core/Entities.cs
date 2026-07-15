@@ -12,6 +12,15 @@ public enum AwdRoundStatus
     Finished
 }
 
+public static class UserInputLimits
+{
+    public const int UserNameMinLength = 3;
+    public const int UserNameMaxLength = 64;
+    public const int EmailMaxLength = 254;
+    public const int PasswordMinLength = 8;
+    public const int PasswordMaxLength = 128;
+}
+
 public class User
 {
     public Guid Id { get; set; }
@@ -133,6 +142,7 @@ public class Challenge : ITenantEntity
     public Guid Id { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid? TemplateId { get; set; }
+    public bool IsDeleting { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string DescriptionFormat { get; set; } = "markdown";
@@ -418,6 +428,7 @@ public class TeamChallengeInstance : ITenantEntity
     public Guid? TopologyId { get; set; }
     public PenetrationInstanceStatus Status { get; set; } = PenetrationInstanceStatus.None;
     public string? ComposeProjectName { get; set; }
+    public Guid? RuntimeOperationId { get; set; }
     public string RenderedComposeYaml { get; set; } = string.Empty;
     public string ContainerIdsJson { get; set; } = "[]";
     public string PortMappingsJson { get; set; } = "{}";
@@ -540,6 +551,9 @@ public class AwdGameBox : ITenantEntity
     public DateTime? ExpiresAt { get; set; }
     public DateTime? LastInstanceActionAt { get; set; }
     public DateTime? LastFlagRefreshedAt { get; set; }
+    public Guid? RuntimeOperationId { get; set; }
+    public string? CleanupOwner { get; set; }
+    public DateTime? CleanupLockedUntil { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -734,6 +748,24 @@ public class BackgroundTaskItem : ITenantEntity
     public DateTime UpdatedAt { get; set; }
     public DateTime? LockedUntil { get; set; }
     public string? LockOwner { get; set; }
+}
+
+/// <summary>
+/// Durable, global outbox for deleting objects after their database references
+/// have been removed. It is intentionally not tenant-filtered because template
+/// objects do not belong to a competition.
+/// </summary>
+public class StorageCleanupItem
+{
+    public Guid Id { get; set; }
+    public string StorageKey { get; set; } = string.Empty;
+    public DateTime NotBefore { get; set; }
+    public int AttemptCount { get; set; }
+    public string? LastError { get; set; }
+    public DateTime? LockedUntil { get; set; }
+    public string? LockOwner { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>Durable scheduling state for a plugin-owned competition engine.</summary>

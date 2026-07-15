@@ -18,7 +18,8 @@ public class ChallengePatchTemplateResponse
 public class UploadChallengeAttachmentEndpoint(
     ApplicationDbContext db,
     IStorageProvider storageProvider,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    ILogger<UploadChallengeAttachmentEndpoint> logger)
     : EndpointWithoutRequest<ChallengeAttachmentResponse>, IAuditableEndpoint
 {
     public override void Configure()
@@ -31,8 +32,7 @@ public class UploadChallengeAttachmentEndpoint(
     public override async Task HandleAsync(CancellationToken ct)
     {
         var challengeId = Route<Guid>("id");
-        var challenge = await db.ChallengeTemplates.FirstOrDefaultAsync(c => c.Id == challengeId, ct);
-        if (challenge is null)
+        if (!await db.ChallengeTemplates.AsNoTracking().AnyAsync(c => c.Id == challengeId, ct))
         {
             await SendNotFoundAsync(ct);
             return;
@@ -52,30 +52,55 @@ public class UploadChallengeAttachmentEndpoint(
             return;
         }
 
-        var safeName = Path.GetFileName(file.FileName);
-        var storagePath = $"challenge-attachments/{challenge.Id:N}/{Guid.NewGuid():N}-{safeName}";
+        var extension = SafeExtension(file.FileName);
+        var storagePath = $"challenge-attachments/{challengeId:N}/{Guid.NewGuid():N}{extension}";
         await using var stream = file.OpenReadStream();
         var key = await storageProvider.UploadAsync(storagePath, stream, file.ContentType, ct);
-        var url = await storageProvider.GetUrlAsync(key, ct);
-
-        var previousKey = challenge.AttachmentStorageKey;
-        challenge.AttachmentUrl = url;
-        challenge.AttachmentStorageKey = key;
-        challenge.DeploymentType = challenge.DeploymentType == NoCTF.Core.ChallengeDeploymentType.NoAttachment
-            ? NoCTF.Core.ChallengeDeploymentType.StaticAttachment
-            : challenge.DeploymentType;
-        challenge.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await StorageObjectCleanup.DeleteUnreferencedAsync(db, storageProvider, [previousKey], ct);
+        string url;
+        try
+        {
+            url = await UploadedObjectPersistence.CompleteAsync(
+                db,
+                key,
+                async cancellationToken =>
+                {
+                    var uploadedUrl = await storageProvider.GetUrlAsync(key, cancellationToken);
+                    await ChallengeTemplateObjectReplacement.ReplaceAsync(
+                        db,
+                        challengeId,
+                        ChallengeTemplateObjectSlot.Attachment,
+                        key,
+                        uploadedUrl,
+                        cancellationToken);
+                    return uploadedUrl;
+                },
+                logger,
+                ct);
+        }
+        catch (ChallengeTemplateNotFoundException)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
 
         await SendAsync(new ChallengeAttachmentResponse { AttachmentUrl = url }, cancellation: ct);
+    }
+
+    internal static string SafeExtension(string fileName)
+    {
+        var extension = Path.GetExtension(Path.GetFileName(fileName));
+        return extension.Length is > 0 and <= 20 &&
+               extension.All(character => char.IsAsciiLetterOrDigit(character) || character == '.')
+            ? extension.ToLowerInvariant()
+            : string.Empty;
     }
 }
 
 public class UploadChallengePatchTemplateEndpoint(
     ApplicationDbContext db,
     IStorageProvider storageProvider,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    ILogger<UploadChallengePatchTemplateEndpoint> logger)
     : EndpointWithoutRequest<ChallengePatchTemplateResponse>, IAuditableEndpoint
 {
     public override void Configure()
@@ -88,8 +113,7 @@ public class UploadChallengePatchTemplateEndpoint(
     public override async Task HandleAsync(CancellationToken ct)
     {
         var challengeId = Route<Guid>("id");
-        var challenge = await db.ChallengeTemplates.FirstOrDefaultAsync(c => c.Id == challengeId, ct);
-        if (challenge is null)
+        if (!await db.ChallengeTemplates.AsNoTracking().AnyAsync(c => c.Id == challengeId, ct))
         {
             await SendNotFoundAsync(ct);
             return;
@@ -109,18 +133,36 @@ public class UploadChallengePatchTemplateEndpoint(
             return;
         }
 
-        var safeName = Path.GetFileName(file.FileName);
-        var storagePath = $"challenge-patch-templates/{challenge.Id:N}/{Guid.NewGuid():N}-{safeName}";
+        var extension = UploadChallengeAttachmentEndpoint.SafeExtension(file.FileName);
+        var storagePath = $"challenge-patch-templates/{challengeId:N}/{Guid.NewGuid():N}{extension}";
         await using var stream = file.OpenReadStream();
         var key = await storageProvider.UploadAsync(storagePath, stream, file.ContentType, ct);
-        var url = await storageProvider.GetUrlAsync(key, ct);
-
-        var previousKey = challenge.PatchTemplateStorageKey;
-        challenge.PatchTemplateUrl = url;
-        challenge.PatchTemplateStorageKey = key;
-        challenge.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await StorageObjectCleanup.DeleteUnreferencedAsync(db, storageProvider, [previousKey], ct);
+        string url;
+        try
+        {
+            url = await UploadedObjectPersistence.CompleteAsync(
+                db,
+                key,
+                async cancellationToken =>
+                {
+                    var uploadedUrl = await storageProvider.GetUrlAsync(key, cancellationToken);
+                    await ChallengeTemplateObjectReplacement.ReplaceAsync(
+                        db,
+                        challengeId,
+                        ChallengeTemplateObjectSlot.PatchTemplate,
+                        key,
+                        uploadedUrl,
+                        cancellationToken);
+                    return uploadedUrl;
+                },
+                logger,
+                ct);
+        }
+        catch (ChallengeTemplateNotFoundException)
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
 
         await SendAsync(new ChallengePatchTemplateResponse { PatchTemplateUrl = url }, cancellation: ct);
     }

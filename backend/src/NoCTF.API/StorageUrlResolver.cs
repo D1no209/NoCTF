@@ -1,6 +1,6 @@
 using NoCTF.PluginBase;
-using Microsoft.EntityFrameworkCore;
 using NoCTF.Infrastructure;
+using NoCTF.Infrastructure.Storage;
 
 namespace NoCTF.API;
 
@@ -66,23 +66,9 @@ internal static class StorageUrlResolver
 
 internal static class StorageObjectCleanup
 {
-    public static async Task DeleteUnreferencedAsync(
+    public static Task EnqueueAsync(
         ApplicationDbContext db,
-        IStorageProvider storage,
         IEnumerable<string?> keys,
         CancellationToken ct)
-    {
-        foreach (var key in keys.Where(k => !string.IsNullOrWhiteSpace(k)).Select(k => k!).Distinct(StringComparer.Ordinal))
-        {
-            var referencedByChallenge = await db.Challenges
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .AnyAsync(c => c.AttachmentStorageKey == key || c.PatchTemplateStorageKey == key, ct);
-            var referencedByTemplate = await db.ChallengeTemplates
-                .AsNoTracking()
-                .AnyAsync(c => c.AttachmentStorageKey == key || c.PatchTemplateStorageKey == key, ct);
-            if (!referencedByChallenge && !referencedByTemplate)
-                await storage.DeleteAsync(key, ct);
-        }
-    }
+        => StorageCleanupOutbox.EnqueueAsync(db, keys, ct);
 }

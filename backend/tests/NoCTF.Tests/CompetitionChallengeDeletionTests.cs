@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API.Endpoints.Admin;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -121,12 +122,24 @@ public class CompetitionChallengeDeletionTests
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });
+        db.Teams.AddRange(Enumerable.Range(0, 64).Select(index => new Team
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            Name = $"idle-{index}",
+            CaptainId = Guid.NewGuid(),
+            InviteToken = Guid.NewGuid().ToString("N"),
+            RegisteredAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        }));
         await db.SaveChangesAsync();
         var manager = new RecordingContainerManager();
+        var executionLease = new RecordingExecutionLease();
 
         await DeleteCompetitionChallengeEndpoint.DeleteChallengeArtifactsAsync(
             db,
             manager,
+            executionLease,
             challenge,
             new DefaultHttpContext(),
             Guid.NewGuid(),
@@ -135,6 +148,9 @@ public class CompetitionChallengeDeletionTests
 
         Assert.Equal(["container-1"], manager.DestroyedContainers);
         Assert.Equal(["noctf-test"], manager.DestroyedComposeProjects);
+        Assert.Equal(
+            [CompetitionExecutionLeaseKeys.ChallengeInstance(teamId, challengeId)],
+            executionLease.EngineKeys);
         Assert.Empty(await db.ChallengeHints.IgnoreQueryFilters().Where(h => h.ChallengeId == challengeId).ToListAsync());
         Assert.Empty(await db.Submissions.IgnoreQueryFilters().Where(s => s.ChallengeId == challengeId).ToListAsync());
         Assert.Empty(await db.ScoreEvents.IgnoreQueryFilters().Where(s => s.ChallengeId == challengeId).ToListAsync());
@@ -149,6 +165,7 @@ public class CompetitionChallengeDeletionTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new FixedTenantContext(competitionId));
@@ -185,6 +202,28 @@ public class CompetitionChallengeDeletionTests
             Dictionary<string, string>? labels = null,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingExecutionLease : ICompetitionExecutionLease
+    {
+        public List<string> EngineKeys { get; } = [];
+
+        public Task<IExecutionLease?> TryAcquireAsync(
+            ApplicationDbContext db,
+            string engineKey,
+            Guid competitionId,
+            CancellationToken ct = default)
+        {
+            EngineKeys.Add(engineKey);
+            return Task.FromResult<IExecutionLease?>(new NoopExecutionLease());
+        }
+    }
+
+    private sealed class NoopExecutionLease : IExecutionLease
+    {
+        public CancellationToken LostToken => CancellationToken.None;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
 

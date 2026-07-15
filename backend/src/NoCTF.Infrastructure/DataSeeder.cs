@@ -18,11 +18,22 @@ public static class DataSeeder
         // Only seed if database is accessible
         try
         {
-            var adminEmail = configuration?["SeedAdmin:Email"] ?? "admin@noctf.local";
-            var adminUserName = configuration?["SeedAdmin:UserName"] ?? "admin";
+            var adminEmail = (configuration?["SeedAdmin:Email"] ?? "admin@noctf.local").Trim().ToLowerInvariant();
+            var adminUserName = (configuration?["SeedAdmin:UserName"] ?? "admin").Trim();
             var adminPassword = configuration?["SeedAdmin:Password"];
 
-            var existingAdmin = await db.Users.FirstOrDefaultAsync(u => u.Email == adminEmail);
+            if (adminEmail.Length > UserInputLimits.EmailMaxLength ||
+                adminUserName.Length is < UserInputLimits.UserNameMinLength or > UserInputLimits.UserNameMaxLength)
+            {
+                throw new SeedConfigurationException("SeedAdmin email or user name exceeds the supported length.");
+            }
+
+            var normalizedAdminEmail = adminEmail.ToLowerInvariant();
+            var existingAdmin = db.Database.IsRelational()
+                ? await db.Users.FirstOrDefaultAsync(
+                    u => EF.Property<string>(u, "NormalizedEmail") == normalizedAdminEmail)
+                : await db.Users.FirstOrDefaultAsync(
+                    u => u.Email.ToLower() == normalizedAdminEmail);
             if (existingAdmin is not null)
             {
                 if (existingAdmin.Role != UserRole.Admin)
