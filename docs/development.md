@@ -139,6 +139,7 @@ backend/src/
   NoCTF.Plugins.AWD/   # AWD plugin
   NoCTF.Plugins.AWDP/  # AWDP plugin
   NoCTF.Plugins.KoH/   # KoH plugin
+  NoCTF.Plugins.QQBot/ # Optional QQ notification plugin
 
 frontend/
   src/                 # Vue 3 application source
@@ -153,3 +154,4 @@ frontend/
 - The backend health endpoint is a quick way to verify everything is wired up: `curl http://localhost:5000/api/health`
 - Swagger UI is available at `http://localhost:5000/swagger` when running in development mode.
 - If you change an endpoint DTO, regenerate the OpenAPI client so the frontend types stay in sync.
+- Keep QQBot platform code in C#. The separately deployed outbound NoneBot agent is under `integrations/qqbot`; never develop it inside the read-only reference checkout at `E:\SourceCode\QQBOT`.

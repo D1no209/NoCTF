@@ -62,6 +62,7 @@ curl http://localhost/api/health
 - The Docker Compose API image builds the Vue SPA with Bun and serves the built `dist` from ASP.NET Core `wwwroot`, so no separate Nginx frontend container is required.
 - Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
 - Penetration Challenge ranges can run through the Docker Runner or the Kubernetes Runner. Set `NOCTF_PUBLIC_HOST` / `InstanceAccess:PublicHost` for Docker NodePort-style entry URLs, or `K8s:PublicEntry` / `K8s:IngressBaseDomain` for Kubernetes entries.
+- QQ group broadcasts are optional. Set `NOCTF_QQBOT_PUBLIC_BASE_URL` to the public competition origin used in message links, then configure the global and per-competition policy in WEB administration. The separately deployed BOT agent needs only outbound HTTPS access; follow [QQBot Integration](qqbot-integration.md) and keep its private key off the platform host.
 
 ## Kubernetes
 

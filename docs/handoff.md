@@ -402,14 +402,18 @@ The current work covers plugin-host fail-fast behavior, score and task idempoten
 Latest verification status:
 
 - Release solution build: 0 warnings, 0 errors.
-- Complete Release suite with real PostgreSQL 16 and Redis 7: 466/466 passed. The EF InMemory test helper now reuses option-compatible service providers without suppressing the production warning.
+- Complete Release suite with real PostgreSQL 16 and Redis 7: 475/475 passed. The EF InMemory test helper now reuses option-compatible service providers without suppressing the production warning.
 - `SubmissionMutationGuard` lease, transaction, cancellation, rollback, and release paths were manually reviewed for CTF, Penetration, AWDP, and AWD. AWD rollback remains available after mutation-token cancellation.
 - Analyzer and whitespace checks passed; the EF migration model has no pending changes.
 - An empty PostgreSQL database passed full upgrade, latest-migration rollback/reapply, full downgrade to `0`, and full re-upgrade.
 - OpenAPI was fetched from a running API and regenerated idempotently. The contract change is the expected `before`/`limit` pagination on AWDP patch submissions; generator template changes follow the security upgrade to `@hey-api/openapi-ts` 0.97.3.
 - Frontend frozen install, lint, and production build passed. NuGet vulnerability/deprecation scans and `bun audit` are clean.
 - Compose parsing and kubeconform strict passed (47 valid resources, 0 invalid/errors/skipped). Local `kubectl apply --dry-run=client` could not perform API discovery because no cluster is configured at `localhost:8080`; this is not a manifest validation failure.
-- API and Worker publish outputs contain all five built-in plugin assemblies. Temporary PostgreSQL/Redis validation containers were removed.
+- API and Worker publish outputs contain the five required game/challenge plugin assemblies plus the optional QQBot assembly. Temporary PostgreSQL/Redis validation containers were removed.
+
+QQ broadcast integration is now implemented as an optional sixth platform plugin plus a separately deployed outbound NoneBot/Milky agent. Platform code is C#; the Python agent lives under `integrations/qqbot` and the read-only reference checkout at `E:\SourceCode\QQBOT` is never modified. Configuration is global-policy plus explicit per-competition opt-in and group/event binding. PostgreSQL owns the durable outbox, leases, ACK/failure history, idempotency, and audit; Redis owns only replay protection and short cooldowns. See [`qqbot-integration.md`](qqbot-integration.md) for deployment, security, triggers, permissions, test-group restrictions, and rollback.
+
+The QQBot agent requirements pass `pip-audit`, and an ephemeral Python 3.12 container successfully imported the plugin and built the allowlisted Milky `mention_all`/`text` message segments. No live QQ message was sent during automated verification; the authorized manual smoke-test target remains group `1095173403`.
 
 The authoritative continuation instructions, architecture reading map, four critical request flows, collaborator protocol, exact risk list, validation caveats, and required execution order are in [`HANDOFF_PROMPT.md`](../HANDOFF_PROMPT.md). A new collaborator should follow its 20–30 minute quick-start sequence before changing the working tree.
 
