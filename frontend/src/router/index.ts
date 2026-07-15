@@ -108,6 +108,12 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
+          path: 'competitions/:id/qqbot',
+          name: 'admin-competition-qqbot',
+          component: () => import('@/views/admin/AdminCompetitionQqBotView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
+        },
+        {
           path: 'collaborators',
           name: 'admin-collaborators',
           component: () => import('@/views/admin/AdminCollaboratorsView.vue'),
@@ -136,6 +142,12 @@ const router = createRouter({
           name: 'admin-plugins',
           component: () => import('@/views/admin/AdminPluginsView.vue'),
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
+        },
+        {
+          path: 'qqbot',
+          name: 'admin-qqbot',
+          component: () => import('@/views/admin/AdminQqBotView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
         },
         {
           path: 'infrastructure',

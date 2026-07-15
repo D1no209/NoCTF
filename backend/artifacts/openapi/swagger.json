@@ -32,6 +32,171 @@
         }
       }
     },
+    "/api/integrations/qqbot/v1/heartbeat": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsQqBotAgentHeartbeatEndpoint",
+        "requestBody": {
+          "x-name": "QqBotHeartbeatRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotHeartbeatRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotAgentOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/qqbot/v1/groups/sync": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsQqBotAgentGroupSyncEndpoint",
+        "requestBody": {
+          "x-name": "QqBotGroupSyncRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupSyncRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupSyncResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/qqbot/v1/deliveries/lease": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsQqBotAgentLeaseEndpoint",
+        "requestBody": {
+          "x-name": "QqBotLeaseRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotLeaseRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotLeaseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/qqbot/v1/deliveries/ack": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsQqBotAgentAckEndpoint",
+        "requestBody": {
+          "x-name": "QqBotDeliveryAckRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotDeliveryAckRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotAgentOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/qqbot/v1/deliveries/fail": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsQqBotAgentFailEndpoint",
+        "requestBody": {
+          "x-name": "QqBotDeliveryFailureRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotDeliveryFailureRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotAgentOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/teams/mine": {
       "get": {
         "tags": [
@@ -4234,6 +4399,781 @@
         ]
       }
     },
+    "/api/admin/qqbot": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetQqBotOverviewEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotAdminOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/qqbot/settings": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdateQqBotSettingsEndpoint",
+        "requestBody": {
+          "x-name": "QqBotGlobalSettingsUpdate",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGlobalSettingsUpdate"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGlobalSettingsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/qqbot/agents": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpsertQqBotAgentEndpoint",
+        "requestBody": {
+          "x-name": "QqBotAgentUpdate",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotAgentUpdate"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotAgentView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/qqbot/groups/{groupId}/authorization": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminAuthorizeQqBotGroupEndpoint",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "QqBotGroupAuthorizationUpdate",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupAuthorizationUpdate"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/qqbot/groups/available": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetAvailableQqBotGroupsEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/qqbot": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionQqBotConfigEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotCompetitionQqBotConfigurationView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdateCompetitionQqBotConfigEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CompetitionQqBotConfigurationUpdate",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotCompetitionQqBotConfigurationUpdate"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotCompetitionQqBotConfigurationView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/qqbot/templates": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionQqBotTemplatesEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotTemplateView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpsertCompetitionQqBotTemplateEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "QqBotTemplateUpdate",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotTemplateUpdate"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotTemplateView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/qqbot/preview": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminPreviewCompetitionQqBotMessageEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "QqBotPreviewRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotPreviewRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotPreviewResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/qqbot/notifications": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminSendCompetitionQqBotNotificationEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "QqBotManualNotificationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotManualNotificationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotQueuedNotification"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/qqbot/logs": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetCompetitionQqBotLogsEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "eventType",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFCoreQqBotEventType"
+                }
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFCoreQqBotDeliveryStatus"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotDeliveryLogPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/competitions/{competitionId}/qqbot/deliveries/{deliveryId}/retry": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminRetryCompetitionQqBotDeliveryEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotRetryResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin",
+              "Organizer"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin",
+              "Organizer"
+            ]
+          }
+        ]
+      }
+    },
     "/api/admin/competitions/{id}/scoreboard/rebuild": {
       "post": {
         "tags": [
@@ -4526,6 +5466,209 @@
   },
   "components": {
     "schemas": {
+      "NoCTFApplicationQqBotQqBotAgentOperationResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "succeeded": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotHeartbeatRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "qqOnline": {
+            "type": "boolean"
+          },
+          "botUin": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "botNickname": {
+            "type": "string",
+            "nullable": true
+          },
+          "implementationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "implementationVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "milkyVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorSummary": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotGroupSyncResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "seenGroups": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "authorizedGroups": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotGroupSyncRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupSyncItem"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotGroupSyncItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "groupName": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotLeaseResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "delivery": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotDeliveryLease"
+              }
+            ]
+          },
+          "retryAfterMilliseconds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotDeliveryLease": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deliveryId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "leaseToken": {
+            "type": "string",
+            "format": "guid"
+          },
+          "groupId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "segmentsJson": {
+            "type": "string"
+          },
+          "lockedUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxAttempts": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotLeaseRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "waitSeconds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotDeliveryAckRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deliveryId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "leaseToken": {
+            "type": "string",
+            "format": "guid"
+          },
+          "messageSequence": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "remoteSentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "safeRemoteSummary": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotDeliveryFailureRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deliveryId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "leaseToken": {
+            "type": "string",
+            "format": "guid"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "safeSummary": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsTeamsMyTeamDto": {
         "allOf": [
           {
@@ -7531,6 +8674,790 @@
       "NoCTFAPIEndpointsAdminPenetrationAdminInstanceRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFApplicationQqBotQqBotAdminOverview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pluginAvailable": {
+            "type": "boolean"
+          },
+          "connectionType": {
+            "type": "string"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGlobalSettingsView"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotAgentView"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupView"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotGlobalSettingsView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "longPollSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deliveryLeaseSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxDeliveryAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxMessageLength": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxPendingDeliveries": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "groupCooldownMilliseconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "competitionCooldownMilliseconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "manualNotificationCooldownSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotAgentView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "hasPublicKey": {
+            "type": "boolean"
+          },
+          "hasPreviousPublicKey": {
+            "type": "boolean"
+          },
+          "previousKeyValidUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastHeartbeatAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "apiReachable": {
+            "type": "boolean"
+          },
+          "qqOnline": {
+            "type": "boolean"
+          },
+          "botUin": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "botNickname": {
+            "type": "string",
+            "nullable": true
+          },
+          "implementationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "implementationVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "milkyVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastErrorSummary": {
+            "type": "string",
+            "nullable": true
+          },
+          "pendingDeliveries": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recentSucceeded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recentFailed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotGroupView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "agentId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "groupId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "isPresent": {
+            "type": "boolean"
+          },
+          "isAuthorized": {
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotGlobalSettingsUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "longPollSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deliveryLeaseSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxDeliveryAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxMessageLength": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxPendingDeliveries": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "groupCooldownMilliseconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "competitionCooldownMilliseconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "manualNotificationCooldownSeconds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotAgentUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "publicKeyPem": {
+            "type": "string"
+          },
+          "previousKeyOverlapMinutes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotGroupAuthorizationUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "isAuthorized": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotCompetitionQqBotConfigurationView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "globalEnabled": {
+            "type": "boolean"
+          },
+          "hasOnlineAgent": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "allowMessages": {
+            "type": "boolean"
+          },
+          "allowManualNotifications": {
+            "type": "boolean"
+          },
+          "stopNormalEventsAfterFinished": {
+            "type": "boolean"
+          },
+          "mentionAll": {
+            "type": "boolean"
+          },
+          "showTeamName": {
+            "type": "boolean"
+          },
+          "showUserName": {
+            "type": "boolean"
+          },
+          "showChallengeCategory": {
+            "type": "boolean"
+          },
+          "includeCompetitionLink": {
+            "type": "boolean"
+          },
+          "includeChallengeLink": {
+            "type": "boolean"
+          },
+          "hidePenaltyDetails": {
+            "type": "boolean"
+          },
+          "eventRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotEventRuleView"
+            }
+          },
+          "groupBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupBindingView"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotEventRuleView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventType": {
+            "$ref": "#/components/schemas/NoCTFCoreQqBotEventType"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFCoreQqBotEventType": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionStarted",
+          "ChallengePublished",
+          "HintPublished",
+          "FirstBlood",
+          "SecondBlood",
+          "ThirdBlood",
+          "TeamPenalized",
+          "Announcement"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "NoCTFApplicationQqBotQqBotGroupBindingView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "agentId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "qqGroupId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFCoreQqBotEventType"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationQqBotCompetitionQqBotConfigurationUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "allowMessages": {
+            "type": "boolean"
+          },
+          "allowManualNotifications": {
+            "type": "boolean"
+          },
+          "stopNormalEventsAfterFinished": {
+            "type": "boolean"
+          },
+          "mentionAll": {
+            "type": "boolean"
+          },
+          "showTeamName": {
+            "type": "boolean"
+          },
+          "showUserName": {
+            "type": "boolean"
+          },
+          "showChallengeCategory": {
+            "type": "boolean"
+          },
+          "includeCompetitionLink": {
+            "type": "boolean"
+          },
+          "includeChallengeLink": {
+            "type": "boolean"
+          },
+          "hidePenaltyDetails": {
+            "type": "boolean"
+          },
+          "eventRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotEventRuleView"
+            }
+          },
+          "groupBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotGroupBindingView"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotTemplateView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/NoCTFCoreQqBotEventType"
+          },
+          "name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "isBuiltIn": {
+            "type": "boolean"
+          },
+          "allowedVariables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotTemplateUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/NoCTFCoreQqBotEventType"
+          },
+          "name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotPreviewResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "renderedText": {
+            "type": "string"
+          },
+          "segmentsJson": {
+            "type": "string"
+          },
+          "characterCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotPreviewRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventType": {
+            "$ref": "#/components/schemas/NoCTFCoreQqBotEventType"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "announcementTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "announcementContent": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotQueuedNotification": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetGroupCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotManualNotificationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "groupIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "templateId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "isTest": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotDeliveryLogPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationQqBotQqBotDeliveryLogView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationQqBotQqBotDeliveryLogView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionName": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/NoCTFCoreQqBotEventType"
+          },
+          "source": {
+            "$ref": "#/components/schemas/NoCTFCoreQqBotDeliverySource"
+          },
+          "qqGroupId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFCoreQqBotDeliveryStatus"
+          },
+          "attemptCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "messageSummary": {
+            "type": "string"
+          },
+          "messageDigest": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastErrorSummary": {
+            "type": "string",
+            "nullable": true
+          },
+          "remoteMessageSequence": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "remoteSentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "retriedByUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFCoreQqBotDeliverySource": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Automatic",
+          "Manual",
+          "Test",
+          "ManualRetry"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFCoreQqBotDeliveryStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Leased",
+          "Retrying",
+          "Succeeded",
+          "Failed",
+          "Cancelled"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "NoCTFAPIEndpointsAdminQqBotLogRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFApplicationQqBotQqBotRetryResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "parentDeliveryId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
       },
       "NoCTFAPIEndpointsAdminRebuildScoreboardResponse": {
         "type": "object",

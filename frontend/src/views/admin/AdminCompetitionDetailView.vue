@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArrowLeft,
+  Bot,
   Check,
   Loader2,
   Lock,
@@ -1064,6 +1065,11 @@ function sectionRoute(section: CompetitionDetailSection) {
         </div>
       </div>
       <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+        <Button variant="outline" size="sm" as-child>
+          <RouterLink :to="{ name: 'admin-competition-qqbot', params: { id: competitionId } }">
+            <Bot class="mr-2 size-4" />QQ Bot
+          </RouterLink>
+        </Button>
         <Button v-if="canOpenAwdpScreen" variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'awdp-screen', params: { gameId: competitionId } }">
             {{ t('awdp.screenEntry') }}
