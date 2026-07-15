@@ -111,6 +111,8 @@ For each AWDP challenge, a team works through the plugin operation card:
 4. The platform validates the FixScript in an isolated runner
 5. Future round settlement awards attack and defense score deltas from the recorded Break/Fix state
 
+AWDP container-related operations, including creating or changing the instance and requesting defense, use a 30-second cooldown. This does not change instance lifetime, runner/check timeouts, or round duration.
+
 Break success and Fix success are state changes. They do not grant the whole challenge score immediately.
 
 Challenge authors can attach a patch-template archive to an AWDP challenge. When `patchTemplateUrl` exists, players can download it from the challenge modal and use it as the starter FixScript package.
