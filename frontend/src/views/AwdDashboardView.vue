@@ -2,8 +2,8 @@
 import type { AttackLogDto } from '@/components/game/AttackLogFeed.vue'
 import type { AwdAwarenessEvent } from '@/components/game/AwdBattlefieldCore.vue'
 import type { ServiceStatus } from '@/components/game/ServiceStatusGrid.vue'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, Upload } from 'lucide-vue-next'
+import { useQuery } from '@tanstack/vue-query'
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -14,7 +14,6 @@ import AttackLogFeed from '@/components/game/AttackLogFeed.vue'
 import AwdBattlefieldCore from '@/components/game/AwdBattlefieldCore.vue'
 import RoundTimer from '@/components/game/RoundTimer.vue'
 import ServiceStatusGrid from '@/components/game/ServiceStatusGrid.vue'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -28,15 +27,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useSignalR } from '@/composables/useSignalR'
-import { runtimeStatusVariant } from '@/lib/statusTones'
 import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
 
-const props = withDefaults(defineProps<{ gameModeType?: string }>(), { gameModeType: 'Awd' })
 const { t } = useI18n()
-const qc = useQueryClient()
-
-const isAwdp = computed(() => props.gameModeType?.toLowerCase() === 'awdp')
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -61,19 +55,6 @@ interface Team {
 interface Challenge {
   id: string
   title: string
-}
-
-interface PatchSubmissionStatus {
-  id?: string
-  submissionId?: string
-  challengeId: string
-  challengeName?: string
-  challengeTitle?: string
-  status: 'Pending' | 'Running' | 'Retrying' | 'Applied' | 'Verified' | 'Rejected' | 'Failed'
-  submittedAt?: string
-  createdAt?: string
-  lastError?: string
-  validationLog?: string
 }
 
 const {
@@ -108,17 +89,6 @@ const {
   enabled: computed(() => !!competitionId.value),
 })
 
-const {
-  data: patchSubmissions,
-  refetch: refetchPatchSubmissions,
-  isError: patchSubmissionsError,
-} = useQuery({
-  queryKey: computed(() => queryKeys.patchSubmissions(competitionId.value)),
-  queryFn: () => competitionApi.patchSubmissions<PatchSubmissionStatus[]>(competitionId.value),
-  enabled: computed(() => !!competitionId.value && isAwdp.value),
-  refetchInterval: computed(() => (isAwdp.value ? 10_000 : false)),
-})
-
 const round = computed(() => dashboard.value?.currentRound ?? 0)
 const remainingSeconds = computed(() => dashboard.value?.remainingSeconds ?? 0)
 const totalSeconds = computed(() => dashboard.value?.roundDurationSeconds ?? 300)
@@ -150,11 +120,6 @@ onUnmounted(() => {
   signalR.stop()
 })
 
-const patchChallenge = ref('')
-const patchFile = ref<File | null>(null)
-const patchLoading = ref(false)
-const isDragOver = ref(false)
-const patchStatuses = computed(() => patchSubmissions.value ?? [])
 const controlDataError = computed(() => teamsError.value || challengesError.value)
 
 async function refetchAwdData() {
@@ -162,39 +127,7 @@ async function refetchAwdData() {
     refetchDashboard(),
     refetchTeams(),
     refetchChallenges(),
-    isAwdp.value ? refetchPatchSubmissions() : Promise.resolve(),
   ])
-}
-
-function onPatchFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  patchFile.value = input.files?.[0] ?? null
-}
-
-function onPatchDrop(e: DragEvent) {
-  isDragOver.value = false
-  patchFile.value = e.dataTransfer?.files[0] ?? null
-}
-
-async function submitPatch() {
-  if (!patchFile.value || !patchChallenge.value) return
-  patchLoading.value = true
-  try {
-    const data = await competitionApi.submitPatch<{ submissionId?: string }>(
-      competitionId.value,
-      patchChallenge.value,
-      patchFile.value,
-    )
-    toast.success(t('awd.patchSubmitted'), {
-      description: data?.submissionId ? `Submission ID: ${data.submissionId}` : undefined,
-    })
-    qc.invalidateQueries({ queryKey: queryKeys.patchSubmissions(competitionId.value) })
-    patchFile.value = null
-  } catch {
-    toast.error(t('awd.patchUploadFailed'))
-  } finally {
-    patchLoading.value = false
-  }
 }
 
 const selectedVictim = ref('')
@@ -365,109 +298,6 @@ function enqueueAttackFailed(reason: string) {
           </CardContent>
         </Card>
 
-        <!-- Upload Patch (AWDP) -->
-        <transition name="slide-up">
-          <Card v-if="isAwdp" class="noctf-panel border-info/20">
-            <CardHeader>
-              <CardTitle class="flex items-center gap-2 text-info">
-                <Upload class="size-5" />
-                {{ t('awd.uploadPatch') }}
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-4">
-              <div class="space-y-2">
-                <label class="text-xs font-bold uppercase text-muted-foreground">{{
-                  t('common.challenge')
-                }}</label>
-                <Select v-model="patchChallenge">
-                  <SelectTrigger>
-                    <SelectValue :placeholder="t('awd.selectChallenge')" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem v-for="ch in challenges" :key="ch.id" :value="ch.id">
-                        {{ ch.title }}
-                      </SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div
-                class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 transition-[background-color,border-color,transform] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:-translate-y-0.5 hover:bg-muted/50"
-                :class="[
-                  isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25',
-                  patchFile ? 'bg-muted/30' : '',
-                ]"
-                @dragover.prevent="isDragOver = true"
-                @dragleave.prevent="isDragOver = false"
-                @drop.prevent="onPatchDrop"
-                @click="($refs.patchFileInput as HTMLInputElement)?.click()"
-              >
-                <div
-                  class="flex size-10 items-center justify-center rounded-full border bg-background transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] group-hover:border-primary/30"
-                >
-                  <Upload class="size-5 text-muted-foreground" />
-                </div>
-                <div class="text-center">
-                  <p class="text-sm font-medium">
-                    {{ patchFile ? patchFile.name : t('awd.dropFile') }}
-                  </p>
-                  <p class="text-xs text-muted-foreground mt-1">.tar.gz or .tgz max 10MB</p>
-                </div>
-                <input
-                  ref="patchFileInput"
-                  type="file"
-                  accept=".tar.gz,.tgz"
-                  class="sr-only"
-                  @change="onPatchFileChange"
-                />
-              </div>
-
-              <Button
-                class="w-full bg-info text-info-foreground hover:bg-info/90"
-                :disabled="patchLoading || !patchFile || !patchChallenge"
-                @click="submitPatch"
-              >
-                <Loader2 v-if="patchLoading" class="mr-2 size-4 animate-spin" />
-                {{ t('awd.submitPatch') }}
-              </Button>
-            </CardContent>
-          </Card>
-        </transition>
-
-        <!-- Patch Status List (AWDP) -->
-        <transition name="fade">
-          <Card v-if="isAwdp && patchStatuses.length > 0" class="noctf-panel">
-            <CardHeader class="pb-2">
-              <CardTitle class="text-sm font-bold uppercase text-muted-foreground">
-                {{ t('awd.patchStatus') }}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="divide-y">
-                <div
-                  v-for="ps in patchStatuses"
-                  :key="ps.challengeId"
-                  class="flex items-center justify-between py-2.5 first:pt-0 last:pb-0"
-                >
-                  <span class="text-sm font-medium">{{
-                    ps.challengeName ?? ps.challengeTitle ?? ps.challengeId
-                  }}</span>
-                  <Badge
-                    :variant="runtimeStatusVariant(ps.status)"
-                    class="text-[10px] uppercase font-bold tracking-tighter h-5"
-                  >
-                    {{ ps.status }}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </transition>
-        <Alert v-if="isAwdp && patchSubmissionsError" variant="destructive">
-          {{ t('awd.patchStatusLoadFailed') }}
-        </Alert>
       </div>
 
       <!-- Right: Attack Log -->

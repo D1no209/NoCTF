@@ -1654,7 +1654,10 @@ export type NoCtfapiEndpointsCompetitionsGetPatchSubmissionsEndpointData = {
     path: {
         id: string;
     };
-    query?: never;
+    query?: {
+        before?: string | null;
+        limit?: number | null;
+    };
     url: '/api/competitions/{id}/patch-submissions';
 };
 

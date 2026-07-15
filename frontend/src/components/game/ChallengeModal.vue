@@ -31,7 +31,6 @@ import {
   Server,
   Timer,
   Trash2,
-  Upload,
 } from 'lucide-vue-next'
 import PenetrationChallengePanel from './PenetrationChallengePanel.vue'
 
@@ -120,7 +119,6 @@ const props = defineProps<{
   competitionId: string
   solved: boolean
   gameModeType?: string
-  isAwdMode?: boolean
   isAwdpMode?: boolean
   instanceReady?: boolean
   defenseEnabled?: boolean
@@ -234,15 +232,6 @@ const destroyConfirmLabel = computed(() => props.challenge?.title ?? '')
 const destroyConfirmed = computed(
   () => destroyConfirmLabel.value.length > 0 && destroyConfirmText.value.trim() === destroyConfirmLabel.value,
 )
-const canUploadPatch = computed(() =>
-  Boolean(
-    props.isAwdMode &&
-    props.defenseEnabled &&
-    patchFile.value &&
-    props.challenge &&
-    canRequestCurrentDefense.value,
-  ),
-)
 const awdpState = computed(() => props.awdpState ?? null)
 const awdpInstanceRunning = computed(() => {
   if (runningInstance.value) return true
@@ -268,6 +257,7 @@ const awdpCanRequestDefense = computed(() =>
   Boolean(
     props.challenge &&
     awdpInstanceRunning.value &&
+    !isCoolingDown.value &&
     canRequestCurrentDefense.value &&
     (awdpState.value?.canRequestDefense ?? true),
   ),
@@ -495,8 +485,7 @@ async function submitFlag() {
 
 async function submitPatch() {
   if (!props.challenge || !patchFile.value) return
-  if (props.isAwdpMode && !awdpCanRequestDefense.value) return
-  if (!props.isAwdpMode && (!props.defenseEnabled || !canRequestCurrentDefense.value)) return
+  if (!props.isAwdpMode || !awdpCanRequestDefense.value) return
   patchUploading.value = true
 
   try {
@@ -653,7 +642,7 @@ function getApiErrorDetail(error: unknown) {
         />
 
         <div
-          v-if="!isPenetrationChallenge && ((isDynamicContainer && !isAwdpMode) || isAwdMode)"
+          v-if="!isPenetrationChallenge && isDynamicContainer && !isAwdpMode"
           class="grid gap-3 rounded-xl border bg-muted/25 p-3 sm:grid-cols-2"
         >
           <div v-if="isDynamicContainer" class="space-y-3 sm:col-span-2">
@@ -764,22 +753,12 @@ function getApiErrorDetail(error: unknown) {
               }}
             </Button>
           </div>
-          <Button
-            v-if="isAwdMode"
-            type="button"
-            variant="outline"
-            class="justify-start"
-            :disabled="defenseEnabled || !canRequestCurrentDefense"
-            @click="emit('request-defense')"
-          >
-            <Shield class="mr-2 size-4" />
-            {{ defenseEnabled ? t('challenges.defenseReady') : t('challenges.requestDefense') }}
-          </Button>
         </div>
         <Alert
           v-if="
             !isPenetrationChallenge &&
-            ((isDynamicContainer && !isAwdpMode) || isAwdMode) &&
+            isDynamicContainer &&
+            !isAwdpMode &&
             !canSubmitCurrentFlag
           "
         >
@@ -1063,37 +1042,6 @@ function getApiErrorDetail(error: unknown) {
             <Download class="mr-1 inline size-4" />
             {{ t('awdp.downloadPatchTemplate') }}
           </a>
-        </div>
-
-        <div v-if="isAwdMode" class="space-y-3 rounded-xl border bg-muted/20 p-3">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <div class="text-sm font-semibold">{{ t('awd.uploadPatch') }}</div>
-              <p class="text-xs text-muted-foreground">
-                {{ defenseEnabled ? t('challenges.patchUnlocked') : t('challenges.patchLocked') }}
-              </p>
-            </div>
-            <Badge :variant="defenseEnabled ? 'defense' : 'warning'">
-              {{ defenseEnabled ? t('challenges.defenseReady') : t('challenges.defenseRequired') }}
-            </Badge>
-          </div>
-          <div class="flex flex-col gap-2 sm:flex-row">
-            <Input
-              type="file"
-              accept=".tar.gz,.tgz"
-              :disabled="!defenseEnabled || patchUploading"
-              @change="onPatchFileChange"
-            />
-            <Button
-              class="shrink-0"
-              :disabled="patchUploading || !canUploadPatch"
-              @click="submitPatch"
-            >
-              <Loader2 v-if="patchUploading" class="mr-2 size-4 animate-spin" />
-              <Upload v-else class="mr-2 size-4" />
-              {{ t('awd.submitPatch') }}
-            </Button>
-          </div>
         </div>
 
         <div v-if="!solved && !isAwdpMode && !isPenetrationChallenge" class="space-y-2">
