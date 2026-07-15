@@ -30,7 +30,11 @@ public class AwdpConfigResolver(ApplicationDbContext db)
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstAsync(c => c.Id == challengeId && c.CompetitionId == competitionId, ct);
+            .FirstAsync(c =>
+                c.Id == challengeId &&
+                c.CompetitionId == competitionId &&
+                !c.IsDeleting,
+                ct);
 
         return Resolve(competition, challenge);
     }

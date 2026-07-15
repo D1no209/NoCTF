@@ -19,7 +19,8 @@ public sealed class PenetrationScoringProfileContributor(ApplicationDbContext db
             .AsNoTracking()
             .AnyAsync(c =>
                 c.CompetitionId == competition.Id &&
-                c.TypeId.ToLower() == PenetrationConstants.TypeId,
+                c.TypeId.ToLower() == PenetrationConstants.TypeId &&
+                !c.IsDeleting,
                 ct);
 
         return hasPenetrationChallenges
@@ -82,7 +83,11 @@ public class PenetrationBloodBonusStrategy(ApplicationDbContext db, IScoreEventW
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.CompetitionId == signal.CompetitionId && c.Id == flag.ChallengeId, ct);
+            .FirstOrDefaultAsync(c =>
+                c.CompetitionId == signal.CompetitionId &&
+                c.Id == flag.ChallengeId &&
+                !c.IsDeleting,
+                ct);
         if (challenge is null || !challenge.EnableBloodBonus) return;
 
         var competition = await db.Competitions
@@ -140,6 +145,9 @@ public class PenetrationBloodBonusStrategy(ApplicationDbContext db, IScoreEventW
 
 public sealed class PenetrationScoreRebuildContributor(ApplicationDbContext db) : IScoreRebuildContributor
 {
+    public IReadOnlySet<string> OwnedChallengeTypeIds { get; } =
+        new HashSet<string>([PenetrationConstants.TypeId], StringComparer.OrdinalIgnoreCase);
+
     private sealed record RankedSolve(Guid TeamId, DateTime SubmittedAt, int Rank, Guid? SignalId);
 
     public async Task RebuildAsync(
@@ -160,7 +168,8 @@ public sealed class PenetrationScoreRebuildContributor(ApplicationDbContext db) 
             .Where(c =>
                 c.CompetitionId == competition.Id &&
                 challengeIds.Contains(c.Id) &&
-                c.TypeId.ToLower() == PenetrationConstants.TypeId)
+                c.TypeId.ToLower() == PenetrationConstants.TypeId &&
+                !c.IsDeleting)
             .ToListAsync(ct);
 
         var penetrationChallengeIds = challenges.Select(c => c.Id).ToHashSet();
@@ -177,7 +186,10 @@ public sealed class PenetrationScoreRebuildContributor(ApplicationDbContext db) 
                 e.ChallengeId.HasValue && penetrationChallengeIds.Contains(e.ChallengeId.Value));
         }
 
-        db.ScoreEvents.RemoveRange(await staleQuery.ToListAsync(ct));
+        if (db.Database.IsRelational())
+            await staleQuery.ExecuteDeleteAsync(ct);
+        else
+            db.ScoreEvents.RemoveRange(await staleQuery.ToListAsync(ct));
 
         if (challenges.Count == 0)
         {
@@ -195,11 +207,15 @@ public sealed class PenetrationScoreRebuildContributor(ApplicationDbContext db) 
             .OrderBy(f => f.ChallengeId)
             .ThenBy(f => f.Stage)
             .ToListAsync(ct);
+        var rankedSolvesByFlag = await GetRankedSolvesAsync(
+            competition.Id,
+            flags.Select(flag => flag.Id).ToArray(),
+            ct);
 
         var rebuiltEvents = new List<ScoreEvent>();
         foreach (var flag in flags)
         {
-            var solves = await GetRankedSolvesAsync(competition.Id, flag, ct);
+            var solves = rankedSolvesByFlag.GetValueOrDefault(flag.Id) ?? [];
             foreach (var solve in solves)
             {
                 rebuiltEvents.Add(new ScoreEvent
@@ -267,18 +283,21 @@ public sealed class PenetrationScoreRebuildContributor(ApplicationDbContext db) 
         await db.SaveChangesAsync(ct);
     }
 
-    private async Task<List<RankedSolve>> GetRankedSolvesAsync(
+    private async Task<Dictionary<Guid, List<RankedSolve>>> GetRankedSolvesAsync(
         Guid competitionId,
-        PenetrationFlag flag,
+        IReadOnlyCollection<Guid> flagIds,
         CancellationToken ct)
     {
+        if (flagIds.Count == 0)
+            return [];
+
         var submissions = await db.Submissions
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s =>
                 s.CompetitionId == competitionId &&
-                s.ChallengeId == flag.ChallengeId &&
-                s.PenetrationFlagId == flag.Id &&
+                s.PenetrationFlagId.HasValue &&
+                flagIds.Contains(s.PenetrationFlagId.Value) &&
                 s.IsCorrect)
             .Join(
                 db.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
@@ -287,35 +306,49 @@ public sealed class PenetrationScoreRebuildContributor(ApplicationDbContext db) 
                     !t.IsBanned),
                 s => s.TeamId,
                 t => t.Id,
-                (s, _) => new { s.TeamId, s.SubmittedAt })
-            .GroupBy(s => s.TeamId)
-            .Select(g => new { TeamId = g.Key, SubmittedAt = g.Min(s => s.SubmittedAt) })
-            .OrderBy(s => s.SubmittedAt)
+                (s, _) => new { FlagId = s.PenetrationFlagId!.Value, s.TeamId, s.SubmittedAt })
+            .GroupBy(s => new { s.FlagId, s.TeamId })
+            .Select(g => new
+            {
+                g.Key.FlagId,
+                g.Key.TeamId,
+                SubmittedAt = g.Min(s => s.SubmittedAt)
+            })
             .ToListAsync(ct);
 
         var teamIds = submissions.Select(s => s.TeamId).ToHashSet();
-        var signalMap = await db.ScoreSignals
+        var signalRows = await db.ScoreSignals
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s =>
                 s.CompetitionId == competitionId &&
-                s.SubjectId == flag.Id &&
+                s.SubjectId.HasValue &&
+                flagIds.Contains(s.SubjectId.Value) &&
                 s.SignalType == ScoreSignalTypes.PenetrationFlagAccepted &&
                 teamIds.Contains(s.TeamId))
-            .GroupBy(s => s.TeamId)
+            .GroupBy(s => new { FlagId = s.SubjectId!.Value, s.TeamId })
             .Select(g => new
             {
-                TeamId = g.Key,
+                g.Key.FlagId,
+                g.Key.TeamId,
                 SignalId = g.OrderBy(s => s.OccurredAt).Select(s => s.Id).FirstOrDefault()
             })
-            .ToDictionaryAsync(s => s.TeamId, s => (Guid?)s.SignalId, ct);
+            .ToListAsync(ct);
+        var signalMap = signalRows.ToDictionary(
+            signal => (signal.FlagId, signal.TeamId),
+            signal => (Guid?)signal.SignalId);
 
         return submissions
-            .Select((solve, index) => new RankedSolve(
-                solve.TeamId,
-                solve.SubmittedAt,
-                index + 1,
-                signalMap.GetValueOrDefault(solve.TeamId)))
-            .ToList();
+            .GroupBy(solve => solve.FlagId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(solve => solve.SubmittedAt)
+                    .Select((solve, index) => new RankedSolve(
+                        solve.TeamId,
+                        solve.SubmittedAt,
+                        index + 1,
+                        signalMap.GetValueOrDefault((solve.FlagId, solve.TeamId))))
+                    .ToList());
     }
 }

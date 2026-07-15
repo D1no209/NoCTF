@@ -4,6 +4,7 @@ using System.Text.Json;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -35,6 +36,7 @@ public static class ChallengeInstanceRuntime
     public static readonly TimeSpan InstanceTtl = TimeSpan.FromHours(2);
     public static readonly TimeSpan ExtendBy = TimeSpan.FromMinutes(30);
     public static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan AwdpCooldown = TimeSpan.FromSeconds(30);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -44,8 +46,22 @@ public static class ChallengeInstanceRuntime
     public static DateTime? CooldownUntil(AwdGameBox? box)
         => box?.LastInstanceActionAt is null ? null : box.LastInstanceActionAt.Value.Add(Cooldown);
 
+    public static DateTime? CooldownUntil(AwdGameBox? box, GameModeType gameModeType)
+        => box?.LastInstanceActionAt is null
+            ? null
+            : box.LastInstanceActionAt.Value.Add(GetCooldown(gameModeType));
+
     public static bool IsCoolingDown(AwdGameBox? box, DateTime now)
         => CooldownUntil(box) is { } until && until > now;
+
+    public static bool IsCoolingDown(AwdGameBox? box, DateTime now, GameModeType gameModeType)
+        => CooldownUntil(box, gameModeType) is { } until && until > now;
+
+    public static bool SupportsPlayerManagedInstance(GameModeType gameModeType)
+        => gameModeType is GameModeType.Ctf or GameModeType.Awdp;
+
+    public static string BuildTransitionKey(Guid teamId, Guid challengeId)
+        => CompetitionExecutionLeaseKeys.ChallengeInstance(teamId, challengeId);
 
     public static Dictionary<int, int> ReadPorts(AwdGameBox? box)
     {
@@ -68,13 +84,10 @@ public static class ChallengeInstanceRuntime
         var configured = configuration["InstanceAccess:PublicHost"];
         if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim();
 
-        var requestHost = httpContext.Request.Host.Host;
-        if (!configuration.GetValue("InstanceAccess:TrustRequestHost", false) &&
-            !string.IsNullOrWhiteSpace(requestHost))
-        {
-            return requestHost;
-        }
+        if (!configuration.GetValue("InstanceAccess:TrustRequestHost", false))
+            return string.Empty;
 
+        var requestHost = httpContext.Request.Host.Host;
         if (!string.IsNullOrWhiteSpace(requestHost) &&
             !IPAddress.IsLoopback(IPAddress.TryParse(requestHost, out var parsed) ? parsed : IPAddress.None) &&
             !requestHost.Equals("localhost", StringComparison.OrdinalIgnoreCase))
@@ -92,6 +105,14 @@ public static class ChallengeInstanceRuntime
         IConfiguration configuration,
         HttpContext httpContext,
         DateTime now)
+        => BuildResponse(box, configuration, httpContext, now, GameModeType.Ctf);
+
+    public static ChallengeInstanceResponse BuildResponse(
+        AwdGameBox? box,
+        IConfiguration configuration,
+        HttpContext httpContext,
+        DateTime now,
+        GameModeType gameModeType)
     {
         var ports = IsActive(box, now) ? ReadPorts(box) : [];
         var host = !string.IsNullOrWhiteSpace(box?.PublicHost)
@@ -119,7 +140,7 @@ public static class ChallengeInstanceRuntime
             AccessHost = host,
             Status = IsActive(box, now) ? "running" : "none",
             ExpiresAt = IsActive(box, now) ? box?.ExpiresAt : null,
-            CooldownUntil = CooldownUntil(box),
+            CooldownUntil = CooldownUntil(box, gameModeType),
             ServerTime = now,
         };
     }
@@ -138,13 +159,28 @@ public static class ChallengeInstanceRuntime
         box.InternalHost = null;
         box.InternalPortMappingsJson = "{}";
         box.ExpiresAt = null;
+        box.RuntimeOperationId = null;
+        box.CleanupOwner = null;
+        box.CleanupLockedUntil = null;
     }
 
     private static string FormatHost(string host)
         => host.Contains(':') && !host.StartsWith('[') ? $"[{host}]" : host;
+
+    private static TimeSpan GetCooldown(GameModeType gameModeType)
+        => gameModeType switch
+        {
+            GameModeType.Ctf => Cooldown,
+            GameModeType.Awdp => AwdpCooldown,
+            _ => throw new ArgumentOutOfRangeException(nameof(gameModeType), gameModeType, "Unsupported player-managed instance mode.")
+        };
 }
 
-public class GetChallengeInstanceEndpoint(ApplicationDbContext dbContext, IConfiguration configuration, IContainerManager containerManager)
+public class GetChallengeInstanceEndpoint(
+    ApplicationDbContext dbContext,
+    IConfiguration configuration,
+    IContainerManager containerManager,
+    ICompetitionExecutionLease executionLease)
     : Endpoint<ChallengeInstanceRequest, ChallengeInstanceResponse>
 {
     public override void Configure()
@@ -169,51 +205,104 @@ public class GetChallengeInstanceEndpoint(ApplicationDbContext dbContext, IConfi
         }
 
         var now = DateTime.UtcNow;
-        if (PublicCompetitionGuard.ResolvePlayBlockReason(context.Competition!, now) is { } blockReason)
+        var blockReason = PublicCompetitionGuard.ResolvePlayBlockReason(context.Competition!, now);
+        var requiresCleanup = context.Box?.ContainerInstanceId is not null &&
+                              (blockReason is not null || !ChallengeInstanceRuntime.IsActive(context.Box, now));
+        IExecutionLease? transitionLease = null;
+        CancellationTokenSource? leaseCts = null;
+        if (requiresCleanup)
         {
-            if (context.Box is not null && context.Box.ContainerInstanceId is not null)
+            transitionLease = await executionLease.TryAcquireAsync(
+                dbContext,
+                ChallengeInstanceRuntime.BuildTransitionKey(context.Team!.Id, req.ChallengeId),
+                req.Id,
+                ct);
+            if (transitionLease is null)
+            {
+                await SendStringAsync("instance_transition_in_progress", 409, cancellation: ct);
+                return;
+            }
+
+            leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+            ct = leaseCts.Token;
+            dbContext.ChangeTracker.Clear();
+            context = await CreateChallengeInstanceEndpoint.LoadContextAsync(dbContext, req, userId, ct);
+            if (context.Error is not null)
+            {
+                await transitionLease.DisposeAsync();
+                leaseCts.Dispose();
+                await SendStringAsync(context.Error.Value.Message, context.Error.Value.StatusCode, cancellation: ct);
+                return;
+            }
+
+            now = DateTime.UtcNow;
+            blockReason = PublicCompetitionGuard.ResolvePlayBlockReason(context.Competition!, now);
+        }
+
+        try
+        {
+            if (blockReason is not null)
+            {
+                if (context.Box is not null && context.Box.ContainerInstanceId is not null)
+                {
+                    await CreateChallengeInstanceEndpoint.DestroyTrackedBoxAsync(
+                        dbContext,
+                        containerManager,
+                        context.Box,
+                        HttpContext,
+                        blockReason,
+                        userId,
+                        updateCooldown: false,
+                        ct);
+                    await dbContext.SaveChangesAsync(ct);
+                }
+
+                await SendStringAsync(blockReason, 403, cancellation: ct);
+                return;
+            }
+
+            if (context.Box is not null && context.Box.ContainerInstanceId is not null && !ChallengeInstanceRuntime.IsActive(context.Box, now))
             {
                 await CreateChallengeInstanceEndpoint.DestroyTrackedBoxAsync(
                     dbContext,
                     containerManager,
                     context.Box,
                     HttpContext,
-                    blockReason,
+                    "instance_expired_on_read",
                     userId,
                     updateCooldown: false,
                     ct);
                 await dbContext.SaveChangesAsync(ct);
             }
 
-            await SendStringAsync(blockReason, 403, cancellation: ct);
-            return;
-        }
-
-        if (context.Box is not null && context.Box.ContainerInstanceId is not null && !ChallengeInstanceRuntime.IsActive(context.Box, now))
-        {
-            await CreateChallengeInstanceEndpoint.DestroyTrackedBoxAsync(
-                dbContext,
-                containerManager,
+            await SendAsync(ChallengeInstanceRuntime.BuildResponse(
                 context.Box,
+                configuration,
                 HttpContext,
-                "instance_expired_on_read",
-                userId,
-                updateCooldown: false,
-                ct);
-            await dbContext.SaveChangesAsync(ct);
+                DateTime.UtcNow,
+                context.Competition!.GameModeType), cancellation: ct);
         }
-
-        await SendAsync(ChallengeInstanceRuntime.BuildResponse(context.Box, configuration, HttpContext, DateTime.UtcNow), cancellation: ct);
+        finally
+        {
+            if (transitionLease is not null)
+                await transitionLease.DisposeAsync();
+            leaseCts?.Dispose();
+        }
     }
 }
 
-public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, IContainerManager containerManager, IConfiguration configuration)
+public class CreateChallengeInstanceEndpoint(
+    ApplicationDbContext dbContext,
+    IContainerManager containerManager,
+    IConfiguration configuration,
+    ICompetitionExecutionLease executionLease)
     : Endpoint<ChallengeInstanceRequest, ChallengeInstanceResponse>
 {
     public override void Configure()
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/instance");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(ChallengeInstanceRequest req, CancellationToken ct)
@@ -225,6 +314,27 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         }
 
         var context = await LoadContextAsync(dbContext, req, userId, ct);
+        if (context.Error is not null)
+        {
+            await SendStringAsync(context.Error.Value.Message, context.Error.Value.StatusCode, cancellation: ct);
+            return;
+        }
+
+        await using var transitionLease = await executionLease.TryAcquireAsync(
+            dbContext,
+            ChallengeInstanceRuntime.BuildTransitionKey(context.Team!.Id, req.ChallengeId),
+            req.Id,
+            ct);
+        if (transitionLease is null)
+        {
+            await SendStringAsync("instance_transition_in_progress", 409, cancellation: ct);
+            return;
+        }
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+        ct = leaseCts.Token;
+
+        dbContext.ChangeTracker.Clear();
+        context = await LoadContextAsync(dbContext, req, userId, ct);
         if (context.Error is not null)
         {
             await SendStringAsync(context.Error.Value.Message, context.Error.Value.StatusCode, cancellation: ct);
@@ -254,7 +364,12 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
 
         if (ChallengeInstanceRuntime.IsActive(context.Box, now))
         {
-            await SendAsync(ChallengeInstanceRuntime.BuildResponse(context.Box, configuration, HttpContext, now), cancellation: ct);
+            await SendAsync(ChallengeInstanceRuntime.BuildResponse(
+                context.Box,
+                configuration,
+                HttpContext,
+                now,
+                context.Competition!.GameModeType), cancellation: ct);
             return;
         }
 
@@ -269,24 +384,106 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
                 userId,
                 updateCooldown: false,
                 ct);
+            // Commit removal of the previous dynamic flag before creating the
+            // replacement. Otherwise EF can return the tracked Deleted entity
+            // from the upsert query and silently delete the newly issued flag.
+            await dbContext.SaveChangesAsync(ct);
         }
 
-        if (ChallengeInstanceRuntime.IsCoolingDown(context.Box, now))
+        if (ChallengeInstanceRuntime.IsCoolingDown(context.Box, now, context.Competition!.GameModeType))
         {
             await SendStringAsync("instance_cooldown", 429, cancellation: ct);
             return;
         }
 
-        var dynamicFlag = await UpsertDynamicFlagAsync(context.Challenge!, context.Team!.Id, ct);
-        var instance = await containerManager.CreateContainerAsync(BuildContainerConfig(context.Challenge!, context.Team.Id, dynamicFlag), ct);
-        var box = context.Box ?? new AwdGameBox
+        AwdGameBox box;
+        CtfDynamicFlag dynamicFlag;
+        await using (var preparationLease = await executionLease.TryAcquireAsync(
+            dbContext,
+            CompetitionExecutionLeaseKeys.RuntimePreparation,
+            req.Id,
+            ct))
         {
-            Id = Guid.NewGuid(),
-            CompetitionId = req.Id,
-            TeamId = context.Team.Id,
-            ChallengeId = req.ChallengeId,
-            CreatedAt = now,
-        };
+            if (preparationLease is null)
+            {
+                await SendStringAsync("runtime_preparation_in_progress", 409, cancellation: ct);
+                return;
+            }
+
+            using var preparationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                preparationLease.LostToken);
+            var preparationCt = preparationCts.Token;
+
+            // Re-read every admission tombstone inside the short preparation
+            // lease. A deletion that wins this lease rejects the create; a
+            // create that wins persists its candidate before deletion scans.
+            dbContext.ChangeTracker.Clear();
+            context = await LoadContextAsync(dbContext, req, userId, preparationCt);
+            if (context.Error is not null)
+            {
+                await SendStringAsync(
+                    context.Error.Value.Message,
+                    context.Error.Value.StatusCode,
+                    cancellation: preparationCt);
+                return;
+            }
+
+            now = DateTime.UtcNow;
+            if (PublicCompetitionGuard.ResolvePlayBlockReason(context.Competition!, now) is { } preparationBlock)
+            {
+                await SendStringAsync(preparationBlock, 403, cancellation: preparationCt);
+                return;
+            }
+            if (ChallengeInstanceRuntime.IsActive(context.Box, now))
+            {
+                await SendAsync(
+                    ChallengeInstanceRuntime.BuildResponse(
+                        context.Box,
+                        configuration,
+                        HttpContext,
+                        now,
+                        context.Competition!.GameModeType),
+                    cancellation: preparationCt);
+                return;
+            }
+            if (ChallengeInstanceRuntime.IsCoolingDown(context.Box, now, context.Competition!.GameModeType))
+            {
+                await SendStringAsync("instance_cooldown", 429, cancellation: preparationCt);
+                return;
+            }
+
+            box = context.Box ?? new AwdGameBox
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = req.Id,
+                TeamId = context.Team!.Id,
+                ChallengeId = req.ChallengeId,
+                CreatedAt = now,
+            };
+            var isPendingRetry = box.ContainerInstanceId is null && box.RuntimeOperationId.HasValue;
+            box.RuntimeOperationId ??= Guid.NewGuid();
+            if (context.Box is null)
+                dbContext.AwdGameBoxes.Add(box);
+
+            dynamicFlag = await UpsertDynamicFlagAsync(
+                context.Challenge!,
+                context.Team!.Id,
+                regenerateExisting: !isPendingRetry,
+                preparationCt);
+
+            // Persist the operation id and flag before crossing the Runner boundary.
+            // A retry after an ambiguous response can then recover the same runtime.
+            await dbContext.SaveChangesAsync(preparationCt);
+        }
+
+        var instance = await containerManager.CreateContainerAsync(
+            BuildContainerConfig(
+                context.Challenge!,
+                context.Team.Id,
+                dynamicFlag,
+                box.RuntimeOperationId),
+            ct);
 
         box.ContainerInstanceId = instance.ContainerId;
         box.ProviderType = instance.ProviderType;
@@ -294,9 +491,9 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         box.EntryUrl = instance.EntryUrl;
         box.OrchestrationNamespace = instance.OrchestrationNamespace;
         box.PortMappingsJson = ChallengeInstanceRuntime.WritePorts(instance.PortMappings);
-        box.ExpiresAt = now.Add(ChallengeInstanceRuntime.InstanceTtl);
-        box.LastInstanceActionAt = now;
-        if (context.Box is null) dbContext.AwdGameBoxes.Add(box);
+        var persistedAt = DateTime.UtcNow;
+        box.ExpiresAt = instance.ExpectedStopAt ?? persistedAt.Add(ChallengeInstanceRuntime.InstanceTtl);
+        box.LastInstanceActionAt = persistedAt;
 
         CompetitionLogWriter.Add(
             dbContext,
@@ -324,17 +521,17 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
                 expiresAt = box.ExpiresAt,
                 flagEnv = dynamicFlag.EnvironmentVariable
             });
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-        }
-        catch
-        {
-            await DestroyBoxAsync(box, containerManager, CancellationToken.None);
-            throw;
-        }
+        // Keep RuntimeOperationId until destroy. If this metadata save fails,
+        // the next request can reuse the Runner receipt instead of duplicating
+        // or prematurely deleting the runtime.
+        await dbContext.SaveChangesAsync(ct);
 
-        await SendAsync(ChallengeInstanceRuntime.BuildResponse(box, configuration, HttpContext, DateTime.UtcNow), cancellation: ct);
+        await SendAsync(ChallengeInstanceRuntime.BuildResponse(
+            box,
+            configuration,
+            HttpContext,
+            DateTime.UtcNow,
+            context.Competition!.GameModeType), cancellation: ct);
     }
 
     internal static async Task<ChallengeInstanceContext> LoadContextAsync(
@@ -360,11 +557,17 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == req.Id, ct);
         if (competition is null) return ChallengeInstanceContext.Fail("competition_not_found", 404);
+        if (!ChallengeInstanceRuntime.SupportsPlayerManagedInstance(competition.GameModeType))
+            return ChallengeInstanceContext.Fail("mode_unavailable", 503);
 
         var challenge = await dbContext.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == req.ChallengeId && c.CompetitionId == req.Id, ct);
+            .FirstOrDefaultAsync(c =>
+                c.Id == req.ChallengeId &&
+                c.CompetitionId == req.Id &&
+                !c.IsDeleting,
+                ct);
         if (challenge is null) return ChallengeInstanceContext.Fail("challenge_not_found", 404);
         if (string.Equals(challenge.TypeId, "Penetration", StringComparison.OrdinalIgnoreCase))
             return ChallengeInstanceContext.Fail("use_penetration_instance_api", 400);
@@ -378,7 +581,11 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         return new ChallengeInstanceContext(team, competition, challenge, box, null);
     }
 
-    private async Task<CtfDynamicFlag> UpsertDynamicFlagAsync(Challenge challenge, Guid teamId, CancellationToken ct)
+    private async Task<CtfDynamicFlag> UpsertDynamicFlagAsync(
+        Challenge challenge,
+        Guid teamId,
+        bool regenerateExisting,
+        CancellationToken ct)
     {
         var envName = string.IsNullOrWhiteSpace(challenge.FlagEnvironmentVariable)
             ? "NOCTF_FLAG_UUID"
@@ -390,9 +597,11 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
                                       f.ChallengeId == challenge.Id, ct);
         if (existing is not null)
         {
-            existing.FlagUuid = Guid.NewGuid().ToString("D");
+            if (regenerateExisting)
+                existing.FlagUuid = Guid.NewGuid().ToString("D");
             existing.EnvironmentVariable = envName;
-            existing.CreatedAt = DateTime.UtcNow;
+            if (regenerateExisting)
+                existing.CreatedAt = DateTime.UtcNow;
             return existing;
         }
 
@@ -410,7 +619,11 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         return flag;
     }
 
-    internal static ContainerConfig BuildContainerConfig(Challenge challenge, Guid? teamId, CtfDynamicFlag? dynamicFlag = null)
+    internal static ContainerConfig BuildContainerConfig(
+        Challenge challenge,
+        Guid? teamId,
+        CtfDynamicFlag? dynamicFlag = null,
+        Guid? operationId = null)
     {
         var spec = OrchestrationSpecSerializer.Read(challenge.OrchestrationJson);
         var image = string.IsNullOrWhiteSpace(spec.Image) ? challenge.ContainerImage : spec.Image;
@@ -445,7 +658,8 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             Entrypoint: spec.Entrypoint.Count > 0 ? spec.Entrypoint : null,
             OrchestrationJson: challenge.OrchestrationJson,
             Ttl: ChallengeInstanceRuntime.InstanceTtl,
-            NetworkAliases: teamId.HasValue ? [BuildGameBoxAlias(teamId.Value, challenge.Id)] : null);
+            NetworkAliases: teamId.HasValue ? [BuildGameBoxAlias(teamId.Value, challenge.Id)] : null,
+            OperationId: operationId ?? dynamicFlag?.Id);
     }
 
     internal static string BuildGameBoxAlias(Guid teamId, Guid challengeId)
@@ -580,13 +794,18 @@ public class CreateChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
     }
 }
 
-public class DestroyChallengeInstanceEndpoint(ApplicationDbContext dbContext, IContainerManager containerManager, IConfiguration configuration)
+public class DestroyChallengeInstanceEndpoint(
+    ApplicationDbContext dbContext,
+    IContainerManager containerManager,
+    IConfiguration configuration,
+    ICompetitionExecutionLease executionLease)
     : Endpoint<ChallengeInstanceRequest, ChallengeInstanceResponse>
 {
     public override void Configure()
     {
         Delete("/api/competitions/{id}/challenges/{challengeId}/instance");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(ChallengeInstanceRequest req, CancellationToken ct)
@@ -604,14 +823,40 @@ public class DestroyChallengeInstanceEndpoint(ApplicationDbContext dbContext, IC
             return;
         }
 
-        var now = DateTime.UtcNow;
-        if (!ChallengeInstanceRuntime.IsActive(context.Box, now))
+        await using var transitionLease = await executionLease.TryAcquireAsync(
+            dbContext,
+            ChallengeInstanceRuntime.BuildTransitionKey(context.Team!.Id, req.ChallengeId),
+            req.Id,
+            ct);
+        if (transitionLease is null)
         {
-            await SendAsync(ChallengeInstanceRuntime.BuildResponse(context.Box, configuration, HttpContext, now), cancellation: ct);
+            await SendStringAsync("instance_transition_in_progress", 409, cancellation: ct);
+            return;
+        }
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+        ct = leaseCts.Token;
+
+        dbContext.ChangeTracker.Clear();
+        context = await CreateChallengeInstanceEndpoint.LoadContextAsync(dbContext, req, userId, ct);
+        if (context.Error is not null)
+        {
+            await SendStringAsync(context.Error.Value.Message, context.Error.Value.StatusCode, cancellation: ct);
             return;
         }
 
-        if (ChallengeInstanceRuntime.IsCoolingDown(context.Box, now))
+        var now = DateTime.UtcNow;
+        if (!ChallengeInstanceRuntime.IsActive(context.Box, now))
+        {
+            await SendAsync(ChallengeInstanceRuntime.BuildResponse(
+                context.Box,
+                configuration,
+                HttpContext,
+                now,
+                context.Competition!.GameModeType), cancellation: ct);
+            return;
+        }
+
+        if (ChallengeInstanceRuntime.IsCoolingDown(context.Box, now, context.Competition!.GameModeType))
         {
             await SendStringAsync("instance_cooldown", 429, cancellation: ct);
             return;
@@ -627,17 +872,26 @@ public class DestroyChallengeInstanceEndpoint(ApplicationDbContext dbContext, IC
             updateCooldown: true,
             ct);
         await dbContext.SaveChangesAsync(ct);
-        await SendAsync(ChallengeInstanceRuntime.BuildResponse(context.Box, configuration, HttpContext, DateTime.UtcNow), cancellation: ct);
+        await SendAsync(ChallengeInstanceRuntime.BuildResponse(
+            context.Box,
+            configuration,
+            HttpContext,
+            DateTime.UtcNow,
+            context.Competition!.GameModeType), cancellation: ct);
     }
 }
 
-public class ExtendChallengeInstanceEndpoint(ApplicationDbContext dbContext, IConfiguration configuration)
+public class ExtendChallengeInstanceEndpoint(
+    ApplicationDbContext dbContext,
+    IConfiguration configuration,
+    ICompetitionExecutionLease executionLease)
     : Endpoint<ChallengeInstanceRequest, ChallengeInstanceResponse>
 {
     public override void Configure()
     {
         Post("/api/competitions/{id}/challenges/{challengeId}/instance/extend");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(ChallengeInstanceRequest req, CancellationToken ct)
@@ -649,6 +903,27 @@ public class ExtendChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
         }
 
         var context = await CreateChallengeInstanceEndpoint.LoadContextAsync(dbContext, req, userId, ct);
+        if (context.Error is not null)
+        {
+            await SendStringAsync(context.Error.Value.Message, context.Error.Value.StatusCode, cancellation: ct);
+            return;
+        }
+
+        await using var transitionLease = await executionLease.TryAcquireAsync(
+            dbContext,
+            ChallengeInstanceRuntime.BuildTransitionKey(context.Team!.Id, req.ChallengeId),
+            req.Id,
+            ct);
+        if (transitionLease is null)
+        {
+            await SendStringAsync("instance_transition_in_progress", 409, cancellation: ct);
+            return;
+        }
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, transitionLease.LostToken);
+        ct = leaseCts.Token;
+
+        dbContext.ChangeTracker.Clear();
+        context = await CreateChallengeInstanceEndpoint.LoadContextAsync(dbContext, req, userId, ct);
         if (context.Error is not null)
         {
             await SendStringAsync(context.Error.Value.Message, context.Error.Value.StatusCode, cancellation: ct);
@@ -668,13 +943,17 @@ public class ExtendChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             return;
         }
 
-        if (ChallengeInstanceRuntime.IsCoolingDown(context.Box, now))
+        if (ChallengeInstanceRuntime.IsCoolingDown(context.Box, now, context.Competition!.GameModeType))
         {
             await SendStringAsync("instance_cooldown", 429, cancellation: ct);
             return;
         }
 
-        context.Box!.ExpiresAt = (context.Box.ExpiresAt > now ? context.Box.ExpiresAt.Value : now).Add(ChallengeInstanceRuntime.ExtendBy);
+        var requestedExpiry = (context.Box!.ExpiresAt > now ? context.Box.ExpiresAt.Value : now)
+            .Add(ChallengeInstanceRuntime.ExtendBy);
+        context.Box.ExpiresAt = requestedExpiry <= context.Competition!.EndTime
+            ? requestedExpiry
+            : context.Competition.EndTime;
         context.Box.LastInstanceActionAt = now;
 
         CompetitionLogWriter.Add(
@@ -702,7 +981,12 @@ public class ExtendChallengeInstanceEndpoint(ApplicationDbContext dbContext, ICo
             });
         await dbContext.SaveChangesAsync(ct);
 
-        await SendAsync(ChallengeInstanceRuntime.BuildResponse(context.Box, configuration, HttpContext, DateTime.UtcNow), cancellation: ct);
+        await SendAsync(ChallengeInstanceRuntime.BuildResponse(
+            context.Box,
+            configuration,
+            HttpContext,
+            DateTime.UtcNow,
+            context.Competition!.GameModeType), cancellation: ct);
     }
 }
 

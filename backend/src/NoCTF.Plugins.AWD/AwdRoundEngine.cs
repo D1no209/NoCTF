@@ -69,8 +69,7 @@ public sealed class AwdRoundEngine : BackgroundService
             .IgnoreQueryFilters()
             .Where(c => c.GameModeType == GameModeType.Awd &&
                         c.Status == CompetitionStatus.Running &&
-                        c.StartTime <= now &&
-                        c.EndTime > now)
+                        c.StartTime <= now)
             .ToListAsync(ct);
 
         foreach (var competition in competitions)
@@ -79,13 +78,14 @@ public sealed class AwdRoundEngine : BackgroundService
             if (lease is null)
                 continue;
 
-            await TickCompetitionAsync(scope.ServiceProvider, db, hubNotifier, competition, now, ct);
+            using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lease.LostToken);
+            await TickCompetitionAsync(scope.ServiceProvider, db, hubNotifier, competition, now, leaseCts.Token);
             if (db.ChangeTracker.HasChanges())
-                await db.SaveChangesAsync(ct);
+                await db.SaveChangesAsync(leaseCts.Token);
         }
     }
 
-    private async Task TickCompetitionAsync(
+    internal async Task TickCompetitionAsync(
         IServiceProvider scopedServices,
         ApplicationDbContext db,
         IHubNotifierService hubNotifier,
@@ -103,6 +103,41 @@ public sealed class AwdRoundEngine : BackgroundService
             .Where(r => r.CompetitionId == competition.Id)
             .OrderByDescending(r => r.RoundNumber)
             .FirstOrDefaultAsync(ct);
+
+        // Ended competitions must remain discoverable after a process outage;
+        // otherwise the EndTime filter leaves both the round and competition in
+        // Running forever when no tick occurred before the deadline.
+        if (now >= competition.EndTime)
+        {
+            if (latestRound is not null && latestRound.Status != AwdRoundStatus.Finished)
+            {
+                latestRound.Status = AwdRoundStatus.Finished;
+                latestRound.EndTime = competition.EndTime;
+            }
+
+            competition.Status = CompetitionStatus.Finished;
+            await db.SaveChangesAsync(ct);
+            return;
+        }
+
+        // A running round can already be durable while its external preparation
+        // was interrupted by a process crash. Resume that idempotent preparation
+        // before deciding whether the round may advance.
+        if (latestRound?.Status == AwdRoundStatus.Running &&
+            !await IsRoundPreparedAsync(db, competition.Id, latestRound.RoundNumber, ct))
+        {
+            if (!await PrepareRoundAsync(
+                    scopedServices,
+                    db,
+                    hubNotifier,
+                    competition,
+                    latestRound.RoundNumber,
+                    totalRounds,
+                    ct))
+            {
+                return;
+            }
+        }
 
         // Determine next round number
         int nextRoundNumber;
@@ -159,70 +194,145 @@ public sealed class AwdRoundEngine : BackgroundService
         };
 
         db.AwdRounds.Add(newRound);
+        // Persist the phase transition before crossing the notification/Runner
+        // boundary. A restarted engine can then discover and finish preparation.
+        await db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
             "Competition {CompetitionId}: starting round {RoundNumber}/{TotalRounds}.",
             competition.Id, nextRoundNumber, totalRounds);
 
-        // Broadcast RoundStarted via SignalR
-        await hubNotifier.NotifyRoundStartedAsync(competition.Id, nextRoundNumber, ct);
-
-        // Generate flags for all rounds (idempotent) then inject flags for this round
-        try
-        {
-            var flagService = scopedServices.GetRequiredService<AwdFlagService>();
-            await flagService.GenerateFlagsAsync(competition.Id, totalRounds, ct);
-            await flagService.RefreshFlagsAsync(competition.Id, nextRoundNumber, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Competition {CompetitionId}: flag generation/refresh failed for round {Round}.",
-                competition.Id, nextRoundNumber);
-        }
-
-        // Run checkers for all game boxes in this round
-        try
-        {
-            var checkerService = scopedServices.GetRequiredService<AwdCheckerService>();
-            await checkerService.RunCheckerAsync(competition.Id, nextRoundNumber, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Competition {CompetitionId}: checker execution failed for round {Round}.",
-                competition.Id, nextRoundNumber);
-        }
-
-        // Calculate round scores after checker results are in
-        try
-        {
-            var scoreEngine = scopedServices.GetRequiredService<AwdScoreEngine>();
-            await scoreEngine.CalculateRoundScoreAsync(competition.Id, nextRoundNumber, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Competition {CompetitionId}: score calculation failed for round {Round}.",
-                competition.Id, nextRoundNumber);
-        }
-
-        // Invoke OnRoundTickAsync on the game mode (scoped)
-        var gameContext = new GameContext(
-            CompetitionId: competition.Id,
-            GameMode: GameModeType.Awd,
-            StartTime: competition.StartTime,
-            EndTime: competition.EndTime,
-            Configuration: new Dictionary<string, string>
-            {
-                ["RoundNumber"] = nextRoundNumber.ToString(),
-                ["TotalRounds"] = totalRounds.ToString(),
-                ["RoundDurationSeconds"] = (competition.RoundDurationSeconds ?? DefaultRoundDurationSeconds).ToString()
-            });
-
-        // AwdGameMode is scoped — resolve from the same scope
-        // (It calls hubNotifier again internally, which is fine — idempotent)
-        // We skip calling OnRoundTickAsync here to avoid double-broadcasting;
-        // the broadcast above is the canonical notification.
+        await PrepareRoundAsync(
+            scopedServices,
+            db,
+            hubNotifier,
+            competition,
+            nextRoundNumber,
+            totalRounds,
+            ct);
     }
+
+    private async Task<bool> PrepareRoundAsync(
+        IServiceProvider scopedServices,
+        ApplicationDbContext db,
+        IHubNotifierService hubNotifier,
+        Competition competition,
+        int roundNumber,
+        int totalRounds,
+        CancellationToken ct)
+    {
+        try
+        {
+            // Stream delivery is at-least-once. Replaying the same round after a
+            // crash is preferable to permanently missing the round transition.
+            try
+            {
+                await hubNotifier.NotifyRoundStartedAsync(competition.Id, roundNumber, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Competition {CompetitionId}: round {Round} notification failed.",
+                    competition.Id,
+                    roundNumber);
+            }
+
+            // Every operation below has a deterministic database/runtime key,
+            // so an interrupted phase can safely be replayed by the next tick.
+            var flagService = scopedServices.GetRequiredService<AwdFlagService>();
+            await flagService.GenerateRoundFlagsAsync(competition.Id, roundNumber, ct);
+            if (!await flagService.RefreshRoundFlagsAsync(competition.Id, roundNumber, ct))
+            {
+                _logger.LogWarning(
+                    "Competition {CompetitionId}: round {Round} runtime refresh is incomplete; it will be retried.",
+                    competition.Id,
+                    roundNumber);
+                return false;
+            }
+
+            await scopedServices
+                .GetRequiredService<AwdCheckerService>()
+                .RunCheckerAsync(competition.Id, roundNumber, ct);
+            await scopedServices
+                .GetRequiredService<AwdScoreEngine>()
+                .CalculateRoundScoreAsync(competition.Id, roundNumber, ct);
+
+            var checkpoint = new CompetitionEngineState
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competition.Id,
+                EngineKey = PreparationEngineKey(roundNumber),
+                LastExecutedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            db.CompetitionEngineStates.Add(checkpoint);
+            await db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Competition {CompetitionId}: AWD round {Round}/{TotalRounds} preparation completed.",
+                competition.Id,
+                roundNumber,
+                totalRounds);
+            return true;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (DbUpdateException ex)
+        {
+            foreach (var entry in db.ChangeTracker.Entries<CompetitionEngineState>()
+                         .Where(entry =>
+                             entry.State == EntityState.Added &&
+                             entry.Entity.CompetitionId == competition.Id &&
+                             entry.Entity.EngineKey == PreparationEngineKey(roundNumber)))
+            {
+                entry.State = EntityState.Detached;
+            }
+
+            if (await IsRoundPreparedAsync(db, competition.Id, roundNumber, ct))
+            {
+                // A unique checkpoint written by a concurrent/recovered
+                // execution proves that preparation completed.
+                return true;
+            }
+
+            _logger.LogError(
+                ex,
+                "Competition {CompetitionId}: AWD round {Round} checkpoint failed; it will be retried.",
+                competition.Id,
+                roundNumber);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Competition {CompetitionId}: AWD round {Round} preparation failed; it will be retried.",
+                competition.Id,
+                roundNumber);
+            return false;
+        }
+    }
+
+    private static Task<bool> IsRoundPreparedAsync(
+        ApplicationDbContext db,
+        Guid competitionId,
+        int roundNumber,
+        CancellationToken ct)
+        => db.CompetitionEngineStates
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(state =>
+                state.CompetitionId == competitionId &&
+                state.EngineKey == PreparationEngineKey(roundNumber),
+                ct);
+
+    private static string PreparationEngineKey(int roundNumber)
+        => $"awd-round:{roundNumber}:prepared";
 }

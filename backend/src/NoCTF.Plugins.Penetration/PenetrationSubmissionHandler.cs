@@ -19,7 +19,8 @@ public class PenetrationSubmissionHandler(
     ISubmissionEventHandler submissionEventHandler,
     IServiceProvider serviceProvider,
     IBackgroundTaskQueue? backgroundTasks = null,
-    ILogger<PenetrationSubmissionHandler>? logger = null)
+    ILogger<PenetrationSubmissionHandler>? logger = null,
+    ICompetitionExecutionLease? executionLease = null)
     : IChallengeSubmissionHandler
 {
     public string TypeId => PenetrationConstants.TypeId;
@@ -45,6 +46,7 @@ public class PenetrationSubmissionHandler(
 
         var instance = await db.TeamChallengeInstances
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .FirstOrDefaultAsync(i =>
                 i.CompetitionId == context.CompetitionId &&
                 i.TeamId == context.TeamId &&
@@ -56,86 +58,138 @@ public class PenetrationSubmissionHandler(
         if (instance.ExpiresAt is not null && instance.ExpiresAt <= now)
             return new ChallengeSubmissionResult(SubmissionResult.InstanceExpired);
 
-        var match = await flagService.MatchAsync(challenge, instance, context.FlagContent, ct);
-        if (!match.IsCorrect)
+        PenetrationFlag flag;
+        Submission submission;
+        bool isFirstBlood;
+        var leaseProvider = executionLease ?? new CompetitionExecutionLease();
+        await using (var preparationLease = await SubmissionMutationGuard.TryAcquireAsync(
+                         leaseProvider,
+                         db,
+                         context.CompetitionId,
+                         ct))
         {
-            if (await IsRateLimitedAsync(context, now, ct))
+            if (preparationLease is null)
+                return new ChallengeSubmissionResult(SubmissionResult.WrongFlag);
+
+            using var preparationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                preparationLease.LostToken);
+            var mutationCt = preparationCts.Token;
+            now = DateTime.UtcNow;
+            var guard = await SubmissionMutationGuard.ValidateAsync(
+                db,
+                context.CompetitionId,
+                context.ChallengeId,
+                [context.TeamId],
+                now,
+                mutationCt,
+                expectedChallengeType: PenetrationConstants.TypeId);
+            if (!guard.IsAllowed)
+                return new ChallengeSubmissionResult(guard.Rejection!.Value);
+            challenge = guard.Challenge!;
+
+            instance = await db.TeamChallengeInstances
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i =>
+                    i.CompetitionId == context.CompetitionId &&
+                    i.TeamId == context.TeamId &&
+                    i.ChallengeId == context.ChallengeId,
+                    mutationCt);
+            if (instance is null || instance.Status != PenetrationInstanceStatus.Running)
+                return new ChallengeSubmissionResult(SubmissionResult.InstanceRequired);
+            if (instance.ExpiresAt is not null && instance.ExpiresAt <= now)
+                return new ChallengeSubmissionResult(SubmissionResult.InstanceExpired);
+
+            var match = await flagService.MatchAsync(challenge, instance, context.FlagContent, mutationCt);
+            if (!match.IsCorrect)
             {
-                AddCompetitionLog(
-                    context,
-                    "penetration.flag.rate_limited",
-                    "Team submitted penetration flags too frequently.",
-                    "warning",
-                    new { submitted = PenetrationFlagService.RedactSubmittedFlag(context.FlagContent) });
-                await db.SaveChangesAsync(ct);
-                return new ChallengeSubmissionResult(SubmissionResult.FlagRateLimited);
+                if (await IsRateLimitedAsync(context, now, mutationCt))
+                {
+                    AddCompetitionLog(
+                        context,
+                        "penetration.flag.rate_limited",
+                        "Team submitted penetration flags too frequently.",
+                        "warning",
+                        new { submitted = PenetrationFlagService.RedactSubmittedFlag(context.FlagContent) });
+                    await db.SaveChangesAsync(mutationCt);
+                    return new ChallengeSubmissionResult(SubmissionResult.FlagRateLimited);
+                }
+
+                await RecordRejectedSubmissionAsync(context, challenge, match, now, mutationCt);
+                return new ChallengeSubmissionResult(SubmissionResult.WrongFlag);
             }
 
-            await RecordRejectedSubmissionAsync(context, challenge, match, now, ct);
-            return new ChallengeSubmissionResult(SubmissionResult.WrongFlag);
-        }
-
-        var flag = match.Flag!;
-        var alreadySolved = await HasCorrectStageSolveAsync(context, flag.Id, ct);
-        if (alreadySolved)
-            return new ChallengeSubmissionResult(SubmissionResult.AlreadySolved, BuildResultData(flag, true));
-
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var submission = new Submission
-        {
-            Id = Guid.NewGuid(),
-            CompetitionId = context.CompetitionId,
-            TeamId = context.TeamId,
-            ChallengeId = context.ChallengeId,
-            PenetrationFlagId = flag.Id,
-            UserId = context.UserId,
-            FlagContent = PenetrationFlagService.RedactSubmittedFlag(context.FlagContent),
-            IsCorrect = true,
-            SubmittedAt = now,
-            IpAddress = context.IpAddress
-        };
-
-        db.Submissions.Add(submission);
-        AddCompetitionLog(
-            context,
-            "penetration.flag.accepted",
-            $"Team solved penetration stage {flag.Stage} for challenge {challenge.Title}.",
-            "info",
-            new { flagId = flag.Id, flag.Stage, flagName = flag.Name, submissionId = submission.Id });
-        await flagService.MarkSolvedAsync(context.CompetitionId, context.TeamId, context.ChallengeId, flag.Id, now, ct);
-
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException)
-        {
-            await transaction.RollbackAsync(ct);
-            if (await HasCorrectStageSolveAsync(context, flag.Id, ct))
+            flag = match.Flag!;
+            var alreadySolved = await HasCorrectStageSolveAsync(context, flag.Id, mutationCt);
+            if (alreadySolved)
                 return new ChallengeSubmissionResult(SubmissionResult.AlreadySolved, BuildResultData(flag, true));
-            throw;
-        }
 
-        await scoreSignalEmitter.EmitAsync(new ScoreSignalCreate(
-            CompetitionId: context.CompetitionId,
-            TeamId: context.TeamId,
-            SignalType: ScoreSignalTypes.PenetrationFlagAccepted,
-            IdempotencyKey: $"penetration:{context.TeamId:N}:{context.ChallengeId:N}:{flag.Id:N}",
-            SubjectType: "penetration-flag",
-            SubjectId: flag.Id,
-            ActorUserId: context.UserId,
-            PayloadJson: ScoringJson.Serialize(new
+            isFirstBlood = flag.SolvedCount == 0;
+            await using var transaction = await db.Database.BeginTransactionAsync(mutationCt);
+            submission = new Submission
             {
-                submissionId = submission.Id,
-                challengeId = context.ChallengeId,
-                flagId = flag.Id,
-                flag.Stage,
-                flagName = flag.Name,
-                score = flag.Score
-            }),
-            OccurredAt: now), ct);
+                Id = Guid.NewGuid(),
+                CompetitionId = context.CompetitionId,
+                TeamId = context.TeamId,
+                ChallengeId = context.ChallengeId,
+                PenetrationFlagId = flag.Id,
+                UserId = context.UserId,
+                FlagContent = PenetrationFlagService.RedactSubmittedFlag(context.FlagContent),
+                IsCorrect = true,
+                SubmittedAt = now,
+                IpAddress = context.IpAddress
+            };
 
-        await transaction.CommitAsync(ct);
+            db.Submissions.Add(submission);
+            AddCompetitionLog(
+                context,
+                "penetration.flag.accepted",
+                $"Team solved penetration stage {flag.Stage} for challenge {challenge.Title}.",
+                "info",
+                new { flagId = flag.Id, flag.Stage, flagName = flag.Name, submissionId = submission.Id });
+            await flagService.MarkSolvedAsync(
+                context.CompetitionId,
+                context.TeamId,
+                context.ChallengeId,
+                flag.Id,
+                now,
+                mutationCt);
+
+            try
+            {
+                await db.SaveChangesAsync(mutationCt);
+            }
+            catch (DbUpdateException)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                db.ChangeTracker.Clear();
+                if (await HasCorrectStageSolveAsync(context, flag.Id, mutationCt))
+                    return new ChallengeSubmissionResult(SubmissionResult.AlreadySolved, BuildResultData(flag, true));
+                throw;
+            }
+
+            await scoreSignalEmitter.PersistAsync(new ScoreSignalCreate(
+                CompetitionId: context.CompetitionId,
+                TeamId: context.TeamId,
+                SignalType: ScoreSignalTypes.PenetrationFlagAccepted,
+                IdempotencyKey: $"penetration:{context.TeamId:N}:{context.ChallengeId:N}:{flag.Id:N}",
+                SubjectType: "penetration-flag",
+                SubjectId: flag.Id,
+                ActorUserId: context.UserId,
+                PayloadJson: ScoringJson.Serialize(new
+                {
+                    submissionId = submission.Id,
+                    challengeId = context.ChallengeId,
+                    flagId = flag.Id,
+                    flag.Stage,
+                    flagName = flag.Name,
+                    score = flag.Score
+                }),
+                OccurredAt: now), mutationCt);
+
+            await transaction.CommitAsync(mutationCt);
+        }
 
         try
         {
@@ -196,7 +250,7 @@ public class PenetrationSubmissionHandler(
                 ChallengeName: challenge.Title,
                 TeamId: context.TeamId,
                 TeamName: team?.Name ?? context.TeamId.ToString(),
-                IsFirstBlood: flag.SolvedCount == 0,
+                IsFirstBlood: isFirstBlood,
                 PointsAwarded: awarded), ct);
         }
         catch (Exception ex)

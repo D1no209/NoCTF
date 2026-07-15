@@ -7,30 +7,50 @@ namespace NoCTF.Plugins.AWD;
 /// <summary>
 /// Plugin module for the AWD game mode. Registers all AWD-related services.
 /// </summary>
-public class AwdModule : IPluginModule
+public class AwdModule : IHostAwarePluginModule
 {
     public string Name => "NoCTF.Plugins.AWD";
     public string Version => "1.0.0";
 
     public void ConfigureServices(IServiceCollection services)
     {
-        // Game mode (scoped to match DbContext lifetime)
+        ConfigureRuntimeServices(services);
+        ConfigureApiSurface(services);
+        ConfigureWorkerHost(services);
+    }
+
+    public void ConfigureServices(IServiceCollection services, PluginHostRole hostRole)
+    {
+        if (hostRole == PluginHostRole.Api)
+        {
+            ConfigureRuntimeServices(services);
+            ConfigureApiSurface(services);
+        }
+        else
+        {
+            ConfigureRuntimeServices(services);
+            ConfigureWorkerHost(services);
+        }
+    }
+
+    private static void ConfigureApiSurface(IServiceCollection services)
+    {
         services.AddScoped<AwdGameMode>();
         services.AddScoped<IGameMode>(sp => sp.GetRequiredService<AwdGameMode>());
         services.AddScoped<ICompetitionModeProvider, AwdModeProvider>();
+    }
 
-        // Flag service (scoped — uses DbContext)
-        services.AddScoped<AwdFlagService>();
-        services.AddScoped<AwdChallengeRuntimeConfigProvider>();
-
-        // Checker service (scoped — uses DbContext)
-        services.AddScoped<AwdCheckerService>();
-
-        // Score engine (scoped — uses DbContext)
-        services.AddScoped<AwdScoreEngine>();
-
-        // Round engine (singleton background service)
+    private static void ConfigureWorkerHost(IServiceCollection services)
+    {
         services.AddSingleton<AwdRoundEngine>();
         services.AddHostedService(sp => sp.GetRequiredService<AwdRoundEngine>());
+    }
+
+    private static void ConfigureRuntimeServices(IServiceCollection services)
+    {
+        services.AddScoped<AwdFlagService>();
+        services.AddScoped<AwdChallengeRuntimeConfigProvider>();
+        services.AddScoped<AwdCheckerService>();
+        services.AddScoped<AwdScoreEngine>();
     }
 }

@@ -1,12 +1,16 @@
 using System.Text.Json;
 using System.Data;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.Security;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
+using NoCTF.Infrastructure.Storage;
 using NoCTF.PluginBase;
 
 namespace NoCTF.Plugins.AWDP;
@@ -23,9 +27,23 @@ public class AwdpPatchService(
     AwdpConfigResolver configResolver,
     AwdpStateService stateService,
     IConfiguration configuration,
-    ILogger<AwdpPatchService> logger) : IAwdpPatchService
+    ILogger<AwdpPatchService> logger,
+    ICompetitionExecutionLease? executionLease = null) : IAwdpPatchService
 {
+    internal static readonly TimeSpan ContainerOperationCooldown = TimeSpan.FromSeconds(30);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly AwdpFixStatus[] TerminalFixStatuses =
+    [
+        AwdpFixStatus.FixSuccess,
+        AwdpFixStatus.FixFailed,
+        AwdpFixStatus.FixServiceError,
+        AwdpFixStatus.FixScriptError,
+        AwdpFixStatus.FixTimeout,
+        AwdpFixStatus.AuditFailed,
+        AwdpFixStatus.DefenseAttemptsExhausted,
+        AwdpFixStatus.FixRuleViolation
+    ];
 
     public async Task<AwdpPatchSubmitResult> SubmitPatchAsync(
         Guid competitionId,
@@ -56,17 +74,25 @@ public class AwdpPatchService(
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == challengeId && c.CompetitionId == competitionId, ct);
+            .FirstOrDefaultAsync(c =>
+                c.Id == challengeId &&
+                c.CompetitionId == competitionId &&
+                !c.IsDeleting,
+                ct);
 
         if (challenge is null)
             return new AwdpPatchSubmitResult(false, "challenge_not_found");
 
-        await using var stateLock = await AwdpPatchStateLock.AcquireAsync(db, teamId, challengeId, ct);
-        async Task SaveAndCommitAsync()
-        {
-            await db.SaveChangesAsync(ct);
-            await stateLock.CommitAsync(ct);
-        }
+        await using var stateLock = await (executionLease ?? new CompetitionExecutionLease()).TryAcquireAsync(
+            db,
+            $"awdp-patch:{teamId:N}:{challengeId:N}",
+            competitionId,
+            ct);
+        if (stateLock is null)
+            return new AwdpPatchSubmitResult(false, "patch_in_progress");
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, stateLock.LostToken);
+        ct = leaseCts.Token;
+        Task SaveAndCommitAsync() => db.SaveChangesAsync(ct);
 
         var config = await configResolver.ResolveAsync(competitionId, challengeId, ct);
         var state = await stateService.GetOrCreateAsync(competitionId, teamId, challengeId, ct);
@@ -103,6 +129,36 @@ public class AwdpPatchService(
         }
 
         state.InstanceStatus = AwdpInstanceStatus.InstanceRunning;
+
+        if (IsContainerOperationCoolingDown(gameBox.LastInstanceActionAt, now))
+        {
+            state.UpdatedAt = now;
+            await SaveAndCommitAsync();
+            return new AwdpPatchSubmitResult(
+                false,
+                "instance_cooldown",
+                DefenseAttempts: state.DefenseAttempts,
+                MaxDefenseAttempts: config.MaxDefenseAttempts);
+        }
+
+        var validationInProgress = await db.AwdpPatchSubmissions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(s =>
+                s.CompetitionId == competitionId &&
+                s.TeamId == teamId &&
+                s.ChallengeId == challengeId &&
+                !TerminalFixStatuses.Contains(s.FixStatus), ct);
+        if (validationInProgress)
+        {
+            state.UpdatedAt = now;
+            await SaveAndCommitAsync();
+            return new AwdpPatchSubmitResult(
+                false,
+                "patch_in_progress",
+                DefenseAttempts: state.DefenseAttempts,
+                MaxDefenseAttempts: config.MaxDefenseAttempts);
+        }
 
         if (state.FixStatus == AwdpFixStatus.FixSuccess && !config.AllowDefenseAfterFixSuccess)
         {
@@ -186,6 +242,10 @@ public class AwdpPatchService(
             now);
 
         db.AwdpPatchSubmissions.Add(submission);
+        AddBackgroundTask(
+            competitionId,
+            AwdpBackgroundTaskTypes.PatchValidation,
+            new AwdpPatchValidationPayload(submission.Id));
         try
         {
             await SaveAndCommitAsync();
@@ -194,11 +254,19 @@ public class AwdpPatchService(
         {
             try
             {
-                await storageProvider.DeleteAsync(storageKey, CancellationToken.None);
+                // SaveChanges can fail after the database committed. Queue the
+                // object and let the cleanup worker re-check references instead
+                // of directly deleting a potentially referenced archive.
+                db.ChangeTracker.Clear();
+                await StorageCleanupOutbox.EnqueueAsync(db, [storageKey], CancellationToken.None);
+                await db.SaveChangesAsync(CancellationToken.None);
             }
             catch (Exception cleanupEx)
             {
-                logger.LogWarning(cleanupEx, "Failed to delete orphaned AWDP FixScript archive {StorageKey}.", storageKey);
+                logger.LogError(
+                    cleanupEx,
+                    "Failed to queue orphaned AWDP FixScript archive {StorageKey} for cleanup.",
+                    storageKey);
             }
 
             throw;
@@ -235,10 +303,36 @@ public class AwdpPatchService(
             return;
         }
 
-        await using var stateLock = await AwdpPatchStateLock.AcquireAsync(db, submission.TeamId, submission.ChallengeId, ct);
+        var leaseProvider = executionLease ?? new CompetitionExecutionLease();
+        await using var stateLock = await leaseProvider.TryAcquireAsync(
+            db,
+            $"awdp-patch:{submission.TeamId:N}:{submission.ChallengeId:N}",
+            submission.CompetitionId,
+            ct);
+        if (stateLock is null)
+            throw new InvalidOperationException($"AWDP patch {submissionId} is already being processed.");
+        using var leaseCts = CancellationTokenSource.CreateLinkedTokenSource(ct, stateLock.LostToken);
+        ct = leaseCts.Token;
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
-            .FirstAsync(c => c.Id == submission.ChallengeId && c.CompetitionId == submission.CompetitionId, ct);
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c =>
+                c.Id == submission.ChallengeId &&
+                c.CompetitionId == submission.CompetitionId &&
+                !c.IsDeleting,
+                ct);
+        if (challenge is null)
+        {
+            submission.Status = AwdpPatchStatus.Rejected;
+            submission.FixStatus = AwdpFixStatus.FixServiceError;
+            submission.ValidatedAt = DateTime.UtcNow;
+            submission.ValidationDetail = "Challenge is no longer available for patch validation.";
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation(
+                "AWDP FixScript submission {SubmissionId} targets a removed challenge; validation was cancelled.",
+                submissionId);
+            return;
+        }
         var config = await configResolver.ResolveAsync(submission.CompetitionId, submission.ChallengeId, ct);
         var state = await stateService.GetOrCreateAsync(
             submission.CompetitionId,
@@ -268,7 +362,24 @@ public class AwdpPatchService(
                 detail,
                 ct,
                 preserveSuccessfulState);
-            await stateLock.CommitAsync(ct);
+        }
+
+        var competition = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == submission.CompetitionId, ct);
+        var validationNow = DateTime.UtcNow;
+        if (competition is null ||
+            competition.Status != CompetitionStatus.Running ||
+            validationNow < competition.StartTime ||
+            validationNow >= competition.EndTime)
+        {
+            await CompleteAndCommitAsync(
+                AwdpPatchStatus.Rejected,
+                AwdpFixStatus.FixServiceError,
+                AwdpServiceStatus.ServiceUnknown,
+                "Competition is no longer accepting patch validation.");
+            return;
         }
 
         if (string.IsNullOrWhiteSpace(challenge.ContainerImage))
@@ -288,6 +399,17 @@ public class AwdpPatchService(
                 AwdpFixStatus.FixServiceError,
                 AwdpServiceStatus.ServiceError,
                 "Instance is not running.");
+            return;
+        }
+
+        if (gameBox.ExpiresAt is not null && gameBox.ExpiresAt <= validationNow)
+        {
+            state.InstanceStatus = AwdpInstanceStatus.InstanceExpired;
+            await CompleteAndCommitAsync(
+                AwdpPatchStatus.Rejected,
+                AwdpFixStatus.FixServiceError,
+                AwdpServiceStatus.ServiceError,
+                "Instance expired before patch validation started.");
             return;
         }
 
@@ -314,44 +436,87 @@ public class AwdpPatchService(
         state.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        var oldInstance = ToContainerInstance(gameBox, gameBox.ContainerInstanceId);
-        var patchedContainer = await CreatePatchedContainerAsync(challenge, submission, ct);
-        if (oldInstance is not null)
+        var expectedInstanceId = gameBox.ContainerInstanceId;
+        ContainerInstance patchedContainer;
+        BackgroundTaskItem candidateCleanupTask;
+        await using (var candidateTransitionLock = await leaseProvider.TryAcquireAsync(
+            db,
+            CompetitionExecutionLeaseKeys.ChallengeInstance(submission.TeamId, submission.ChallengeId),
+            submission.CompetitionId,
+            ct))
         {
-            try
+            if (candidateTransitionLock is null)
+                throw new InvalidOperationException($"AWDP instance for patch {submissionId} is being transitioned.");
+
+            await using var candidatePreparationLock = await leaseProvider.TryAcquireAsync(
+                db,
+                CompetitionExecutionLeaseKeys.RuntimePreparation,
+                submission.CompetitionId,
+                ct);
+            if (candidatePreparationLock is null)
+                throw new InvalidOperationException($"AWDP runtime for patch {submissionId} is being prepared or deleted.");
+
+            using var candidateTransitionCts = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                candidateTransitionLock.LostToken,
+                candidatePreparationLock.LostToken);
+            var candidateCt = candidateTransitionCts.Token;
+            await db.Entry(gameBox).ReloadAsync(candidateCt);
+            var candidateNow = DateTime.UtcNow;
+            var candidateAllowed = db.Entry(gameBox).State != EntityState.Detached &&
+                !string.IsNullOrWhiteSpace(gameBox.ContainerInstanceId) &&
+                string.Equals(gameBox.ContainerInstanceId, expectedInstanceId, StringComparison.Ordinal) &&
+                (gameBox.ExpiresAt is null || gameBox.ExpiresAt > candidateNow) &&
+                await db.Competitions.IgnoreQueryFilters().AsNoTracking().AnyAsync(c =>
+                    c.Id == submission.CompetitionId &&
+                    c.Status == CompetitionStatus.Running &&
+                    c.StartTime <= candidateNow &&
+                    c.EndTime > candidateNow, candidateCt) &&
+                await db.Teams.IgnoreQueryFilters().AsNoTracking().AnyAsync(t =>
+                    t.CompetitionId == submission.CompetitionId &&
+                    t.Id == submission.TeamId &&
+                    t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                    !t.IsBanned, candidateCt) &&
+                await db.Challenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(c =>
+                    c.CompetitionId == submission.CompetitionId &&
+                    c.Id == submission.ChallengeId &&
+                    !c.IsDeleting, candidateCt);
+            if (!candidateAllowed)
             {
-                await DestroyContainerInstanceAsync(oldInstance, ct);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to destroy old AWDP container {ContainerId}; rejecting patch to preserve tracked instance.", oldInstance.ContainerId);
-                await DestroyContainerBestEffortAsync(patchedContainer);
                 await CompleteAndCommitAsync(
                     AwdpPatchStatus.Rejected,
                     AwdpFixStatus.FixServiceError,
                     AwdpServiceStatus.ServiceError,
-                    "Failed to replace the running container safely.");
+                    "Instance changed or became unavailable before candidate creation.");
                 return;
+            }
+
+            patchedContainer = await CreatePatchedContainerAsync(challenge, submission, gameBox.ExpiresAt, candidateCt);
+            candidateCleanupTask = await GetOrCreateContainerCleanupSafeguardAsync(
+                submission.CompetitionId,
+                submission.Id,
+                patchedContainer,
+                candidateCt);
+            try
+            {
+                // Persist a dormant cleanup saga before releasing the shared
+                // instance transition lease. Deletion cleanup therefore sees
+                // either no external candidate or its durable cleanup record.
+                await db.SaveChangesAsync(candidateCt);
+            }
+            catch
+            {
+                db.Entry(candidateCleanupTask).State = EntityState.Detached;
+                await DestroyCandidateBestEffortAsync(patchedContainer);
+                throw;
             }
         }
 
-        ApplyContainerMetadata(gameBox, patchedContainer);
-        gameBox.ExpiresAt ??= DateTime.UtcNow.AddHours(2);
-        gameBox.LastInstanceActionAt = DateTime.UtcNow;
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch
-        {
-            await DestroyContainerBestEffortAsync(patchedContainer);
-            throw;
-        }
-
-        var checkResult = await RunCheckAsync(challenge, submission, gameBox, ct);
+        var checkResult = await RunCheckAsync(challenge, submission, patchedContainer, ct);
         if (checkResult.FixStatus != AwdpFixStatus.FixSuccess)
         {
-            var restoredPreviousSuccess = await RollbackAsync(challenge, gameBox, patchedContainer, submission, ct);
+            ActivateContainerCleanupTask(candidateCleanupTask, patchedContainer);
+            var restoredPreviousSuccess = await FindPreviousSuccessfulPatchAsync(submission, ct) is not null;
             await CompleteAndCommitAsync(
                 AwdpPatchStatus.Rejected,
                 checkResult.FixStatus,
@@ -359,6 +524,94 @@ public class AwdpPatchService(
                 checkResult.Detail,
                 preserveSuccessfulState: restoredPreviousSuccess);
             return;
+        }
+
+        // Patch validation owns the AWDP patch lease first. Acquire the shared
+        // challenge-instance lease only for the final compare-and-swap so long
+        // FixScript/checker runs do not block Start/Stop/Destroy. This lock
+        // order is global for this flow and cannot deadlock with instance
+        // transitions, which never acquire the AWDP patch lease.
+        await using var transitionLock = await leaseProvider.TryAcquireAsync(
+            db,
+            CompetitionExecutionLeaseKeys.ChallengeInstance(submission.TeamId, submission.ChallengeId),
+            submission.CompetitionId,
+            ct);
+        if (transitionLock is null)
+            throw new InvalidOperationException($"AWDP instance for patch {submissionId} is being transitioned.");
+
+        await using var transitionPreparationLock = await leaseProvider.TryAcquireAsync(
+            db,
+            CompetitionExecutionLeaseKeys.RuntimePreparation,
+            submission.CompetitionId,
+            ct);
+        if (transitionPreparationLock is null)
+            throw new InvalidOperationException($"AWDP runtime for patch {submissionId} is being prepared or deleted.");
+
+        using var transitionCts = CancellationTokenSource.CreateLinkedTokenSource(
+            ct,
+            transitionLock.LostToken,
+            transitionPreparationLock.LostToken);
+        ct = transitionCts.Token;
+
+        await db.Entry(gameBox).ReloadAsync(ct);
+        var switchNow = DateTime.UtcNow;
+        var competitionStillRunning = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(c =>
+                c.Id == submission.CompetitionId &&
+                c.Status == CompetitionStatus.Running &&
+                c.StartTime <= switchNow &&
+                c.EndTime > switchNow, ct);
+        var teamStillActive = await db.Teams
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(t =>
+                t.CompetitionId == submission.CompetitionId &&
+                t.Id == submission.TeamId &&
+                t.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                !t.IsBanned, ct);
+        var challengeStillActive = await db.Challenges
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(c =>
+                c.CompetitionId == submission.CompetitionId &&
+                c.Id == submission.ChallengeId &&
+                !c.IsDeleting, ct);
+        if (db.Entry(gameBox).State == EntityState.Detached ||
+            !competitionStillRunning ||
+            !teamStillActive ||
+            !challengeStillActive ||
+            string.IsNullOrWhiteSpace(gameBox.ContainerInstanceId) ||
+            !string.Equals(gameBox.ContainerInstanceId, expectedInstanceId, StringComparison.Ordinal) ||
+            (gameBox.ExpiresAt is not null && gameBox.ExpiresAt <= switchNow))
+        {
+            ActivateContainerCleanupTask(candidateCleanupTask, patchedContainer);
+            var restoredPreviousSuccess = await FindPreviousSuccessfulPatchAsync(submission, ct) is not null;
+            await CompleteAndCommitAsync(
+                AwdpPatchStatus.Rejected,
+                AwdpFixStatus.FixServiceError,
+                AwdpServiceStatus.ServiceError,
+                "Instance changed or expired during patch validation.",
+                preserveSuccessfulState: restoredPreviousSuccess);
+            return;
+        }
+
+        var oldInstance = ToContainerInstance(gameBox, gameBox.ContainerInstanceId);
+        ApplyContainerMetadata(
+            gameBox,
+            patchedContainer,
+            CreateOperationId(submission.Id, "patched-container"));
+        gameBox.ExpiresAt ??= DateTime.UtcNow.AddHours(2);
+        gameBox.LastInstanceActionAt = DateTime.UtcNow;
+        if (oldInstance is not null &&
+            !string.Equals(oldInstance.ContainerId, patchedContainer.ContainerId, StringComparison.Ordinal))
+        {
+            ActivateContainerCleanupTask(candidateCleanupTask, oldInstance);
+        }
+        else
+        {
+            CompleteContainerCleanupSafeguard(candidateCleanupTask);
         }
 
         await CompleteAndCommitAsync(
@@ -388,7 +641,8 @@ public class AwdpPatchService(
             NetworkName: ResolveUtilityNetwork(),
             Ttl: timeout,
             Entrypoint: ["/bin/sh", "-c"],
-            OrchestrationJson: TrustedUtilityOrchestrationJson());
+            OrchestrationJson: TrustedUtilityOrchestrationJson(),
+            OperationId: CreateOperationId(submission.Id, "fix-script"));
 
         try
         {
@@ -411,13 +665,14 @@ public class AwdpPatchService(
         catch (Exception ex)
         {
             logger.LogError(ex, "AWDP FixScript sandbox failed for submission {SubmissionId}.", submission.Id);
-            return (AwdpFixStatus.FixScriptError, $"Sandbox error: {ex.Message}");
+            return (AwdpFixStatus.FixScriptError, "Sandbox execution failed.");
         }
     }
 
     private async Task<ContainerInstance> CreatePatchedContainerAsync(
         Challenge challenge,
         AwdpPatchSubmission submission,
+        DateTime? expiresAt,
         CancellationToken ct)
     {
         var environment = await BuildRuntimeEnvironmentAsync(
@@ -432,8 +687,12 @@ public class AwdpPatchService(
             EnvironmentVariables: environment,
             Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
             PortMappings: BuildPortMappings(challenge),
+            Ttl: expiresAt is { } deadline && deadline > DateTime.UtcNow
+                ? deadline - DateTime.UtcNow
+                : TimeSpan.FromHours(2),
             OrchestrationJson: challenge.OrchestrationJson,
-            NetworkAliases: [BuildGameBoxAlias(submission.TeamId, submission.ChallengeId)]);
+            NetworkAliases: [BuildGameBoxAlias(submission.TeamId, submission.ChallengeId)],
+            OperationId: CreateOperationId(submission.Id, "patched-container"));
 
         return await containerManager.CreateContainerAsync(patchedContainerConfig, ct);
     }
@@ -478,7 +737,7 @@ public class AwdpPatchService(
     private async Task<CheckOutcome> RunCheckAsync(
         Challenge challenge,
         AwdpPatchSubmission submission,
-        AwdGameBox gameBox,
+        ContainerInstance targetContainer,
         CancellationToken ct)
     {
         if (challenge.CheckerConfig?.Image is null)
@@ -489,21 +748,26 @@ public class AwdpPatchService(
                 "AWDP check container is required before a FixScript can be verified.");
         }
 
-        var timeout = TimeSpan.FromSeconds(challenge.CheckerConfig.TimeoutSeconds ?? 30);
-        var checkConfig = new ContainerConfig(
-            Image: challenge.CheckerConfig.Image,
-            Command: challenge.CheckerConfig.Command,
-            EnvironmentVariables: BuildCheckEnvironment(challenge, submission),
-            Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
-            NetworkName: gameBox.OrchestrationNamespace,
-            Ttl: timeout);
-
+        // Candidate safeguards are recovered after ten minutes. Keep the
+        // checker deadline strictly below that window so a live validation
+        // cannot have its candidate reclaimed by recovery.
+        var timeout = TimeSpan.FromSeconds(Math.Clamp(challenge.CheckerConfig.TimeoutSeconds ?? 30, 1, 300));
         var deadline = DateTime.UtcNow.Add(timeout);
         CheckOutcome? lastOutcome = null;
+        var attempt = 0;
         try
         {
             do
             {
+                attempt++;
+                var checkConfig = new ContainerConfig(
+                    Image: challenge.CheckerConfig.Image,
+                    Command: challenge.CheckerConfig.Command,
+                    EnvironmentVariables: BuildCheckEnvironment(challenge, submission),
+                    Labels: BuildLabels(submission.CompetitionId, submission.TeamId, submission.ChallengeId),
+                    NetworkName: targetContainer.OrchestrationNamespace,
+                    Ttl: timeout,
+                    OperationId: CreateOperationId(submission.Id, $"check:{attempt}"));
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 cts.CancelAfter(TimeSpan.FromSeconds(Math.Clamp((deadline - DateTime.UtcNow).TotalSeconds + 5, 5, 15)));
                 var result = await containerManager.RunContainerAsync(checkConfig, cts.Token);
@@ -540,66 +804,8 @@ public class AwdpPatchService(
             return new CheckOutcome(
                 AwdpFixStatus.FixServiceError,
                 AwdpServiceStatus.ServiceError,
-                $"Check container failed: {ex.Message}");
+                "Check container failed.");
         }
-    }
-
-    private async Task<bool> RollbackAsync(
-        Challenge challenge,
-        AwdGameBox gameBox,
-        ContainerInstance patchedContainer,
-        AwdpPatchSubmission rejectedSubmission,
-        CancellationToken ct)
-    {
-        var previousPatch = await FindPreviousSuccessfulPatchAsync(rejectedSubmission, ct);
-        var originalConfig = new ContainerConfig(
-            Image: challenge.ContainerImage!,
-            EnvironmentVariables: await BuildRuntimeEnvironmentAsync(
-                challenge,
-                gameBox.CompetitionId,
-                gameBox.TeamId,
-                gameBox.ChallengeId,
-                previousPatch,
-                ct),
-            Labels: BuildLabels(gameBox.CompetitionId, gameBox.TeamId, gameBox.ChallengeId),
-            PortMappings: BuildPortMappings(challenge),
-            OrchestrationJson: challenge.OrchestrationJson,
-            NetworkAliases: [BuildGameBoxAlias(gameBox.TeamId, gameBox.ChallengeId)]);
-
-        try
-        {
-            var restored = await containerManager.CreateContainerAsync(originalConfig, ct);
-            ApplyContainerMetadata(gameBox, restored);
-            gameBox.LastInstanceActionAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
-            await DestroyContainerBestEffortAsync(patchedContainer);
-            return previousPatch is not null;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to restore original AWDP container for challenge {ChallengeId}.", gameBox.ChallengeId);
-            await DestroyContainerBestEffortAsync(patchedContainer);
-            ClearContainerMetadata(gameBox);
-            await db.SaveChangesAsync(ct);
-            return false;
-        }
-    }
-
-    private async Task DestroyContainerBestEffortAsync(ContainerInstance container)
-    {
-        try
-        {
-            await containerManager.DestroyContainerAsync(container, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to destroy AWDP container {ContainerId}.", container.ContainerId);
-        }
-    }
-
-    private async Task DestroyContainerInstanceAsync(ContainerInstance instance, CancellationToken ct)
-    {
-        await containerManager.DestroyContainerAsync(instance, ct);
     }
 
     private static ContainerInstance? ToContainerInstance(AwdGameBox gameBox, string? containerId)
@@ -619,7 +825,10 @@ public class AwdpPatchService(
                 EntryUrl: gameBox.EntryUrl,
                 OrchestrationNamespace: gameBox.OrchestrationNamespace);
 
-    private static void ApplyContainerMetadata(AwdGameBox gameBox, ContainerInstance container)
+    private static void ApplyContainerMetadata(
+        AwdGameBox gameBox,
+        ContainerInstance container,
+        Guid operationId)
     {
         gameBox.ContainerInstanceId = container.ContainerId;
         gameBox.ProviderType = container.ProviderType;
@@ -627,6 +836,16 @@ public class AwdpPatchService(
         gameBox.EntryUrl = container.EntryUrl;
         gameBox.OrchestrationNamespace = container.OrchestrationNamespace;
         gameBox.PortMappingsJson = JsonSerializer.Serialize(container.PortMappings, JsonOptions);
+        gameBox.RuntimeKind = "container";
+        gameBox.ComposeProjectName = null;
+        gameBox.ComposeYaml = null;
+        gameBox.InternalHost = container.InternalHost;
+        gameBox.InternalPortMappingsJson = JsonSerializer.Serialize(
+            container.InternalPortMappings ?? [],
+            JsonOptions);
+        gameBox.RuntimeOperationId = operationId;
+        gameBox.CleanupOwner = null;
+        gameBox.CleanupLockedUntil = null;
     }
 
     private async Task CompleteValidationAsync(
@@ -698,7 +917,9 @@ public class AwdpPatchService(
             !patchUrl.StartsWith("/", StringComparison.Ordinal) &&
             !Uri.TryCreate(patchUrl, UriKind.Absolute, out _))
         {
-            patchUrl = await storageProvider.GetUrlAsync(patchUrl, ct);
+            patchUrl = storageProvider is ITemporaryUrlStorageProvider temporaryUrls
+                ? await temporaryUrls.GetUrlAsync(patchUrl, TimeSpan.FromHours(3), ct)
+                : await storageProvider.GetUrlAsync(patchUrl, ct);
         }
 
         return new Dictionary<string, string>
@@ -795,16 +1016,104 @@ public class AwdpPatchService(
             .OrderByDescending(s => s.ValidatedAt ?? s.SubmittedAt)
             .FirstOrDefaultAsync(ct);
 
-    private static void ClearContainerMetadata(AwdGameBox gameBox)
+    private async Task<BackgroundTaskItem> GetOrCreateContainerCleanupSafeguardAsync(
+        Guid competitionId,
+        Guid submissionId,
+        ContainerInstance container,
+        CancellationToken ct)
     {
-        gameBox.ContainerInstanceId = null;
-        gameBox.ProviderType = "unknown";
-        gameBox.PublicHost = null;
-        gameBox.EntryUrl = null;
-        gameBox.OrchestrationNamespace = null;
-        gameBox.PortMappingsJson = "{}";
-        gameBox.ExpiresAt = null;
-        gameBox.LastInstanceActionAt = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
+        var marker = $"awdp-candidate:{submissionId:N}";
+        var existing = await db.BackgroundTasks
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(task =>
+                task.CompetitionId == competitionId &&
+                task.Type == AwdpBackgroundTaskTypes.ContainerCleanup &&
+                task.LastError == marker &&
+                task.Status != BackgroundTaskStatus.Succeeded &&
+                task.Status != BackgroundTaskStatus.Failed &&
+                task.Status != BackgroundTaskStatus.Cancelled, ct);
+        if (existing is not null)
+        {
+            existing.Status = BackgroundTaskStatus.Running;
+            existing.PayloadJson = JsonSerializer.Serialize(new AwdpContainerCleanupPayload(container), JsonOptions);
+            existing.LockOwner = $"awdp-validation:{submissionId:N}";
+            existing.LockedUntil = now.AddMinutes(10);
+            existing.UpdatedAt = now;
+            return existing;
+        }
+
+        var task = new BackgroundTaskItem
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            Type = AwdpBackgroundTaskTypes.ContainerCleanup,
+            Status = BackgroundTaskStatus.Running,
+            PayloadJson = JsonSerializer.Serialize(new AwdpContainerCleanupPayload(container), JsonOptions),
+            AttemptCount = 0,
+            MaxAttempts = 5,
+            LockOwner = $"awdp-validation:{submissionId:N}",
+            LockedUntil = now.AddMinutes(10),
+            LastError = marker,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        db.BackgroundTasks.Add(task);
+        return task;
+    }
+
+    private static void ActivateContainerCleanupTask(
+        BackgroundTaskItem task,
+        ContainerInstance container)
+    {
+        task.PayloadJson = JsonSerializer.Serialize(new AwdpContainerCleanupPayload(container), JsonOptions);
+        task.Status = BackgroundTaskStatus.Pending;
+        task.LockOwner = null;
+        task.LockedUntil = null;
+        task.LastError = null;
+        task.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void CompleteContainerCleanupSafeguard(BackgroundTaskItem task)
+    {
+        task.Status = BackgroundTaskStatus.Succeeded;
+        task.LockOwner = null;
+        task.LockedUntil = null;
+        task.LastError = null;
+        task.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private async Task DestroyCandidateBestEffortAsync(ContainerInstance container)
+    {
+        try
+        {
+            using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await containerManager.DestroyContainerAsync(container, cleanupCts.Token);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Failed to destroy untracked AWDP candidate container {ContainerId} after cleanup-saga persistence failed.",
+                container.ContainerId);
+        }
+    }
+
+    private void AddBackgroundTask<TPayload>(Guid competitionId, string type, TPayload payload)
+    {
+        var now = DateTime.UtcNow;
+        db.BackgroundTasks.Add(new BackgroundTaskItem
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            Type = type,
+            Status = BackgroundTaskStatus.Pending,
+            PayloadJson = JsonSerializer.Serialize(payload, JsonOptions),
+            AttemptCount = 0,
+            MaxAttempts = 5,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
     }
 
     private static string TrustedUtilityOrchestrationJson()
@@ -980,6 +1289,12 @@ public class AwdpPatchService(
             ? "application/zip"
             : "application/gzip";
 
+    private static Guid CreateOperationId(Guid submissionId, string stage)
+    {
+        var digest = SHA256.HashData(Encoding.UTF8.GetBytes($"awdp:{submissionId:N}:{stage}"));
+        return new Guid(digest.AsSpan(0, 16));
+    }
+
     private static bool IsTerminal(AwdpFixStatus status)
         => status is AwdpFixStatus.FixSuccess
             or AwdpFixStatus.FixFailed
@@ -989,6 +1304,9 @@ public class AwdpPatchService(
             or AwdpFixStatus.AuditFailed
             or AwdpFixStatus.FixRuleViolation
             or AwdpFixStatus.DefenseAttemptsExhausted;
+
+    internal static bool IsContainerOperationCoolingDown(DateTime? lastInstanceActionAt, DateTime now)
+        => lastInstanceActionAt?.Add(ContainerOperationCooldown) > now;
 
     private sealed record CheckOutcome(
         AwdpFixStatus FixStatus,
@@ -1033,6 +1351,14 @@ internal sealed class AwdpPatchStateLock : IAsyncDisposable
 
         await _transaction.CommitAsync(ct);
         _committed = true;
+    }
+
+    public async Task RollbackAsync(CancellationToken ct)
+    {
+        if (_transaction is null || _committed)
+            return;
+
+        await _transaction.RollbackAsync(ct);
     }
 
     public async ValueTask DisposeAsync()

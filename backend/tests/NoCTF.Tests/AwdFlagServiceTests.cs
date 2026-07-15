@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.Plugins.AWD;
+using NoCTF.PluginBase;
 
 namespace NoCTF.Tests;
 
@@ -82,6 +83,7 @@ public class AwdFlagServiceTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new FixedTenantContext2(competitionId));
@@ -171,6 +173,152 @@ public class AwdFlagServiceTests
         Assert.Equal(5, flags.Distinct().Count());
     }
 
+    [Fact]
+    public async Task RefreshFlagsAsync_UsesStableNetworkAliasAndCompetitionTtl()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var flagId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        SeedTeam(db, competitionId, teamId);
+        SeedChallenge(db, competitionId, challengeId, "ctf", "secret");
+        await db.SaveChangesAsync();
+        var challenge = await db.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId);
+        challenge.ContainerImage = "challenge:latest";
+        challenge.ExposedPort = 8080;
+        db.AwdFlags.Add(new AwdFlag
+        {
+            Id = flagId,
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            RoundNumber = 1,
+            FlagContent = "flag{round-one}",
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var manager = new RefreshContainerManager();
+        var service = new AwdFlagService(
+            db,
+            manager,
+            new AwdChallengeRuntimeConfigProvider(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AwdFlagService>.Instance);
+        await service.RefreshFlagsAsync(competitionId, 1);
+
+        var config = Assert.Single(manager.CreateConfigs);
+        Assert.Equal(flagId, config.OperationId);
+        Assert.Contains(
+            $"gamebox-{teamId:N}"[..16] + $"-{challengeId:N}"[..9],
+            config.NetworkAliases!);
+        Assert.True(config.Ttl > TimeSpan.FromHours(1));
+        var box = await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal(flagId, box.RuntimeOperationId);
+        Assert.NotNull(box.ExpiresAt);
+        Assert.Equal("created-container", box.ContainerInstanceId);
+    }
+
+    [Fact]
+    public async Task RefreshFlagsAsync_CreateFailureAfterDestroy_PersistsTruthfulRetryState()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var flagId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        SeedTeam(db, competitionId, teamId);
+        SeedChallenge(db, competitionId, challengeId, "ctf", "secret");
+        await db.SaveChangesAsync();
+        var challenge = await db.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId);
+        challenge.ContainerImage = "challenge:latest";
+        challenge.ExposedPort = 8080;
+        db.AwdFlags.Add(new AwdFlag
+        {
+            Id = flagId,
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            RoundNumber = 1,
+            FlagContent = "flag{round-one}",
+            CreatedAt = DateTime.UtcNow
+        });
+        db.AwdGameBoxes.Add(new AwdGameBox
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            ContainerInstanceId = "destroyed-container",
+            PublicHost = "stale.example.test",
+            EntryUrl = "http://stale.example.test",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30),
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var manager = new RefreshContainerManager(failCreate: true);
+        var service = new AwdFlagService(
+            db,
+            manager,
+            new AwdChallengeRuntimeConfigProvider(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AwdFlagService>.Instance);
+        var completed = await service.RefreshRoundFlagsAsync(competitionId, 1);
+
+        var box = await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync();
+        Assert.False(completed);
+        Assert.Equal("destroyed-container", Assert.Single(manager.DestroyedContainerIds));
+        Assert.Null(box.ContainerInstanceId);
+        Assert.Null(box.PublicHost);
+        Assert.Null(box.EntryUrl);
+        Assert.Null(box.ExpiresAt);
+        Assert.Equal(flagId, box.RuntimeOperationId);
+        Assert.NotNull(box.LastInstanceActionAt);
+    }
+
+    [Fact]
+    public async Task RefreshFlagsAsync_RepeatedRound_DoesNotDestroySuccessfulOperation()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var flagId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        SeedTeam(db, competitionId, teamId);
+        SeedChallenge(db, competitionId, challengeId, "ctf", "secret");
+        await db.SaveChangesAsync();
+        var challenge = await db.Challenges.IgnoreQueryFilters().SingleAsync(c => c.Id == challengeId);
+        challenge.ContainerImage = "challenge:latest";
+        challenge.ExposedPort = 8080;
+        db.AwdFlags.Add(new AwdFlag
+        {
+            Id = flagId,
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            RoundNumber = 1,
+            FlagContent = "flag{round-one}",
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var manager = new RefreshContainerManager();
+        var service = new AwdFlagService(
+            db,
+            manager,
+            new AwdChallengeRuntimeConfigProvider(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AwdFlagService>.Instance);
+        await service.RefreshFlagsAsync(competitionId, 1);
+        await service.RefreshFlagsAsync(competitionId, 1);
+
+        Assert.Single(manager.CreateConfigs);
+        Assert.Empty(manager.DestroyedContainerIds);
+        Assert.Equal("created-container", (await db.AwdGameBoxes.IgnoreQueryFilters().SingleAsync()).ContainerInstanceId);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static AwdFlagService CreateService(ApplicationDbContext db)
@@ -250,6 +398,47 @@ public class AwdFlagServiceTests
         public Task ComposeDownAsync(
             NoCTF.PluginBase.ComposeDeployment deployment, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+    }
+
+    private sealed class RefreshContainerManager(bool failCreate = false) : IContainerManager
+    {
+        public List<ContainerConfig> CreateConfigs { get; } = [];
+        public List<string> DestroyedContainerIds { get; } = [];
+
+        public Task<ContainerInstance> CreateContainerAsync(ContainerConfig config, CancellationToken ct = default)
+        {
+            CreateConfigs.Add(config);
+            if (failCreate)
+                throw new InvalidOperationException("Create failed.");
+
+            return Task.FromResult(new ContainerInstance(
+                Guid.NewGuid(),
+                Guid.Empty,
+                null,
+                null,
+                "docker",
+                "created-container",
+                new Dictionary<int, int> { [8080] = 32000 },
+                "running",
+                DateTime.UtcNow,
+                InternalHost: "runner.test",
+                InternalPortMappings: new Dictionary<int, int> { [8080] = 32000 }));
+        }
+
+        public Task DestroyContainerAsync(ContainerInstance container, CancellationToken ct = default)
+        {
+            DestroyedContainerIds.Add(container.ContainerId);
+            return Task.CompletedTask;
+        }
+
+        public Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<ComposeDeployment> ComposeUpAsync(ComposeConfig config, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task ComposeDownAsync(ComposeDeployment deployment, CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 }
 

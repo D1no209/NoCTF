@@ -7,12 +7,21 @@ namespace NoCTF.Plugins.CTF;
 /// <summary>
 /// Plugin module for the CTF game mode. Registers all CTF-related services.
 /// </summary>
-public class CtfModule : IPluginModule
+public class CtfModule : IHostAwarePluginModule
 {
     public string Name => "NoCTF.Plugins.CTF";
     public string Version => "1.0.0";
 
     public void ConfigureServices(IServiceCollection services)
+        => ConfigureApiServices(services);
+
+    public void ConfigureServices(IServiceCollection services, PluginHostRole hostRole)
+    {
+        if (hostRole == PluginHostRole.Api)
+            ConfigureApiServices(services);
+    }
+
+    private static void ConfigureApiServices(IServiceCollection services)
     {
         // Core CTF services
         services.AddSingleton<DynamicScoringCalculator>();

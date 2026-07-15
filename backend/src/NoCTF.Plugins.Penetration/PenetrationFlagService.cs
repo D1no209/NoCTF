@@ -22,16 +22,37 @@ public class PenetrationFlagService(ApplicationDbContext db)
         IReadOnlyCollection<PenetrationFlag> flags,
         CancellationToken ct)
     {
-        var oldFlags = await db.DynamicFlagInstances
+        var activeFlags = db.DynamicFlagInstances
             .IgnoreQueryFilters()
             .Where(f =>
                 f.CompetitionId == challenge.CompetitionId &&
                 f.TeamId == instance.TeamId &&
                 f.ChallengeId == challenge.Id &&
-                f.IsActive)
-            .ToListAsync(ct);
-        foreach (var oldFlag in oldFlags)
-            oldFlag.IsActive = false;
+                f.IsActive);
+        if (db.Database.IsRelational())
+        {
+            // Deactivate in one statement before inserting replacements. This
+            // avoids loading every historical flag and guarantees the partial
+            // unique active-flag index cannot observe old and new rows together.
+            await activeFlags.ExecuteUpdateAsync(
+                setters => setters.SetProperty(flag => flag.IsActive, false),
+                ct);
+            foreach (var entry in db.ChangeTracker.Entries<DynamicFlagInstance>().Where(entry =>
+                         entry.Entity.CompetitionId == challenge.CompetitionId &&
+                         entry.Entity.TeamId == instance.TeamId &&
+                         entry.Entity.ChallengeId == challenge.Id &&
+                         entry.Entity.IsActive))
+            {
+                entry.Entity.IsActive = false;
+            }
+        }
+        else
+        {
+            var oldFlags = await activeFlags.ToListAsync(ct);
+            foreach (var oldFlag in oldFlags)
+                oldFlag.IsActive = false;
+            await db.SaveChangesAsync(ct);
+        }
 
         var now = DateTime.UtcNow;
         var generated = flags
@@ -49,7 +70,9 @@ public class PenetrationFlagService(ApplicationDbContext db)
                     InstanceId = instance.Id,
                     ValueSecret = "[REDACTED]",
                     PlainValue = rawValue,
-                    ValueHash = HashCandidates(rawValue, FormatFlag(challenge, rawValue)),
+                    // Store one canonical digest so matching can use an indexed lookup.
+                    // Submitted formatted flags are normalized back to their raw value.
+                    ValueHash = Hash(rawValue),
                     IsActive = true,
                     GeneratedAt = now,
                 };
@@ -74,13 +97,18 @@ public class PenetrationFlagService(ApplicationDbContext db)
             .OrderBy(f => f.Stage)
             .ToListAsync(ct);
 
+        var submittedHashes = SubmittedFlagCandidates(challenge, submittedFlag)
+            .Select(Hash)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
         var dynamicFlags = await db.DynamicFlagInstances
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(f =>
                 f.CompetitionId == challenge.CompetitionId &&
                 f.ChallengeId == challenge.Id &&
-                f.IsActive)
+                f.IsActive &&
+                submittedHashes.Contains(f.ValueHash))
             .ToListAsync(ct);
 
         foreach (var flag in flags)
@@ -130,11 +158,26 @@ public class PenetrationFlagService(ApplicationDbContext db)
         if (dynamicFlag is not null)
             dynamicFlag.SolvedAt = solvedAt;
 
-        var flag = await db.PenetrationFlags
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(f => f.CompetitionId == competitionId && f.Id == flagId, ct);
-        if (flag is not null)
-            flag.SolvedCount += 1;
+        if (db.Database.IsRelational())
+        {
+            await db.PenetrationFlags
+                .IgnoreQueryFilters()
+                .Where(f => f.CompetitionId == competitionId && f.Id == flagId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(f => f.SolvedCount, f => f.SolvedCount + 1)
+                    .SetProperty(f => f.UpdatedAt, solvedAt), ct);
+        }
+        else
+        {
+            var flag = await db.PenetrationFlags
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(f => f.CompetitionId == competitionId && f.Id == flagId, ct);
+            if (flag is not null)
+            {
+                flag.SolvedCount += 1;
+                flag.UpdatedAt = solvedAt;
+            }
+        }
     }
 
     public static string FormatFlag(Challenge challenge, string content)
@@ -246,9 +289,6 @@ public class PenetrationFlagService(ApplicationDbContext db)
             yield return submittedFlag[wrappedPrefix.Length..^1];
         }
     }
-
-    private static string HashCandidates(params string[] values)
-        => string.Join(';', values.Select(Hash).Distinct(StringComparer.Ordinal));
 
     private static string GenerateRandomValue()
     {

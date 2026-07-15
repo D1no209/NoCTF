@@ -33,9 +33,55 @@ public class ChallengeSolveCountsTests
         Assert.Equal(1, result[challengeId]);
     }
 
+    [Fact]
+    public async Task PenetrationQueries_IgnoreHiddenFlagsForProgressAndPlayerHistory()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var visibleFlagOne = Guid.NewGuid();
+        var visibleFlagTwo = Guid.NewGuid();
+        var hiddenFlag = Guid.NewGuid();
+
+        await using var db = CreateDb(competitionId);
+        SeedTeam(db, competitionId, teamId, "Active");
+        db.PenetrationFlags.AddRange(
+            Flag(visibleFlagOne, competitionId, challengeId, stage: 1, visible: true),
+            Flag(visibleFlagTwo, competitionId, challengeId, stage: 2, visible: true),
+            Flag(hiddenFlag, competitionId, challengeId, stage: 99, visible: false));
+        SeedPenetrationSubmission(db, competitionId, teamId, challengeId, visibleFlagOne);
+        SeedPenetrationSubmission(db, competitionId, teamId, challengeId, hiddenFlag);
+        await db.SaveChangesAsync();
+
+        var solvedFlags = await GetSubmissionsEndpoint.BuildVisibleSolvedFlagsQuery(
+                db,
+                competitionId,
+                teamId,
+                [challengeId])
+            .ToListAsync();
+        var incompleteCounts = await ChallengeSolveCounts.GetPenetrationFullSolveCountsAsync(
+            db,
+            competitionId,
+            [challengeId]);
+
+        Assert.Single(solvedFlags);
+        Assert.Equal(visibleFlagOne, solvedFlags[0].FlagId);
+        Assert.DoesNotContain(challengeId, incompleteCounts.Keys);
+
+        SeedPenetrationSubmission(db, competitionId, teamId, challengeId, visibleFlagTwo);
+        await db.SaveChangesAsync();
+
+        var completeCounts = await ChallengeSolveCounts.GetPenetrationFullSolveCountsAsync(
+            db,
+            competitionId,
+            [challengeId]);
+        Assert.Equal(1, completeCounts[challengeId]);
+    }
+
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
@@ -84,6 +130,48 @@ public class ChallengeSolveCountsTests
             UserId = Guid.NewGuid(),
             FlagContent = isCorrect ? "flag{ok}" : "flag{wrong}",
             IsCorrect = isCorrect,
+            SubmittedAt = DateTime.UtcNow,
+            IpAddress = "127.0.0.1"
+        });
+    }
+
+    private static PenetrationFlag Flag(
+        Guid id,
+        Guid competitionId,
+        Guid challengeId,
+        int stage,
+        bool visible)
+        => new()
+        {
+            Id = id,
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            TopologyId = Guid.NewGuid(),
+            Name = $"flag-{stage}",
+            Stage = stage,
+            Score = 100,
+            Visible = visible,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+    private static void SeedPenetrationSubmission(
+        ApplicationDbContext db,
+        Guid competitionId,
+        Guid teamId,
+        Guid challengeId,
+        Guid flagId)
+    {
+        db.Submissions.Add(new Submission
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            UserId = Guid.NewGuid(),
+            PenetrationFlagId = flagId,
+            FlagContent = "[REDACTED]",
+            IsCorrect = true,
             SubmittedAt = DateTime.UtcNow,
             IpAddress = "127.0.0.1"
         });

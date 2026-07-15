@@ -1,4 +1,8 @@
+using System.Net;
+using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
@@ -20,6 +24,7 @@ public class KohPollEngineTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new FixedTenantContextKoh(competitionId));
@@ -74,6 +79,22 @@ public class KohPollEngineTests
         return id;
     }
 
+    private static Guid SeedChallenge(ApplicationDbContext db, Guid competitionId)
+    {
+        var id = Guid.NewGuid();
+        db.Challenges.Add(new Challenge
+        {
+            Id = id,
+            CompetitionId = competitionId,
+            Title = "KoH hill",
+            TypeId = "koh",
+            PointsConfig = new PointsConfig(),
+            CreatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+        return id;
+    }
+
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -87,7 +108,7 @@ public class KohPollEngineTests
 
         SeedCompetition(db, competitionId, controlPoints: 10);
         var teamId = SeedTeam(db, competitionId, "Team A");
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
         var now = DateTime.UtcNow;
 
         var engine = CreateEngine(db);
@@ -122,7 +143,7 @@ public class KohPollEngineTests
         SeedCompetition(db, competitionId, controlPoints: 10);
         var teamA = SeedTeam(db, competitionId, "Team A");
         var teamB = SeedTeam(db, competitionId, "Team B");
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
         var t0 = DateTime.UtcNow;
         var t1 = t0.AddSeconds(30);
 
@@ -163,7 +184,7 @@ public class KohPollEngineTests
         SeedCompetition(db, competitionId, controlPoints: 10);
         var teamA = SeedTeam(db, competitionId, "Team A");
         var teamB = SeedTeam(db, competitionId, "Team B");
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
         var notifier = new NullKohHubNotifier();
 
         var engine = CreateEngine(db, notifier);
@@ -185,7 +206,7 @@ public class KohPollEngineTests
         await using var db = CreateDb(competitionId);
 
         SeedCompetition(db, competitionId, controlPoints: 10);
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
 
         var engine = CreateEngine(db);
 
@@ -210,7 +231,7 @@ public class KohPollEngineTests
 
         SeedCompetition(db, competitionId, controlPoints: 10);
         var teamA = SeedTeam(db, competitionId, "Team A");
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
         var t0 = DateTime.UtcNow;
         var t1 = t0.AddSeconds(30);
 
@@ -223,6 +244,110 @@ public class KohPollEngineTests
         Assert.Single(records);
         Assert.NotNull(records[0].EndTime);
         Assert.Equal(t1, records[0].EndTime);
+    }
+
+    [Fact]
+    public async Task AgentFailure_PreservesActiveControlWindow()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamId = SeedTeam(db, competitionId, "Team A");
+        var challengeId = SeedPollTarget(db, competitionId);
+        var scoreEngine = CreateEngine(db);
+        var startedAt = DateTime.UtcNow.AddMinutes(-1);
+        await scoreEngine.UpdateControlAsync(competitionId, challengeId, teamId, startedAt, 10);
+
+        using var httpClient = new HttpClient(new DelegateHandler(_ =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable))));
+        await PollOnceAsync(db, scoreEngine, new KohAgentClient(httpClient, NullLogger<KohAgentClient>.Instance));
+
+        var active = await db.KohControlRecords.IgnoreQueryFilters().SingleAsync();
+        Assert.Null(active.EndTime);
+        Assert.Empty(await db.ScoreEvents.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
+    public async Task AuthoritativeNoController_ClosesActiveControlWindow()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamId = SeedTeam(db, competitionId, "Team A");
+        var challengeId = SeedPollTarget(db, competitionId);
+        var scoreEngine = CreateEngine(db);
+        await scoreEngine.UpdateControlAsync(
+            competitionId,
+            challengeId,
+            teamId,
+            DateTime.UtcNow.AddMinutes(-1),
+            10);
+
+        using var httpClient = new HttpClient(new DelegateHandler(_ => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new KohStatusResponse(true, null))
+            })));
+        var polledAt = DateTime.UtcNow;
+        await PollOnceAsync(
+            db,
+            scoreEngine,
+            new KohAgentClient(httpClient, NullLogger<KohAgentClient>.Instance),
+            polledAt);
+
+        var record = await db.KohControlRecords.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal(polledAt, record.EndTime);
+    }
+
+    private static Guid SeedPollTarget(ApplicationDbContext db, Guid competitionId)
+    {
+        var challengeId = Guid.NewGuid();
+        db.Challenges.Add(new Challenge
+        {
+            Id = challengeId,
+            CompetitionId = competitionId,
+            Title = "KoH hill",
+            TypeId = "koh",
+            PointsConfig = new PointsConfig(),
+            KohAgentConfig = new KohAgentConfig { Port = 8080 },
+            CreatedAt = DateTime.UtcNow
+        });
+        db.AwdGameBoxes.Add(new AwdGameBox
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = Guid.Empty,
+            ChallengeId = challengeId,
+            ContainerInstanceId = "hill-container",
+            InternalHost = "runner.test",
+            InternalPortMappingsJson = "{\"8080\":32080}",
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            CreatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+        return challengeId;
+    }
+
+    private static async Task PollOnceAsync(
+        ApplicationDbContext db,
+        KohScoreEngine scoreEngine,
+        KohAgentClient agentClient,
+        DateTime? now = null)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        using var engine = new KohPollEngine(
+            services,
+            NullLogger<KohPollEngine>.Instance,
+            new ConfigurationBuilder().Build());
+        var competition = await db.Competitions.IgnoreQueryFilters().SingleAsync();
+        await engine.PollCompetitionAsync(
+            services,
+            db,
+            agentClient,
+            scoreEngine,
+            competition,
+            now ?? DateTime.UtcNow,
+            TestContext.Current.CancellationToken);
     }
 
     // ── Null stubs ────────────────────────────────────────────────────────────
@@ -254,6 +379,15 @@ public class KohPollEngineTests
         public Task NotifySystemAlertAsync(Guid competitionId, string level, string message, CancellationToken ct = default) => Task.CompletedTask;
         public Task NotifyRoundStartedAsync(Guid competitionId, int roundNumber, CancellationToken ct = default) => Task.CompletedTask;
         public Task NotifyAttackLogAsync(Guid competitionId, Guid attackerTeamId, string attackerTeamName, Guid victimTeamId, string victimTeamName, Guid challengeId, string challengeName, int roundNumber, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class DelegateHandler(
+        Func<HttpRequestMessage, Task<HttpResponseMessage>> handler) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+            => handler(request);
     }
 }
 

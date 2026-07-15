@@ -1,4 +1,7 @@
 using NoCTF.Core;
+using NoCTF.Container.Docker;
+using NoCTF.Container.K8s;
+using NoCTF.PluginBase;
 using NoCTF.Plugins.Penetration;
 
 namespace NoCTF.Tests;
@@ -40,6 +43,7 @@ public class PenetrationComposeBuilderTests
             Name = "web",
             Image = "registry/range-web:latest",
             EnvironmentJson = "{\"APP_ENV\":\"prod\"}",
+            OrchestrationJson = "{\"kubernetes\":{\"labels\":{\"range\":\"built-in\"}}}",
             PortsJson = "[8080]",
             IsEntry = true,
             IsInternal = false,
@@ -74,6 +78,9 @@ public class PenetrationComposeBuilderTests
         };
 
         var result = new PenetrationComposeBuilder().Build(challenge, instance, [node], [flag], [dynamicFlag]);
+        DockerComposeRunner.ValidateComposeYaml(result.ComposeYaml);
+        var kubernetesService = Assert.Single(
+            KubernetesComposeParser.Parse(result.ComposeYaml, new OrchestrationSpec()));
 
         Assert.Equal(node, result.EntryNode);
         Assert.Equal(8080, result.EntryContainerPort);
@@ -93,6 +100,7 @@ public class PenetrationComposeBuilderTests
         Assert.Contains("memory: \"256M\"", result.ComposeYaml);
         Assert.DoesNotContain("networks:", result.ComposeYaml);
         Assert.Contains($"instanceId: \"{instanceId}\"", result.ComposeYaml);
+        Assert.Equal("built-in", kubernetesService.Orchestration.Kubernetes.Labels["range"]);
     }
 
     [Fact]

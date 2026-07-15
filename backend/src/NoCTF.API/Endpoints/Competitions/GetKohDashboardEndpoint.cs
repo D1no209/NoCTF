@@ -51,7 +51,9 @@ public class GetKohDashboardEndpoint(ApplicationDbContext dbContext)
     {
         var competition = await dbContext.Competitions
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(c => c.Id == req.Id)
+            .Select(c => new { c.Status, c.StartTime })
             .FirstOrDefaultAsync(ct);
 
         if (competition is null || !PublicCompetitionGuard.IsPublic(competition.Status))
@@ -72,32 +74,55 @@ public class GetKohDashboardEndpoint(ApplicationDbContext dbContext)
 
         var challenges = await dbContext.Challenges
             .IgnoreQueryFilters()
-            .Where(c => c.CompetitionId == req.Id)
+            .AsNoTracking()
+            .Where(c => c.CompetitionId == req.Id && !c.IsDeleting)
+            .Select(c => new { c.Id, c.Title })
             .ToListAsync(ct);
 
         var teamIds = await dbContext.Teams
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(t =>
                 t.CompetitionId == req.Id &&
                 t.RegistrationStatus == TeamRegistrationStatus.Approved &&
                 !t.IsBanned)
             .ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
-        var controlRecords = await dbContext.KohControlRecords
+        var activeChallengeIds = challenges.Select(challenge => challenge.Id).ToArray();
+        var historyCapacity = Math.Clamp(challenges.Count * 100, 100, 5_000);
+        var eligibleControlRecords = dbContext.KohControlRecords
             .IgnoreQueryFilters()
-            .Where(r => r.CompetitionId == req.Id && teamIds.Keys.Contains(r.TeamId))
-            .OrderBy(r => r.StartTime)
+            .AsNoTracking()
+            .Where(r =>
+                r.CompetitionId == req.Id &&
+                activeChallengeIds.Contains(r.ChallengeId) &&
+                teamIds.Keys.Contains(r.TeamId));
+        var activeControlRecords = await eligibleControlRecords
+            .Where(record => record.EndTime == null)
             .ToListAsync(ct);
+        var recentControlHistory = await eligibleControlRecords
+            .Where(record => record.EndTime != null)
+            .OrderByDescending(r => r.StartTime)
+            .Take(historyCapacity)
+            .ToListAsync(ct);
+        var controlRecords = activeControlRecords
+            .Concat(recentControlHistory)
+            .DistinctBy(record => record.Id)
+            .ToList();
 
         var now = DateTime.UtcNow;
+        var recordsByChallenge = controlRecords.ToLookup(record => record.ChallengeId);
 
         var challengeStatuses = challenges.Select(challenge =>
         {
-            var records = controlRecords
-                .Where(r => r.ChallengeId == challenge.Id)
+            var records = recordsByChallenge[challenge.Id]
+                .OrderBy(r => r.StartTime)
                 .ToList();
 
-            var activeRecord = records.FirstOrDefault(r => r.EndTime == null);
+            // A legacy/racing writer may have left more than one open record.
+            // Prefer the most recently observed controller instead of reporting
+            // a stale predecessor while repair closes the duplicate row.
+            var activeRecord = records.LastOrDefault(r => r.EndTime == null);
 
             double controlDuration = 0;
             if (activeRecord is not null)

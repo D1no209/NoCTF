@@ -44,10 +44,23 @@ public class AwdCheckerService(
         var challengeIds = gameBoxes.Select(g => g.ChallengeId).Distinct().ToList();
         var challenges = await db.Challenges
             .IgnoreQueryFilters()
-            .Where(c => challengeIds.Contains(c.Id))
+            .Where(c => challengeIds.Contains(c.Id) && !c.IsDeleting)
             .ToListAsync(ct);
 
         var challengeMap = challenges.ToDictionary(c => c.Id);
+        var existingResultKeys = (await db.AwdCheckResults
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(result =>
+                    result.CompetitionId == competitionId &&
+                    result.RoundNumber == roundNumber &&
+                    activeTeamIds.Contains(result.TeamId) &&
+                    challengeIds.Contains(result.ChallengeId))
+                .Select(result => new { result.TeamId, result.ChallengeId })
+                .Distinct()
+                .ToListAsync(ct))
+            .Select(result => (result.TeamId, result.ChallengeId))
+            .ToHashSet();
 
         var semaphore = new SemaphoreSlim(MaxConcurrency);
         var results = new List<AwdCheckResult>();
@@ -56,6 +69,8 @@ public class AwdCheckerService(
         var tasks = gameBoxes.Select(async gameBox =>
         {
             if (!challengeMap.TryGetValue(gameBox.ChallengeId, out var challenge))
+                return;
+            if (existingResultKeys.Contains((gameBox.TeamId, gameBox.ChallengeId)))
                 return;
 
             var checkerConfig = challenge.CheckerConfig;
@@ -71,7 +86,7 @@ public class AwdCheckerService(
             try
             {
                 var result = await RunSingleCheckerAsync(
-                    competitionId, gameBox, checkerConfig, roundNumber, ct);
+                    competitionId, gameBox, challenge, checkerConfig, roundNumber, ct);
 
                 lock (resultsLock)
                     results.Add(result);
@@ -98,17 +113,18 @@ public class AwdCheckerService(
     private async Task<AwdCheckResult> RunSingleCheckerAsync(
         Guid competitionId,
         AwdGameBox gameBox,
+        Challenge challenge,
         CheckerConfig checkerConfig,
         int roundNumber,
         CancellationToken ct)
     {
         var targetHost = BuildGameBoxAlias(gameBox.TeamId, gameBox.ChallengeId);
-        const int defaultPort = 80;
+        var targetPort = ResolveTargetPort(challenge);
 
         var envVars = new Dictionary<string, string>
         {
             ["TARGET_HOST"] = targetHost,
-            ["TARGET_PORT"] = defaultPort.ToString(),
+            ["TARGET_PORT"] = targetPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["ROUND"] = roundNumber.ToString(),
             ["TEAM_ID"] = gameBox.TeamId.ToString()
         };
@@ -160,7 +176,7 @@ public class AwdCheckerService(
         catch (Exception ex)
         {
             status = AwdCheckStatus.Error;
-            detail = ex.Message;
+            detail = "checker_execution_failed";
             logger.LogError(ex,
                 "Checker failed for team {TeamId} challenge {ChallengeId} round {Round}.",
                 gameBox.TeamId, gameBox.ChallengeId, roundNumber);
@@ -184,4 +200,14 @@ public class AwdCheckerService(
 
     private static string ShortId(Guid id)
         => id.ToString("N")[..8];
+
+    internal static int ResolveTargetPort(Challenge challenge)
+    {
+        var spec = OrchestrationSpecSerializer.Read(challenge.OrchestrationJson);
+        return spec.ExposedPort is > 0
+            ? spec.ExposedPort.Value
+            : challenge.ExposedPort is > 0
+                ? challenge.ExposedPort.Value
+                : 80;
+    }
 }

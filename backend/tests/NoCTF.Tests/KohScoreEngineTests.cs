@@ -19,6 +19,7 @@ public class KohScoreEngineTests
     private static ApplicationDbContext CreateDb(Guid competitionId)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new FixedTenantContextKohEngine(competitionId));
@@ -71,6 +72,23 @@ public class KohScoreEngineTests
         return id;
     }
 
+    private static Guid SeedChallenge(ApplicationDbContext db, Guid competitionId, bool isDeleting = false)
+    {
+        var id = Guid.NewGuid();
+        db.Challenges.Add(new Challenge
+        {
+            Id = id,
+            CompetitionId = competitionId,
+            Title = "KoH hill",
+            TypeId = "koh",
+            PointsConfig = new PointsConfig(),
+            IsDeleting = isDeleting,
+            CreatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+        return id;
+    }
+
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -83,7 +101,7 @@ public class KohScoreEngineTests
         await using var db = CreateDb(competitionId);
         SeedCompetition(db, competitionId, controlPoints: 15);
         var teamId = SeedTeam(db, competitionId, "Team A");
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
         var now = DateTime.UtcNow;
 
         var engine = CreateEngine(db);
@@ -116,7 +134,7 @@ public class KohScoreEngineTests
         SeedCompetition(db, competitionId);
         var teamA = SeedTeam(db, competitionId, "Team A");
         var teamB = SeedTeam(db, competitionId, "Team B");
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
         var t0 = DateTime.UtcNow;
         var t1 = t0.AddSeconds(30);
 
@@ -149,7 +167,7 @@ public class KohScoreEngineTests
         await using var db = CreateDb(competitionId);
         SeedCompetition(db, competitionId);
         var teamA = SeedTeam(db, competitionId, "Team A");
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
         var t0 = DateTime.UtcNow;
         var t1 = t0.AddSeconds(30);
 
@@ -180,7 +198,7 @@ public class KohScoreEngineTests
         SeedCompetition(db, competitionId);
         var teamA = SeedTeam(db, competitionId, "Team A");
         var teamB = SeedTeam(db, competitionId, "Team B");
-        var challengeId = Guid.NewGuid();
+        var challengeId = SeedChallenge(db, competitionId);
         var spy = new KohHubNotifierSpy();
 
         var engine = CreateEngine(db, spy);
@@ -196,6 +214,81 @@ public class KohScoreEngineTests
         // A → B: 1 more notification
         await engine.UpdateControlAsync(competitionId, challengeId, teamB, DateTime.UtcNow.AddSeconds(60), 10);
         Assert.Equal(2, spy.KohUpdateCount);
+    }
+
+    [Fact]
+    public async Task UpdateControlAsync_TombstonedChallenge_DoesNotCreateControlOrScore()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamId = SeedTeam(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId, isDeleting: true);
+
+        await CreateEngine(db).UpdateControlAsync(
+            competitionId,
+            challengeId,
+            teamId,
+            DateTime.UtcNow,
+            10);
+
+        Assert.Empty(await db.KohControlRecords.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreSignals.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreEvents.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
+    public async Task UpdateControlsAsync_MultipleHills_AppliesPollAsOneBatch()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId, controlPoints: 12);
+        var teamId = SeedTeam(db, competitionId);
+        var firstChallenge = SeedChallenge(db, competitionId);
+        var secondChallenge = SeedChallenge(db, competitionId);
+        var engine = CreateEngine(db);
+        var capturedAt = DateTime.UtcNow;
+        var updates = new[]
+        {
+            new KohScoreEngine.ControlUpdate(firstChallenge, teamId),
+            new KohScoreEngine.ControlUpdate(secondChallenge, teamId)
+        };
+
+        Assert.True(await engine.UpdateControlsAsync(
+            competitionId,
+            updates,
+            capturedAt,
+            12));
+        Assert.True(await engine.UpdateControlsAsync(
+            competitionId,
+            updates,
+            capturedAt.AddSeconds(30),
+            12));
+
+        Assert.Equal(2, await db.KohControlRecords.IgnoreQueryFilters().CountAsync());
+        var scoreEvents = await db.ScoreEvents.IgnoreQueryFilters().ToListAsync();
+        Assert.Equal(2, scoreEvents.Count);
+        Assert.All(scoreEvents, scoreEvent => Assert.Equal(12, scoreEvent.PointsDelta));
+    }
+
+    [Fact]
+    public async Task UpdateControlsAsync_ReplayedCaptureTimestamp_DoesNotAwardHeldPoints()
+    {
+        var competitionId = Guid.NewGuid();
+        await using var db = CreateDb(competitionId);
+        SeedCompetition(db, competitionId);
+        var teamId = SeedTeam(db, competitionId);
+        var challengeId = SeedChallenge(db, competitionId);
+        var engine = CreateEngine(db);
+        var pollTimestamp = DateTime.UtcNow;
+        var update = new[] { new KohScoreEngine.ControlUpdate(challengeId, teamId) };
+
+        Assert.True(await engine.UpdateControlsAsync(competitionId, update, pollTimestamp, 10));
+        Assert.True(await engine.UpdateControlsAsync(competitionId, update, pollTimestamp, 10));
+
+        Assert.Single(await db.KohControlRecords.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreSignals.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await db.ScoreEvents.IgnoreQueryFilters().ToListAsync());
     }
 
     // ── Stubs ─────────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ public class AwdpPatchValidationJobHandler(IAwdpPatchService patchService) : ICo
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public string JobKey => AwdpBackgroundTaskTypes.PatchValidation;
+    public CompetitionJobWorkload Workload => CompetitionJobWorkload.LongRunning;
 
     public async Task ExecuteAsync(BackgroundTaskItem task, CancellationToken ct = default)
     {

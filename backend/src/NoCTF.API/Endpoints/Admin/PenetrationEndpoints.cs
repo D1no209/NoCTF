@@ -48,7 +48,11 @@ internal static class PenetrationAdminEndpointRuntime
         var challenge = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.CompetitionId == competitionId && c.Id == challengeId, ct);
+            .FirstOrDefaultAsync(c =>
+                c.CompetitionId == competitionId &&
+                c.Id == challengeId &&
+                !c.IsDeleting,
+                ct);
         return challenge is null ? (null, 404, "challenge_not_found") : (challenge.TypeId, null, null);
     }
 

@@ -5,6 +5,9 @@ using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
 using System.Text.Json;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json.Serialization.Metadata;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -159,8 +162,8 @@ public class AwdpScreenEventsEndpoint(AwdpScreenSnapshotCache snapshotCache)
 
     public override async Task HandleAsync(AwdpScreenRequest req, CancellationToken ct)
     {
-        var firstSnapshot = await snapshotCache.GetAsync(req.GameId, ct);
-        if (firstSnapshot is null)
+        var firstSnapshot = await snapshotCache.GetCachedAsync(req.GameId, ct);
+        if (firstSnapshot.Snapshot is null)
         {
             await SendNotFoundAsync(ct);
             return;
@@ -172,18 +175,31 @@ public class AwdpScreenEventsEndpoint(AwdpScreenSnapshotCache snapshotCache)
         HttpContext.Response.Headers.Connection = "keep-alive";
         HttpContext.Response.Headers["X-Accel-Buffering"] = "no";
 
-        await WriteSnapshotAsync(firstSnapshot, ct);
+        await WriteSnapshotAsync(firstSnapshot.SsePayload, ct);
+        var currentVersion = firstSnapshot.Version;
+        var nextHeartbeatAt = DateTime.UtcNow.Add(AwdpScreenSnapshotCache.HeartbeatInterval);
 
         while (!ct.IsCancellationRequested)
         {
             try
             {
                 await Task.Delay(TimeSpan.FromSeconds(3), ct);
-                var snapshot = await snapshotCache.GetAsync(req.GameId, ct);
-                if (snapshot is null)
+                var snapshot = await snapshotCache.GetCachedAsync(req.GameId, ct);
+                if (snapshot.Snapshot is null)
                     return;
 
-                await WriteSnapshotAsync(snapshot, ct);
+                if (!string.Equals(snapshot.Version, currentVersion, StringComparison.Ordinal))
+                {
+                    await WriteSnapshotAsync(snapshot.SsePayload, ct);
+                    currentVersion = snapshot.Version;
+                    nextHeartbeatAt = DateTime.UtcNow.Add(AwdpScreenSnapshotCache.HeartbeatInterval);
+                }
+                else if (DateTime.UtcNow >= nextHeartbeatAt)
+                {
+                    await HttpContext.Response.Body.WriteAsync(AwdpScreenSnapshotCache.HeartbeatPayload, ct);
+                    await HttpContext.Response.Body.FlushAsync(ct);
+                    nextHeartbeatAt = DateTime.UtcNow.Add(AwdpScreenSnapshotCache.HeartbeatInterval);
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -192,50 +208,191 @@ public class AwdpScreenEventsEndpoint(AwdpScreenSnapshotCache snapshotCache)
         }
     }
 
-    private async Task WriteSnapshotAsync(AwdpScreenSnapshotDto snapshot, CancellationToken ct)
+    private async Task WriteSnapshotAsync(ReadOnlyMemory<byte> payload, CancellationToken ct)
     {
-        var payload = JsonSerializer.Serialize(new { snapshot }, AwdpScreenSnapshotBuilder.JsonOptions);
-        await HttpContext.Response.WriteAsync($"data: {payload}\n\n", ct);
+        await HttpContext.Response.Body.WriteAsync(payload, ct);
         await HttpContext.Response.Body.FlushAsync(ct);
     }
 }
 
-public sealed class AwdpScreenSnapshotCache(IServiceScopeFactory scopeFactory)
+internal sealed record AwdpScreenCachedSnapshot(
+    AwdpScreenSnapshotDto? Snapshot,
+    string? Version,
+    ReadOnlyMemory<byte> SsePayload);
+
+public sealed class AwdpScreenSnapshotCache
 {
+    internal const int DefaultCapacity = 128;
+    internal const int DefaultStripeCount = 32;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan EntryRetention = TimeSpan.FromMinutes(5);
+    internal static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(15);
+    internal static readonly ReadOnlyMemory<byte> HeartbeatPayload = Encoding.UTF8.GetBytes(": heartbeat\n\n");
+    private static readonly byte[] SsePrefix = Encoding.UTF8.GetBytes("data: ");
+    private static readonly byte[] SseSuffix = Encoding.UTF8.GetBytes("\n\n");
+    private static readonly JsonSerializerOptions VersionJsonOptions = CreateVersionJsonOptions();
+
+    private readonly Func<Guid, CancellationToken, Task<AwdpScreenSnapshotDto?>> _snapshotLoader;
+    private readonly int _capacity;
+    private readonly TimeSpan _cacheDuration;
+    private readonly TimeSpan _entryRetention;
     private readonly ConcurrentDictionary<Guid, CacheEntry> _entries = new();
+    private readonly SemaphoreSlim[] _stripes;
+    private readonly object _cacheMutationLock = new();
+
+    public AwdpScreenSnapshotCache(IServiceScopeFactory scopeFactory)
+        : this(
+            async (competitionId, ct) =>
+            {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                return await AwdpScreenSnapshotBuilder.BuildAsync(db, competitionId, ct);
+            },
+            DefaultCapacity,
+            DefaultStripeCount,
+            CacheDuration,
+            EntryRetention)
+    {
+    }
+
+    internal AwdpScreenSnapshotCache(
+        Func<Guid, CancellationToken, Task<AwdpScreenSnapshotDto?>> snapshotLoader,
+        int capacity = DefaultCapacity,
+        int stripeCount = DefaultStripeCount,
+        TimeSpan? cacheDuration = null,
+        TimeSpan? entryRetention = null)
+    {
+        ArgumentNullException.ThrowIfNull(snapshotLoader);
+        if (capacity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(capacity));
+        if (stripeCount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(stripeCount));
+
+        _snapshotLoader = snapshotLoader;
+        _capacity = capacity;
+        _cacheDuration = cacheDuration ?? CacheDuration;
+        _entryRetention = entryRetention ?? EntryRetention;
+        _stripes = Enumerable.Range(0, stripeCount)
+            .Select(_ => new SemaphoreSlim(1, 1))
+            .ToArray();
+    }
+
+    internal int CachedEntryCount => _entries.Count;
+    internal int StripeCount => _stripes.Length;
 
     public async Task<AwdpScreenSnapshotDto?> GetAsync(Guid competitionId, CancellationToken ct)
-    {
-        var entry = _entries.GetOrAdd(competitionId, _ => new CacheEntry());
-        var now = DateTime.UtcNow;
-        if (entry.ExpiresAt > now)
-            return entry.Snapshot;
+        => (await GetCachedAsync(competitionId, ct)).Snapshot;
 
-        await entry.Gate.WaitAsync(ct);
+    internal async Task<AwdpScreenCachedSnapshot> GetCachedAsync(Guid competitionId, CancellationToken ct)
+    {
+        var nowTicks = DateTime.UtcNow.Ticks;
+        if (TryGetFresh(competitionId, nowTicks, out var cached))
+            return cached;
+
+        var stripe = _stripes[(int)((uint)competitionId.GetHashCode() % (uint)_stripes.Length)];
+        await stripe.WaitAsync(ct);
         try
         {
-            now = DateTime.UtcNow;
-            if (entry.ExpiresAt > now)
-                return entry.Snapshot;
+            nowTicks = DateTime.UtcNow.Ticks;
+            if (TryGetFresh(competitionId, nowTicks, out cached))
+                return cached;
 
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            entry.Snapshot = await AwdpScreenSnapshotBuilder.BuildAsync(db, competitionId, ct);
-            entry.ExpiresAt = now.Add(CacheDuration);
-            return entry.Snapshot;
+            var snapshot = await _snapshotLoader(competitionId, ct);
+            var value = CreateCachedSnapshot(snapshot);
+            nowTicks = DateTime.UtcNow.Ticks;
+            Store(competitionId, new CacheEntry(
+                value,
+                nowTicks + _cacheDuration.Ticks,
+                nowTicks + _entryRetention.Ticks,
+                nowTicks), nowTicks);
+            return value;
         }
         finally
         {
-            entry.Gate.Release();
+            stripe.Release();
         }
     }
 
-    private sealed class CacheEntry
+    internal static AwdpScreenCachedSnapshot CreateCachedSnapshot(AwdpScreenSnapshotDto? snapshot)
     {
-        public SemaphoreSlim Gate { get; } = new(1, 1);
-        public AwdpScreenSnapshotDto? Snapshot { get; set; }
-        public DateTime ExpiresAt { get; set; }
+        if (snapshot is null)
+            return new AwdpScreenCachedSnapshot(null, null, ReadOnlyMemory<byte>.Empty);
+
+        var versionBytes = JsonSerializer.SerializeToUtf8Bytes(snapshot, VersionJsonOptions);
+        var version = Convert.ToHexString(SHA256.HashData(versionBytes));
+        var json = JsonSerializer.SerializeToUtf8Bytes(new { snapshot }, AwdpScreenSnapshotBuilder.JsonOptions);
+        var payload = new byte[SsePrefix.Length + json.Length + SseSuffix.Length];
+        SsePrefix.CopyTo(payload, 0);
+        json.CopyTo(payload, SsePrefix.Length);
+        SseSuffix.CopyTo(payload, SsePrefix.Length + json.Length);
+        return new AwdpScreenCachedSnapshot(snapshot, version, payload);
+    }
+
+    private bool TryGetFresh(Guid competitionId, long nowTicks, out AwdpScreenCachedSnapshot value)
+    {
+        if (_entries.TryGetValue(competitionId, out var entry) && entry.FreshUntilTicks > nowTicks)
+        {
+            Volatile.Write(ref entry.LastAccessTicks, nowTicks);
+            value = entry.Value;
+            return true;
+        }
+
+        value = default!;
+        return false;
+    }
+
+    private void Store(Guid competitionId, CacheEntry entry, long nowTicks)
+    {
+        lock (_cacheMutationLock)
+        {
+            foreach (var candidate in _entries)
+            {
+                if (candidate.Value.RetainUntilTicks <= nowTicks)
+                    _entries.TryRemove(candidate.Key, out _);
+            }
+
+            if (!_entries.ContainsKey(competitionId) && _entries.Count >= _capacity)
+            {
+                var victim = _entries
+                    .OrderBy(candidate => Volatile.Read(ref candidate.Value.LastAccessTicks))
+                    .FirstOrDefault();
+                if (!victim.Equals(default(KeyValuePair<Guid, CacheEntry>)))
+                    _entries.TryRemove(victim.Key, out _);
+            }
+
+            _entries[competitionId] = entry;
+        }
+    }
+
+    private static JsonSerializerOptions CreateVersionJsonOptions()
+    {
+        var resolver = new DefaultJsonTypeInfoResolver();
+        resolver.Modifiers.Add(typeInfo =>
+        {
+            if (typeInfo.Type != typeof(AwdpScreenGameDto))
+                return;
+
+            var serverTime = typeInfo.Properties.FirstOrDefault(property =>
+                property.Name.Equals("serverTime", StringComparison.OrdinalIgnoreCase));
+            if (serverTime is not null)
+                serverTime.ShouldSerialize = static (_, _) => false;
+        });
+        return new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            TypeInfoResolver = resolver
+        };
+    }
+
+    private sealed class CacheEntry(
+        AwdpScreenCachedSnapshot value,
+        long freshUntilTicks,
+        long retainUntilTicks,
+        long lastAccessTicks)
+    {
+        public AwdpScreenCachedSnapshot Value { get; } = value;
+        public long FreshUntilTicks { get; } = freshUntilTicks;
+        public long RetainUntilTicks { get; } = retainUntilTicks;
+        public long LastAccessTicks = lastAccessTicks;
     }
 }
 
@@ -258,6 +415,7 @@ internal static class AwdpScreenSnapshotBuilder
                 c.GameModeType == GameModeType.Awdp &&
                 (c.Status == CompetitionStatus.Published ||
                  c.Status == CompetitionStatus.Running ||
+                 c.Status == CompetitionStatus.Paused ||
                  c.Status == CompetitionStatus.Finished), ct);
 
         if (competition is null)
@@ -279,13 +437,11 @@ internal static class AwdpScreenSnapshotBuilder
         var challenges = await db.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(c => c.CompetitionId == competitionId)
+            .Where(c => c.CompetitionId == competitionId && !c.IsDeleting)
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(ct);
         var activeTeamIds = teams.Select(t => t.Id).ToList();
         var activeChallengeIds = challenges.Select(c => c.Id).ToList();
-        var activeTeamIdSet = activeTeamIds.ToHashSet();
-        var activeChallengeIdSet = activeChallengeIds.ToHashSet();
 
         var states = await db.AwdpTeamChallengeStates
             .IgnoreQueryFilters()
@@ -296,21 +452,51 @@ internal static class AwdpScreenSnapshotBuilder
                 activeChallengeIds.Contains(s.ChallengeId))
             .ToListAsync(ct);
 
-        var rounds = await db.AwdpRounds
+        var currentRound = await db.AwdpRounds
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(r => r.CompetitionId == competitionId)
-            .OrderBy(r => r.RoundNumber)
-            .ToListAsync(ct);
+            .OrderByDescending(r => r.RoundNumber)
+            .FirstOrDefaultAsync(ct);
+        var currentRoundNumber = currentRound?.RoundNumber ?? 0;
 
-        var roundScores = await db.AwdpRoundScores
+        var roundScoreQuery = db.AwdpRoundScores
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s =>
                 s.CompetitionId == competitionId &&
                 activeTeamIds.Contains(s.TeamId) &&
-                activeChallengeIds.Contains(s.ChallengeId))
+                activeChallengeIds.Contains(s.ChallengeId));
+        var currentRoundScores = currentRoundNumber == 0
+            ? []
+            : await roundScoreQuery
+                .Where(s => s.RoundNumber == currentRoundNumber)
+                .ToListAsync(ct);
+        var scoreTotalsByTeam = await roundScoreQuery
+            .GroupBy(s => s.TeamId)
+            .Select(g => new
+            {
+                TeamId = g.Key,
+                AttackScore = g.Sum(s => s.AttackScoreDelta),
+                DefenseScore = g.Sum(s => s.DefenseScoreDelta)
+            })
+            .ToDictionaryAsync(row => row.TeamId, ct);
+        var timeline = await roundScoreQuery
+            .GroupBy(s => s.RoundNumber)
+            .Select(g => new AwdpScreenRoundStatDto
+            {
+                Round = g.Key,
+                AttackSuccessCount = g.Count(s => s.AttackScoreDelta > 0),
+                DefenseSuccessCount = g.Count(s => s.DefenseScoreDelta > 0),
+                AttackFailCount = 0,
+                DefenseFailCount = g.Count(s => s.PenaltyDelta > 0),
+                ScoreDelta = g.Sum(s => s.RoundScoreDelta),
+                ActiveTeamCount = g.Select(s => s.TeamId).Distinct().Count()
+            })
+            .OrderByDescending(row => row.Round)
+            .Take(240)
             .ToListAsync(ct);
+        timeline.Reverse();
 
         var scoreEvents = await db.ScoreEvents
             .IgnoreQueryFilters()
@@ -349,11 +535,8 @@ internal static class AwdpScreenSnapshotBuilder
         var teamNames = teams.ToDictionary(t => t.Id, t => t.Name);
         var challengeNames = challenges.ToDictionary(c => c.Id, c => c.Title);
         var challengeCategories = challenges.ToDictionary(c => c.Id, c => NormalizeCategory(c.TypeId));
-        var currentRound = rounds.LastOrDefault();
-        var currentRoundNumber = currentRound?.RoundNumber ?? 0;
 
-        var roundScoreByTeam = roundScores
-            .Where(s => s.RoundNumber == currentRoundNumber)
+        var roundScoreByTeam = currentRoundScores
             .GroupBy(s => s.TeamId)
             .ToDictionary(g => g.Key, g => g.Sum(s => s.RoundScoreDelta));
 
@@ -368,12 +551,6 @@ internal static class AwdpScreenSnapshotBuilder
             .Select(g => new { TeamId = g.Key, Score = g.Sum(e => e.PointsDelta) })
             .ToDictionaryAsync(x => x.TeamId, x => x.Score, ct);
 
-        var attackScoreByTeam = roundScores
-            .GroupBy(s => s.TeamId)
-            .ToDictionary(g => g.Key, g => g.Sum(s => s.AttackScoreDelta));
-        var defenseScoreByTeam = roundScores
-            .GroupBy(s => s.TeamId)
-            .ToDictionary(g => g.Key, g => g.Sum(s => s.DefenseScoreDelta));
         var lastActiveByTeam = states
             .GroupBy(s => s.TeamId)
             .ToDictionary(g => g.Key, g => g.Max(LastActivityAt));
@@ -384,8 +561,8 @@ internal static class AwdpScreenSnapshotBuilder
                 TeamId = t.Id,
                 TeamName = t.Name,
                 TotalScore = scoreByTeam.GetValueOrDefault(t.Id),
-                AttackScore = attackScoreByTeam.GetValueOrDefault(t.Id),
-                DefenseScore = defenseScoreByTeam.GetValueOrDefault(t.Id),
+                AttackScore = scoreTotalsByTeam.GetValueOrDefault(t.Id)?.AttackScore ?? 0,
+                DefenseScore = scoreTotalsByTeam.GetValueOrDefault(t.Id)?.DefenseScore ?? 0,
                 CurrentRoundScore = roundScoreByTeam.GetValueOrDefault(t.Id),
                 LastActiveAt = lastActiveByTeam.GetValueOrDefault(t.Id),
                 Trend = roundScoreByTeam.GetValueOrDefault(t.Id) > 0 ? "up" : "stable"
@@ -399,19 +576,15 @@ internal static class AwdpScreenSnapshotBuilder
 
         var rankByTeam = scoreboard.ToDictionary(t => t.TeamId, t => t.Rank);
         var stateByTeamChallenge = states.ToDictionary(s => (s.TeamId, s.ChallengeId));
-        var roundScoreByTeamChallenge = roundScores
-            .Where(s => s.RoundNumber == currentRoundNumber)
+        var statesByChallenge = states.ToLookup(s => s.ChallengeId);
+        var roundScoreByTeamChallenge = currentRoundScores
             .GroupBy(s => (s.TeamId, s.ChallengeId))
             .ToDictionary(g => g.Key, g => g.Sum(s => s.RoundScoreDelta));
 
         var challengeStatuses = challenges.Select(challenge =>
         {
-            var challengeStates = states
-                .Where(s => s.ChallengeId == challenge.Id &&
-                            activeTeamIdSet.Contains(s.TeamId) &&
-                            activeChallengeIdSet.Contains(s.ChallengeId))
-                .ToList();
-            var lastEventAt = challengeStates.Count == 0
+            var challengeStates = statesByChallenge[challenge.Id];
+            var lastEventAt = !challengeStates.Any()
                 ? null
                 : challengeStates.Max(LastActivityAt);
             return new AwdpScreenChallengeStatusDto
@@ -453,21 +626,6 @@ internal static class AwdpScreenSnapshotBuilder
             }
         }
 
-        var timeline = roundScores
-            .GroupBy(s => s.RoundNumber)
-            .Select(g => new AwdpScreenRoundStatDto
-            {
-                Round = g.Key,
-                AttackSuccessCount = g.Count(s => s.AttackScoreDelta > 0),
-                DefenseSuccessCount = g.Count(s => s.DefenseScoreDelta > 0),
-                AttackFailCount = 0,
-                DefenseFailCount = g.Count(s => s.PenaltyDelta > 0),
-                ScoreDelta = g.Sum(s => s.RoundScoreDelta),
-                ActiveTeamCount = g.Select(s => s.TeamId).Distinct().Count()
-            })
-            .OrderBy(r => r.Round)
-            .ToList();
-
         var recentEvents = BuildEvents(competitionId, currentRoundNumber, scoreEvents, patchSubmissions, competitionLogs, states, teamNames, challengeNames, challengeCategories)
             .OrderByDescending(e => e.CreatedAt)
             .Take(100)
@@ -482,7 +640,7 @@ internal static class AwdpScreenSnapshotBuilder
                 Title = competition.Title,
                 Status = MapCompetitionStatus(competition.Status),
                 CurrentRound = currentRoundNumber,
-                TotalRounds = competition.TotalRounds ?? Math.Max(currentRoundNumber, rounds.Count),
+                TotalRounds = competition.TotalRounds ?? currentRoundNumber,
                 Phase = MapPhase(competition.Status, currentRound?.Status),
                 ServerTime = now,
                 RoundStartedAt = currentRound?.StartTime,
