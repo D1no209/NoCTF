@@ -33,6 +33,7 @@ public static class KubernetesComposeParser
         "cap_drop",
         "read_only",
         "user",
+        "pids_limit",
         "deploy",
         "x-noctf-orchestration"
     };
@@ -88,6 +89,7 @@ public static class KubernetesComposeParser
                 spec.ExposedPort = ports.FirstOrDefault(port => port > 0);
             ApplyResources(spec, GetValue(service, "deploy"));
             ApplySecurity(spec, service);
+            ValidatePidsLimit(GetValue(service, "pids_limit"));
             var volumes = ReadVolumes(GetValue(service, "volumes"));
             if (volumes.Count > 0)
                 spec.Kubernetes.Volumes = volumes;
@@ -408,6 +410,18 @@ public static class KubernetesComposeParser
             throw new InvalidOperationException("Compose long-form port must define a valid target port.");
 
         return port;
+    }
+
+    private static void ValidatePidsLimit(YamlNode? node)
+    {
+        if (node is null)
+            return;
+
+        if (!int.TryParse(Scalar(node), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ||
+            value is <= 0 or > 512)
+        {
+            throw new InvalidOperationException("Compose pids_limit must be between 1 and 512.");
+        }
     }
 
     private static void ApplyServiceOrchestrationOverrides(OrchestrationSpec spec, YamlNode? node)

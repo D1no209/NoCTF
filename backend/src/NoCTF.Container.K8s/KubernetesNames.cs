@@ -6,6 +6,8 @@ namespace NoCTF.Container.K8s;
 
 internal static class KubernetesNames
 {
+    private const int DnsLabelMaxLength = 63;
+    private const int NamespaceHashLength = 12;
     private static readonly Regex Invalid = new("[^a-z0-9-]", RegexOptions.Compiled);
 
     public static string SafeName(string value, string fallback = "noctf")
@@ -15,7 +17,7 @@ internal static class KubernetesNames
             lower = lower.Replace("--", "-", StringComparison.Ordinal);
         if (string.IsNullOrWhiteSpace(lower))
             lower = fallback;
-        return lower.Length <= 63 ? lower : lower[..63].Trim('-');
+        return lower.Length <= DnsLabelMaxLength ? lower : lower[..DnsLabelMaxLength].Trim('-');
     }
 
     public static string ShortHash(string value, int length = 10)
@@ -25,5 +27,14 @@ internal static class KubernetesNames
     }
 
     public static string InstanceNamespace(string prefix, string seed)
-        => SafeName($"{prefix}-{ShortHash(seed, 12)}", "noctf-inst");
+        => $"{InstancePrefix(prefix)}-{ShortHash(seed, NamespaceHashLength)}";
+
+    public static string InstancePrefix(string prefix)
+    {
+        var normalized = SafeName(prefix, "noctf-inst");
+        var maximumPrefixLength = DnsLabelMaxLength - NamespaceHashLength - 1;
+        return normalized.Length <= maximumPrefixLength
+            ? normalized
+            : normalized[..maximumPrefixLength].Trim('-');
+    }
 }

@@ -20,6 +20,9 @@ public sealed class KubernetesRunnerOptions
     public string NamespaceMemoryLimit { get; set; } = "2Gi";
     public string NamespacePodLimit { get; set; } = "16";
     public string NetworkMode { get; set; } = "Isolated";
+    public int ReadinessTimeoutSeconds { get; set; } = 120;
+    public int RunReceiptRetentionSeconds { get; set; } = 1_800;
+    public int RuntimeOrphanGraceSeconds { get; set; } = 7 * 86_400;
     public string[] DnsServers { get; set; } = [];
     public string[] ImagePullSecrets { get; set; } = [];
     public List<KubernetesRegistryCredential> Registries { get; set; } = [];
@@ -29,6 +32,16 @@ public sealed class KubernetesRunnerOptions
         var options = new KubernetesRunnerOptions();
         configuration.GetSection("K8s").Bind(options);
         configuration.GetSection("Kubernetes").Bind(options);
+        options.RunReceiptRetentionSeconds = Math.Clamp(
+            configuration.GetValue(
+                "Runner:OperationReceiptMinutes",
+                Math.Max(1, options.RunReceiptRetentionSeconds / 60)) * 60,
+            60,
+            86_400);
+        options.RuntimeOrphanGraceSeconds = Math.Clamp(
+            options.RuntimeOrphanGraceSeconds,
+            3_600,
+            30 * 86_400);
         return options;
     }
 }

@@ -10,6 +10,10 @@ public static class KubernetesManifestFactory
     public const string InstanceLabel = "noctf.io/instance";
     public const string ProjectLabel = "noctf.io/project";
     public const string ServiceLabel = "noctf.io/service";
+    public const string OperationLabel = "noctf.operation-id";
+    public const string SpecFingerprintLabel = "noctf.spec-fingerprint";
+    public const string RunReceiptLabel = "noctf.run-receipt";
+    public const string RunReceiptExpiresLabel = "noctf.run-receipt-expires";
 
     public static Dictionary<string, string> CommonLabels(string component, string instance) => new()
     {
@@ -25,7 +29,7 @@ public static class KubernetesManifestFactory
             Metadata = new V1ObjectMeta
             {
                 Name = name,
-                Labels = MergeUserLabels(CommonLabels("challenge-instance", name), labels)
+                Labels = MergeRuntimeLabels(CommonLabels("challenge-instance", name), labels)
             }
         };
 
@@ -318,12 +322,22 @@ public static class KubernetesManifestFactory
     {
         var labels = BuildWorkloadLabels(name, config.Labels, null);
         ApplyLabels(labels, spec.Kubernetes.Labels);
+        var runTimeout = config.Ttl ?? TimeSpan.FromMinutes(5);
+        var activeDeadlineSeconds = Math.Clamp(
+            (long)Math.Ceiling(runTimeout.TotalSeconds),
+            1L,
+            (long)TimeSpan.FromHours(24).TotalSeconds);
         return new V1Job
         {
             Metadata = new V1ObjectMeta { Name = name, NamespaceProperty = namespaceName, Labels = labels },
             Spec = new V1JobSpec
             {
                 BackoffLimit = 0,
+                ActiveDeadlineSeconds = activeDeadlineSeconds,
+                TtlSecondsAfterFinished = Math.Clamp(
+                    options.RunReceiptRetentionSeconds,
+                    60,
+                    86_400),
                 Template = new V1PodTemplateSpec
                 {
                     Metadata = new V1ObjectMeta { Labels = labels },
@@ -479,7 +493,9 @@ public static class KubernetesManifestFactory
         return new V1PodSpec
         {
             RestartPolicy = restartPolicy,
-            AutomountServiceAccountToken = k8s.Security.AutomountServiceAccountToken,
+            // Challenge workloads never need Kubernetes API credentials. The
+            // orchestration document is data, not an authority grant.
+            AutomountServiceAccountToken = false,
             EnableServiceLinks = false,
             DnsPolicy = options.DnsServers.Length > 0 ? "None" : "ClusterFirst",
             DnsConfig = options.DnsServers.Length > 0
@@ -544,13 +560,13 @@ public static class KubernetesManifestFactory
         => new()
         {
             AllowPrivilegeEscalation = false,
-            RunAsNonRoot = security.RunAsNonRoot != false,
+            RunAsNonRoot = true,
             RunAsUser = security.RunAsUser is > 0 ? security.RunAsUser : 1000,
             RunAsGroup = security.RunAsGroup is > 0 ? security.RunAsGroup : 1000,
             ReadOnlyRootFilesystem = security.ReadOnlyRootFilesystem,
             Capabilities = new V1Capabilities
             {
-                Drop = security.CapabilitiesDrop.Count > 0 ? security.CapabilitiesDrop : ["ALL"],
+                Drop = ["ALL"],
                 Add = null
             }
         };
@@ -602,8 +618,11 @@ public static class KubernetesManifestFactory
         var labels = CommonLabels("challenge-workload", name);
         foreach (var (key, value) in configLabels ?? new Dictionary<string, string>())
         {
-            if (IsSafeUserLabelKey(key) && !string.IsNullOrWhiteSpace(value))
+            if ((IsSafeUserLabelKey(key) || IsRuntimeIdentityLabel(key)) &&
+                !string.IsNullOrWhiteSpace(value))
+            {
                 labels[key] = KubernetesNames.SafeName(value);
+            }
         }
         foreach (var (key, value) in extraLabels ?? new Dictionary<string, string>())
         {
@@ -652,6 +671,21 @@ public static class KubernetesManifestFactory
         return baseLabels;
     }
 
+    private static Dictionary<string, string> MergeRuntimeLabels(
+        Dictionary<string, string> baseLabels,
+        IReadOnlyDictionary<string, string>? extra)
+    {
+        foreach (var (key, value) in extra ?? new Dictionary<string, string>())
+        {
+            if ((IsSafeUserLabelKey(key) || IsRuntimeIdentityLabel(key)) &&
+                !string.IsNullOrWhiteSpace(value))
+            {
+                baseLabels[key] = KubernetesNames.SafeName(value);
+            }
+        }
+        return baseLabels;
+    }
+
     private static Dictionary<string, string> MergeSystemLabels(
         Dictionary<string, string> baseLabels,
         IReadOnlyDictionary<string, string>? extra)
@@ -674,7 +708,15 @@ public static class KubernetesManifestFactory
            key.Equals("app.kubernetes.io/component", StringComparison.OrdinalIgnoreCase) ||
            key.Equals(InstanceLabel, StringComparison.OrdinalIgnoreCase) ||
            key.Equals(ProjectLabel, StringComparison.OrdinalIgnoreCase) ||
-           key.Equals(ServiceLabel, StringComparison.OrdinalIgnoreCase);
+           key.Equals(ServiceLabel, StringComparison.OrdinalIgnoreCase) ||
+           IsRuntimeIdentityLabel(key);
+
+    private static bool IsRuntimeIdentityLabel(string key)
+        => key.Equals(OperationLabel, StringComparison.OrdinalIgnoreCase) ||
+           key.Equals(SpecFingerprintLabel, StringComparison.OrdinalIgnoreCase) ||
+           key.Equals(ProjectLabel, StringComparison.OrdinalIgnoreCase) ||
+           key.Equals(RunReceiptLabel, StringComparison.OrdinalIgnoreCase) ||
+           key.Equals(RunReceiptExpiresLabel, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsSafeLabelKey(string key)
     {

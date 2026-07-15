@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using YamlDotNet.RepresentationModel;
 
@@ -6,8 +7,20 @@ namespace NoCTF.Container.Docker;
 
 public static class DockerComposeRunner
 {
+    internal const int MaxCapturedBytesPerStream = 1_048_576;
+    internal const int MaxFailureDiagnosticCharacters = 4_096;
     private static readonly System.Text.RegularExpressions.Regex ProjectNamePattern =
         new("^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex SensitiveAssignmentPattern =
+        new(
+            @"(?im)(\b(?:password|passwd|token|secret|api[_-]?key|authorization)\b\s*[:=]\s*)[^\r\n]*",
+            System.Text.RegularExpressions.RegexOptions.Compiled |
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    private static readonly System.Text.RegularExpressions.Regex UriCredentialPattern =
+        new(
+            @"(?i)([a-z][a-z0-9+.-]*://)[^\s/@:]+(?::[^\s/@]*)?@",
+            System.Text.RegularExpressions.RegexOptions.Compiled |
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     private static readonly HashSet<string> AllowedRootKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -35,7 +48,8 @@ public static class DockerComposeRunner
         "pids_limit",
         "deploy",
         "volumes",
-        "healthcheck"
+        "healthcheck",
+        "x-noctf-orchestration"
     };
 
     public static async Task<string> RunAsync(
@@ -45,11 +59,12 @@ public static class DockerComposeRunner
         Dictionary<string, string>? environmentVariables,
         CancellationToken cancellationToken)
     {
+        ValidateProcessEnvironment(environmentVariables);
         var composeFile = Path.Combine(Path.GetTempPath(), $"noctf-compose-{Guid.NewGuid():N}.yml");
-        await File.WriteAllTextAsync(composeFile, composeYaml, cancellationToken);
 
         try
         {
+            await File.WriteAllTextAsync(composeFile, composeYaml, cancellationToken);
             var output = await RunDockerAsync(
                 BuildArguments(composeFile, projectName, args),
                 environmentVariables,
@@ -59,8 +74,19 @@ public static class DockerComposeRunner
         }
         finally
         {
-            if (File.Exists(composeFile))
-                File.Delete(composeFile);
+            DeleteTemporaryFileBestEffort(composeFile);
+        }
+    }
+
+    internal static void DeleteTemporaryFileBestEffort(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch
+        {
+            // Cleanup must never replace the compose operation's result or exception.
         }
     }
 
@@ -110,6 +136,188 @@ public static class DockerComposeRunner
     {
         if (string.IsNullOrWhiteSpace(projectName) || !ProjectNamePattern.IsMatch(projectName))
             throw new InvalidOperationException("Compose project name is invalid.");
+    }
+
+    /// <summary>
+    /// Produces the exact compose document handed to Docker. Runtime identity is
+    /// written into every service and project-owned resource so it survives a
+    /// Runner restart and can be verified before a later mutation.
+    /// </summary>
+    internal static string ApplyRuntimeLabels(
+        string composeYaml,
+        IReadOnlyDictionary<string, string> runtimeLabels)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(composeYaml);
+        ArgumentNullException.ThrowIfNull(runtimeLabels);
+
+        var yaml = new YamlStream();
+        try
+        {
+            using var reader = new StringReader(composeYaml);
+            yaml.Load(reader);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("Compose YAML is invalid.", ex);
+        }
+
+        if (yaml.Documents.Count != 1 || yaml.Documents[0].RootNode is not YamlMappingNode root)
+            throw new InvalidOperationException("Compose YAML must contain exactly one mapping document.");
+        if (TryGetMapping(root, "services") is not { } services || services.Children.Count == 0)
+            throw new InvalidOperationException("Compose YAML must define at least one service.");
+
+        foreach (var serviceNode in services.Children.Values)
+        {
+            if (serviceNode is not YamlMappingNode service)
+                throw new InvalidOperationException("Compose service definitions must be mappings.");
+            MergeLabels(service, runtimeLabels);
+        }
+
+        MergeProjectResourceLabels(root, "volumes", runtimeLabels, createDefault: false);
+        MergeProjectResourceLabels(root, "networks", runtimeLabels, createDefault: true);
+
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+        yaml.Save(writer, assignAnchors: false);
+        return writer.ToString();
+    }
+
+    private static void MergeProjectResourceLabels(
+        YamlMappingNode root,
+        string resourceKey,
+        IReadOnlyDictionary<string, string> runtimeLabels,
+        bool createDefault)
+    {
+        var resources = TryGetMapping(root, resourceKey);
+        if (resources is null)
+        {
+            if (!createDefault)
+                return;
+
+            resources = new YamlMappingNode();
+            SetMappingValue(root, resourceKey, resources);
+        }
+
+        if (createDefault && !resources.Children.Keys.Any(key =>
+                ScalarValue(key).Equals("default", StringComparison.OrdinalIgnoreCase)))
+        {
+            resources.Add(new YamlScalarNode("default"), new YamlMappingNode());
+        }
+
+        foreach (var pair in resources.Children.ToArray())
+        {
+            YamlMappingNode resource;
+            if (pair.Value is YamlMappingNode mapping)
+            {
+                resource = mapping;
+            }
+            else if (pair.Value is YamlScalarNode scalar && string.IsNullOrWhiteSpace(scalar.Value))
+            {
+                resource = new YamlMappingNode();
+                resources.Children[pair.Key] = resource;
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Compose top-level {resourceKey} must be mappings.");
+            }
+
+            MergeLabels(resource, runtimeLabels);
+        }
+    }
+
+    private static void MergeLabels(
+        YamlMappingNode owner,
+        IReadOnlyDictionary<string, string> runtimeLabels)
+    {
+        var merged = new Dictionary<string, string>(StringComparer.Ordinal);
+        var existing = GetValue(owner, "labels");
+        switch (existing)
+        {
+            case null:
+                break;
+            case YamlMappingNode mapping:
+                foreach (var (keyNode, valueNode) in mapping.Children)
+                {
+                    var key = ScalarValue(keyNode);
+                    if (string.IsNullOrWhiteSpace(key) || valueNode is not YamlScalarNode)
+                        throw new InvalidOperationException("Compose labels must use scalar keys and values.");
+                    merged[key] = ScalarValue(valueNode);
+                }
+                break;
+            case YamlSequenceNode sequence:
+                foreach (var item in sequence.Children)
+                {
+                    if (item is not YamlScalarNode)
+                        throw new InvalidOperationException("Compose labels must be scalar values.");
+                    var value = ScalarValue(item);
+                    var separator = value.IndexOf('=', StringComparison.Ordinal);
+                    var key = separator < 0 ? value : value[..separator];
+                    if (string.IsNullOrWhiteSpace(key))
+                        throw new InvalidOperationException("Compose label keys cannot be empty.");
+                    merged[key] = separator < 0 ? string.Empty : value[(separator + 1)..];
+                }
+                break;
+            default:
+                throw new InvalidOperationException("Compose labels must be a mapping or a list.");
+        }
+
+        foreach (var (key, value) in runtimeLabels)
+        {
+            foreach (var existingKey in merged.Keys
+                         .Where(candidate => candidate.Equals(key, StringComparison.OrdinalIgnoreCase))
+                         .ToArray())
+            {
+                merged.Remove(existingKey);
+            }
+            merged[key] = value;
+        }
+
+        var labels = new YamlMappingNode();
+        foreach (var (key, value) in merged.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            labels.Add(new YamlScalarNode(key), new YamlScalarNode(value));
+        SetMappingValue(owner, "labels", labels);
+    }
+
+    private static void SetMappingValue(YamlMappingNode mapping, string key, YamlNode value)
+    {
+        var existingKey = mapping.Children.Keys.FirstOrDefault(candidate =>
+            ScalarValue(candidate).Equals(key, StringComparison.OrdinalIgnoreCase));
+        if (existingKey is null)
+            mapping.Add(new YamlScalarNode(key), value);
+        else
+            mapping.Children[existingKey] = value;
+    }
+
+    internal static void ValidateProcessEnvironment(
+        IReadOnlyDictionary<string, string>? environmentVariables)
+    {
+        if (environmentVariables is null)
+            return;
+
+        foreach (var key in environmentVariables.Keys)
+        {
+            if (string.IsNullOrWhiteSpace(key) ||
+                key.Contains('=') ||
+                key.Any(char.IsControl) ||
+                IsReservedProcessEnvironmentKey(key))
+            {
+                throw new InvalidOperationException(
+                    $"Compose process environment variable '{key}' is not allowed.");
+            }
+        }
+    }
+
+    private static bool IsReservedProcessEnvironmentKey(string key)
+    {
+        string[] exact =
+        [
+            "PATH", "PATHEXT", "COMSPEC", "SYSTEMROOT", "WINDIR", "HOME",
+            "USERPROFILE", "TMP", "TEMP", "TMPDIR", "HTTP_PROXY",
+            "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "SSH_AUTH_SOCK"
+        ];
+        string[] prefixes = ["DOCKER_", "COMPOSE_", "BUILDX_", "BUILDKIT_", "XDG_", "LD_", "DYLD_"];
+        return exact.Contains(key, StringComparer.OrdinalIgnoreCase) ||
+               prefixes.Any(prefix => key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void ValidateRoot(YamlMappingNode root)
@@ -238,8 +446,10 @@ public static class DockerComposeRunner
             return false;
 
         var first = user.Split(':', 2, StringSplitOptions.TrimEntries)[0];
-        return !first.Equals("0", StringComparison.Ordinal) &&
-               !first.Equals("root", StringComparison.OrdinalIgnoreCase);
+        if (long.TryParse(first, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numericUser))
+            return numericUser > 0;
+
+        return !first.Equals("root", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool HasReadOnlyRootFilesystem(YamlMappingNode service)
@@ -513,35 +723,37 @@ public static class DockerComposeRunner
     private static string ScalarValue(YamlNode? node)
         => node is YamlScalarNode scalar ? scalar.Value ?? string.Empty : string.Empty;
 
-    private static string BuildArguments(string composeFile, string projectName, IReadOnlyList<string> args)
+    private static IReadOnlyList<string> BuildArguments(
+        string composeFile,
+        string projectName,
+        IReadOnlyList<string> args)
     {
-        var builder = new StringBuilder();
-        builder.Append("compose -f ");
-        AppendQuoted(builder, composeFile);
-        builder.Append(" -p ");
-        AppendQuoted(builder, projectName);
-
-        foreach (var arg in args)
+        var result = new List<string>(5 + args.Count)
         {
-            builder.Append(' ');
-            AppendQuoted(builder, arg);
-        }
-
-        return builder.ToString();
+            "compose",
+            "-f",
+            composeFile,
+            "-p",
+            projectName
+        };
+        result.AddRange(args);
+        return result;
     }
 
     private static async Task<string> RunDockerAsync(
-        string arguments,
+        IReadOnlyList<string> arguments,
         Dictionary<string, string>? environmentVariables,
         CancellationToken cancellationToken)
     {
-        var startInfo = new ProcessStartInfo("docker", arguments)
+        var startInfo = new ProcessStartInfo("docker")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
 
         var inheritedEnvironment = new Dictionary<string, string?>(startInfo.Environment, StringComparer.OrdinalIgnoreCase);
         startInfo.Environment.Clear();
@@ -565,8 +777,15 @@ public static class DockerComposeRunner
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start docker compose process.");
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        using var outputCts = new CancellationTokenSource();
+        var stdoutTask = ReadBoundedOutputAsync(
+            process.StandardOutput.BaseStream,
+            MaxCapturedBytesPerStream,
+            outputCts.Token);
+        var stderrTask = ReadBoundedOutputAsync(
+            process.StandardError.BaseStream,
+            MaxCapturedBytesPerStream,
+            outputCts.Token);
 
         try
         {
@@ -575,15 +794,91 @@ public static class DockerComposeRunner
         catch (OperationCanceledException)
         {
             TryKillProcessTree(process);
+            outputCts.CancelAfter(TimeSpan.FromSeconds(5));
+            try
+            {
+                await process.WaitForExitAsync(outputCts.Token);
+                await Task.WhenAll(stdoutTask, stderrTask);
+            }
+            catch (OperationCanceledException)
+            {
+            }
             throw;
         }
         var stdout = await stdoutTask;
         var stderr = await stderrTask;
 
         if (process.ExitCode != 0)
-            throw new InvalidOperationException($"docker {arguments} failed with exit code {process.ExitCode}: {stderr}");
+        {
+            var diagnostic = SanitizeFailureDiagnostic(
+                stderr.Text,
+                environmentVariables?.Values);
+            throw new InvalidOperationException(
+                $"docker compose failed with exit code {process.ExitCode}: {diagnostic}");
+        }
 
-        return stdout;
+        return stdout.Text;
+    }
+
+    internal static async Task<BoundedProcessOutput> ReadBoundedOutputAsync(
+        Stream stream,
+        int maxCapturedBytes,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCapturedBytes);
+        var captured = new MemoryStream(Math.Min(maxCapturedBytes, 65_536));
+        var buffer = new byte[16_384];
+        var truncated = false;
+        while (true)
+        {
+            var read = await stream.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+                break;
+
+            var writable = Math.Min(read, maxCapturedBytes - (int)captured.Length);
+            if (writable > 0)
+                captured.Write(buffer, 0, writable);
+            if (writable < read)
+                truncated = true;
+        }
+
+        var text = Encoding.UTF8.GetString(captured.GetBuffer(), 0, (int)captured.Length);
+        if (truncated)
+            text += "\n[output truncated]";
+        return new BoundedProcessOutput(text, truncated, (int)captured.Length);
+    }
+
+    internal static string SanitizeFailureDiagnostic(
+        string diagnostic,
+        IEnumerable<string>? sensitiveValues)
+    {
+        var sanitized = diagnostic;
+        if (sensitiveValues is not null)
+        {
+            foreach (var value in sensitiveValues
+                         .Where(value => !string.IsNullOrWhiteSpace(value) && value.Length >= 4)
+                         .Distinct(StringComparer.Ordinal)
+                         .OrderByDescending(value => value.Length))
+            {
+                sanitized = sanitized.Replace(value, "[redacted]", StringComparison.Ordinal);
+            }
+        }
+
+        sanitized = UriCredentialPattern.Replace(sanitized, "$1[redacted]@");
+        sanitized = SensitiveAssignmentPattern.Replace(sanitized, "$1[redacted]");
+        sanitized = new string(sanitized
+            .Where(character => !char.IsControl(character) || character is '\r' or '\n' or '\t')
+            .ToArray())
+            .Trim();
+        if (sanitized.Length > MaxFailureDiagnosticCharacters)
+        {
+            sanitized = sanitized[..MaxFailureDiagnosticCharacters] +
+                        "\n[diagnostic truncated]";
+        }
+
+        return string.IsNullOrWhiteSpace(sanitized)
+            ? "diagnostic output unavailable"
+            : sanitized;
     }
 
     private static void TryKillProcessTree(Process process)
@@ -599,10 +894,5 @@ public static class DockerComposeRunner
         }
     }
 
-    private static void AppendQuoted(StringBuilder builder, string value)
-    {
-        builder.Append('"');
-        builder.Append(value.Replace("\\", "\\\\").Replace("\"", "\\\""));
-        builder.Append('"');
-    }
+    internal sealed record BoundedProcessOutput(string Text, bool Truncated, int CapturedBytes);
 }
