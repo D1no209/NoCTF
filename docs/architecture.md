@@ -19,16 +19,13 @@ All plugins implement interfaces defined in `NoCTF.PluginBase`:
 | `IStorageProvider` | Upload, download, delete, and generate URLs for files |
 | `IPluginModule` | Entry point for a plugin to register services |
 
-Plugins are currently loaded eagerly in `Program.cs`:
-
-```csharp
-new CtfModule().ConfigureServices(builder.Services);
-new AwdModule().ConfigureServices(builder.Services);
-new AwdpModule().ConfigureServices(builder.Services);
-new KohModule().ConfigureServices(builder.Services);
-```
-
-Future versions may load plugins dynamically via `AssemblyLoadContext` so new game modes can be added without recompiling the API.
+The API and Worker load `NoCTF.Plugins.*.dll` assemblies from the configured
+`plugins/` directory at startup. `PluginLoader` uses a dedicated
+`PluginLoadContext` (`AssemblyLoadContext`) for each plugin, applies the shared
+`IPluginModule` contract, and applies host-specific registration through the
+additive host-aware plugin contract when implemented. Both hosts fail fast when
+the required built-in plugin set is incomplete, and publish output is expected
+to contain the plugin assemblies under `plugins/`.
 
 ## Game Mode Designs
 
@@ -81,7 +78,9 @@ Task<ContainerRunResult> RunContainerAsync(ContainerConfig config, ...);
 
 ### `IContainerProvider<TClient, TMetadata>`
 
-The low-level provider interface. The only built-in implementation today is `DockerProvider` + `DockerManager`, which wraps the Docker Engine API.
+The low-level provider interface. Built-in runtime implementations include
+`DockerProvider` + `DockerManager` for the Docker Engine API and
+`KubernetesProvider` + `KubernetesManager` for Kubernetes-backed execution.
 
 Container configuration includes image, command, environment variables, port mappings, labels, network, and optional TTL for auto-cleanup.
 

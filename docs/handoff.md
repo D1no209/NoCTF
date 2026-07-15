@@ -244,7 +244,7 @@ backend/src/NoCTF.Plugins.AWDP/Templates/standard-web
 6. Filter challenges by direction or show all.
 7. Open a challenge card and solve/submit.
 8. For dynamic containers, create an instance, copy the displayed `host:port`, extend/destroy as needed.
-9. For AWDP/AWD flows, request defense and upload patches only after defense is enabled.
+9. For AWDP, request defense and upload a FixScript only after defense is enabled. AWD uses its own team-to-team attack and service-defense dashboard.
 
 ### Penetration Challenge Flow
 
@@ -284,7 +284,8 @@ Current lifecycle rules:
 - one active instance per team/challenge
 - 2 hour default TTL
 - 30 minute extension
-- 5 second cooldown between create/destroy/extend operations
+- 5 second cooldown between create/destroy/extend operations for CTF dynamic instances
+- 30 second container-operation cooldown for AWDP create/destroy/extend and defense requests
 - expired instances are cleaned by the worker
 
 Dynamic flag environment variable:
@@ -394,55 +395,23 @@ For frontend/player/admin flows:
 
 ## Current Work Context
 
-As of this handoff update, the active local branch is:
+The audit remediation is grouped into local commits on `codex/backend-architecture-performance-remediation`. It has not been pushed and no PR was created. Use `git status --short` and `git log --oneline -n 15` for the current HEAD instead of relying on a fixed hash; do not reset or clean unrelated user work.
 
-```text
-main
-```
+The current work covers plugin-host fail-fast behavior, score and task idempotency, PostgreSQL execution leases, storage CAS replacement and cleanup outbox, Redis leaderboard versioning, API query/rate-limit/security hardening, Docker/Kubernetes runtime durability, game-engine recovery, team lifecycle invariants, safe identity migration, deployment manifests, CI, and expanded integration tests. Plugin boundaries and public API compatibility remain required.
 
-Repository state:
+Latest verification status:
 
-```text
-origin/main: 51a0791 feat: add AWDP screen and management improvements
-local main:  contains local commits for frontend product UI cleanup and Penetration Challenge work
-```
+- Release solution build: 0 warnings, 0 errors.
+- Complete Release suite with real PostgreSQL 16 and Redis 7: 466/466 passed. The EF InMemory test helper now reuses option-compatible service providers without suppressing the production warning.
+- `SubmissionMutationGuard` lease, transaction, cancellation, rollback, and release paths were manually reviewed for CTF, Penetration, AWDP, and AWD. AWD rollback remains available after mutation-token cancellation.
+- Analyzer and whitespace checks passed; the EF migration model has no pending changes.
+- An empty PostgreSQL database passed full upgrade, latest-migration rollback/reapply, full downgrade to `0`, and full re-upgrade.
+- OpenAPI was fetched from a running API and regenerated idempotently. The contract change is the expected `before`/`limit` pagination on AWDP patch submissions; generator template changes follow the security upgrade to `@hey-api/openapi-ts` 0.97.3.
+- Frontend frozen install, lint, and production build passed. NuGet vulnerability/deprecation scans and `bun audit` are clean.
+- Compose parsing and kubeconform strict passed (47 valid resources, 0 invalid/errors/skipped). Local `kubectl apply --dry-run=client` could not perform API discovery because no cluster is configured at `localhost:8080`; this is not a manifest validation failure.
+- API and Worker publish outputs contain all five built-in plugin assemblies. Temporary PostgreSQL/Redis validation containers were removed.
 
-The local `main` branch is ahead of `origin/main` by one commit. A push attempt failed because the local GitHub SSH key was not accepted:
-
-```text
-git@github.com: Permission denied (publickey).
-```
-
-Recent completed focus areas:
-
-- Penetration Challenge MVP in progress: data model, EF migration, plugin registry, Penetration plugin services, player/admin APIs, staged scoring, dynamic flags, Compose generation, Worker cleanup/status sync, challenge-bank topology editor, competition topology editor, admin instance monitor, and player challenge panel
-- AWDP round scoring and admin challenge workflow
-- AWDP single check-container validation flow
-- AWDP patch-template upload/download support
-- AWDP basic and standard authoring templates
-- Admin competition detail navigation split across settings, challenges, team review, cheating info, and logs
-- AWDP management score configuration moved to per-challenge management
-- AWDP command screen and AWD/AWDP realtime visual polish
-- AWDP command screen 16:9 redesign: event-wall style center sensing, dense paginated scoreboard, event stream, round timeline, and challenge matrix for projection use
-- Frontend visual cleanup to reduce glassmorphism, cheap gradients, and template-like surfaces
-- Targeted anti-AI frontend cleanup on 2026-07-04: auth shell, competition list rows, shared panel shadows, AWDP/AWD live-screen tokens, and narrow-screen AWDP screen overflow
-
-Most recent verification:
-
-- `npx --yes impeccable --json frontend/src` passed with zero findings after the targeted anti-AI frontend cleanup
-- `bun run build` passed after the targeted frontend cleanup; Rollup still emits existing third-party PURE annotation warnings from SignalR/reka-ui
-- In-app browser loaded `/login?redirect=/competitions`, logged in with the seeded admin account, and rendered `/competitions` with no console errors or horizontal overflow
-- In-app browser loaded `/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f` at 1920x1080 and 390x844; the screen rendered, the frame stayed 16:9 on wide view, narrow view had no horizontal overflow, the center realtime awareness module did not show score-delta fields, and no console errors were reported
-- `dotnet build backend/NoCTF.slnx --no-restore` passed after Penetration changes
-- `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore` passed with 111 tests
-- `bun run build` passed after Penetration frontend changes
-- `bun run fetch-openapi` and `bun run generate-api` passed after Penetration API additions
-- `bunx eslint <changed frontend files>` passed for the frontend UI cleanup
-- In-app browser loaded `http://127.0.0.1:5173/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f` at desktop and narrow widths with no console errors
-- In-app browser loaded `http://127.0.0.1:5173/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f` and the same route with `?mock=1` at 1920x1080; the command screen stayed 16:9, had no row clipping, no horizontal overflow, and the center sensing module/event log did not expose instant score deltas or `scoreDelta`/`penalty` fields
-- In-app browser loaded `http://127.0.0.1:5173/awdp/screen/e570d6f9-231f-477a-9f2d-229e3a67c91f?mock=1` at 390x844 with no horizontal overflow and no console errors
-- In-app browser loaded `http://127.0.0.1:5173/admin/competitions/792a8e46-920a-4a2c-8d74-c82008a41a6c?section=instances`; the Penetration instance monitor rendered at desktop and 390px width with no console errors
-- Full `bun run lint` still reports pre-existing lint issues in generated/config/unrelated admin files
+The authoritative continuation instructions, architecture reading map, four critical request flows, collaborator protocol, exact risk list, validation caveats, and required execution order are in [`HANDOFF_PROMPT.md`](../HANDOFF_PROMPT.md). A new collaborator should follow its 20–30 minute quick-start sequence before changing the working tree.
 
 ## Common Pitfalls
 
