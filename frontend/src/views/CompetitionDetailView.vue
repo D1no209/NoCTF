@@ -232,7 +232,6 @@ function formatDate(iso: string) {
 }
 
 const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
-const isAwdMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awd')
 const isAwdpMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awdp')
 const canManageCompetition = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
 const approvedTeam = computed(
@@ -601,7 +600,6 @@ function withChallengeProgress(challenge: Challenge): Challenge {
       :competition-id="competitionId"
       :solved="solvedIds.has(selectedChallenge.id)"
       :game-mode-type="competition?.gameModeType ?? 'ctf'"
-      :is-awd-mode="isAwdMode"
       :is-awdp-mode="isAwdpMode"
       :instance-ready="instanceChallengeIds.has(selectedChallenge.id)"
       :defense-enabled="defenseChallengeIds.has(selectedChallenge.id)"
