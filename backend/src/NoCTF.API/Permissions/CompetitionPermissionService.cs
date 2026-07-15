@@ -15,59 +15,85 @@ public class CompetitionPermissionService(ApplicationDbContext dbContext) : ICom
 {
     public async Task<bool> CanManageCompetitionAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken = default)
     {
-        var user = await dbContext.Users.FindAsync(new object[] { userId }, cancellationToken);
-        if (user?.Role == UserRole.Admin)
-            return true;
+        var admin = dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId && user.Role == UserRole.Admin)
+            .Select(_ => 1);
 
-        var competition = await dbContext.Competitions
+        var owned = dbContext.Competitions
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.Id == competitionId, cancellationToken);
-        if (competition?.OwnerId == userId)
-            return true;
+            .AsNoTracking()
+            .Where(competition => competition.Id == competitionId && competition.OwnerId == userId)
+            .Select(_ => 1);
 
-        var collaborator = await dbContext.CompetitionCollaborators
+        var managed = dbContext.CompetitionCollaborators
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.CompetitionId == competitionId && c.UserId == userId, cancellationToken);
+            .AsNoTracking()
+            .Where(collaborator =>
+                collaborator.CompetitionId == competitionId &&
+                collaborator.UserId == userId &&
+                collaborator.Role == CollaboratorRole.Manager)
+            .Select(_ => 1);
 
-        return collaborator?.Role == CollaboratorRole.Manager;
+        return await admin
+            .Concat(owned)
+            .Concat(managed)
+            .AnyAsync(cancellationToken);
     }
 
     public async Task<bool> CanViewCompetitionAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken = default)
     {
-        var competition = await dbContext.Competitions
+        var userAccess = dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId && user.Role == UserRole.Admin)
+            .Select(_ => 1);
+        var competitionAccess = dbContext.Competitions
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.Id == competitionId, cancellationToken);
-        if (competition is null) return false;
-        if (competition.Status == CompetitionStatus.Published || competition.Status == CompetitionStatus.Running)
-            return true;
+            .AsNoTracking()
+            .Where(competition =>
+                competition.Id == competitionId &&
+                (competition.OwnerId == userId ||
+                 competition.Status == CompetitionStatus.Published ||
+                 competition.Status == CompetitionStatus.Running ||
+                 competition.Status == CompetitionStatus.Paused ||
+                 competition.Status == CompetitionStatus.Finished))
+            .Select(_ => 1);
+        var collaboratorAccess = dbContext.CompetitionCollaborators
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(collaborator =>
+                collaborator.CompetitionId == competitionId &&
+                collaborator.UserId == userId &&
+                collaborator.Role == CollaboratorRole.Manager)
+            .Select(_ => 1);
 
-        return await CanManageCompetitionAsync(userId, competitionId, cancellationToken);
+        return await userAccess
+            .Concat(competitionAccess)
+            .Concat(collaboratorAccess)
+            .AnyAsync(cancellationToken);
     }
 
     public async Task<HashSet<Guid>> GetManageableCompetitionIdsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await dbContext.Users.FindAsync(new object[] { userId }, cancellationToken);
-        if (user?.Role == UserRole.Admin)
-        {
-            var allIds = await dbContext.Competitions
-                .IgnoreQueryFilters()
-                .Select(c => c.Id)
-                .ToListAsync(cancellationToken);
-            return allIds.ToHashSet();
-        }
-
-        var ownedIds = await dbContext.Competitions
+        var ownedOrAdministratorIds = dbContext.Competitions
             .IgnoreQueryFilters()
-            .Where(c => c.OwnerId == userId)
-            .Select(c => c.Id)
-            .ToListAsync(cancellationToken);
+            .AsNoTracking()
+            .Where(competition =>
+                competition.OwnerId == userId ||
+                dbContext.Users.AsNoTracking().Any(user =>
+                    user.Id == userId && user.Role == UserRole.Admin))
+            .Select(c => c.Id);
 
-        var managedIds = await dbContext.CompetitionCollaborators
+        var managedIds = dbContext.CompetitionCollaborators
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(c => c.UserId == userId && c.Role == CollaboratorRole.Manager)
-            .Select(c => c.CompetitionId)
-            .ToListAsync(cancellationToken);
+            .Select(c => c.CompetitionId);
 
-        return ownedIds.Concat(managedIds).ToHashSet();
+        return (await ownedOrAdministratorIds
+                .Concat(managedIds)
+                .Distinct()
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
     }
 }

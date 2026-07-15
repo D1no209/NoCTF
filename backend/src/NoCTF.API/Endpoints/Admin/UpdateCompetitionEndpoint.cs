@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API.Permissions;
 using NoCTF.Application.CompetitionModes;
+using NoCTF.Application.Leaderboard;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -52,7 +53,8 @@ public class UpdateCompetitionAdminRequest
 public class UpdateCompetitionEndpoint(
     ApplicationDbContext dbContext,
     ICompetitionPermissionService permissions,
-    ICtfScoreRebuilder ctfScoreRebuilder) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
+    ICtfScoreRebuilder ctfScoreRebuilder,
+    IRedisLeaderboardCache leaderboardCache) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -161,6 +163,7 @@ public class UpdateCompetitionEndpoint(
 
         await dbContext.SaveChangesAsync(ct);
         await ctfScoreRebuilder.RebuildCompetitionAsync(id, ct);
+        await leaderboardCache.InvalidateAsync(id, ct);
         await SendOkAsync(ct);
     }
 

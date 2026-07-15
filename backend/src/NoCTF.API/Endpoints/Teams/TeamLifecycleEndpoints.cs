@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using System.Data;
+using System.Security.Cryptography;
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using NoCTF.API;
 using NoCTF.API.Permissions;
 using NoCTF.Core;
@@ -89,6 +91,7 @@ public class GetMyTeamsEndpoint(ApplicationDbContext db) : EndpointWithoutReques
         }
 
         var teams = await db.TeamMembers
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(tm => tm.UserId == userId.Value)
             .Join(db.Teams.IgnoreQueryFilters(),
@@ -115,7 +118,9 @@ public class GetMyTeamsEndpoint(ApplicationDbContext db) : EndpointWithoutReques
                     StartTime = c.StartTime,
                     EndTime = c.EndTime,
                     MaxTeamMembers = c.MaxTeamMembers,
-                    MemberCount = db.TeamMembers.Count(member => member.TeamId == x.Team.Id),
+                    MemberCount = db.TeamMembers.IgnoreQueryFilters().Count(member =>
+                        member.CompetitionId == x.Team.CompetitionId &&
+                        member.TeamId == x.Team.Id),
                     IsCaptain = x.Team.CaptainId == userId.Value,
                     RegisteredAt = x.Team.RegisteredAt,
                     ApprovedAt = x.Team.ApprovedAt,
@@ -133,6 +138,7 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
     {
         Post("/api/teams");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(CreateTeamRequest req, CancellationToken ct)
@@ -143,6 +149,8 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
             await SendUnauthorizedAsync(ct);
             return;
         }
+
+        await using var transaction = await TeamLifecycleRules.BeginSerializableTransactionAsync(db, ct);
 
         var competition = await db.Competitions
             .IgnoreQueryFilters()
@@ -159,7 +167,9 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
             return;
         }
 
+        await TeamLifecycleRules.AcquireMembershipLockAsync(db, req.CompetitionId, userId.Value, ct);
         var alreadyInTeam = await db.TeamMembers
+            .IgnoreQueryFilters()
             .AnyAsync(tm => tm.CompetitionId == req.CompetitionId && tm.UserId == userId.Value, ct);
         if (alreadyInTeam)
         {
@@ -182,22 +192,12 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
         }
 
         var approved = competition.TeamRegistrationAutoApprove;
-        var team = new Team
-        {
-            Id = Guid.NewGuid(),
-            CompetitionId = req.CompetitionId,
-            Name = req.Name.Trim(),
-            AvatarUrl = req.AvatarUrl,
-            TrackName = competition.TracksEnabled ? trackName : null,
-            CaptainId = userId.Value,
-            InviteToken = NewInviteToken(),
-            RegistrationStatus = approved ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending,
-            RegisteredAt = DateTime.UtcNow,
-            ApprovedAt = approved ? DateTime.UtcNow : null,
-            ApprovedById = approved ? userId.Value : null,
-            IsLocked = approved,
-            CreatedAt = DateTime.UtcNow
-        };
+        var team = TeamLifecycleRules.CreateRegisteredTeam(
+            competition,
+            req,
+            userId.Value,
+            competition.TracksEnabled ? trackName : null,
+            DateTime.UtcNow);
         db.Teams.Add(team);
         db.TeamMembers.Add(new TeamMember
         {
@@ -217,6 +217,8 @@ public class CreateTeamEndpoint(ApplicationDbContext db) : Endpoint<CreateTeamRe
             userId: userId.Value,
             metadata: new { team.Name, team.TrackName, approved });
         await db.SaveChangesAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
 
         await SendAsync(ToDto(team), 201, ct);
     }
@@ -246,6 +248,7 @@ public class JoinTeamEndpoint(ApplicationDbContext db) : Endpoint<JoinTeamReques
     {
         Post("/api/teams/{teamId}/join");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(JoinTeamRequest req, CancellationToken ct)
@@ -293,6 +296,7 @@ public class JoinTeamByTokenEndpoint(ApplicationDbContext db) : Endpoint<JoinTea
     {
         Post("/api/teams/join-by-token");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(JoinTeamByTokenRequest req, CancellationToken ct)
@@ -341,6 +345,7 @@ public class LeaveTeamEndpoint(ApplicationDbContext db) : Endpoint<LeaveTeamRequ
     {
         Post("/api/teams/{teamId}/leave");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(LeaveTeamRequest req, CancellationToken ct)
@@ -352,29 +357,23 @@ public class LeaveTeamEndpoint(ApplicationDbContext db) : Endpoint<LeaveTeamRequ
             return;
         }
 
-        var member = await db.TeamMembers.FirstOrDefaultAsync(tm => tm.TeamId == req.TeamId && tm.UserId == userId.Value, ct);
-        if (member is null)
+        var leaveResult = await TeamLifecycleRules.TryLeaveMemberAsync(
+            db,
+            req.TeamId,
+            userId.Value,
+            ct);
+        if (!leaveResult.Success)
         {
-            await SendNotFoundAsync(ct);
+            if (leaveResult.StatusCode == 404)
+                await SendNotFoundAsync(ct);
+            else
+                await SendStringAsync(
+                    leaveResult.Code ?? "leave_failed",
+                    leaveResult.StatusCode,
+                    cancellation: ct);
             return;
         }
 
-        var team = await db.Teams.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == req.TeamId, ct);
-        if (team?.IsLocked == true)
-        {
-            await SendStringAsync("team_locked", 409, cancellation: ct);
-            return;
-        }
-
-        if (member.Role == TeamMemberRole.Captain &&
-            await db.TeamMembers.CountAsync(tm => tm.TeamId == req.TeamId, ct) > 1)
-        {
-            await SendStringAsync("captain_transfer_required", 409, cancellation: ct);
-            return;
-        }
-
-        db.TeamMembers.Remove(member);
-        await db.SaveChangesAsync(ct);
         await SendNoContentAsync(ct);
     }
 }
@@ -386,6 +385,7 @@ public class TransferCaptainEndpoint(ApplicationDbContext db, ITeamPermissionSer
     {
         Post("/api/teams/{teamId}/transfer-captain");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(TransferCaptainRequest req, CancellationToken ct)
@@ -397,14 +397,21 @@ public class TransferCaptainEndpoint(ApplicationDbContext db, ITeamPermissionSer
             return;
         }
 
+        await using var transaction = await TeamLifecycleRules.BeginSerializableTransactionAsync(db, ct);
+        await TeamLifecycleRules.AcquireTeamLockAsync(db, req.TeamId, ct);
+
         if (!await teamPermissionService.IsCaptainAsync(userId.Value, req.TeamId, ct))
         {
             await SendForbiddenAsync(ct);
             return;
         }
 
-        var currentCaptain = await db.TeamMembers.FirstAsync(tm => tm.TeamId == req.TeamId && tm.UserId == userId.Value, ct);
-        var newCaptain = await db.TeamMembers.FirstOrDefaultAsync(tm => tm.TeamId == req.TeamId && tm.UserId == req.NewCaptainUserId, ct);
+        var currentCaptain = await db.TeamMembers.IgnoreQueryFilters().FirstAsync(
+            tm => tm.TeamId == req.TeamId && tm.UserId == userId.Value,
+            ct);
+        var newCaptain = await db.TeamMembers.IgnoreQueryFilters().FirstOrDefaultAsync(
+            tm => tm.TeamId == req.TeamId && tm.UserId == req.NewCaptainUserId,
+            ct);
         if (newCaptain is null)
         {
             await SendNotFoundAsync(ct);
@@ -421,6 +428,8 @@ public class TransferCaptainEndpoint(ApplicationDbContext db, ITeamPermissionSer
         }
         team.CaptainId = req.NewCaptainUserId;
         await db.SaveChangesAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
         await SendNoContentAsync(ct);
     }
 }
@@ -432,6 +441,7 @@ public class RemoveTeamMemberEndpoint(ApplicationDbContext db, ITeamPermissionSe
     {
         Delete("/api/teams/{teamId}/members/{userId}");
         Claims(ClaimTypes.NameIdentifier);
+        Options(builder => builder.RequireRateLimiting("competition-submit"));
     }
 
     public override async Task HandleAsync(RemoveTeamMemberRequest req, CancellationToken ct)
@@ -443,13 +453,18 @@ public class RemoveTeamMemberEndpoint(ApplicationDbContext db, ITeamPermissionSe
             return;
         }
 
+        await using var transaction = await TeamLifecycleRules.BeginSerializableTransactionAsync(db, ct);
+        await TeamLifecycleRules.AcquireTeamLockAsync(db, req.TeamId, ct);
+
         if (!await teamPermissionService.IsCaptainAsync(userId.Value, req.TeamId, ct))
         {
             await SendForbiddenAsync(ct);
             return;
         }
 
-        var member = await db.TeamMembers.FirstOrDefaultAsync(tm => tm.TeamId == req.TeamId && tm.UserId == req.UserId, ct);
+        var member = await db.TeamMembers.IgnoreQueryFilters().FirstOrDefaultAsync(
+            tm => tm.TeamId == req.TeamId && tm.UserId == req.UserId,
+            ct);
         if (member is null)
         {
             await SendNotFoundAsync(ct);
@@ -471,12 +486,42 @@ public class RemoveTeamMemberEndpoint(ApplicationDbContext db, ITeamPermissionSe
 
         db.TeamMembers.Remove(member);
         await db.SaveChangesAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
         await SendNoContentAsync(ct);
     }
 }
 
 internal static class TeamLifecycleRules
 {
+    internal static Team CreateRegisteredTeam(
+        Competition competition,
+        CreateTeamRequest request,
+        Guid captainId,
+        string? trackName,
+        DateTime utcNow)
+    {
+        var approved = competition.TeamRegistrationAutoApprove;
+        return new Team
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competition.Id,
+            Name = request.Name.Trim(),
+            AvatarUrl = request.AvatarUrl,
+            TrackName = trackName,
+            CaptainId = captainId,
+            InviteToken = CreateTeamEndpoint.NewInviteToken(),
+            RegistrationStatus = approved ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending,
+            RegisteredAt = utcNow,
+            ApprovedAt = approved ? utcNow : null,
+            ApprovedById = approved ? captainId : null,
+            // Approval controls competition eligibility. Roster locking is a separate,
+            // explicit review/administrative decision.
+            IsLocked = false,
+            CreatedAt = utcNow
+        };
+    }
+
     public static string? GetRegistrationBlockReason(Competition competition)
     {
         var now = DateTime.UtcNow;
@@ -496,14 +541,8 @@ internal static class TeamLifecycleRules
         Guid userId,
         CancellationToken ct)
     {
-        await using var transaction = db.Database.IsRelational()
-            ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
-            : null;
-
-        if (transaction is not null)
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock({AdvisoryLockKey(teamId)})",
-                ct);
+        await using var transaction = await BeginSerializableTransactionAsync(db, ct);
+        await AcquireTeamLockAsync(db, teamId, ct);
 
         var team = await db.Teams.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == teamId, ct);
         if (team is null)
@@ -521,12 +560,16 @@ internal static class TeamLifecycleRules
         if (GetRegistrationBlockReason(competition) is { } registrationBlockReason)
             return (false, registrationBlockReason, 403);
 
+        await AcquireMembershipLockAsync(db, team.CompetitionId, userId, ct);
         var alreadyInCompetition = await db.TeamMembers
+            .IgnoreQueryFilters()
             .AnyAsync(tm => tm.CompetitionId == team.CompetitionId && tm.UserId == userId, ct);
         if (alreadyInCompetition)
             return (false, "already_registered", 409);
 
-        var memberCount = await db.TeamMembers.CountAsync(tm => tm.TeamId == team.Id, ct);
+        var memberCount = await db.TeamMembers.IgnoreQueryFilters().CountAsync(
+            tm => tm.CompetitionId == team.CompetitionId && tm.TeamId == team.Id,
+            ct);
         if (competition.MaxTeamMembers > 0 && memberCount >= competition.MaxTeamMembers)
             return (false, "team_full", 409);
 
@@ -546,6 +589,134 @@ internal static class TeamLifecycleRules
         return (true, null, 200);
     }
 
-    private static long AdvisoryLockKey(Guid id)
-        => BitConverter.ToInt64(id.ToByteArray(), 0);
+    public static async Task<(bool Success, string? Code, int StatusCode)> TryLeaveMemberAsync(
+        ApplicationDbContext db,
+        Guid teamId,
+        Guid userId,
+        CancellationToken ct)
+    {
+        await using var transaction = await BeginSerializableTransactionAsync(db, ct);
+        await AcquireTeamLockAsync(db, teamId, ct);
+
+        var team = await db.Teams
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == teamId, ct);
+        var member = await db.TeamMembers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(tm => tm.TeamId == teamId && tm.UserId == userId, ct);
+        if (team is null || member is null)
+            return (false, "team_membership_not_found", 404);
+        if (team.IsLocked)
+            return (false, "team_locked", 409);
+
+        await AcquireMembershipLockAsync(db, team.CompetitionId, userId, ct);
+
+        var memberCount = await db.TeamMembers
+            .IgnoreQueryFilters()
+            .CountAsync(
+                tm => tm.CompetitionId == team.CompetitionId && tm.TeamId == team.Id,
+                ct);
+        var isCaptain = member.Role == TeamMemberRole.Captain || team.CaptainId == userId;
+        if (isCaptain && memberCount > 1)
+            return (false, "captain_transfer_required", 409);
+
+        if (memberCount == 1)
+        {
+            var competition = await db.Competitions
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == team.CompetitionId, ct);
+            if (competition is null)
+                return (false, "competition_not_found", 404);
+
+            if (!CanWithdrawLastMemberTeam(team, competition, DateTime.UtcNow))
+                return (false, isCaptain ? "sole_captain_cannot_leave" : "last_team_member_cannot_leave", 409);
+
+            db.TeamMembers.Remove(member);
+            db.Teams.Remove(team);
+            CompetitionLogWriter.Add(
+                db,
+                team.CompetitionId,
+                "team.withdrawn",
+                $"Team {team.Name} was withdrawn by its captain.",
+                teamId: team.Id,
+                userId: userId);
+        }
+        else
+        {
+            db.TeamMembers.Remove(member);
+        }
+
+        await db.SaveChangesAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
+
+        return (true, null, 204);
+    }
+
+    internal static bool CanWithdrawLastMemberTeam(Team team, Competition competition, DateTime utcNow)
+    {
+        // Pending teams have never been eligible to create competition activity.
+        // Approved teams may be withdrawn only during the pre-start registration window;
+        // once play can begin, administrators must use the full cleanup workflow.
+        return team.RegistrationStatus == TeamRegistrationStatus.Pending ||
+               (competition.Status == CompetitionStatus.Published && utcNow < competition.StartTime);
+    }
+
+    internal static async Task<IDbContextTransaction?> BeginSerializableTransactionAsync(
+        ApplicationDbContext db,
+        CancellationToken ct)
+    {
+        if (!db.Database.IsRelational())
+            return null;
+
+        return await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+    }
+
+    internal static async Task AcquireTeamLockAsync(
+        ApplicationDbContext db,
+        Guid teamId,
+        CancellationToken ct)
+    {
+        if (!UsesPostgreSql(db))
+            return;
+
+        var key = AdvisoryLockKey(1, teamId, Guid.Empty);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({key})",
+            ct);
+    }
+
+    internal static async Task AcquireMembershipLockAsync(
+        ApplicationDbContext db,
+        Guid competitionId,
+        Guid userId,
+        CancellationToken ct)
+    {
+        if (!UsesPostgreSql(db))
+            return;
+
+        var key = AdvisoryLockKey(2, competitionId, userId);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({key})",
+            ct);
+    }
+
+    private static long AdvisoryLockKey(byte domain, Guid first, Guid second)
+    {
+        Span<byte> input = stackalloc byte[33];
+        input[0] = domain;
+        first.TryWriteBytes(input[1..17]);
+        second.TryWriteBytes(input[17..33]);
+        Span<byte> hash = stackalloc byte[32];
+        SHA256.HashData(input, hash);
+        return BitConverter.ToInt64(hash);
+    }
+
+    private static bool UsesPostgreSql(ApplicationDbContext db)
+        => db.Database.IsRelational() &&
+           string.Equals(
+               db.Database.ProviderName,
+               "Npgsql.EntityFrameworkCore.PostgreSQL",
+               StringComparison.Ordinal);
 }

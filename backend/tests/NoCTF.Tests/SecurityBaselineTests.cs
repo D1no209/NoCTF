@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NoCTF.API;
 using NoCTF.API.Permissions;
+using NoCTF.API.SignalR;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -154,6 +155,125 @@ public class SecurityBaselineTests
     }
 
     [Fact]
+    public async Task GetManageableCompetitionIds_AdminReceivesAllCompetitions()
+    {
+        var adminId = Guid.NewGuid();
+        var firstCompetitionId = Guid.NewGuid();
+        var secondCompetitionId = Guid.NewGuid();
+        await using var db = CreateDb();
+        db.Users.Add(new User
+        {
+            Id = adminId,
+            UserName = "admin",
+            Email = "admin-scope@example.test",
+            Role = UserRole.Admin,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.Competitions.AddRange(
+            Competition(firstCompetitionId, Guid.NewGuid()),
+            Competition(secondCompetitionId, Guid.NewGuid()));
+        await db.SaveChangesAsync();
+
+        var ids = await new CompetitionPermissionService(db)
+            .GetManageableCompetitionIdsAsync(adminId);
+
+        Assert.Equal(2, ids.Count);
+        Assert.Contains(firstCompetitionId, ids);
+        Assert.Contains(secondCompetitionId, ids);
+    }
+
+    [Fact]
+    public async Task CanViewCompetition_AllowsPausedAndFinishedPublicCompetitions()
+    {
+        var userId = Guid.NewGuid();
+        var pausedId = Guid.NewGuid();
+        var finishedId = Guid.NewGuid();
+        await using var db = CreateDb();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            UserName = "viewer",
+            Email = "viewer@example.test",
+            Role = UserRole.User,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        var paused = Competition(pausedId, Guid.NewGuid());
+        paused.Status = CompetitionStatus.Paused;
+        var finished = Competition(finishedId, Guid.NewGuid());
+        finished.Status = CompetitionStatus.Finished;
+        db.Competitions.AddRange(paused, finished);
+        await db.SaveChangesAsync();
+
+        var permissions = new CompetitionPermissionService(db);
+
+        Assert.True(await permissions.CanViewCompetitionAsync(userId, pausedId));
+        Assert.True(await permissions.CanViewCompetitionAsync(userId, finishedId));
+    }
+
+    [Fact]
+    public async Task RealtimeAccess_UsesOneCombinedQueryAndAllowsPausedParticipants()
+    {
+        var userId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        await using var db = CreateDb();
+        db.Users.Add(new User
+        {
+            Id = userId,
+            UserName = "participant",
+            Email = "participant@example.test",
+            Role = UserRole.User,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        var competition = Competition(competitionId, Guid.NewGuid());
+        competition.Status = CompetitionStatus.Paused;
+        competition.StartTime = DateTime.UtcNow.AddHours(-1);
+        db.Competitions.Add(competition);
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = competitionId,
+            Name = "participant-team",
+            CaptainId = userId,
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            CreatedAt = DateTime.UtcNow
+        });
+        db.TeamMembers.Add(new TeamMember
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            TeamId = teamId,
+            UserId = userId,
+            Role = TeamMemberRole.Captain,
+            JoinedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        Assert.True(await CompetitionRealtimeAccess.BuildAccessQuery(
+                db,
+                competitionId,
+                userId,
+                DateTime.UtcNow)
+            .AnyAsync());
+
+        await using var postgres = new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseNpgsql("Host=localhost;Database=noctf_query_shape;Username=noctf;Password=noctf")
+                .Options,
+            new MutableTenantContext());
+        var sql = CompetitionRealtimeAccess.BuildAccessQuery(
+                postgres,
+                competitionId,
+                userId,
+                DateTime.UtcNow)
+            .ToQueryString();
+        Assert.Contains("UNION ALL", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task DataSeeder_RejectsDefaultAdminPasswordOutsideDevelopmentDefaults()
     {
         await using var db = CreateDb();
@@ -175,6 +295,7 @@ public class SecurityBaselineTests
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new ApplicationDbContext(options, new MutableTenantContext());

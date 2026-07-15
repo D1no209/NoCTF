@@ -11,7 +11,9 @@ public class InfrastructureDto
     public object Kubernetes { get; set; } = new { };
 }
 
-public class GetInfrastructureEndpoint(IConfiguration configuration) : EndpointWithoutRequest<InfrastructureDto>
+public class GetInfrastructureEndpoint(
+    IConfiguration configuration,
+    IHttpClientFactory httpClientFactory) : EndpointWithoutRequest<InfrastructureDto>
 {
     public override void Configure()
     {
@@ -28,12 +30,21 @@ public class GetInfrastructureEndpoint(IConfiguration configuration) : EndpointW
         {
             try
             {
-                using var http = new HttpClient { BaseAddress = new Uri(runnerBaseUrl) };
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(5));
+                var http = httpClientFactory.CreateClient();
+                http.BaseAddress = new Uri(runnerBaseUrl);
                 var runnerApiKey = configuration["Runner:ApiKey"];
                 if (!string.IsNullOrWhiteSpace(runnerApiKey))
                     http.DefaultRequestHeaders.Add("X-Runner-Token", runnerApiKey);
-                runnerInfo = await http.GetFromJsonAsync<object>("/runner/info", ct);
+                using var response = await http.GetAsync("/runner/info", timeout.Token);
+                response.EnsureSuccessStatusCode();
+                runnerInfo = await response.Content.ReadFromJsonAsync<object>(cancellationToken: timeout.Token);
                 runnerReachable = true;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {

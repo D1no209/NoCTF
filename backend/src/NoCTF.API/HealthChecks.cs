@@ -11,39 +11,46 @@ public class PostgreSqlHealthCheck(IConfiguration configuration) : IHealthCheck
     {
         try
         {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
             var connectionString = configuration.GetConnectionString("DefaultConnection");
             await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync(ct);
+            await conn.OpenAsync(timeoutCts.Token);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT 1";
-            await cmd.ExecuteScalarAsync(ct);
+            await cmd.ExecuteScalarAsync(timeoutCts.Token);
             return HealthCheckResult.Healthy();
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy(ex.Message);
+            return HealthCheckResult.Unhealthy("PostgreSQL health check failed.", ex);
         }
     }
 }
 
 public class RedisHealthCheck(IConnectionMultiplexer redis) : IHealthCheck
 {
-    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
     {
         try
         {
-            return Task.FromResult(redis.IsConnected
-                ? HealthCheckResult.Healthy()
-                : HealthCheckResult.Unhealthy("Redis not connected"));
+            if (!redis.IsConnected)
+                return HealthCheckResult.Unhealthy("Redis not connected");
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
+            await redis.GetDatabase().PingAsync().WaitAsync(timeoutCts.Token);
+            return HealthCheckResult.Healthy();
         }
         catch (Exception ex)
         {
-            return Task.FromResult(HealthCheckResult.Unhealthy(ex.Message));
+            return HealthCheckResult.Unhealthy("Redis health check failed.", ex);
         }
     }
 }
 
-public class DockerHealthCheck(IConfiguration configuration) : IHealthCheck
+public class DockerHealthCheck(
+    IConfiguration configuration,
+    IHttpClientFactory httpClientFactory) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
     {
@@ -55,15 +62,16 @@ public class DockerHealthCheck(IConfiguration configuration) : IHealthCheck
             var runnerBaseUrl = configuration["Runner:BaseUrl"];
             if (!string.IsNullOrWhiteSpace(runnerBaseUrl))
             {
-                using var httpClient = new HttpClient { BaseAddress = new Uri(runnerBaseUrl) };
-                var response = await httpClient.GetAsync("/runner/health", timeoutCts.Token);
+                var httpClient = httpClientFactory.CreateClient();
+                httpClient.BaseAddress = new Uri(runnerBaseUrl);
+                using var response = await httpClient.GetAsync("/runner/health", timeoutCts.Token);
                 return response.IsSuccessStatusCode
                     ? HealthCheckResult.Healthy()
                     : HealthCheckResult.Unhealthy($"Runner health returned {(int)response.StatusCode}");
             }
 
             var dockerHost = configuration["Docker:Host"];
-            var config = dockerHost is not null
+            using var config = dockerHost is not null
                 ? new DockerClientConfiguration(new Uri(dockerHost))
                 : new DockerClientConfiguration();
             using var client = config.CreateClient();
@@ -72,7 +80,7 @@ public class DockerHealthCheck(IConfiguration configuration) : IHealthCheck
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy(ex.Message);
+            return HealthCheckResult.Unhealthy("Container runtime health check failed.", ex);
         }
     }
 }

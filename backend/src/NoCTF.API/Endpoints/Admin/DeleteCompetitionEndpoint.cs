@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.BackgroundTasks;
 using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -11,8 +12,8 @@ public class DeleteCompetitionEndpoint(
     ApplicationDbContext dbContext,
     ICompetitionPermissionService permissions,
     IContainerManager containerManager,
-    IRedisLeaderboardCache leaderboardCache,
-    IStorageProvider storageProvider) : Endpoint<EmptyRequest>, IAuditableEndpoint
+    ICompetitionExecutionLease executionLease,
+    IRedisLeaderboardCache leaderboardCache) : Endpoint<EmptyRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -40,9 +41,32 @@ public class DeleteCompetitionEndpoint(
         if (Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var parsedUserId))
             userId = parsedUserId;
 
+        await using (var preparationLease = await executionLease.TryAcquireAsync(
+            dbContext,
+            CompetitionExecutionLeaseKeys.RuntimePreparation,
+            id,
+            ct))
+        {
+            if (preparationLease is null)
+            {
+                await SendStringAsync("runtime_preparation_in_progress", 409, cancellation: ct);
+                return;
+            }
+
+            using var preparationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                preparationLease.LostToken);
+            competition.Status = NoCTF.Core.CompetitionStatus.Finished;
+            competition.EndTime = DateTime.UtcNow < competition.EndTime ? DateTime.UtcNow : competition.EndTime;
+            await dbContext.SaveChangesAsync(preparationCts.Token);
+        }
+
+        await leaderboardCache.InvalidateAsync(id, ct);
+
         await ContainerCleanupRuntime.CleanupCompetitionAsync(
             dbContext,
             containerManager,
+            executionLease,
             id,
             HttpContext,
             userId,
@@ -55,15 +79,26 @@ public class DeleteCompetitionEndpoint(
             .Where(c => c.CompetitionId == id)
             .Select(c => new { c.AttachmentStorageKey, c.PatchTemplateStorageKey })
             .ToListAsync(ct);
+        var patchArchiveKeys = await dbContext.AwdpPatchSubmissions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(submission => submission.CompetitionId == id)
+            .Select(submission => submission.PatchArchiveUrl)
+            .ToListAsync(ct);
+        await using var cleanupTransaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(ct)
+            : null;
         await DeleteCompetitionArtifactsAsync(dbContext, id, ct);
         dbContext.Competitions.Remove(competition);
-        await dbContext.SaveChangesAsync(ct);
-        await StorageObjectCleanup.DeleteUnreferencedAsync(
+        await StorageObjectCleanup.EnqueueAsync(
             dbContext,
-            storageProvider,
-            storageKeys.SelectMany(k => new[] { k.AttachmentStorageKey, k.PatchTemplateStorageKey }),
+            storageKeys
+                .SelectMany(k => new[] { k.AttachmentStorageKey, k.PatchTemplateStorageKey })
+                .Concat(patchArchiveKeys),
             ct);
-        await leaderboardCache.InvalidateAsync(id, ct);
+        await dbContext.SaveChangesAsync(ct);
+        if (cleanupTransaction is not null)
+            await cleanupTransaction.CommitAsync(ct);
         await SendNoContentAsync(ct);
     }
 
@@ -72,112 +107,47 @@ public class DeleteCompetitionEndpoint(
         Guid competitionId,
         CancellationToken ct)
     {
-        db.TeamMembers.RemoveRange(await db.TeamMembers
-            .Where(tm => tm.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.CompetitionCollaborators.RemoveRange(await db.CompetitionCollaborators
-            .IgnoreQueryFilters()
-            .Where(c => c.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.ChallengeHints.RemoveRange(await db.ChallengeHints
-            .IgnoreQueryFilters()
-            .Where(h => h.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.Submissions.RemoveRange(await db.Submissions
-            .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.ScoreEvents.RemoveRange(await db.ScoreEvents
-            .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.ScoreSignals.RemoveRange(await db.ScoreSignals
-            .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.CtfDynamicFlags.RemoveRange(await db.CtfDynamicFlags
-            .IgnoreQueryFilters()
-            .Where(f => f.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.DynamicFlagInstances.RemoveRange(await db.DynamicFlagInstances
-            .IgnoreQueryFilters()
-            .Where(f => f.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.CompetitionLogs.RemoveRange(await db.CompetitionLogs
-            .IgnoreQueryFilters()
-            .Where(l => l.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.CheatIncidents.RemoveRange(await db.CheatIncidents
-            .IgnoreQueryFilters()
-            .Where(i => i.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdRounds.RemoveRange(await db.AwdRounds
-            .IgnoreQueryFilters()
-            .Where(r => r.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdFlags.RemoveRange(await db.AwdFlags
-            .IgnoreQueryFilters()
-            .Where(f => f.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdAttackRecords.RemoveRange(await db.AwdAttackRecords
-            .IgnoreQueryFilters()
-            .Where(r => r.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdCheckResults.RemoveRange(await db.AwdCheckResults
-            .IgnoreQueryFilters()
-            .Where(r => r.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdGameBoxes.RemoveRange(await db.AwdGameBoxes
-            .IgnoreQueryFilters()
-            .Where(g => g.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdpRounds.RemoveRange(await db.AwdpRounds
-            .IgnoreQueryFilters()
-            .Where(r => r.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdpTeamChallengeStates.RemoveRange(await db.AwdpTeamChallengeStates
-            .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdpRoundScores.RemoveRange(await db.AwdpRoundScores
-            .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.AwdpPatchSubmissions.RemoveRange(await db.AwdpPatchSubmissions
-            .IgnoreQueryFilters()
-            .Where(s => s.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.PenetrationFlags.RemoveRange(await db.PenetrationFlags
-            .IgnoreQueryFilters()
-            .Where(f => f.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.PenetrationNodes.RemoveRange(await db.PenetrationNodes
-            .IgnoreQueryFilters()
-            .Where(n => n.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.PenetrationTopologies.RemoveRange(await db.PenetrationTopologies
-            .IgnoreQueryFilters()
-            .Where(t => t.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.TeamChallengeInstances.RemoveRange(await db.TeamChallengeInstances
-            .IgnoreQueryFilters()
-            .Where(i => i.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.KohControlRecords.RemoveRange(await db.KohControlRecords
-            .IgnoreQueryFilters()
-            .Where(r => r.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.BackgroundTasks.RemoveRange(await db.BackgroundTasks
-            .IgnoreQueryFilters()
-            .Where(t => t.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.Challenges.RemoveRange(await db.Challenges
-            .IgnoreQueryFilters()
-            .Where(c => c.CompetitionId == competitionId)
-            .ToListAsync(ct));
-        db.Teams.RemoveRange(await db.Teams
-            .IgnoreQueryFilters()
-            .Where(t => t.CompetitionId == competitionId)
-            .ToListAsync(ct));
+        await DeleteAsync(db, db.TeamMembers.Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.CompetitionCollaborators.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.ChallengeHints.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.Submissions.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.ScoreEvents.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.ScoreSignals.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.CtfDynamicFlags.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.DynamicFlagInstances.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.CompetitionLogs.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.CheatIncidents.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdAttackRecords.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdCheckResults.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdFlags.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdRounds.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdGameBoxes.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdpRoundScores.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdpRounds.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdpPatchSubmissions.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.AwdpTeamChallengeStates.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.PenetrationFlags.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.PenetrationNodes.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.TeamChallengeInstances.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.PenetrationTopologies.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.KohControlRecords.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.BackgroundTasks.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.Challenges.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+        await DeleteAsync(db, db.Teams.IgnoreQueryFilters().Where(x => x.CompetitionId == competitionId), ct);
+    }
+
+    internal static async Task DeleteAsync<TEntity>(
+        ApplicationDbContext db,
+        IQueryable<TEntity> query,
+        CancellationToken ct)
+        where TEntity : class
+    {
+        if (db.Database.IsRelational())
+        {
+            await query.ExecuteDeleteAsync(ct);
+            return;
+        }
+
+        db.RemoveRange(await query.ToListAsync(ct));
     }
 }

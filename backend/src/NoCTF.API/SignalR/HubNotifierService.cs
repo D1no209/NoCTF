@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.Application;
+using NoCTF.Application.Leaderboard;
 
 namespace NoCTF.API.SignalR;
 
@@ -7,20 +8,23 @@ namespace NoCTF.API.SignalR;
 /// Concrete implementation of IHubNotifierService using SignalR IHubContext.
 /// Registered as a singleton in the API layer.
 /// </summary>
-public sealed class HubNotifierService : IHubNotifierService
+public sealed class HubNotifierService : IHubNotifierService, IHubNotificationRelayTarget
 {
     private readonly IHubContext<LeaderboardHub, ILeaderboardClient> _leaderboard;
     private readonly IHubContext<GameHub, IGameNotificationClient> _game;
     private readonly IHubContext<MonitorHub, IMonitorClient> _monitor;
+    private readonly IRedisLeaderboardCache _leaderboardCache;
 
     public HubNotifierService(
         IHubContext<LeaderboardHub, ILeaderboardClient> leaderboard,
         IHubContext<GameHub, IGameNotificationClient> game,
-        IHubContext<MonitorHub, IMonitorClient> monitor)
+        IHubContext<MonitorHub, IMonitorClient> monitor,
+        IRedisLeaderboardCache leaderboardCache)
     {
         _leaderboard = leaderboard;
         _game = game;
         _monitor = monitor;
+        _leaderboardCache = leaderboardCache;
     }
 
     private static string Group(Guid competitionId) => $"Competition_{competitionId}";
@@ -32,6 +36,23 @@ public sealed class HubNotifierService : IHubNotifierService
     public Task NotifyLeaderboardSnapshotAsync(Guid competitionId, IEnumerable<LeaderboardEntryPayload> entries, CancellationToken ct = default)
         => _leaderboard.Clients.Group(Group(competitionId))
             .ReceiveLeaderboardSnapshot(entries.Select(e => new LeaderboardEntryDto(e.Rank, e.TeamId, e.TeamName, e.Score, e.SolvedCount)));
+
+    public async Task NotifyLatestLeaderboardSnapshotAsync(Guid competitionId, CancellationToken ct = default)
+    {
+        var entries = await _leaderboardCache.GetAsync(competitionId, ct);
+        if (entries is null)
+            return;
+
+        await NotifyLeaderboardSnapshotAsync(
+            competitionId,
+            entries.Select(entry => new LeaderboardEntryPayload(
+                entry.Rank,
+                entry.TeamId,
+                entry.TeamName,
+                entry.TotalScore,
+                entry.SolvedCount)),
+            ct);
+    }
 
     public Task NotifyFlagSolvedAsync(Guid competitionId, Guid challengeId, string challengeName, Guid teamId, string teamName, bool isFirstBlood, CancellationToken ct = default)
         => _game.Clients.Group(Group(competitionId))

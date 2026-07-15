@@ -47,7 +47,8 @@ public class GetCompetitionTeamsAdminEndpoint(ApplicationDbContext dbContext, IC
                     .Where(u => u.Id == t.CaptainId)
                     .Select(u => u.UserName)
                     .FirstOrDefault() ?? string.Empty,
-                MemberCount = dbContext.TeamMembers.Count(tm => tm.TeamId == t.Id),
+                MemberCount = dbContext.TeamMembers.IgnoreQueryFilters().Count(tm =>
+                    tm.CompetitionId == t.CompetitionId && tm.TeamId == t.Id),
                 CompetitionTitle = dbContext.Competitions
                     .IgnoreQueryFilters()
                     .Where(c => c.Id == t.CompetitionId)
@@ -136,7 +137,8 @@ public class ApproveCompetitionTeamEndpoint(
                 CompetitionId = t.CompetitionId,
                 Name = t.Name,
                 CaptainName = dbContext.Users.Where(u => u.Id == t.CaptainId).Select(u => u.UserName).FirstOrDefault() ?? string.Empty,
-                MemberCount = dbContext.TeamMembers.Count(tm => tm.TeamId == t.Id),
+                MemberCount = dbContext.TeamMembers.IgnoreQueryFilters().Count(tm =>
+                    tm.CompetitionId == t.CompetitionId && tm.TeamId == t.Id),
                 CompetitionTitle = dbContext.Competitions.IgnoreQueryFilters().Where(c => c.Id == t.CompetitionId).Select(c => c.Title).FirstOrDefault() ?? string.Empty,
                 InviteToken = t.InviteToken,
                 IsLocked = t.IsLocked,

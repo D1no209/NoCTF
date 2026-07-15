@@ -33,7 +33,7 @@ public class MonitorHub(ICompetitionPermissionService permissions) : Hub<IMonito
             return;
         }
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"{GroupPrefix}{competitionId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"{GroupPrefix}{parsedCompetitionId:D}");
         if (Context.User?.IsInRole("Admin") == true)
             await Groups.AddToGroupAsync(Context.ConnectionId, AdminLogGroup);
 
@@ -44,8 +44,8 @@ public class MonitorHub(ICompetitionPermissionService permissions) : Hub<IMonito
     {
         var competitionId = Context.GetHttpContext()?.Request.Query["competitionId"].ToString();
 
-        if (!string.IsNullOrWhiteSpace(competitionId))
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"{GroupPrefix}{competitionId}");
+        if (Guid.TryParse(competitionId, out var parsedCompetitionId))
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"{GroupPrefix}{parsedCompetitionId:D}");
         if (Context.User?.IsInRole("Admin") == true)
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, AdminLogGroup);
 

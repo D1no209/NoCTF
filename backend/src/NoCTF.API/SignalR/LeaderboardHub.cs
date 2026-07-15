@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using NoCTF.API.Permissions;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.SignalR;
@@ -10,9 +9,7 @@ namespace NoCTF.API.SignalR;
 /// Clients connect with ?competitionId=xxx query string.
 /// </summary>
 [Authorize]
-public class LeaderboardHub(
-    ApplicationDbContext db,
-    ICompetitionPermissionService permissions) : Hub<ILeaderboardClient>
+public class LeaderboardHub(ApplicationDbContext db) : Hub<ILeaderboardClient>
 {
     private const string GroupPrefix = "Competition_";
 
@@ -26,13 +23,13 @@ public class LeaderboardHub(
             return;
         }
 
-        if (!await CompetitionRealtimeAccess.CanJoinCompetitionGroupAsync(Context, db, permissions, parsedCompetitionId))
+        if (!await CompetitionRealtimeAccess.CanJoinCompetitionGroupAsync(Context, db, parsedCompetitionId))
         {
             Context.Abort();
             return;
         }
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"{GroupPrefix}{competitionId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"{GroupPrefix}{parsedCompetitionId:D}");
         await base.OnConnectedAsync();
     }
 
@@ -40,8 +37,8 @@ public class LeaderboardHub(
     {
         var competitionId = Context.GetHttpContext()?.Request.Query["competitionId"].ToString();
 
-        if (!string.IsNullOrWhiteSpace(competitionId))
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"{GroupPrefix}{competitionId}");
+        if (Guid.TryParse(competitionId, out var parsedCompetitionId))
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"{GroupPrefix}{parsedCompetitionId:D}");
 
         await base.OnDisconnectedAsync(exception);
     }

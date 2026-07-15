@@ -33,9 +33,9 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
                    ?? user.Identity?.Name;
 
         var ipAddress = httpCtx.Connection.RemoteIpAddress?.ToString();
-        var userAgent = httpCtx.Request.Headers.UserAgent.ToString();
+        var userAgent = Limit(httpCtx.Request.Headers.UserAgent.ToString(), 512);
         var method = httpCtx.Request.Method;
-        var path = httpCtx.Request.Path.Value ?? string.Empty;
+        var path = Limit(httpCtx.Request.Path.Value ?? string.Empty, 2_048);
         var action = $"{method} {path}";
 
         string? newValues = null;
@@ -48,7 +48,7 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
             if (ctx.Request is not null)
             {
                 var reqJson = JsonSerializer.Serialize(ctx.Request, ctx.Request.GetType(), JsonOptions);
-                newValues = AuditValueRedactor.RedactJson(reqJson);
+                newValues = LimitJson(AuditValueRedactor.RedactJson(reqJson), 16_384);
                 (entityType, entityId) = ExtractEntityInfo(ctx.Request);
             }
         }
@@ -56,7 +56,7 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
 
         if (ctx.ExceptionDispatchInfo is not null)
         {
-            exception = ctx.ExceptionDispatchInfo.SourceException.Message;
+            exception = $"{ctx.ExceptionDispatchInfo.SourceException.GetType().Name}: request_failed";
         }
         else
         {
@@ -82,6 +82,10 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
             Exception = exception
         };
 
+        // Endpoint work must already be committed before post-processing. Do
+        // not let failed or forgotten tracked mutations hitch a ride on the
+        // best-effort audit write.
+        db.ChangeTracker.Clear();
         db.AuditLogs.Add(auditLog);
 
         try
@@ -121,4 +125,16 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
         catch { /* best-effort */ }
         return (null, null);
     }
+
+    private static string Limit(string value, int maxLength)
+        => value.Length <= maxLength ? value : value[..maxLength];
+
+    private static string LimitJson(string value, int maxLength)
+        => value.Length <= maxLength
+            ? value
+            : JsonSerializer.Serialize(new
+            {
+                truncated = true,
+                preview = value[..Math.Max(0, maxLength - 128)]
+            }, JsonOptions);
 }

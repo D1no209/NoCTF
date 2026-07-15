@@ -36,7 +36,8 @@ public class GetTeamMembersEndpoint(ApplicationDbContext dbContext, ICompetition
         }
 
         var members = await dbContext.TeamMembers
-            .Where(tm => tm.TeamId == id)
+            .IgnoreQueryFilters()
+            .Where(tm => tm.CompetitionId == team.CompetitionId && tm.TeamId == id)
             .Select(tm => new TeamMembersDto
             {
                 UserId = tm.UserId,

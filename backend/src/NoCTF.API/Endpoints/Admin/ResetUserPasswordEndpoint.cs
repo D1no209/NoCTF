@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Auth;
 using NoCTF.Infrastructure;
 
 namespace NoCTF.API.Endpoints.Admin;
@@ -10,7 +11,9 @@ public class ResetUserPasswordRequest
     public string NewPassword { get; set; } = string.Empty;
 }
 
-public class ResetUserPasswordEndpoint(ApplicationDbContext dbContext) : Endpoint<ResetUserPasswordRequest>, IAuditableEndpoint
+public class ResetUserPasswordEndpoint(
+    ApplicationDbContext dbContext,
+    IUserTokenVersionCache tokenVersionCache) : Endpoint<ResetUserPasswordRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -38,6 +41,7 @@ public class ResetUserPasswordEndpoint(ApplicationDbContext dbContext) : Endpoin
         user.TokenVersion++;
         user.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(ct);
+        await tokenVersionCache.SetAsync(user.Id, user.TokenVersion);
 
         await SendOkAsync(ct);
     }

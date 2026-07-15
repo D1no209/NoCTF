@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Auth;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -10,7 +11,9 @@ public class UpdateUserRoleRequest
     public string Role { get; set; } = string.Empty;
 }
 
-public class UpdateUserRoleEndpoint(ApplicationDbContext dbContext) : Endpoint<UpdateUserRoleRequest>, IAuditableEndpoint
+public class UpdateUserRoleEndpoint(
+    ApplicationDbContext dbContext,
+    IUserTokenVersionCache tokenVersionCache) : Endpoint<UpdateUserRoleRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -43,6 +46,7 @@ public class UpdateUserRoleEndpoint(ApplicationDbContext dbContext) : Endpoint<U
         user.TokenVersion++;
         user.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(ct);
+        await tokenVersionCache.SetAsync(user.Id, user.TokenVersion);
 
         await SendOkAsync(ct);
     }

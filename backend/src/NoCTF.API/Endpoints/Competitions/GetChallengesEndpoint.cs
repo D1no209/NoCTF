@@ -67,7 +67,7 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext, IStorageProvi
         var challengeRows = await dbContext.Challenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(c => c.CompetitionId == req.Id)
+            .Where(c => c.CompetitionId == req.Id && !c.IsDeleting)
             .OrderBy(c => c.CreatedAt)
             .Select(c => new
             {
@@ -109,11 +109,13 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext, IStorageProvi
             .Where(h => h.CompetitionId == req.Id && challengeIds.Contains(h.ChallengeId))
             .OrderBy(h => h.DisplayOrder)
             .ToListAsync(ct);
+        var challengeRowsById = challengeRows.ToDictionary(row => row.Challenge.Id);
+        var hintsByChallengeId = hints.ToLookup(hint => hint.ChallengeId);
 
         foreach (var challenge in challenges)
         {
             challenge.SolveCount = solveCounts.GetValueOrDefault(challenge.Id);
-            var scoring = challengeRows.First(row => row.Challenge.Id == challenge.Id);
+            var scoring = challengeRowsById[challenge.Id];
             challenge.AttachmentUrl = await StorageUrlResolver.ResolveAsync(
                 storageProvider,
                 scoring.AttachmentStorageKey,
@@ -139,9 +141,7 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext, IStorageProvi
                     scoring.PointsConfig,
                     scoring.DifficultyCoefficient);
             }
-            challenge.Hints = hints
-                .Where(h => h.ChallengeId == challenge.Id)
-                .OrderBy(h => h.DisplayOrder)
+            challenge.Hints = hintsByChallengeId[challenge.Id]
                 .Select(h => h.Content)
                 .ToList();
         }
@@ -206,8 +206,20 @@ public static class ChallengeSolveCounts
             .Where(s =>
                 s.CompetitionId == competitionId &&
                 s.IsCorrect &&
-                s.PenetrationFlagId != null &&
-                challengeIds.Contains(s.ChallengeId))
+                s.PenetrationFlagId != null)
+            .Join(
+                dbContext.PenetrationFlags.IgnoreQueryFilters().AsNoTracking().Where(flag =>
+                    flag.CompetitionId == competitionId &&
+                    flag.Visible &&
+                    challengeIds.Contains(flag.ChallengeId)),
+                submission => submission.PenetrationFlagId!.Value,
+                flag => flag.Id,
+                (submission, flag) => new
+                {
+                    flag.ChallengeId,
+                    submission.TeamId,
+                    FlagId = flag.Id
+                })
             .Join(
                 dbContext.Teams.IgnoreQueryFilters().AsNoTracking().Where(t =>
                     t.CompetitionId == competitionId &&
@@ -215,7 +227,7 @@ public static class ChallengeSolveCounts
                     !t.IsBanned),
                 s => s.TeamId,
                 t => t.Id,
-                (s, _) => new { s.ChallengeId, s.TeamId, FlagId = s.PenetrationFlagId!.Value })
+                (submission, _) => submission)
             .Distinct()
             .GroupBy(s => new { s.ChallengeId, s.TeamId })
             .Select(g => new { g.Key.ChallengeId, g.Key.TeamId, Count = g.Count() })

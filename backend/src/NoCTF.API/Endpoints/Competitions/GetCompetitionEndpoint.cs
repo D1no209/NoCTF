@@ -41,6 +41,7 @@ public class GetCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<G
     {
         var competition = await dbContext.Competitions
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Where(c => c.Id == req.Id)
             .FirstOrDefaultAsync(ct);
 

@@ -7,13 +7,24 @@ public class TenantResolutionMiddleware(RequestDelegate next)
     public async Task InvokeAsync(HttpContext context, ITenantContext tenantContext)
     {
         var competitionIdClaim = context.User.FindFirst("competition_id")?.Value;
-        if (Guid.TryParse(competitionIdClaim, out var competitionId))
+        var hasRouteCompetition = TryGetCompetitionIdFromRoute(
+            context.Request.Path,
+            out var routeCompetitionId);
+        if (hasRouteCompetition)
         {
-            tenantContext.SetCompetitionId(competitionId);
-        }
-        else if (TryGetCompetitionIdFromRoute(context.Request.Path, out var routeCompetitionId))
-        {
+            if (!string.IsNullOrWhiteSpace(competitionIdClaim) &&
+                (!Guid.TryParse(competitionIdClaim, out var claimedCompetitionId) ||
+                 claimedCompetitionId != routeCompetitionId))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+
             tenantContext.SetCompetitionId(routeCompetitionId);
+        }
+        else if (Guid.TryParse(competitionIdClaim, out var claimedCompetitionId))
+        {
+            tenantContext.SetCompetitionId(claimedCompetitionId);
         }
 
         await next(context);
