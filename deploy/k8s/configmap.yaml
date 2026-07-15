@@ -17,6 +17,7 @@ data:
   StorageProvider__S3__Bucket: "noctf"
   StorageProvider__S3__Region: "us-east-1"
   StorageProvider__PublicBaseUrl: "https://minio.noctf.local"
+  QqBot__PublicBaseUrl: "https://noctf.local"
   Runner__BaseUrl: "http://runner:8080"
   Runner__TimeoutSeconds: "900"
   Runner__Provider: "Kubernetes"
