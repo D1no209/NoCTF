@@ -4,6 +4,7 @@ using NoCTF.API;
 using NoCTF.API.Permissions;
 using NoCTF.Application;
 using NoCTF.Application.Leaderboard;
+using NoCTF.Application.Events;
 using NoCTF.Application.Scoring;
 using NoCTF.Infrastructure;
 using NoCTF.PluginBase;
@@ -145,7 +146,8 @@ public class BanCompetitionTeamEndpoint(
     IHubNotifierService hubNotifier,
     ICtfScoreRebuilder ctfScoreRebuilder,
     IContainerManager containerManager,
-    NoCTF.Application.BackgroundTasks.ICompetitionExecutionLease executionLease)
+    NoCTF.Application.BackgroundTasks.ICompetitionExecutionLease executionLease,
+    ICompetitionNotificationOutbox notificationOutbox)
     : Endpoint<TeamBanRequest, TeamAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -171,6 +173,11 @@ public class BanCompetitionTeamEndpoint(
             await SendNotFoundAsync(ct);
             return;
         }
+        var wasBanned = team.IsBanned;
+        var competitionTitle = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
+            .Where(item => item.Id == competitionId)
+            .Select(item => item.Title)
+            .FirstOrDefaultAsync(ct) ?? competitionId.ToString();
 
         await using (var preparationLease = await executionLease.TryAcquireAsync(
             db,
@@ -192,6 +199,22 @@ public class BanCompetitionTeamEndpoint(
             team.BannedReason = string.IsNullOrWhiteSpace(req.Reason) ? "cheat_suspected" : req.Reason.Trim();
             if (Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId))
                 team.BannedById = userId;
+
+            if (!wasBanned)
+            {
+                notificationOutbox.Add(CompetitionNotification.Create(
+                    competitionId, CompetitionNotificationTypes.TeamPenalized,
+                    "team", team.Id, team.BannedById,
+                    $"team.penalized:{competitionId:N}:{team.Id:N}:{team.BannedAt:O}",
+                    new
+                    {
+                        competition_name = competitionTitle,
+                        team_name = team.Name,
+                        penalty_type = "封禁",
+                        penalty_reason = team.BannedReason,
+                        occurred_at = team.BannedAt?.ToString("O")
+                    }));
+            }
 
             // Persist the admission tombstone while runtime candidates are
             // prevented from crossing their durable-preparation boundary.

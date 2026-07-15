@@ -1,5 +1,8 @@
 using NoCTF.Application.Leaderboard;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using NoCTF.Infrastructure;
 
 namespace NoCTF.Application.Events;
 
@@ -10,7 +13,10 @@ namespace NoCTF.Application.Events;
 public class LeaderboardSyncHandler(
     ILeaderboardService leaderboardService,
     IRedisLeaderboardCache leaderboardCache,
-    IHubNotifierService hubNotifier) : ISubmissionEventHandler
+    IHubNotifierService hubNotifier,
+    ICompetitionNotificationOutbox? notificationOutbox = null,
+    ApplicationDbContext? db = null,
+    ILogger<LeaderboardSyncHandler>? logger = null) : ISubmissionEventHandler
 {
     private static readonly LeaderboardRefreshCoordinator SharedRefreshCoordinator = new();
     private readonly LeaderboardRefreshCoordinator _refreshCoordinator = SharedRefreshCoordinator;
@@ -45,11 +51,47 @@ public class LeaderboardSyncHandler(
                 solvedEvent.TeamName,
                 solvedEvent.IsFirstBlood,
                 CancellationToken.None);
+            await QueueBloodNotificationAsync(solvedEvent);
         }
         finally
         {
             // A SignalR failure or a disconnected request must not orphan the accepted refresh.
             await refreshTask;
+        }
+    }
+
+    private async Task QueueBloodNotificationAsync(SubmissionSolvedEvent solvedEvent)
+    {
+        if (notificationOutbox is null || db is null || solvedEvent.SolveRank is < 1 or > 3)
+            return;
+        var type = solvedEvent.SolveRank switch
+        {
+            1 => CompetitionNotificationTypes.FirstBlood,
+            2 => CompetitionNotificationTypes.SecondBlood,
+            3 => CompetitionNotificationTypes.ThirdBlood,
+            _ => throw new InvalidOperationException()
+        };
+        try
+        {
+            var scopeId = solvedEvent.BloodScopeId ?? solvedEvent.ChallengeId;
+            notificationOutbox.Add(CompetitionNotification.Create(
+                solvedEvent.CompetitionId, type, "challenge", scopeId, solvedEvent.UserId,
+                $"blood:{scopeId:N}:rank:{solvedEvent.SolveRank}",
+                new
+                {
+                    problem_title = solvedEvent.ChallengeName,
+                    team_name = solvedEvent.TeamName,
+                    blood_rank = solvedEvent.SolveRank,
+                    occurred_at = (solvedEvent.OccurredAt ?? DateTime.UtcNow).ToString("O")
+                }));
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            (logger ?? NullLogger<LeaderboardSyncHandler>.Instance).LogError(exception,
+                "Failed to queue QQBot blood notification for submission {SubmissionId}; the solve remains accepted.",
+                solvedEvent.SubmissionId);
+            db.ChangeTracker.Clear();
         }
     }
 

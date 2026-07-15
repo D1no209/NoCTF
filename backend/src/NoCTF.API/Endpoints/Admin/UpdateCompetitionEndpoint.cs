@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.API.Permissions;
 using NoCTF.Application.CompetitionModes;
+using NoCTF.Application.Events;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
@@ -54,7 +55,8 @@ public class UpdateCompetitionEndpoint(
     ApplicationDbContext dbContext,
     ICompetitionPermissionService permissions,
     ICtfScoreRebuilder ctfScoreRebuilder,
-    IRedisLeaderboardCache leaderboardCache) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
+    IRedisLeaderboardCache leaderboardCache,
+    ICompetitionNotificationOutbox notificationOutbox) : Endpoint<UpdateCompetitionAdminRequest>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -158,8 +160,19 @@ public class UpdateCompetitionEndpoint(
             competition.ScoringProfileJson = ScoringJson.Serialize(CompetitionModeDefaults.GetScoringProfile(mode));
         }
 
+        var previousStatus = competition.Status;
         if (Enum.TryParse<CompetitionStatus>(req.Status, ignoreCase: true, out var status))
             competition.Status = status;
+
+        if (previousStatus != CompetitionStatus.Running && competition.Status == CompetitionStatus.Running)
+        {
+            AdminCompetitionAuthorization.TryGetUserId(HttpContext, out var actorUserId);
+            notificationOutbox.Add(CompetitionNotification.Create(
+                competition.Id, CompetitionNotificationTypes.CompetitionStarted,
+                "competition", competition.Id, actorUserId == Guid.Empty ? null : actorUserId,
+                $"competition.started:{competition.Id:N}:v1",
+                new { competition_name = competition.Title, occurred_at = DateTime.UtcNow.ToString("O") }));
+        }
 
         await dbContext.SaveChangesAsync(ct);
         await ctfScoreRebuilder.RebuildCompetitionAsync(id, ct);

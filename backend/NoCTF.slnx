@@ -12,6 +12,7 @@
     <Project Path="src/NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj" />
     <Project Path="src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
     <Project Path="src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
+    <Project Path="src/NoCTF.Plugins.QQBot/NoCTF.Plugins.QQBot.csproj" />
     <Project Path="src/NoCTF.Runner.Client/NoCTF.Runner.Client.csproj" />
     <Project Path="src/NoCTF.Runner/NoCTF.Runner.csproj" />
     <Project Path="src/NoCTF.Worker/NoCTF.Worker.csproj" />

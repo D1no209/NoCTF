@@ -26,13 +26,20 @@ public sealed class PluginCatalog
 /// </summary>
 public static class PluginLoader
 {
-    private static readonly HashSet<string> BuiltInPluginAssemblies = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> RequiredBuiltInPluginAssemblies = new(StringComparer.OrdinalIgnoreCase)
     {
         "NoCTF.Plugins.CTF.dll",
         "NoCTF.Plugins.AWD.dll",
         "NoCTF.Plugins.AWDP.dll",
         "NoCTF.Plugins.KoH.dll",
         "NoCTF.Plugins.Penetration.dll"
+    };
+
+    private static readonly HashSet<string> TrustedPlatformPluginAssemblies = new(
+        RequiredBuiltInPluginAssemblies,
+        StringComparer.OrdinalIgnoreCase)
+    {
+        "NoCTF.Plugins.QQBot.dll"
     };
 
     /// <summary>
@@ -78,7 +85,7 @@ public static class PluginLoader
             var fileName = Path.GetFileName(dll);
             try
             {
-                if (!BuiltInPluginAssemblies.Contains(fileName) &&
+                if (!TrustedPlatformPluginAssemblies.Contains(fileName) &&
                     !allowAllExternal &&
                     !allowedExternalSet.Contains(fileName))
                 {
@@ -86,7 +93,7 @@ public static class PluginLoader
                     continue;
                 }
 
-                if (!BuiltInPluginAssemblies.Contains(fileName))
+                if (!TrustedPlatformPluginAssemblies.Contains(fileName))
                 {
                     var expectedDigest = configuration[$"Plugins:AssemblySha256:{fileName}"];
                     if (string.IsNullOrWhiteSpace(expectedDigest) || !HasExpectedDigest(dll, expectedDigest))
@@ -108,7 +115,7 @@ public static class PluginLoader
 
                 if (moduleTypes.Length == 0)
                 {
-                    if (BuiltInPluginAssemblies.Contains(fileName))
+                    if (TrustedPlatformPluginAssemblies.Contains(fileName))
                         throw new InvalidOperationException($"Built-in plugin {fileName} does not expose an IPluginModule.");
                     Console.WriteLine($"[Plugins] No IPluginModule found in {fileName}");
                     continue;
@@ -135,7 +142,7 @@ public static class PluginLoader
             catch (Exception ex)
             {
                 Console.WriteLine($"[Plugins] Failed to load {fileName}: {ex.Message}");
-                if (BuiltInPluginAssemblies.Contains(fileName))
+                if (RequiredBuiltInPluginAssemblies.Contains(fileName))
                 {
                     throw new InvalidOperationException(
                         $"Required built-in plugin {fileName} failed to load.", ex);
@@ -154,7 +161,7 @@ public static class PluginLoader
             .Select(Path.GetFileName)
             .Where(fileName => !string.IsNullOrWhiteSpace(fileName))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var missing = BuiltInPluginAssemblies
+        var missing = RequiredBuiltInPluginAssemblies
             .Where(fileName => !available.Contains(fileName))
             .OrderBy(fileName => fileName, StringComparer.OrdinalIgnoreCase)
             .ToArray();

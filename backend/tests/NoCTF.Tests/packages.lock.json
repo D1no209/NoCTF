@@ -974,6 +974,15 @@
           "NoCTF.PluginBase": "[1.0.0, )"
         }
       },
+      "noctf.plugins.qqbot": {
+        "type": "Project",
+        "dependencies": {
+          "NoCTF.Application": "[1.0.0, )",
+          "NoCTF.Core": "[1.0.0, )",
+          "NoCTF.Infrastructure": "[1.0.0, )",
+          "NoCTF.PluginBase": "[1.0.0, )"
+        }
+      },
       "noctf.runner": {
         "type": "Project",
         "dependencies": {
