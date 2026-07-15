@@ -25,7 +25,11 @@ The API and Worker load `NoCTF.Plugins.*.dll` assemblies from the configured
 `IPluginModule` contract, and applies host-specific registration through the
 additive host-aware plugin contract when implemented. Both hosts fail fast when
 the required built-in plugin set is incomplete, and publish output is expected
-to contain the plugin assemblies under `plugins/`.
+to contain the plugin assemblies under `plugins/`. `NoCTF.Plugins.QQBot` is a
+trusted but optional integration plugin: its absence does not weaken the
+required CTF/AWD/AWDP/KoH/Penetration fail-fast check. It consumes confirmed
+competition events through the application outbox and does not implement a
+game mode or modify scoring. See [QQBot Integration](qqbot-integration.md).
 
 ## Game Mode Designs
 

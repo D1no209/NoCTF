@@ -7,6 +7,7 @@ A modern, extensible CTF/AWD/AWDP/KoH competition platform built with .NET 8 and
 - **Multi-mode support**: CTF (Jeopardy), AWD (Attack with Defense), AWDP (Patch Defense), and KoH (King of the Hill)
 - **Penetration challenges**: CTF/Jeopardy challenge type for per-team Docker Compose ranges with staged flags
 - **Plugin-based architecture**: Game modes and challenge types load as plugins via `AssemblyLoadContext`
+- **Optional QQ broadcasts**: Per-competition, audited QQ group notifications through an outbound-only Milky agent
 - **Real-time experience**: SignalR hubs power live leaderboards, game notifications, and monitor streams
 - **Container-native challenge orchestration**: Docker-based containers for dynamic challenges and checkers
 - **Multi-tenancy**: Competitions are fully isolated with EF Core global query filters
@@ -64,6 +65,7 @@ NoCTF/
 │   │   ├── NoCTF.Plugins.AWD/      # AWD game mode plugin
 │   │   ├── NoCTF.Plugins.AWDP/     # AWDP game mode plugin
 │   │   ├── NoCTF.Plugins.KoH/      # KoH game mode plugin
+│   │   ├── NoCTF.Plugins.QQBot/    # Optional QQ notification plugin
 │   │   └── NoCTF.Plugins.Penetration/ # Penetration challenge type plugin
 │   └── tests/NoCTF.Tests/          # Unit and integration tests
 ├── frontend/                       # Vue 3 SPA
@@ -118,6 +120,7 @@ flowchart LR
 - [Collaborator Handoff](docs/handoff.md)
 - [Architecture](docs/architecture.md)
 - [Deployment Guide](docs/deployment.md)
+- [QQBot Integration](docs/qqbot-integration.md)
 - [Development Guide](docs/development.md)
 - [Game Modes](docs/game-modes.md)
 - [Penetration Challenges](docs/penetration-challenges.md)
