@@ -1,10 +1,13 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Permissions;
 using NoCTF.Application;
 using NoCTF.Application.BackgroundTasks;
+using NoCTF.Application.Events;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Leaderboard;
 using NoCTF.Application.Scoring;
@@ -105,7 +108,8 @@ public class BindCompetitionChallengeEndpoint(
     ApplicationDbContext db,
     IChallengeAdminFeatureRegistry adminFeatureRegistry,
     ICompetitionPermissionService permissions,
-    IStorageProvider storageProvider)
+    IStorageProvider storageProvider,
+    ICompetitionNotificationOutbox notificationOutbox)
     : Endpoint<BindCompetitionChallengeRequest, CompetitionChallengeAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -238,6 +242,19 @@ public class BindCompetitionChallengeEndpoint(
             db.Challenges.Add(challenge);
             var hints = BuildHints(competitionId, challenge.Id, req.Hints);
             db.ChallengeHints.AddRange(hints);
+            if (competition.Status == CompetitionStatus.Running)
+            {
+                notificationOutbox.Add(CompetitionNotification.Create(
+                    competitionId, CompetitionNotificationTypes.ChallengePublished,
+                    "challenge", challenge.Id, null,
+                    $"challenge.published:{challenge.Id:N}:v1",
+                    new
+                    {
+                        problem_title = challenge.Title,
+                        problem_category = challenge.TypeId,
+                        occurred_at = DateTime.UtcNow.ToString("O")
+                    }));
+            }
             await db.SaveChangesAsync(ct);
 
             if (isPenetration && penetrationProvider is not null)
@@ -337,7 +354,8 @@ public class UpdateCompetitionChallengeEndpoint(
     ICompetitionPermissionService permissions,
     ICtfScoreRebuilder ctfScoreRebuilder,
     IRedisLeaderboardCache leaderboardCache,
-    IStorageProvider storageProvider)
+    IStorageProvider storageProvider,
+    ICompetitionNotificationOutbox notificationOutbox)
     : Endpoint<UpdateCompetitionChallengeRequest, CompetitionChallengeAdminDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -401,6 +419,9 @@ public class UpdateCompetitionChallengeEndpoint(
             .IgnoreQueryFilters()
             .Where(h => h.CompetitionId == competitionId && h.ChallengeId == challengeId)
             .ToListAsync(ct);
+        var existingHintContents = existingHints
+            .Select(item => item.Content.Trim())
+            .ToHashSet(StringComparer.Ordinal);
         db.ChallengeHints.RemoveRange(existingHints);
         var hints = req.Hints
             .Where(h => !string.IsNullOrWhiteSpace(h))
@@ -415,6 +436,27 @@ public class UpdateCompetitionChallengeEndpoint(
             })
             .ToList();
         db.ChallengeHints.AddRange(hints);
+
+        var competitionRunning = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(item => item.Id == competitionId && item.Status == CompetitionStatus.Running, ct);
+        if (competitionRunning)
+        {
+            foreach (var hint in hints.Where(item => !existingHintContents.Contains(item.Content)))
+            {
+                var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(hint.Content))).ToLowerInvariant();
+                notificationOutbox.Add(CompetitionNotification.Create(
+                    competitionId, CompetitionNotificationTypes.HintPublished,
+                    "challenge", challenge.Id, null,
+                    $"hint.published:{challenge.Id:N}:{digest}",
+                    new
+                    {
+                        problem_title = challenge.Title,
+                        hint_title = $"提示 {hint.DisplayOrder}",
+                        hint_content = hint.Content,
+                        occurred_at = hint.CreatedAt.ToString("O")
+                    }));
+            }
+        }
 
         await db.SaveChangesAsync(ct);
         await ctfScoreRebuilder.RebuildChallengeAsync(competitionId, challengeId, ct);

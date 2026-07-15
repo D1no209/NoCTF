@@ -43,6 +43,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<StorageCleanupItem> StorageCleanupItems => Set<StorageCleanupItem>();
     public DbSet<CompetitionEngineState> CompetitionEngineStates => Set<CompetitionEngineState>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<QqBotGlobalSettings> QqBotGlobalSettings => Set<QqBotGlobalSettings>();
+    public DbSet<QqBotAgent> QqBotAgents => Set<QqBotAgent>();
+    public DbSet<QqBotGroup> QqBotGroups => Set<QqBotGroup>();
+    public DbSet<CompetitionQqBotSettings> CompetitionQqBotSettings => Set<CompetitionQqBotSettings>();
+    public DbSet<CompetitionQqBotEventRule> CompetitionQqBotEventRules => Set<CompetitionQqBotEventRule>();
+    public DbSet<CompetitionQqBotGroupBinding> CompetitionQqBotGroupBindings => Set<CompetitionQqBotGroupBinding>();
+    public DbSet<QqBotTemplate> QqBotTemplates => Set<QqBotTemplate>();
+    public DbSet<QqBotEvent> QqBotEvents => Set<QqBotEvent>();
+    public DbSet<QqBotDelivery> QqBotDeliveries => Set<QqBotDelivery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -506,6 +515,144 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .IsUnique()
             .HasDatabaseName("ux_competitionenginestates_competition_engine");
 
+        modelBuilder.Entity<QqBotAgent>()
+            .Property(agent => agent.Name)
+            .HasMaxLength(128);
+
+        modelBuilder.Entity<QqBotAgent>()
+            .Property(agent => agent.PublicKeyPem)
+            .HasMaxLength(4096);
+
+        modelBuilder.Entity<QqBotAgent>()
+            .Property(agent => agent.PreviousPublicKeyPem)
+            .HasMaxLength(4096);
+
+        modelBuilder.Entity<QqBotGroup>()
+            .HasOne<QqBotAgent>()
+            .WithMany()
+            .HasForeignKey(group => group.AgentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<QqBotGroup>()
+            .HasIndex(group => new { group.AgentId, group.GroupId })
+            .IsUnique()
+            .HasDatabaseName("ux_qqbotgroups_agent_group");
+
+        modelBuilder.Entity<QqBotGroup>()
+            .Property(group => group.GroupName)
+            .HasMaxLength(256);
+
+        modelBuilder.Entity<CompetitionQqBotSettings>()
+            .HasIndex(settings => settings.CompetitionId)
+            .IsUnique()
+            .HasDatabaseName("ux_competitionqqbotsettings_competition");
+
+        modelBuilder.Entity<CompetitionQqBotEventRule>()
+            .HasIndex(rule => new { rule.CompetitionId, rule.EventType })
+            .IsUnique()
+            .HasDatabaseName("ux_competitionqqboteventrules_competition_event");
+
+        modelBuilder.Entity<CompetitionQqBotEventRule>()
+            .HasOne<QqBotTemplate>()
+            .WithMany()
+            .HasForeignKey(rule => rule.TemplateId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<CompetitionQqBotGroupBinding>()
+            .HasIndex(binding => new { binding.CompetitionId, binding.GroupId })
+            .IsUnique()
+            .HasDatabaseName("ux_competitionqqbotgroupbindings_competition_group");
+
+        modelBuilder.Entity<CompetitionQqBotGroupBinding>()
+            .HasOne<QqBotAgent>()
+            .WithMany()
+            .HasForeignKey(binding => binding.AgentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CompetitionQqBotGroupBinding>()
+            .HasOne<QqBotGroup>()
+            .WithMany()
+            .HasForeignKey(binding => binding.GroupId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CompetitionQqBotGroupBinding>()
+            .Property(binding => binding.EventTypesJson)
+            .HasMaxLength(1024);
+
+        modelBuilder.Entity<QqBotTemplate>()
+            .HasOne<Competition>()
+            .WithMany()
+            .HasForeignKey(template => template.CompetitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<QqBotTemplate>()
+            .HasIndex(template => new { template.CompetitionId, template.EventType, template.Name })
+            .IsUnique()
+            .HasDatabaseName("ux_qqbottemplates_scope_event_name");
+
+        modelBuilder.Entity<QqBotTemplate>()
+            .Property(template => template.Name)
+            .HasMaxLength(128);
+
+        modelBuilder.Entity<QqBotTemplate>()
+            .Property(template => template.Content)
+            .HasMaxLength(8000);
+
+        modelBuilder.Entity<QqBotEvent>()
+            .HasIndex(botEvent => new { botEvent.Status, botEvent.CreatedAt })
+            .HasDatabaseName("ix_qqbotevents_status_created");
+
+        modelBuilder.Entity<QqBotEvent>()
+            .HasIndex(botEvent => new { botEvent.CompetitionId, botEvent.IdempotencyKey })
+            .HasDatabaseName("ix_qqbotevents_competition_idempotency");
+
+        modelBuilder.Entity<QqBotEvent>()
+            .Property(botEvent => botEvent.IdempotencyKey)
+            .HasMaxLength(512);
+
+        modelBuilder.Entity<QqBotEvent>()
+            .Property(botEvent => botEvent.SubjectType)
+            .HasMaxLength(128);
+
+        modelBuilder.Entity<QqBotDelivery>()
+            .HasOne<QqBotEvent>()
+            .WithMany()
+            .HasForeignKey(delivery => delivery.EventId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<QqBotDelivery>()
+            .HasOne<QqBotAgent>()
+            .WithMany()
+            .HasForeignKey(delivery => delivery.AgentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<QqBotDelivery>()
+            .HasOne<QqBotGroup>()
+            .WithMany()
+            .HasForeignKey(delivery => delivery.GroupId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<QqBotDelivery>()
+            .HasIndex(delivery => delivery.IdempotencyKey)
+            .IsUnique()
+            .HasDatabaseName("ux_qqbotdeliveries_idempotency");
+
+        modelBuilder.Entity<QqBotDelivery>()
+            .HasIndex(delivery => new { delivery.AgentId, delivery.Status, delivery.AvailableAt, delivery.LockedUntil })
+            .HasDatabaseName("ix_qqbotdeliveries_agent_dispatch");
+
+        modelBuilder.Entity<QqBotDelivery>()
+            .HasIndex(delivery => new { delivery.CompetitionId, delivery.CreatedAt })
+            .HasDatabaseName("ix_qqbotdeliveries_competition_created");
+
+        modelBuilder.Entity<QqBotDelivery>()
+            .Property(delivery => delivery.IdempotencyKey)
+            .HasMaxLength(768);
+
+        modelBuilder.Entity<QqBotDelivery>()
+            .Property(delivery => delivery.MessageDigest)
+            .HasMaxLength(128);
+
         modelBuilder.Entity<TeamChallengeInstance>()
             .Property(i => i.UpdatedAt)
             .IsConcurrencyToken();
@@ -538,6 +685,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         ConfigureCompetitionOwnership<KohControlRecord>(modelBuilder);
         ConfigureCompetitionOwnership<BackgroundTaskItem>(modelBuilder);
         ConfigureCompetitionOwnership<CompetitionEngineState>(modelBuilder);
+        ConfigureCompetitionOwnership<CompetitionQqBotSettings>(modelBuilder);
+        ConfigureCompetitionOwnership<CompetitionQqBotEventRule>(modelBuilder);
+        ConfigureCompetitionOwnership<CompetitionQqBotGroupBinding>(modelBuilder);
+        ConfigureCompetitionOwnership<QqBotEvent>(modelBuilder);
+        ConfigureCompetitionOwnership<QqBotDelivery>(modelBuilder);
     }
 
     private static void SetTenantQueryFilter<TEntity>(ModelBuilder builder, ITenantContext tenantContext)

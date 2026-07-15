@@ -10,7 +10,12 @@ public record SubmissionSolvedEvent(
     Guid TeamId,
     string TeamName,
     bool IsFirstBlood,
-    int PointsAwarded);
+    int PointsAwarded,
+    int SolveRank = 0,
+    Guid? SubmissionId = null,
+    Guid? UserId = null,
+    Guid? BloodScopeId = null,
+    DateTime? OccurredAt = null);
 
 /// <summary>
 /// Handles post-solve side effects: leaderboard sync and SignalR notifications.

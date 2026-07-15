@@ -133,6 +133,7 @@ public class CtfGameMode : IGameMode
 
         Submission submission;
         bool isFirstBlood;
+        var solveRank = 0;
         await using (var preparationLease = await SubmissionMutationGuard.TryAcquireAsync(
                          _executionLease,
                          _db,
@@ -233,7 +234,8 @@ public class CtfGameMode : IGameMode
                         s.ChallengeId == context.ChallengeId &&
                         s.IsCorrect,
                         mutationCt);
-                isFirstBlood = solveCount == 0;
+                solveRank = solveCount + 1;
+                isFirstBlood = solveRank == 1;
 
                 try
                 {
@@ -332,7 +334,12 @@ public class CtfGameMode : IGameMode
                 TeamId: context.TeamId,
                 TeamName: teamName,
                 IsFirstBlood: isFirstBlood,
-                PointsAwarded: pointsAwarded), cancellationToken);
+                PointsAwarded: pointsAwarded,
+                SolveRank: solveRank,
+                SubmissionId: submission.Id,
+                UserId: context.UserId,
+                BloodScopeId: context.ChallengeId,
+                OccurredAt: submission.SubmittedAt), cancellationToken);
         }
         catch (Exception ex)
         {

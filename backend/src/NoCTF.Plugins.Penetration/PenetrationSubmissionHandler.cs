@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.BackgroundTasks;
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 
 namespace NoCTF.Plugins.Penetration;
 
@@ -61,6 +63,7 @@ public class PenetrationSubmissionHandler(
         PenetrationFlag flag;
         Submission submission;
         bool isFirstBlood;
+        var solveRank = 0;
         var leaseProvider = executionLease ?? new CompetitionExecutionLease();
         await using (var preparationLease = await SubmissionMutationGuard.TryAcquireAsync(
                          leaseProvider,
@@ -125,8 +128,19 @@ public class PenetrationSubmissionHandler(
             if (alreadySolved)
                 return new ChallengeSubmissionResult(SubmissionResult.AlreadySolved, BuildResultData(flag, true));
 
-            isFirstBlood = flag.SolvedCount == 0;
             await using var transaction = await db.Database.BeginTransactionAsync(mutationCt);
+            await using var bloodLock = await PenetrationBloodRankLock.AcquireAsync(
+                db, context.CompetitionId, flag.Id, mutationCt);
+            var solveCount = await db.Submissions
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .CountAsync(item =>
+                    item.CompetitionId == context.CompetitionId &&
+                    item.PenetrationFlagId == flag.Id &&
+                    item.IsCorrect,
+                    mutationCt);
+            solveRank = solveCount + 1;
+            isFirstBlood = solveRank == 1;
             submission = new Submission
             {
                 Id = Guid.NewGuid(),
@@ -251,7 +265,12 @@ public class PenetrationSubmissionHandler(
                 TeamId: context.TeamId,
                 TeamName: team?.Name ?? context.TeamId.ToString(),
                 IsFirstBlood: isFirstBlood,
-                PointsAwarded: awarded), ct);
+                PointsAwarded: awarded,
+                SolveRank: solveRank,
+                SubmissionId: submission.Id,
+                UserId: context.UserId,
+                BloodScopeId: flag.Id,
+                OccurredAt: submission.SubmittedAt), ct);
         }
         catch (Exception ex)
         {
@@ -384,4 +403,48 @@ public class PenetrationSubmissionHandler(
             flag.Score,
             alreadySolved
         };
+}
+
+internal sealed class PenetrationBloodRankLock : IAsyncDisposable
+{
+    private static readonly ConcurrentDictionary<(Guid CompetitionId, Guid FlagId), SemaphoreSlim> LocalLocks = new();
+    private readonly SemaphoreSlim? _local;
+    private readonly (Guid CompetitionId, Guid FlagId) _key;
+
+    private PenetrationBloodRankLock(SemaphoreSlim? local, (Guid, Guid) key)
+    {
+        _local = local;
+        _key = key;
+    }
+
+    public static async Task<PenetrationBloodRankLock> AcquireAsync(
+        ApplicationDbContext db,
+        Guid competitionId,
+        Guid flagId,
+        CancellationToken ct)
+    {
+        if (db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var input = new byte[32];
+            competitionId.TryWriteBytes(input);
+            flagId.TryWriteBytes(input.AsSpan(16));
+            var key = BitConverter.ToInt64(SHA256.HashData(input));
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({key})", ct);
+            return new PenetrationBloodRankLock(null, default);
+        }
+
+        var localKey = (competitionId, flagId);
+        var semaphore = LocalLocks.GetOrAdd(localKey, static _ => new SemaphoreSlim(1, 1));
+        await semaphore.WaitAsync(ct);
+        return new PenetrationBloodRankLock(semaphore, localKey);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        if (_local is null) return ValueTask.CompletedTask;
+        _local.Release();
+        if (_local.CurrentCount == 1)
+            LocalLocks.TryRemove(new KeyValuePair<(Guid, Guid), SemaphoreSlim>(_key, _local));
+        return ValueTask.CompletedTask;
+    }
 }

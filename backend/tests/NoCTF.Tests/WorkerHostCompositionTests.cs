@@ -83,7 +83,7 @@ public class WorkerHostCompositionTests
         Assert.Empty(scope.ServiceProvider.GetServices<IChallengeSubmissionHandler>());
 
         var catalog = host.Services.GetRequiredService<PluginCatalog>();
-        Assert.Equal(5, catalog.Plugins.Count);
+        Assert.Equal(6, catalog.Plugins.Count);
         Assert.All(catalog.Plugins, plugin => Assert.True(plugin.IsHostAware));
 
         var hostedServiceNames = host.Services

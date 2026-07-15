@@ -44,3 +44,41 @@ public enum BackgroundTaskStatus
     Retrying,
     Cancelled
 }
+
+public enum QqBotEventType
+{
+    CompetitionStarted,
+    ChallengePublished,
+    HintPublished,
+    FirstBlood,
+    SecondBlood,
+    ThirdBlood,
+    TeamPenalized,
+    Announcement
+}
+
+public enum QqBotEventStatus
+{
+    Pending,
+    Expanded,
+    Suppressed,
+    Failed
+}
+
+public enum QqBotDeliveryStatus
+{
+    Pending,
+    Leased,
+    Retrying,
+    Succeeded,
+    Failed,
+    Cancelled
+}
+
+public enum QqBotDeliverySource
+{
+    Automatic,
+    Manual,
+    Test,
+    ManualRetry
+}

@@ -1,5 +1,6 @@
 using FastEndpoints;
 using NoCTF.Application.CompetitionModes;
+using NoCTF.Application.Events;
 using NoCTF.Application.Scoring;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -47,7 +48,9 @@ public class CreateCompetitionAdminRequest
     public int? AwdpFixTimeoutSeconds { get; set; }
 }
 
-public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
+public class CreateCompetitionAdminEndpoint(
+    ApplicationDbContext dbContext,
+    ICompetitionNotificationOutbox notificationOutbox)
     : Endpoint<CreateCompetitionAdminRequest, CompetitionSummaryDto>, IAuditableEndpoint
 {
     public override void Configure()
@@ -146,6 +149,14 @@ public class CreateCompetitionAdminEndpoint(ApplicationDbContext dbContext)
         competition.CompetitionId = competition.Id;
 
         dbContext.Competitions.Add(competition);
+        if (competition.Status == CompetitionStatus.Running)
+        {
+            notificationOutbox.Add(CompetitionNotification.Create(
+                competition.Id, CompetitionNotificationTypes.CompetitionStarted,
+                "competition", competition.Id, userId,
+                $"competition.started:{competition.Id:N}:v1",
+                new { competition_name = competition.Title, occurred_at = DateTime.UtcNow.ToString("O") }));
+        }
         await dbContext.SaveChangesAsync(ct);
 
         await SendAsync(new CompetitionSummaryDto

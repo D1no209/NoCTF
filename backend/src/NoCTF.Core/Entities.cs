@@ -778,6 +778,164 @@ public class CompetitionEngineState : ITenantEntity
     public DateTime UpdatedAt { get; set; }
 }
 
+public class QqBotGlobalSettings
+{
+    public Guid Id { get; set; }
+    public bool Enabled { get; set; }
+    public int LongPollSeconds { get; set; } = 25;
+    public int DeliveryLeaseSeconds { get; set; } = 60;
+    public int MaxDeliveryAttempts { get; set; } = 5;
+    public int MaxMessageLength { get; set; } = 2000;
+    public int MaxPendingDeliveries { get; set; } = 10000;
+    public int GroupCooldownMilliseconds { get; set; } = 1000;
+    public int CompetitionCooldownMilliseconds { get; set; } = 250;
+    public int ManualNotificationCooldownSeconds { get; set; } = 10;
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class QqBotAgent
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public bool Enabled { get; set; }
+    public string PublicKeyPem { get; set; } = string.Empty;
+    public string? PreviousPublicKeyPem { get; set; }
+    public DateTime? PreviousKeyValidUntil { get; set; }
+    public DateTime? LastHeartbeatAt { get; set; }
+    public DateTime? LastGroupSyncAt { get; set; }
+    public bool QqOnline { get; set; }
+    public long? BotUin { get; set; }
+    public string? BotNickname { get; set; }
+    public string? ImplementationName { get; set; }
+    public string? ImplementationVersion { get; set; }
+    public string? MilkyVersion { get; set; }
+    public string? LastErrorCode { get; set; }
+    public string? LastErrorSummary { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class QqBotGroup
+{
+    public Guid Id { get; set; }
+    public Guid AgentId { get; set; }
+    public long GroupId { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public bool IsPresent { get; set; }
+    public bool IsAuthorized { get; set; }
+    public DateTime LastSeenAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class CompetitionQqBotSettings : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public bool Enabled { get; set; }
+    public bool AllowMessages { get; set; }
+    public bool AllowManualNotifications { get; set; }
+    public bool StopNormalEventsAfterFinished { get; set; } = true;
+    public bool MentionAll { get; set; }
+    public bool ShowTeamName { get; set; } = true;
+    public bool ShowUserName { get; set; }
+    public bool ShowChallengeCategory { get; set; } = true;
+    public bool IncludeCompetitionLink { get; set; } = true;
+    public bool IncludeChallengeLink { get; set; } = true;
+    public bool HidePenaltyDetails { get; set; } = true;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class CompetitionQqBotEventRule : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public QqBotEventType EventType { get; set; }
+    public bool Enabled { get; set; }
+    public Guid? TemplateId { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class CompetitionQqBotGroupBinding : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid AgentId { get; set; }
+    public Guid GroupId { get; set; }
+    public bool IsDefault { get; set; }
+    public string EventTypesJson { get; set; } = "[]";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class QqBotTemplate
+{
+    public Guid Id { get; set; }
+    public Guid? CompetitionId { get; set; }
+    public QqBotEventType EventType { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public bool IsDefault { get; set; }
+    public Guid? UpdatedById { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class QqBotEvent : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public QqBotEventType EventType { get; set; }
+    public QqBotEventStatus Status { get; set; }
+    public QqBotDeliverySource Source { get; set; }
+    public string SubjectType { get; set; } = string.Empty;
+    public Guid? SubjectId { get; set; }
+    public Guid? ActorUserId { get; set; }
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public string PayloadJson { get; set; } = "{}";
+    public string? TargetGroupIdsJson { get; set; }
+    public Guid? RequestedTemplateId { get; set; }
+    public Guid? ParentDeliveryId { get; set; }
+    public string? LastErrorCode { get; set; }
+    public string? LastErrorSummary { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ExpandedAt { get; set; }
+}
+
+public class QqBotDelivery : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
+    public Guid EventId { get; set; }
+    public Guid AgentId { get; set; }
+    public Guid GroupId { get; set; }
+    public long QqGroupId { get; set; }
+    public QqBotEventType EventType { get; set; }
+    public QqBotDeliverySource Source { get; set; }
+    public Guid? TemplateId { get; set; }
+    public string RenderedText { get; set; } = string.Empty;
+    public string RenderedSegmentsJson { get; set; } = "[]";
+    public string MessageDigest { get; set; } = string.Empty;
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public QqBotDeliveryStatus Status { get; set; }
+    public int AttemptCount { get; set; }
+    public int MaxAttempts { get; set; } = 5;
+    public DateTime AvailableAt { get; set; }
+    public Guid? LeaseToken { get; set; }
+    public DateTime? LockedUntil { get; set; }
+    public DateTime? LastAttemptAt { get; set; }
+    public DateTime? SentAt { get; set; }
+    public long? RemoteMessageSequence { get; set; }
+    public DateTime? RemoteSentAt { get; set; }
+    public string? LastErrorCode { get; set; }
+    public string? LastErrorSummary { get; set; }
+    public bool? LastErrorRetryable { get; set; }
+    public string? SafeRemoteSummary { get; set; }
+    public Guid? RetriedByUserId { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
 public static class AwdpPlayerDefenseResult
 {
     public const string DefenseSuccess = "defense_success";

@@ -36,6 +36,7 @@
     <ProjectReference Include="../../src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
     <ProjectReference Include="../../src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
     <ProjectReference Include="../../src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Plugins.QQBot/NoCTF.Plugins.QQBot.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runner.Client/NoCTF.Runner.Client.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runner/NoCTF.Runner.csproj" />
     <ProjectReference Include="../../src/NoCTF.Worker/NoCTF.Worker.csproj" />
@@ -47,6 +48,7 @@
     <NoCtfPluginProject Include="../../src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
     <NoCtfPluginProject Include="../../src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
     <NoCtfPluginProject Include="../../src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
+    <NoCtfPluginProject Include="../../src/NoCTF.Plugins.QQBot/NoCTF.Plugins.QQBot.csproj" />
   </ItemGroup>
 
 </Project>

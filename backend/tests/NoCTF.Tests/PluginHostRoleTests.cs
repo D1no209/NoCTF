@@ -19,7 +19,7 @@ public class PluginHostRoleTests
             configuration,
             PluginHostRole.Api);
 
-        Assert.Equal(5, catalog.Plugins.Count);
+        Assert.Equal(6, catalog.Plugins.Count);
         Assert.All(catalog.Plugins, plugin => Assert.True(plugin.IsHostAware));
         Assert.DoesNotContain(
             services,

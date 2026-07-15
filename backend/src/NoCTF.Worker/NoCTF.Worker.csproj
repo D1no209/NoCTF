@@ -21,6 +21,7 @@
     <NoCtfPluginProject Include="../NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
     <NoCtfPluginProject Include="../NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
     <NoCtfPluginProject Include="../NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
+    <NoCtfPluginProject Include="../NoCTF.Plugins.QQBot/NoCTF.Plugins.QQBot.csproj" />
     <ProjectReference Include="@(NoCtfPluginProject)" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
