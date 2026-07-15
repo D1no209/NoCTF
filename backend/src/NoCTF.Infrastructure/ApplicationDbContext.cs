@@ -40,6 +40,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AwdpPatchSubmission> AwdpPatchSubmissions => Set<AwdpPatchSubmission>();
     public DbSet<KohControlRecord> KohControlRecords => Set<KohControlRecord>();
     public DbSet<BackgroundTaskItem> BackgroundTasks => Set<BackgroundTaskItem>();
+    public DbSet<StorageCleanupItem> StorageCleanupItems => Set<StorageCleanupItem>();
     public DbSet<CompetitionEngineState> CompetitionEngineStates => Set<CompetitionEngineState>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
@@ -77,6 +78,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasDatabaseName("ix_submissions_rate_limit_window");
 
         modelBuilder.Entity<Submission>()
+            .HasIndex(s => new { s.CompetitionId, s.ChallengeId, s.SubmittedAt })
+            .HasFilter("\"IsCorrect\" = true")
+            .HasDatabaseName("ix_submissions_correct_challenge_time");
+
+        modelBuilder.Entity<Submission>()
             .HasIndex(s => new { s.CompetitionId, s.TeamId, s.ChallengeId })
             .IsUnique()
             .HasFilter("\"IsCorrect\" = true AND \"PenetrationFlagId\" IS NULL")
@@ -93,6 +99,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasDatabaseName("ix_scoreevents_competition_team");
 
         modelBuilder.Entity<ScoreEvent>()
+            .HasIndex(se => new { se.CompetitionId, se.ScoringKey, se.ChallengeId, se.TeamId })
+            .HasDatabaseName("ix_scoreevents_competition_scoring_challenge_team");
+
+        modelBuilder.Entity<ScoreEvent>()
             .HasIndex(se => new { se.CompetitionId, se.IdempotencyKey })
             .IsUnique()
             .HasFilter("\"IdempotencyKey\" <> ''")
@@ -107,6 +117,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(s => new { s.CompetitionId, s.TeamId, s.SignalType })
             .HasDatabaseName("ix_scoresignals_competition_team_type");
 
+        modelBuilder.Entity<ScoreSignal>()
+            .HasIndex(s => new { s.CompetitionId, s.SignalType, s.SubjectId, s.TeamId })
+            .HasDatabaseName("ix_scoresignals_competition_type_subject_team");
+
         modelBuilder.Entity<Challenge>()
             .HasIndex(c => c.CompetitionId)
             .HasDatabaseName("ix_challenges_competition");
@@ -115,9 +129,33 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(c => new { c.CompetitionId, c.TemplateId })
             .HasDatabaseName("ix_challenges_competition_template");
 
+        modelBuilder.Entity<Challenge>()
+            .HasIndex(c => c.AttachmentStorageKey)
+            .HasMethod("hash")
+            .HasFilter("\"AttachmentStorageKey\" IS NOT NULL")
+            .HasDatabaseName("ix_challenges_attachment_storage_key");
+
+        modelBuilder.Entity<Challenge>()
+            .HasIndex(c => c.PatchTemplateStorageKey)
+            .HasMethod("hash")
+            .HasFilter("\"PatchTemplateStorageKey\" IS NOT NULL")
+            .HasDatabaseName("ix_challenges_patch_template_storage_key");
+
         modelBuilder.Entity<ChallengeTemplate>()
             .HasIndex(c => c.Title)
             .HasDatabaseName("ix_challenge_templates_title");
+
+        modelBuilder.Entity<ChallengeTemplate>()
+            .HasIndex(c => c.AttachmentStorageKey)
+            .HasMethod("hash")
+            .HasFilter("\"AttachmentStorageKey\" IS NOT NULL")
+            .HasDatabaseName("ix_challenge_templates_attachment_storage_key");
+
+        modelBuilder.Entity<ChallengeTemplate>()
+            .HasIndex(c => c.PatchTemplateStorageKey)
+            .HasMethod("hash")
+            .HasFilter("\"PatchTemplateStorageKey\" IS NOT NULL")
+            .HasDatabaseName("ix_challenge_templates_patch_template_storage_key");
 
         modelBuilder.Entity<ChallengeHint>()
             .HasIndex(h => new { h.CompetitionId, h.ChallengeId, h.DisplayOrder })
@@ -171,6 +209,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(f => new { f.CompetitionId, f.TopologyId })
             .HasDatabaseName("ix_penflags_competition_topology");
 
+        modelBuilder.Entity<PenetrationFlag>()
+            .HasIndex(f => new { f.CompetitionId, f.ChallengeId, f.ValueHash })
+            .HasFilter("\"ValueHash\" IS NOT NULL")
+            .HasDatabaseName("ix_penflags_competition_challenge_value_hash");
+
         modelBuilder.Entity<TeamChallengeInstance>()
             .HasIndex(i => new { i.CompetitionId, i.TeamId, i.ChallengeId })
             .IsUnique()
@@ -179,6 +222,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<TeamChallengeInstance>()
             .HasIndex(i => new { i.CompetitionId, i.Status })
             .HasDatabaseName("ix_teamchallengeinstances_competition_status");
+
+        modelBuilder.Entity<TeamChallengeInstance>()
+            .HasIndex(i => new { i.ExpiresAt, i.Status })
+            .HasFilter("\"ExpiresAt\" IS NOT NULL")
+            .HasDatabaseName("ix_teamchallengeinstances_expiry_status");
+
+        modelBuilder.Entity<TeamChallengeInstance>()
+            .HasIndex(i => new { i.Status, i.UpdatedAt, i.LastActionAt })
+            .HasDatabaseName("ix_teamchallengeinstances_status_activity");
 
         modelBuilder.Entity<DynamicFlagInstance>()
             .HasIndex(f => new { f.CompetitionId, f.TeamId, f.FlagId, f.IsActive })
@@ -193,6 +245,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<DynamicFlagInstance>()
             .HasIndex(f => new { f.CompetitionId, f.ChallengeId, f.FlagId })
             .HasDatabaseName("ix_dynamicflaginstances_competition_challenge_flag");
+
+        modelBuilder.Entity<DynamicFlagInstance>()
+            .HasIndex(f => new { f.CompetitionId, f.ChallengeId, f.ValueHash })
+            .HasFilter("\"IsActive\" = true")
+            .HasDatabaseName("ix_dynamicflaginstances_active_challenge_hash");
 
         modelBuilder.Entity<CompetitionLog>()
             .HasIndex(l => new { l.CompetitionId, l.CreatedAt })
@@ -243,18 +300,41 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasDatabaseName("ix_competitioncollaborators_competition_user");
 
         modelBuilder.Entity<User>()
-            .HasIndex(u => u.Email)
+            .Property(u => u.Email)
+            .HasMaxLength(UserInputLimits.EmailMaxLength);
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.UserName)
+            .HasMaxLength(UserInputLimits.UserNameMaxLength);
+
+        modelBuilder.Entity<User>()
+            .Property<string>("NormalizedEmail")
+            .HasMaxLength(UserInputLimits.EmailMaxLength)
+            .HasComputedColumnSql("lower(btrim(\"Email\"))", stored: true);
+
+        modelBuilder.Entity<User>()
+            .Property<string>("NormalizedUserName")
+            .HasMaxLength(UserInputLimits.UserNameMaxLength)
+            .HasComputedColumnSql("lower(btrim(\"UserName\"))", stored: true);
+
+        modelBuilder.Entity<User>()
+            .HasIndex("NormalizedEmail")
             .IsUnique()
             .HasDatabaseName("ix_users_email");
 
         modelBuilder.Entity<User>()
-            .HasIndex(u => u.UserName)
+            .HasIndex("NormalizedUserName")
             .IsUnique()
             .HasDatabaseName("ix_users_username");
 
+        modelBuilder.Entity<Competition>()
+            .HasIndex(c => new { c.Status, c.StartTime })
+            .HasDatabaseName("ix_competitions_status_start");
+
         modelBuilder.Entity<AwdRound>()
-            .HasIndex(r => r.CompetitionId)
-            .HasDatabaseName("ix_awdrounds_competition");
+            .HasIndex(r => new { r.CompetitionId, r.RoundNumber })
+            .IsUnique()
+            .HasDatabaseName("ux_awdrounds_competition_round");
 
         modelBuilder.Entity<AwdAttackRecord>()
             .HasIndex(a => a.CompetitionId)
@@ -269,6 +349,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .IsUnique()
             .HasDatabaseName("ix_awdattackrecords_unique_attack");
 
+        modelBuilder.Entity<AwdAttackRecord>()
+            .HasIndex(a => new { a.CompetitionId, a.RoundNumber, a.VictimTeamId, a.ChallengeId })
+            .HasDatabaseName("ix_awdattackrecords_round_victim_challenge");
+
         modelBuilder.Entity<AwdFlag>()
             .HasIndex(f => f.CompetitionId)
             .HasDatabaseName("ix_awdflags_competition");
@@ -278,6 +362,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .IsUnique()
             .HasDatabaseName("ix_awdflags_competition_team_challenge_round");
 
+        modelBuilder.Entity<AwdFlag>()
+            .HasIndex(f => new { f.CompetitionId, f.ChallengeId, f.FlagContent })
+            .HasDatabaseName("ix_awdflags_competition_challenge_content");
+
         modelBuilder.Entity<AwdGameBox>()
             .HasIndex(g => g.CompetitionId)
             .HasDatabaseName("ix_awdgameboxes_competition");
@@ -286,6 +374,19 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(g => new { g.CompetitionId, g.TeamId, g.ChallengeId })
             .IsUnique()
             .HasDatabaseName("ix_awdgameboxes_competition_team_challenge");
+
+        modelBuilder.Entity<AwdGameBox>()
+            .HasIndex(g => new { g.ExpiresAt, g.CleanupLockedUntil })
+            .HasFilter("\"ContainerInstanceId\" IS NOT NULL AND \"ExpiresAt\" IS NOT NULL")
+            .HasDatabaseName("ix_awdgameboxes_expired_instances");
+
+        modelBuilder.Entity<AwdGameBox>()
+            .Property(g => g.ContainerInstanceId)
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<AwdGameBox>()
+            .Property(g => g.RuntimeOperationId)
+            .IsConcurrencyToken();
 
         modelBuilder.Entity<AwdCheckResult>()
             .HasIndex(r => r.CompetitionId)
@@ -298,6 +399,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<AwdCheckResult>()
             .HasIndex(r => new { r.CompetitionId, r.TeamId, r.ChallengeId, r.RoundNumber })
             .HasDatabaseName("ix_awdcheckresults_competition_team_challenge_round");
+
+        modelBuilder.Entity<AwdCheckResult>()
+            .HasIndex(r => new { r.CompetitionId, r.RoundNumber, r.TeamId, r.ChallengeId, r.CheckedAt })
+            .HasDatabaseName("ix_awdcheckresults_round_team_challenge_checked");
 
         modelBuilder.Entity<AwdpRound>()
             .HasIndex(r => r.CompetitionId)
@@ -334,6 +439,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex(p => new { p.CompetitionId, p.TeamId, p.ChallengeId })
             .HasDatabaseName("ix_awdpatchsubmissions_competition_team_challenge");
 
+        modelBuilder.Entity<AwdpPatchSubmission>()
+            .HasIndex(p => new { p.CompetitionId, p.TeamId, p.SubmittedAt })
+            .HasDatabaseName("ix_awdpatchsubmissions_competition_team_submitted");
+
+        modelBuilder.Entity<AwdpPatchSubmission>()
+            .HasIndex(p => p.PatchArchiveUrl)
+            .HasMethod("hash")
+            .HasFilter("\"PatchArchiveUrl\" <> ''")
+            .HasDatabaseName("ix_awdpatchsubmissions_patch_archive_key");
+
         modelBuilder.Entity<Challenge>()
             .OwnsOne(c => c.KohAgentConfig);
 
@@ -342,16 +457,49 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasDatabaseName("ix_kohcontrolrecords_competition");
 
         modelBuilder.Entity<KohControlRecord>()
+            .HasIndex(r => new { r.CompetitionId, r.ChallengeId, r.StartTime })
+            .HasDatabaseName("ix_kohcontrolrecords_competition_challenge_start");
+
+        modelBuilder.Entity<KohControlRecord>()
             .HasIndex(r => new { r.CompetitionId, r.ChallengeId })
-            .HasDatabaseName("ix_kohcontrolrecords_competition_challenge");
+            .IsUnique()
+            .HasFilter("\"EndTime\" IS NULL")
+            .HasDatabaseName("ux_kohcontrolrecords_active_hill");
+
+        modelBuilder.Entity<AuditLog>()
+            .HasIndex(log => log.Timestamp)
+            .HasDatabaseName("ix_auditlogs_timestamp");
 
         modelBuilder.Entity<BackgroundTaskItem>()
             .HasIndex(t => new { t.Status, t.LockedUntil, t.CreatedAt })
             .HasDatabaseName("ix_backgroundtasks_dispatch");
 
         modelBuilder.Entity<BackgroundTaskItem>()
+            .HasIndex(t => new { t.Status, t.Type, t.LockedUntil, t.CreatedAt })
+            .HasFilter("\"Status\" IN (0, 4)")
+            .HasDatabaseName("ix_backgroundtasks_typed_dispatch");
+
+        modelBuilder.Entity<BackgroundTaskItem>()
+            .HasIndex(t => new { t.Status, t.UpdatedAt, t.LockedUntil })
+            .HasFilter("\"Status\" = 1")
+            .HasDatabaseName("ix_backgroundtasks_recovery");
+
+        modelBuilder.Entity<BackgroundTaskItem>()
             .HasIndex(t => new { t.CompetitionId, t.Type })
             .HasDatabaseName("ix_backgroundtasks_competition_type");
+
+        modelBuilder.Entity<StorageCleanupItem>()
+            .Property(item => item.StorageKey)
+            .HasMaxLength(1024);
+
+        modelBuilder.Entity<StorageCleanupItem>()
+            .HasIndex(item => item.StorageKey)
+            .IsUnique()
+            .HasDatabaseName("ux_storagecleanupitems_storage_key");
+
+        modelBuilder.Entity<StorageCleanupItem>()
+            .HasIndex(item => new { item.NotBefore, item.LockedUntil })
+            .HasDatabaseName("ix_storagecleanupitems_dispatch");
 
         modelBuilder.Entity<CompetitionEngineState>()
             .HasIndex(s => new { s.CompetitionId, s.EngineKey })
@@ -364,11 +512,30 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         ConfigureCompetitionOwnership<Team>(modelBuilder);
         ConfigureCompetitionOwnership<TeamMember>(modelBuilder);
+        ConfigureCompetitionOwnership<CompetitionCollaborator>(modelBuilder);
         ConfigureCompetitionOwnership<Challenge>(modelBuilder);
         ConfigureCompetitionOwnership<ChallengeHint>(modelBuilder);
+        ConfigureCompetitionOwnership<CtfDynamicFlag>(modelBuilder);
+        ConfigureCompetitionOwnership<CompetitionLog>(modelBuilder);
+        ConfigureCompetitionOwnership<CheatIncident>(modelBuilder);
         ConfigureCompetitionOwnership<Submission>(modelBuilder);
+        ConfigureCompetitionOwnership<PenetrationTopology>(modelBuilder);
+        ConfigureCompetitionOwnership<PenetrationNode>(modelBuilder);
+        ConfigureCompetitionOwnership<PenetrationFlag>(modelBuilder);
+        ConfigureCompetitionOwnership<TeamChallengeInstance>(modelBuilder);
+        ConfigureCompetitionOwnership<DynamicFlagInstance>(modelBuilder);
         ConfigureCompetitionOwnership<ScoreEvent>(modelBuilder);
         ConfigureCompetitionOwnership<ScoreSignal>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdRound>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdAttackRecord>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdFlag>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdGameBox>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdCheckResult>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdpRound>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdpTeamChallengeState>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdpRoundScore>(modelBuilder);
+        ConfigureCompetitionOwnership<AwdpPatchSubmission>(modelBuilder);
+        ConfigureCompetitionOwnership<KohControlRecord>(modelBuilder);
         ConfigureCompetitionOwnership<BackgroundTaskItem>(modelBuilder);
         ConfigureCompetitionOwnership<CompetitionEngineState>(modelBuilder);
     }

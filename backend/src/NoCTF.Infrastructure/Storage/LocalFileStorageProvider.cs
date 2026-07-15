@@ -4,31 +4,46 @@ using NoCTF.PluginBase;
 
 namespace NoCTF.Infrastructure.Storage;
 
-public class LocalFileStorageProvider(string basePath, string? signingKey = null) : IStorageProvider
+public class LocalFileStorageProvider(string basePath, string? signingKey = null) : ITemporaryUrlStorageProvider
 {
     private readonly string _rootPath = Path.GetFullPath(basePath);
 
     public Task<Stream> DownloadAsync(string fileName, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var path = ResolvePath(fileName);
+        EnsureNoReparsePoints(path);
         return Task.FromResult<Stream>(File.OpenRead(path));
     }
 
     public Task DeleteAsync(string fileName, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var path = ResolvePath(fileName);
+        EnsureNoReparsePoints(path);
         if (File.Exists(path))
             File.Delete(path);
         return Task.CompletedTask;
     }
 
     public Task<string> GetUrlAsync(string fileName, CancellationToken cancellationToken = default)
+        => GetUrlAsync(fileName, TimeSpan.FromHours(1), cancellationToken);
+
+    public Task<string> GetUrlAsync(
+        string fileName,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken = default)
     {
-        var normalized = NormalizeKey(fileName);
+        var normalized = StorageObjectKey.Normalize(fileName);
         var url = $"/api/files/{normalized}";
         if (!string.IsNullOrWhiteSpace(signingKey))
         {
-            var expires = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+            var effectiveLifetime = lifetime <= TimeSpan.Zero
+                ? TimeSpan.FromMinutes(1)
+                : lifetime > TimeSpan.FromDays(7)
+                    ? TimeSpan.FromDays(7)
+                    : lifetime;
+            var expires = DateTimeOffset.UtcNow.Add(effectiveLifetime).ToUnixTimeSeconds();
             var signature = LocalFileUrlSigner.Sign(normalized, expires, signingKey);
             url = $"{url}?expires={expires}&sig={Uri.EscapeDataString(signature)}";
         }
@@ -38,19 +53,46 @@ public class LocalFileStorageProvider(string basePath, string? signingKey = null
 
     public async Task<string> UploadAsync(string fileName, Stream content, string contentType, CancellationToken cancellationToken = default)
     {
+        var normalized = StorageObjectKey.Normalize(fileName);
         var path = ResolvePath(fileName);
         var directory = Path.GetDirectoryName(path);
+        EnsureNoReparsePoints(path);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             Directory.CreateDirectory(directory);
+        EnsureNoReparsePoints(path);
 
-        await using var fileStream = File.Create(path);
-        await content.CopyToAsync(fileStream, cancellationToken);
-        return fileName;
+        var temporaryPath = Path.Combine(
+            directory ?? _rootPath,
+            $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.upload");
+        try
+        {
+            await using (var fileStream = new FileStream(
+                             temporaryPath,
+                             FileMode.CreateNew,
+                             FileAccess.Write,
+                             FileShare.None,
+                             81920,
+                             FileOptions.Asynchronous))
+            {
+                await content.CopyToAsync(fileStream, cancellationToken);
+                await fileStream.FlushAsync(cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            EnsureNoReparsePoints(path);
+            File.Move(temporaryPath, path, overwrite: true);
+            return normalized;
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
     }
 
     private string ResolvePath(string fileName)
     {
-        var normalized = NormalizeKey(fileName);
+        var normalized = StorageObjectKey.Normalize(fileName);
         var path = Path.GetFullPath(Path.Combine(_rootPath, normalized));
         var rootWithSeparator = _rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                                 + Path.DirectorySeparatorChar;
@@ -59,35 +101,27 @@ public class LocalFileStorageProvider(string basePath, string? signingKey = null
         return path;
     }
 
-    private static string NormalizeKey(string fileName)
+    private void EnsureNoReparsePoints(string path)
     {
-        if (string.IsNullOrWhiteSpace(fileName) ||
-            Path.IsPathRooted(fileName) ||
-            Path.IsPathFullyQualified(fileName))
+        var current = _rootPath;
+        RejectReparsePoint(current);
+        var relative = Path.GetRelativePath(_rootPath, path);
+        foreach (var segment in relative.Split(
+                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
         {
-            throw new InvalidOperationException("Storage key is invalid.");
+            current = Path.Combine(current, segment);
+            RejectReparsePoint(current);
         }
+    }
 
-        var normalized = fileName.Replace("\\", "/", StringComparison.Ordinal);
-        string decoded;
-        try
-        {
-            decoded = Uri.UnescapeDataString(normalized).Replace("\\", "/", StringComparison.Ordinal);
-        }
-        catch (UriFormatException)
-        {
-            throw new InvalidOperationException("Storage key is invalid.");
-        }
-        var segments = decoded.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0 ||
-            segments.Any(part => part is "." or "..") ||
-            decoded[0] == '/' ||
-            (decoded.Length >= 2 && char.IsLetter(decoded[0]) && decoded[1] == ':') ||
-            decoded.Contains('\0'))
-        {
-            throw new InvalidOperationException("Storage key is invalid.");
-        }
-        return normalized;
+    private static void RejectReparsePoint(string path)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path))
+            return;
+
+        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Storage path contains a symbolic link or reparse point.");
     }
 }
 

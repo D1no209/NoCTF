@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NoCTF.Infrastructure;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260714062708_DurableStorageCleanupOutbox")]
+    partial class DurableStorageCleanupOutbox
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -266,9 +269,8 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CompetitionId", "RoundNumber")
-                        .IsUnique()
-                        .HasDatabaseName("ux_awdrounds_competition_round");
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_awdrounds_competition");
 
                     b.ToTable("AwdRounds");
                 });
@@ -537,14 +539,6 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasIndex("Status", "LockedUntil", "CreatedAt")
                         .HasDatabaseName("ix_backgroundtasks_dispatch");
-
-                    b.HasIndex("Status", "UpdatedAt", "LockedUntil")
-                        .HasDatabaseName("ix_backgroundtasks_recovery")
-                        .HasFilter("\"Status\" = 1");
-
-                    b.HasIndex("Status", "Type", "LockedUntil", "CreatedAt")
-                        .HasDatabaseName("ix_backgroundtasks_typed_dispatch")
-                        .HasFilter("\"Status\" IN (0, 4)");
 
                     b.ToTable("BackgroundTasks");
                 });
@@ -995,9 +989,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Status", "StartTime")
-                        .HasDatabaseName("ix_competitions_status_start");
 
                     b.ToTable("Competitions");
                 });
@@ -1696,9 +1687,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("CompetitionId", "TeamId")
                         .HasDatabaseName("ix_scoreevents_competition_team");
 
-                    b.HasIndex("CompetitionId", "ScoringKey", "ChallengeId", "TeamId")
-                        .HasDatabaseName("ix_scoreevents_competition_scoring_challenge_team");
-
                     b.ToTable("ScoreEvents");
                 });
 
@@ -1750,9 +1738,6 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasIndex("CompetitionId", "TeamId", "SignalType")
                         .HasDatabaseName("ix_scoresignals_competition_team_type");
-
-                    b.HasIndex("CompetitionId", "SignalType", "SubjectId", "TeamId")
-                        .HasDatabaseName("ix_scoresignals_competition_type_subject_team");
 
                     b.ToTable("ScoreSignals");
                 });
@@ -1840,10 +1825,6 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasIndex("CompetitionId", "TeamId")
                         .HasDatabaseName("ix_submissions_competition_team");
-
-                    b.HasIndex("CompetitionId", "ChallengeId", "SubmittedAt")
-                        .HasDatabaseName("ix_submissions_correct_challenge_time")
-                        .HasFilter("\"IsCorrect\" = true");
 
                     b.HasIndex("CompetitionId", "TeamId", "ChallengeId")
                         .IsUnique()
@@ -2007,16 +1988,9 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("CompetitionId", "Status")
                         .HasDatabaseName("ix_teamchallengeinstances_competition_status");
 
-                    b.HasIndex("ExpiresAt", "Status")
-                        .HasDatabaseName("ix_teamchallengeinstances_expiry_status")
-                        .HasFilter("\"ExpiresAt\" IS NOT NULL");
-
                     b.HasIndex("CompetitionId", "TeamId", "ChallengeId")
                         .IsUnique()
                         .HasDatabaseName("ux_teamchallengeinstances_competition_team_challenge");
-
-                    b.HasIndex("Status", "UpdatedAt", "LastActionAt")
-                        .HasDatabaseName("ix_teamchallengeinstances_status_activity");
 
                     b.ToTable("TeamChallengeInstances");
                 });
@@ -2169,87 +2143,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasDatabaseName("ix_auditlogs_timestamp");
 
                     b.ToTable("AuditLogs");
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdAttackRecord", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdCheckResult", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdFlag", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdGameBox", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdRound", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdpPatchSubmission", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdpRound", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdpRoundScore", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.AwdpTeamChallengeState", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("NoCTF.Core.BackgroundTaskItem", b =>
@@ -2413,88 +2306,7 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Navigation("KohAgentConfig");
                 });
 
-            modelBuilder.Entity("NoCTF.Core.CheatIncident", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.CompetitionCollaborator", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("NoCTF.Core.CompetitionEngineState", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.CompetitionLog", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.CtfDynamicFlag", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.DynamicFlagInstance", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.KohControlRecord", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.PenetrationFlag", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.PenetrationNode", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.PenetrationTopology", b =>
                 {
                     b.HasOne("NoCTF.Core.Competition", null)
                         .WithMany()
@@ -2531,15 +2343,6 @@ namespace NoCTF.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("NoCTF.Core.Team", b =>
-                {
-                    b.HasOne("NoCTF.Core.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Core.TeamChallengeInstance", b =>
                 {
                     b.HasOne("NoCTF.Core.Competition", null)
                         .WithMany()

@@ -1,9 +1,78 @@
+using Microsoft.Extensions.Configuration;
+using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Storage;
 
 namespace NoCTF.Tests;
 
 public class StorageProviderTests
 {
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("Local", true)]
+    [InlineData("S3", false)]
+    [InlineData("MinIO", false)]
+    public void StorageProviderFactory_DetectsLocalStorage(string? providerType, bool expected)
+    {
+        var values = new Dictionary<string, string?>();
+        if (providerType is not null)
+            values["StorageProvider:Type"] = providerType;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+
+        Assert.Equal(expected, StorageProviderFactory.UsesLocalStorage(configuration));
+    }
+
+    [Fact]
+    public void StorageProviderFactory_RequiresDedicatedSigningKeyForLocalStorage()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["StorageProvider:Type"] = "Local",
+                ["JwtSettings:Secret"] = new string('j', 64)
+            })
+            .Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => StorageProviderFactory.ValidateLocalUrlSigningKey(configuration));
+
+        Assert.Contains("StorageProvider:Local:UrlSigningKey", exception.Message);
+    }
+
+    [Fact]
+    public void StorageProviderFactory_ValidatesS3ConfigurationWithoutLocalSigningKey()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["StorageProvider:Type"] = "S3",
+                ["StorageProvider:S3:Endpoint"] = "https://objects.example.test",
+                ["StorageProvider:S3:Bucket"] = "noctf",
+                ["StorageProvider:S3:AccessKey"] = "A1B2C3D4E5F6G7H8",
+                ["StorageProvider:S3:SecretKey"] = "V7mZ4-rQ2x-H9pL6-kT8w"
+            })
+            .Build();
+
+        StorageProviderFactory.ValidateLocalUrlSigningKey(configuration);
+    }
+
+    [Fact]
+    public void StorageProviderFactory_RejectsMissingS3Credentials()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["StorageProvider:Type"] = "S3",
+                ["StorageProvider:S3:Endpoint"] = "https://objects.example.test",
+                ["StorageProvider:S3:Bucket"] = "noctf"
+            })
+            .Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => StorageProviderFactory.ValidateLocalUrlSigningKey(configuration));
+
+        Assert.Contains("StorageProvider:S3:AccessKey", exception.Message);
+    }
+
     [Fact]
     public async Task LocalFileStorageProvider_Upload_Download_Delete_Works()
     {
@@ -91,8 +160,16 @@ public class StorageProviderTests
     [InlineData("nested/../../outside.txt")]
     [InlineData("%2e%2e/outside.txt")]
     [InlineData("nested/%2E%2E/outside.txt")]
+    [InlineData("%252e%252e/outside.txt")]
+    [InlineData("nested//file.txt")]
+    [InlineData("nested/file.txt/")]
+    [InlineData("nested/%ZZ/file.txt")]
     [InlineData("/absolute/path.txt")]
     [InlineData("C:\\absolute\\path.txt")]
+    [InlineData("nested/file.txt:secret")]
+    [InlineData("nested/CON.txt")]
+    [InlineData("nested/LPT1")]
+    [InlineData("nested/file|name.txt")]
     public async Task LocalFileStorageProvider_Rejects_PathTraversal(string key)
     {
         var basePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -103,5 +180,50 @@ public class StorageProviderTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => provider.DownloadAsync(key));
         await Assert.ThrowsAsync<InvalidOperationException>(() => provider.DeleteAsync(key));
         await Assert.ThrowsAsync<InvalidOperationException>(() => provider.GetUrlAsync(key));
+    }
+
+    [Theory]
+    [InlineData("../outside.txt")]
+    [InlineData("%252e%252e/outside.txt")]
+    [InlineData("/absolute/path.txt")]
+    [InlineData("C:\\absolute\\path.txt")]
+    [InlineData("nested//file.txt")]
+    [InlineData("nested/file.txt:secret")]
+    [InlineData("nested/CON.txt")]
+    public async Task S3StorageProvider_Rejects_InvalidObjectKeys(string key)
+    {
+        using var provider = new S3StorageProvider(
+            "https://objects.example.test",
+            "noctf",
+            "access-key",
+            "secret-key");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.GetUrlAsync(key));
+    }
+
+    [Fact]
+    public async Task LocalFileStorageProvider_CancelledUpload_DoesNotLeavePartialObject()
+    {
+        var basePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var provider = new LocalFileStorageProvider(basePath);
+        await provider.UploadAsync("object.bin", new MemoryStream([9, 9, 9]), "application/octet-stream");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => provider.UploadAsync(
+            "object.bin",
+            new MemoryStream(new byte[1024]),
+            "application/octet-stream",
+            cancellation.Token));
+
+        await using (var existing = await provider.DownloadAsync("object.bin"))
+        {
+            using var buffer = new MemoryStream();
+            await existing.CopyToAsync(buffer);
+            Assert.Equal([9, 9, 9], buffer.ToArray());
+        }
+        Assert.Empty(Directory.EnumerateFiles(basePath, "*.upload", SearchOption.AllDirectories));
+
+        Directory.Delete(basePath, recursive: true);
     }
 }

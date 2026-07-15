@@ -11,64 +11,85 @@ public class S3StorageProvider(
     string accessKey,
     string secretKey,
     string? region = null,
-    string? publicBaseUrl = null) : IStorageProvider
+    string? publicBaseUrl = null) : ITemporaryUrlStorageProvider, IDisposable
 {
-    private readonly AmazonS3Client _client = new(
-        accessKey,
-        secretKey,
+    private readonly AmazonS3Client _client = CreateClient(endpoint, accessKey, secretKey, region);
+    private readonly AmazonS3Client? _publicClient = string.IsNullOrWhiteSpace(publicBaseUrl)
+        ? null
+        : CreateClient(publicBaseUrl, accessKey, secretKey, region);
+
+    private static AmazonS3Client CreateClient(
+        string serviceUrl,
+        string clientAccessKey,
+        string clientSecretKey,
+        string? clientRegion) => new(
+        clientAccessKey,
+        clientSecretKey,
         new AmazonS3Config
         {
-            ServiceURL = endpoint,
+            ServiceURL = serviceUrl,
             ForcePathStyle = true,
-            RegionEndpoint = region is null ? RegionEndpoint.USEast1 : RegionEndpoint.GetBySystemName(region)
+            RegionEndpoint = clientRegion is null
+                ? RegionEndpoint.USEast1
+                : RegionEndpoint.GetBySystemName(clientRegion)
         });
 
     public async Task<Stream> DownloadAsync(string fileName, CancellationToken cancellationToken = default)
     {
-        var response = await _client.GetObjectAsync(bucketName, fileName, cancellationToken);
+        var key = StorageObjectKey.Normalize(fileName);
+        var response = await _client.GetObjectAsync(bucketName, key, cancellationToken);
         return response.ResponseStream;
     }
 
     public async Task DeleteAsync(string fileName, CancellationToken cancellationToken = default)
     {
-        await _client.DeleteObjectAsync(bucketName, fileName, cancellationToken);
+        var key = StorageObjectKey.Normalize(fileName);
+        await _client.DeleteObjectAsync(bucketName, key, cancellationToken);
     }
 
     public async Task<string> GetUrlAsync(string fileName, CancellationToken cancellationToken = default)
+        => await GetUrlAsync(fileName, TimeSpan.FromHours(1), cancellationToken);
+
+    public async Task<string> GetUrlAsync(
+        string fileName,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken = default)
     {
+        var key = StorageObjectKey.Normalize(fileName);
+        var effectiveLifetime = lifetime <= TimeSpan.Zero
+            ? TimeSpan.FromMinutes(1)
+            : lifetime > TimeSpan.FromDays(7)
+                ? TimeSpan.FromDays(7)
+                : lifetime;
         var request = new GetPreSignedUrlRequest
         {
             BucketName = bucketName,
-            Key = fileName,
-            Expires = DateTime.UtcNow.AddHours(1),
+            Key = key,
+            Expires = DateTime.UtcNow.Add(effectiveLifetime),
             Verb = HttpVerb.GET
         };
-        if (string.IsNullOrWhiteSpace(publicBaseUrl))
-            return await _client.GetPreSignedURLAsync(request);
-
-        using var publicClient = new AmazonS3Client(
-            accessKey,
-            secretKey,
-            new AmazonS3Config
-            {
-                ServiceURL = publicBaseUrl,
-                ForcePathStyle = true,
-                RegionEndpoint = region is null ? RegionEndpoint.USEast1 : RegionEndpoint.GetBySystemName(region)
-            });
-        return await publicClient.GetPreSignedURLAsync(request);
+        return await (_publicClient ?? _client).GetPreSignedURLAsync(request);
     }
 
     public async Task<string> UploadAsync(string fileName, Stream content, string contentType, CancellationToken cancellationToken = default)
     {
+        var key = StorageObjectKey.Normalize(fileName);
         var putRequest = new PutObjectRequest
         {
             BucketName = bucketName,
-            Key = fileName,
+            Key = key,
             InputStream = content,
             ContentType = contentType,
             AutoCloseStream = false
         };
         await _client.PutObjectAsync(putRequest, cancellationToken);
-        return fileName;
+        return key;
+    }
+
+    public void Dispose()
+    {
+        _publicClient?.Dispose();
+        _client.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
