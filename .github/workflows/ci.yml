@@ -62,9 +62,21 @@ jobs:
       - name: Build backend
         run: dotnet build backend/NoCTF.slnx --configuration Release --no-restore
 
+      - name: Verify plugin host publish artifacts
+        shell: bash
+        run: |
+          dotnet publish backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build --no-restore --output artifacts/api /p:BuildSpaOnPublish=false
+          dotnet publish backend/src/NoCTF.Worker/NoCTF.Worker.csproj --configuration Release --no-build --no-restore --output artifacts/worker
+          for host in api worker; do
+            for plugin in CTF AWD AWDP KoH Penetration; do
+              test -f "artifacts/$host/plugins/NoCTF.Plugins.$plugin.dll"
+            done
+          done
+
       - name: Test backend
         env:
           NOCTF_REDIS_INTEGRATION: 127.0.0.1:6379,abortConnect=false
+          NOCTF_POSTGRES_INTEGRATION: Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=noctf_test_password
         run: dotnet test backend/NoCTF.slnx --configuration Release --no-build
 
       - name: Verify analyzers and migration model
@@ -91,6 +103,7 @@ jobs:
           SEED_ADMIN_PASSWORD: ci-admin-password-123456
           RUNNER_API_KEY: ci-runner-api-key-value-123456789
           MINIO_ROOT_PASSWORD: ci-minio-password-123456
+          LOCAL_STORAGE_URL_SIGNING_KEY: ci-local-storage-signing-key-with-at-least-32-characters
         run: docker compose -f deploy/docker-compose.yml config -q
 
       - name: Install frontend dependencies
