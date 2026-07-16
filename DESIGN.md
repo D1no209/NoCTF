@@ -51,13 +51,13 @@ typography:
     letterSpacing: "normal"
   pixel-body:
     fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "0.875rem"
+    fontSize: "0.9rem"
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: "normal"
   pixel-label:
     fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "0.75rem"
+    fontSize: "0.9rem"
     fontWeight: 700
     lineHeight: 1.25
     letterSpacing: "0.12em"
@@ -76,14 +76,14 @@ components:
   pixel-button-primary:
     backgroundColor: "{colors.pixel-command}"
     textColor: "{colors.pixel-command-foreground}"
-    typography: "{typography.pixel-body}"
+    typography: "{typography.pixel-label}"
     rounded: "{rounded.square}"
     padding: "0.5rem 1rem"
     height: "2.5rem"
   pixel-button-outline:
     backgroundColor: "{colors.pixel-canvas}"
     textColor: "{colors.pixel-ink}"
-    typography: "{typography.pixel-body}"
+    typography: "{typography.pixel-label}"
     rounded: "{rounded.square}"
     padding: "0.5rem 1rem"
     height: "2.5rem"
@@ -178,7 +178,7 @@ Pixel Industrial uses a restrained achromatic control palette with small, delibe
 
 **Display Font:** Fusion Pixel 10px with Courier New, Lucida Console, MS Gothic, and system monospace fallbacks.
 
-**Body Font:** Fusion Pixel 10px with the same monospace fallback stack.
+**Body Font:** Fusion Pixel 10px with the same monospace fallback stack. Pixel Industrial keeps its mosaic character across headings, body copy, tables, forms, descriptions, and captions.
 
 **Label/Mono Font:** Fusion Pixel 10px. Pixel Industrial is mono-forward by design.
 
@@ -189,8 +189,10 @@ Pixel Industrial uses a restrained achromatic control palette with small, delibe
 - **Display** (700, `3rem`, `1.25`): Authentication statements and rare identity-led headings.
 - **Headline** (700, `1.5rem`, `1.25`): Page headings and major administrative workspaces.
 - **Title** (700, `1.25rem`, `1.25`): Cards, dialogs, operational panels, and competition regions.
-- **Body** (400, `0.875rem`, `1.5`): Default UI copy, tables, forms, and descriptions. Narrative copy stays within 65 to 75 characters per line.
-- **Label** (700, `0.75rem`, `0.12em`, uppercase for actions and compact metadata): Buttons, field captions, badges, and state markers.
+- **Body** (400, `0.9rem`, `1.5`): Default UI copy, tables, forms, and descriptions. Narrative copy stays within 65 to 75 characters per line.
+- **Label** (700, `0.9rem`, `0.12em`, uppercase for pixel-styled actions): Buttons and prominent state markers. Compact badges may step down to the `0.8rem` pixel minimum.
+
+**The Pixel Minimum Rule.** Pixel glyphs are never rendered below `0.8rem`. Compact roles gain space or truncate rather than switching fonts or shrinking the bitmap face further.
 
 **The Theme Typography Rule.** A theme may change its developer-supplied family and character, but it must preserve the five hierarchy roles, readable CJK coverage, stable control dimensions, and code-safe fallbacks.
 
