@@ -8,6 +8,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<Competition> Competitions => Set<Competition>();
@@ -335,6 +336,31 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex("NormalizedUserName")
             .IsUnique()
             .HasDatabaseName("ix_users_username");
+
+        modelBuilder.Entity<UserNotification>()
+            .Property(notification => notification.Type)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<UserNotification>()
+            .Property(notification => notification.DataJson)
+            .HasMaxLength(4096);
+
+        modelBuilder.Entity<UserNotification>()
+            .Property(notification => notification.IdempotencyKey)
+            .HasMaxLength(512);
+
+        modelBuilder.Entity<UserNotification>()
+            .HasIndex(notification => new { notification.UserId, notification.CreatedAt })
+            .HasDatabaseName("ix_usernotifications_user_created");
+
+        modelBuilder.Entity<UserNotification>()
+            .HasIndex(notification => new { notification.UserId, notification.IsRead, notification.CreatedAt })
+            .HasDatabaseName("ix_usernotifications_user_read_created");
+
+        modelBuilder.Entity<UserNotification>()
+            .HasIndex(notification => new { notification.UserId, notification.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("ux_usernotifications_user_idempotency");
 
         modelBuilder.Entity<Competition>()
             .HasIndex(c => new { c.Status, c.StartTime })

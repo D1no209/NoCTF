@@ -91,6 +91,18 @@ Clients receive:
 
 ## Common Endpoints
 
+### User Notifications
+
+Authenticated users receive an inbox derived from competition events that have already been accepted by the platform. Notifications are scoped to the current user; clients cannot request or mutate another user's inbox.
+
+```http
+GET /api/notifications?limit=20
+POST /api/notifications/{id}/read
+POST /api/notifications/read-all
+```
+
+The list response contains the newest notifications and the user's total unread count. The supported event types are `competition.started`, `challenge.published`, `hint.published`, `blood.first`, `blood.second`, `blood.third`, `team.penalized`, and `announcement`. Payloads contain only the event-specific public fields allowlisted by the server. Delivery to this inbox is independent of the optional QQ Bot plugin; one sink failing does not prevent the other sinks from accepting an event.
+
 ### Health Check
 
 ```http

@@ -16,7 +16,7 @@ public sealed class QqBotModule : IHostAwarePluginModule
 
     public void ConfigureServices(IServiceCollection services, PluginHostRole hostRole)
     {
-        services.AddScoped<ICompetitionNotificationOutbox, QqBotNotificationOutbox>();
+        services.AddScoped<ICompetitionNotificationSink, QqBotNotificationOutbox>();
         services.AddScoped<QqBotTemplateRenderer>();
         services.AddScoped<IQqBotAdministrationService, QqBotAdministrationService>();
         services.AddScoped<IQqBotAgentService, QqBotAgentService>();

@@ -33,6 +33,20 @@ public class User
     public DateTime UpdatedAt { get; set; }
 }
 
+public class UserNotification
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public Guid? CompetitionId { get; set; }
+    public Guid? SubjectId { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string DataJson { get; set; } = "{}";
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public bool IsRead { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ReadAt { get; set; }
+}
+
 public class Team : ITenantEntity
 {
     public Guid Id { get; set; }
