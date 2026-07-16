@@ -1,5 +1,16 @@
+import type { AuthSession } from '@/api/auth-session'
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+import {
+  clearAuthSession,
+  isTokenExpired,
+  millisecondsUntilTokenRefresh,
+  readAuthSession,
+  refreshAuthSessionIfNeeded,
+  saveAuthSession,
+  shouldRefreshToken,
+  subscribeAuthSession,
+} from '@/api/auth-session'
 import { authApi, setAuthToken } from '@/api/noctf'
 
 interface UserInfo {
@@ -7,74 +18,62 @@ interface UserInfo {
   role: string
 }
 
-function readStoredUser(): UserInfo | null {
-  const storedUser = localStorage.getItem('authUser')
-  if (!storedUser)
-    return null
-
-  try {
-    const parsed = JSON.parse(storedUser) as Partial<UserInfo>
-    if (typeof parsed.userName === 'string' && typeof parsed.role === 'string')
-      return { userName: parsed.userName, role: parsed.role }
-  }
-  catch {
-    // A malformed persisted session should never prevent the app from booting.
-  }
-
-  localStorage.removeItem('authUser')
-  return null
-}
-
-function getTokenExpiry(token: string | null): number | null {
-  if (!token) return null
-
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-
-    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=')
-    const decoded = JSON.parse(atob(paddedPayload))
-    return typeof decoded.exp === 'number' ? decoded.exp * 1000 : null
-  } catch {
-    return null
-  }
-}
-
-function isExpired(token: string | null) {
-  const expiresAt = getTokenExpiry(token)
-  return expiresAt !== null && expiresAt <= Date.now()
-}
+const MIN_REFRESH_RETRY_MS = 30_000
 
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref<string | null>(localStorage.getItem('accessToken'))
-  const user = ref<UserInfo | null>(readStoredUser())
+  const storedSession = readAuthSession()
+  const accessToken = ref<string | null>(storedSession?.accessToken ?? null)
+  const user = ref<UserInfo | null>(storedSession
+    ? { userName: storedSession.userName, role: storedSession.role }
+    : null)
 
-  if (isExpired(accessToken.value)) {
-    accessToken.value = null
-    user.value = null
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('authUser')
-  }
-
-  const isAuthenticated = computed(() => !!accessToken.value && !isExpired(accessToken.value))
+  const isAuthenticated = computed(() => !!accessToken.value && !isTokenExpired(accessToken.value))
   const userRole = computed(() => user.value?.role ?? '')
+  let refreshTimer: number | null = null
 
-  // Configure client auth header on init if token exists
-  if (accessToken.value) {
-    setAuthToken(accessToken.value)
+  function scheduleSessionRefresh(token: string | null) {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
+
+    const delay = millisecondsUntilTokenRefresh(token)
+    if (delay === null)
+      return
+
+    refreshTimer = window.setTimeout(refreshBeforeExpiry, Math.max(delay, MIN_REFRESH_RETRY_MS))
   }
+
+  async function refreshBeforeExpiry() {
+    refreshTimer = null
+    try {
+      await refreshAuthSessionIfNeeded()
+    }
+    catch {
+      if (accessToken.value && !isTokenExpired(accessToken.value))
+        refreshTimer = window.setTimeout(refreshBeforeExpiry, MIN_REFRESH_RETRY_MS)
+    }
+  }
+
+  function applySession(session: AuthSession | null) {
+    accessToken.value = session?.accessToken ?? null
+    user.value = session
+      ? { userName: session.userName, role: session.role }
+      : null
+    setAuthToken(session?.accessToken ?? null)
+    scheduleSessionRefresh(session?.accessToken ?? null)
+  }
+
+  subscribeAuthSession(applySession)
+  applySession(storedSession)
 
   async function login(email: string, password: string) {
     const data = await authApi.login(email, password)
-
-    const token = data.accessToken ?? ''
-    accessToken.value = token
-    user.value = { userName: data.userName ?? '', role: data.role ?? '' }
-
-    localStorage.setItem('accessToken', token)
-    localStorage.setItem('authUser', JSON.stringify(user.value))
-    setAuthToken(token)
+    saveAuthSession({
+      accessToken: data.accessToken ?? '',
+      userName: data.userName ?? '',
+      role: data.role ?? '',
+    })
   }
 
   async function register(userName: string, email: string, password: string) {
@@ -82,20 +81,29 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
-    accessToken.value = null
-    user.value = null
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('authUser')
-    setAuthToken(null)
+    clearAuthSession()
   }
 
-  function ensureFreshSession() {
-    if (!accessToken.value || isExpired(accessToken.value)) {
+  async function ensureFreshSession() {
+    if (!accessToken.value) {
       logout()
       return false
     }
 
-    return true
+    if (shouldRefreshToken(accessToken.value)) {
+      try {
+        await refreshAuthSessionIfNeeded()
+      }
+      catch {
+        // Keep a still-valid token when refresh fails due to a transient error.
+      }
+    }
+
+    if (accessToken.value && !isTokenExpired(accessToken.value))
+      return true
+
+    logout()
+    return false
   }
 
   return { user, accessToken, isAuthenticated, userRole, login, register, logout, ensureFreshSession }
