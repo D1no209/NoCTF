@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { Eye, FileText, Loader2, RefreshCw, RotateCcw, Save, Send } from 'lucide-vue-next'
 import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { adminApi } from '@/api/noctf'
 import DataState from '@/components/state/DataState.vue'
@@ -80,7 +81,10 @@ interface QqDelivery {
   lastErrorSummary?: string | null
 }
 
+type BooleanConfigKey = Exclude<keyof QqConfig, 'eventRules' | 'groupBindings' | 'warnings'>
+
 const props = defineProps<{ competitionId: string }>()
+const { t } = useI18n()
 const qc = useQueryClient()
 const selectedTemplateId = ref('')
 const preview = ref<QqPreview | null>(null)
@@ -104,16 +108,29 @@ const form = reactive<QqConfig>({
   warnings: [],
 })
 
-const eventLabels: Record<QqEventType, string> = {
-  0: 'Competition start',
-  1: 'Competition end',
-  2: 'Challenge solved',
-  3: 'First blood',
-  4: 'Team penalty',
-  5: 'System notice',
-  6: 'Manual announcement',
-  7: 'Scoreboard update',
-}
+const eventLabels = computed<Record<QqEventType, string>>(() => ({
+  0: t('admin.qqBot.competition.events.competitionStart'),
+  1: t('admin.qqBot.competition.events.competitionEnd'),
+  2: t('admin.qqBot.competition.events.challengeSolved'),
+  3: t('admin.qqBot.competition.events.firstBlood'),
+  4: t('admin.qqBot.competition.events.teamPenalty'),
+  5: t('admin.qqBot.competition.events.systemNotice'),
+  6: t('admin.qqBot.competition.events.manualAnnouncement'),
+  7: t('admin.qqBot.competition.events.scoreboardUpdate'),
+}))
+const configOptions: Array<{ key: BooleanConfigKey, label: string }> = [
+  { key: 'enabled', label: 'admin.qqBot.competition.enableDelivery' },
+  { key: 'allowMessages', label: 'admin.qqBot.competition.allowMessages' },
+  { key: 'allowManualNotifications', label: 'admin.qqBot.competition.allowManualAnnouncements' },
+  { key: 'stopNormalEventsAfterFinished', label: 'admin.qqBot.competition.stopNormalEventsAfterFinish' },
+  { key: 'mentionAll', label: 'admin.qqBot.competition.mentionAll' },
+  { key: 'showTeamName', label: 'admin.qqBot.competition.showTeamName' },
+  { key: 'showUserName', label: 'admin.qqBot.competition.showUserName' },
+  { key: 'showChallengeCategory', label: 'admin.qqBot.competition.showChallengeCategory' },
+  { key: 'includeCompetitionLink', label: 'admin.qqBot.competition.includeCompetitionLink' },
+  { key: 'includeChallengeLink', label: 'admin.qqBot.competition.includeChallengeLink' },
+  { key: 'hidePenaltyDetails', label: 'admin.qqBot.competition.hidePenaltyDetails' },
+]
 
 const { data: config, isLoading, isError, refetch } = useQuery({
   queryKey: computed(() => ['competition-qqbot', props.competitionId]),
@@ -140,14 +157,16 @@ const bindings = computed<QqBinding[]>(() => selectedGroupIds.value.flatMap((gro
   if (existing)
     return [existing]
   const group = groupsById.value.get(groupId)
-  return group ? [{
-    agentId: group.agentId,
-    groupId: group.id,
-    qqGroupId: group.groupId,
-    groupName: group.groupName,
-    isDefault: true,
-    eventTypes: [],
-  }] : []
+  return group
+    ? [{
+        agentId: group.agentId,
+        groupId: group.id,
+        qqGroupId: group.groupId,
+        groupName: group.groupName,
+        isDefault: true,
+        eventTypes: [],
+      }]
+    : []
 }))
 const deliveryItems = computed(() => deliveryLog.value?.items ?? [])
 
@@ -202,7 +221,9 @@ function resetTemplate() {
 }
 
 function statusLabel(status?: number) {
-  return ['Queued', 'Leased', 'Sent', 'Failed', 'Cancelled', 'Retrying'][status ?? 0] ?? 'Unknown'
+  const statusKeys = ['queued', 'leased', 'sent', 'failed', 'cancelled', 'retrying']
+  const key = statusKeys[status ?? 0]
+  return key ? t(`admin.qqBot.competition.statuses.${key}`) : t('admin.qqBot.competition.statuses.unknown')
 }
 
 function statusVariant(status?: number): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -217,9 +238,9 @@ const saveConfig = useMutation({
   mutationFn: () => adminApi.updateCompetitionQqBot(props.competitionId, { ...form, groupBindings: bindings.value }),
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: ['competition-qqbot', props.competitionId] })
-    toast.success('QQ Bot configuration saved')
+    toast.success(t('admin.qqBot.competition.configurationSaved'))
   },
-  onError: () => toast.error('Unable to save QQ Bot configuration'),
+  onError: () => toast.error(t('admin.qqBot.competition.configurationSaveFailed')),
 })
 const saveTemplate = useMutation({
   mutationFn: () => adminApi.upsertCompetitionQqBotTemplate(props.competitionId, {
@@ -231,9 +252,9 @@ const saveTemplate = useMutation({
   }),
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: ['competition-qqbot-templates', props.competitionId] })
-    toast.success('Template saved')
+    toast.success(t('admin.qqBot.competition.templateSaved'))
   },
-  onError: () => toast.error('Unable to save the template'),
+  onError: () => toast.error(t('admin.qqBot.competition.templateSaveFailed')),
 })
 const previewTemplate = useMutation({
   mutationFn: () => adminApi.previewQqBot(props.competitionId, {
@@ -242,8 +263,8 @@ const previewTemplate = useMutation({
     announcementTitle: announcementForm.title.trim() || null,
     announcementContent: announcementForm.content.trim() || null,
   }),
-  onSuccess: value => { preview.value = value as QqPreview },
-  onError: () => toast.error('Unable to render the preview'),
+  onSuccess: (value) => { preview.value = value as QqPreview },
+  onError: () => toast.error(t('admin.qqBot.competition.previewFailed')),
 })
 const sendAnnouncement = useMutation({
   mutationFn: () => adminApi.sendQqBotNotification(props.competitionId, {
@@ -257,71 +278,66 @@ const sendAnnouncement = useMutation({
     announcementForm.title = ''
     announcementForm.content = ''
     qc.invalidateQueries({ queryKey: ['competition-qqbot-log', props.competitionId] })
-    toast.success('Notification queued')
+    toast.success(t('admin.qqBot.competition.notificationQueued'))
   },
-  onError: () => toast.error('Unable to queue the notification'),
+  onError: () => toast.error(t('admin.qqBot.competition.notificationQueueFailed')),
 })
 const retryDelivery = useMutation({
   mutationFn: (deliveryId: string) => adminApi.retryQqBotDelivery(props.competitionId, deliveryId),
   onSuccess: () => {
     refetchDeliveryLog()
-    toast.success('Delivery queued for retry')
+    toast.success(t('admin.qqBot.competition.deliveryRetryQueued'))
   },
-  onError: () => toast.error('Unable to retry this delivery'),
+  onError: () => toast.error(t('admin.qqBot.competition.deliveryRetryFailed')),
 })
 </script>
 
 <template>
   <DataState v-if="isLoading" loading />
-  <DataState v-else-if="isError" error retry-label="Retry" @retry="refetch()" />
+  <DataState v-else-if="isError" error :retry-label="t('admin.qqBot.retry')" @retry="refetch()" />
 
   <div v-else class="space-y-6">
     <Card>
       <CardHeader class="flex-row items-center justify-between gap-4">
-        <div><CardTitle>Delivery configuration</CardTitle><p class="mt-1 text-sm text-muted-foreground">Event rules and target groups for this competition.</p></div>
-        <Button variant="outline" size="sm" @click="refetch()"><RefreshCw class="size-4" />Refresh</Button>
+        <div><CardTitle>{{ t('admin.qqBot.competition.deliveryConfiguration') }}</CardTitle><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.qqBot.competition.deliveryConfigurationDescription') }}</p></div>
+        <Button variant="outline" size="sm" @click="refetch()"><RefreshCw class="size-4" />{{ t('common.refresh') }}</Button>
       </CardHeader>
       <CardContent class="space-y-5">
         <div v-if="form.warnings.length" class="border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800">{{ form.warnings.join(' ') }}</div>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <label v-for="item in [
-            ['enabled', 'Enable delivery'], ['allowMessages', 'Allow messages'], ['allowManualNotifications', 'Allow manual announcements'],
-            ['stopNormalEventsAfterFinished', 'Stop normal events after finish'], ['mentionAll', 'Mention all'], ['showTeamName', 'Show team name'],
-            ['showUserName', 'Show user name'], ['showChallengeCategory', 'Show challenge category'], ['includeCompetitionLink', 'Include competition link'],
-            ['includeChallengeLink', 'Include challenge link'], ['hidePenaltyDetails', 'Hide penalty details'],
-          ]" :key="item[0]" class="flex items-center justify-between border p-3 text-sm"><span>{{ item[1] }}</span><input v-model="form[item[0] as keyof QqConfig] as boolean" type="checkbox" class="size-4"></label>
+          <label v-for="item in configOptions" :key="item.key" class="flex items-center justify-between border p-3 text-sm"><span>{{ t(item.label) }}</span><input v-model="form[item.key]" type="checkbox" class="size-4"></label>
         </div>
         <div class="grid gap-5 xl:grid-cols-2">
-          <div class="space-y-2"><Label>Bound groups</Label><div v-if="availableGroups?.length" class="grid gap-2 sm:grid-cols-2"><Button v-for="group in availableGroups" :key="group.id" variant="outline" class="h-auto justify-start p-3 text-left" :class="selectedGroupIds.includes(group.id) && 'border-primary bg-primary/5'" @click="toggleGroup(group.id)"><span class="min-w-0"><span class="block truncate font-medium">{{ group.groupName }}</span><span class="block text-xs text-muted-foreground">{{ group.groupId }}</span></span></Button></div><p v-else class="text-sm text-muted-foreground">No additional authorized group is available to this account.</p><div v-if="bindings.length" class="flex flex-wrap gap-2"><Badge v-for="binding in bindings" :key="binding.groupId" variant="secondary">{{ binding.groupName ?? binding.qqGroupId }}</Badge></div></div>
-          <div class="space-y-2"><Label>Event rules</Label><Panel v-for="rule in form.eventRules" :key="rule.eventType" class="flex items-center justify-between gap-3 p-3"><span>{{ eventLabels[rule.eventType] }}</span><input v-model="rule.enabled" type="checkbox" class="size-4"></Panel></div>
+          <div class="space-y-2"><Label>{{ t('admin.qqBot.competition.boundGroups') }}</Label><div v-if="availableGroups?.length" class="grid gap-2 sm:grid-cols-2"><Button v-for="group in availableGroups" :key="group.id" variant="outline" class="h-auto justify-start p-3 text-left" :class="selectedGroupIds.includes(group.id) && 'border-primary bg-primary/5'" @click="toggleGroup(group.id)"><span class="min-w-0"><span class="block truncate font-medium">{{ group.groupName }}</span><span class="block text-xs text-muted-foreground">{{ group.groupId }}</span></span></Button></div><p v-else class="text-sm text-muted-foreground">{{ t('admin.qqBot.competition.noAvailableGroups') }}</p><div v-if="bindings.length" class="flex flex-wrap gap-2"><Badge v-for="binding in bindings" :key="binding.groupId" variant="secondary">{{ binding.groupName ?? binding.qqGroupId }}</Badge></div></div>
+          <div class="space-y-2"><Label>{{ t('admin.qqBot.competition.eventRules') }}</Label><Panel v-for="rule in form.eventRules" :key="rule.eventType" class="flex items-center justify-between gap-3 p-3"><span>{{ eventLabels[rule.eventType] }}</span><input v-model="rule.enabled" type="checkbox" class="size-4"></Panel></div>
         </div>
-        <Button :disabled="saveConfig.isPending.value" @click="saveConfig.mutate()"><Loader2 v-if="saveConfig.isPending.value" class="size-4 animate-spin" /><Save v-else class="size-4" />Save configuration</Button>
+        <Button :disabled="saveConfig.isPending.value" @click="saveConfig.mutate()"><Loader2 v-if="saveConfig.isPending.value" class="size-4 animate-spin" /><Save v-else class="size-4" />{{ t('admin.qqBot.competition.saveConfiguration') }}</Button>
       </CardContent>
     </Card>
 
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <Card>
-        <CardHeader class="flex-row items-center justify-between gap-4"><div><CardTitle class="flex items-center gap-2"><FileText class="size-5 text-primary" />Message templates</CardTitle><p class="mt-1 text-sm text-muted-foreground">Create event templates and inspect the rendered result.</p></div><Button variant="outline" size="sm" @click="resetTemplate">New</Button></CardHeader>
+        <CardHeader class="flex-row items-center justify-between gap-4"><div><CardTitle class="flex items-center gap-2"><FileText class="size-5 text-primary" />{{ t('admin.qqBot.competition.messageTemplates') }}</CardTitle><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.qqBot.competition.messageTemplatesDescription') }}</p></div><Button variant="outline" size="sm" @click="resetTemplate">{{ t('admin.qqBot.competition.newTemplate') }}</Button></CardHeader>
         <CardContent class="space-y-4">
-          <div v-if="loadingTemplates" class="text-sm text-muted-foreground">Loading templates...</div>
+          <div v-if="loadingTemplates" class="text-sm text-muted-foreground">{{ t('admin.qqBot.competition.loadingTemplates') }}</div>
           <div v-else-if="templates?.length" class="flex flex-wrap gap-2"><Button v-for="template in templates" :key="template.id ?? template.name" size="sm" :variant="templateForm.id === template.id ? 'default' : 'outline'" @click="selectTemplate(template)">{{ template.name || eventLabels[template.eventType ?? 0] }}</Button></div>
-          <div class="grid gap-3 md:grid-cols-2"><div class="grid gap-2"><Label>Event</Label><Select v-model="templateForm.eventType"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem v-for="(_, eventType) in eventLabels" :key="eventType" :value="Number(eventType)">{{ eventLabels[Number(eventType) as QqEventType] }}</SelectItem></SelectContent></Select></div><div class="grid gap-2"><Label>Name</Label><Input v-model="templateForm.name" placeholder="Template name" /></div></div>
-          <div class="grid gap-2"><Label>Content</Label><Textarea v-model="templateForm.content" rows="10" class="font-mono text-xs" placeholder="Use the variables allowed by this event." /></div>
-          <label class="flex items-center gap-2 text-sm"><input v-model="templateForm.isDefault" type="checkbox" class="size-4">Use as the event default</label>
-          <div class="flex flex-wrap gap-2"><Button :disabled="!templateForm.name.trim() || !templateForm.content.trim() || saveTemplate.isPending.value" @click="saveTemplate.mutate()"><Loader2 v-if="saveTemplate.isPending.value" class="size-4 animate-spin" /><Save v-else class="size-4" />Save template</Button><Button variant="outline" :disabled="previewTemplate.isPending.value" @click="previewTemplate.mutate()"><Loader2 v-if="previewTemplate.isPending.value" class="size-4 animate-spin" /><Eye v-else class="size-4" />Preview</Button></div>
-          <Panel v-if="preview" class="space-y-2 p-4"><div class="flex items-center justify-between text-sm"><span class="font-medium">Preview</span><Badge variant="outline">{{ preview.characterCount ?? 0 }} chars</Badge></div><pre class="whitespace-pre-wrap break-words text-sm">{{ preview.renderedText }}</pre><p v-if="preview.warnings?.length" class="text-xs text-amber-700">{{ preview.warnings.join(' ') }}</p></Panel>
+          <div class="grid gap-3 md:grid-cols-2"><div class="grid gap-2"><Label>{{ t('admin.qqBot.competition.event') }}</Label><Select v-model="templateForm.eventType"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem v-for="(_, eventType) in eventLabels" :key="eventType" :value="Number(eventType)">{{ eventLabels[Number(eventType) as QqEventType] }}</SelectItem></SelectContent></Select></div><div class="grid gap-2"><Label>{{ t('common.name') }}</Label><Input v-model="templateForm.name" :placeholder="t('admin.qqBot.competition.templateName')" /></div></div>
+          <div class="grid gap-2"><Label>{{ t('admin.qqBot.competition.content') }}</Label><Textarea v-model="templateForm.content" rows="10" class="font-mono text-xs" :placeholder="t('admin.qqBot.competition.templateContentPlaceholder')" /></div>
+          <label class="flex items-center gap-2 text-sm"><input v-model="templateForm.isDefault" type="checkbox" class="size-4">{{ t('admin.qqBot.competition.useAsEventDefault') }}</label>
+          <div class="flex flex-wrap gap-2"><Button :disabled="!templateForm.name.trim() || !templateForm.content.trim() || saveTemplate.isPending.value" @click="saveTemplate.mutate()"><Loader2 v-if="saveTemplate.isPending.value" class="size-4 animate-spin" /><Save v-else class="size-4" />{{ t('admin.qqBot.competition.saveTemplate') }}</Button><Button variant="outline" :disabled="previewTemplate.isPending.value" @click="previewTemplate.mutate()"><Loader2 v-if="previewTemplate.isPending.value" class="size-4 animate-spin" /><Eye v-else class="size-4" />{{ t('admin.qqBot.competition.preview') }}</Button></div>
+          <Panel v-if="preview" class="space-y-2 p-4"><div class="flex items-center justify-between text-sm"><span class="font-medium">{{ t('admin.qqBot.competition.preview') }}</span><Badge variant="outline">{{ t('admin.qqBot.competition.characterCount', { count: preview.characterCount ?? 0 }) }}</Badge></div><pre class="whitespace-pre-wrap break-words text-sm">{{ preview.renderedText }}</pre><p v-if="preview.warnings?.length" class="text-xs text-amber-700">{{ preview.warnings.join(' ') }}</p></Panel>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle class="flex items-center gap-2"><Send class="size-5 text-primary" />Manual announcement</CardTitle></CardHeader>
-        <CardContent class="space-y-4"><div class="grid gap-2"><Label>Title</Label><Input v-model="announcementForm.title" placeholder="Announcement title" /></div><div class="grid gap-2"><Label>Content</Label><Textarea v-model="announcementForm.content" rows="8" placeholder="Message content" /></div><div class="grid gap-2"><Label>Template</Label><Select v-model="selectedTemplateId"><SelectTrigger><SelectValue placeholder="No template" /></SelectTrigger><SelectContent><SelectItem value="">No template</SelectItem><SelectItem v-for="template in templates ?? []" :key="template.id ?? template.name ?? `event-${template.eventType ?? 0}`" :value="template.id ?? ''">{{ template.name || eventLabels[template.eventType ?? 0] }}</SelectItem></SelectContent></Select></div><p class="text-xs text-muted-foreground">{{ bindings.length }} bound group{{ bindings.length === 1 ? '' : 's' }} will receive this message.</p><label class="flex items-center gap-2 text-sm"><input v-model="announcementForm.isTest" type="checkbox" class="size-4">Send as a test</label><Button class="w-full" :disabled="!announcementForm.title.trim() || !announcementForm.content.trim() || !bindings.length || sendAnnouncement.isPending.value" @click="sendAnnouncement.mutate()"><Loader2 v-if="sendAnnouncement.isPending.value" class="size-4 animate-spin" /><Send v-else class="size-4" />Queue announcement</Button></CardContent>
+        <CardHeader><CardTitle class="flex items-center gap-2"><Send class="size-5 text-primary" />{{ t('admin.qqBot.competition.manualAnnouncement') }}</CardTitle></CardHeader>
+        <CardContent class="space-y-4"><div class="grid gap-2"><Label>{{ t('common.title') }}</Label><Input v-model="announcementForm.title" :placeholder="t('admin.qqBot.competition.announcementTitle')" /></div><div class="grid gap-2"><Label>{{ t('admin.qqBot.competition.content') }}</Label><Textarea v-model="announcementForm.content" rows="8" :placeholder="t('admin.qqBot.competition.messageContent')" /></div><div class="grid gap-2"><Label>{{ t('admin.qqBot.competition.template') }}</Label><Select v-model="selectedTemplateId"><SelectTrigger><SelectValue :placeholder="t('admin.qqBot.competition.noTemplate')" /></SelectTrigger><SelectContent><SelectItem value="">{{ t('admin.qqBot.competition.noTemplate') }}</SelectItem><SelectItem v-for="template in templates ?? []" :key="template.id ?? template.name ?? `event-${template.eventType ?? 0}`" :value="template.id ?? ''">{{ template.name || eventLabels[template.eventType ?? 0] }}</SelectItem></SelectContent></Select></div><p class="text-xs text-muted-foreground">{{ t('admin.qqBot.competition.boundGroupRecipients', { count: bindings.length }) }}</p><label class="flex items-center gap-2 text-sm"><input v-model="announcementForm.isTest" type="checkbox" class="size-4">{{ t('admin.qqBot.competition.sendAsTest') }}</label><Button class="w-full" :disabled="!announcementForm.title.trim() || !announcementForm.content.trim() || !bindings.length || sendAnnouncement.isPending.value" @click="sendAnnouncement.mutate()"><Loader2 v-if="sendAnnouncement.isPending.value" class="size-4 animate-spin" /><Send v-else class="size-4" />{{ t('admin.qqBot.competition.queueAnnouncement') }}</Button></CardContent>
       </Card>
     </div>
 
     <Card>
-      <CardHeader class="flex-row items-center justify-between gap-4"><div><CardTitle>Delivery log</CardTitle><p class="mt-1 text-sm text-muted-foreground">Recent delivery attempts for this competition.</p></div><Button variant="outline" size="sm" @click="refetchDeliveryLog()"><RefreshCw class="size-4" />Refresh</Button></CardHeader>
-      <CardContent class="space-y-2"><Panel v-for="delivery in deliveryItems" :key="delivery.id" class="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between"><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">{{ delivery.groupName || 'Unknown group' }}</span><Badge :variant="statusVariant(delivery.status)">{{ statusLabel(delivery.status) }}</Badge><span class="text-xs text-muted-foreground">{{ eventLabels[delivery.eventType ?? 0] }}</span></div><p class="mt-1 truncate text-sm text-muted-foreground">{{ delivery.messageSummary }}</p><p v-if="delivery.lastErrorSummary" class="mt-1 text-xs text-destructive">{{ delivery.lastErrorSummary }}</p></div><div class="flex items-center gap-3"><span class="text-xs tabular-nums text-muted-foreground">{{ delivery.attemptCount ?? 0 }} / {{ delivery.maxAttempts ?? 0 }}</span><Button v-if="delivery.id && delivery.status === 3" size="sm" variant="outline" :disabled="retryDelivery.isPending.value" @click="retryDelivery.mutate(delivery.id)"><RotateCcw class="size-4" />Retry</Button></div></Panel><p v-if="!deliveryItems.length" class="py-4 text-sm text-muted-foreground">No deliveries have been recorded yet.</p></CardContent>
+      <CardHeader class="flex-row items-center justify-between gap-4"><div><CardTitle>{{ t('admin.qqBot.competition.deliveryLog') }}</CardTitle><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.qqBot.competition.deliveryLogDescription') }}</p></div><Button variant="outline" size="sm" @click="refetchDeliveryLog()"><RefreshCw class="size-4" />{{ t('common.refresh') }}</Button></CardHeader>
+      <CardContent class="space-y-2"><Panel v-for="delivery in deliveryItems" :key="delivery.id" class="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between"><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">{{ delivery.groupName || t('admin.qqBot.competition.unknownGroup') }}</span><Badge :variant="statusVariant(delivery.status)">{{ statusLabel(delivery.status) }}</Badge><span class="text-xs text-muted-foreground">{{ eventLabels[delivery.eventType ?? 0] }}</span></div><p class="mt-1 truncate text-sm text-muted-foreground">{{ delivery.messageSummary }}</p><p v-if="delivery.lastErrorSummary" class="mt-1 text-xs text-destructive">{{ delivery.lastErrorSummary }}</p></div><div class="flex items-center gap-3"><span class="text-xs tabular-nums text-muted-foreground">{{ delivery.attemptCount ?? 0 }} / {{ delivery.maxAttempts ?? 0 }}</span><Button v-if="delivery.id && delivery.status === 3" size="sm" variant="outline" :disabled="retryDelivery.isPending.value" @click="retryDelivery.mutate(delivery.id)"><RotateCcw class="size-4" />{{ t('admin.qqBot.retry') }}</Button></div></Panel><p v-if="!deliveryItems.length" class="py-4 text-sm text-muted-foreground">{{ t('admin.qqBot.competition.noDeliveries') }}</p></CardContent>
     </Card>
   </div>
 </template>
