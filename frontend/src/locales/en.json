@@ -100,7 +100,9 @@
     "loadHealth": "Failed to load health",
     "awdpScreenLoad": "Failed to load AWDP screen data",
     "awdpScreenNonJson": "AWDP screen endpoint did not return JSON. Rebuild or restart the backend so /api/awdp/screen/snapshot is registered.",
-    "awdpScreenInvalidJson": "AWDP screen endpoint returned invalid JSON"
+    "awdpScreenInvalidJson": "AWDP screen endpoint returned invalid JSON",
+    "loadNotifications": "Failed to load notifications",
+    "updateNotifications": "Failed to update notifications"
   },
   "nav": {
     "home": "Home",
@@ -112,10 +114,59 @@
     "backToApp": "Back to App",
     "score": "pts"
   },
+  "notifications": {
+    "title": "Notifications",
+    "open": "Open notifications",
+    "openUnread": "Open notifications, {count} unread",
+    "unreadSummary": "{count} unread",
+    "markAllRead": "Read all",
+    "loadFailed": "Notifications unavailable",
+    "empty": "You're all caught up",
+    "emptyHint": "Competition updates will appear here.",
+    "events": {
+      "competitionStarted": {
+        "title": "Competition started",
+        "body": "{competition_name} is now live."
+      },
+      "challengePublished": {
+        "title": "New challenge: {problem_title}",
+        "body": "A {problem_category} challenge is now available."
+      },
+      "hintPublished": {
+        "title": "New hint: {problem_title}",
+        "body": "{hint_title}: {hint_content}"
+      },
+      "firstBlood": {
+        "title": "First blood",
+        "body": "{team_name} solved {problem_title}."
+      },
+      "secondBlood": {
+        "title": "Second blood",
+        "body": "{team_name} solved {problem_title}."
+      },
+      "thirdBlood": {
+        "title": "Third blood",
+        "body": "{team_name} solved {problem_title}."
+      },
+      "teamPenalized": {
+        "title": "Competition penalty",
+        "body": "{team_name}: {penalty_type}"
+      },
+      "announcement": {
+        "title": "{announcement_title}",
+        "body": "{announcement_content}"
+      },
+      "unknown": {
+        "title": "Competition update",
+        "body": "A new competition event is available."
+      }
+    }
+  },
   "common": {
     "loading": "Loading...",
     "search": "Search",
     "refresh": "Refresh",
+    "retry": "Retry",
     "cancel": "Cancel",
     "save": "Save",
     "create": "Create",
