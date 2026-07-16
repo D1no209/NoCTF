@@ -1,0 +1,428 @@
+{
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "body": {
+        "accessToken": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJleHAiOjQxMDAwMDAwMDAsInN1YiI6Im1vY2stdXNlciIsInVzZXJOYW1lIjoibW9jay1hZG1pbiIsInJvbGUiOiJBZG1pbiJ9.mock",
+        "userName": "mock-admin",
+        "role": "Admin"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/register",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/refresh",
+      "status": 200,
+      "body": {
+        "accessToken": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJleHAiOjQxMDAwMDAwMDAsInN1YiI6Im1vY2stdXNlciIsInVzZXJOYW1lIjoibW9jay1hZG1pbiIsInJvbGUiOiJBZG1pbiJ9.mock",
+        "userName": "mock-admin",
+        "role": "Admin"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions",
+      "status": 200,
+      "body": [
+        {
+          "id": "comp-2026-awdp",
+          "title": "NoCTF 2026 AWDP Invitational",
+          "description": "Development mock competition for the AWDP workspace and command screen.",
+          "status": "running",
+          "gameModeType": "AWDP",
+          "startTime": "2026-07-05T09:00:00Z",
+          "endTime": "2026-07-05T17:00:00Z",
+          "registeredTeamCount": 12
+        },
+        {
+          "id": "comp-2026-koh",
+          "title": "NoCTF 2026 King of the Hill",
+          "description": "Mock KoH competition for dashboard and registration flow checks.",
+          "status": "published",
+          "gameModeType": "KoH",
+          "startTime": "2026-07-06T09:00:00Z",
+          "endTime": "2026-07-06T15:00:00Z",
+          "registeredTeamCount": 6
+        },
+        {
+          "id": "comp-2026-ctf",
+          "title": "NoCTF 2026 Classic Qualifier",
+          "description": "Mock classic jeopardy event for list and card rendering.",
+          "status": "draft",
+          "gameModeType": "CTF",
+          "startTime": "2026-07-12T09:00:00Z",
+          "endTime": "2026-07-12T18:00:00Z",
+          "registeredTeamCount": 0
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-awdp/challenges",
+      "status": 200,
+      "body": [
+        { "id": "awdp-web-1", "title": "WEB-upload", "typeId": "web", "points": 500, "solveCount": 12, "deploymentType": "DynamicContainer", "description": "Patch the upload pipeline and keep the service online.", "descriptionFormat": "markdown", "hints": ["Look at file extension handling.", "Verify service status after patching."], "patchTemplateUrl": "/mock/patch-template.zip" },
+        { "id": "awdp-pwn-1", "title": "PWN-baby", "typeId": "pwn", "points": 460, "solveCount": 8, "deploymentType": "DynamicContainer", "description": "Harden the binary service and preserve availability.", "descriptionFormat": "markdown", "hints": ["Check bounds around packet parsing."] },
+        { "id": "awdp-rev-1", "title": "REV-portal", "typeId": "reverse", "points": 420, "solveCount": 6, "deploymentType": "DynamicContainer", "description": "Reverse the control flow, then submit a fix script.", "descriptionFormat": "markdown", "hints": ["The license branch is inverted."] },
+        { "id": "awdp-crypto-1", "title": "CRYPTO-lock", "typeId": "crypto", "points": 400, "solveCount": 4, "deploymentType": "DynamicContainer", "description": "Repair key validation without breaking the round service.", "descriptionFormat": "markdown", "hints": ["Compare expected key length and actual slice boundaries."] },
+        { "id": "awdp-misc-1", "title": "MISC-agent", "typeId": "misc", "points": 380, "solveCount": 3, "deploymentType": "DynamicContainer", "description": "Stabilize the agent workflow under repeated submissions.", "descriptionFormat": "markdown", "hints": ["Inspect temporary-file cleanup."] }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-koh/challenges",
+      "status": 200,
+      "body": [
+        { "id": "koh-web-1", "title": "WEB-hill", "typeId": "web", "points": 300, "solveCount": 5, "description": "Capture the web hill and retain control.", "descriptionFormat": "markdown", "hints": ["Session fixation matters here."] },
+        { "id": "koh-pwn-1", "title": "PWN-hill", "typeId": "pwn", "points": 320, "solveCount": 4, "description": "Win the process race and own the hill.", "descriptionFormat": "markdown", "hints": ["A signal handler changes the timing window."] },
+        { "id": "koh-rev-1", "title": "REV-hill", "typeId": "reverse", "points": 280, "solveCount": 2, "description": "Reverse the challenge client and keep the token stream flowing.", "descriptionFormat": "markdown", "hints": ["The key schedule is static."] },
+        { "id": "koh-crypto-1", "title": "CRYPTO-hill", "typeId": "crypto", "points": 340, "solveCount": 3, "description": "Break the weak cipher to take hill control.", "descriptionFormat": "markdown", "hints": ["Nonce reuse is visible."], "attachmentUrl": "/mock/koh-crypto.zip" },
+        { "id": "koh-misc-1", "title": "MISC-hill", "typeId": "misc", "points": 260, "solveCount": 1, "description": "Exploit the scoreboard helper to gain control ticks.", "descriptionFormat": "markdown", "hints": ["Look for untrusted plugin input."] }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-ctf/challenges",
+      "status": 200,
+      "body": [
+        { "id": "ctf-web-1", "title": "WEB-notes", "typeId": "web", "points": 500, "solveCount": 15, "deploymentType": "DynamicContainer", "description": "Find the auth bypass in the notes service.", "descriptionFormat": "markdown", "hints": ["The role check happens after data fetch."] },
+        { "id": "ctf-pwn-1", "title": "PWN-echo", "typeId": "pwn", "points": 470, "solveCount": 11, "deploymentType": "DynamicContainer", "description": "Turn the echo loop into code execution.", "descriptionFormat": "markdown", "hints": ["Saved return pointers are reachable."] },
+        { "id": "ctf-rev-1", "title": "REV-pocket", "typeId": "reverse", "points": 430, "solveCount": 7, "description": "Extract the hidden unlock path from the handheld binary.", "descriptionFormat": "markdown", "hints": ["One branch table is shifted by one index."] },
+        { "id": "ctf-crypto-1", "title": "CRYPTO-slab", "typeId": "crypto", "points": 410, "solveCount": 5, "description": "Recover the flag from a malformed padding oracle.", "descriptionFormat": "markdown", "hints": ["Error timing differs by 1 block."] },
+        { "id": "ctf-misc-1", "title": "MISC-parser", "typeId": "misc", "points": 390, "solveCount": 6, "description": "Abuse the parser to leak the hidden token.", "descriptionFormat": "markdown", "hints": ["Nested delimiters produce an unexpected fallback."] }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-awdp/submissions",
+      "status": 200,
+      "body": { "competitionId": "comp-2026-awdp", "teamId": "team-open-alpha", "solvedChallenges": [{ "challengeId": "awdp-web-1" }] }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-koh/submissions",
+      "status": 200,
+      "body": { "competitionId": "comp-2026-koh", "teamId": "team-hill-watch", "solvedChallenges": [{ "challengeId": "koh-web-1" }] }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-ctf/submissions",
+      "status": 200,
+      "body": { "competitionId": "comp-2026-ctf", "teamId": "team-ctf-mock", "solvedChallenges": [{ "challengeId": "ctf-web-1" }, { "challengeId": "ctf-misc-1" }] }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-awdp/teams/mine",
+      "status": 200,
+      "body": [{ "id": "team-open-alpha", "name": "OpenAlpha", "inviteToken": "MOCK-OPEN-ALPHA", "memberCount": 4, "isLocked": false, "isBanned": false, "trackName": "Open", "registrationStatus": "approved", "isCaptain": true }]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-koh/teams/mine",
+      "status": 200,
+      "body": [{ "id": "team-hill-watch", "name": "HillWatch", "inviteToken": "MOCK-HILL-WATCH", "memberCount": 3, "isLocked": false, "isBanned": false, "trackName": null, "registrationStatus": "approved", "isCaptain": true }]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-ctf/teams/mine",
+      "status": 200,
+      "body": [{ "id": "team-ctf-mock", "name": "ByteGuild", "inviteToken": "MOCK-CTF-GUILD", "memberCount": 5, "isLocked": false, "isBanned": false, "trackName": null, "registrationStatus": "approved", "isCaptain": true }]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-awdp/leaderboard",
+      "status": 200,
+      "body": { "__mockGenerate": "leaderboard" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-koh/leaderboard",
+      "status": 200,
+      "body": { "__mockGenerate": "leaderboard" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-ctf/leaderboard",
+      "status": 200,
+      "body": { "__mockGenerate": "leaderboard" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-awdp/leaderboard/trend",
+      "status": 200,
+      "body": { "__mockGenerate": "leaderboardTrend" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-koh/leaderboard/trend",
+      "status": 200,
+      "body": { "__mockGenerate": "leaderboardTrend" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-ctf/leaderboard/trend",
+      "status": 200,
+      "body": { "__mockGenerate": "leaderboardTrend" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-awdp/patch-submissions",
+      "status": 200,
+      "body": [
+        { "challengeId": "awdp-web-1", "challengeName": "WEB-upload", "status": "Verified", "attemptNumber": 2, "fileName": "fix-web-upload.tar.gz", "fixEntry": "fix.sh", "submittedAt": "2026-07-05T10:24:00Z", "validatedAt": "2026-07-05T10:25:00Z" },
+        { "challengeId": "awdp-pwn-1", "challengeName": "PWN-baby", "status": "Pending", "attemptNumber": 1, "fileName": "fix-pwn-baby.tar.gz", "fixEntry": "fix.sh", "submittedAt": "2026-07-05T10:29:00Z" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-awdp/views/challenge-state",
+      "status": 200,
+      "body": {
+        "viewKey": "challenge-state",
+        "data": {
+          "code": "ok",
+          "competitionId": "comp-2026-awdp",
+          "teamId": "team-open-alpha",
+          "serverTime": "2026-07-05T10:32:00Z",
+          "currentRound": { "roundNumber": 12, "status": "running", "startTime": "2026-07-05T10:30:00Z", "endTime": "2026-07-05T10:35:00Z" },
+          "challenges": [
+            { "challengeId": "awdp-web-1", "instanceStatus": "InstanceRunning", "breakStatus": "BreakSuccess", "fixStatus": "FixSuccess", "serviceStatus": "ServiceOk", "currentRoundAttackScore": 120, "currentRoundDefenseScore": 100, "attackScorePerRound": 50, "defenseScorePerRound": 100, "attackAttempts": 2, "defenseAttempts": 1, "maxAttackAttempts": 5, "maxDefenseAttempts": 3, "remainingAttackAttempts": 3, "remainingDefenseAttempts": 2, "canSubmitFlag": false, "canRequestDefense": true, "allowAttackAfterBreakSuccess": false, "allowDefenseAfterFixSuccess": true, "fixEntry": "fix.sh" },
+            { "challengeId": "awdp-pwn-1", "instanceStatus": "InstanceRunning", "breakStatus": "BreakFailed", "fixStatus": "FixNotStarted", "serviceStatus": "ServiceOk", "currentRoundAttackScore": 0, "currentRoundDefenseScore": 0, "attackScorePerRound": 50, "defenseScorePerRound": 100, "attackAttempts": 1, "defenseAttempts": 0, "maxAttackAttempts": 5, "maxDefenseAttempts": 3, "remainingAttackAttempts": 4, "remainingDefenseAttempts": 3, "canSubmitFlag": true, "canRequestDefense": true, "allowAttackAfterBreakSuccess": false, "allowDefenseAfterFixSuccess": true, "fixEntry": "fix.sh" },
+            { "challengeId": "awdp-rev-1", "instanceStatus": "InstanceNotCreated", "breakStatus": "BreakNotStarted", "fixStatus": "FixNotStarted", "serviceStatus": "ServiceUnknown", "currentRoundAttackScore": 0, "currentRoundDefenseScore": 0, "attackScorePerRound": 50, "defenseScorePerRound": 100, "attackAttempts": 0, "defenseAttempts": 0, "maxAttackAttempts": 5, "maxDefenseAttempts": 3, "remainingAttackAttempts": 5, "remainingDefenseAttempts": 3, "canSubmitFlag": false, "canRequestDefense": false, "allowAttackAfterBreakSuccess": false, "allowDefenseAfterFixSuccess": true, "fixEntry": "fix.sh" },
+            { "challengeId": "awdp-crypto-1", "instanceStatus": "InstanceRunning", "breakStatus": "AttackAttemptsExhausted", "fixStatus": "DefenseAttemptsExhausted", "serviceStatus": "ServiceError", "currentRoundAttackScore": 0, "currentRoundDefenseScore": 0, "attackScorePerRound": 50, "defenseScorePerRound": 100, "attackAttempts": 5, "defenseAttempts": 3, "maxAttackAttempts": 5, "maxDefenseAttempts": 3, "remainingAttackAttempts": 0, "remainingDefenseAttempts": 0, "canSubmitFlag": false, "canRequestDefense": false, "allowAttackAfterBreakSuccess": false, "allowDefenseAfterFixSuccess": false, "fixEntry": "fix.sh" },
+            { "challengeId": "awdp-misc-1", "instanceStatus": "InstanceExpired", "breakStatus": "BreakSubmitted", "fixStatus": "FixUploading", "serviceStatus": "ServiceOk", "currentRoundAttackScore": 10, "currentRoundDefenseScore": 20, "attackScorePerRound": 50, "defenseScorePerRound": 100, "attackAttempts": 2, "defenseAttempts": 1, "maxAttackAttempts": 5, "maxDefenseAttempts": 3, "remainingAttackAttempts": 3, "remainingDefenseAttempts": 2, "canSubmitFlag": false, "canRequestDefense": true, "allowAttackAfterBreakSuccess": false, "allowDefenseAfterFixSuccess": true, "fixEntry": "fix.sh" }
+          ]
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/comp-2026-awdp/challenges/:challengeId/submit",
+      "status": 200,
+      "body": { "correct": true, "alreadySolved": false }
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/comp-2026-koh/challenges/:challengeId/submit",
+      "status": 200,
+      "body": { "correct": true, "alreadySolved": false }
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/comp-2026-ctf/challenges/:challengeId/submit",
+      "status": 200,
+      "body": { "correct": true, "alreadySolved": false }
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/comp-2026-awdp/challenges/:challengeId/patch",
+      "status": 200,
+      "body": { "challengeId": "awdp-pwn-1", "status": "Pending", "attemptNumber": 2, "fileName": "fix.tar.gz", "fixEntry": "fix.sh", "submittedAt": "2026-07-05T10:40:00Z" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-awdp",
+      "status": 200,
+      "body": {
+        "id": "comp-2026-awdp",
+        "title": "NoCTF 2026 AWDP Invitational",
+        "description": "Development mock competition for the AWDP workspace and command screen.",
+        "status": "running",
+        "gameModeType": "AWDP",
+        "startTime": "2026-07-05T09:00:00Z",
+        "endTime": "2026-07-05T17:00:00Z",
+        "tracksEnabled": true,
+        "trackNames": ["Open", "Campus"]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-koh",
+      "status": 200,
+      "body": {
+        "id": "comp-2026-koh",
+        "title": "NoCTF 2026 King of the Hill",
+        "description": "Mock KoH competition for dashboard and registration flow checks.",
+        "status": "published",
+        "gameModeType": "KoH",
+        "startTime": "2026-07-06T09:00:00Z",
+        "endTime": "2026-07-06T15:00:00Z",
+        "tracksEnabled": false,
+        "trackNames": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-ctf",
+      "status": 200,
+      "body": {
+        "id": "comp-2026-ctf",
+        "title": "NoCTF 2026 Classic Qualifier",
+        "description": "Mock classic jeopardy event for list and card rendering.",
+        "status": "draft",
+        "gameModeType": "CTF",
+        "startTime": "2026-07-12T09:00:00Z",
+        "endTime": "2026-07-12T18:00:00Z",
+        "tracksEnabled": false,
+        "trackNames": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/teams/mine",
+      "status": 200,
+      "body": [
+        {
+          "id": "team-open-alpha",
+          "competitionId": "comp-2026-awdp",
+          "name": "OpenAlpha",
+          "competitionTitle": "NoCTF 2026 AWDP Invitational",
+          "competitionStatus": "running",
+          "registrationStatus": "approved",
+          "memberCount": 4,
+          "maxTeamMembers": 6,
+          "isLocked": false,
+          "isBanned": false,
+          "isCaptain": true,
+          "trackName": "Open",
+          "inviteToken": "MOCK-OPEN-ALPHA",
+          "gameModeType": "AWDP"
+        },
+        {
+          "id": "team-hill-watch",
+          "competitionId": "comp-2026-koh",
+          "name": "HillWatch",
+          "competitionTitle": "NoCTF 2026 King of the Hill",
+          "competitionStatus": "published",
+          "registrationStatus": "pending",
+          "memberCount": 3,
+          "maxTeamMembers": 5,
+          "isLocked": false,
+          "isBanned": false,
+          "isCaptain": false,
+          "trackName": null,
+          "inviteToken": "MOCK-HILL-WATCH",
+          "gameModeType": "KoH"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/:id/challenges/:challengeId/instance",
+      "status": 200,
+      "body": {
+        "status": "running",
+        "containerId": "mock-instance-1",
+        "address": "example.com",
+        "addresses": ["example.com"],
+        "accessHost": "example.com",
+        "ports": { "8080": 8080 },
+        "expiresAt": "2030-01-01T00:00:00Z",
+        "serverTime": "2026-07-05T10:32:00Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/:id/challenges/:challengeId/instance",
+      "status": 200,
+      "body": {
+        "status": "running",
+        "containerId": "mock-instance-1",
+        "address": "example.com",
+        "addresses": ["example.com"],
+        "accessHost": "example.com",
+        "ports": { "8080": 8080 },
+        "expiresAt": "2030-01-01T00:00:00Z",
+        "serverTime": "2026-07-05T10:32:00Z"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/competitions/:id/challenges/:challengeId/instance",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/:id/challenges/:challengeId/instance/extend",
+      "status": 200,
+      "body": {
+        "status": "running",
+        "containerId": "mock-instance-1",
+        "address": "example.com",
+        "addresses": ["example.com"],
+        "accessHost": "example.com",
+        "ports": { "8080": 8080 },
+        "expiresAt": "2030-01-01T00:00:00Z",
+        "serverTime": "2026-07-05T10:32:00Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/awdp/screen/snapshot",
+      "status": 200,
+      "body": {
+        "game": {
+          "id": "comp-2026-awdp",
+          "title": "NoCTF 2026 AWDP Invitational",
+          "status": "running",
+          "currentRound": 12,
+          "totalRounds": 36,
+          "phase": "running",
+          "serverTime": "2026-07-05T10:32:00Z",
+          "roundStartedAt": "2026-07-05T10:30:00Z",
+          "roundEndsAt": "2026-07-05T10:35:00Z"
+        },
+        "stats": {
+          "teamCount": 6,
+          "challengeCount": 4,
+          "totalAttackCount": 286,
+          "totalDefenseCount": 194,
+          "attackSuccessCount": 132,
+          "attackFailCount": 154,
+          "defenseSuccessCount": 118,
+          "defenseFailCount": 76,
+          "activeTeamCount": 5,
+          "activeChallengeCount": 4,
+          "totalScoreDelta": 524
+        },
+        "scoreboard": [
+          { "teamId": "team-1", "teamName": "SnowTeam", "rank": 1, "previousRank": 2, "totalScore": 1594, "attackScore": 842, "defenseScore": 702, "currentRoundScore": 50, "lastActiveAt": "2026-07-05T10:31:10Z", "trend": "up" },
+          { "teamId": "team-2", "teamName": "QAQTeam", "rank": 2, "previousRank": 1, "totalScore": 1560, "attackScore": 830, "defenseScore": 680, "currentRoundScore": 50, "lastActiveAt": "2026-07-05T10:31:18Z", "trend": "down" },
+          { "teamId": "team-3", "teamName": "RedShift", "rank": 3, "previousRank": 3, "totalScore": 1498, "attackScore": 780, "defenseScore": 668, "currentRoundScore": 50, "lastActiveAt": "2026-07-05T10:30:52Z", "trend": "stable" },
+          { "teamId": "team-4", "teamName": "BlueBase", "rank": 4, "previousRank": 5, "totalScore": 1410, "attackScore": 720, "defenseScore": 650, "currentRoundScore": 40, "lastActiveAt": "2026-07-05T10:29:57Z", "trend": "up" },
+          { "teamId": "team-5", "teamName": "NullCrew", "rank": 5, "previousRank": 4, "totalScore": 1362, "attackScore": 690, "defenseScore": 632, "currentRoundScore": 40, "lastActiveAt": "2026-07-05T10:28:44Z", "trend": "down" },
+          { "teamId": "team-6", "teamName": "PatchLab", "rank": 6, "previousRank": 6, "totalScore": 1304, "attackScore": 640, "defenseScore": 624, "currentRoundScore": 40, "lastActiveAt": "2026-07-05T10:27:12Z", "trend": "stable" }
+        ],
+        "challenges": [
+          { "challengeId": "challenge-1", "challengeName": "WEB-upload", "category": "web", "attackHeat": 84, "defensePassedCount": 20, "defenseFailedCount": 7, "instanceCount": 11, "activeTeamCount": 5, "lastEventAt": "2026-07-05T10:31:20Z" },
+          { "challengeId": "challenge-2", "challengeName": "PWN-baby", "category": "pwn", "attackHeat": 67, "defensePassedCount": 17, "defenseFailedCount": 11, "instanceCount": 9, "activeTeamCount": 4, "lastEventAt": "2026-07-05T10:30:41Z" },
+          { "challengeId": "challenge-3", "challengeName": "REV-portal", "category": "reverse", "attackHeat": 58, "defensePassedCount": 14, "defenseFailedCount": 6, "instanceCount": 8, "activeTeamCount": 3, "lastEventAt": "2026-07-05T10:29:39Z" },
+          { "challengeId": "challenge-4", "challengeName": "CRYPTO-lock", "category": "crypto", "attackHeat": 41, "defensePassedCount": 12, "defenseFailedCount": 4, "instanceCount": 6, "activeTeamCount": 2, "lastEventAt": "2026-07-05T10:28:17Z" }
+        ],
+        "teamChallengeStates": [],
+        "recentEvents": [
+          { "id": "event-1", "gameId": "comp-2026-awdp", "round": 12, "type": "ATTACK_ACCEPTED", "teamId": "team-1", "teamName": "SnowTeam", "challengeId": "challenge-1", "challengeName": "WEB-upload", "challengeCategory": "web", "level": "success", "message": "", "createdAt": "2026-07-05T10:31:20Z" },
+          { "id": "event-2", "gameId": "comp-2026-awdp", "round": 12, "type": "DEFENSE_CHECK_PASSED", "teamId": "team-2", "teamName": "QAQTeam", "challengeId": "challenge-2", "challengeName": "PWN-baby", "challengeCategory": "pwn", "level": "success", "message": "", "createdAt": "2026-07-05T10:31:04Z" },
+          { "id": "event-3", "gameId": "comp-2026-awdp", "round": 12, "type": "ATTACK_REJECTED", "teamId": "team-4", "teamName": "BlueBase", "challengeId": "challenge-3", "challengeName": "REV-portal", "challengeCategory": "reverse", "level": "warning", "message": "", "createdAt": "2026-07-05T10:30:56Z" },
+          { "id": "event-4", "gameId": "comp-2026-awdp", "round": 12, "type": "SERVICE_ERROR", "teamId": "team-5", "teamName": "NullCrew", "challengeId": "challenge-4", "challengeName": "CRYPTO-lock", "challengeCategory": "crypto", "level": "danger", "message": "", "createdAt": "2026-07-05T10:30:37Z" }
+        ],
+        "roundTimeline": [
+          { "round": 7, "attackSuccessCount": 6, "defenseSuccessCount": 5, "attackFailCount": 8, "defenseFailCount": 3, "scoreDelta": 236, "activeTeamCount": 5 },
+          { "round": 8, "attackSuccessCount": 8, "defenseSuccessCount": 4, "attackFailCount": 10, "defenseFailCount": 5, "scoreDelta": 288, "activeTeamCount": 6 },
+          { "round": 9, "attackSuccessCount": 7, "defenseSuccessCount": 6, "attackFailCount": 12, "defenseFailCount": 4, "scoreDelta": 301, "activeTeamCount": 6 },
+          { "round": 10, "attackSuccessCount": 9, "defenseSuccessCount": 7, "attackFailCount": 11, "defenseFailCount": 6, "scoreDelta": 352, "activeTeamCount": 6 },
+          { "round": 11, "attackSuccessCount": 10, "defenseSuccessCount": 8, "attackFailCount": 13, "defenseFailCount": 7, "scoreDelta": 401, "activeTeamCount": 6 },
+          { "round": 12, "attackSuccessCount": 11, "defenseSuccessCount": 9, "attackFailCount": 9, "defenseFailCount": 4, "scoreDelta": 524, "activeTeamCount": 6 }
+        ]
+      }
+    }
+  ]
+}

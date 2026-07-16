@@ -2,20 +2,43 @@
 import type { AwdpScreenEvent } from '@/types/awdpScreen'
 import { Bell, CheckCircle2, CircleAlert, Info, RotateCw, XCircle } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { Panel } from '@/components/ui/panel'
+import AwdpEventFilter from './AwdpEventFilter.vue'
 
 const props = defineProps<{
   events: AwdpScreenEvent[]
 }>()
 
-const PAGE_SIZE = 5
+const { t } = useI18n()
+const PAGE_SIZE = 6
 const ROTATE_MS = 6_400
 const page = ref(0)
+const filter = ref('all')
 let rotateTimer: ReturnType<typeof setInterval> | null = null
 
-const operationalEvents = computed(() => props.events.filter(event => event.type !== 'SCORE_UPDATED' && event.type !== 'TEAM_RANK_CHANGED'))
-const pageCount = computed(() => Math.max(1, Math.ceil(operationalEvents.value.length / PAGE_SIZE)))
-const visibleEvents = computed(() => operationalEvents.value.slice(page.value * PAGE_SIZE, page.value * PAGE_SIZE + PAGE_SIZE))
+function matchesFilter(event: AwdpScreenEvent, activeFilter: string) {
+  if (activeFilter === 'all')
+    return true
+  if (activeFilter === 'attack')
+    return event.type.startsWith('ATTACK')
+  if (activeFilter === 'defense')
+    return event.type === 'DEFENSE_REQUESTED' || event.type === 'PATCH_UPLOADED' || event.type.startsWith('DEFENSE_CHECK')
+  if (activeFilter === 'service')
+    return event.type === 'SERVICE_ERROR'
+  if (activeFilter === 'system')
+    return event.type === 'ROUND_STARTED' || event.type === 'ROUND_ENDED' || event.type === 'SCORE_UPDATED' || event.type === 'TEAM_RANK_CHANGED' || event.type === 'CHALLENGE_SELECTED' || event.type === 'INSTANCE_CREATED'
+  return true
+}
+
+const filteredEvents = computed(() => props.events.filter(event => matchesFilter(event, filter.value)))
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredEvents.value.length / PAGE_SIZE)))
+const visibleEvents = computed(() => filteredEvents.value.slice(page.value * PAGE_SIZE, page.value * PAGE_SIZE + PAGE_SIZE))
 const pageLabel = computed(() => `${page.value + 1}/${pageCount.value}`)
+
+watch(filter, () => {
+  page.value = 0
+})
 
 watch(pageCount, (count) => {
   page.value = Math.min(page.value, count - 1)
@@ -45,25 +68,25 @@ function levelIcon(level: AwdpScreenEvent['level']) {
 
 function levelClass(level: AwdpScreenEvent['level']) {
   if (level === 'success')
-    return 'event-success'
+    return 'text-emerald-700 bg-emerald-100/60 border-emerald-300/60'
   if (level === 'warning')
-    return 'event-warning'
+    return 'text-amber-700 bg-amber-100/60 border-amber-300/60'
   if (level === 'danger')
-    return 'event-danger'
-  return 'event-info'
+    return 'text-rose-700 bg-rose-100/60 border-rose-300/60'
+  return 'text-cyan-700 bg-cyan-100/60 border-cyan-300/60'
 }
 
 function eventTypeLabel(type: AwdpScreenEvent['type']) {
   if (type === 'ATTACK_ACCEPTED')
-    return 'BREAK SUCCESS'
+    return t('awdpScreen.battleMap.events.attackSuccess')
   if (type === 'ATTACK_REJECTED')
-    return 'BREAK FAILED'
+    return t('awdpScreen.battleMap.events.attackFailed')
   if (type === 'DEFENSE_CHECK_PASSED')
-    return 'FIX SUCCESS'
+    return t('awdpScreen.battleMap.events.defenseSuccess')
   if (type === 'DEFENSE_CHECK_FAILED')
-    return 'FIX FAILED'
+    return t('awdpScreen.battleMap.events.defenseFailed')
   if (type === 'SERVICE_ERROR')
-    return 'SERVICE ERROR'
+    return t('awdpScreen.battleMap.events.serviceError')
   return type.replace(/_/g, ' ')
 }
 
@@ -74,229 +97,66 @@ function formatTime(value: string) {
     second: '2-digit',
   }).format(new Date(value))
 }
-
-function eventMessage(event: AwdpScreenEvent) {
-  const team = event.teamName ?? 'Team'
-  const challenge = event.challengeName ?? 'service'
-
-  if (event.type === 'ATTACK_ACCEPTED')
-    return `${team} broke ${challenge}`
-  if (event.type === 'ATTACK_REJECTED')
-    return `${team} break failed on ${challenge}`
-  if (event.type === 'DEFENSE_CHECK_PASSED')
-    return `${team} fix verified on ${challenge}`
-  if (event.type === 'DEFENSE_CHECK_FAILED')
-    return `${team} fix failed on ${challenge}`
-  if (event.type === 'SERVICE_ERROR')
-    return `${team} service error on ${challenge}`
-  if (event.type === 'PATCH_UPLOADED')
-    return `${team} uploaded patch for ${challenge}`
-  if (event.type === 'DEFENSE_REQUESTED')
-    return `${team} requested fix validation on ${challenge}`
-  if (event.type === 'INSTANCE_CREATED')
-    return `${team} created ${challenge} instance`
-  if (event.type === 'ROUND_STARTED')
-    return `Round ${event.round} started`
-  if (event.type === 'ROUND_ENDED')
-    return `Round ${event.round} ended`
-  return event.message
-}
 </script>
 
 <template>
-  <section class="awdp-panel event-panel">
-    <div class="event-head">
-      <div>
-        <h2>
-          Event stream
-        </h2>
-        <p>
-          Real AWDP events, page {{ pageLabel }}
-        </p>
+  <Panel variant="default" class="flex min-h-0 flex-col">
+    <div class="flex flex-col gap-2.5 border-b border-slate-300/40 px-4 py-3">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <h2 class="text-sm font-semibold uppercase text-slate-900">
+            {{ t('awdpScreen.eventStream.title') }}
+          </h2>
+          <p class="text-xs text-slate-500">
+            {{ t('awdpScreen.eventStream.subtitle', { page: pageLabel }) }}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 text-slate-500">
+          <RotateCw v-if="pageCount > 1" class="size-3.5 text-cyan-600" />
+          <Bell class="size-5 text-cyan-600" />
+        </div>
       </div>
-      <div class="event-head-icons">
-        <RotateCw v-if="pageCount > 1" class="size-3.5" />
-        <Bell class="size-4" />
-      </div>
+      <AwdpEventFilter v-model="filter" />
     </div>
 
-    <div v-if="visibleEvents.length === 0" class="event-empty">
-      No live events yet.
+    <div v-if="visibleEvents.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-500">
+      {{ t('awdpScreen.eventStream.empty') }}
     </div>
 
     <TransitionGroup
       v-else
       name="event-row"
       tag="div"
-      class="event-list"
+      class="min-h-0 flex-1 space-y-1.5 px-2.5 py-2.5"
     >
       <article
         v-for="event in visibleEvents"
         :key="event.id"
-        class="event-row"
+        class="event-row rounded-lg border border-slate-300/40 bg-white/60 p-2.5"
       >
-        <div class="event-row-top">
+        <div class="mb-1.5 flex items-center justify-between gap-2">
           <span
-            class="event-badge"
+            class="inline-flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-bold uppercase"
             :class="levelClass(event.level)"
           >
             <component :is="levelIcon(event.level)" class="size-3.5 shrink-0" />
             <span class="truncate">{{ eventTypeLabel(event.type) }}</span>
           </span>
-          <span class="event-time">{{ formatTime(event.createdAt) }}</span>
+          <span class="font-mono text-[11px] text-slate-500">{{ formatTime(event.createdAt) }}</span>
         </div>
-        <p class="event-message">
-          {{ eventMessage(event) }}
+        <p class="line-clamp-2 text-xs leading-snug text-slate-800">
+          {{ event.message }}
         </p>
-        <div class="event-meta">
-          <span>Round {{ event.round }}</span>
-          <span>{{ event.teamName ?? '-' }} → {{ event.challengeName ?? '-' }}</span>
+        <div class="mt-1.5 flex items-center justify-between text-[10px] text-slate-500">
+          <span>{{ t('awdpScreen.eventStream.roundPrefix', { round: event.round }) }}</span>
+          <span>{{ event.teamName ?? t('awdpScreen.eventStream.fallbackDash') }} → {{ event.challengeName ?? t('awdpScreen.eventStream.fallbackDash') }}</span>
         </div>
       </article>
     </TransitionGroup>
-  </section>
+  </Panel>
 </template>
 
 <style scoped>
-.event-panel {
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.event-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-bottom: 1px solid var(--awdp-screen-border);
-  padding: 0.78rem 0.9rem 0.68rem;
-}
-
-.event-head h2 {
-  margin: 0;
-  color: var(--sidebar-foreground);
-  font-size: 0.82rem;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.event-head p {
-  margin: 0.16rem 0 0;
-  color: color-mix(in oklch, var(--sidebar-foreground) 44%, transparent);
-  font-size: 0.68rem;
-}
-
-.event-head-icons {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.42rem;
-  color: color-mix(in oklch, var(--sidebar-foreground) 52%, transparent);
-}
-
-.event-empty {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  padding: 1.5rem;
-  color: color-mix(in oklch, var(--sidebar-foreground) 45%, transparent);
-  font-size: 0.82rem;
-  text-align: center;
-}
-
-.event-list {
-  min-height: 0;
-  flex: 1;
-  padding: 0.55rem;
-}
-
-.event-row {
-  min-height: calc((100% - 0.48rem * 4) / 5);
-  margin-bottom: 0.48rem;
-  border: 1px solid color-mix(in oklch, var(--sidebar-foreground) 10%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklch, var(--awdp-screen-panel-raised) 44%, var(--awdp-screen-bg));
-  padding: 0.54rem 0.62rem;
-}
-
-.event-row:last-child {
-  margin-bottom: 0;
-}
-
-.event-row-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
-}
-
-.event-badge {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.36rem;
-  border: 1px solid currentColor;
-  border-radius: var(--radius-sm);
-  padding: 0.22rem 0.42rem;
-  font-size: 0.58rem;
-  font-weight: 850;
-}
-
-.event-success {
-  color: var(--awdp-fix);
-  background: color-mix(in oklch, var(--awdp-fix) 9%, transparent);
-}
-
-.event-warning {
-  color: var(--awdp-warn);
-  background: color-mix(in oklch, var(--awdp-warn) 9%, transparent);
-}
-
-.event-danger {
-  color: var(--awdp-error);
-  background: color-mix(in oklch, var(--awdp-error) 10%, transparent);
-}
-
-.event-info {
-  color: color-mix(in oklch, var(--sidebar-foreground) 72%, transparent);
-  background: color-mix(in oklch, var(--sidebar-foreground) 7%, transparent);
-}
-
-.event-time {
-  flex: 0 0 auto;
-  color: color-mix(in oklch, var(--sidebar-foreground) 42%, transparent);
-  font-size: 0.62rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.event-message {
-  display: -webkit-box;
-  margin: 0.42rem 0 0;
-  overflow: hidden;
-  color: var(--sidebar-foreground);
-  font-size: 0.74rem;
-  font-weight: 700;
-  line-height: 1.22;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.event-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.7rem;
-  margin-top: 0.42rem;
-  color: color-mix(in oklch, var(--sidebar-foreground) 42%, transparent);
-  font-size: 0.58rem;
-}
-
-.event-meta span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .event-row-enter-active,
 .event-row-leave-active {
   transition:
@@ -308,5 +168,12 @@ function eventMessage(event: AwdpScreenEvent) {
 .event-row-leave-to {
   opacity: 0;
   transform: translateX(12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-row-enter-active,
+  .event-row-leave-active {
+    transition: none;
+  }
 }
 </style>

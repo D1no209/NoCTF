@@ -1,5 +1,9 @@
 import type { ClientOptions, Config } from './generated/client'
 import type { ClientOptions as GeneratedClientOptions } from './generated/types.gen'
+// Mock interceptor is dev-only; the import is retained so the factory resolves
+// in dev builds, while the `import.meta.env.DEV` branch below is dead-code
+// eliminated in production so the mock runtime never ships.
+import { createMockAwareFetch } from '@/mocks/runtime'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 12_000
 
@@ -45,10 +49,13 @@ export function createClientConfig(
   override?: Config<ClientOptions & GeneratedClientOptions>,
 ): Config<ClientOptions & GeneratedClientOptions> {
   const baseFetch = override?.fetch ?? globalThis.fetch
+  const appFetch = import.meta.env.DEV
+    ? createMockAwareFetch(baseFetch)
+    : baseFetch
 
   return {
     ...override,
     baseUrl: override?.baseUrl ?? import.meta.env.VITE_API_BASE_URL ?? '',
-    fetch: timeoutFetch(baseFetch),
+    fetch: timeoutFetch(appFetch),
   }
 }

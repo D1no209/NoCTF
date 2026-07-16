@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 
 export interface KohControlEntry {
   teamId: string | null
@@ -45,12 +46,12 @@ function formatTime(iso: string) {
 </script>
 
 <template>
-  <Card class="noctf-live-card flex flex-col">
+  <Card class="flex flex-col rounded-xl">
     <CardHeader class="pb-2">
       <div class="flex items-center justify-between gap-2">
         <CardTitle class="text-sm font-semibold truncate">{{ status.challengeName }}</CardTitle>
         <Badge
-          :variant="status.controllerTeamId ? 'warning' : 'neutral'"
+          :variant="status.controllerTeamId ? 'default' : 'outline'"
           class="shrink-0 text-xs"
         >
           {{ status.controllerTeamId ? t('koh.controlled') : t('koh.uncontested') }}
@@ -59,16 +60,18 @@ function formatTime(iso: string) {
     </CardHeader>
     <CardContent class="space-y-3 flex-1">
       <!-- Current controller -->
-      <div class="space-y-0.5 rounded-md border bg-muted/30 px-3 py-2">
+      <Card class="gap-1 p-3 bg-muted">
         <p class="text-xs text-muted-foreground">{{ t('koh.controller') }}</p>
         <p class="font-medium text-sm">{{ controllerLabel }}</p>
         <p class="text-xs text-muted-foreground font-mono">{{ durationLabel }}</p>
-      </div>
+      </Card>
+
+      <Separator />
 
       <!-- History -->
       <div v-if="status.history.length > 0">
         <p class="text-xs font-medium text-muted-foreground mb-1.5">{{ t('koh.history') }}</p>
-        <ul class="noctf-scrollbar max-h-32 space-y-1 overflow-y-auto">
+        <ul class="max-h-32 space-y-1 overflow-y-auto">
           <li
             v-for="(entry, i) in status.history"
             :key="i"

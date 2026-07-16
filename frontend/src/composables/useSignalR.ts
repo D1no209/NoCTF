@@ -30,8 +30,6 @@ export function useSignalR(options: UseSignalROptions) {
   const connection = ref<signalR.HubConnection | null>(null)
   const isConnected = ref(false)
   const error = ref<Error | null>(null)
-  let disposed = false
-  let stopping = false
 
   const builder = new signalR.HubConnectionBuilder()
     .withUrl(resolveHubUrl(options.hubUrl), {
@@ -48,7 +46,6 @@ export function useSignalR(options: UseSignalROptions) {
   conn.onclose((err) => {
     isConnected.value = false
     if (err) error.value = err instanceof Error ? err : new Error(String(err))
-    if (disposed || stopping) return
     options.onDisconnected?.(err instanceof Error ? err : err ? new Error(String(err)) : undefined)
   })
 
@@ -64,31 +61,23 @@ export function useSignalR(options: UseSignalROptions) {
   })
 
   async function start() {
-    if (disposed) return
     try {
       await conn.start()
-      if (disposed) {
-        await conn.stop()
-        return
-      }
       isConnected.value = true
       error.value = null
       options.onConnected?.()
     } catch (err) {
       isConnected.value = false
       error.value = err instanceof Error ? err : new Error(String(err))
-      if (!disposed) options.onDisconnected?.(error.value)
+      options.onDisconnected?.(error.value)
     }
   }
 
   async function stop() {
-    disposed = true
-    stopping = true
     try {
       await conn.stop()
     } finally {
       isConnected.value = false
-      stopping = false
     }
   }
 
@@ -104,8 +93,8 @@ export function useSignalR(options: UseSignalROptions) {
     conn.on('ReceiveAttackLog', (log: AttackLogDto) => callback(log))
   }
 
-  function onKohUpdate(callback: (dto: { challengeId: string; controllerTeamId: string | null; controllerTeamName: string | null; timestamp: string }) => void) {
-    conn.on('ReceiveKohUpdate', (dto: any) => callback(dto))
+  function onKohUpdate(callback: (dto: { challengeId: string; controllerTeamId: string | null; timestamp: string }) => void) {
+    conn.on('ReceiveKohUpdate', (dto: { challengeId: string; controllerTeamId: string | null; timestamp: string }) => callback(dto))
   }
 
   return { connection, isConnected, error, start, stop, onRoundStarted, onAttackLog, onKohUpdate }

@@ -26,9 +26,9 @@ const progress = computed(() =>
 )
 
 const progressColor = computed(() => {
-  if (progress.value > 50) return 'bg-success'
-  if (progress.value > 20) return 'bg-warning'
-  return 'bg-danger'
+  if (progress.value > 50) return 'bg-green-500'
+  if (progress.value > 20) return 'bg-yellow-500'
+  return 'bg-red-500'
 })
 
 function formatTime(seconds: number) {
@@ -41,7 +41,7 @@ function formatTime(seconds: number) {
 <template>
   <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
     <div :key="fadeKey" class="round-fade min-w-[9rem]">
-      <span class="noctf-label">{{ t('common.round') }}</span>
+      <span>{{ t('common.round') }}</span>
       <span class="ml-2 text-4xl font-bold tabular-nums">{{ round }}</span>
     </div>
 
@@ -52,9 +52,9 @@ function formatTime(seconds: number) {
       </div>
       <div class="h-2 overflow-hidden rounded-full bg-muted">
         <div
-          class="h-full w-full origin-left rounded-full transition-transform duration-1000 ease-linear"
+          class="h-full rounded-full transition-all duration-1000"
           :class="progressColor"
-          :style="{ transform: `scaleX(${progress / 100})` }"
+          :style="{ width: `${progress}%` }"
         />
       </div>
     </div>
@@ -63,7 +63,7 @@ function formatTime(seconds: number) {
 
 <style scoped>
 .round-fade {
-  animation: fadeIn var(--motion-standard) var(--ease-out-expo);
+  animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {

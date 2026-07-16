@@ -2,6 +2,14 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export interface ServiceStatus {
   teamId: string
@@ -42,9 +50,9 @@ function getStatus(teamId: string, challengeId: string): 'healthy' | 'down' | 'u
 }
 
 function statusClass(status: 'healthy' | 'down' | 'unknown') {
-  if (status === 'healthy') return 'bg-success text-success-foreground'
-  if (status === 'down') return 'bg-danger text-danger-foreground'
-  return 'bg-status-neutral-muted text-status-neutral'
+  if (status === 'healthy') return 'bg-emerald-500'
+  if (status === 'down') return 'bg-destructive'
+  return 'bg-muted'
 }
 
 function statusLabel(status: 'healthy' | 'down' | 'unknown') {
@@ -55,7 +63,7 @@ function statusLabel(status: 'healthy' | 'down' | 'unknown') {
 </script>
 
 <template>
-  <Card class="noctf-live-card">
+  <Card class="rounded-xl">
     <CardHeader>
       <CardTitle class="text-base">{{ t('awd.serviceStatus') }}</CardTitle>
     </CardHeader>
@@ -63,43 +71,43 @@ function statusLabel(status: 'healthy' | 'down' | 'unknown') {
       <div v-if="services.length === 0" class="text-sm text-muted-foreground">
         {{ t('awd.noServices') }}
       </div>
-      <div v-else class="noctf-scrollbar overflow-x-auto">
-        <table class="w-full text-xs">
-          <thead>
-            <tr>
-              <th class="text-left pb-2 pr-2 text-muted-foreground font-medium">{{ t('awd.teamHeader') }}</th>
-              <th
-                v-for="ch in challenges"
-                :key="ch.id"
-                class="pb-2 px-1 text-center text-muted-foreground font-medium truncate max-w-[60px]"
-                :title="ch.name"
+      <Table v-else>
+        <TableHeader>
+          <TableRow>
+            <TableHead class="py-2 pr-2 text-left text-xs">
+              {{ t('awd.teamHeader') }}
+            </TableHead>
+            <TableHead
+              v-for="ch in challenges"
+              :key="ch.id"
+              class="py-2 px-1 text-center text-xs truncate max-w-[60px]"
+              :title="ch.name"
+            >
+              {{ ch.name }}
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow v-for="team in teams" :key="team.id">
+            <TableCell class="py-1.5 pr-2 truncate max-w-[80px]" :title="team.name">
+              {{ team.name }}
+            </TableCell>
+            <TableCell
+              v-for="ch in challenges"
+              :key="ch.id"
+              class="py-1.5 px-1 text-center"
+            >
+              <span
+                class="inline-flex h-5 w-10 items-center justify-center border-2 border-border text-[10px] font-bold text-white"
+                :class="statusClass(getStatus(team.id, ch.id))"
+                :title="getStatus(team.id, ch.id)"
               >
-                {{ ch.name }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="team in teams" :key="team.id" class="border-t border-border/40">
-              <td class="py-1.5 pr-2 text-foreground truncate max-w-[80px]" :title="team.name">
-                {{ team.name }}
-              </td>
-              <td
-                v-for="ch in challenges"
-                :key="ch.id"
-                class="py-1.5 px-1 text-center"
-              >
-                <span
-                  class="inline-flex h-5 w-10 items-center justify-center rounded text-[10px] font-bold"
-                  :class="statusClass(getStatus(team.id, ch.id))"
-                  :title="getStatus(team.id, ch.id)"
-                >
-                  {{ statusLabel(getStatus(team.id, ch.id)) }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                {{ statusLabel(getStatus(team.id, ch.id)) }}
+              </span>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </CardContent>
   </Card>
 </template>
