@@ -395,7 +395,7 @@ For frontend/player/admin flows:
 
 ## Current Work Context
 
-The audit remediation is grouped into local commits on `codex/backend-architecture-performance-remediation`. It has not been pushed and no PR was created. Use `git status --short` and `git log --oneline -n 15` for the current HEAD instead of relying on a fixed hash; do not reset or clean unrelated user work.
+The active working branch is `main`. Use `git status --short` and `git log --oneline -n 15` for the current HEAD instead of relying on a fixed hash; do not reset or clean unrelated user work.
 
 The current work covers plugin-host fail-fast behavior, score and task idempotency, PostgreSQL execution leases, storage CAS replacement and cleanup outbox, Redis leaderboard versioning, API query/rate-limit/security hardening, Docker/Kubernetes runtime durability, game-engine recovery, team lifecycle invariants, safe identity migration, deployment manifests, CI, and expanded integration tests. Plugin boundaries and public API compatibility remain required.
 
@@ -410,6 +410,7 @@ Latest verification status:
 - Frontend frozen install, lint, and production build passed. NuGet vulnerability/deprecation scans and `bun audit` are clean.
 - Compose parsing and kubeconform strict passed (47 valid resources, 0 invalid/errors/skipped). Local `kubectl apply --dry-run=client` could not perform API discovery because no cluster is configured at `localhost:8080`; this is not a manifest validation failure.
 - API and Worker publish outputs contain the five required game/challenge plugin assemblies plus the optional QQBot assembly. Temporary PostgreSQL/Redis validation containers were removed.
+- Frontend authentication now refreshes active sessions two minutes before access-token expiry, coalesces concurrent refresh attempts, retries transient refresh failures without discarding a still-valid token, and updates route guards, API requests, and SignalR token callbacks from the renewed session. The backend's existing absolute session limit and unauthorized-response behavior remain unchanged. Focused auth tests, frontend type-check/production build, and a real login-refresh-admin API sequence pass.
 
 QQ broadcast integration is now implemented as an optional sixth platform plugin plus a separately deployed outbound NoneBot/Milky agent. Platform code is C#; the Python agent lives under `integrations/qqbot` and the read-only reference checkout at `E:\SourceCode\QQBOT` is never modified. Configuration is global-policy plus explicit per-competition opt-in and group/event binding. PostgreSQL owns the durable outbox, leases, ACK/failure history, idempotency, and audit; Redis owns only replay protection and short cooldowns. See [`qqbot-integration.md`](qqbot-integration.md) for deployment, security, triggers, permissions, test-group restrictions, and rollback.
 
@@ -427,7 +428,7 @@ The authoritative continuation instructions, architecture reading map, four crit
 - Do not move game-mode-specific logic into the API project unless it is orchestration glue.
 - Do not forget i18n for new visible UI text.
 - Do not reintroduce a separate AWDP EXP container or expose internal bad-patch details to participants.
-- Do not leave old JWTs in local storage when testing auth; expired tokens can make admin pages appear broken.
+- Do not bypass the shared auth-session coordinator when adding authenticated frontend transports; API requests, route guards, and SignalR must observe the same renewed token.
 
 ## Useful Links
 

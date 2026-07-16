@@ -183,9 +183,9 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (to.meta.requiresAuth && !auth.ensureFreshSession()) {
+  if (to.meta.requiresAuth && !(await auth.ensureFreshSession())) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
