@@ -55,6 +55,42 @@ export function setAuthToken(token: string | null) {
   })
 }
 
+export interface UserNotification {
+  id: string
+  competitionId?: string | null
+  subjectId?: string | null
+  type: string
+  data: Record<string, string>
+  isRead: boolean
+  createdAt: string
+  readAt?: string | null
+}
+
+export interface UserNotificationPage {
+  items: UserNotification[]
+  unreadCount: number
+}
+
+export const notificationApi = {
+  async list(limit = 20) {
+    return unwrap(await client.get<{ 200: UserNotificationPage }, unknown, false>({
+      url: '/api/notifications',
+      query: { limit },
+    }), tt('errors.loadNotifications'))
+  },
+  async markRead(id: string) {
+    await requireSuccess(client.post<{ 204: never }, unknown, false>({
+      url: '/api/notifications/{id}/read',
+      path: { id },
+    }), tt('errors.updateNotifications'))
+  },
+  async markAllRead() {
+    await requireSuccess(client.post<{ 204: never }, unknown, false>({
+      url: '/api/notifications/read-all',
+    }), tt('errors.updateNotifications'))
+  },
+}
+
 export const authApi = {
   async login(email: string, password: string) {
     return unwrap(await sdk.noCtfapiEndpointsAuthLoginEndpoint({ body: { email, password } }), tt('errors.login'))
