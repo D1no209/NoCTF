@@ -39,6 +39,8 @@ COPY backend/src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj src/NoCTF.Plugins.Ko
 COPY backend/src/NoCTF.Plugins.KoH/packages.lock.json src/NoCTF.Plugins.KoH/
 COPY backend/src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj src/NoCTF.Plugins.Penetration/
 COPY backend/src/NoCTF.Plugins.Penetration/packages.lock.json src/NoCTF.Plugins.Penetration/
+COPY backend/src/NoCTF.Plugins.QQBot/NoCTF.Plugins.QQBot.csproj src/NoCTF.Plugins.QQBot/
+COPY backend/src/NoCTF.Plugins.QQBot/packages.lock.json src/NoCTF.Plugins.QQBot/
 COPY backend/src/NoCTF.Runner.Client/NoCTF.Runner.Client.csproj src/NoCTF.Runner.Client/
 COPY backend/src/NoCTF.Runner.Client/packages.lock.json src/NoCTF.Runner.Client/
 COPY backend/src/NoCTF.Runner/NoCTF.Runner.csproj src/NoCTF.Runner/
