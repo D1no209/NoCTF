@@ -82,6 +82,8 @@ bun run dev
 
 The dev server runs at `http://localhost:5173`.
 
+Vite proxies API and SignalR requests to the real local backend by default. Mock routes are only enabled when explicitly requested with `VITE_ENABLE_MOCKS=true`; do not enable them while validating login or management APIs against the backend.
+
 If the backend is running with `dotnet run`, you can also access the frontend through the backend URL (`http://localhost:5000`) because of the SPA proxy. The API project is configured with `SpaProxyLaunchCommand=bun run dev`; you can also start `bun run dev` yourself before opening the backend URL.
 
 Production publish uses the checked-in `bun.lock` to build the SPA and copy `frontend/dist` into the API `wwwroot`.

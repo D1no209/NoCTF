@@ -1,4 +1,3 @@
-
 interface MockRoute {
   method: string
   path: string
@@ -15,12 +14,20 @@ interface MockConfig {
 const MOCK_HEADER = 'x-noctf-mock'
 let mockConfigPromise: Promise<MockConfig> | null = null
 
+export function areMocksEnabled(isDevelopment: boolean, configuredValue?: string) {
+  return isDevelopment && configuredValue === 'true'
+}
+
+function mocksEnabled() {
+  return areMocksEnabled(import.meta.env.DEV, import.meta.env.VITE_ENABLE_MOCKS)
+}
+
 function emptyConfig(): MockConfig {
   return { routes: [] }
 }
 
 async function loadMockConfig(baseFetch: typeof fetch): Promise<MockConfig> {
-  if (!import.meta.env.DEV)
+  if (!mocksEnabled())
     return emptyConfig()
 
   if (!mockConfigPromise) {
@@ -99,7 +106,7 @@ async function resolveMockBody(body: unknown, competitionId: string | null): Pro
     return body
 
   const generator = (body as Record<string, unknown>).__mockGenerate
-  if (!import.meta.env.DEV || typeof generator !== 'string')
+  if (!mocksEnabled() || typeof generator !== 'string')
     return null
 
   const id = competitionId ?? 'mock-competition'
@@ -119,7 +126,7 @@ async function resolveMockBody(body: unknown, competitionId: string | null): Pro
 
 export function createMockAwareFetch(baseFetch: typeof fetch): typeof fetch {
   return async (input, init) => {
-    if (!import.meta.env.DEV)
+    if (!mocksEnabled())
       return baseFetch(input, init)
 
     const url = normalizeUrl(input)
