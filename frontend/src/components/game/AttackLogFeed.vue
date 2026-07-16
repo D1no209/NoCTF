@@ -21,64 +21,43 @@ const props = defineProps<{
 const sortedLogs = computed(() => [...props.logs].reverse())
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 </script>
 
 <template>
-  <Card class="noctf-live-card flex h-full flex-col">
+  <Card class="flex h-full flex-col rounded-xl">
     <CardHeader>
       <CardTitle class="text-base flex items-center gap-2">
         {{ $t('awd.attackLog') }}
-        <Badge variant="attack" class="font-mono text-xs">{{ logs.length }}</Badge>
+        <Badge variant="secondary" class="font-mono text-xs">{{ logs.length }}</Badge>
       </CardTitle>
     </CardHeader>
     <CardContent class="flex-1 overflow-hidden p-0">
-      <div class="noctf-scrollbar h-full max-h-[500px] space-y-1.5 overflow-y-auto px-4 pb-4">
+      <div class="h-full max-h-[500px] space-y-1.5 overflow-y-auto px-4 pb-4">
         <div v-if="logs.length === 0" class="text-sm text-muted-foreground pt-2">
           {{ $t('awd.noAttacks') }}
         </div>
-        <div
+        <Card
           v-for="(log, i) in sortedLogs"
           :key="i"
-          class="log-entry rounded-md border border-border/40 bg-muted/40 px-2 py-1.5 text-xs"
+          class="p-2 gap-1"
         >
-          <div class="flex items-center justify-between gap-2 mb-0.5">
-            <span class="font-semibold text-foreground truncate">{{ log.attackerTeamName }}</span>
-            <span class="text-muted-foreground shrink-0">R{{ log.roundNumber }}</span>
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold text-foreground text-xs truncate">{{ log.attackerTeamName }}</span>
+            <span class="text-muted-foreground shrink-0 text-xs">R{{ log.roundNumber }}</span>
           </div>
-          <div class="flex items-center gap-1 text-muted-foreground">
-            <span class="text-attack">-&gt;</span>
+          <div class="flex items-center gap-1 text-xs text-muted-foreground">
+            <span class="text-destructive">-&gt;</span>
             <span class="truncate">{{ log.victimTeamName }}</span>
             <span class="mx-1">·</span>
-            <span class="truncate text-info">{{ log.challengeName }}</span>
+            <span class="truncate text-primary">{{ log.challengeName }}</span>
           </div>
-          <div class="text-[10px] text-muted-foreground/60 mt-0.5">
+          <div class="text-[10px] text-muted-foreground/60">
             {{ formatTime(log.timestamp) }}
           </div>
-        </div>
+        </Card>
       </div>
     </CardContent>
   </Card>
 </template>
-
-<style scoped>
-.log-entry {
-  animation: logEntryIn var(--motion-standard) var(--ease-out-expo) both;
-}
-
-@keyframes logEntryIn {
-  from {
-    opacity: 0;
-    transform: translateX(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-</style>

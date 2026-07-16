@@ -10,7 +10,6 @@ import type {
 } from '@/types/awdpScreen'
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { awdpScreenApi, buildSafeEventMessage, parseAwdpScreenEvent, parseAwdpScreenSnapshot } from '@/api/awdpScreen'
-import { createMockAwdpScreenSnapshot } from '@/mocks/awdpScreenMock'
 
 type MaybeRef<T> = T | Ref<T>
 
@@ -95,6 +94,13 @@ export function useAwdpScreenData(gameId: Ref<string>, options: UseAwdpScreenDat
     snapshotController = new AbortController()
 
     if (mockMode() === 'force') {
+      // Import is gated behind `import.meta.env.DEV` at the call sites, so this
+      // branch only runs in dev. The specifier is a variable guarded by
+      // `@vite-ignore` so Rollup does not emit a dev-only mock chunk into the
+      // production bundle.
+      const mockModulePath = import.meta.env.DEV ? '@/mocks/awdpScreenMock' : null
+      if (!mockModulePath) return
+      const { createMockAwdpScreenSnapshot } = await import(/* @vite-ignore */ mockModulePath)
       applySnapshot(createMockAwdpScreenSnapshot(id), true)
       isLoading.value = false
       return
@@ -134,7 +140,7 @@ export function useAwdpScreenData(gameId: Ref<string>, options: UseAwdpScreenDat
     }
 
     usingMock.value = mock
-    connectionStatus.value = mock ? 'mock' : 'connected'
+    connectionStatus.value = 'connected'
     lastSyncAt.value = new Date().toISOString()
     updateServerOffset(snapshot.value.game.serverTime)
   }
@@ -304,7 +310,6 @@ export function useAwdpScreenData(gameId: Ref<string>, options: UseAwdpScreenDat
     isLoading,
     error,
     connectionStatus,
-    usingMock,
     lastSyncAt,
     reconnectAttempts,
     refreshSnapshot,

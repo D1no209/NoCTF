@@ -5,7 +5,10 @@ import AwdpScreenPage from '@/components/awdp-screen/AwdpScreenPage.vue'
 
 const route = useRoute()
 const gameId = computed(() => route.params.gameId as string)
-const forceMock = computed(() => route.query.mock === '1' || route.query.mock === 'true')
+// Mock preview only works in dev builds; production ignores the query param.
+const forceMock = computed(() =>
+  import.meta.env.DEV && (route.query.mock === '1' || route.query.mock === 'true'),
+)
 </script>
 
 <template>

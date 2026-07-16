@@ -7,6 +7,24 @@ interface UserInfo {
   role: string
 }
 
+function readStoredUser(): UserInfo | null {
+  const storedUser = localStorage.getItem('authUser')
+  if (!storedUser)
+    return null
+
+  try {
+    const parsed = JSON.parse(storedUser) as Partial<UserInfo>
+    if (typeof parsed.userName === 'string' && typeof parsed.role === 'string')
+      return { userName: parsed.userName, role: parsed.role }
+  }
+  catch {
+    // A malformed persisted session should never prevent the app from booting.
+  }
+
+  localStorage.removeItem('authUser')
+  return null
+}
+
 function getTokenExpiry(token: string | null): number | null {
   if (!token) return null
 
@@ -28,41 +46,15 @@ function isExpired(token: string | null) {
   return expiresAt !== null && expiresAt <= Date.now()
 }
 
-function parseStoredUser(value: string | null): UserInfo | null {
-  if (!value) return null
-
-  try {
-    const parsed = JSON.parse(value)
-    if (
-      parsed &&
-      typeof parsed === 'object' &&
-      typeof parsed.userName === 'string' &&
-      typeof parsed.role === 'string'
-    ) {
-      return { userName: parsed.userName, role: parsed.role }
-    }
-  } catch {
-    // Invalid localStorage should clear the session instead of crashing the app shell.
-  }
-
-  return null
-}
-
-function clearStoredSession() {
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('authUser')
-}
-
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(localStorage.getItem('accessToken'))
-  const storedUser = localStorage.getItem('authUser')
-  const parsedUser = parseStoredUser(storedUser)
-  const user = ref<UserInfo | null>(parsedUser)
+  const user = ref<UserInfo | null>(readStoredUser())
 
-  if ((storedUser && !parsedUser) || isExpired(accessToken.value)) {
+  if (isExpired(accessToken.value)) {
     accessToken.value = null
     user.value = null
-    clearStoredSession()
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('authUser')
   }
 
   const isAuthenticated = computed(() => !!accessToken.value && !isExpired(accessToken.value))
@@ -92,7 +84,8 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     accessToken.value = null
     user.value = null
-    clearStoredSession()
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('authUser')
     setAuthToken(null)
   }
 

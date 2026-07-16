@@ -67,7 +67,6 @@ export type AwdpScreenConnectionStatus
     | 'connected'
     | 'reconnecting'
     | 'disconnected'
-    | 'mock'
 
 export interface AwdpScreenSnapshot {
   game: {

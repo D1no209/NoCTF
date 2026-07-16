@@ -23,12 +23,6 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
-      path: '/crash',
-      name: 'crash',
-      component: () => import('@/views/CrashView.vue'),
-      meta: { requiresAuth: false },
-    },
-    {
       path: '/competitions',
       name: 'competitions',
       component: () => import('@/views/CompetitionsView.vue'),
@@ -72,6 +66,11 @@ const router = createRouter({
           name: 'koh-dashboard',
           component: () => import('@/views/KohDashboardView.vue'),
         },
+        {
+          path: 'penetration',
+          name: 'penetration-dashboard',
+          component: () => import('@/views/PenetrationView.vue'),
+        },
       ],
     },
     {
@@ -108,9 +107,9 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
-          path: 'competitions/:id/qqbot',
-          name: 'admin-competition-qqbot',
-          component: () => import('@/views/admin/AdminCompetitionQqBotView.vue'),
+          path: 'competitions/:id/operations',
+          name: 'admin-competition-operations',
+          component: () => import('@/views/admin/AdminCompetitionOperationsView.vue'),
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
@@ -144,15 +143,15 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
-          path: 'qqbot',
-          name: 'admin-qqbot',
-          component: () => import('@/views/admin/AdminQqBotView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
-        },
-        {
           path: 'infrastructure',
           name: 'admin-infrastructure',
           component: () => import('@/views/admin/AdminInfrastructureView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
+        },
+        {
+          path: 'qqbot',
+          name: 'admin-qqbot',
+          component: () => import('@/views/admin/AdminQqBotView.vue'),
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
         },
         {

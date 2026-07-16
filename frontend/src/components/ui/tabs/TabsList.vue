@@ -1,5 +1,9 @@
+<script setup lang="ts">
+import { TabsList as TabsListPrimitive } from 'reka-ui'
+</script>
+
 <template>
-  <div class="inline-flex h-9 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+  <TabsListPrimitive class="inline-flex h-9 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
     <slot />
-  </div>
+  </TabsListPrimitive>
 </template>

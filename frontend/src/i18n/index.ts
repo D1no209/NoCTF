@@ -16,3 +16,7 @@ export const i18n = createI18n({
   fallbackLocale: 'en',
   messages,
 })
+
+export function translate(key: string, named?: Record<string, unknown>) {
+  return i18n.global.t(key, named ?? {})
+}

@@ -1,25 +1,16 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { TabsTrigger as TabsTriggerPrimitive } from 'reka-ui'
 
-defineProps<{
+const props = defineProps<{
   value: string
 }>()
-
-const activeValue = inject('tabs-value', { value: undefined as string | undefined })
-const setValue = inject<(value: string) => void>('tabs-set-value', () => {})
 </script>
 
 <template>
-  <button
-    type="button"
-    class="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-[background-color,color,box-shadow,opacity,transform] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50"
-    :class="
-      activeValue?.value === value
-        ? 'bg-background text-foreground shadow-sm'
-        : 'hover:text-foreground'
-    "
-    @click="setValue(value)"
+  <TabsTriggerPrimitive
+    :value="props.value"
+    class="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground"
   >
     <slot />
-  </button>
+  </TabsTriggerPrimitive>
 </template>

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ShieldAlert, Wrench } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import EmptyState from './EmptyState.vue'
 import ErrorState from './ErrorState.vue'
 import { Skeleton } from '@/components/ui/skeleton'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   loading?: boolean
@@ -19,10 +22,11 @@ const props = withDefaults(defineProps<{
   retryLabel?: string
 }>(), {
   loadingRows: 3,
-  loadingTitle: 'Loading...',
-  emptyTitle: 'No data',
-  errorTitle: 'Failed to load',
 })
+
+const resolvedLoadingTitle = () => props.loadingTitle || t('common.loading')
+const resolvedEmptyTitle = () => props.emptyTitle || t('state.noData')
+const resolvedErrorTitle = () => props.errorTitle || t('state.failedToLoad')
 
 const emit = defineEmits<{
   retry: []
@@ -31,31 +35,31 @@ const emit = defineEmits<{
 
 <template>
   <div v-if="props.loading" class="space-y-3">
-    <div class="text-sm text-muted-foreground">{{ loadingTitle }}</div>
+    <div class="text-sm text-muted-foreground">{{ resolvedLoadingTitle() }}</div>
     <Skeleton v-for="i in loadingRows" :key="i" class="h-12 w-full" />
   </div>
   <EmptyState
     v-else-if="props.forbidden"
     :icon="ShieldAlert"
-    title="Permission required"
-    description="You do not have access to this view."
+    :title="t('state.permissionRequired')"
+    :description="t('state.noAccessToView')"
   />
   <EmptyState
     v-else-if="props.unsupported"
     :icon="Wrench"
-    title="Unsupported"
-    description="This capability is not available yet."
+    :title="t('state.unsupported')"
+    :description="t('state.capabilityUnavailable')"
   />
   <ErrorState
     v-else-if="props.error"
-    :title="errorTitle"
+    :title="resolvedErrorTitle()"
     :message="errorMessage"
     :retry-label="retryLabel"
     @retry="emit('retry')"
   />
   <EmptyState
     v-else-if="props.empty"
-    :title="emptyTitle"
+    :title="resolvedEmptyTitle()"
     :description="emptyDescription"
   />
   <slot v-else />
