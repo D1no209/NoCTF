@@ -1,42 +1,6 @@
 import antfu from '@antfu/eslint-config'
 
-export default antfu(
-  {
-    ignores: ['src/api/generated/**', 'dist/**', 'node_modules/**', 'swagger.json'],
-    jsonc: false,
-    stylistic: false,
-    vue: true,
-    typescript: true,
-  },
-  {
-    rules: {
-      'antfu/curly': 'off',
-      'antfu/if-newline': 'off',
-      'antfu/top-level-function': 'off',
-      'e18e/prefer-static-regex': 'off',
-      'import/consistent-type-specifier-style': 'off',
-      'node/prefer-global/process': 'off',
-      'perfectionist/sort-imports': 'off',
-      'perfectionist/sort-named-imports': 'off',
-      'prefer-template': 'off',
-      'style/arrow-parens': 'off',
-      'style/brace-style': 'off',
-      'style/comma-dangle': 'off',
-      'style/indent': 'off',
-      'style/member-delimiter-style': 'off',
-      'style/no-trailing-spaces': 'off',
-      'style/operator-linebreak': 'off',
-      'style/quote-props': 'off',
-      'style/quotes': 'off',
-      'style/semi': 'off',
-      'vue/attributes-order': 'off',
-      'vue/custom-event-name-casing': 'off',
-      'vue/html-closing-bracket-newline': 'off',
-      'vue/html-indent': 'off',
-      'vue/html-self-closing': 'off',
-      'vue/multiline-html-element-content-newline': 'off',
-      'vue/operator-linebreak': 'off',
-      'vue/singleline-html-element-content-newline': 'off',
-    },
-  },
-)
+export default antfu({
+  vue: true,
+  typescript: true,
+})

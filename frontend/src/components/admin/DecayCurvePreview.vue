@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 
 interface DecayCurveConfig {
   initialPoints?: number | string | null
@@ -224,7 +225,7 @@ function updateHoverPoint(event: MouseEvent) {
 </script>
 
 <template>
-  <div class="rounded-lg border bg-muted/30 p-3">
+  <Card class="p-3">
     <div class="mb-2 flex items-center justify-between">
       <div>
         <div class="text-sm font-medium">
@@ -316,5 +317,5 @@ function updateHoverPoint(event: MouseEvent) {
         </g>
       </g>
     </svg>
-  </div>
+  </Card>
 </template>

@@ -11,29 +11,24 @@ defineProps<{
 </script>
 
 <template>
-  <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+  <header class="flex flex-col gap-3 border-b-2 border-border pb-3 sm:flex-row sm:items-start sm:justify-between">
     <div class="min-w-0 space-y-2">
       <RouterLink
         v-if="backTo"
         :to="backTo"
-        class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] hover:text-foreground"
+        class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft class="size-4" />
         {{ backLabel }}
       </RouterLink>
       <div>
-        <h1 class="break-words text-2xl font-bold tracking-tight sm:truncate md:text-3xl">
-          {{ title }}
-        </h1>
+        <h1 class="truncate text-2xl font-bold tracking-tight md:text-3xl">{{ title }}</h1>
         <p v-if="description" class="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
           {{ description }}
         </p>
       </div>
     </div>
-    <div
-      v-if="$slots.actions"
-      class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end"
-    >
+    <div v-if="$slots.actions" class="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
       <slot name="actions" />
     </div>
   </header>

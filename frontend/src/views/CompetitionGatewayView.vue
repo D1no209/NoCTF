@@ -2,13 +2,13 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import { ApiError, competitionApi } from '@/api/noctf'
+import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import DataState from '@/components/state/DataState.vue'
 import CompetitionDetailView from './CompetitionDetailView.vue'
 import AwdDashboardView from './AwdDashboardView.vue'
 import KohDashboardView from './KohDashboardView.vue'
-import NotFoundView from './NotFoundView.vue'
-import { Button } from '@/components/ui/button'
+import PenetrationView from './PenetrationView.vue'
 
 const route = useRoute()
 const id = computed(() => route.params.id as string)
@@ -20,9 +20,9 @@ interface CompetitionDetail {
 
 const {
   data: competition,
-  isLoading,
-  isError,
   error,
+  isError,
+  isLoading,
   refetch,
 } = useQuery({
   queryKey: computed(() => queryKeys.competition(id.value)),
@@ -31,30 +31,31 @@ const {
 })
 
 const mode = computed(() => competition.value?.gameModeType?.toLowerCase())
-const isNotFound = computed(() => error.value instanceof ApiError && error.value.status === 404)
 </script>
 
 <template>
-  <NotFoundView v-if="isNotFound" />
-  <CompetitionDetailView v-else-if="mode === 'ctf' || mode === 'awdp'" />
-  <AwdDashboardView v-else-if="mode === 'awd'" />
-  <KohDashboardView v-else-if="mode === 'koh'" />
-  <div v-else-if="isLoading" class="flex items-center justify-center min-h-screen text-muted-foreground">
-    {{ $t('common.loading') }}
+  <div class="mx-auto flex min-h-screen w-full max-w-6xl items-center px-4 py-8">
+    <DataState
+      v-if="isLoading"
+      class="w-full"
+      loading
+    />
+    <DataState
+      v-else-if="isError"
+      class="w-full"
+      error
+      :error-message="error instanceof Error ? error.message : undefined"
+      :retry-label="$t('common.refresh')"
+      @retry="refetch"
+    />
+    <DataState
+      v-else-if="mode !== 'ctf' && mode !== 'awdp' && mode !== 'awd' && mode !== 'koh' && mode !== 'penetration'"
+      class="w-full"
+      unsupported
+    />
+    <CompetitionDetailView v-else-if="mode === 'ctf' || mode === 'awdp'" class="w-full" />
+    <AwdDashboardView v-else-if="mode === 'awd'" class="w-full" />
+    <KohDashboardView v-else-if="mode === 'koh'" class="w-full" />
+    <PenetrationView v-else class="w-full" />
   </div>
-  <div
-    v-else-if="isError"
-    class="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-4 px-4 text-center"
-  >
-    <div>
-      <h1 class="text-xl font-semibold">{{ $t('errors.loadFailed') }}</h1>
-      <p class="mt-2 text-sm text-muted-foreground">
-        {{ $t('errors.genericError') }}
-      </p>
-    </div>
-    <Button type="button" variant="outline" @click="refetch()">
-      {{ $t('common.refresh') }}
-    </Button>
-  </div>
-  <NotFoundView v-else />
 </template>

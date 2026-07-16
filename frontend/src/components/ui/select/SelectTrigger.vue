@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import type { SelectTriggerProps } from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
-import { reactiveOmit } from '@vueuse/core'
-import { ChevronDown } from 'lucide-vue-next'
-import { SelectIcon, SelectTrigger, useForwardProps } from 'reka-ui'
-import { cn } from '@/lib/utils'
+import type { SelectTriggerProps } from "reka-ui"
+import type { HTMLAttributes } from "vue"
+import { reactiveOmit } from "@vueuse/core"
+import { ChevronDown } from "lucide-vue-next"
+import { SelectIcon, SelectTrigger, useForwardProps } from "reka-ui"
+import { cn } from "@/lib/utils"
 
-const props = defineProps<SelectTriggerProps & { class?: HTMLAttributes['class'] }>()
+const props = defineProps<SelectTriggerProps & { class?: HTMLAttributes["class"] }>()
 
-const delegatedProps = reactiveOmit(props, 'class')
+const delegatedProps = reactiveOmit(props, "class")
 
 const forwardedProps = useForwardProps(delegatedProps)
 </script>
@@ -16,12 +16,10 @@ const forwardedProps = useForwardProps(delegatedProps)
 <template>
   <SelectTrigger
     v-bind="forwardedProps"
-    :class="
-      cn(
-        'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background/80 px-3 py-2 text-sm shadow-none ring-offset-background transition-[background-color,border-color,box-shadow,color,opacity] duration-[var(--motion-fast)] ease-[var(--ease-out-quint)] data-[placeholder]:text-muted-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-11 [&>span]:truncate text-start',
-        props.class,
-      )
-    "
+      :class="cn(
+      'flex h-10 w-full items-center justify-between border-2 border-input bg-card px-3 py-2 text-sm transition-colors data-[placeholder]:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate text-start',
+      props.class,
+    )"
   >
     <slot />
     <SelectIcon as-child>
