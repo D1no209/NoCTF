@@ -1,5 +1,9 @@
 import type { AwdpScreenEvent, AwdpScreenEventLevel, AwdpScreenEventType, AwdpScreenSnapshot } from '@/types/awdpScreen'
 import { ApiError, apiUrl } from '@/api/noctf'
+import { createMockAwareFetch } from '@/mocks/runtime'
+import { translate as tt } from '@/i18n'
+
+const appFetch = import.meta.env.DEV ? createMockAwareFetch(globalThis.fetch) : globalThis.fetch
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('accessToken')
@@ -7,7 +11,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function requestJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(apiUrl(url), {
+  const response = await appFetch(apiUrl(url), {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -17,14 +21,14 @@ async function requestJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   })
 
   if (!response.ok) {
-    throw new ApiError('Failed to load AWDP screen data', response.status)
+    throw new ApiError(tt('errors.awdpScreenLoad'), response.status)
   }
 
   const contentType = response.headers.get('content-type') ?? ''
   const body = await response.text()
   if (!contentType.toLowerCase().includes('application/json')) {
     throw new ApiError(
-      'AWDP screen endpoint did not return JSON. Rebuild or restart the backend so /api/awdp/screen/snapshot is registered.',
+      tt('errors.awdpScreenNonJson'),
       response.status,
       body.slice(0, 160),
     )
@@ -34,7 +38,7 @@ async function requestJson<T>(url: string, signal?: AbortSignal): Promise<T> {
     return JSON.parse(body) as T
   }
   catch (err) {
-    throw new ApiError('AWDP screen endpoint returned invalid JSON', response.status, err)
+    throw new ApiError(tt('errors.awdpScreenInvalidJson'), response.status, err)
   }
 }
 
@@ -91,39 +95,39 @@ export function parseAwdpScreenSnapshot(raw: unknown): AwdpScreenSnapshot | null
 }
 
 export function buildSafeEventMessage(event: Pick<AwdpScreenEvent, 'round' | 'type' | 'teamName' | 'challengeName'>) {
-  const round = event.round > 0 ? `Round ${event.round}` : 'Round'
-  const team = event.teamName ?? 'Team'
-  const challenge = event.challengeName ?? 'challenge'
+  const round = event.round > 0 ? tt('awdpScreen.events.roundFallback') + ' ' + event.round : tt('awdpScreen.events.roundFallback')
+  const team = event.teamName ?? tt('awdpScreen.events.teamFallback')
+  const challenge = event.challengeName ?? tt('awdpScreen.events.challengeFallback')
 
   switch (event.type) {
     case 'ROUND_STARTED':
-      return `${round} started`
+      return tt('awdpScreen.events.roundStarted', { round })
     case 'ROUND_ENDED':
-      return `${round} ended`
+      return tt('awdpScreen.events.roundEnded', { round })
     case 'CHALLENGE_SELECTED':
-      return `${round} / ${team} selected ${challenge}`
+      return tt('awdpScreen.events.challengeSelected', { round, team, challenge })
     case 'INSTANCE_CREATED':
-      return `${round} / ${team} created ${challenge} instance`
+      return tt('awdpScreen.events.instanceCreated', { round, team, challenge })
     case 'DEFENSE_REQUESTED':
-      return `${round} / ${team} requested defense on ${challenge}`
+      return tt('awdpScreen.events.defenseRequested', { round, team, challenge })
     case 'PATCH_UPLOADED':
-      return `${round} / ${team} uploaded patch for ${challenge}`
+      return tt('awdpScreen.events.patchUploaded', { round, team, challenge })
     case 'DEFENSE_CHECK_PASSED':
-      return `${round} / ${team} defense succeeded on ${challenge}`
+      return tt('awdpScreen.events.defensePassed', { round, team, challenge })
     case 'DEFENSE_CHECK_FAILED':
-      return `${round} / ${team} defense failed on ${challenge}`
+      return tt('awdpScreen.events.defenseFailed', { round, team, challenge })
     case 'ATTACK_SUBMITTED':
-      return `${round} / ${team} submitted attack on ${challenge}`
+      return tt('awdpScreen.events.attackSubmitted', { round, team, challenge })
     case 'ATTACK_ACCEPTED':
-      return `${round} / ${team} attack succeeded on ${challenge}`
+      return tt('awdpScreen.events.attackAccepted', { round, team, challenge })
     case 'ATTACK_REJECTED':
-      return `${round} / ${team} attack failed on ${challenge}`
+      return tt('awdpScreen.events.attackRejected', { round, team, challenge })
     case 'SERVICE_ERROR':
-      return `${round} / ${team} ${challenge} service error`
+      return tt('awdpScreen.events.serviceError', { round, team, challenge })
     case 'SCORE_UPDATED':
-      return `${round} / ${team} round score settled`
+      return tt('awdpScreen.events.scoreUpdated', { round, team })
     case 'TEAM_RANK_CHANGED':
-      return `${round} / ${team} rank changed`
+      return tt('awdpScreen.events.rankChanged', { round, team })
   }
 }
 

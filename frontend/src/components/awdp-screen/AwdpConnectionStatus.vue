@@ -1,59 +1,53 @@
 <script setup lang="ts">
 import type { AwdpScreenConnectionStatus } from '@/types/awdpScreen'
-import { Radio, RefreshCw, Wifi, WifiOff } from 'lucide-vue-next'
+import { RefreshCw, Wifi, WifiOff } from 'lucide-vue-next'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   status: AwdpScreenConnectionStatus
-  usingMock: boolean
   reconnectAttempts: number
   lastSyncAt?: string | null
 }>()
 
+const { t } = useI18n()
+
 const statusView = computed(() => {
-  if (props.usingMock || props.status === 'mock') {
-    return {
-      label: 'Mock feed',
-      detail: 'central mock data',
-      tone: 'connection-warning',
-      icon: Radio,
-    }
-  }
   if (props.status === 'connected') {
     return {
-      label: 'Live',
+      label: t('awdpScreen.connection.live'),
       detail: formatTime(props.lastSyncAt),
-      tone: 'connection-live',
+      tone: 'text-cyan-700 bg-cyan-100/50 border-cyan-300/50',
       icon: Wifi,
     }
   }
   if (props.status === 'reconnecting') {
     return {
-      label: 'Reconnecting',
-      detail: `attempt ${Math.max(1, props.reconnectAttempts)}`,
-      tone: 'connection-warning',
+      label: t('awdpScreen.connection.reconnecting'),
+      detail: t('awdpScreen.connection.attempt', { count: Math.max(1, props.reconnectAttempts) }),
+      tone: 'text-orange-700 bg-orange-100/50 border-orange-300/50',
       icon: RefreshCw,
     }
   }
   if (props.status === 'connecting') {
     return {
-      label: 'Connecting',
-      detail: 'opening stream',
-      tone: 'connection-neutral',
+      label: t('awdpScreen.connection.connecting'),
+      detail: t('awdpScreen.connection.openingStream'),
+      tone: 'text-slate-700 bg-slate-100/50 border-slate-300/40',
       icon: RefreshCw,
     }
   }
   return {
-    label: 'Offline',
-    detail: 'snapshot only',
-    tone: 'connection-danger',
+    label: t('awdpScreen.connection.offline'),
+    detail: t('awdpScreen.connection.snapshotOnly'),
+    tone: 'text-rose-700 bg-rose-100/50 border-rose-300/50',
     icon: WifiOff,
   }
 })
 
 function formatTime(value?: string | null) {
   if (!value)
-    return 'synced'
+    return t('awdpScreen.connection.synced')
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
@@ -64,7 +58,7 @@ function formatTime(value?: string | null) {
 
 <template>
   <div
-    class="inline-flex min-w-[11rem] items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"
+    class="inline-flex min-w-[11rem] items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs"
     :class="statusView.tone"
   >
     <div class="flex min-w-0 items-center gap-2">
@@ -78,29 +72,3 @@ function formatTime(value?: string | null) {
     <span class="shrink-0 font-mono text-[11px] opacity-75">{{ statusView.detail }}</span>
   </div>
 </template>
-
-<style scoped>
-.connection-live {
-  border-color: color-mix(in oklch, var(--awdp-fix) 26%, transparent);
-  background: color-mix(in oklch, var(--awdp-fix) 8%, transparent);
-  color: color-mix(in oklch, var(--sidebar-foreground) 92%, var(--awdp-fix));
-}
-
-.connection-warning {
-  border-color: color-mix(in oklch, var(--awdp-warn) 28%, transparent);
-  background: color-mix(in oklch, var(--awdp-warn) 9%, transparent);
-  color: color-mix(in oklch, var(--sidebar-foreground) 88%, var(--awdp-warn));
-}
-
-.connection-danger {
-  border-color: color-mix(in oklch, var(--awdp-error) 28%, transparent);
-  background: color-mix(in oklch, var(--awdp-error) 9%, transparent);
-  color: color-mix(in oklch, var(--sidebar-foreground) 88%, var(--awdp-error));
-}
-
-.connection-neutral {
-  border-color: color-mix(in oklch, var(--sidebar-foreground) 20%, transparent);
-  background: color-mix(in oklch, var(--sidebar-foreground) 8%, transparent);
-  color: color-mix(in oklch, var(--sidebar-foreground) 82%, transparent);
-}
-</style>
