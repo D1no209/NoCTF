@@ -188,11 +188,11 @@
       },
       "pixel-body": {
         "displayName": "Pixel Body",
-        "purpose": "Default UI copy, tables, forms, and descriptions."
+        "purpose": "Default mosaic UI copy, tables, forms, descriptions, and captions."
       },
       "pixel-label": {
         "displayName": "Pixel Label",
-        "purpose": "Buttons, field captions, badges, and compact state markers."
+        "purpose": "Buttons and prominent or compact state markers, never below the 0.8rem pixel minimum."
       }
     },
     "shadows": [
@@ -259,7 +259,7 @@
       "refersTo": "pixel-button-primary",
       "description": "The decisive action control in the current Pixel Industrial theme.",
       "html": "<button class=\"ds-pixel-button-primary\">SUBMIT FLAG</button>",
-      "css": ".ds-pixel-button-primary { display:inline-flex; align-items:center; justify-content:center; min-height:2.5rem; border:2px solid #1b1b1b; border-radius:0; background:var(--primary, #2f2f2f); color:var(--primary-foreground, #f5f5f5); padding:0.5rem 1rem; font:700 0.875rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; box-shadow:2px 2px 0 #8c8c8c; transition:transform 75ms ease-out, background-color 75ms ease-out, border-color 75ms ease-out; } .ds-pixel-button-primary:hover { background:#3a3a3a; } .ds-pixel-button-primary:active { transform:translate(1px, 1px); } .ds-pixel-button-primary:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
+      "css": ".ds-pixel-button-primary { display:inline-flex; align-items:center; justify-content:center; min-height:2.5rem; border:2px solid #1b1b1b; border-radius:0; background:var(--primary, #2f2f2f); color:var(--primary-foreground, #f5f5f5); padding:0.5rem 1rem; font:700 0.9rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; box-shadow:2px 2px 0 #8c8c8c; transition:transform 75ms ease-out, background-color 75ms ease-out, border-color 75ms ease-out; } .ds-pixel-button-primary:hover { background:#3a3a3a; } .ds-pixel-button-primary:active { transform:translate(1px, 1px); } .ds-pixel-button-primary:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
     },
     {
       "name": "Pixel Outline Button",
@@ -267,7 +267,7 @@
       "refersTo": "pixel-button-outline",
       "description": "A secondary mechanical action for refresh, cancel, and lower-risk commands.",
       "html": "<button class=\"ds-pixel-button-outline\">REFRESH</button>",
-      "css": ".ds-pixel-button-outline { display:inline-flex; align-items:center; justify-content:center; min-height:2.5rem; border:2px solid #7f7f7f; border-radius:0; background:#e5e5e5; color:var(--foreground, #242424); padding:0.5rem 1rem; font:700 0.875rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; box-shadow:2px 2px 0 #c7c7c7; transition:transform 75ms ease-out, background-color 75ms ease-out; } .ds-pixel-button-outline:hover { background:#d8d8d8; } .ds-pixel-button-outline:active { transform:translate(1px, 1px); } .ds-pixel-button-outline:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
+      "css": ".ds-pixel-button-outline { display:inline-flex; align-items:center; justify-content:center; min-height:2.5rem; border:2px solid #7f7f7f; border-radius:0; background:#e5e5e5; color:var(--foreground, #242424); padding:0.5rem 1rem; font:700 0.9rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; box-shadow:2px 2px 0 #c7c7c7; transition:transform 75ms ease-out, background-color 75ms ease-out; } .ds-pixel-button-outline:hover { background:#d8d8d8; } .ds-pixel-button-outline:active { transform:translate(1px, 1px); } .ds-pixel-button-outline:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
     },
     {
       "name": "Pixel Input Field",
@@ -275,7 +275,7 @@
       "refersTo": "pixel-input",
       "description": "The square two-pixel field used across filters and forms.",
       "html": "<label class=\"ds-pixel-field\"><span>TEAM NAME</span><input class=\"ds-pixel-input\" placeholder=\"Enter team name\" /></label>",
-      "css": ".ds-pixel-field { display:grid; gap:0.375rem; color:var(--muted-foreground, #5a5a5a); font:700 0.75rem/1.25 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; } .ds-pixel-input { min-height:2.5rem; border:2px solid var(--input, #a2a2a2); border-radius:0; background:var(--card, #eeeeee); color:var(--foreground, #242424); padding:0.25rem 0.75rem; font:400 0.875rem/1.5 var(--font-sans, monospace); transition:border-color 75ms ease-out, box-shadow 75ms ease-out; } .ds-pixel-input::placeholder { color:var(--muted-foreground, #5a5a5a); } .ds-pixel-input:focus { outline:none; border-color:var(--primary, #2f2f2f); box-shadow:0 0 0 2px rgb(58 58 58 / 0.2); }"
+      "css": ".ds-pixel-field { display:grid; gap:0.375rem; color:var(--muted-foreground, #5a5a5a); font:700 0.9rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; } .ds-pixel-input { min-height:2.5rem; border:2px solid var(--input, #a2a2a2); border-radius:0; background:var(--card, #eeeeee); color:var(--foreground, #242424); padding:0.25rem 0.75rem; font:400 0.9rem/1.5 var(--font-sans, monospace); transition:border-color 75ms ease-out, box-shadow 75ms ease-out; } .ds-pixel-input::placeholder { color:var(--muted-foreground, #5a5a5a); } .ds-pixel-input:focus { outline:none; border-color:var(--primary, #2f2f2f); box-shadow:0 0 0 2px rgb(58 58 58 / 0.2); }"
     },
     {
       "name": "Pixel Status Badge",
@@ -283,7 +283,7 @@
       "refersTo": "pixel-badge",
       "description": "A compact pixel-ellipse label for mode and operational state.",
       "html": "<span class=\"ds-pixel-badge\">RUNNING</span>",
-      "css": ".ds-pixel-badge { display:inline-flex; align-items:center; justify-content:center; width:max-content; background:var(--primary, #2f2f2f); color:var(--primary-foreground, #f5f5f5); padding:0.125rem 0.5rem; font:700 0.75rem/1.25 var(--font-sans, monospace); letter-spacing:0.05em; clip-path:polygon(12.5% 0%,87.5% 0%,87.5% 6.25%,93.75% 6.25%,93.75% 12.5%,96.875% 12.5%,96.875% 25%,98.4375% 25%,98.4375% 37.5%,100% 37.5%,100% 62.5%,98.4375% 62.5%,98.4375% 75%,96.875% 75%,96.875% 87.5%,93.75% 87.5%,93.75% 93.75%,87.5% 93.75%,87.5% 100%,12.5% 100%,12.5% 93.75%,6.25% 93.75%,6.25% 87.5%,3.125% 87.5%,3.125% 75%,1.5625% 75%,1.5625% 62.5%,0% 62.5%,0% 37.5%,1.5625% 37.5%,1.5625% 25%,3.125% 25%,3.125% 12.5%,6.25% 12.5%,6.25% 6.25%,12.5% 6.25%); } .ds-pixel-badge:hover { background:#3a3a3a; } .ds-pixel-badge:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
+      "css": ".ds-pixel-badge { display:inline-flex; align-items:center; justify-content:center; width:max-content; background:var(--primary, #2f2f2f); color:var(--primary-foreground, #f5f5f5); padding:0.125rem 0.5rem; font:700 0.8rem/1.5 var(--font-sans, monospace); letter-spacing:0.05em; clip-path:polygon(12.5% 0%,87.5% 0%,87.5% 6.25%,93.75% 6.25%,93.75% 12.5%,96.875% 12.5%,96.875% 25%,98.4375% 25%,98.4375% 37.5%,100% 37.5%,100% 62.5%,98.4375% 62.5%,98.4375% 75%,96.875% 75%,96.875% 87.5%,93.75% 87.5%,93.75% 93.75%,87.5% 93.75%,87.5% 100%,12.5% 100%,12.5% 93.75%,6.25% 93.75%,6.25% 87.5%,3.125% 87.5%,3.125% 75%,1.5625% 75%,1.5625% 62.5%,0% 62.5%,0% 37.5%,1.5625% 37.5%,1.5625% 25%,3.125% 25%,3.125% 12.5%,6.25% 12.5%,6.25% 6.25%,12.5% 6.25%); } .ds-pixel-badge:hover { background:#3a3a3a; } .ds-pixel-badge:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
     },
     {
       "name": "Pixel Competition Card",
@@ -291,7 +291,7 @@
       "refersTo": "pixel-card-default",
       "description": "A bordered equipment face with a raster corner signature.",
       "html": "<article class=\"ds-pixel-card\"><div class=\"ds-pixel-card-meta\">RUNNING · AWD</div><h3>SPRING ATTACK DEFENSE</h3><p>Live competition workspace with service and score state.</p><span class=\"ds-pixel-corner\" aria-hidden=\"true\"></span></article>",
-      "css": ".ds-pixel-card { position:relative; display:flex; flex-direction:column; gap:1rem; max-width:24rem; overflow:hidden; border:2px solid var(--card-border-color, #8b8b8b); border-radius:0; background:var(--card, #eeeeee); color:var(--card-foreground, #242424); padding:1rem; box-shadow:2px 2px 0 #bdbdbd; } .ds-pixel-card h3 { margin:0; font:700 1.25rem/1.25 var(--font-sans, monospace); } .ds-pixel-card p { max-width:65ch; margin:0; color:var(--muted-foreground, #5a5a5a); font:400 0.875rem/1.5 var(--font-sans, monospace); } .ds-pixel-card-meta { font:700 0.75rem/1.25 var(--font-sans, monospace); letter-spacing:0.12em; } .ds-pixel-corner { position:absolute; right:-4px; bottom:-4px; width:64px; height:64px; opacity:0.45; background:repeating-linear-gradient(135deg, transparent 0 8px, #000 8px 16px); clip-path:polygon(100% 0,100% 100%,0 100%); }"
+      "css": ".ds-pixel-card { position:relative; display:flex; flex-direction:column; gap:1rem; max-width:24rem; overflow:hidden; border:2px solid var(--card-border-color, #8b8b8b); border-radius:0; background:var(--card, #eeeeee); color:var(--card-foreground, #242424); padding:1rem; box-shadow:2px 2px 0 #bdbdbd; } .ds-pixel-card h3 { margin:0; font:700 1.25rem/1.25 var(--font-sans, monospace); } .ds-pixel-card p { max-width:65ch; margin:0; color:var(--muted-foreground, #5a5a5a); font:400 0.9rem/1.5 var(--font-sans, monospace); } .ds-pixel-card-meta { font:700 0.8rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; } .ds-pixel-corner { position:absolute; right:-4px; bottom:-4px; width:64px; height:64px; opacity:0.45; background:repeating-linear-gradient(135deg, transparent 0 8px, #000 8px 16px); clip-path:polygon(100% 0,100% 100%,0 100%); }"
     },
     {
       "name": "Layered Pixel Panel",
@@ -307,7 +307,7 @@
       "refersTo": "pixel-card-default",
       "description": "The public navigation bar with mechanical active-route feedback.",
       "html": "<nav class=\"ds-pixel-nav\"><strong>NoCTF</strong><a class=\"ds-pixel-nav-active\" href=\"#\">HOME</a><a href=\"#\">COMPETITIONS</a><a href=\"#\">TEAMS</a></nav>",
-      "css": ".ds-pixel-nav { display:flex; align-items:center; gap:0.5rem; min-height:4rem; border-bottom:2px solid var(--border, #8b8b8b); background:var(--muted, #dddddd); color:var(--foreground, #242424); padding:0 1rem; font-family:var(--font-sans, monospace); } .ds-pixel-nav strong { margin-right:1rem; font-size:1.25rem; } .ds-pixel-nav a { border-bottom:2px solid transparent; color:var(--muted-foreground, #5a5a5a); padding:0.5rem 0.75rem; text-decoration:none; font-size:0.875rem; font-weight:700; letter-spacing:0.05em; transition:background-color 75ms ease-out, color 75ms ease-out, border-color 75ms ease-out; } .ds-pixel-nav a:hover { background:var(--accent, #cdcdcd); color:var(--foreground, #242424); } .ds-pixel-nav .ds-pixel-nav-active { border-color:var(--primary, #2f2f2f); background:var(--accent, #cdcdcd); color:var(--foreground, #242424); } .ds-pixel-nav a:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
+      "css": ".ds-pixel-nav { display:flex; align-items:center; gap:0.5rem; min-height:4rem; border-bottom:2px solid var(--border, #8b8b8b); background:var(--muted, #dddddd); color:var(--foreground, #242424); padding:0 1rem; font-family:var(--font-sans, monospace); } .ds-pixel-nav strong { margin-right:1rem; font-size:1.25rem; } .ds-pixel-nav a { border-bottom:2px solid transparent; color:var(--muted-foreground, #5a5a5a); padding:0.5rem 0.75rem; text-decoration:none; font-size:0.9rem; font-weight:700; letter-spacing:0.05em; transition:background-color 75ms ease-out, color 75ms ease-out, border-color 75ms ease-out; } .ds-pixel-nav a:hover { background:var(--accent, #cdcdcd); color:var(--foreground, #242424); } .ds-pixel-nav .ds-pixel-nav-active { border-color:var(--primary, #2f2f2f); background:var(--accent, #cdcdcd); color:var(--foreground, #242424); } .ds-pixel-nav a:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
     }
   ],
   "narrative": {
@@ -355,6 +355,11 @@
       {
         "name": "The Theme Typography Rule",
         "body": "A theme may change its developer-supplied family and character, but it must preserve the five hierarchy roles, readable CJK coverage, stable control dimensions, and code-safe fallbacks.",
+        "section": "typography"
+      },
+      {
+        "name": "The Pixel Minimum Rule",
+        "body": "Pixel glyphs are never rendered below 0.8rem. Compact roles gain space or truncate rather than switching fonts or shrinking the bitmap face further.",
         "section": "typography"
       },
       {
