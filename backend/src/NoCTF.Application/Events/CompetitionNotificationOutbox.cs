@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace NoCTF.Application.Events;
 
@@ -60,6 +61,39 @@ public sealed record CompetitionNotification(
 public interface ICompetitionNotificationOutbox
 {
     void Add(CompetitionNotification notification);
+}
+
+public interface ICompetitionNotificationSink
+{
+    void Add(CompetitionNotification notification);
+}
+
+public sealed class CompositeCompetitionNotificationOutbox(
+    IEnumerable<ICompetitionNotificationSink> sinks,
+    ILogger<CompositeCompetitionNotificationOutbox> logger)
+    : ICompetitionNotificationOutbox
+{
+    public void Add(CompetitionNotification notification)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+
+        foreach (var sink in sinks)
+        {
+            try
+            {
+                sink.Add(notification);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(
+                    exception,
+                    "Competition notification sink {SinkType} rejected event {EventType} ({IdempotencyKey})",
+                    sink.GetType().Name,
+                    notification.Type,
+                    notification.IdempotencyKey);
+            }
+        }
+    }
 }
 
 public sealed class NullCompetitionNotificationOutbox : ICompetitionNotificationOutbox

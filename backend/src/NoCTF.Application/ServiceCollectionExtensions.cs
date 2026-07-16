@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.BackgroundTasks;
 using NoCTF.Application.CompetitionModes;
 using NoCTF.Application.Events;
+using NoCTF.Application.Notifications;
 using NoCTF.Application.QqBot;
 using NoCTF.Application.Scoring;
 
@@ -18,7 +19,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChallengeAdminFeatureRegistry, ChallengeAdminFeatureRegistry>();
         services.AddScoped<ICompetitionJobRegistry, CompetitionJobRegistry>();
         services.AddScoped<ICompetitionJobHandler, CtfScoreRebuildJobHandler>();
-        services.AddScoped<ICompetitionNotificationOutbox, NullCompetitionNotificationOutbox>();
+        services.AddScoped<ICompetitionNotificationSink, UserNotificationOutbox>();
+        services.AddScoped<ICompetitionNotificationOutbox, CompositeCompetitionNotificationOutbox>();
+        services.AddScoped<IUserNotificationService, UserNotificationService>();
         services.AddScoped<IQqBotAdministrationService, UnavailableQqBotService>();
         services.AddScoped<IQqBotAgentService, UnavailableQqBotService>();
         services.AddSingleton<ICompetitionExecutionLease, CompetitionExecutionLease>();

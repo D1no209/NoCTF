@@ -6,7 +6,7 @@ using NoCTF.Infrastructure;
 
 namespace NoCTF.Plugins.QQBot;
 
-internal sealed class QqBotNotificationOutbox(ApplicationDbContext db) : ICompetitionNotificationOutbox
+internal sealed class QqBotNotificationOutbox(ApplicationDbContext db) : ICompetitionNotificationSink
 {
     public void Add(CompetitionNotification notification)
     {
