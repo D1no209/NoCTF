@@ -402,12 +402,12 @@ The current work covers plugin-host fail-fast behavior, score and task idempoten
 Latest verification status:
 
 - Release solution build: 0 warnings, 0 errors.
-- Complete Release suite with real PostgreSQL 16 and Redis 7: 475/475 passed. The EF InMemory test helper now reuses option-compatible service providers without suppressing the production warning.
+- Complete Release suite with real PostgreSQL 16 and Redis 7: 479/479 passed. The EF InMemory test helper now reuses option-compatible service providers without suppressing the production warning; the notification payload boundary regression is included in this count.
 - `SubmissionMutationGuard` lease, transaction, cancellation, rollback, and release paths were manually reviewed for CTF, Penetration, AWDP, and AWD. AWD rollback remains available after mutation-token cancellation.
 - Analyzer and whitespace checks passed; the EF migration model has no pending changes.
 - An empty PostgreSQL database passed full upgrade, latest-migration rollback/reapply, full downgrade to `0`, and full re-upgrade.
-- OpenAPI was fetched from a running API and regenerated idempotently. The contract change is the expected `before`/`limit` pagination on AWDP patch submissions; generator template changes follow the security upgrade to `@hey-api/openapi-ts` 0.97.3.
-- Frontend frozen install, lint, and production build passed. NuGet vulnerability/deprecation scans and `bun audit` are clean.
+- OpenAPI was fetched from a running API and regenerated idempotently. Contract changes are the expected `before`/`limit` pagination on AWDP patch submissions and the authenticated notification inbox endpoints; generator template changes follow the security upgrade to `@hey-api/openapi-ts` 0.97.3.
+- Frontend frozen install, all 8 focused tests, type-check, and production build passed. NuGet vulnerability/deprecation scans and `bun audit` are clean. The repository-wide ESLint run still reports the pre-existing generated/UI-scaffold baseline; the newly added notification files pass targeted lint and no unrelated bulk formatting was applied.
 - Compose parsing and kubeconform strict passed (47 valid resources, 0 invalid/errors/skipped). Local `kubectl apply --dry-run=client` could not perform API discovery because no cluster is configured at `localhost:8080`; this is not a manifest validation failure.
 - API and Worker publish outputs contain the five required game/challenge plugin assemblies plus the optional QQBot assembly. Temporary PostgreSQL/Redis validation containers were removed.
 - Frontend authentication now refreshes active sessions two minutes before access-token expiry, coalesces concurrent refresh attempts, retries transient refresh failures without discarding a still-valid token, and updates route guards, API requests, and SignalR token callbacks from the renewed session. The backend's existing absolute session limit and unauthorized-response behavior remain unchanged. Focused auth tests, frontend type-check/production build, and a real login-refresh-admin API sequence pass.
