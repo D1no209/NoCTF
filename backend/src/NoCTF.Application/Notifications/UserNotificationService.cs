@@ -134,7 +134,7 @@ public sealed class UserNotificationOutbox(ApplicationDbContext db) : ICompetiti
             .Where(item => item.IdempotencyKey == notification.IdempotencyKey && recipientIds.Contains(item.UserId))
             .Select(item => item.UserId)
             .ToHashSet();
-        var dataJson = JsonSerializer.Serialize(data, JsonOptions);
+        var dataJson = SerializeData(data);
         var now = DateTime.UtcNow;
 
         foreach (var recipientId in recipientIds)
@@ -203,20 +203,40 @@ public sealed class UserNotificationOutbox(ApplicationDbContext db) : ICompetiti
             payload = new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
-        string Value(string key) => payload.GetValueOrDefault(key, string.Empty);
-        Dictionary<string, string> Select(params string[] keys)
-            => keys.ToDictionary(key => key, Value, StringComparer.Ordinal);
+        string Value(string key, int maxLength)
+        {
+            var value = payload.GetValueOrDefault(key, string.Empty);
+            return Limit(value, maxLength);
+        }
+        Dictionary<string, string> Select(params (string Key, int MaxLength)[] fields)
+            => fields.ToDictionary(
+                field => field.Key,
+                field => Value(field.Key, field.MaxLength),
+                StringComparer.Ordinal);
 
         return notification.Type switch
         {
-            CompetitionNotificationTypes.CompetitionStarted => Select("competition_name"),
-            CompetitionNotificationTypes.ChallengePublished => Select("problem_title", "problem_category"),
-            CompetitionNotificationTypes.HintPublished => Select("problem_title", "hint_title", "hint_content"),
+            CompetitionNotificationTypes.CompetitionStarted => Select(("competition_name", 256)),
+            CompetitionNotificationTypes.ChallengePublished => Select(
+                ("problem_title", 256),
+                ("problem_category", 128)),
+            CompetitionNotificationTypes.HintPublished => Select(
+                ("problem_title", 256),
+                ("hint_title", 256),
+                ("hint_content", 1800)),
             CompetitionNotificationTypes.FirstBlood or
             CompetitionNotificationTypes.SecondBlood or
-            CompetitionNotificationTypes.ThirdBlood => Select("problem_title", "team_name", "blood_rank"),
-            CompetitionNotificationTypes.TeamPenalized => Select("competition_name", "team_name", "penalty_type"),
-            CompetitionNotificationTypes.Announcement => Select("announcement_title", "announcement_content"),
+            CompetitionNotificationTypes.ThirdBlood => Select(
+                ("problem_title", 256),
+                ("team_name", 256),
+                ("blood_rank", 16)),
+            CompetitionNotificationTypes.TeamPenalized => Select(
+                ("competition_name", 256),
+                ("team_name", 256),
+                ("penalty_type", 128)),
+            CompetitionNotificationTypes.Announcement => Select(
+                ("announcement_title", 256),
+                ("announcement_content", 1800)),
             _ => null
         };
     }
@@ -226,5 +246,33 @@ public sealed class UserNotificationOutbox(ApplicationDbContext db) : ICompetiti
             ? element.GetString() ?? string.Empty
             : element.ToString();
 
+    private static string SerializeData(Dictionary<string, string> data)
+    {
+        var json = JsonSerializer.Serialize(data, JsonOptions);
+        while (json.Length > MaxDataJsonLength)
+        {
+            var field = data
+                .Where(pair => pair.Value.Length > 0)
+                .OrderByDescending(pair => pair.Value.Length)
+                .First();
+            var removeCount = Math.Min(field.Value.Length, json.Length - MaxDataJsonLength);
+            data[field.Key] = Limit(field.Value, field.Value.Length - Math.Max(1, removeCount));
+            json = JsonSerializer.Serialize(data, JsonOptions);
+        }
+        return json;
+    }
+
+    private static string Limit(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+            return value;
+
+        var length = Math.Max(0, maxLength);
+        if (length > 0 && char.IsHighSurrogate(value[length - 1]))
+            length--;
+        return value[..length];
+    }
+
+    private const int MaxDataJsonLength = 4096;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 }

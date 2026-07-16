@@ -131,6 +131,32 @@ export type NoCtfapiEndpointsTeamsUpdateTeamRequest = {
     avatarUrl?: string | null;
 };
 
+export type NoCtfApplicationNotificationsUserNotificationPage = {
+    items?: Array<NoCtfApplicationNotificationsUserNotificationView>;
+    unreadCount?: number;
+};
+
+export type NoCtfApplicationNotificationsUserNotificationView = {
+    id?: string;
+    competitionId?: string | null;
+    subjectId?: string | null;
+    type?: string;
+    data?: {
+        [key: string]: string;
+    };
+    isRead?: boolean;
+    createdAt?: string;
+    readAt?: string | null;
+};
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsCompetitionsAwdpScreenSnapshotDto = {
     game?: NoCtfapiEndpointsCompetitionsAwdpScreenGameDto;
     stats?: NoCtfapiEndpointsCompetitionsAwdpScreenStatsDto;
@@ -1647,6 +1673,91 @@ export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponse = NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses];
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointData = {
+    body?: never;
+    path?: never;
+    query: {
+        limit: number;
+    };
+    url: '/api/notifications';
+};
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationNotificationsUserNotificationPage;
+};
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointResponse = NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointResponses[keyof NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointResponses];
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/notifications/{id}/read';
+};
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointResponse = NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointResponses[keyof NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointResponses];
+
+export type NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/notifications/read-all';
+};
+
+export type NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointResponse = NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointResponses[keyof NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointResponses];
 
 export type NoCtfapiEndpointsCompetitionsAwdpScreenSnapshotEndpointData = {
     body?: never;
