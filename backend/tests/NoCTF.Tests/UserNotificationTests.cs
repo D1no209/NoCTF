@@ -136,6 +136,48 @@ public sealed class UserNotificationTests
     }
 
     [Fact]
+    public async Task Outbox_BoundsPublicPayloadsBeforeTheyReachTheNotificationColumn()
+    {
+        await using var db = CreateDb();
+        var competitionId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        db.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            CompetitionId = competitionId,
+            OwnerId = ownerId,
+            Title = "Payload Test",
+            ModeKey = "ctf"
+        });
+        await db.SaveChangesAsync();
+        var outbox = new UserNotificationOutbox(db);
+
+        outbox.Add(CompetitionNotification.Create(
+            competitionId,
+            CompetitionNotificationTypes.HintPublished,
+            "challenge",
+            Guid.NewGuid(),
+            null,
+            "oversized-hint:v1",
+            new
+            {
+                problem_title = new string('P', 1000),
+                hint_title = new string('T', 1000),
+                hint_content = string.Concat(Enumerable.Repeat("\0😀", 5000))
+            }));
+        await db.SaveChangesAsync();
+
+        var item = await db.UserNotifications.SingleAsync();
+        using var data = JsonDocument.Parse(item.DataJson);
+        Assert.True(item.DataJson.Length <= 4096);
+        Assert.Equal(256, data.RootElement.GetProperty("problem_title").GetString()!.Length);
+        Assert.Equal(256, data.RootElement.GetProperty("hint_title").GetString()!.Length);
+        var hintContent = data.RootElement.GetProperty("hint_content").GetString()!;
+        Assert.True(hintContent.Length <= 1800);
+        Assert.DoesNotContain('\uFFFD', hintContent);
+    }
+
+    [Fact]
     public void CompositeOutbox_IsolatesSinkFailures()
     {
         var collecting = new CollectingSink();
