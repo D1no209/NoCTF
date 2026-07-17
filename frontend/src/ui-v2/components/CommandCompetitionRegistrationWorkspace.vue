@@ -97,8 +97,8 @@ function formatDate(value: string | null | undefined) {
   if (!value)
     return 'Not scheduled'
 
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime()))
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp))
     return 'Not scheduled'
 
   return new Intl.DateTimeFormat(undefined, {
@@ -107,7 +107,7 @@ function formatDate(value: string | null | undefined) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(date)
+  }).format(new Date(timestamp))
 }
 </script>
 

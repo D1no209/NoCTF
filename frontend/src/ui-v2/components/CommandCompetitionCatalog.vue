@@ -43,6 +43,7 @@ const modeOptions: CommandSelectOption[] = [
   { value: 'awd', label: 'AWD' },
   { value: 'awdp', label: 'AWDP' },
   { value: 'koh', label: 'KoH' },
+  { value: 'penetration', label: 'Penetration' },
 ]
 </script>
 

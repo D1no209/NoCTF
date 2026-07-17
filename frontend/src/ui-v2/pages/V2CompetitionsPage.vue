@@ -39,6 +39,8 @@ const visibleCompetitions = computed(() => {
   })
 })
 
+const competitionCount = computed(() => (competitions.value ?? []).length)
+
 const catalogState = computed(() => {
   if (isLoading.value)
     return 'loading'
@@ -74,7 +76,7 @@ function registerForCompetition(id: string) {
       title="Competition registry"
       description="Filter and enter the competitions exposed by the platform service."
       :stat-icon="Blocks"
-      :stat-value="String(competitions?.length ?? 0).padStart(2, '0')"
+      :stat-value="String(competitionCount).padStart(2, '0')"
       stat-label="records"
     />
 

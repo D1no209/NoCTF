@@ -37,13 +37,17 @@ function statusTone(status: string) {
 }
 
 function formatDateRange(startTime: string, endTime: string) {
+  const start = Date.parse(startTime)
+  const end = Date.parse(endTime)
+  if (!Number.isFinite(start) || !Number.isFinite(end))
+    return 'Schedule pending'
   const formatter = new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })
-  return `${formatter.format(new Date(startTime))} - ${formatter.format(new Date(endTime))}`
+  return `${formatter.format(new Date(start))} - ${formatter.format(new Date(end))}`
 }
 </script>
 

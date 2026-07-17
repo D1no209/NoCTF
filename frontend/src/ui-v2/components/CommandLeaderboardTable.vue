@@ -69,7 +69,7 @@ function score(entry: CommandLeaderboardEntry) {
 .leaderboard-table__row:last-child { box-shadow: none; }
 .leaderboard-table__row strong { color: var(--v2-text-faint); font-weight: 600; }
 .leaderboard-table__row span:nth-child(2) { overflow: hidden; color: var(--v2-text); font-family: var(--v2-font-sans); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.leaderboard-table__row b { color: var(--v2-cyan); font-weight: 700; }
+.leaderboard-table__row b { color: var(--v2-cyan); font-weight: 600; }
 .leaderboard-table__leader { color: var(--v2-warning) !important; }
 .leaderboard-table__loading { padding: 26px 18px; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 12px; text-align: center; }
 .leaderboard-table__loading--error { display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--v2-danger); }
