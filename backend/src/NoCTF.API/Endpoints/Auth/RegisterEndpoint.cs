@@ -87,6 +87,7 @@ public class RegisterEndpoint(
             return;
         }
 
+        var emailVerificationEnabled = await emailVerification.IsEnabledAsync(ct);
         var hasher = new PasswordHasher<User>();
         var user = new User
         {
@@ -95,7 +96,7 @@ public class RegisterEndpoint(
             Email = email,
             PasswordHash = hasher.HashPassword(null!, password),
             Role = UserRole.User,
-            EmailVerifiedAt = emailVerification.IsEnabled ? null : DateTime.UtcNow,
+            EmailVerifiedAt = emailVerificationEnabled ? null : DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

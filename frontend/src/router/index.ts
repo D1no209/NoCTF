@@ -161,6 +161,12 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
         },
         {
+          path: 'email-verification',
+          name: 'admin-email-verification',
+          component: () => import('@/views/admin/AdminEmailVerificationView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
+        },
+        {
           path: 'audit-logs',
           name: 'admin-audit-logs',
           component: () => import('@/views/admin/AdminAuditLogsView.vue'),

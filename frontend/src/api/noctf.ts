@@ -599,6 +599,17 @@ export const adminApi = {
   async infrastructure() {
     return unwrap(await sdk.noCtfapiEndpointsAdminGetInfrastructureEndpoint(), tt('errors.loadHealth'))
   },
+  async emailVerificationSettings() {
+    return unwrap(await sdk.noCtfapiEndpointsAdminGetEmailVerificationSettingsEndpoint(), tt('errors.requestFailed'))
+  },
+  async updateEmailVerificationSettings(
+    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpoint>[0]['body'],
+  ) {
+    return unwrap(await sdk.noCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpoint({ body }), tt('errors.requestFailed'))
+  },
+  async testEmailVerificationSettings() {
+    return unwrap(await sdk.noCtfapiEndpointsAdminTestEmailVerificationSettingsEndpoint(), tt('errors.requestFailed'))
+  },
   async rebuildScoreboard(competitionId: string) {
     return unwrap(await sdk.noCtfapiEndpointsAdminRebuildScoreboardEndpoint({
       path: { id: competitionId },

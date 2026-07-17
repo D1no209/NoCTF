@@ -44,6 +44,24 @@ public class EmailVerificationToken
     public DateTime? ConsumedAt { get; set; }
 }
 
+public class EmailVerificationSettings
+{
+    public Guid Id { get; set; }
+    public bool Enabled { get; set; }
+    public string PublicBaseUrl { get; set; } = string.Empty;
+    public int TokenLifetimeMinutes { get; set; }
+    public int ResendCooldownSeconds { get; set; }
+    public string SmtpHost { get; set; } = string.Empty;
+    public int SmtpPort { get; set; }
+    public bool SmtpEnableSsl { get; set; }
+    public string SmtpUserName { get; set; } = string.Empty;
+    public string SmtpPasswordProtected { get; set; } = string.Empty;
+    public string SmtpFromAddress { get; set; } = string.Empty;
+    public string SmtpFromName { get; set; } = string.Empty;
+    public int SmtpTimeoutSeconds { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
 public class UserNotification
 {
     public Guid Id { get; set; }
