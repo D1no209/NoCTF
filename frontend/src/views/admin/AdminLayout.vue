@@ -73,9 +73,9 @@ async function handleLogout() {
 <template>
   <SidebarProvider>
     <Sidebar collapsible="icon" class="border-r-0">
-      <SidebarHeader class="h-16 flex items-center border-b border-white/10 px-3">
+      <SidebarHeader class="h-20 flex items-center border-b border-white/10 px-4">
         <div class="flex items-center gap-2 overflow-hidden">
-          <BrandLogo class="h-8" />
+          <BrandLogo class="h-10" />
           <div class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
             <span class="mt-0.5 inline-flex w-fit rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">{{ t('nav.admin') }}</span>
           </div>
@@ -83,16 +83,14 @@ async function handleLogout() {
       </SidebarHeader>
 
       <SidebarContent class="py-2">
-        <SidebarMenu class="gap-0.5">
+        <SidebarMenu class="h-full justify-between gap-0.5">
           <SidebarMenuItem v-for="item in navItems" :key="item.to">
             <SidebarMenuButton
               as-child
-              size="sm"
-              class="px-2.5 py-1"
               :tooltip="item.label"
               :is-active="route.path === item.to"
             >
-              <RouterLink :to="item.to" class="flex items-center gap-2">
+              <RouterLink :to="item.to" class="flex items-center gap-3">
                 <component :is="item.icon" class="size-4" />
                 <span>{{ item.label }}</span>
               </RouterLink>
