@@ -8,6 +8,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
@@ -78,6 +79,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         modelBuilder.Entity<ChallengeTemplate>()
             .OwnsOne(c => c.KohAgentConfig);
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .Property(token => token.TokenHash)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasIndex(token => token.TokenHash)
+            .IsUnique()
+            .HasDatabaseName("ux_emailverificationtokens_hash");
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasIndex(token => new { token.UserId, token.CreatedAt })
+            .HasDatabaseName("ix_emailverificationtokens_user_created");
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(token => token.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Submission>()
             .HasIndex(s => new { s.CompetitionId, s.TeamId })

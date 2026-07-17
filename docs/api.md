@@ -30,6 +30,17 @@ Content-Type: application/json
 
 The response contains an `accessToken` string.
 
+When email verification is enabled, registration returns `requiresEmailVerification: true` and login returns `403 email_not_verified` until the address is verified. Verification tokens are submitted in the request body rather than in an API URL:
+
+```http
+POST /api/auth/email-verification/verify
+Content-Type: application/json
+
+{ "token": "<token from the email link>" }
+```
+
+Clients can request another message with `POST /api/auth/email-verification/resend`. That endpoint always returns the same accepted response for unknown, already verified, cooling-down, and pending addresses to avoid account enumeration.
+
 ### Use the Token
 
 Include the token in the `Authorization` header for all protected endpoints:
