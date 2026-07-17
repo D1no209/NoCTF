@@ -60,6 +60,16 @@
           "startTime": "2026-07-12T09:00:00Z",
           "endTime": "2026-07-12T18:00:00Z",
           "registeredTeamCount": 0
+        },
+        {
+          "id": "comp-2026-pen",
+          "title": "NoCTF 2026 Penetration Range",
+          "description": "Mock penetration competition for topology, instance, and staged flag flows.",
+          "status": "running",
+          "gameModeType": "Penetration",
+          "startTime": "2026-07-08T09:00:00Z",
+          "endTime": "2026-07-08T18:00:00Z",
+          "registeredTeamCount": 4
         }
       ]
     },
@@ -97,6 +107,15 @@
         { "id": "ctf-rev-1", "title": "REV-pocket", "typeId": "reverse", "points": 430, "solveCount": 7, "description": "Extract the hidden unlock path from the handheld binary.", "descriptionFormat": "markdown", "hints": ["One branch table is shifted by one index."] },
         { "id": "ctf-crypto-1", "title": "CRYPTO-slab", "typeId": "crypto", "points": 410, "solveCount": 5, "description": "Recover the flag from a malformed padding oracle.", "descriptionFormat": "markdown", "hints": ["Error timing differs by 1 block."] },
         { "id": "ctf-misc-1", "title": "MISC-parser", "typeId": "misc", "points": 390, "solveCount": 6, "description": "Abuse the parser to leak the hidden token.", "descriptionFormat": "markdown", "hints": ["Nested delimiters produce an unexpected fallback."] }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-pen/challenges",
+      "status": 200,
+      "body": [
+        { "id": "pen-dmz-1", "title": "PEN-dmz-breach", "typeId": "penetration", "points": 600, "solveCount": 2, "totalStageCount": 3, "totalScore": 900, "fullSolveCount": 1, "description": "Breach the DMZ range and escalate through three staged targets.", "descriptionFormat": "markdown", "hints": ["Start with the exposed gateway service."] },
+        { "id": "pen-lateral-1", "title": "PEN-lateral-move", "typeId": "penetration", "points": 540, "solveCount": 1, "totalStageCount": 2, "totalScore": 700, "fullSolveCount": 0, "description": "Pivot from the web front into the internal segment.", "descriptionFormat": "markdown", "hints": ["The internal host only trusts the web tier."] }
       ]
     },
     {
@@ -423,6 +442,258 @@
           { "round": 12, "attackSuccessCount": 11, "defenseSuccessCount": 9, "attackFailCount": 9, "defenseFailCount": 4, "scoreDelta": 524, "activeTeamCount": 6 }
         ]
       }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-pen",
+      "status": 200,
+      "body": {
+        "id": "comp-2026-pen",
+        "title": "NoCTF 2026 Penetration Range",
+        "description": "Mock penetration competition for topology, instance, and staged flag flows.",
+        "status": "running",
+        "gameModeType": "Penetration",
+        "startTime": "2026-07-08T09:00:00Z",
+        "endTime": "2026-07-08T18:00:00Z",
+        "tracksEnabled": false,
+        "trackNames": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-pen/submissions",
+      "status": 200,
+      "body": { "competitionId": "comp-2026-pen", "teamId": "team-pen-crew", "solvedChallenges": [] }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-pen/teams/mine",
+      "status": 200,
+      "body": [{ "id": "team-pen-crew", "name": "PenCrew", "inviteToken": "MOCK-PEN-CREW", "memberCount": 2, "isLocked": false, "isBanned": false, "trackName": null, "registrationStatus": "approved", "isCaptain": true }]
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-pen/leaderboard",
+      "status": 200,
+      "body": { "__mockGenerate": "leaderboard" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/comp-2026-pen/leaderboard/trend",
+      "status": 200,
+      "body": { "__mockGenerate": "leaderboardTrend" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/:id/awd-dashboard",
+      "status": 200,
+      "body": {
+        "competitionId": "comp-2026-awdp",
+        "currentRound": 12,
+        "roundDurationSeconds": 300,
+        "remainingSeconds": 148,
+        "services": [
+          { "teamId": "team-1", "teamName": "SnowTeam", "challengeId": "awdp-web-1", "challengeName": "WEB-upload", "status": "healthy" },
+          { "teamId": "team-1", "teamName": "SnowTeam", "challengeId": "awdp-pwn-1", "challengeName": "PWN-baby", "status": "healthy" },
+          { "teamId": "team-1", "teamName": "SnowTeam", "challengeId": "awdp-rev-1", "challengeName": "REV-portal", "status": "healthy" },
+          { "teamId": "team-1", "teamName": "SnowTeam", "challengeId": "awdp-crypto-1", "challengeName": "CRYPTO-lock", "status": "down" },
+          { "teamId": "team-1", "teamName": "SnowTeam", "challengeId": "awdp-misc-1", "challengeName": "MISC-agent", "status": "healthy" },
+          { "teamId": "team-2", "teamName": "QAQTeam", "challengeId": "awdp-web-1", "challengeName": "WEB-upload", "status": "healthy" },
+          { "teamId": "team-2", "teamName": "QAQTeam", "challengeId": "awdp-pwn-1", "challengeName": "PWN-baby", "status": "down" },
+          { "teamId": "team-2", "teamName": "QAQTeam", "challengeId": "awdp-rev-1", "challengeName": "REV-portal", "status": "healthy" },
+          { "teamId": "team-2", "teamName": "QAQTeam", "challengeId": "awdp-crypto-1", "challengeName": "CRYPTO-lock", "status": "healthy" },
+          { "teamId": "team-2", "teamName": "QAQTeam", "challengeId": "awdp-misc-1", "challengeName": "MISC-agent", "status": "healthy" },
+          { "teamId": "team-3", "teamName": "RedShift", "challengeId": "awdp-web-1", "challengeName": "WEB-upload", "status": "down" },
+          { "teamId": "team-3", "teamName": "RedShift", "challengeId": "awdp-pwn-1", "challengeName": "PWN-baby", "status": "healthy" },
+          { "teamId": "team-3", "teamName": "RedShift", "challengeId": "awdp-rev-1", "challengeName": "REV-portal", "status": "healthy" },
+          { "teamId": "team-3", "teamName": "RedShift", "challengeId": "awdp-crypto-1", "challengeName": "CRYPTO-lock", "status": "healthy" },
+          { "teamId": "team-3", "teamName": "RedShift", "challengeId": "awdp-misc-1", "challengeName": "MISC-agent", "status": "down" },
+          { "teamId": "team-4", "teamName": "BlueBase", "challengeId": "awdp-web-1", "challengeName": "WEB-upload", "status": "healthy" },
+          { "teamId": "team-4", "teamName": "BlueBase", "challengeId": "awdp-pwn-1", "challengeName": "PWN-baby", "status": "healthy" },
+          { "teamId": "team-4", "teamName": "BlueBase", "challengeId": "awdp-rev-1", "challengeName": "REV-portal", "status": "down" },
+          { "teamId": "team-4", "teamName": "BlueBase", "challengeId": "awdp-crypto-1", "challengeName": "CRYPTO-lock", "status": "healthy" },
+          { "teamId": "team-4", "teamName": "BlueBase", "challengeId": "awdp-misc-1", "challengeName": "MISC-agent", "status": "healthy" }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/:id/koh-dashboard",
+      "status": 200,
+      "body": {
+        "competitionId": "comp-2026-koh",
+        "challenges": [
+          {
+            "challengeId": "koh-web-1",
+            "challengeName": "WEB-hill",
+            "currentControllerTeamId": "team-hill-watch",
+            "currentControllerTeamName": "HillWatch",
+            "controlDurationSeconds": 1260,
+            "history": [
+              { "teamId": "team-1", "teamName": "SnowTeam", "startTime": "2026-07-06T09:00:00Z", "endTime": "2026-07-06T09:42:00Z" },
+              { "teamId": "team-hill-watch", "teamName": "HillWatch", "startTime": "2026-07-06T09:42:00Z", "endTime": null }
+            ]
+          },
+          {
+            "challengeId": "koh-pwn-1",
+            "challengeName": "PWN-hill",
+            "currentControllerTeamId": "team-1",
+            "currentControllerTeamName": "SnowTeam",
+            "controlDurationSeconds": 540,
+            "history": [
+              { "teamId": "team-hill-watch", "teamName": "HillWatch", "startTime": "2026-07-06T09:00:00Z", "endTime": "2026-07-06T10:05:00Z" },
+              { "teamId": "team-1", "teamName": "SnowTeam", "startTime": "2026-07-06T10:05:00Z", "endTime": null }
+            ]
+          },
+          {
+            "challengeId": "koh-rev-1",
+            "challengeName": "REV-hill",
+            "currentControllerTeamId": "team-3",
+            "currentControllerTeamName": "RedShift",
+            "controlDurationSeconds": 2210,
+            "history": [
+              { "teamId": "team-3", "teamName": "RedShift", "startTime": "2026-07-06T09:00:00Z", "endTime": null }
+            ]
+          },
+          {
+            "challengeId": "koh-crypto-1",
+            "challengeName": "CRYPTO-hill",
+            "currentControllerTeamId": null,
+            "currentControllerTeamName": null,
+            "controlDurationSeconds": 0,
+            "history": [
+              { "teamId": "team-2", "teamName": "QAQTeam", "startTime": "2026-07-06T09:12:00Z", "endTime": "2026-07-06T09:58:00Z" }
+            ]
+          },
+          {
+            "challengeId": "koh-misc-1",
+            "challengeName": "MISC-hill",
+            "currentControllerTeamId": "team-2",
+            "currentControllerTeamName": "QAQTeam",
+            "controlDurationSeconds": 320,
+            "history": [
+              { "teamId": "team-4", "teamName": "BlueBase", "startTime": "2026-07-06T09:30:00Z", "endTime": "2026-07-06T10:20:00Z" },
+              { "teamId": "team-2", "teamName": "QAQTeam", "startTime": "2026-07-06T10:20:00Z", "endTime": null }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/notifications",
+      "status": 200,
+      "body": {
+        "items": [
+          { "id": "notif-1", "competitionId": "comp-2026-awdp", "subjectId": null, "type": "competition.announcement", "data": { "message": "Round 12 started across all AWDP services." }, "isRead": false, "createdAt": "2026-07-05T10:30:05Z", "readAt": null },
+          { "id": "notif-2", "competitionId": null, "subjectId": null, "type": "system.notice", "data": { "message": "Mock notification center entry for offline development." }, "isRead": true, "createdAt": "2026-07-05T09:12:00Z", "readAt": "2026-07-05T09:20:00Z" }
+        ],
+        "unreadCount": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/notifications/read-all",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/notifications/:id/read",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/teams",
+      "status": 200,
+      "body": { "id": "team-mock-created", "competitionId": "comp-2026-ctf", "name": "MockCreated", "inviteToken": "MOCK-CREATED", "memberCount": 1, "isLocked": false, "isBanned": false, "bannedReason": null, "trackName": null, "registrationStatus": "approved", "isCaptain": true }
+    },
+    {
+      "method": "POST",
+      "path": "/api/teams/join-by-token",
+      "status": 200,
+      "body": { "id": "team-hill-watch", "competitionId": "comp-2026-koh", "name": "HillWatch", "inviteToken": "MOCK-HILL-WATCH", "memberCount": 4, "isLocked": false, "isBanned": false, "bannedReason": null, "trackName": null, "registrationStatus": "approved", "isCaptain": false }
+    },
+    {
+      "method": "POST",
+      "path": "/api/teams/:teamId/join",
+      "status": 200,
+      "body": { "id": "team-open-alpha", "competitionId": "comp-2026-awdp", "name": "OpenAlpha", "inviteToken": "MOCK-OPEN-ALPHA", "memberCount": 5, "isLocked": false, "isBanned": false, "bannedReason": null, "trackName": "Open", "registrationStatus": "approved", "isCaptain": false }
+    },
+    {
+      "method": "POST",
+      "path": "/api/teams/:teamId/leave",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/competitions/:id/challenges/:challengeId/penetration",
+      "status": 200,
+      "body": {
+        "topology": {
+          "name": "DMZ Breach Lab",
+          "description": "Mock penetration range with three staged targets.",
+          "nodes": [
+            { "id": "node-entry", "name": "entry-gateway", "image": "mock/entry:latest", "isEntry": true, "isInternal": false },
+            { "id": "node-web", "name": "web-front", "image": "mock/web:latest", "isEntry": false, "isInternal": false },
+            { "id": "node-db", "name": "db-core", "image": "mock/db:latest", "isEntry": false, "isInternal": true }
+          ],
+          "flags": [
+            { "id": "flag-1", "name": "Entry foothold", "nodeName": "entry-gateway", "stage": 1, "score": 200, "visible": true, "solved": true, "hintAfterSolved": "The gateway banner leaks the internal hostnames." },
+            { "id": "flag-2", "name": "Web escalation", "nodeName": "web-front", "stage": 2, "score": 300, "visible": true, "solved": false },
+            { "id": "flag-3", "name": "Database crown", "nodeName": "db-core", "stage": 3, "score": 400, "visible": true, "solved": false }
+          ],
+          "config": { "allowReset": true }
+        },
+        "instance": {
+          "id": "pen-instance-1",
+          "status": "running",
+          "entryHost": "127.0.0.1",
+          "entryPort": 2222,
+          "entryUrl": "http://127.0.0.1:8080",
+          "resetCount": 1,
+          "resetLimit": 3,
+          "expiresAt": "2030-01-01T00:00:00Z",
+          "cooldownUntil": null,
+          "lastError": null,
+          "ports": { "22": 2222, "80": 8080 }
+        },
+        "totalStageCount": 3,
+        "solvedStageCount": 1,
+        "totalScore": 600
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/:id/challenges/:challengeId/penetration/instance/start",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/:id/challenges/:challengeId/penetration/instance/stop",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/:id/challenges/:challengeId/penetration/instance/reset",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/competitions/:id/challenges/:challengeId/penetration/instance",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/competitions/:id/challenges/:challengeId/penetration/flags/submit",
+      "status": 200,
+      "body": { "correct": true, "alreadySolved": false, "result": "accepted" }
     }
   ]
 }

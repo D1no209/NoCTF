@@ -82,7 +82,7 @@ bun run dev
 
 The dev server runs at `http://localhost:5173`.
 
-Vite proxies API and SignalR requests to the real local backend by default. Mock routes are only enabled when explicitly requested with `VITE_ENABLE_MOCKS=true`; do not enable them while validating login or management APIs against the backend.
+Vite proxies API and SignalR requests to the real local backend by default. If the backend is unreachable, the dev session automatically falls back to the mock route table (`src/mocks/mock-data.json`) after a failed request plus an `/api/health` probe; watch for the `[noctf-mock]` console message. Set `VITE_ENABLE_MOCKS=true` to force mock routes on, or `VITE_ENABLE_MOCKS=false` to disable mocks entirely — keep mocks disabled (or unset with the backend running) while validating login or management APIs against the backend, since the mock login token is not accepted by real protected APIs.
 
 If the backend is running with `dotnet run`, you can also access the frontend through the backend URL (`http://localhost:5000`) because of the SPA proxy. The API project is configured with `SpaProxyLaunchCommand=bun run dev`; you can also start `bun run dev` yourself before opening the backend URL.
 

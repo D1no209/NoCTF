@@ -8,14 +8,15 @@ import { mockDataPlugin } from './src/mocks/mockDataPlugin'
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, '.', '')
   const apiTarget = env.NOCTF_API_TARGET || 'http://127.0.0.1'
-  const enableMocks = command === 'serve' && env.VITE_ENABLE_MOCKS === 'true'
 
   return {
     plugins: [
       vue(),
       tailwindcss(),
-      // Mock data is opt-in and only served in development, never copied to dist.
-      ...(enableMocks ? [mockDataPlugin()] : []),
+      // The route table is always served in development; the runtime decides
+      // whether mocks apply (VITE_ENABLE_MOCKS=true, or automatic fallback when
+      // the backend is unreachable). Never copied to dist.
+      ...(command === 'serve' ? [mockDataPlugin()] : []),
     ],
     resolve: {
       alias: {

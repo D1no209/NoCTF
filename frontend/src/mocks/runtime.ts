@@ -11,15 +11,44 @@ interface MockConfig {
   routes?: MockRoute[]
 }
 
+type MockMode = 'on' | 'off' | 'auto'
+
 const MOCK_HEADER = 'x-noctf-mock'
 let mockConfigPromise: Promise<MockConfig> | null = null
+let autoMockActive = false
+let backendProbePromise: Promise<boolean> | null = null
+const reportedMisses = new Set<string>()
 
 export function areMocksEnabled(isDevelopment: boolean, configuredValue?: string) {
   return isDevelopment && configuredValue === 'true'
 }
 
+/**
+ * Mock serving mode:
+ * - 'on'   — VITE_ENABLE_MOCKS=true; every registered route is served from mock data.
+ * - 'off'  — production builds, or VITE_ENABLE_MOCKS=false.
+ * - 'auto' — development default; requests pass through to the real backend until it
+ *            proves unreachable, then the session transparently switches to mock data.
+ */
+function mockMode(): MockMode {
+  if (!import.meta.env.DEV)
+    return 'off'
+  const configured = import.meta.env.VITE_ENABLE_MOCKS
+  if (configured === 'true')
+    return 'on'
+  if (configured === 'false')
+    return 'off'
+  return 'auto'
+}
+
 function mocksEnabled() {
-  return areMocksEnabled(import.meta.env.DEV, import.meta.env.VITE_ENABLE_MOCKS)
+  const mode = mockMode()
+  return mode === 'on' || (mode === 'auto' && autoMockActive)
+}
+
+/** True once the dev mock runtime is actually serving responses. */
+export function isMockRuntimeActive() {
+  return mocksEnabled()
 }
 
 function emptyConfig(): MockConfig {
@@ -101,6 +130,54 @@ function extractCompetitionId(pathname: string): string | null {
   return null
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
+/**
+ * The vite dev proxy answers with a 5xx when the backend target is down, so a
+ * request can fail either by throwing (direct connection) or by returning 5xx
+ * (proxied). A health probe disambiguates "backend down" from a genuine
+ * application-level error on a live backend.
+ */
+function probeBackendAlive(baseFetch: typeof fetch, url: URL) {
+  if (!backendProbePromise) {
+    const healthUrl = new URL('/api/health', url.origin).toString()
+    backendProbePromise = baseFetch(healthUrl, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    })
+      .then(response => response.status < 500)
+      .catch(() => false)
+      .finally(() => {
+        backendProbePromise = null
+      })
+  }
+  return backendProbePromise
+}
+
+function activateAutoMock() {
+  if (autoMockActive)
+    return
+  autoMockActive = true
+  console.info(
+    '[noctf-mock] Backend unreachable — this dev session now serves mock data. '
+    + 'Start the backend and reload to leave mock mode, or set VITE_ENABLE_MOCKS=false to opt out.',
+  )
+}
+
+function mockMissResponse(method: string, url: URL) {
+  const key = `${method} ${url.pathname}`
+  if (!reportedMisses.has(key)) {
+    reportedMisses.add(key)
+    console.warn(`[noctf-mock] No mock route registered for ${key}. Add it to src/mocks/mock-data.json.`)
+  }
+  return new Response(JSON.stringify({ message: `Mock route missing: ${key}` }), {
+    status: 404,
+    headers: { 'content-type': 'application/json', [MOCK_HEADER]: 'miss' },
+  })
+}
+
 async function resolveMockBody(body: unknown, competitionId: string | null): Promise<unknown> {
   if (!body || typeof body !== 'object' || !('__mockGenerate' in (body as Record<string, unknown>)))
     return body
@@ -126,17 +203,38 @@ async function resolveMockBody(body: unknown, competitionId: string | null): Pro
 
 export function createMockAwareFetch(baseFetch: typeof fetch): typeof fetch {
   return async (input, init) => {
-    if (!mocksEnabled())
+    const mode = mockMode()
+    if (mode === 'off')
       return baseFetch(input, init)
 
     const url = normalizeUrl(input)
     if (!isApiRequest(url))
       return baseFetch(input, init)
 
+    if (mode === 'auto' && !autoMockActive) {
+      try {
+        const response = await baseFetch(input, init)
+        if (response.status < 500 || await probeBackendAlive(baseFetch, url))
+          return response
+        activateAutoMock()
+      }
+      catch (error) {
+        if (isAbortError(error) || await probeBackendAlive(baseFetch, url))
+          throw error
+        activateAutoMock()
+      }
+    }
+
     const config = await loadMockConfig(baseFetch)
     const route = findRoute(config.routes ?? [], getMethod(input, init), url)
-    if (!route)
+    if (!route) {
+      // Forced mock mode is allowed to mix with a live backend; auto mode only
+      // activates once the backend is gone, so a miss is answered with a
+      // diagnosable 404 instead of a second doomed request.
+      if (mode === 'auto')
+        return mockMissResponse(getMethod(input, init), url)
       return baseFetch(input, init)
+    }
 
     const body = await resolveMockBody(route.body, extractCompetitionId(url.pathname))
 
