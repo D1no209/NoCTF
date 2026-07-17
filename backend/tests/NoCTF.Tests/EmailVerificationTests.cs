@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.API.Auth;
@@ -9,6 +10,20 @@ namespace NoCTF.Tests;
 
 public class EmailVerificationTests
 {
+    [Theory]
+    [InlineData(465, true, SecureSocketOptions.SslOnConnect)]
+    [InlineData(587, true, SecureSocketOptions.StartTls)]
+    [InlineData(25, false, SecureSocketOptions.None)]
+    public void SmtpTransport_UsesExplicitSecurityMode(
+        int port,
+        bool enableSsl,
+        SecureSocketOptions expected)
+    {
+        var smtp = new SmtpOptions { Port = port, EnableSsl = enableSsl };
+
+        Assert.Equal(expected, SmtpVerificationEmailSender.GetSocketOptions(smtp));
+    }
+
     [Fact]
     public async Task SendAndVerify_StoresOnlyHashAndVerifiesUser()
     {

@@ -1,9 +1,10 @@
-using System.Net;
-using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
+using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using MimeKit;
+using MimeKit.Text;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 
@@ -216,15 +217,17 @@ internal sealed class SmtpVerificationEmailSender(IEmailVerificationSettingsStor
     public async Task SendAsync(string recipient, string verificationUrl, CancellationToken ct)
     {
         var smtp = (await settingsStore.GetAsync(ct)).Smtp;
-        using var message = new MailMessage
+        var message = new MimeMessage
         {
-            From = new MailAddress(smtp.FromAddress, smtp.FromName),
             Subject = "Verify your NoCTF email address",
-            Body = $"Verify your NoCTF account by opening this link:\n\n{verificationUrl}\n\n" +
-                   "If you did not create this account, you can ignore this message.",
-            IsBodyHtml = false
+            Body = new TextPart(TextFormat.Plain)
+            {
+                Text = $"Verify your NoCTF account by opening this link:\n\n{verificationUrl}\n\n" +
+                       "If you did not create this account, you can ignore this message."
+            }
         };
-        message.To.Add(new MailAddress(recipient));
+        message.From.Add(new MailboxAddress(smtp.FromName, smtp.FromAddress));
+        message.To.Add(MailboxAddress.Parse(recipient));
 
         await SendAsync(message, smtp, ct);
     }
@@ -232,27 +235,36 @@ internal sealed class SmtpVerificationEmailSender(IEmailVerificationSettingsStor
     public async Task SendTestAsync(string recipient, CancellationToken ct)
     {
         var smtp = (await settingsStore.GetAsync(ct)).Smtp;
-        using var message = new MailMessage
+        var message = new MimeMessage
         {
-            From = new MailAddress(smtp.FromAddress, smtp.FromName),
             Subject = "NoCTF SMTP configuration test",
-            Body = "NoCTF successfully connected to the configured SMTP server and sent this test message.",
-            IsBodyHtml = false
+            Body = new TextPart(TextFormat.Plain)
+            {
+                Text = "NoCTF successfully connected to the configured SMTP server and sent this test message."
+            }
         };
-        message.To.Add(new MailAddress(recipient));
+        message.From.Add(new MailboxAddress(smtp.FromName, smtp.FromAddress));
+        message.To.Add(MailboxAddress.Parse(recipient));
         await SendAsync(message, smtp, ct);
     }
 
-    private static async Task SendAsync(MailMessage message, SmtpOptions smtp, CancellationToken ct)
+    private static async Task SendAsync(MimeMessage message, SmtpOptions smtp, CancellationToken ct)
     {
-        using var client = new SmtpClient(smtp.Host, smtp.Port)
+        using var client = new MailKit.Net.Smtp.SmtpClient
         {
-            EnableSsl = smtp.EnableSsl,
-            DeliveryMethod = SmtpDeliveryMethod.Network,
             Timeout = checked(smtp.TimeoutSeconds * 1000)
         };
+        await client.ConnectAsync(smtp.Host, smtp.Port, GetSocketOptions(smtp), ct);
         if (!string.IsNullOrWhiteSpace(smtp.UserName))
-            client.Credentials = new NetworkCredential(smtp.UserName, smtp.Password);
-        await client.SendMailAsync(message, ct);
+            await client.AuthenticateAsync(smtp.UserName, smtp.Password, ct);
+        await client.SendAsync(message, ct);
+        await client.DisconnectAsync(quit: true, ct);
     }
+
+    internal static SecureSocketOptions GetSocketOptions(SmtpOptions smtp)
+        => !smtp.EnableSsl
+            ? SecureSocketOptions.None
+            : smtp.Port == 465
+                ? SecureSocketOptions.SslOnConnect
+                : SecureSocketOptions.StartTls;
 }
