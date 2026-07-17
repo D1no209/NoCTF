@@ -20,7 +20,10 @@ public class LoginResponse
     public string Role { get; set; } = string.Empty;
 }
 
-public class LoginEndpoint(ApplicationDbContext dbContext, JwtTokenService jwtService) : Endpoint<LoginRequest, LoginResponse>, IAuditableEndpoint
+public class LoginEndpoint(
+    ApplicationDbContext dbContext,
+    JwtTokenService jwtService,
+    IEmailVerificationService emailVerification) : Endpoint<LoginRequest, LoginResponse>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -47,6 +50,12 @@ public class LoginEndpoint(ApplicationDbContext dbContext, JwtTokenService jwtSe
         if (result == PasswordVerificationResult.Failed)
         {
             await SendUnauthorizedAsync(ct);
+            return;
+        }
+
+        if (await emailVerification.IsEnabledAsync(ct) && !user.EmailVerifiedAt.HasValue)
+        {
+            await SendStringAsync("email_not_verified", StatusCodes.Status403Forbidden, cancellation: ct);
             return;
         }
 

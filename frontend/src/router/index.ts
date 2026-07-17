@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/verify-email',
+      name: 'verify-email',
+      component: () => import('@/views/VerifyEmailView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/competitions',
       name: 'competitions',
       component: () => import('@/views/CompetitionsView.vue'),
@@ -161,6 +167,12 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
         },
         {
+          path: 'email-verification',
+          name: 'admin-email-verification',
+          component: () => import('@/views/admin/AdminEmailVerificationView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
+        },
+        {
           path: 'audit-logs',
           name: 'admin-audit-logs',
           component: () => import('@/views/admin/AdminAuditLogsView.vue'),
@@ -189,9 +201,9 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (to.meta.requiresAuth && !auth.ensureFreshSession()) {
+  if (to.meta.requiresAuth && !(await auth.ensureFreshSession())) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {

@@ -29,6 +29,7 @@ import {
   Puzzle,
   Network,
   Bot,
+  MailCheck,
   Trophy,
   User,
   Users,
@@ -51,9 +52,10 @@ const navItems = computed(() => {
     { to: '/admin/challenges', label: t('admin.nav.challenges'), icon: Puzzle },
     { to: '/admin/containers', label: t('admin.nav.containers'), icon: Container },
     { to: '/admin/plugins', label: t('admin.nav.plugins'), icon: Plug },
-    { to: '/admin/theme-packs', label: 'Theme packages', icon: Palette, adminOnly: true },
-    { to: '/admin/infrastructure', label: 'Infrastructure', icon: Network, adminOnly: true },
-    { to: '/admin/qqbot', label: 'QQ Bot', icon: Bot, adminOnly: true },
+    { to: '/admin/theme-packs', label: t('admin.nav.themePacks'), icon: Palette, adminOnly: true },
+    { to: '/admin/infrastructure', label: t('admin.nav.infrastructure'), icon: Network, adminOnly: true },
+    { to: '/admin/qqbot', label: t('admin.nav.qqBot'), icon: Bot, adminOnly: true },
+    { to: '/admin/email-verification', label: t('admin.nav.emailVerification'), icon: MailCheck, adminOnly: true },
     { to: '/admin/audit-logs', label: t('admin.nav.auditLogs'), icon: ClipboardList, adminOnly: true },
     { to: '/admin/health', label: t('admin.nav.health'), icon: Activity },
     { to: '/admin/logs', label: t('admin.nav.liveLogs'), icon: FileText },
@@ -82,8 +84,8 @@ async function handleLogout() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent class="py-5">
-        <SidebarMenu>
+      <SidebarContent class="py-2">
+        <SidebarMenu class="h-full justify-between gap-0.5">
           <SidebarMenuItem v-for="item in navItems" :key="item.to">
             <SidebarMenuButton
               as-child
@@ -99,11 +101,11 @@ async function handleLogout() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter class="space-y-4 border-t p-4 [border-color:var(--admin-chrome-border)] group-data-[collapsible=icon]:p-2">
+      <SidebarFooter class="space-y-2 border-t p-2 [border-color:var(--admin-chrome-border)]">
         <div class="group-data-[collapsible=icon]:hidden">
-          <div class="mb-3 rounded-xl border p-3 [border-color:var(--admin-chrome-border)] bg-[var(--admin-account-surface)]">
+          <div class="mb-1 rounded-xl border p-2 [border-color:var(--admin-chrome-border)] bg-[var(--admin-account-surface)]">
             <div class="flex items-center gap-3">
-              <div class="flex size-9 items-center justify-center rounded-full bg-[var(--dialog-surface)] text-[var(--foreground)] font-semibold">
+              <div class="flex size-8 items-center justify-center rounded-full bg-[var(--dialog-surface)] text-[var(--foreground)] font-semibold">
                 {{ auth.user?.userName?.charAt(0)?.toUpperCase() ?? 'A' }}
               </div>
               <div class="min-w-0">
@@ -114,17 +116,17 @@ async function handleLogout() {
           </div>
         </div>
 
-        <SidebarMenu>
+        <SidebarMenu class="gap-0.5">
           <SidebarMenuItem>
-            <SidebarMenuButton as-child :tooltip="t('nav.backToApp')">
-              <RouterLink to="/competitions" class="flex items-center gap-3">
+            <SidebarMenuButton as-child size="sm" class="px-2.5 py-1" :tooltip="t('nav.backToApp')">
+              <RouterLink to="/competitions" class="flex items-center gap-2">
                 <Home class="size-4" />
                 <span>{{ t('nav.backToApp') }}</span>
               </RouterLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton @click="handleLogout" :tooltip="t('auth.logout')">
+            <SidebarMenuButton size="sm" class="px-2.5 py-1" :tooltip="t('auth.logout')" @click="handleLogout">
               <LogOut class="size-4" />
               <span>{{ t('auth.logout') }}</span>
             </SidebarMenuButton>

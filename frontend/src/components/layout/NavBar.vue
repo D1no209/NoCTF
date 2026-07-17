@@ -7,8 +7,9 @@ import { useScoreStore } from '@/stores/score'
 import { Button } from '@/components/ui/button'
 import BrandLogo from '@/components/BrandLogo.vue'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
-import { Bell, Home, LayoutDashboard, Menu, Users } from 'lucide-vue-next'
+import { Home, LayoutDashboard, Menu, Users } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import NotificationCenter from '@/components/notifications/NotificationCenter.vue'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -75,9 +76,7 @@ async function handleLogout() {
           <LanguageSwitch />
         </div>
 
-        <Button variant="ghost" size="icon-sm" class="hidden rounded-lg sm:inline-flex">
-          <Bell class="size-4" />
-        </Button>
+        <NotificationCenter />
         
         <template v-if="auth.isAuthenticated">
           <div v-if="displayName" class="flex min-w-0 items-center gap-2 border-2 border-border bg-card px-2 py-1.5 text-sm">

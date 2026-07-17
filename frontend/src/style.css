@@ -69,6 +69,11 @@
   --shadow-float: var(--float-shadow);
   --font-sans: "Fusion Pixel 10px", "Courier New", "Lucida Console", "MS Gothic", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --font-heading: var(--font-sans);
+  --font-mono: var(--font-sans);
+  --text-xs: 0.8rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.9rem;
+  --text-sm--line-height: 1.5;
 }
 
 :root {
@@ -282,7 +287,7 @@
   html {
     font-family: var(--font-sans);
     font-size: 20px;
-    line-height: 1.4;
+    line-height: 1.5;
     image-rendering: pixelated;
     -webkit-font-smoothing: none;
     -moz-osx-font-smoothing: unset;

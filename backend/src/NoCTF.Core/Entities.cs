@@ -29,8 +29,51 @@ public class User
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; }
     public int TokenVersion { get; set; }
+    public DateTime? EmailVerifiedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+}
+
+public class EmailVerificationToken
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string TokenHash { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? ConsumedAt { get; set; }
+}
+
+public class EmailVerificationSettings
+{
+    public Guid Id { get; set; }
+    public bool Enabled { get; set; }
+    public string PublicBaseUrl { get; set; } = string.Empty;
+    public int TokenLifetimeMinutes { get; set; }
+    public int ResendCooldownSeconds { get; set; }
+    public string SmtpHost { get; set; } = string.Empty;
+    public int SmtpPort { get; set; }
+    public bool SmtpEnableSsl { get; set; }
+    public string SmtpUserName { get; set; } = string.Empty;
+    public string SmtpPasswordProtected { get; set; } = string.Empty;
+    public string SmtpFromAddress { get; set; } = string.Empty;
+    public string SmtpFromName { get; set; } = string.Empty;
+    public int SmtpTimeoutSeconds { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class UserNotification
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public Guid? CompetitionId { get; set; }
+    public Guid? SubjectId { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string DataJson { get; set; } = "{}";
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public bool IsRead { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ReadAt { get; set; }
 }
 
 public class Team : ITenantEntity

@@ -158,6 +158,8 @@ bun run dev
 
 浏览器可以打开 http://localhost:5173，也可以打开后端同源入口 http://localhost:5000。
 
+默认情况下 Vite 会连接真实后端。只有独立调试模拟界面时才设置 `VITE_ENABLE_MOCKS=true`；验证登录和管理后台时必须保持该变量未设置，否则模拟登录令牌不能访问真实受保护 API。
+
 > 开发环境下后端会通过 ASP.NET Core SPA proxy 转发到 `localhost:5173`。API 项目已配置 `SpaProxyLaunchCommand=bun run dev`，也可以手动先启动前端 dev server。
 
 ---

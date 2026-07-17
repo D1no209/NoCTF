@@ -35,6 +35,12 @@ using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 var usesLocalStorage = StorageProviderFactory.UsesLocalStorage(builder.Configuration);
+var emailVerificationOptions = builder.Configuration
+    .GetSection(EmailVerificationOptions.SectionName)
+    .Get<EmailVerificationOptions>() ?? new EmailVerificationOptions();
+EmailVerificationOptionsValidator.Validate(emailVerificationOptions, builder.Environment.IsDevelopment());
+builder.Services.Configure<EmailVerificationOptions>(
+    builder.Configuration.GetSection(EmailVerificationOptions.SectionName));
 builder.Services.AddHttpClient();
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
@@ -189,6 +195,29 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+    options.AddPolicy("auth-email-verification", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 6,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy("admin-email-test", httpContext =>
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            userId,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
     options.AddPolicy("auth-refresh", httpContext =>
     {
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
@@ -339,6 +368,9 @@ builder.Services.AddSingleton<IStorageProvider>(_ => StorageProviderFactory.Crea
 
 // JWT token service
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();
+builder.Services.AddScoped<IEmailVerificationSettingsStore, EmailVerificationSettingsStore>();
+builder.Services.AddScoped<IVerificationEmailSender, SmtpVerificationEmailSender>();
 
 // Permission services
 builder.Services.AddScoped<ICompetitionPermissionService, CompetitionPermissionService>();

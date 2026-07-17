@@ -79,6 +79,18 @@ services:
       Runner__UtilityNetwork: ${RUNNER_UTILITY_NETWORK:-deploy_default}
       InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
       QqBot__PublicBaseUrl: ${NOCTF_QQBOT_PUBLIC_BASE_URL:-}
+      EmailVerification__Enabled: ${EMAIL_VERIFICATION_ENABLED:-false}
+      EmailVerification__PublicBaseUrl: ${NOCTF_PUBLIC_BASE_URL:-http://localhost:5173}
+      EmailVerification__TokenLifetimeMinutes: ${EMAIL_VERIFICATION_TOKEN_MINUTES:-1440}
+      EmailVerification__ResendCooldownSeconds: ${EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS:-60}
+      EmailVerification__Smtp__Host: ${SMTP_HOST:-}
+      EmailVerification__Smtp__Port: ${SMTP_PORT:-587}
+      EmailVerification__Smtp__EnableSsl: ${SMTP_ENABLE_SSL:-true}
+      EmailVerification__Smtp__UserName: ${SMTP_USERNAME:-}
+      EmailVerification__Smtp__Password: ${SMTP_PASSWORD:-}
+      EmailVerification__Smtp__FromAddress: ${SMTP_FROM_ADDRESS:-}
+      EmailVerification__Smtp__FromName: ${SMTP_FROM_NAME:-NoCTF}
+      EmailVerification__Smtp__TimeoutSeconds: ${SMTP_TIMEOUT_SECONDS:-10}
     volumes:
       - backend_uploads:/app/uploads
     security_opt:

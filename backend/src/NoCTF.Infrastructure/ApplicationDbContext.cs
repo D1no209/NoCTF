@@ -8,6 +8,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    public DbSet<EmailVerificationSettings> EmailVerificationSettings => Set<EmailVerificationSettings>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<Competition> Competitions => Set<Competition>();
@@ -77,6 +80,29 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         modelBuilder.Entity<ChallengeTemplate>()
             .OwnsOne(c => c.KohAgentConfig);
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .Property(token => token.TokenHash)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasIndex(token => token.TokenHash)
+            .IsUnique()
+            .HasDatabaseName("ux_emailverificationtokens_hash");
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasIndex(token => new { token.UserId, token.CreatedAt })
+            .HasDatabaseName("ix_emailverificationtokens_user_created");
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(token => token.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<EmailVerificationSettings>()
+            .Property(settings => settings.SmtpPasswordProtected)
+            .HasMaxLength(2048);
 
         modelBuilder.Entity<Submission>()
             .HasIndex(s => new { s.CompetitionId, s.TeamId })
@@ -335,6 +361,31 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasIndex("NormalizedUserName")
             .IsUnique()
             .HasDatabaseName("ix_users_username");
+
+        modelBuilder.Entity<UserNotification>()
+            .Property(notification => notification.Type)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<UserNotification>()
+            .Property(notification => notification.DataJson)
+            .HasMaxLength(4096);
+
+        modelBuilder.Entity<UserNotification>()
+            .Property(notification => notification.IdempotencyKey)
+            .HasMaxLength(512);
+
+        modelBuilder.Entity<UserNotification>()
+            .HasIndex(notification => new { notification.UserId, notification.CreatedAt })
+            .HasDatabaseName("ix_usernotifications_user_created");
+
+        modelBuilder.Entity<UserNotification>()
+            .HasIndex(notification => new { notification.UserId, notification.IsRead, notification.CreatedAt })
+            .HasDatabaseName("ix_usernotifications_user_read_created");
+
+        modelBuilder.Entity<UserNotification>()
+            .HasIndex(notification => new { notification.UserId, notification.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("ux_usernotifications_user_idempotency");
 
         modelBuilder.Entity<Competition>()
             .HasIndex(c => new { c.Status, c.StartTime })

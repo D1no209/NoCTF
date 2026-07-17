@@ -1336,6 +1336,98 @@ namespace NoCTF.Infrastructure.Migrations
                     b.ToTable("DynamicFlagInstances");
                 });
 
+            modelBuilder.Entity("NoCTF.Core.EmailVerificationSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PublicBaseUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ResendCooldownSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SmtpEnableSsl")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SmtpFromAddress")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SmtpFromName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SmtpHost")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SmtpPasswordProtected")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<int>("SmtpPort")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SmtpTimeoutSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SmtpUserName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("TokenLifetimeMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EmailVerificationSettings");
+                });
+
+            modelBuilder.Entity("NoCTF.Core.EmailVerificationToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_emailverificationtokens_hash");
+
+                    b.HasIndex("UserId", "CreatedAt")
+                        .HasDatabaseName("ix_emailverificationtokens_user_created");
+
+                    b.ToTable("EmailVerificationTokens");
+                });
+
             modelBuilder.Entity("NoCTF.Core.KohControlRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2577,6 +2669,9 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
+                    b.Property<DateTime?>("EmailVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("NormalizedEmail")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasMaxLength(254)
@@ -2618,6 +2713,60 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasDatabaseName("ix_users_username");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("NoCTF.Core.UserNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CompetitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DataJson")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt")
+                        .HasDatabaseName("ix_usernotifications_user_created");
+
+                    b.HasIndex("UserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_usernotifications_user_idempotency");
+
+                    b.HasIndex("UserId", "IsRead", "CreatedAt")
+                        .HasDatabaseName("ix_usernotifications_user_read_created");
+
+                    b.ToTable("UserNotifications");
                 });
 
             modelBuilder.Entity("NoCTF.Infrastructure.AuditLog", b =>
@@ -3015,6 +3164,15 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasOne("NoCTF.Core.Competition", null)
                         .WithMany()
                         .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("NoCTF.Core.EmailVerificationToken", b =>
+                {
+                    b.HasOne("NoCTF.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

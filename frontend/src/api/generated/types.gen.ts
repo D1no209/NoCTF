@@ -131,6 +131,32 @@ export type NoCtfapiEndpointsTeamsUpdateTeamRequest = {
     avatarUrl?: string | null;
 };
 
+export type NoCtfApplicationNotificationsUserNotificationPage = {
+    items?: Array<NoCtfApplicationNotificationsUserNotificationView>;
+    unreadCount?: number;
+};
+
+export type NoCtfApplicationNotificationsUserNotificationView = {
+    id?: string;
+    competitionId?: string | null;
+    subjectId?: string | null;
+    type?: string;
+    data?: {
+        [key: string]: string;
+    };
+    isRead?: boolean;
+    createdAt?: string;
+    readAt?: string | null;
+};
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsCompetitionsAwdpScreenSnapshotDto = {
     game?: NoCtfapiEndpointsCompetitionsAwdpScreenGameDto;
     stats?: NoCtfapiEndpointsCompetitionsAwdpScreenStatsDto;
@@ -609,6 +635,18 @@ export type NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAuthResendEmailVerificationRequest = {
+    email?: string;
+};
+
+export type NoCtfapiEndpointsAuthVerifyEmailResponse = {
+    status?: string;
+};
+
+export type NoCtfapiEndpointsAuthVerifyEmailRequest = {
+    token?: string;
+};
+
 export type NoCtfapiEndpointsAuthLoginResponse = {
     accessToken?: string;
     userName?: string;
@@ -623,6 +661,8 @@ export type NoCtfapiEndpointsAuthLoginRequest = {
 export type NoCtfapiEndpointsAuthRegisterResponse = {
     id?: string;
     userName?: string;
+    requiresEmailVerification?: boolean;
+    verificationEmailSent?: boolean;
 };
 
 export type NoCtfapiEndpointsAuthRegisterRequest = {
@@ -925,6 +965,43 @@ export type NoCtfapiEndpointsAdminDeleteChallengeRequest = {
 
 export type NoCtfapiEndpointsAdminDestroyContainerRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiAuthEmailVerificationSettingsView = {
+    enabled?: boolean;
+    publicBaseUrl?: string;
+    tokenLifetimeMinutes?: number;
+    resendCooldownSeconds?: number;
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpEnableSsl?: boolean;
+    smtpUserName?: string;
+    smtpPasswordConfigured?: boolean;
+    smtpFromAddress?: string;
+    smtpFromName?: string;
+    smtpTimeoutSeconds?: number;
+    persisted?: boolean;
+    updatedAt?: string | null;
+};
+
+export type NoCtfapiAuthEmailVerificationSettingsUpdate = {
+    enabled?: boolean;
+    publicBaseUrl?: string;
+    tokenLifetimeMinutes?: number;
+    resendCooldownSeconds?: number;
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpEnableSsl?: boolean;
+    smtpUserName?: string;
+    smtpPassword?: string | null;
+    smtpFromAddress?: string;
+    smtpFromName?: string;
+    smtpTimeoutSeconds?: number;
+};
+
+export type NoCtfapiAuthEmailVerificationTestResult = {
+    success?: boolean;
+    code?: string;
 };
 
 export type NoCtfapiSignalRLogEntryDto = {
@@ -1647,6 +1724,91 @@ export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponse = NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses];
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointData = {
+    body?: never;
+    path?: never;
+    query: {
+        limit: number;
+    };
+    url: '/api/notifications';
+};
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationNotificationsUserNotificationPage;
+};
+
+export type NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointResponse = NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointResponses[keyof NoCtfapiEndpointsNotificationsGetUserNotificationsEndpointResponses];
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/notifications/{id}/read';
+};
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointResponse = NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointResponses[keyof NoCtfapiEndpointsNotificationsMarkUserNotificationReadEndpointResponses];
+
+export type NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/notifications/read-all';
+};
+
+export type NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointResponse = NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointResponses[keyof NoCtfapiEndpointsNotificationsMarkAllUserNotificationsReadEndpointResponses];
 
 export type NoCtfapiEndpointsCompetitionsAwdpScreenSnapshotEndpointData = {
     body?: never;
@@ -2466,6 +2628,38 @@ export type NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointRespons
 };
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointResponse = NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointResponses[keyof NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointResponses];
+
+export type NoCtfapiEndpointsAuthResendEmailVerificationEndpointData = {
+    body: NoCtfapiEndpointsAuthResendEmailVerificationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/auth/email-verification/resend';
+};
+
+export type NoCtfapiEndpointsAuthResendEmailVerificationEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type NoCtfapiEndpointsAuthResendEmailVerificationEndpointResponse = NoCtfapiEndpointsAuthResendEmailVerificationEndpointResponses[keyof NoCtfapiEndpointsAuthResendEmailVerificationEndpointResponses];
+
+export type NoCtfapiEndpointsAuthVerifyEmailEndpointData = {
+    body: NoCtfapiEndpointsAuthVerifyEmailRequest;
+    path?: never;
+    query?: never;
+    url: '/api/auth/email-verification/verify';
+};
+
+export type NoCtfapiEndpointsAuthVerifyEmailEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthVerifyEmailResponse;
+};
+
+export type NoCtfapiEndpointsAuthVerifyEmailEndpointResponse = NoCtfapiEndpointsAuthVerifyEmailEndpointResponses[keyof NoCtfapiEndpointsAuthVerifyEmailEndpointResponses];
 
 export type NoCtfapiEndpointsAuthLoginEndpointData = {
     body: NoCtfapiEndpointsAuthLoginRequest;
@@ -3333,6 +3527,87 @@ export type NoCtfapiEndpointsAdminDestroyContainerEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsAdminDestroyContainerEndpointResponse = NoCtfapiEndpointsAdminDestroyContainerEndpointResponses[keyof NoCtfapiEndpointsAdminDestroyContainerEndpointResponses];
+
+export type NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/email-verification';
+};
+
+export type NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiAuthEmailVerificationSettingsView;
+};
+
+export type NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointResponse = NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointResponses[keyof NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointResponses];
+
+export type NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointData = {
+    body: NoCtfapiAuthEmailVerificationSettingsUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/admin/email-verification';
+};
+
+export type NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiAuthEmailVerificationSettingsView;
+};
+
+export type NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointResponse = NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointResponses[keyof NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointResponses];
+
+export type NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/email-verification/test';
+};
+
+export type NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiAuthEmailVerificationTestResult;
+};
+
+export type NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointResponse = NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointResponses[keyof NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointResponses];
 
 export type NoCtfapiEndpointsAdminGetAdminLogsEndpointData = {
     body?: never;

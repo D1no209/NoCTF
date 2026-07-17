@@ -30,6 +30,27 @@ Content-Type: application/json
 
 The response contains an `accessToken` string.
 
+When email verification is enabled, registration returns `requiresEmailVerification: true` and login returns `403 email_not_verified` until the address is verified. Verification tokens are submitted in the request body rather than in an API URL:
+
+```http
+POST /api/auth/email-verification/verify
+Content-Type: application/json
+
+{ "token": "<token from the email link>" }
+```
+
+Clients can request another message with `POST /api/auth/email-verification/resend`. That endpoint always returns the same accepted response for unknown, already verified, cooling-down, and pending addresses to avoid account enumeration.
+
+Administrators can manage the effective verification and SMTP settings through:
+
+```text
+GET  /api/admin/email-verification
+PUT  /api/admin/email-verification
+POST /api/admin/email-verification/test
+```
+
+These endpoints require the `Admin` role. The read response reports only whether an SMTP password is configured; it never returns the credential. A blank password on update preserves the current value. The test endpoint sends only to the authenticated administrator's own account email and is limited to three requests per ten minutes.
+
 ### Use the Token
 
 Include the token in the `Authorization` header for all protected endpoints:
@@ -90,6 +111,18 @@ Clients receive:
 - `LogEntry` — real-time log stream from the backend
 
 ## Common Endpoints
+
+### User Notifications
+
+Authenticated users receive an inbox derived from competition events that have already been accepted by the platform. Notifications are scoped to the current user; clients cannot request or mutate another user's inbox.
+
+```http
+GET /api/notifications?limit=20
+POST /api/notifications/{id}/read
+POST /api/notifications/read-all
+```
+
+The list response contains the newest notifications and the user's total unread count. The supported event types are `competition.started`, `challenge.published`, `hint.published`, `blood.first`, `blood.second`, `blood.third`, `team.penalized`, and `announcement`. Payloads contain only the event-specific public fields allowlisted by the server. Delivery to this inbox is independent of the optional QQ Bot plugin; one sink failing does not prevent the other sinks from accepting an event.
 
 ### Health Check
 

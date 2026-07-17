@@ -1,282 +1,403 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-01T23:01:56.2068235+08:00",
-  "title": "Design System: NoCTF",
+  "generatedAt": "2026-07-17T00:57:42.3638170+08:00",
+  "title": "Design System: NoCTF Developer Theme System",
   "extensions": {
     "colorMeta": {
-      "background": {
+      "pixel-canvas": {
         "role": "neutral",
-        "displayName": "Control Canvas",
-        "canonical": "oklch(0.984 0.006 255)",
-        "tonalRamp": [
-          "oklch(0.15 0.006 255)",
-          "oklch(0.27 0.006 255)",
-          "oklch(0.39 0.006 255)",
-          "oklch(0.51 0.006 255)",
-          "oklch(0.63 0.006 255)",
-          "oklch(0.75 0.006 255)",
-          "oklch(0.87 0.006 255)",
-          "oklch(0.96 0.006 255)"
-        ]
+        "displayName": "Industrial Canvas",
+        "canonical": "#e4e4e4",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#7d7d7d", "#a2a2a2", "#c9c9c9", "#e4e4e4", "#f5f5f5"]
       },
-      "foreground": {
+      "pixel-ink": {
         "role": "neutral",
         "displayName": "Console Ink",
-        "canonical": "oklch(0.18 0.04 260)",
-        "tonalRamp": [
-          "oklch(0.15 0.04 260)",
-          "oklch(0.27 0.04 260)",
-          "oklch(0.39 0.04 260)",
-          "oklch(0.51 0.04 260)",
-          "oklch(0.63 0.04 260)",
-          "oklch(0.75 0.04 260)",
-          "oklch(0.87 0.04 260)",
-          "oklch(0.95 0.04 260)"
-        ]
+        "canonical": "#242424",
+        "tonalRamp": ["#181818", "#242424", "#3a3a3a", "#5a5a5a", "#7d7d7d", "#a2a2a2", "#d6d6d6", "#f0f0f0"]
       },
-      "primary": {
-        "role": "primary",
-        "displayName": "Signal Violet",
-        "canonical": "oklch(0.56 0.23 262)",
-        "tonalRamp": [
-          "oklch(0.15 0.11 262)",
-          "oklch(0.27 0.16 262)",
-          "oklch(0.39 0.2 262)",
-          "oklch(0.51 0.23 262)",
-          "oklch(0.63 0.2 262)",
-          "oklch(0.75 0.15 262)",
-          "oklch(0.87 0.08 262)",
-          "oklch(0.95 0.035 262)"
-        ]
-      },
-      "secondary": {
-        "role": "secondary",
-        "displayName": "Cool Command Wash",
-        "canonical": "oklch(0.95 0.03 258)",
-        "tonalRamp": [
-          "oklch(0.15 0.03 258)",
-          "oklch(0.27 0.03 258)",
-          "oklch(0.39 0.03 258)",
-          "oklch(0.51 0.03 258)",
-          "oklch(0.63 0.03 258)",
-          "oklch(0.75 0.03 258)",
-          "oklch(0.87 0.03 258)",
-          "oklch(0.95 0.03 258)"
-        ]
-      },
-      "sidebar": {
+      "pixel-card": {
         "role": "neutral",
-        "displayName": "Admin Shell",
-        "canonical": "oklch(0.16 0.055 260)",
-        "tonalRamp": [
-          "oklch(0.15 0.055 260)",
-          "oklch(0.27 0.055 260)",
-          "oklch(0.39 0.055 260)",
-          "oklch(0.51 0.055 260)",
-          "oklch(0.63 0.055 260)",
-          "oklch(0.75 0.055 260)",
-          "oklch(0.87 0.055 260)",
-          "oklch(0.95 0.055 260)"
-        ]
+        "displayName": "Equipment Face",
+        "canonical": "#eeeeee",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#8b8b8b", "#bdbdbd", "#d6d6d6", "#eeeeee", "#f7f7f7"]
       },
-      "destructive": {
+      "pixel-popover": {
+        "role": "neutral",
+        "displayName": "Raised Sheet",
+        "canonical": "#ededed",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#8b8b8b", "#bdbdbd", "#d6d6d6", "#ededed", "#f7f7f7"]
+      },
+      "pixel-command": {
+        "role": "primary",
+        "displayName": "Graphite Command",
+        "canonical": "#2f2f2f",
+        "tonalRamp": ["#181818", "#242424", "#2f2f2f", "#4b4b4b", "#737373", "#a2a2a2", "#d6d6d6", "#f0f0f0"]
+      },
+      "pixel-command-foreground": {
+        "role": "neutral",
+        "displayName": "Paper Signal",
+        "canonical": "#f5f5f5",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#8b8b8b", "#bdbdbd", "#dddddd", "#eeeeee", "#f5f5f5"]
+      },
+      "pixel-secondary": {
+        "role": "secondary",
+        "displayName": "Machine Wash",
+        "canonical": "#d6d6d6",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#7d7d7d", "#a2a2a2", "#bdbdbd", "#d6d6d6", "#eeeeee"]
+      },
+      "pixel-muted": {
+        "role": "neutral",
+        "displayName": "Quiet Alloy",
+        "canonical": "#dddddd",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#7d7d7d", "#a2a2a2", "#c9c9c9", "#dddddd", "#f0f0f0"]
+      },
+      "pixel-muted-foreground": {
+        "role": "neutral",
+        "displayName": "Secondary Ink",
+        "canonical": "#5a5a5a",
+        "tonalRamp": ["#181818", "#2f2f2f", "#5a5a5a", "#737373", "#8b8b8b", "#bdbdbd", "#dddddd", "#f0f0f0"]
+      },
+      "pixel-accent": {
+        "role": "secondary",
+        "displayName": "Interaction Zinc",
+        "canonical": "#cdcdcd",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#7d7d7d", "#9d9d9d", "#bdbdbd", "#cdcdcd", "#eeeeee"]
+      },
+      "pixel-fault": {
         "role": "danger",
-        "displayName": "Fault Red",
-        "canonical": "oklch(0.577 0.245 27.325)",
-        "tonalRamp": [
-          "oklch(0.15 0.12 27.325)",
-          "oklch(0.27 0.17 27.325)",
-          "oklch(0.39 0.22 27.325)",
-          "oklch(0.51 0.245 27.325)",
-          "oklch(0.63 0.2 27.325)",
-          "oklch(0.75 0.14 27.325)",
-          "oklch(0.87 0.08 27.325)",
-          "oklch(0.95 0.035 27.325)"
-        ]
+        "displayName": "Fault Brick",
+        "canonical": "#a13e34",
+        "tonalRamp": ["#321411", "#54211c", "#762e27", "#a13e34", "#bd5b50", "#d9847b", "#ebb5b0", "#f8e5e3"]
+      },
+      "pixel-border": {
+        "role": "neutral",
+        "displayName": "Structural Steel",
+        "canonical": "#8b8b8b",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#737373", "#8b8b8b", "#b6b6b6", "#d6d6d6", "#eeeeee"]
+      },
+      "pixel-input": {
+        "role": "neutral",
+        "displayName": "Input Rail",
+        "canonical": "#a2a2a2",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#7d7d7d", "#a2a2a2", "#bdbdbd", "#dddddd", "#f0f0f0"]
+      },
+      "pixel-focus": {
+        "role": "primary",
+        "displayName": "Focus Graphite",
+        "canonical": "#3a3a3a",
+        "tonalRamp": ["#181818", "#242424", "#3a3a3a", "#5a5a5a", "#7d7d7d", "#a2a2a2", "#d6d6d6", "#f0f0f0"]
+      },
+      "pixel-sidebar": {
+        "role": "neutral",
+        "displayName": "Navigation Alloy",
+        "canonical": "#c9c9c9",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#7d7d7d", "#9d9d9d", "#b7b7b7", "#c9c9c9", "#eeeeee"]
+      },
+      "pixel-sidebar-accent": {
+        "role": "secondary",
+        "displayName": "Navigation Press",
+        "canonical": "#bdbdbd",
+        "tonalRamp": ["#242424", "#3a3a3a", "#5a5a5a", "#737373", "#9d9d9d", "#bdbdbd", "#d6d6d6", "#eeeeee"]
+      },
+      "category-web": {
+        "role": "tertiary",
+        "displayName": "Web Amber",
+        "canonical": "#ff9e42",
+        "tonalRamp": ["#351e09", "#5e340e", "#874a15", "#b86520", "#df812f", "#ff9e42", "#ffc486", "#ffe5c5"]
+      },
+      "category-pwn": {
+        "role": "tertiary",
+        "displayName": "Pwn Vermilion",
+        "canonical": "#ff5e36",
+        "tonalRamp": ["#3a1209", "#681d10", "#922a18", "#bd3a22", "#e64c2d", "#ff7454", "#ffac98", "#ffddd4"]
+      },
+      "category-misc": {
+        "role": "tertiary",
+        "displayName": "Misc Violet",
+        "canonical": "#c47aff",
+        "tonalRamp": ["#281239", "#45205f", "#633087", "#8345ad", "#a35fd2", "#c47aff", "#dcaeff", "#f1dcff"]
+      },
+      "category-reverse": {
+        "role": "tertiary",
+        "displayName": "Reverse Cyan",
+        "canonical": "#66ccff",
+        "tonalRamp": ["#0d2b39", "#16485e", "#216784", "#3088aa", "#45aad0", "#66ccff", "#9adeff", "#d5f1ff"]
+      },
+      "category-mobile": {
+        "role": "tertiary",
+        "displayName": "Mobile Magenta",
+        "canonical": "#f06eff",
+        "tonalRamp": ["#341038", "#591c61", "#7f2a8a", "#a53db3", "#ca55d9", "#f06eff", "#f7a8ff", "#fddcff"]
+      },
+      "category-crypto": {
+        "role": "tertiary",
+        "displayName": "Crypto Yellow",
+        "canonical": "#ffe14d",
+        "tonalRamp": ["#373007", "#5d500b", "#857210", "#ae9618", "#d8bb29", "#ffe14d", "#ffed8f", "#fff8ce"]
+      },
+      "category-forensics": {
+        "role": "tertiary",
+        "displayName": "Forensics Apricot",
+        "canonical": "#ffb86c",
+        "tonalRamp": ["#38230d", "#5f3b16", "#87551f", "#b0712e", "#da9047", "#ffb86c", "#ffd09e", "#ffe9d1"]
+      },
+      "category-ai": {
+        "role": "tertiary",
+        "displayName": "AI Electric Cyan",
+        "canonical": "#4deaff",
+        "tonalRamp": ["#073137", "#0b535e", "#117784", "#1c9dab", "#2ec3d2", "#4deaff", "#91f2ff", "#d2fbff"]
+      },
+      "category-blockchain": {
+        "role": "tertiary",
+        "displayName": "Blockchain Pink",
+        "canonical": "#ff7ec7",
+        "tonalRamp": ["#371126", "#5e1d41", "#872b5e", "#af3e7c", "#d6569f", "#ff7ec7", "#ffaddb", "#ffdeef"]
+      },
+      "category-hardware": {
+        "role": "tertiary",
+        "displayName": "Hardware Orange",
+        "canonical": "#ff8c42",
+        "tonalRamp": ["#371b09", "#5e2e0e", "#874216", "#b25921", "#dc722f", "#ff8c42", "#ffb780", "#ffdfc2"]
+      },
+      "category-osint": {
+        "role": "tertiary",
+        "displayName": "OSINT Coral",
+        "canonical": "#ff9f7a",
+        "tonalRamp": ["#381b10", "#5f2e1c", "#87432b", "#b25c3e", "#dc7858", "#ff9f7a", "#ffc0a8", "#ffe3d7"]
+      },
+      "category-cloud": {
+        "role": "tertiary",
+        "displayName": "Cloud Blue",
+        "canonical": "#7ab8ff",
+        "tonalRamp": ["#10243a", "#1b3d62", "#29588b", "#3b75b4", "#5594dc", "#7ab8ff", "#add3ff", "#deedff"]
       }
     },
     "typographyMeta": {
-      "display": {
-        "displayName": "Display",
-        "purpose": "Rare product page titles and auth headings."
+      "pixel-display": {
+        "displayName": "Pixel Display",
+        "purpose": "Authentication statements and rare identity-led headings."
       },
-      "headline": {
-        "displayName": "Headline",
-        "purpose": "Admin page titles and dashboard section headings."
+      "pixel-headline": {
+        "displayName": "Pixel Headline",
+        "purpose": "Page headings and major administrative workspaces."
       },
-      "title": {
-        "displayName": "Title",
-        "purpose": "Cards, dialogs, and panel titles."
+      "pixel-title": {
+        "displayName": "Pixel Title",
+        "purpose": "Cards, dialogs, operational panels, and competition regions."
       },
-      "body": {
-        "displayName": "Body",
-        "purpose": "Default interface text and table content."
+      "pixel-body": {
+        "displayName": "Pixel Body",
+        "purpose": "Default mosaic UI copy, tables, forms, descriptions, and captions."
       },
-      "label": {
-        "displayName": "Label",
-        "purpose": "Compact metadata, status captions, and field labels."
+      "pixel-label": {
+        "displayName": "Pixel Label",
+        "purpose": "Buttons and prominent or compact state markers, never below the 0.8rem pixel minimum."
       }
     },
     "shadows": [
       {
-        "name": "panel-ambient",
-        "value": "0 22px 80px rgb(15 23 42 / 0.08)",
-        "purpose": "Authentication panels, filter panels, and important grouped tool surfaces."
+        "name": "button-detent",
+        "value": "2px 2px 0 #8c8c8c",
+        "purpose": "Primary Pixel Industrial controls at rest."
       },
       {
-        "name": "card-ambient",
-        "value": "0 16px 60px rgb(15 23 42 / 0.06)",
+        "name": "card-detent",
+        "value": "2px 2px 0 #bdbdbd",
         "purpose": "Default cards and repeated item containers."
       },
       {
-        "name": "primary-glow",
-        "value": "0 4px 12px rgb(37 99 235 / 0.25)",
-        "purpose": "Primary buttons and active navigation states."
+        "name": "panel-chassis",
+        "value": "4px 4px 0 #d4d4d4",
+        "purpose": "Layered operational panels."
       },
       {
-        "name": "hover-lift",
-        "value": "0 24px 70px rgb(37 99 235 / 0.14)",
-        "purpose": "Clickable cards on hover."
+        "name": "dark-panel-chassis",
+        "value": "6px 6px 0 #7d7d7d",
+        "purpose": "Dark Pixel Industrial game-dashboard panels."
       },
       {
-        "name": "dialog-lift",
-        "value": "0 30px 90px rgb(15 23 42 / 0.22)",
-        "purpose": "Dialogs and sheets."
+        "name": "floating-equipment",
+        "value": "6px 6px 0 #bdbdbd",
+        "purpose": "Menus and higher temporary surfaces."
       }
     ],
     "motion": [
       {
-        "name": "state-fast",
-        "value": "150ms ease-out",
-        "purpose": "Small hover, focus, and feedback transitions."
+        "name": "mechanical-press",
+        "value": "75ms ease-out",
+        "purpose": "Button hover and one-pixel active press feedback."
       },
       {
         "name": "state-standard",
-        "value": "200ms ease-out",
-        "purpose": "Default component state transitions."
+        "value": "180ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Default opacity and transform state changes."
       },
       {
-        "name": "feedback-lift",
+        "name": "icon-feedback",
         "value": "300ms ease-out",
-        "purpose": "Card hover lift and non-layout transform feedback."
+        "purpose": "Short icon appearance feedback without layout animation."
+      },
+      {
+        "name": "status-pulse",
+        "value": "2000ms ease-in-out",
+        "purpose": "Low-amplitude opacity pulse for live status only."
       }
     ],
     "breakpoints": [
-      {
-        "name": "sm",
-        "value": "640px"
-      },
-      {
-        "name": "md",
-        "value": "768px"
-      },
-      {
-        "name": "lg",
-        "value": "1024px"
-      },
-      {
-        "name": "xl",
-        "value": "1280px"
-      }
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
     ]
   },
   "components": [
     {
-      "name": "Primary Button",
+      "name": "Pixel Primary Button",
       "kind": "button",
-      "refersTo": "button-primary",
-      "description": "Primary action for submissions, creation, and decisive workflow steps.",
-      "html": "<button class=\"ds-btn-primary\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 5l7 7-7 7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>Submit Flag</button>",
-      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; height:2.5rem; padding:0.5rem 1rem; border:0; border-radius:0.75rem; background:oklch(0.56 0.23 262); color:oklch(0.985 0.004 255); font:600 0.875rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif; box-shadow:0 4px 12px rgb(37 99 235 / 0.25); transition:background 200ms ease-out, box-shadow 200ms ease-out, transform 150ms ease-out; } .ds-btn-primary svg { width:1rem; height:1rem; } .ds-btn-primary:hover { background:oklch(0.504 0.207 262); box-shadow:0 8px 20px rgb(37 99 235 / 0.30); } .ds-btn-primary:active { transform:translateY(1px); } .ds-btn-primary:focus-visible { outline:2px solid oklch(0.58 0.22 262); outline-offset:2px; }"
+      "refersTo": "pixel-button-primary",
+      "description": "The decisive action control in the current Pixel Industrial theme.",
+      "html": "<button class=\"ds-pixel-button-primary\">SUBMIT FLAG</button>",
+      "css": ".ds-pixel-button-primary { display:inline-flex; align-items:center; justify-content:center; min-height:2.5rem; border:2px solid #1b1b1b; border-radius:0; background:var(--primary, #2f2f2f); color:var(--primary-foreground, #f5f5f5); padding:0.5rem 1rem; font:700 0.9rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; box-shadow:2px 2px 0 #8c8c8c; transition:transform 75ms ease-out, background-color 75ms ease-out, border-color 75ms ease-out; } .ds-pixel-button-primary:hover { background:#3a3a3a; } .ds-pixel-button-primary:active { transform:translate(1px, 1px); } .ds-pixel-button-primary:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
     },
     {
-      "name": "Outline Button",
+      "name": "Pixel Outline Button",
       "kind": "button",
-      "refersTo": "button-outline",
-      "description": "Secondary action for refresh, cancel, and lower-risk commands.",
-      "html": "<button class=\"ds-btn-outline\">Refresh</button>",
-      "css": ".ds-btn-outline { display:inline-flex; align-items:center; justify-content:center; height:2.5rem; padding:0.5rem 1rem; border:1px solid oklch(0.88 0.027 252); border-radius:0.75rem; background:rgb(255 255 255 / 0.8); color:oklch(0.18 0.04 260); font:600 0.875rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif; box-shadow:0 1px 2px rgb(15 23 42 / 0.06); transition:background 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out; } .ds-btn-outline:hover { border-color:rgb(37 99 235 / 0.3); background:oklch(0.93 0.045 258); color:oklch(0.29 0.09 262); } .ds-btn-outline:focus-visible { outline:2px solid oklch(0.58 0.22 262); outline-offset:2px; }"
+      "refersTo": "pixel-button-outline",
+      "description": "A secondary mechanical action for refresh, cancel, and lower-risk commands.",
+      "html": "<button class=\"ds-pixel-button-outline\">REFRESH</button>",
+      "css": ".ds-pixel-button-outline { display:inline-flex; align-items:center; justify-content:center; min-height:2.5rem; border:2px solid #7f7f7f; border-radius:0; background:#e5e5e5; color:var(--foreground, #242424); padding:0.5rem 1rem; font:700 0.9rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; box-shadow:2px 2px 0 #c7c7c7; transition:transform 75ms ease-out, background-color 75ms ease-out; } .ds-pixel-button-outline:hover { background:#d8d8d8; } .ds-pixel-button-outline:active { transform:translate(1px, 1px); } .ds-pixel-button-outline:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
     },
     {
-      "name": "Search Input",
+      "name": "Pixel Input Field",
       "kind": "input",
-      "refersTo": "input-default",
-      "description": "Default text field for filters, forms, and search surfaces.",
-      "html": "<label class=\"ds-field\"><span>Search</span><input class=\"ds-input\" placeholder=\"Search competitions...\" /></label>",
-      "css": ".ds-field { display:grid; gap:0.375rem; color:oklch(0.49 0.05 260); font:700 0.75rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif; text-transform:uppercase; letter-spacing:0.05em; } .ds-input { height:2.5rem; border:1px solid oklch(0.88 0.027 252); border-radius:0.75rem; background:rgb(255 255 255 / 0.85); color:oklch(0.18 0.04 260); padding:0.5rem 0.75rem; font:400 0.875rem/1.5 Inter, ui-sans-serif, system-ui, sans-serif; box-shadow:0 1px 2px rgb(15 23 42 / 0.06); transition:border-color 200ms ease-out, box-shadow 200ms ease-out; } .ds-input::placeholder { color:oklch(0.49 0.05 260); } .ds-input:focus { outline:none; border-color:oklch(0.56 0.23 262); box-shadow:0 0 0 4px rgb(37 99 235 / 0.15); }"
+      "refersTo": "pixel-input",
+      "description": "The square two-pixel field used across filters and forms.",
+      "html": "<label class=\"ds-pixel-field\"><span>TEAM NAME</span><input class=\"ds-pixel-input\" placeholder=\"Enter team name\" /></label>",
+      "css": ".ds-pixel-field { display:grid; gap:0.375rem; color:var(--muted-foreground, #5a5a5a); font:700 0.9rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; text-transform:uppercase; } .ds-pixel-input { min-height:2.5rem; border:2px solid var(--input, #a2a2a2); border-radius:0; background:var(--card, #eeeeee); color:var(--foreground, #242424); padding:0.25rem 0.75rem; font:400 0.9rem/1.5 var(--font-sans, monospace); transition:border-color 75ms ease-out, box-shadow 75ms ease-out; } .ds-pixel-input::placeholder { color:var(--muted-foreground, #5a5a5a); } .ds-pixel-input:focus { outline:none; border-color:var(--primary, #2f2f2f); box-shadow:0 0 0 2px rgb(58 58 58 / 0.2); }"
     },
     {
-      "name": "Status Badge",
+      "name": "Pixel Status Badge",
       "kind": "chip",
-      "refersTo": "badge-primary",
-      "description": "Compact mode, score, and state label.",
-      "html": "<span class=\"ds-badge\">Running</span>",
-      "css": ".ds-badge { display:inline-flex; align-items:center; justify-content:center; gap:0.25rem; width:max-content; border:1px solid transparent; border-radius:9999px; background:oklch(0.56 0.23 262); color:oklch(0.985 0.004 255); padding:0.125rem 0.5rem; font:600 0.75rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif; white-space:nowrap; transition:background 200ms ease-out, box-shadow 200ms ease-out; } .ds-badge:hover { background:oklch(0.504 0.207 262); } .ds-badge:focus-visible { outline:2px solid oklch(0.58 0.22 262); outline-offset:2px; }"
+      "refersTo": "pixel-badge",
+      "description": "A compact pixel-ellipse label for mode and operational state.",
+      "html": "<span class=\"ds-pixel-badge\">RUNNING</span>",
+      "css": ".ds-pixel-badge { display:inline-flex; align-items:center; justify-content:center; width:max-content; background:var(--primary, #2f2f2f); color:var(--primary-foreground, #f5f5f5); padding:0.125rem 0.5rem; font:700 0.8rem/1.5 var(--font-sans, monospace); letter-spacing:0.05em; clip-path:polygon(12.5% 0%,87.5% 0%,87.5% 6.25%,93.75% 6.25%,93.75% 12.5%,96.875% 12.5%,96.875% 25%,98.4375% 25%,98.4375% 37.5%,100% 37.5%,100% 62.5%,98.4375% 62.5%,98.4375% 75%,96.875% 75%,96.875% 87.5%,93.75% 87.5%,93.75% 93.75%,87.5% 93.75%,87.5% 100%,12.5% 100%,12.5% 93.75%,6.25% 93.75%,6.25% 87.5%,3.125% 87.5%,3.125% 75%,1.5625% 75%,1.5625% 62.5%,0% 62.5%,0% 37.5%,1.5625% 37.5%,1.5625% 25%,3.125% 25%,3.125% 12.5%,6.25% 12.5%,6.25% 6.25%,12.5% 6.25%); } .ds-pixel-badge:hover { background:#3a3a3a; } .ds-pixel-badge:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
     },
     {
-      "name": "Competition Card",
+      "name": "Pixel Competition Card",
       "kind": "card",
-      "refersTo": "card-default",
-      "description": "Clickable card for competition entry and high-level event summary.",
-      "html": "<article class=\"ds-card\"><div class=\"ds-card-kicker\"><span class=\"ds-badge-small\">Running</span><span class=\"ds-badge-soft\">AWD</span></div><h3>Spring Attack Defense</h3><p>Live attack-defense competition workspace.</p><button class=\"ds-card-action\">Enter</button></article>",
-      "css": ".ds-card { display:flex; flex-direction:column; gap:1rem; max-width:22rem; border:1px solid oklch(0.9 0.023 252); border-radius:1rem; background:rgb(255 255 255 / 0.95); color:oklch(0.18 0.04 260); padding:1.5rem; box-shadow:0 16px 60px rgb(15 23 42 / 0.06); transition:border-color 300ms ease-out, box-shadow 300ms ease-out, transform 300ms ease-out; } .ds-card:hover { border-color:rgb(37 99 235 / 0.3); box-shadow:0 24px 70px rgb(37 99 235 / 0.14); transform:translateY(-4px); } .ds-card-kicker { display:flex; gap:0.5rem; } .ds-card h3 { margin:0; font:700 1.25rem/1.25 Inter, ui-sans-serif, system-ui, sans-serif; } .ds-card p { margin:0; color:oklch(0.49 0.05 260); font:400 0.875rem/1.5 Inter, ui-sans-serif, system-ui, sans-serif; } .ds-badge-small { border-radius:9999px; background:oklch(0.56 0.23 262); color:oklch(0.985 0.004 255); padding:0.125rem 0.5rem; font:600 0.75rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif; } .ds-badge-soft { border-radius:9999px; background:oklch(0.95 0.03 258); color:oklch(0.26 0.06 260); padding:0.125rem 0.5rem; font:600 0.75rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif; } .ds-card-action { height:2.5rem; border:0; border-radius:0.75rem; background:oklch(0.56 0.23 262); color:oklch(0.985 0.004 255); font:600 0.875rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif; }"
+      "refersTo": "pixel-card-default",
+      "description": "A bordered equipment face with a raster corner signature.",
+      "html": "<article class=\"ds-pixel-card\"><div class=\"ds-pixel-card-meta\">RUNNING · AWD</div><h3>SPRING ATTACK DEFENSE</h3><p>Live competition workspace with service and score state.</p><span class=\"ds-pixel-corner\" aria-hidden=\"true\"></span></article>",
+      "css": ".ds-pixel-card { position:relative; display:flex; flex-direction:column; gap:1rem; max-width:24rem; overflow:hidden; border:2px solid var(--card-border-color, #8b8b8b); border-radius:0; background:var(--card, #eeeeee); color:var(--card-foreground, #242424); padding:1rem; box-shadow:2px 2px 0 #bdbdbd; } .ds-pixel-card h3 { margin:0; font:700 1.25rem/1.25 var(--font-sans, monospace); } .ds-pixel-card p { max-width:65ch; margin:0; color:var(--muted-foreground, #5a5a5a); font:400 0.9rem/1.5 var(--font-sans, monospace); } .ds-pixel-card-meta { font:700 0.8rem/1.5 var(--font-sans, monospace); letter-spacing:0.12em; } .ds-pixel-corner { position:absolute; right:-4px; bottom:-4px; width:64px; height:64px; opacity:0.45; background:repeating-linear-gradient(135deg, transparent 0 8px, #000 8px 16px); clip-path:polygon(100% 0,100% 100%,0 100%); }"
     },
     {
-      "name": "Admin Navigation",
+      "name": "Layered Pixel Panel",
+      "kind": "custom",
+      "refersTo": "pixel-card-default",
+      "description": "The signature chassis panel with an offset mechanical base.",
+      "html": "<section class=\"ds-panel-shell\"><div class=\"ds-panel-base\" aria-hidden=\"true\"></div><div class=\"ds-panel-face\"><strong>SERVICE STATUS</strong><p>All checker paths are visible.</p></div></section>",
+      "css": ".ds-panel-shell { position:relative; isolation:isolate; min-width:20rem; min-height:9rem; } .ds-panel-base { position:absolute; inset:10px 0 0 10px; z-index:1; border:2px solid #d4d4d4; background:#f5f5f5; box-shadow:2px 2px 0 #e0e0e0; } .ds-panel-face { position:relative; z-index:2; min-height:inherit; border:2px solid #bdbdbd; border-radius:0; background:linear-gradient(180deg,#e4e4e4 0%,#dadada 100%); color:#242424; padding:1rem; box-shadow:4px 4px 0 #d4d4d4; font-family:var(--font-sans, monospace); } .ds-panel-face strong { letter-spacing:0.12em; } .ds-panel-face p { color:#5a5a5a; }"
+    },
+    {
+      "name": "Pixel Top Navigation",
       "kind": "nav",
-      "refersTo": "navigation-admin",
-      "description": "Dark control-shell navigation for organizer and administrator workflows.",
-      "html": "<nav class=\"ds-admin-nav\"><div class=\"ds-admin-brand\"><span class=\"ds-logo\"></span><strong>NoCTF</strong><small>Admin</small></div><a class=\"ds-nav-active\" href=\"#\">Competitions</a><a href=\"#\">Teams</a><a href=\"#\">Audit Logs</a></nav>",
-      "css": ".ds-admin-nav { width:16rem; min-height:20rem; border-radius:1rem; background:oklch(0.16 0.055 260); color:oklch(0.95 0.012 255); padding:1rem; font-family:Inter, ui-sans-serif, system-ui, sans-serif; } .ds-admin-brand { display:grid; grid-template-columns:2.5rem 1fr; column-gap:0.625rem; align-items:center; padding-bottom:1rem; margin-bottom:1rem; border-bottom:1px solid rgb(255 255 255 / 0.1); } .ds-admin-brand strong { font-size:1.25rem; line-height:1.1; } .ds-admin-brand small { grid-column:2; width:max-content; margin-top:0.25rem; border-radius:0.375rem; background:rgb(255 255 255 / 0.1); color:oklch(0.75 0.025 255); padding:0.125rem 0.5rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; } .ds-logo { grid-row:1 / span 2; width:2.5rem; height:2.5rem; border-radius:0.75rem; background:linear-gradient(145deg, #42d2ff 0%, #1264ff 45%, #5a3bff 100%); box-shadow:0 10px 24px rgb(37 99 235 / 0.25); } .ds-admin-nav a { display:flex; align-items:center; min-height:2.25rem; border-radius:0.625rem; color:oklch(0.82 0.018 255); padding:0 0.75rem; text-decoration:none; font-size:0.875rem; font-weight:600; transition:background 200ms ease-out, color 200ms ease-out; } .ds-admin-nav a:hover, .ds-admin-nav .ds-nav-active { background:oklch(0.25 0.08 262); color:oklch(0.985 0.004 255); }"
+      "refersTo": "pixel-card-default",
+      "description": "The public navigation bar with mechanical active-route feedback.",
+      "html": "<nav class=\"ds-pixel-nav\"><strong>NoCTF</strong><a class=\"ds-pixel-nav-active\" href=\"#\">HOME</a><a href=\"#\">COMPETITIONS</a><a href=\"#\">TEAMS</a></nav>",
+      "css": ".ds-pixel-nav { display:flex; align-items:center; gap:0.5rem; min-height:4rem; border-bottom:2px solid var(--border, #8b8b8b); background:var(--muted, #dddddd); color:var(--foreground, #242424); padding:0 1rem; font-family:var(--font-sans, monospace); } .ds-pixel-nav strong { margin-right:1rem; font-size:1.25rem; } .ds-pixel-nav a { border-bottom:2px solid transparent; color:var(--muted-foreground, #5a5a5a); padding:0.5rem 0.75rem; text-decoration:none; font-size:0.9rem; font-weight:700; letter-spacing:0.05em; transition:background-color 75ms ease-out, color 75ms ease-out, border-color 75ms ease-out; } .ds-pixel-nav a:hover { background:var(--accent, #cdcdcd); color:var(--foreground, #242424); } .ds-pixel-nav .ds-pixel-nav-active { border-color:var(--primary, #2f2f2f); background:var(--accent, #cdcdcd); color:var(--foreground, #242424); } .ds-pixel-nav a:focus-visible { outline:2px solid var(--ring, #3a3a3a); outline-offset:2px; }"
     }
   ],
   "narrative": {
-    "northStar": "The Competition Control Room",
-    "overview": "NoCTF should feel like a live event control surface: calm enough for organizers to trust, sharp enough for participants to feel the pace of attack-defense play. The system uses a light operational workspace for legibility, a deep sidebar shell for administrative control, and concentrated blue-violet energy for primary actions, active navigation, score state, and real-time signals.\n\nThe design rejects generic SaaS softness, overdone cyberpunk spectacle, and default CTFd list density. It is allowed to be dense, but never muddy. Every surface should make state, fairness, and system movement inspectable: competitions, scores, containers, logs, plugins, patches, and audit records all need a clear place in the visual hierarchy.",
+    "northStar": "The Curated Competition Control Room",
+    "overview": "NoCTF is one product with a developer-curated catalog of complete visual themes. Platform developers author, review, test, and ship every theme. Users may select a registered theme, but they never upload CSS, edit token values, inject fonts, or provide external visual resources. Theme choice changes presentation only. It must never alter layout, information hierarchy, permissions, status meaning, game-mode behavior, or API interaction.\n\nThe shared interface contract is calm, precise, trustworthy, sharp, energetic, and technical. Every theme must make live competition state and operational truth easy to inspect. Pixel Industrial is the current implemented default: a participant or operator reads dense state on a laptop in a brightly lit event hall, where monochrome contrast, hard edges, and tactile offset shadows remain legible through glare and pressure.\n\nFuture themes may use different palettes, fonts, radii, elevation, textures, and motion intensity, but they must preserve the same semantic CSS roles and component states. The root frontmatter records the current Pixel Industrial implementation. Additional themes require their own reviewed token set and theme-specific design document before registration.",
     "keyCharacteristics": [
-      "Light, cool-tinted work surfaces with deep control-shell contrast.",
-      "Saturated blue-violet used sparingly for decisions, activity, and identity.",
-      "Dense tables and dashboards, softened by precise spacing and rounded controls.",
-      "Real-time states shown with labels, icons, and color, never color alone.",
-      "Motion is fast feedback, not choreography."
+      "Developer-curated themes selected from a closed registry.",
+      "Stable semantic roles across every theme and game mode.",
+      "Pixel Industrial as the current square, grayscale, tactile default.",
+      "Dense but legible operational surfaces with visible fairness and system state.",
+      "Fast state feedback, stable dimensions, and reduced-motion support.",
+      "Category accents used for recognition, never as decorative page themes."
     ],
     "rules": [
       {
-        "name": "The Signal Rarity Rule",
-        "body": "Signal Violet should mark action, selection, or live state. Do not spread it across decorative backgrounds.",
+        "name": "The Theme Contract Rule",
+        "body": "Every registered theme implements the complete semantic token contract. A missing token, unreadable state, or component-specific fallback is a release blocker.",
+        "section": "overview"
+      },
+      {
+        "name": "The Closed Catalog Rule",
+        "body": "Users choose a theme identifier from the platform registry. Custom CSS, custom token payloads, external fonts, remote backgrounds, and arbitrary theme URLs are forbidden.",
+        "section": "overview"
+      },
+      {
+        "name": "The Presentation Only Rule",
+        "body": "A theme may change visual expression. It may not change workflow, component purpose, data density, status meaning, or competition logic.",
+        "section": "overview"
+      },
+      {
+        "name": "The Semantic Stability Rule",
+        "body": "A theme can change a color value, but it cannot exchange semantic roles. Fault must remain fault, focus must remain focus, and category identity must remain recognizable.",
         "section": "colors"
       },
       {
-        "name": "The No Neon Rule",
-        "body": "The interface may be energetic, but full neon cyberpunk palettes are forbidden because they weaken data reading.",
+        "name": "The Category Restraint Rule",
+        "body": "Category colors label challenges and related data. They never flood inactive pages, replace primary actions, or become a competition-mode skin.",
         "section": "colors"
       },
       {
-        "name": "The Data First Rule",
-        "body": "Use weight, spacing, and tabular numerals for hierarchy before increasing type size.",
+        "name": "The No Neon Spectacle Rule",
+        "body": "Bright category colors are small signals. Neon black-purple surfaces, decorative glow, and saturated full-page effects are prohibited.",
+        "section": "colors"
+      },
+      {
+        "name": "The Theme Typography Rule",
+        "body": "A theme may change its developer-supplied family and character, but it must preserve the five hierarchy roles, readable CJK coverage, stable control dimensions, and code-safe fallbacks.",
         "section": "typography"
       },
       {
-        "name": "The Border Before Shadow Rule",
-        "body": "Use borders and tonal surfaces for default structure. Add stronger shadows only for hover, dialogs, or primary emphasis.",
+        "name": "The Pixel Minimum Rule",
+        "body": "Pixel glyphs are never rendered below 0.8rem. Compact roles gain space or truncate rather than switching fonts or shrinking the bitmap face further.",
+        "section": "typography"
+      },
+      {
+        "name": "The Operational Numeral Rule",
+        "body": "Scores, IDs, ports, timestamps, attempts, and live counters use tabular numeral behavior whenever the chosen theme font supports it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Solid Offset Rule",
+        "body": "Pixel Industrial shadows have zero blur and small positive offsets. If a shadow looks soft, cinematic, or luminous, it does not belong to this theme.",
+        "section": "elevation"
+      },
+      {
+        "name": "The State Before Decoration Rule",
+        "body": "Elevation communicates clickability, pressed state, stacking, or temporary focus. It never exists only to make a screen look expensive.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "Do make fairness visible with score state, audit state, and traceable action feedback.",
-      "Do keep Admin screens denser, calmer, and more operational than participant screens.",
-      "Do use Signal Violet for primary decisions, active state, and live competition signals.",
-      "Do pair color with labels or icons for status, severity, connection state, and mode.",
-      "Do use skeletons and stable dimensions for loading live dashboards and tables.",
-      "Do preserve the cool-tinted light workspace and deep Admin Shell contrast."
+      "Do keep the developer theme registry closed, typed, versioned, and shipped with the frontend build.",
+      "Do store only an allowlisted theme identifier in user preference, then validate it again before application.",
+      "Do apply the selected theme before Vue mounts so the first frame never flashes another theme.",
+      "Do require every theme to pass contrast, keyboard focus, reduced-motion, CJK coverage, responsive, and critical-state checks.",
+      "Do preserve component structure, permissions, data density, layout, and semantic status roles across themes.",
+      "Do make fairness visible with score state, audit state, traceable action feedback, and stable live updates.",
+      "Do keep administrator screens dense, calm, and operational in every theme.",
+      "Do use labels and icons with color for severity, connection, mode, and delivery state."
     ],
     "donts": [
+      "Don't expose theme editing, CSS uploads, token JSON, arbitrary font URLs, remote backgrounds, theme imports, or user-authored visual code.",
+      "Don't allow themes to change API behavior, competition logic, score presentation meaning, permissions, workflow, or component purpose.",
+      "Don't bind a user theme to CTF, AWD, AWDP, KoH, a route, or a plugin. Theme selection is a visual preference, not a game-mode branch.",
       "Don't make the interface feel like generic SaaS admin design: white cards everywhere, soft marketing polish, flat dashboards, and no sense of competition.",
       "Don't use overdone cyberpunk: neon black-purple surfaces, decorative glow, heavy visual effects, or anything that makes status and scores harder to read.",
       "Don't drift into the default CTFd feel: traditional list-heavy competition pages, weak hierarchy, and a lack of modern control-room presence.",
       "Don't hide operational truth. Health, logs, scoring, audit trails, round state, and container status must be straightforward to inspect.",
-      "Don't use side-stripe colored borders, gradient text, decorative glassmorphism, or identical card grids.",
-      "Don't use modals as the first answer when inline editing, sheets, or progressive disclosure would keep the workflow intact."
+      "Don't use side-stripe colored borders, gradient text, decorative glassmorphism, hero-metric templates, or identical card grids.",
+      "Don't use modals as the first answer when inline editing, sheets, or progressive disclosure can preserve workflow context."
     ]
   }
 }

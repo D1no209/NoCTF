@@ -1,229 +1,285 @@
 ---
-name: NoCTF
-description: A competition control surface for live CTF, AWD, AWDP, and KoH events.
+name: NoCTF Developer Theme System
+description: A developer-curated visual theme contract for a precise live competition platform.
 colors:
-  background: "oklch(0.984 0.006 255)"
-  foreground: "oklch(0.18 0.04 260)"
-  surface-card: "oklch(1 0 0)"
-  primary: "oklch(0.56 0.23 262)"
-  primary-hover: "oklch(0.504 0.207 262)"
-  secondary: "oklch(0.95 0.03 258)"
-  muted: "oklch(0.955 0.017 252)"
-  accent: "oklch(0.93 0.045 258)"
-  border: "oklch(0.9 0.023 252)"
-  destructive: "oklch(0.577 0.245 27.325)"
-  sidebar: "oklch(0.16 0.055 260)"
-  sidebar-accent: "oklch(0.25 0.08 262)"
-  chart-orange: "oklch(0.646 0.222 41.116)"
-  chart-cyan: "oklch(0.6 0.118 184.704)"
-  chart-ink: "oklch(0.398 0.07 227.392)"
+  pixel-canvas: "#e4e4e4"
+  pixel-ink: "#242424"
+  pixel-card: "#eeeeee"
+  pixel-popover: "#ededed"
+  pixel-command: "#2f2f2f"
+  pixel-command-foreground: "#f5f5f5"
+  pixel-secondary: "#d6d6d6"
+  pixel-muted: "#dddddd"
+  pixel-muted-foreground: "#5a5a5a"
+  pixel-accent: "#cdcdcd"
+  pixel-fault: "#a13e34"
+  pixel-border: "#8b8b8b"
+  pixel-input: "#a2a2a2"
+  pixel-focus: "#3a3a3a"
+  pixel-sidebar: "#c9c9c9"
+  pixel-sidebar-accent: "#bdbdbd"
+  category-web: "#ff9e42"
+  category-pwn: "#ff5e36"
+  category-misc: "#c47aff"
+  category-reverse: "#66ccff"
+  category-mobile: "#f06eff"
+  category-crypto: "#ffe14d"
+  category-forensics: "#ffb86c"
+  category-ai: "#4deaff"
+  category-blockchain: "#ff7ec7"
+  category-hardware: "#ff8c42"
+  category-osint: "#ff9f7a"
+  category-cloud: "#7ab8ff"
 typography:
-  display:
-    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "1.875rem"
+  pixel-display:
+    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+    fontSize: "3rem"
     fontWeight: 700
-    lineHeight: 1.2
+    lineHeight: 1.25
     letterSpacing: "normal"
-  headline:
-    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  pixel-headline:
+    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
     fontSize: "1.5rem"
     fontWeight: 700
     lineHeight: 1.25
     letterSpacing: "normal"
-  title:
-    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  pixel-title:
+    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
     fontSize: "1.25rem"
     fontWeight: 700
     lineHeight: 1.25
     letterSpacing: "normal"
-  body:
-    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "0.875rem"
+  pixel-body:
+    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+    fontSize: "0.9rem"
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: "normal"
-  label:
-    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "0.75rem"
+  pixel-label:
+    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+    fontSize: "0.9rem"
     fontWeight: 700
-    lineHeight: 1.2
-    letterSpacing: "0.05em"
+    lineHeight: 1.25
+    letterSpacing: "0.12em"
 rounded:
-  sm: "0.5rem"
-  md: "0.625rem"
-  lg: "0.75rem"
-  xl: "1rem"
+  square: "0px"
+  pill: "9999px"
 spacing:
+  pixel-cell: "8px"
+  grid-unit: "16px"
   xs: "0.25rem"
   sm: "0.5rem"
   md: "1rem"
   lg: "1.5rem"
   xl: "2rem"
 components:
-  button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.surface-card}"
-    rounded: "{rounded.lg}"
+  pixel-button-primary:
+    backgroundColor: "{colors.pixel-command}"
+    textColor: "{colors.pixel-command-foreground}"
+    typography: "{typography.pixel-label}"
+    rounded: "{rounded.square}"
     padding: "0.5rem 1rem"
     height: "2.5rem"
-    typography: "{typography.body}"
-  button-outline:
-    backgroundColor: "{colors.surface-card}"
-    textColor: "{colors.foreground}"
-    rounded: "{rounded.lg}"
+  pixel-button-outline:
+    backgroundColor: "{colors.pixel-canvas}"
+    textColor: "{colors.pixel-ink}"
+    typography: "{typography.pixel-label}"
+    rounded: "{rounded.square}"
     padding: "0.5rem 1rem"
     height: "2.5rem"
-    typography: "{typography.body}"
-  input-default:
-    backgroundColor: "{colors.surface-card}"
-    textColor: "{colors.foreground}"
-    rounded: "{rounded.lg}"
-    padding: "0.5rem 0.75rem"
+  pixel-input:
+    backgroundColor: "{colors.pixel-card}"
+    textColor: "{colors.pixel-ink}"
+    typography: "{typography.pixel-body}"
+    rounded: "{rounded.square}"
+    padding: "0.25rem 0.75rem"
     height: "2.5rem"
-    typography: "{typography.body}"
-  badge-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.surface-card}"
-    rounded: "9999px"
+  pixel-badge:
+    backgroundColor: "{colors.pixel-command}"
+    textColor: "{colors.pixel-command-foreground}"
+    typography: "{typography.pixel-label}"
+    rounded: "{rounded.pill}"
     padding: "0.125rem 0.5rem"
-    typography: "{typography.label}"
-  card-default:
-    backgroundColor: "{colors.surface-card}"
-    textColor: "{colors.foreground}"
-    rounded: "{rounded.xl}"
-    padding: "1.5rem"
+  pixel-card-default:
+    backgroundColor: "{colors.pixel-card}"
+    textColor: "{colors.pixel-ink}"
+    rounded: "{rounded.square}"
+    padding: "1rem"
 ---
 
 # Design System: NoCTF
 
-## 1. Overview
+## Overview
 
-**Creative North Star: "The Competition Control Room"**
+**Creative North Star: "The Curated Competition Control Room"**
 
-NoCTF should feel like a live event control surface: calm enough for organizers to trust, sharp enough for participants to feel the pace of attack-defense play. The system uses a light operational workspace for legibility, a deep sidebar shell for administrative control, and concentrated blue-violet energy for primary actions, active navigation, score state, and real-time signals.
+NoCTF is one product with a developer-curated catalog of complete visual themes. Platform developers author, review, test, and ship every theme. Users may select a registered theme, but they never upload CSS, edit token values, inject fonts, or provide external visual resources. Theme choice changes presentation only. It must never alter layout, information hierarchy, permissions, status meaning, game-mode behavior, or API interaction.
 
-The design rejects generic SaaS softness, overdone cyberpunk spectacle, and default CTFd list density. It is allowed to be dense, but never muddy. Every surface should make state, fairness, and system movement inspectable: competitions, scores, containers, logs, plugins, patches, and audit records all need a clear place in the visual hierarchy.
+The shared interface contract is calm, precise, trustworthy, sharp, energetic, and technical. Every theme must make live competition state and operational truth easy to inspect. Pixel Industrial is the current implemented default: a participant or operator reads dense state on a laptop in a brightly lit event hall, where monochrome contrast, hard edges, and tactile offset shadows remain legible through glare and pressure.
+
+Future themes may use different palettes, fonts, radii, elevation, textures, and motion intensity, but they must preserve the same semantic CSS roles and component states. The root frontmatter records the current Pixel Industrial implementation. Additional themes require their own reviewed token set and theme-specific design document before registration.
 
 **Key Characteristics:**
-- Light, cool-tinted work surfaces with deep control-shell contrast.
-- Saturated blue-violet used sparingly for decisions, activity, and identity.
-- Dense tables and dashboards, softened by precise spacing and rounded controls.
-- Real-time states shown with labels, icons, and color, never color alone.
-- Motion is fast feedback, not choreography.
 
-## 2. Colors
+- Developer-curated themes selected from a closed registry.
+- Stable semantic roles across every theme and game mode.
+- Pixel Industrial as the current square, grayscale, tactile default.
+- Dense but legible operational surfaces with visible fairness and system state.
+- Fast state feedback, stable dimensions, and reduced-motion support.
+- Category accents used for recognition, never as decorative page themes.
 
-The palette is a restrained product system with a charged blue-violet core and cool technical neutrals.
+**The Theme Contract Rule.** Every registered theme implements the complete semantic token contract. A missing token, unreadable state, or component-specific fallback is a release blocker.
+
+**The Closed Catalog Rule.** Users choose a theme identifier from the platform registry. Custom CSS, custom token payloads, external fonts, remote backgrounds, and arbitrary theme URLs are forbidden.
+
+**The Presentation Only Rule.** A theme may change visual expression. It may not change workflow, component purpose, data density, status meaning, or competition logic.
+
+## Colors
+
+Pixel Industrial uses a restrained achromatic control palette with small, deliberate category signals. Every future theme may reinterpret the visual palette, but success, warning, fault, focus, selection, and category roles must remain distinguishable and stable.
 
 ### Primary
-- **Signal Violet** (`primary`): The NoCTF action color. Use it for primary buttons, active navigation, selected states, focus rings, and live control emphasis.
-- **Pressed Signal Violet** (`primary-hover`): The hover and pressed state for primary action surfaces.
+
+- **Graphite Command** (`pixel-command`, `#2f2f2f`): Primary actions, selected controls, and the strongest interface decisions.
+- **Paper Signal** (`pixel-command-foreground`, `#f5f5f5`): Text and icons placed on Graphite Command.
 
 ### Secondary
-- **Cool Command Wash** (`secondary`): A quiet blue-tinted surface for secondary controls, status filters, and non-destructive grouping.
-- **Operational Mist** (`accent`): Hover backgrounds, selected tabs, and soft interactive feedback.
+
+- **Machine Wash** (`pixel-secondary`, `#d6d6d6`): Secondary controls and grouped inactive surfaces.
+- **Interaction Zinc** (`pixel-accent`, `#cdcdcd`): Hover, active, and low-intensity selection feedback.
+- **Quiet Alloy** (`pixel-muted`, `#dddddd`): Muted sections, disabled groupings, and low-priority backgrounds.
 
 ### Tertiary
-- **Round Orange** (`chart-orange`): Scoring contrast, round highlights, and time-sensitive chart roles.
-- **Telemetry Cyan** (`chart-cyan`): Health, connectivity, and service telemetry chart roles.
-- **Deep Metric Ink** (`chart-ink`): Low-frequency chart contrast where text-like authority is needed.
+
+- **Web Amber** (`category-web`, `#ff9e42`), **Pwn Vermilion** (`category-pwn`, `#ff5e36`), **Misc Violet** (`category-misc`, `#c47aff`), and **Reverse Cyan** (`category-reverse`, `#66ccff`) identify challenge categories.
+- **Mobile Magenta** (`category-mobile`, `#f06eff`), **Crypto Yellow** (`category-crypto`, `#ffe14d`), **Forensics Apricot** (`category-forensics`, `#ffb86c`), and **AI Electric Cyan** (`category-ai`, `#4deaff`) extend that category vocabulary.
+- **Blockchain Pink** (`category-blockchain`, `#ff7ec7`), **Hardware Orange** (`category-hardware`, `#ff8c42`), **OSINT Coral** (`category-osint`, `#ff9f7a`), and **Cloud Blue** (`category-cloud`, `#7ab8ff`) complete the shipped category set.
 
 ### Neutral
-- **Control Canvas** (`background`): The main app background. It should stay cool, light, and low-noise.
-- **Console Ink** (`foreground`): Primary text and dense interface labels.
-- **Panel Surface** (`surface-card`): Cards, tables, dialogs, and inputs.
-- **Quiet Divider** (`border`): Borders and separators.
-- **Admin Shell** (`sidebar`): Dark administrative navigation and high-authority shell surfaces.
-- **Admin Active Field** (`sidebar-accent`): Active and hover fields inside the admin shell.
-- **Fault Red** (`destructive`): Delete, error, and destructive confirmation actions only.
 
-### Named Rules
+- **Industrial Canvas** (`pixel-canvas`, `#e4e4e4`): Main page background beneath the 16px technical grid.
+- **Console Ink** (`pixel-ink`, `#242424`): Default foreground and dense operational text.
+- **Equipment Face** (`pixel-card`, `#eeeeee`): Cards, inputs, tables, and control faces.
+- **Raised Sheet** (`pixel-popover`, `#ededed`): Popovers, menus, and temporary surfaces.
+- **Structural Steel** (`pixel-border`, `#8b8b8b`): Two-pixel borders and strong separators.
+- **Input Rail** (`pixel-input`, `#a2a2a2`): Default form-control border.
+- **Focus Graphite** (`pixel-focus`, `#3a3a3a`): Keyboard focus and high-confidence interactive emphasis.
+- **Navigation Alloy** (`pixel-sidebar`, `#c9c9c9`): Sidebar and authoritative navigation surfaces.
+- **Navigation Press** (`pixel-sidebar-accent`, `#bdbdbd`): Active and hovered navigation items.
+- **Fault Brick** (`pixel-fault`, `#a13e34`): Errors and destructive actions only.
 
-**The Signal Rarity Rule.** Signal Violet should mark action, selection, or live state. Do not spread it across decorative backgrounds.
+**The Semantic Stability Rule.** A theme can change a color value, but it cannot exchange semantic roles. Fault must remain fault, focus must remain focus, and category identity must remain recognizable.
 
-**The No Neon Rule.** The interface may be energetic, but full neon cyberpunk palettes are forbidden because they weaken data reading.
+**The Category Restraint Rule.** Category colors label challenges and related data. They never flood inactive pages, replace primary actions, or become a competition-mode skin.
 
-## 3. Typography
+**The No Neon Spectacle Rule.** Bright category colors are small signals. Neon black-purple surfaces, decorative glow, and saturated full-page effects are prohibited.
 
-**Display Font:** Inter with system sans fallbacks.
-**Body Font:** Inter with system sans fallbacks.
-**Label/Mono Font:** Inter for labels; use the system monospace stack only for scores, IDs, logs, flags, and code-like values.
+## Typography
 
-**Character:** The typography is functional and technical, with weight doing most of the hierarchy work. It should feel like a serious operations product, not a campaign page.
+**Display Font:** Fusion Pixel 10px with Courier New, Lucida Console, MS Gothic, and system monospace fallbacks.
+
+**Body Font:** Fusion Pixel 10px with the same monospace fallback stack. Pixel Industrial keeps its mosaic character across headings, body copy, tables, forms, descriptions, and captions.
+
+**Label/Mono Font:** Fusion Pixel 10px. Pixel Industrial is mono-forward by design.
+
+**Character:** Pixel Industrial is direct, mechanical, and visibly constructed. Its 20px root size makes compact rem-based controls physically larger than typical browser defaults, which supports event-floor readability. Future themes may register a different developer-supplied font stack, but fonts must ship with the platform or use trusted local system families.
 
 ### Hierarchy
-- **Display** (700, `1.875rem`, `1.2`): Page-level auth titles and rare high-level headings.
-- **Headline** (700, `1.5rem`, `1.25`): View headings, admin page titles, and major dashboard regions.
-- **Title** (700, `1.25rem`, `1.25`): Competition cards, dialog titles, and panel headers.
-- **Body** (400, `0.875rem`, `1.5`): Default UI copy, descriptions, table body text, and controls. Prose should stay under 75ch.
-- **Label** (700, `0.75rem`, `0.05em`, uppercase when used as metadata): Section labels, field groups, and compact status captions.
 
-### Named Rules
+- **Display** (700, `3rem`, `1.25`): Authentication statements and rare identity-led headings.
+- **Headline** (700, `1.5rem`, `1.25`): Page headings and major administrative workspaces.
+- **Title** (700, `1.25rem`, `1.25`): Cards, dialogs, operational panels, and competition regions.
+- **Body** (400, `0.9rem`, `1.5`): Default UI copy, tables, forms, and descriptions. Narrative copy stays within 65 to 75 characters per line.
+- **Label** (700, `0.9rem`, `0.12em`, uppercase for pixel-styled actions): Buttons and prominent state markers. Compact badges may step down to the `0.8rem` pixel minimum.
 
-**The Data First Rule.** Use weight, spacing, and tabular numerals for hierarchy before increasing type size.
+**The Pixel Minimum Rule.** Pixel glyphs are never rendered below `0.8rem`. Compact roles gain space or truncate rather than switching fonts or shrinking the bitmap face further.
 
-## 4. Elevation
+**The Theme Typography Rule.** A theme may change its developer-supplied family and character, but it must preserve the five hierarchy roles, readable CJK coverage, stable control dimensions, and code-safe fallbacks.
 
-NoCTF uses a hybrid depth model: borders define structure, tinted surfaces define grouping, and soft ambient shadows are reserved for panels, cards, dialogs, and hover lift. Shadows should feel like monitor glow on a clean control desk, not heavy material layers.
+**The Operational Numeral Rule.** Scores, IDs, ports, timestamps, attempts, and live counters use tabular numeral behavior whenever the chosen theme font supports it.
+
+## Elevation
+
+Pixel Industrial uses structural elevation, not ambient blur. Two-pixel borders define equipment edges; solid offset shadows make controls feel pressed from a mechanical panel. The result is deliberately tactile and flat-faced. Other developer themes may use softer or flatter elevation, but every theme must distinguish page, surface, overlay, focus, and pressed states without decorative glass effects.
 
 ### Shadow Vocabulary
-- **Panel Ambient** (`0 22px 80px rgb(15 23 42 / 0.08)`): Authentication panels, filter panels, and important grouped tool surfaces.
-- **Card Ambient** (`0 16px 60px rgb(15 23 42 / 0.06)`): Default cards and repeated item containers.
-- **Primary Glow** (`0 4px 12px rgb(37 99 235 / 0.25)`): Primary buttons and active navigation states.
-- **Hover Lift** (`0 24px 70px rgb(37 99 235 / 0.14)`): Competition cards and other clickable surfaces when hovered.
-- **Dialog Lift** (`0 30px 90px rgb(15 23 42 / 0.22)`): Blocking dialogs and sheets.
 
-### Named Rules
+- **Button Detent** (`box-shadow: 2px 2px 0 #8c8c8c`): Primary control depth at rest.
+- **Card Detent** (`box-shadow: 2px 2px 0 #bdbdbd`): Default cards and repeated item containers.
+- **Panel Chassis** (`box-shadow: 4px 4px 0 #d4d4d4`): Layered operational panels.
+- **Dark Panel Chassis** (`box-shadow: 6px 6px 0 #7d7d7d`): Dark Pixel Industrial panel variant used by game dashboards.
+- **Floating Equipment** (`box-shadow: 6px 6px 0 #bdbdbd`): Menus and higher temporary surfaces.
 
-**The Border Before Shadow Rule.** Use borders and tonal surfaces for default structure. Add stronger shadows only for hover, dialogs, or primary emphasis.
+**The Solid Offset Rule.** Pixel Industrial shadows have zero blur and small positive offsets. If a shadow looks soft, cinematic, or luminous, it does not belong to this theme.
 
-## 5. Components
+**The State Before Decoration Rule.** Elevation communicates clickability, pressed state, stacking, or temporary focus. It never exists only to make a screen look expensive.
+
+## Components
+
+All themes render the same component tree and preserve the same variant names. Theme-specific CSS may adjust visual primitives, but it cannot create alternate business components or route-specific forks.
 
 ### Buttons
-- **Shape:** Gently rounded rectangles (`0.75rem` default, `0.625rem` for compact sizes).
-- **Primary:** Signal Violet background, light foreground, semibold 14px type, `2.5rem` height, `0.5rem 1rem` padding, subtle primary glow.
-- **Hover / Focus:** Hover deepens the primary color and increases glow. Focus uses a visible ring from the same primary family.
-- **Secondary / Ghost / Tertiary:** Secondary controls use Cool Command Wash. Ghost buttons are transparent until hover. Link buttons are text-only Signal Violet.
+
+- **Shape:** Square mechanical controls (`0px`) with a two-pixel frame.
+- **Primary:** Graphite Command face, Paper Signal text, bold uppercase label, `0.5rem 1rem` padding, and Button Detent shadow.
+- **Hover / Focus:** Hover shifts to `#3a3a3a`. Keyboard focus uses a visible two-pixel ring. Active state moves one pixel right and down to imitate a physical press. State transitions complete in 75ms.
+- **Secondary / Ghost / Tertiary:** Outline and secondary variants use light alloy faces with visible borders. Ghost actions gain a border and Interaction Zinc background only on hover. Link actions remain text-only and underlined on interaction.
 
 ### Chips
-- **Style:** Rounded-full badges with compact padding, 12px type, and role-specific tonal fills.
-- **State:** Active or important chips use Signal Violet. Mode and status chips can use secondary fills, but must include text labels.
+
+- **Style:** Status badges use a pixel-ellipse silhouette, compact `0.125rem 0.5rem` padding, and a readable text label.
+- **State:** Selected and important badges use the primary semantic role. Secondary, destructive, and outline variants keep identical geometry. No state may rely on fill color alone.
 
 ### Cards / Containers
-- **Corner Style:** Large rounded corners (`1rem`) on cards and panels.
-- **Background:** Panel Surface at high opacity, often over the cool Control Canvas.
-- **Shadow Strategy:** Card Ambient at rest, Hover Lift only for clickable cards.
-- **Border:** Quiet Divider at rest; primary-tinted border on hover or active selection.
-- **Internal Padding:** `1.5rem` for cards, `1.25rem` for compact filter panels, `2rem` for broad page rhythm.
+
+- **Corner Style:** Square equipment faces (`0px`).
+- **Background:** Equipment Face over Industrial Canvas.
+- **Shadow Strategy:** Card Detent at rest. Clickable cards may move by one or two pixels, but large floating lifts are foreign to Pixel Industrial.
+- **Border:** Two-pixel Structural Steel frame.
+- **Internal Padding:** `1rem` base rhythm with `1.5rem` for broad content regions. The card component itself provides vertical rhythm while consumers define horizontal density.
+- **Decoration:** The canonical card may render a black eight-pixel corner raster. It is an identity marker, not a generic decoration for every nested surface.
 
 ### Inputs / Fields
-- **Style:** White-tinted field, Quiet Divider border, `0.75rem` radius, `2.5rem` height, 14px text.
-- **Focus:** Border shifts to Signal Violet with a soft `4px` primary ring.
-- **Error / Disabled:** Fault Red for invalid state, reduced opacity for disabled controls, never rely on color without message text.
+
+- **Style:** Equipment Face background, two-pixel Input Rail border, square corners, `2.5rem` nominal height, and `0.25rem 0.75rem` internal padding.
+- **Focus:** Border changes to the primary semantic role with a clear two-pixel focus ring.
+- **Error / Disabled:** Fault Brick marks invalid fields with accompanying text. Disabled controls retain their shape, reduce opacity, and reject pointer interaction.
 
 ### Navigation
-- **Style:** The app top bar is translucent white with blur and a thin divider. Admin navigation uses the dark Admin Shell with compact icon-text rows.
-- **Active State:** Active top navigation becomes Signal Violet with light text and glow. Active sidebar rows use Admin Active Field with clear foreground contrast.
-- **Mobile Treatment:** Top navigation collapses into a right sheet. Keep the same labels and ordering as desktop.
 
-### Signature Component
+- **Style:** Public navigation uses a muted alloy bar, a two-pixel divider, pixel logo, and compact icon-label links. Admin navigation uses the sidebar semantic roles without introducing a separate theme.
+- **Active State:** The current route receives a primary bottom rule and Interaction Zinc surface. Hover and focus remain visibly distinct.
+- **Mobile Treatment:** Navigation collapses into the existing sheet/dialog system while preserving label order and authorization boundaries.
 
-**NoCTF Logo Mark:** A rounded blue-violet gradient tile with an angular inner mark. Use it as identity, not decoration. It belongs in navigation, auth, and empty or loading states where orientation matters.
+### Layered Panel
 
-## 6. Do's and Don'ts
+The stacked Panel is Pixel Industrial's signature container. A face layer sits above a ten-pixel offset base, producing a chassis-like silhouette with solid shadows. The dark panel variant is a component variant within Pixel Industrial, not a separate user theme.
+
+### Theme Registration Contract
+
+A developer theme is complete only when it defines every semantic CSS variable, all component states, a bundled or trusted font stack, a color-scheme declaration, localized name and description keys, a static preview asset, and an allowlisted registry identifier. User preference stores only that identifier. Unknown or retired identifiers fall back to Pixel Industrial before the application renders.
+
+## Do's and Don'ts
 
 ### Do:
-- **Do** make fairness visible with score state, audit state, and traceable action feedback.
-- **Do** keep Admin screens denser, calmer, and more operational than participant screens.
-- **Do** use Signal Violet for primary decisions, active state, and live competition signals.
-- **Do** pair color with labels or icons for status, severity, connection state, and mode.
-- **Do** use skeletons and stable dimensions for loading live dashboards and tables.
-- **Do** preserve the cool-tinted light workspace and deep Admin Shell contrast.
+
+- **Do** keep the developer theme registry closed, typed, versioned, and shipped with the frontend build.
+- **Do** store only an allowlisted theme identifier in user preference, then validate it again before application.
+- **Do** apply the selected theme before Vue mounts so the first frame never flashes another theme.
+- **Do** require every theme to pass contrast, keyboard focus, reduced-motion, CJK coverage, responsive, and critical-state checks.
+- **Do** preserve component structure, permissions, data density, layout, and semantic status roles across themes.
+- **Do** make fairness visible with score state, audit state, traceable action feedback, and stable live updates.
+- **Do** keep administrator screens dense, calm, and operational in every theme.
+- **Do** use labels and icons with color for severity, connection, mode, and delivery state.
 
 ### Don't:
+
+- **Don't** expose theme editing, CSS uploads, token JSON, arbitrary font URLs, remote backgrounds, theme imports, or user-authored visual code.
+- **Don't** allow themes to change API behavior, competition logic, score presentation meaning, permissions, workflow, or component purpose.
+- **Don't** bind a user theme to CTF, AWD, AWDP, KoH, a route, or a plugin. Theme selection is a visual preference, not a game-mode branch.
 - **Don't** make the interface feel like generic SaaS admin design: white cards everywhere, soft marketing polish, flat dashboards, and no sense of competition.
 - **Don't** use overdone cyberpunk: neon black-purple surfaces, decorative glow, heavy visual effects, or anything that makes status and scores harder to read.
 - **Don't** drift into the default CTFd feel: traditional list-heavy competition pages, weak hierarchy, and a lack of modern control-room presence.
 - **Don't** hide operational truth. Health, logs, scoring, audit trails, round state, and container status must be straightforward to inspect.
-- **Don't** use side-stripe colored borders, gradient text, decorative glassmorphism, or identical card grids.
-- **Don't** use modals as the first answer when inline editing, sheets, or progressive disclosure would keep the workflow intact.
+- **Don't** use side-stripe colored borders, gradient text, decorative glassmorphism, hero-metric templates, or identical card grids.
+- **Don't** use modals as the first answer when inline editing, sheets, or progressive disclosure can preserve workflow context.

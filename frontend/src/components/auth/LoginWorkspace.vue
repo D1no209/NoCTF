@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { ApiError } from '@/api/noctf'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { useForm } from 'vee-validate'
@@ -50,6 +51,10 @@ const onSubmit = form.handleSubmit(async (values) => {
       : '/'
     await router.push(redirect)
   } catch (error: any) {
+    if (error instanceof ApiError && error.status === 403) {
+      await router.push({ name: 'verify-email', query: { email: values.email } })
+      return
+    }
     loginError.value = t('errors.loginFailed')
     toast.error(loginError.value)
   } finally {

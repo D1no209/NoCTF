@@ -55,12 +55,60 @@ export function setAuthToken(token: string | null) {
   })
 }
 
+export interface UserNotification {
+  id: string
+  competitionId?: string | null
+  subjectId?: string | null
+  type: string
+  data: Record<string, string>
+  isRead: boolean
+  createdAt: string
+  readAt?: string | null
+}
+
+export interface UserNotificationPage {
+  items: UserNotification[]
+  unreadCount: number
+}
+
+export const notificationApi = {
+  async list(limit = 20) {
+    return unwrap(await client.get<{ 200: UserNotificationPage }, unknown, false>({
+      url: '/api/notifications',
+      query: { limit },
+    }), tt('errors.loadNotifications'))
+  },
+  async markRead(id: string) {
+    await requireSuccess(client.post<{ 204: never }, unknown, false>({
+      url: '/api/notifications/{id}/read',
+      path: { id },
+    }), tt('errors.updateNotifications'))
+  },
+  async markAllRead() {
+    await requireSuccess(client.post<{ 204: never }, unknown, false>({
+      url: '/api/notifications/read-all',
+    }), tt('errors.updateNotifications'))
+  },
+}
+
 export const authApi = {
   async login(email: string, password: string) {
     return unwrap(await sdk.noCtfapiEndpointsAuthLoginEndpoint({ body: { email, password } }), tt('errors.login'))
   },
   async register(userName: string, email: string, password: string) {
     return unwrap(await sdk.noCtfapiEndpointsAuthRegisterEndpoint({ body: { userName, email, password } }), tt('errors.registration'))
+  },
+  async verifyEmail(token: string) {
+    return unwrap(await client.post<{ 200: { status: string } }, unknown, false>({
+      url: '/api/auth/email-verification/verify',
+      body: { token },
+    }), tt('errors.verifyEmail'))
+  },
+  async resendEmailVerification(email: string) {
+    return unwrap(await client.post<{ 202: string }, unknown, false>({
+      url: '/api/auth/email-verification/resend',
+      body: { email },
+    }), tt('errors.resendVerification'))
   },
   async refresh() {
     return unwrap(await sdk.noCtfapiEndpointsAuthRefreshTokenEndpoint(), tt('errors.refreshToken'))
@@ -550,6 +598,17 @@ export const adminApi = {
   },
   async infrastructure() {
     return unwrap(await sdk.noCtfapiEndpointsAdminGetInfrastructureEndpoint(), tt('errors.loadHealth'))
+  },
+  async emailVerificationSettings() {
+    return unwrap(await sdk.noCtfapiEndpointsAdminGetEmailVerificationSettingsEndpoint(), tt('errors.requestFailed'))
+  },
+  async updateEmailVerificationSettings(
+    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpoint>[0]['body'],
+  ) {
+    return unwrap(await sdk.noCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpoint({ body }), tt('errors.requestFailed'))
+  },
+  async testEmailVerificationSettings() {
+    return unwrap(await sdk.noCtfapiEndpointsAdminTestEmailVerificationSettingsEndpoint(), tt('errors.requestFailed'))
   },
   async rebuildScoreboard(competitionId: string) {
     return unwrap(await sdk.noCtfapiEndpointsAdminRebuildScoreboardEndpoint({
