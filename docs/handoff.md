@@ -430,6 +430,8 @@ QQ broadcast integration is now implemented as an optional sixth platform plugin
 
 The QQBot agent requirements pass `pip-audit`, and an ephemeral Python 3.12 container successfully imported the plugin and built the allowlisted Milky `mention_all`/`text` message segments. No live QQ message was sent during automated verification; the authorized manual smoke-test target remains group `1095173403`.
 
+The production NoneBot/Milky agent is registered against `https://noctf.fa1lsnow.com` and locally allowlists only group `1095173403`. Milky 1.2 requires the `no_cache` field on `get_group_list`; the agent supplies `false` explicitly so group synchronization works with the deployed Lagrange implementation instead of failing request deserialization. Existing QQBOT matchers remain untouched.
+
 The authoritative continuation instructions, architecture reading map, four critical request flows, collaborator protocol, exact risk list, validation caveats, and required execution order are in [`HANDOFF_PROMPT.md`](../HANDOFF_PROMPT.md). A new collaborator should follow its 20–30 minute quick-start sequence before changing the working tree.
 
 ## Common Pitfalls
