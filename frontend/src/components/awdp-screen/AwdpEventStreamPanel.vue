@@ -68,12 +68,12 @@ function levelIcon(level: AwdpScreenEvent['level']) {
 
 function levelClass(level: AwdpScreenEvent['level']) {
   if (level === 'success')
-    return 'text-emerald-700 bg-emerald-100/60 border-emerald-300/60'
+    return 'text-[var(--semantic-success)] bg-[var(--semantic-success-soft)] border-[var(--semantic-success-border)]'
   if (level === 'warning')
-    return 'text-amber-700 bg-amber-100/60 border-amber-300/60'
+    return 'text-[var(--semantic-warning)] bg-[var(--semantic-warning-soft)] border-[var(--semantic-warning-border)]'
   if (level === 'danger')
-    return 'text-rose-700 bg-rose-100/60 border-rose-300/60'
-  return 'text-cyan-700 bg-cyan-100/60 border-cyan-300/60'
+    return 'text-[var(--semantic-danger)] bg-[var(--semantic-danger-soft)] border-[var(--semantic-danger-border)]'
+  return 'text-[var(--semantic-info)] bg-[var(--semantic-info-soft)] border-[var(--semantic-info-border)]'
 }
 
 function eventTypeLabel(type: AwdpScreenEvent['type']) {
@@ -101,25 +101,25 @@ function formatTime(value: string) {
 
 <template>
   <Panel variant="default" class="flex min-h-0 flex-col">
-    <div class="flex flex-col gap-2.5 border-b border-slate-300/40 px-4 py-3">
+    <div class="flex flex-col gap-2.5 border-b border-[var(--awdp-border)] px-4 py-3">
       <div class="flex items-center justify-between gap-4">
         <div>
-          <h2 class="text-sm font-semibold uppercase text-slate-900">
+          <h2 class="text-sm font-semibold uppercase text-[var(--awdp-text)]">
             {{ t('awdpScreen.eventStream.title') }}
           </h2>
-          <p class="text-xs text-slate-500">
+          <p class="text-xs text-[var(--awdp-text-muted)]">
             {{ t('awdpScreen.eventStream.subtitle', { page: pageLabel }) }}
           </p>
         </div>
-        <div class="flex items-center gap-2 text-slate-500">
-          <RotateCw v-if="pageCount > 1" class="size-3.5 text-cyan-600" />
-          <Bell class="size-5 text-cyan-600" />
+        <div class="flex items-center gap-2 text-[var(--awdp-text-muted)]">
+          <RotateCw v-if="pageCount > 1" class="size-3.5 text-[var(--semantic-info)]" />
+          <Bell class="size-5 text-[var(--semantic-info)]" />
         </div>
       </div>
       <AwdpEventFilter v-model="filter" />
     </div>
 
-    <div v-if="visibleEvents.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-500">
+    <div v-if="visibleEvents.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-[var(--awdp-text-muted)]">
       {{ t('awdpScreen.eventStream.empty') }}
     </div>
 
@@ -132,7 +132,7 @@ function formatTime(value: string) {
       <article
         v-for="event in visibleEvents"
         :key="event.id"
-        class="event-row rounded-lg border border-slate-300/40 bg-white/60 p-2.5"
+        class="event-row rounded-lg border border-[var(--awdp-border)] bg-[var(--awdp-surface)] p-2.5"
       >
         <div class="mb-1.5 flex items-center justify-between gap-2">
           <span
@@ -142,12 +142,12 @@ function formatTime(value: string) {
             <component :is="levelIcon(event.level)" class="size-3.5 shrink-0" />
             <span class="truncate">{{ eventTypeLabel(event.type) }}</span>
           </span>
-          <span class="font-mono text-[11px] text-slate-500">{{ formatTime(event.createdAt) }}</span>
+          <span class="font-mono text-[11px] text-[var(--awdp-text-muted)]">{{ formatTime(event.createdAt) }}</span>
         </div>
-        <p class="line-clamp-2 text-xs leading-snug text-slate-800">
+        <p class="line-clamp-2 text-xs leading-snug text-[var(--awdp-text)]">
           {{ event.message }}
         </p>
-        <div class="mt-1.5 flex items-center justify-between text-[10px] text-slate-500">
+        <div class="mt-1.5 flex items-center justify-between text-[10px] text-[var(--awdp-text-muted)]">
           <span>{{ t('awdpScreen.eventStream.roundPrefix', { round: event.round }) }}</span>
           <span>{{ event.teamName ?? t('awdpScreen.eventStream.fallbackDash') }} → {{ event.challengeName ?? t('awdpScreen.eventStream.fallbackDash') }}</span>
         </div>

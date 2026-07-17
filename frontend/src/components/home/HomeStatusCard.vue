@@ -33,7 +33,7 @@ const { t } = useI18n()
       </Panel>
 
       <Panel class="col-span-2 min-h-12 flex-row items-center justify-between p-3 max-[420px]:col-span-1">
-        <span class="text-sm text-zinc-600">{{ t('home.pendingReview') }}</span>
+        <span class="text-sm text-muted-foreground">{{ t('home.pendingReview') }}</span>
         <Badge :variant="pendingReview ? 'secondary' : 'outline'">
           {{ pendingReview }}
         </Badge>

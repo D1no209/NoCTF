@@ -77,7 +77,7 @@ onUnmounted(() => signalR.stop())
       >
         <template #actions>
           <div class="flex items-center gap-2">
-            <Badge variant="secondary" class="animate-pulse bg-amber-500/10 text-amber-500 border-amber-500/20 px-3">
+            <Badge variant="secondary" class="animate-pulse border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)] text-[var(--semantic-warning)] px-3">
               <Trophy class="mr-1.5 size-3.5" />
               {{ t('common.live') }}
             </Badge>
@@ -125,7 +125,7 @@ onUnmounted(() => signalR.stop())
         v-for="ch in challenges"
         :key="ch.challengeId"
         :status="ch"
-        class="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgb(79_70_229/0.12)]"
+        class="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-float"
       />
     </div>
   </div>

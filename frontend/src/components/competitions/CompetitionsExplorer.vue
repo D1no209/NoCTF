@@ -165,11 +165,11 @@ function formatDate(iso: string) {
               <div class="min-w-0 space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
                   <Badge variant="default" class="animate-status-pulse">{{ t('competitions.status.running') }}</Badge>
-                  <span class="text-xs font-bold uppercase tracking-[0.2em] text-zinc-300">{{ modeLabel(featured.gameModeType) }}</span>
+                  <span class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--awdp-text-inverse)]">{{ modeLabel(featured.gameModeType) }}</span>
                 </div>
-                <h2 class="text-2xl font-bold text-zinc-100 md:text-3xl">{{ featured.title }}</h2>
-                <p v-if="featured.description" class="line-clamp-2 text-sm text-zinc-300 md:text-base">{{ featured.description }}</p>
-                <div class="flex flex-wrap gap-x-4 text-xs text-zinc-400">
+                <h2 class="text-2xl font-bold text-[var(--awdp-text-inverse)] md:text-3xl">{{ featured.title }}</h2>
+                <p v-if="featured.description" class="line-clamp-2 text-sm text-[var(--awdp-text-inverse)] md:text-base">{{ featured.description }}</p>
+                <div class="flex flex-wrap gap-x-4 text-xs text-[var(--awdp-text-muted)]">
                   <div class="flex items-center gap-1.5">
                     <Calendar class="size-3.5" />
                     <span>{{ formatDate(featured.startTime) }} ~ {{ formatDate(featured.endTime) }}</span>

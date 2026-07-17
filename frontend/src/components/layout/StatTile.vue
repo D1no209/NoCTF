@@ -27,8 +27,8 @@ withDefaults(defineProps<{
         class="size-5 shrink-0"
         :class="{
           'text-muted-foreground': tone === 'default',
-          'text-green-600': tone === 'success',
-          'text-yellow-600': tone === 'warning',
+          'text-[var(--semantic-success)]': tone === 'success',
+          'text-[var(--semantic-warning)]': tone === 'warning',
           'text-destructive': tone === 'danger',
         }"
       />

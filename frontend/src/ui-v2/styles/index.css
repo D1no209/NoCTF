@@ -1,0 +1,61 @@
+.ui-v2 {
+  --v2-canvas: #050816;
+  --v2-canvas-raised: #081126;
+  --v2-surface: #0b1730;
+  --v2-surface-strong: #0f2141;
+  --v2-surface-hover: #132a52;
+  --v2-line: #1a3a67;
+  --v2-line-bright: #2f8cff;
+  --v2-text: #e8f1ff;
+  --v2-text-muted: #8ea4c9;
+  --v2-text-faint: #5f759b;
+  --v2-primary: #2f8cff;
+  --v2-cyan: #22f5c7;
+  --v2-magenta: #e66bff;
+  --v2-warning: #ffd166;
+  --v2-danger: #ff5470;
+  --v2-shadow: rgb(0 0 0 / 0.32);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  color: var(--v2-text);
+  background-color: var(--v2-canvas);
+  background-image:
+    linear-gradient(rgb(47 140 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(47 140 255 / 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  image-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ui-v2 *,
+.ui-v2 *::before,
+.ui-v2 *::after {
+  box-sizing: border-box;
+}
+
+.ui-v2 button,
+.ui-v2 input,
+.ui-v2 select,
+.ui-v2 textarea {
+  font: inherit;
+}
+
+.ui-v2 ::selection {
+  color: var(--v2-canvas);
+  background: var(--v2-cyan);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-v2 *,
+  .ui-v2 *::before,
+  .ui-v2 *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

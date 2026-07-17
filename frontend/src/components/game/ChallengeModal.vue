@@ -479,7 +479,7 @@ function getApiErrorDetail(error: unknown) {
     >
       <!-- Folder tab -->
       <div
-        class="absolute -top-5 left-6 z-20 rounded-t-md px-4 py-1.5 text-xs font-black uppercase tracking-wider text-black shadow-sm"
+        class="absolute -top-5 left-6 z-20 rounded-t-md px-4 py-1.5 text-xs font-black uppercase tracking-wider text-[var(--neon-foreground)] shadow-sm"
         :class="challengeType.pinClassName"
       >
         CASE FILE
@@ -894,13 +894,13 @@ function getApiErrorDetail(error: unknown) {
 
 .challenge-markdown :deep(code) {
   border-radius: 0.25rem;
-  background: hsl(var(--muted));
+  background: var(--muted);
   padding: 0.1rem 0.3rem;
   font-size: 0.85em;
 }
 
 .challenge-markdown :deep(a) {
-  color: hsl(var(--primary));
+  color: var(--primary);
   text-underline-offset: 0.2rem;
 }
 

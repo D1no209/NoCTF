@@ -43,7 +43,7 @@ const { t } = useI18n()
         </DialogDescription>
       </DialogHeader>
       <div class="py-4">
-        <div class="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+        <div class="rounded-lg border border-[var(--semantic-danger-border)] bg-[var(--semantic-danger-soft)] p-3 text-sm text-[var(--semantic-danger)]">
           <p class="font-medium">{{ t('admin.teams.disbandConfirmQuestion', { name: team?.name }) }}</p>
         </div>
       </div>

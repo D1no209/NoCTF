@@ -28,22 +28,22 @@ const SERVICE_RADIUS = 130
 const TEAM_RADIUS = 240
 
 const categoryColors: Record<string, string> = {
-  web: '#0891b2',
-  pwn: '#db2777',
-  crypto: '#7c3aed',
-  reverse: '#059669',
-  misc: '#ca8a04',
+  web: 'var(--awdp-category-web)',
+  pwn: 'var(--awdp-category-pwn)',
+  crypto: 'var(--awdp-category-crypto)',
+  reverse: 'var(--awdp-category-reverse)',
+  misc: 'var(--awdp-category-misc)',
 }
 
-const NODE_FILL = '#f8fafc'
-const NODE_STROKE = '#64748b'
+const NODE_FILL = 'var(--awdp-node-fill)'
+const NODE_STROKE = 'var(--awdp-node-stroke)'
 
 function toRad(deg: number) {
   return (deg * Math.PI) / 180
 }
 
 function serviceColor(category: string) {
-  return categoryColors[category.toLowerCase()] ?? '#64748b'
+  return categoryColors[category.toLowerCase()] ?? 'var(--awdp-node-stroke)'
 }
 
 // deterministic rng
@@ -181,18 +181,18 @@ const activeChallengeIds = computed(() => {
 
 function beamColor(type: AwdpScreenEvent['type']) {
   if (type === 'ATTACK_ACCEPTED')
-    return '#0891b2'
+    return 'var(--semantic-info)'
   if (type === 'ATTACK_REJECTED')
-    return '#d97706'
+    return 'var(--semantic-warning)'
   if (type === 'DEFENSE_CHECK_PASSED' || type === 'PATCH_UPLOADED')
-    return '#059669'
+    return 'var(--semantic-success)'
   if (type === 'DEFENSE_CHECK_FAILED')
-    return '#d97706'
+    return 'var(--semantic-warning)'
   if (type === 'SERVICE_ERROR')
-    return '#e11d48'
+    return 'var(--semantic-danger)'
   if (type === 'ATTACK_SUBMITTED')
-    return '#64748b'
-  return '#64748b'
+    return 'var(--semantic-neutral)'
+  return 'var(--semantic-neutral)'
 }
 
 function beamLabel(type: AwdpScreenEvent['type']) {
@@ -239,9 +239,9 @@ function serviceLabelY(y: number) {
   >
     <defs>
       <radialGradient id="star-battle-nebula" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#cbd5e1" stop-opacity="0.28" />
-        <stop offset="60%" stop-color="#e2e8f0" stop-opacity="0.08" />
-        <stop offset="100%" stop-color="#f8fafc" stop-opacity="0" />
+        <stop offset="0%" stop-color="var(--awdp-nebula-start)" stop-opacity="0.28" />
+        <stop offset="60%" stop-color="var(--awdp-nebula-mid)" stop-opacity="0.08" />
+        <stop offset="100%" stop-color="var(--awdp-nebula-end)" stop-opacity="0" />
       </radialGradient>
     </defs>
 
@@ -261,7 +261,7 @@ function serviceLabelY(y: number) {
         :cx="star.x"
         :cy="star.y"
         :r="star.r"
-        class="star-battle-star fill-slate-500"
+        class="star-battle-star fill-[var(--awdp-star)]"
         :opacity="star.opacity"
         :style="{
           '--dx': `${star.dx}px`,
@@ -280,7 +280,7 @@ function serviceLabelY(y: number) {
         :cx="p.x"
         :cy="p.y"
         :r="p.r"
-        class="star-battle-dust fill-slate-400"
+        class="star-battle-dust fill-[var(--awdp-text-muted)]"
         :opacity="p.opacity"
         :style="{
           '--dx': `${p.dx}px`,
@@ -301,7 +301,7 @@ function serviceLabelY(y: number) {
         :x2="seg.x2"
         :y2="seg.y2"
         stroke="currentColor"
-        class="text-slate-400/15"
+        class="text-[var(--awdp-border)]"
         stroke-width="1"
         stroke-dasharray="2 8"
       />
@@ -409,7 +409,7 @@ function serviceLabelY(y: number) {
         :x="serviceLabelX(node.x)"
         :y="serviceLabelY(node.y)"
         :text-anchor="textAnchor(node.x)"
-        class="fill-slate-800 text-[11px] font-bold"
+        class="fill-[var(--awdp-text)] text-[11px] font-bold"
       >
         {{ node.challengeName }}
       </text>
@@ -417,7 +417,7 @@ function serviceLabelY(y: number) {
         :x="serviceLabelX(node.x)"
         :y="serviceLabelY(node.y) + 12"
         :text-anchor="textAnchor(node.x)"
-        class="fill-slate-500 text-[9px] font-semibold uppercase"
+        class="fill-[var(--awdp-text-muted)] text-[9px] font-semibold uppercase"
       >
         {{ node.category }}
       </text>
@@ -442,7 +442,7 @@ function serviceLabelY(y: number) {
         :cy="node.y"
         r="13"
         fill="none"
-        stroke="#0891b2"
+        stroke="var(--semantic-info)"
         stroke-width="1"
         opacity="0"
         :class="activeTeamIds.has(node.teamId) ? 'star-battle-pulse' : ''"
@@ -451,7 +451,7 @@ function serviceLabelY(y: number) {
         :x="teamLabelX(node.x)"
         :y="node.y + 4"
         :text-anchor="textAnchor(node.x)"
-        class="fill-slate-700 text-[10px] font-semibold"
+        class="fill-[var(--awdp-text)] text-[10px] font-semibold"
       >
         #{{ node.rank }} {{ node.teamName }}
       </text>
@@ -506,7 +506,7 @@ function serviceLabelY(y: number) {
 }
 
 .star-battle-team-active circle:first-of-type {
-  filter: drop-shadow(0 0 6px rgba(8, 145, 178, 0.6));
+  filter: drop-shadow(0 0 6px var(--semantic-info));
 }
 
 @keyframes star-battle-drift {

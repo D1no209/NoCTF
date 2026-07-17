@@ -64,7 +64,7 @@ function getPluginIcon(type: string) {
         </div>
         <div class="h-4 w-px bg-border" />
         <div class="flex items-center gap-2">
-          <ShieldCheck class="size-4 text-emerald-500" />
+          <ShieldCheck class="size-4 text-[var(--semantic-success)]" />
           <span>{{ t('admin.plugins.coreEngine') }}</span>
           <span class="text-xs font-mono opacity-60">{{ t('admin.plugins.coreEngineVersion') }}</span>
         </div>
@@ -107,7 +107,7 @@ function getPluginIcon(type: string) {
               {{ t('admin.plugins.active') }}
             </Badge>
             <div class="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
-              <CheckCircle2 class="size-3 text-emerald-500" />
+              <CheckCircle2 class="size-3 text-[var(--semantic-success)]" />
               {{ t('admin.plugins.verified') }}
             </div>
           </div>

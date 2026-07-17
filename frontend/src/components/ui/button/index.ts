@@ -8,14 +8,14 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-[#1b1b1b] bg-primary text-primary-foreground shadow-[2px_2px_0_#8c8c8c] hover:bg-[#3a3a3a]",
+        default: "[border-color:var(--button-primary-border)] bg-primary text-primary-foreground shadow-[2px_2px_0_var(--button-primary-shadow)] hover:bg-[var(--button-primary-hover)]",
         destructive:
-          "border-[#5f1f18] bg-destructive text-white shadow-[2px_2px_0_#bda3a0] hover:bg-[#8f372f]",
+          "[border-color:var(--button-destructive-border)] bg-destructive text-primary-foreground shadow-[2px_2px_0_var(--button-destructive-shadow)] hover:bg-[var(--button-destructive-hover)]",
         outline:
-          "border-[#7f7f7f] bg-[#e5e5e5] text-foreground shadow-[2px_2px_0_#c7c7c7] hover:bg-[#d8d8d8]",
+          "[border-color:var(--button-outline-border)] bg-[var(--button-outline-surface)] text-foreground shadow-[2px_2px_0_var(--button-outline-shadow)] hover:bg-[var(--button-outline-hover)]",
         secondary:
-          "border-[#7f7f7f] bg-secondary text-secondary-foreground shadow-[2px_2px_0_#c7c7c7] hover:bg-[#bdbdbd]",
-        ghost: "border-transparent bg-transparent text-foreground hover:border-[#9a9a9a] hover:bg-[#d8d8d8]",
+          "[border-color:var(--button-outline-border)] bg-secondary text-secondary-foreground shadow-[2px_2px_0_var(--button-outline-shadow)] hover:bg-[var(--button-outline-hover)]",
+        ghost: "border-transparent bg-transparent text-foreground hover:[border-color:var(--button-ghost-border)] hover:bg-[var(--button-ghost-hover)]",
         link: "border-transparent bg-transparent text-foreground underline-offset-4 hover:underline",
       },
       size: {

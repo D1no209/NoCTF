@@ -50,7 +50,7 @@ function getStatus(teamId: string, challengeId: string): 'healthy' | 'down' | 'u
 }
 
 function statusClass(status: 'healthy' | 'down' | 'unknown') {
-  if (status === 'healthy') return 'bg-emerald-500'
+  if (status === 'healthy') return 'bg-[var(--semantic-success)]'
   if (status === 'down') return 'bg-destructive'
   return 'bg-muted'
 }
@@ -98,7 +98,7 @@ function statusLabel(status: 'healthy' | 'down' | 'unknown') {
               class="py-1.5 px-1 text-center"
             >
               <span
-                class="inline-flex h-5 w-10 items-center justify-center border-2 border-border text-[10px] font-bold text-white"
+                class="inline-flex h-5 w-10 items-center justify-center border-2 border-border text-[10px] font-bold text-primary-foreground"
                 :class="statusClass(getStatus(team.id, ch.id))"
                 :title="getStatus(team.id, ch.id)"
               >

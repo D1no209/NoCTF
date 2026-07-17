@@ -77,7 +77,7 @@ function formatDate(iso: string) {
     <!-- Top grip ridge -->
     <div
       class="absolute inset-x-0 top-0 z-10 h-4 border-y-2 border-border bg-muted"
-      :style="{ backgroundImage: 'repeating-linear-gradient(90deg, rgb(0 0 0 / 0.14) 0px, rgb(0 0 0 / 0.14) 2px, transparent 2px, transparent 5px)' }"
+      :style="{ backgroundImage: 'repeating-linear-gradient(90deg, var(--page-grid-color) 0px, var(--page-grid-color) 2px, transparent 2px, transparent 5px)' }"
       aria-hidden="true"
     />
 
@@ -89,7 +89,7 @@ function formatDate(iso: string) {
       >
         <div
           class="absolute inset-0"
-          :style="{ backgroundImage: 'repeating-linear-gradient(45deg, rgb(0 0 0 / 0.12) 0px, rgb(0 0 0 / 0.12) 2px, transparent 2px, transparent 10px)' }"
+          :style="{ backgroundImage: 'repeating-linear-gradient(45deg, var(--page-grid-color) 0px, var(--page-grid-color) 2px, transparent 2px, transparent 10px)' }"
           aria-hidden="true"
         />
         <component :is="modeMeta.icon" class="relative z-10 size-10" />
@@ -136,7 +136,7 @@ function formatDate(iso: string) {
     <!-- Bottom grip ridge -->
     <div
       class="absolute inset-x-0 bottom-0 z-10 h-4 border-y-2 border-border bg-muted"
-      :style="{ backgroundImage: 'repeating-linear-gradient(90deg, rgb(0 0 0 / 0.14) 0px, rgb(0 0 0 / 0.14) 2px, transparent 2px, transparent 5px)' }"
+      :style="{ backgroundImage: 'repeating-linear-gradient(90deg, var(--page-grid-color) 0px, var(--page-grid-color) 2px, transparent 2px, transparent 5px)' }"
       aria-hidden="true"
     />
   </Card>

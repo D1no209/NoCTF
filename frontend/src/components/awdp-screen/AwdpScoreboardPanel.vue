@@ -50,23 +50,23 @@ onUnmounted(() => {
 
 <template>
   <Panel variant="default" class="flex min-h-0 flex-col">
-    <div class="flex items-center justify-between border-b border-slate-300/40 px-4 py-3">
+    <div class="flex items-center justify-between border-b border-[var(--awdp-border)] px-4 py-3">
       <div>
-        <h2 class="text-sm font-semibold uppercase text-slate-900">
+        <h2 class="text-sm font-semibold uppercase text-[var(--awdp-text)]">
           {{ t('awdpScreen.scoreboard.title') }}
         </h2>
-        <p class="text-xs text-slate-500">
+        <p class="text-xs text-[var(--awdp-text-muted)]">
           {{ t('awdpScreen.scoreboard.subtitle') }}
         </p>
       </div>
-      <div class="flex items-center gap-2 text-[11px] font-semibold uppercase text-slate-500">
-        <RotateCw v-if="pageCount > 1" class="size-3.5 text-cyan-600" />
+      <div class="flex items-center gap-2 text-[11px] font-semibold uppercase text-[var(--awdp-text-muted)]">
+        <RotateCw v-if="pageCount > 1" class="size-3.5 text-[var(--semantic-info)]" />
         <span>{{ pageLabel }}</span>
-        <Trophy class="size-5 text-orange-600" />
+        <Trophy class="size-5 text-[var(--semantic-warning)]" />
       </div>
     </div>
 
-    <div v-if="visibleTeams.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-500">
+    <div v-if="visibleTeams.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-[var(--awdp-text-muted)]">
       {{ t('awdpScreen.scoreboard.empty') }}
     </div>
 

@@ -109,6 +109,7 @@
   --neon-osint: #ff9f7a;
   --neon-cloud: #7ab8ff;
   --neon-default: var(--neon-misc);
+  --neon-foreground: #171717;
   --sidebar: #c9c9c9;
   --sidebar-foreground: #242424;
   --sidebar-primary: #2f2f2f;
@@ -122,6 +123,107 @@
   --panel-shadow: 4px 4px 0 #d4d4d4;
   --panel-shadow-dark: 6px 6px 0 #7d7d7d;
   --float-shadow: 6px 6px 0 #bdbdbd;
+  --page-background-start: #ebebeb;
+  --page-background-end: #e3e3e3;
+  --page-grid-color: rgb(80 80 80 / 0.08);
+  --app-background-start: #e7e7e7;
+  --app-background-end: #dfdfdf;
+  --app-effect-color: #2f2f2f;
+  --app-effect-opacity: 0.28;
+  --card-decoration: #000000;
+  --panel-border: #bdbdbd;
+  --panel-dark-border: #5f5f5f;
+  --panel-face-start: #e4e4e4;
+  --panel-face-end: #dadada;
+  --panel-dark-face-start: #4b4b4b;
+  --panel-dark-face-end: #383838;
+  --panel-base-border: #d4d4d4;
+  --panel-base-surface: #f5f5f5;
+  --panel-base-shadow: #e0e0e0;
+  --panel-dark-base-border: #8b8b8b;
+  --panel-dark-base-surface: #d7d7d7;
+  --panel-dark-base-shadow: #b6b6b6;
+  --button-primary-border: #1b1b1b;
+  --button-primary-shadow: #8c8c8c;
+  --button-primary-hover: #3a3a3a;
+  --button-destructive-border: #5f1f18;
+  --button-destructive-shadow: #bda3a0;
+  --button-destructive-hover: #8f372f;
+  --button-outline-border: #7f7f7f;
+  --button-outline-surface: #e5e5e5;
+  --button-outline-shadow: #c7c7c7;
+  --button-outline-hover: #d8d8d8;
+  --button-ghost-border: #9a9a9a;
+  --button-ghost-hover: #d8d8d8;
+  --admin-header-background: rgb(255 255 255 / 0.85);
+  --admin-chrome-border: rgb(255 255 255 / 0.1);
+  --admin-account-surface: rgb(255 255 255 / 0.05);
+  --admin-account-muted: #94a3b8;
+  --semantic-info: #0e7490;
+  --semantic-info-soft: #cffafe;
+  --semantic-info-border: #67e8f9;
+  --semantic-success: #047857;
+  --semantic-success-soft: #d1fae5;
+  --semantic-success-border: #6ee7b7;
+  --semantic-warning: #b45309;
+  --semantic-warning-soft: #fef3c7;
+  --semantic-warning-border: #fcd34d;
+  --semantic-danger: #be123c;
+  --semantic-danger-soft: #ffe4e6;
+  --semantic-danger-border: #fda4af;
+  --semantic-neutral: #64748b;
+  --semantic-neutral-soft: #e2e8f0;
+  --semantic-neutral-border: #94a3b8;
+  --dialog-overlay: rgb(15 23 42 / 0.45);
+  --dialog-surface: rgb(255 255 255 / 0.95);
+  --cursor-color: #ffffff;
+  --auth-border: #8b8b8b;
+  --auth-surface: #d9d9d9;
+  --auth-surface-strong: #bfbfbf;
+  --auth-surface-muted: #dcdcdc;
+  --auth-grid: rgb(70 70 70 / 0.16);
+  --auth-grid-soft: rgb(70 70 70 / 0.1);
+  --auth-background-start: #dddddd;
+  --auth-background-end: #d4d4d4;
+  --auth-foreground: #1f1f1f;
+  --auth-accent: #60a5fa;
+  --auth-accent-soft: #bfdbfe;
+  --auth-muted: #64748b;
+  --awdp-surface: #ffffff;
+  --awdp-surface-muted: #f1f5f9;
+  --awdp-surface-deep: #0f172a;
+  --awdp-text: #0f172a;
+  --awdp-text-muted: #64748b;
+  --awdp-text-inverse: #f8fafc;
+  --awdp-border: #cbd5e1;
+  --awdp-star: #64748b;
+  --awdp-nebula-start: #cbd5e1;
+  --awdp-nebula-mid: #e2e8f0;
+  --awdp-nebula-end: #f8fafc;
+  --awdp-node-fill: #f8fafc;
+  --awdp-node-stroke: #64748b;
+  --awdp-category-web: #0891b2;
+  --awdp-category-pwn: #db2777;
+  --awdp-category-crypto: #7c3aed;
+  --awdp-category-reverse: #059669;
+  --awdp-category-misc: #ca8a04;
+  --leaderboard-paper: #fdfbf7;
+  --leaderboard-border: #d7ccc8;
+  --leaderboard-line-1: #e63946;
+  --leaderboard-line-2: #1d3557;
+  --leaderboard-line-3: #06d6a0;
+  --leaderboard-line-4: #7b2cbf;
+  --leaderboard-line-5: #f4a261;
+  --leaderboard-line-6: #f72585;
+  --leaderboard-line-7: #2a9d8f;
+  --leaderboard-line-8: #e9c46a;
+  --leaderboard-line-9: #457b9d;
+  --leaderboard-line-10: #d62828;
+  --leaderboard-gold: #ffd700;
+  --leaderboard-gold-foreground: #5c4800;
+  --leaderboard-silver: #c0c0c0;
+  --leaderboard-silver-foreground: #3a3a3a;
+  --leaderboard-bronze: #cd7f32;
 }
 
 .dark {
@@ -161,6 +263,7 @@
   --neon-osint: #ffb38f;
   --neon-cloud: #9ecaff;
   --neon-default: var(--neon-misc);
+  --neon-foreground: #f5f5f5;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -188,9 +291,9 @@
   body {
     @apply bg-background text-foreground;
     background:
-      linear-gradient(90deg, rgb(80 80 80 / 0.08) 1px, transparent 1px),
-      linear-gradient(180deg, rgb(80 80 80 / 0.08) 1px, transparent 1px),
-      linear-gradient(180deg, #ebebeb 0%, #e3e3e3 100%);
+      linear-gradient(90deg, var(--page-grid-color) 1px, transparent 1px),
+      linear-gradient(180deg, var(--page-grid-color) 1px, transparent 1px),
+      linear-gradient(180deg, var(--page-background-start) 0%, var(--page-background-end) 100%);
     background-size: 16px 16px, 16px 16px, auto;
   }
 }

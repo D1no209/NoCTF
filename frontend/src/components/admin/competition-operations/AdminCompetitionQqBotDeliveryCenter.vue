@@ -282,7 +282,7 @@ const retryDelivery = useMutation({
         <Button variant="outline" size="sm" @click="refetch()"><RefreshCw class="size-4" />Refresh</Button>
       </CardHeader>
       <CardContent class="space-y-5">
-        <div v-if="form.warnings.length" class="border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800">{{ form.warnings.join(' ') }}</div>
+        <div v-if="form.warnings.length" class="border border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)] p-3 text-sm text-[var(--semantic-warning)]">{{ form.warnings.join(' ') }}</div>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <label v-for="item in [
             ['enabled', 'Enable delivery'], ['allowMessages', 'Allow messages'], ['allowManualNotifications', 'Allow manual announcements'],
@@ -309,7 +309,7 @@ const retryDelivery = useMutation({
           <div class="grid gap-2"><Label>Content</Label><Textarea v-model="templateForm.content" rows="10" class="font-mono text-xs" placeholder="Use the variables allowed by this event." /></div>
           <label class="flex items-center gap-2 text-sm"><input v-model="templateForm.isDefault" type="checkbox" class="size-4">Use as the event default</label>
           <div class="flex flex-wrap gap-2"><Button :disabled="!templateForm.name.trim() || !templateForm.content.trim() || saveTemplate.isPending.value" @click="saveTemplate.mutate()"><Loader2 v-if="saveTemplate.isPending.value" class="size-4 animate-spin" /><Save v-else class="size-4" />Save template</Button><Button variant="outline" :disabled="previewTemplate.isPending.value" @click="previewTemplate.mutate()"><Loader2 v-if="previewTemplate.isPending.value" class="size-4 animate-spin" /><Eye v-else class="size-4" />Preview</Button></div>
-          <Panel v-if="preview" class="space-y-2 p-4"><div class="flex items-center justify-between text-sm"><span class="font-medium">Preview</span><Badge variant="outline">{{ preview.characterCount ?? 0 }} chars</Badge></div><pre class="whitespace-pre-wrap break-words text-sm">{{ preview.renderedText }}</pre><p v-if="preview.warnings?.length" class="text-xs text-amber-700">{{ preview.warnings.join(' ') }}</p></Panel>
+          <Panel v-if="preview" class="space-y-2 p-4"><div class="flex items-center justify-between text-sm"><span class="font-medium">Preview</span><Badge variant="outline">{{ preview.characterCount ?? 0 }} chars</Badge></div><pre class="whitespace-pre-wrap break-words text-sm">{{ preview.renderedText }}</pre><p v-if="preview.warnings?.length" class="text-xs text-[var(--semantic-warning)]">{{ preview.warnings.join(' ') }}</p></Panel>
         </CardContent>
       </Card>
 

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(defineProps<{
@@ -12,11 +11,6 @@ const props = withDefaults(defineProps<{
   border: 'transparent',
 })
 
-const borderClass = computed(() => {
-  if (props.border === 'transparent')
-    return 'border-transparent'
-  return props.variant === 'dark' ? 'border-[#5f5f5f]' : 'border-[#bdbdbd]'
-})
 </script>
 
 <template>
@@ -31,10 +25,8 @@ const borderClass = computed(() => {
       :class="
         cn(
           'panel-face relative z-[2] flex flex-col border-[2px]',
-          borderClass,
-          props.variant === 'dark'
-            ? 'bg-[linear-gradient(180deg,#4b4b4b_0%,#383838_100%)] text-zinc-100 shadow-panel-dark'
-            : 'bg-[linear-gradient(180deg,#e4e4e4_0%,#dadada_100%)] text-black shadow-panel',
+          props.border === 'transparent' ? 'border-transparent' : '',
+          props.variant === 'dark' ? 'panel-face-dark' : 'panel-face-default',
           props.class,
         )
       "
@@ -58,18 +50,32 @@ const borderClass = computed(() => {
 }
 
 .panel-base-default {
-  border-color: #d4d4d4;
-  background: #f5f5f5;
-  box-shadow: 2px 2px 0 #e0e0e0;
+  border-color: var(--panel-base-border);
+  background: var(--panel-base-surface);
+  box-shadow: 2px 2px 0 var(--panel-base-shadow);
 }
 
 .panel-base-dark {
-  border-color: #8b8b8b;
-  background: #d7d7d7;
-  box-shadow: 2px 2px 0 #b6b6b6;
+  border-color: var(--panel-dark-base-border);
+  background: var(--panel-dark-base-surface);
+  box-shadow: 2px 2px 0 var(--panel-dark-base-shadow);
 }
 
 .panel-face {
   min-height: inherit;
+}
+
+.panel-face-default {
+  border-color: var(--panel-border);
+  background: linear-gradient(180deg, var(--panel-face-start) 0%, var(--panel-face-end) 100%);
+  color: var(--foreground);
+  box-shadow: var(--panel-shadow);
+}
+
+.panel-face-dark {
+  border-color: var(--panel-dark-border);
+  background: linear-gradient(180deg, var(--panel-dark-face-start) 0%, var(--panel-dark-face-end) 100%);
+  color: var(--primary-foreground);
+  box-shadow: var(--panel-shadow-dark);
 }
 </style>

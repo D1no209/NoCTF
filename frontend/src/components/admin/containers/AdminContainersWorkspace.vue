@@ -140,8 +140,8 @@ const table = useVueTable({
       </Card>
       <Card class="p-0">
         <CardContent class="flex items-center gap-4 p-3">
-          <div class="bg-emerald-500/10 p-2.5 rounded-lg">
-            <Activity class="size-5 text-emerald-500" />
+          <div class="bg-[var(--semantic-success-soft)] p-2.5 rounded-lg">
+            <Activity class="size-5 text-[var(--semantic-success)]" />
           </div>
           <div>
             <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{{ t('admin.containers.stats.healthy') }}</p>
@@ -151,8 +151,8 @@ const table = useVueTable({
       </Card>
       <Card class="p-0">
         <CardContent class="flex items-center gap-4 p-3">
-          <div class="bg-rose-500/10 p-2.5 rounded-lg">
-            <Cpu class="size-5 text-rose-500" />
+          <div class="bg-[var(--semantic-danger-soft)] p-2.5 rounded-lg">
+            <Cpu class="size-5 text-[var(--semantic-danger)]" />
           </div>
           <div>
             <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{{ t('admin.containers.stats.terminated') }}</p>

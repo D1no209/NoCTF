@@ -19,13 +19,13 @@ const { t } = useI18n()
 <template>
   <AwdpScreenShell variant="center">
     <Panel variant="dark" class="max-w-xl p-6 text-center">
-      <div class="mx-auto flex size-12 items-center justify-center rounded-lg border border-amber-300/25 bg-amber-300/10 text-amber-100">
+      <div class="mx-auto flex size-12 items-center justify-center rounded-lg border border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)] text-[var(--semantic-warning)]">
         <AlertTriangle class="size-6" />
       </div>
-      <h1 class="mt-4 text-xl font-semibold text-slate-50">
+      <h1 class="mt-4 text-xl font-semibold text-[var(--awdp-text-inverse)]">
         {{ t('awdpScreen.errors.dataUnavailable') }}
       </h1>
-      <p class="mt-2 text-sm text-slate-400">
+      <p class="mt-2 text-sm text-[var(--awdp-text-muted)]">
         {{ message || t('awdpScreen.errors.snapshotUnavailable') }}
       </p>
       <Button

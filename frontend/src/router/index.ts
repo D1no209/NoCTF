@@ -143,6 +143,12 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
+          path: 'theme-packs',
+          name: 'admin-theme-packs',
+          component: () => import('@/views/admin/AdminThemePacksView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
+        },
+        {
           path: 'infrastructure',
           name: 'admin-infrastructure',
           component: () => import('@/views/admin/AdminInfrastructureView.vue'),

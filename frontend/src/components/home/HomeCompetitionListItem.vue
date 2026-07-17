@@ -45,12 +45,12 @@ function formatDate(iso: string) {
       <div class="home-competition-grid">
       <div class="home-competition-main">
         <div class="flex flex-wrap items-center gap-2">
-          <h3 class="truncate font-semibold text-black">{{ competition.title }}</h3>
+          <h3 class="truncate font-semibold text-foreground">{{ competition.title }}</h3>
           <Badge :variant="statusVariant(competition.status)">{{ competition.status }}</Badge>
           <Badge variant="secondary">{{ competition.gameModeType || 'CTF' }}</Badge>
         </div>
-        <div class="flex items-center gap-2 text-xs text-zinc-600">
-          <Calendar class="size-3.5 text-zinc-500" />
+        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+          <Calendar class="size-3.5 text-muted-foreground" />
           <span>{{ formatDate(competition.startTime) }} - {{ formatDate(competition.endTime) }}</span>
         </div>
       </div>

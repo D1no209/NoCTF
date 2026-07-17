@@ -23,10 +23,10 @@ const visibleRounds = computed(() => props.rounds.slice(-props.maxRows))
 const viewHeight = computed(() => visibleRounds.value.length * ROW_H + PAD_Y * 2)
 
 const segments = [
-  { key: 'attackSuccessCount', color: '#0891b2', label: '命中' },
-  { key: 'attackFailCount', color: '#d97706', label: '被防' },
-  { key: 'defenseSuccessCount', color: '#059669', label: '防御' },
-  { key: 'defenseFailCount', color: '#e11d48', label: '失守' },
+  { key: 'attackSuccessCount', color: 'var(--semantic-info)', label: '命中' },
+  { key: 'attackFailCount', color: 'var(--semantic-warning)', label: '被防' },
+  { key: 'defenseSuccessCount', color: 'var(--semantic-success)', label: '防御' },
+  { key: 'defenseFailCount', color: 'var(--semantic-danger)', label: '失守' },
 ] as const
 
 const maxTotal = computed(() => Math.max(1, ...visibleRounds.value.map(round =>
@@ -79,8 +79,8 @@ const rows = computed(() => visibleRounds.value.map((round, index) => {
         :width="VIEW_W"
         :height="ROW_H - 4"
         rx="6"
-        fill="rgba(8, 145, 178, 0.10)"
-        stroke="rgba(8, 145, 178, 0.25)"
+        fill="var(--semantic-info-soft)"
+        stroke="var(--semantic-info-border)"
         stroke-width="1"
       />
 
@@ -88,7 +88,7 @@ const rows = computed(() => visibleRounds.value.map((round, index) => {
         :x="LABEL_W"
         :y="row.y + ROW_H / 2 + 4"
         text-anchor="end"
-        class="fill-slate-700 text-[11px] font-bold"
+        class="fill-[var(--awdp-text)] text-[11px] font-bold"
       >
         R{{ row.round.round }}
       </text>
@@ -113,7 +113,7 @@ const rows = computed(() => visibleRounds.value.map((round, index) => {
         :x="VIEW_W - 6"
         :y="row.y + ROW_H / 2 + 4"
         text-anchor="end"
-        class="fill-slate-600 text-[10px] font-mono"
+        class="fill-[var(--awdp-text-muted)] text-[10px] font-mono"
       >
         {{ row.total }}
       </text>

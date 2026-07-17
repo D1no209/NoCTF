@@ -568,7 +568,7 @@ function serviceNodeClasses(node: ServiceNode) {
     if (event?.type === 'service_down')
       return 'border-destructive/50 bg-destructive/10'
     if (event?.type === 'service_recovered')
-      return 'border-emerald-500/50 bg-emerald-500/10'
+      return 'border-[var(--semantic-success-border)] bg-[var(--semantic-success-soft)]'
     if (event?.type === 'checker_error')
       return 'border-neon-misc/50 bg-neon-misc/10'
     return 'border-primary/50 bg-primary/10'

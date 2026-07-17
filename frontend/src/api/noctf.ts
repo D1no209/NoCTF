@@ -262,7 +262,7 @@ export const teamApi = {
     }), tt('errors.loadMyTeams'))
   },
   async create<T = unknown>(body: { competitionId: string; name: string; avatarUrl?: string; trackName?: string }) {
-    return unwrap(await client.post<{ 201: T }, unknown, false>({
+    return unwrap(await client.post<{ 200: T, 201: T }, unknown, false>({
       url: '/api/teams',
       body,
     }), tt('errors.createTeam'))

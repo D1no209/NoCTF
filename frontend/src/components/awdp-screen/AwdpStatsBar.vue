@@ -13,14 +13,14 @@ const props = defineProps<{
 const { t } = useI18n()
 
 const statItems = computed(() => [
-  { label: t('awdpScreen.stats.activeTeams'), value: props.stats.activeTeamCount, sub: t('awdpScreen.stats.total', { count: props.stats.teamCount }), icon: UsersRound, tone: 'text-cyan-600' },
-  { label: t('awdpScreen.stats.activeChallenges'), value: props.stats.activeChallengeCount, sub: t('awdpScreen.stats.total', { count: props.stats.challengeCount }), icon: Target, tone: 'text-cyan-600' },
-  { label: t('awdpScreen.stats.round'), value: props.currentRound, sub: t('awdpScreen.stats.current'), icon: Activity, tone: 'text-orange-600' },
-  { label: t('awdpScreen.stats.attackSuccess'), value: props.stats.attackSuccessCount, sub: t('awdpScreen.stats.failed', { count: props.stats.attackFailCount }), icon: Swords, tone: 'text-emerald-600' },
-  { label: t('awdpScreen.stats.defenseSuccess'), value: props.stats.defenseSuccessCount, sub: t('awdpScreen.stats.failed', { count: props.stats.defenseFailCount }), icon: ShieldCheck, tone: 'text-emerald-600' },
-  { label: t('awdpScreen.stats.attackFailed'), value: props.stats.attackFailCount, sub: t('awdpScreen.stats.attemptResults'), icon: Gauge, tone: 'text-amber-600' },
-  { label: t('awdpScreen.stats.defenseFailed'), value: props.stats.defenseFailCount, sub: t('awdpScreen.stats.ruleDependent'), icon: ShieldX, tone: 'text-amber-600' },
-  { label: t('awdpScreen.stats.scoreDelta'), value: props.stats.totalScoreDelta ?? 0, sub: t('awdpScreen.stats.attackDefense'), icon: TrendingUp, tone: 'text-cyan-600', signed: true },
+  { label: t('awdpScreen.stats.activeTeams'), value: props.stats.activeTeamCount, sub: t('awdpScreen.stats.total', { count: props.stats.teamCount }), icon: UsersRound, tone: 'text-[var(--semantic-info)]' },
+  { label: t('awdpScreen.stats.activeChallenges'), value: props.stats.activeChallengeCount, sub: t('awdpScreen.stats.total', { count: props.stats.challengeCount }), icon: Target, tone: 'text-[var(--semantic-info)]' },
+  { label: t('awdpScreen.stats.round'), value: props.currentRound, sub: t('awdpScreen.stats.current'), icon: Activity, tone: 'text-[var(--semantic-warning)]' },
+  { label: t('awdpScreen.stats.attackSuccess'), value: props.stats.attackSuccessCount, sub: t('awdpScreen.stats.failed', { count: props.stats.attackFailCount }), icon: Swords, tone: 'text-[var(--semantic-success)]' },
+  { label: t('awdpScreen.stats.defenseSuccess'), value: props.stats.defenseSuccessCount, sub: t('awdpScreen.stats.failed', { count: props.stats.defenseFailCount }), icon: ShieldCheck, tone: 'text-[var(--semantic-success)]' },
+  { label: t('awdpScreen.stats.attackFailed'), value: props.stats.attackFailCount, sub: t('awdpScreen.stats.attemptResults'), icon: Gauge, tone: 'text-[var(--semantic-warning)]' },
+  { label: t('awdpScreen.stats.defenseFailed'), value: props.stats.defenseFailCount, sub: t('awdpScreen.stats.ruleDependent'), icon: ShieldX, tone: 'text-[var(--semantic-warning)]' },
+  { label: t('awdpScreen.stats.scoreDelta'), value: props.stats.totalScoreDelta ?? 0, sub: t('awdpScreen.stats.attackDefense'), icon: TrendingUp, tone: 'text-[var(--semantic-info)]', signed: true },
 ])
 
 function formatNumber(value: number, signed?: boolean) {
@@ -38,13 +38,13 @@ function formatNumber(value: number, signed?: boolean) {
       class="min-h-[4.35rem] p-2.5"
     >
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold uppercase text-slate-600">{{ item.label }}</span>
+        <span class="text-[11px] font-semibold uppercase text-[var(--awdp-text-muted)]">{{ item.label }}</span>
         <component :is="item.icon" class="size-4" :class="item.tone" />
       </div>
-      <div class="mt-1.5 font-mono text-xl font-semibold tabular-nums text-slate-900">
+      <div class="mt-1.5 font-mono text-xl font-semibold tabular-nums text-[var(--awdp-text)]">
         {{ formatNumber(item.value, item.signed) }}
       </div>
-      <div class="mt-0.5 truncate text-[10px] text-slate-500">
+      <div class="mt-0.5 truncate text-[10px] text-[var(--awdp-text-muted)]">
         {{ item.sub }}
       </div>
     </Panel>

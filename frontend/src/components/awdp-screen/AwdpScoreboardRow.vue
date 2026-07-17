@@ -24,22 +24,22 @@ const rankTone = computed(() => {
 
 const rankClass = computed(() => {
   if (rankTone.value === 'gold')
-    return 'border-amber-400/40 bg-amber-100/40 text-amber-800'
+    return 'border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)] text-[var(--semantic-warning)]'
   if (rankTone.value === 'silver')
-    return 'border-slate-400/40 bg-slate-200/40 text-slate-800'
+    return 'border-[var(--awdp-border)] bg-[var(--semantic-neutral-soft)] text-[var(--awdp-text)]'
   if (rankTone.value === 'bronze')
-    return 'border-orange-600/30 bg-orange-100/40 text-orange-900'
-  return 'border-slate-300/60 bg-white/70 text-slate-700'
+    return 'border-[var(--semantic-danger-border)] bg-[var(--semantic-danger-soft)] text-[var(--semantic-danger)]'
+  return 'border-[var(--awdp-border)] bg-[var(--awdp-surface)] text-[var(--awdp-text)]'
 })
 
 const rowClass = computed(() => {
   if (rankTone.value === 'gold')
-    return 'border-amber-300/30 bg-gradient-to-r from-amber-100/[0.25] to-transparent'
+    return 'border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)]'
   if (rankTone.value === 'silver')
-    return 'border-slate-300/30 bg-gradient-to-r from-slate-200/[0.25] to-transparent'
+    return 'border-[var(--awdp-border)] bg-[var(--semantic-neutral-soft)]'
   if (rankTone.value === 'bronze')
-    return 'border-orange-300/30 bg-gradient-to-r from-orange-100/[0.25] to-transparent'
-  return 'border-slate-300/40 bg-white/50 hover:bg-slate-100/60'
+    return 'border-[var(--semantic-danger-border)] bg-[var(--semantic-danger-soft)]'
+  return 'border-[var(--awdp-border)] bg-[var(--awdp-surface)] hover:bg-[var(--awdp-surface-muted)]'
 })
 
 const attackWidth = computed(() => `${Math.min(100, (props.maxAttackScore > 0 ? (props.team.attackScore / props.maxAttackScore) : 0) * 100).toFixed(1)}%`)
@@ -55,10 +55,10 @@ function trendIcon(trend: AwdpTeamTrend) {
 
 function trendClass(trend: AwdpTeamTrend) {
   if (trend === 'up')
-    return 'text-emerald-600'
+    return 'text-[var(--semantic-success)]'
   if (trend === 'down')
-    return 'text-rose-600'
-  return 'text-slate-500'
+    return 'text-[var(--semantic-danger)]'
+  return 'text-[var(--awdp-text-muted)]'
 }
 
 function isActive(lastActiveAt?: string) {
@@ -90,7 +90,7 @@ const offset = computed(() => rankOffset(props.team.previousRank, props.team.ran
       <span
         v-if="offset !== null"
         class="mt-0.5 text-[9px] font-bold"
-        :class="offset > 0 ? 'text-emerald-600' : offset < 0 ? 'text-rose-600' : 'text-slate-400'"
+        :class="offset > 0 ? 'text-[var(--semantic-success)]' : offset < 0 ? 'text-[var(--semantic-danger)]' : 'text-[var(--semantic-neutral)]'"
       >
         {{ offset > 0 ? `+${offset}` : offset < 0 ? `${offset}` : '=' }}
       </span>
@@ -99,27 +99,27 @@ const offset = computed(() => rankOffset(props.team.previousRank, props.team.ran
     <!-- team + bars -->
     <div class="min-w-0">
       <div class="flex items-center gap-2">
-        <span class="truncate text-sm font-semibold text-slate-900">{{ team.teamName }}</span>
+        <span class="truncate text-sm font-semibold text-[var(--awdp-text)]">{{ team.teamName }}</span>
         <Circle
           class="size-2 shrink-0"
-          :class="isActive(team.lastActiveAt) ? 'fill-emerald-500 text-emerald-500' : 'fill-slate-300 text-slate-300'"
+          :class="isActive(team.lastActiveAt) ? 'fill-[var(--semantic-success)] text-[var(--semantic-success)]' : 'fill-[var(--semantic-neutral)] text-[var(--semantic-neutral)]'"
         />
       </div>
       <div class="mt-1.5 space-y-1">
         <div class="flex items-center gap-1.5">
-          <span class="w-6 shrink-0 text-[9px] font-bold uppercase text-slate-500">Atk</span>
-          <div class="h-1 flex-1 overflow-hidden rounded-full bg-slate-300/50">
+          <span class="w-6 shrink-0 text-[9px] font-bold uppercase text-[var(--awdp-text-muted)]">Atk</span>
+          <div class="h-1 flex-1 overflow-hidden rounded-full bg-[var(--awdp-surface-muted)]">
             <div
-              class="h-full rounded-full bg-cyan-500/80 transition-[width] duration-500"
+              class="h-full rounded-full bg-[var(--semantic-info)] transition-[width] duration-500"
               :style="{ width: attackWidth }"
             />
           </div>
         </div>
         <div class="flex items-center gap-1.5">
-          <span class="w-6 shrink-0 text-[9px] font-bold uppercase text-slate-500">Def</span>
-          <div class="h-1 flex-1 overflow-hidden rounded-full bg-slate-300/50">
+          <span class="w-6 shrink-0 text-[9px] font-bold uppercase text-[var(--awdp-text-muted)]">Def</span>
+          <div class="h-1 flex-1 overflow-hidden rounded-full bg-[var(--awdp-surface-muted)]">
             <div
-              class="h-full rounded-full bg-emerald-500/80 transition-[width] duration-500"
+              class="h-full rounded-full bg-[var(--semantic-success)] transition-[width] duration-500"
               :style="{ width: defenseWidth }"
             />
           </div>
@@ -129,12 +129,12 @@ const offset = computed(() => rankOffset(props.team.previousRank, props.team.ran
 
     <!-- score + trend -->
     <div class="text-right">
-      <div class="font-mono text-lg font-semibold tabular-nums text-slate-900">
+      <div class="font-mono text-lg font-semibold tabular-nums text-[var(--awdp-text)]">
         {{ team.totalScore }}
       </div>
       <div class="mt-1 flex items-center justify-end gap-2 text-[11px]">
         <component :is="trendIcon(team.trend)" class="size-3.5" :class="trendClass(team.trend)" />
-        <span class="font-mono text-slate-500">{{ team.currentRoundScore }}</span>
+        <span class="font-mono text-[var(--awdp-text-muted)]">{{ team.currentRoundScore }}</span>
       </div>
     </div>
   </div>

@@ -118,16 +118,16 @@ const hoveredTeamId = ref<string | null>(null)
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
 const markerColors = [
-  '#E63946',
-  '#1D3557',
-  '#06D6A0',
-  '#7B2CBF',
-  '#F4A261',
-  '#F72585',
-  '#2A9D8F',
-  '#E9C46A',
-  '#457B9D',
-  '#D62828',
+  'var(--leaderboard-line-1)',
+  'var(--leaderboard-line-2)',
+  'var(--leaderboard-line-3)',
+  'var(--leaderboard-line-4)',
+  'var(--leaderboard-line-5)',
+  'var(--leaderboard-line-6)',
+  'var(--leaderboard-line-7)',
+  'var(--leaderboard-line-8)',
+  'var(--leaderboard-line-9)',
+  'var(--leaderboard-line-10)',
 ]
 
 const sortedEntries = computed(() => entries.value.map(entry => ({
@@ -227,11 +227,11 @@ function formatDate(value?: string | null) {
 
 function rankBadgeClass(rank?: number) {
   if (rank === 1)
-    return 'bg-[#FFD700] text-[#5C4800] -rotate-2 shadow-sm'
+    return 'bg-[var(--leaderboard-gold)] text-[var(--leaderboard-gold-foreground)] -rotate-2 shadow-sm'
   if (rank === 2)
-    return 'bg-[#C0C0C0] text-[#3A3A3A] rotate-1 shadow-sm'
+    return 'bg-[var(--leaderboard-silver)] text-[var(--leaderboard-silver-foreground)] rotate-1 shadow-sm'
   if (rank === 3)
-    return 'bg-[#CD7F32] text-white -rotate-1 shadow-sm'
+    return 'bg-[var(--leaderboard-bronze)] text-primary-foreground -rotate-1 shadow-sm'
   return 'bg-muted text-muted-foreground'
 }
 
@@ -354,10 +354,10 @@ onUnmounted(() => {
         <h2 class="text-xl font-semibold">
           {{ t('scoreboard.title') }}
         </h2>
-        <HandDrawnUnderline :width="120" color="#E63946" />
+        <HandDrawnUnderline :width="120" color="var(--leaderboard-line-1)" />
       </div>
       <div class="flex items-center gap-2">
-        <Badge v-if="isConnected" class="bg-green-600 text-white border-transparent text-xs">
+        <Badge v-if="isConnected" class="border-transparent bg-[var(--semantic-success)] text-primary-foreground text-xs">
           {{ t('common.live') }}
         </Badge>
         <Badge v-else-if="usingFallback" variant="secondary" class="text-xs">
@@ -369,13 +369,13 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <Card class="relative overflow-hidden border-2 border-dashed border-[#D7CCC8] bg-[#FDFBF7] p-4 dark:border-[#4A4238] dark:bg-[#1C1917]">
+    <Card class="relative overflow-hidden border-2 border-dashed border-[var(--leaderboard-border)] bg-[var(--leaderboard-paper)] p-4">
       <div class="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 class="text-sm font-bold">
             {{ t('scoreboard.topTrend') }}
           </h3>
-          <HandDrawnUnderline :width="80" color="#1D3557" />
+          <HandDrawnUnderline :width="80" color="var(--leaderboard-line-2)" />
         </div>
         <span class="text-xs text-muted-foreground">{{ t('scoreboard.topTrendHint') }}</span>
       </div>
@@ -410,7 +410,7 @@ onUnmounted(() => {
     </div>
 
     <div v-else-if="sortedEntries.length === 0">
-      <Card class="relative flex min-h-48 flex-col items-center justify-center gap-2 border-2 border-dashed border-foreground/20 bg-[#FDFBF7] p-6 text-center dark:bg-[#1C1917]">
+      <Card class="relative flex min-h-48 flex-col items-center justify-center gap-2 border-2 border-dashed border-foreground/20 bg-[var(--leaderboard-paper)] p-6 text-center">
         <span class="text-4xl">📋</span>
         <p class="text-sm font-medium text-muted-foreground">
           {{ t('scoreboard.empty') }}
@@ -424,14 +424,14 @@ onUnmounted(() => {
           <h3 class="text-sm font-bold">
             {{ t('scoreboard.fullBoard') }}
           </h3>
-          <HandDrawnUnderline :width="100" color="#F4A261" />
+          <HandDrawnUnderline :width="100" color="var(--leaderboard-line-5)" />
         </div>
       </div>
       <div class="grid gap-2">
         <Card
           v-for="(entry, index) in displayedEntries"
           :key="entry.teamId ?? entry.rank"
-          class="relative cursor-pointer border-2 border-dashed border-foreground/10 bg-[#FDFBF7] px-3 py-2 transition-all hover:-translate-y-0.5 hover:shadow-sm dark:bg-[#1C1917]"
+          class="relative cursor-pointer border-2 border-dashed border-foreground/10 bg-[var(--leaderboard-paper)] px-3 py-2 transition-all hover:-translate-y-0.5 hover:shadow-sm"
           :class="rowTiltClass(index)"
           @mouseenter="hoveredTeamId = entry.teamId ?? null"
           @mouseleave="hoveredTeamId = null"
@@ -549,7 +549,7 @@ onUnmounted(() => {
                       <Badge
                         v-if="score.bloodRank"
                         variant="outline"
-                        class="mt-1 border-amber-500/70 bg-amber-500/10 text-amber-700"
+                        class="mt-1 border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)] text-[var(--semantic-warning)]"
                       >
                         {{ bloodLabel(score.bloodRank) }}
                       </Badge>

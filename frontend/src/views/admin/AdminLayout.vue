@@ -25,6 +25,7 @@ import {
   FileText,
   Handshake,
   Plug,
+  Palette,
   Puzzle,
   Network,
   Bot,
@@ -50,6 +51,7 @@ const navItems = computed(() => {
     { to: '/admin/challenges', label: t('admin.nav.challenges'), icon: Puzzle },
     { to: '/admin/containers', label: t('admin.nav.containers'), icon: Container },
     { to: '/admin/plugins', label: t('admin.nav.plugins'), icon: Plug },
+    { to: '/admin/theme-packs', label: 'Theme packages', icon: Palette, adminOnly: true },
     { to: '/admin/infrastructure', label: 'Infrastructure', icon: Network, adminOnly: true },
     { to: '/admin/qqbot', label: 'QQ Bot', icon: Bot, adminOnly: true },
     { to: '/admin/audit-logs', label: t('admin.nav.auditLogs'), icon: ClipboardList, adminOnly: true },
@@ -71,11 +73,11 @@ async function handleLogout() {
 <template>
   <SidebarProvider>
     <Sidebar collapsible="icon" class="border-r-0">
-      <SidebarHeader class="h-20 flex items-center border-b border-white/10 px-4">
+      <SidebarHeader class="h-20 flex items-center border-b px-4 [border-color:var(--admin-chrome-border)]">
         <div class="flex items-center gap-2 overflow-hidden">
           <BrandLogo class="h-10" />
           <div class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-            <span class="mt-0.5 inline-flex w-fit rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">{{ t('nav.admin') }}</span>
+            <span class="mt-0.5 inline-flex w-fit rounded-md bg-[var(--admin-account-surface)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{{ t('nav.admin') }}</span>
           </div>
         </div>
       </SidebarHeader>
@@ -97,16 +99,16 @@ async function handleLogout() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter class="space-y-4 border-t border-white/10 p-4 group-data-[collapsible=icon]:p-2">
+      <SidebarFooter class="space-y-4 border-t p-4 [border-color:var(--admin-chrome-border)] group-data-[collapsible=icon]:p-2">
         <div class="group-data-[collapsible=icon]:hidden">
-          <div class="mb-3 rounded-xl border border-white/10 bg-white/5 p-3">
+          <div class="mb-3 rounded-xl border p-3 [border-color:var(--admin-chrome-border)] bg-[var(--admin-account-surface)]">
             <div class="flex items-center gap-3">
-              <div class="flex size-9 items-center justify-center rounded-full bg-white text-slate-900 font-semibold">
+              <div class="flex size-9 items-center justify-center rounded-full bg-[var(--dialog-surface)] text-[var(--foreground)] font-semibold">
                 {{ auth.user?.userName?.charAt(0)?.toUpperCase() ?? 'A' }}
               </div>
               <div class="min-w-0">
-                <div class="truncate text-sm font-semibold text-white">{{ auth.user?.userName ?? t('nav.admin') }}</div>
-                <div class="text-xs text-slate-400">{{ auth.userRole }}</div>
+                <div class="truncate text-sm font-semibold text-sidebar-primary-foreground">{{ auth.user?.userName ?? t('nav.admin') }}</div>
+                <div class="text-xs [color:var(--admin-account-muted)]">{{ auth.userRole }}</div>
               </div>
             </div>
           </div>
@@ -132,14 +134,14 @@ async function handleLogout() {
     </Sidebar>
 
     <SidebarInset>
-      <header class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-white/[0.85] px-4 backdrop-blur-xl">
+      <header class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-[var(--admin-header-background)] px-4 backdrop-blur-xl">
         <SidebarTrigger class="-ml-1" />
         <div class="h-4 w-px bg-border mx-2" />
         <div class="flex min-w-0 flex-1 items-center gap-3">
           <h1 class="truncate text-xl font-bold tracking-tight">
             {{ navItems.find(i => i.to === route.path)?.label || t('nav.admin') }}
           </h1>
-          <span v-if="isAdmin" class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-600">
+          <span v-if="isAdmin" class="inline-flex items-center gap-1 rounded-md bg-[var(--semantic-danger-soft)] px-2 py-1 text-xs font-semibold text-[var(--semantic-danger)]">
             <BadgeCheck class="size-3.5" />
             {{ t('nav.admin') }}
           </span>

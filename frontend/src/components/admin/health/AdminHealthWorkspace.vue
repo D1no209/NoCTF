@@ -101,18 +101,18 @@ function getServiceIcon(name: string) {
     <div v-if="health" v-auto-animate>
       <div 
         class="relative flex flex-col items-center gap-6 overflow-hidden rounded-xl border p-6 transition-all duration-300 sm:flex-row"
-        :class="overallHealthy ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-destructive/5 border-destructive/20'"
+        :class="overallHealthy ? 'bg-[var(--semantic-success-soft)] border-[var(--semantic-success-border)]' : 'bg-[var(--semantic-danger-soft)] border-[var(--semantic-danger-border)]'"
       >
         <div 
           class="flex size-16 items-center justify-center rounded-xl shadow-lg transition-transform hover:scale-105"
-          :class="overallHealthy ? 'bg-emerald-500 text-white' : 'bg-destructive text-white'"
+          :class="overallHealthy ? 'bg-[var(--semantic-success)] text-primary-foreground' : 'bg-destructive text-primary-foreground'"
         >
           <HeartPulse class="size-8" :class="{ 'animate-pulse': overallHealthy }" />
         </div>
         
         <div class="flex-1 text-center sm:text-left space-y-1">
           <h3 class="text-2xl font-black uppercase tracking-normal">
-            {{ t('admin.health.overallStatus') }}: <span :class="overallHealthy ? 'text-emerald-500' : 'text-destructive'">{{ health.status }}</span>
+            {{ t('admin.health.overallStatus') }}: <span :class="overallHealthy ? 'text-[var(--semantic-success)]' : 'text-destructive'">{{ health.status }}</span>
           </h3>
           <p class="text-sm text-muted-foreground max-w-lg">
             {{ overallHealthy ? t('admin.health.operationalDescription') : t('admin.health.degradedDescription') }}
@@ -120,7 +120,7 @@ function getServiceIcon(name: string) {
         </div>
 
         <div class="hidden lg:flex items-center gap-2">
-           <Badge variant="outline" class="bg-background/50 border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+           <Badge variant="outline" class="border-[var(--semantic-success-border)] bg-[var(--semantic-success-soft)] text-[var(--semantic-success)]">
              <CheckCircle2 class="size-3 mr-1" /> {{ health.checks.length }} {{ t('admin.health.components') }}
            </Badge>
         </div>
@@ -137,7 +137,7 @@ function getServiceIcon(name: string) {
       <Card 
         v-for="check in health.checks" 
         :key="check.name"
-        class="group overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgb(79_70_229/0.10)]"
+        class="group overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-float"
       >
         <CardHeader class="pb-3 border-b bg-muted/20">
           <div class="flex items-center justify-between">
@@ -160,7 +160,7 @@ function getServiceIcon(name: string) {
               {{ check.description }}
             </p>
             <div class="flex items-center gap-1.5 mt-2">
-              <div class="size-1.5 rounded-full" :class="check.status === 'Healthy' ? 'bg-emerald-500' : 'bg-destructive'" />
+              <div class="size-1.5 rounded-full" :class="check.status === 'Healthy' ? 'bg-[var(--semantic-success)]' : 'bg-destructive'" />
               <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
                 {{ check.status === 'Healthy' ? t('admin.health.operational') : t('admin.health.actionRequired') }}
               </span>

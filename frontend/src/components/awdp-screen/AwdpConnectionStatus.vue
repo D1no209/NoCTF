@@ -17,7 +17,7 @@ const statusView = computed(() => {
     return {
       label: t('awdpScreen.connection.live'),
       detail: formatTime(props.lastSyncAt),
-      tone: 'text-cyan-700 bg-cyan-100/50 border-cyan-300/50',
+      tone: 'text-[var(--semantic-info)] bg-[var(--semantic-info-soft)] border-[var(--semantic-info-border)]',
       icon: Wifi,
     }
   }
@@ -25,7 +25,7 @@ const statusView = computed(() => {
     return {
       label: t('awdpScreen.connection.reconnecting'),
       detail: t('awdpScreen.connection.attempt', { count: Math.max(1, props.reconnectAttempts) }),
-      tone: 'text-orange-700 bg-orange-100/50 border-orange-300/50',
+      tone: 'text-[var(--semantic-warning)] bg-[var(--semantic-warning-soft)] border-[var(--semantic-warning-border)]',
       icon: RefreshCw,
     }
   }
@@ -33,14 +33,14 @@ const statusView = computed(() => {
     return {
       label: t('awdpScreen.connection.connecting'),
       detail: t('awdpScreen.connection.openingStream'),
-      tone: 'text-slate-700 bg-slate-100/50 border-slate-300/40',
+      tone: 'text-[var(--semantic-neutral)] bg-[var(--semantic-neutral-soft)] border-[var(--awdp-border)]',
       icon: RefreshCw,
     }
   }
   return {
     label: t('awdpScreen.connection.offline'),
     detail: t('awdpScreen.connection.snapshotOnly'),
-    tone: 'text-rose-700 bg-rose-100/50 border-rose-300/50',
+    tone: 'text-[var(--semantic-danger)] bg-[var(--semantic-danger-soft)] border-[var(--semantic-danger-border)]',
     icon: WifiOff,
   }
 })

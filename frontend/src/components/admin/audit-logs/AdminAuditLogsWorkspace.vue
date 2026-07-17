@@ -150,7 +150,7 @@ const columns = [
       return h('div', { class: 'flex items-center justify-center' }, [
         val 
           ? h(ShieldAlert, { class: 'size-4 text-destructive' }) 
-          : h(CheckCircle2, { class: 'size-4 text-green-500' })
+          : h(CheckCircle2, { class: 'size-4 text-[var(--semantic-success)]' })
       ])
     },
   }),

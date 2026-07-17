@@ -26,9 +26,9 @@ const progress = computed(() =>
 )
 
 const progressColor = computed(() => {
-  if (progress.value > 50) return 'bg-green-500'
-  if (progress.value > 20) return 'bg-yellow-500'
-  return 'bg-red-500'
+  if (progress.value > 50) return 'bg-[var(--semantic-success)]'
+  if (progress.value > 20) return 'bg-[var(--semantic-warning)]'
+  return 'bg-[var(--semantic-danger)]'
 })
 
 function formatTime(seconds: number) {

@@ -110,17 +110,17 @@ function formatJson(json?: string) {
             <div class="flex items-center justify-between px-1">
               <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">{{ t('admin.auditLogs.diff') }}</span>
             </div>
-            <pre class="max-h-60 overflow-auto rounded-xl border bg-zinc-950 p-4 font-mono text-[11px] text-emerald-400 shadow-inner">{{ formatJson(selectedLog.diff) }}</pre>
+            <pre class="max-h-60 overflow-auto rounded-xl border bg-[var(--awdp-surface-deep)] p-4 font-mono text-[11px] text-[var(--semantic-success)] shadow-inner">{{ formatJson(selectedLog.diff) }}</pre>
           </div>
 
           <div v-if="selectedLog.newValues" class="space-y-2">
             <span class="px-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">{{ t('admin.auditLogs.newValues') }}</span>
-            <pre class="max-h-60 overflow-auto rounded-xl border bg-zinc-950 p-4 font-mono text-[11px] text-blue-400 shadow-inner">{{ formatJson(selectedLog.newValues) }}</pre>
+            <pre class="max-h-60 overflow-auto rounded-xl border bg-[var(--awdp-surface-deep)] p-4 font-mono text-[11px] text-[var(--semantic-info)] shadow-inner">{{ formatJson(selectedLog.newValues) }}</pre>
           </div>
 
           <div v-if="selectedLog.oldValues" class="space-y-2">
             <span class="px-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">{{ t('admin.auditLogs.oldValues') }}</span>
-            <pre class="max-h-60 overflow-auto rounded-xl border bg-zinc-950 p-4 font-mono text-[11px] text-rose-400 shadow-inner">{{ formatJson(selectedLog.oldValues) }}</pre>
+            <pre class="max-h-60 overflow-auto rounded-xl border bg-[var(--awdp-surface-deep)] p-4 font-mono text-[11px] text-[var(--semantic-danger)] shadow-inner">{{ formatJson(selectedLog.oldValues) }}</pre>
           </div>
         </div>
       </div>

@@ -63,7 +63,7 @@ const cells = computed(() => {
         :y="cell.y"
         :width="CELL"
         :height="CELL"
-        fill="black"
+        fill="var(--card-decoration)"
         :fill-opacity="cell.opacity"
       />
     </svg>

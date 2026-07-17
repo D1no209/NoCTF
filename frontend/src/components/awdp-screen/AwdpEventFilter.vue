@@ -35,8 +35,8 @@ function select(key: string) {
       type="button"
       class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide transition-colors"
       :class="model === item.key
-        ? 'border-cyan-500/40 bg-cyan-100/40 text-cyan-800'
-        : 'border-slate-300/60 bg-white/60 text-slate-600 hover:border-slate-400/80 hover:text-slate-800'"
+        ? 'border-[var(--semantic-info-border)] bg-[var(--semantic-info-soft)] text-[var(--semantic-info)]'
+        : 'border-[var(--awdp-border)] bg-[var(--awdp-surface)] text-[var(--awdp-text-muted)] hover:border-[var(--semantic-neutral)] hover:text-[var(--awdp-text)]'"
       @click="select(item.key)"
     >
       <component :is="item.icon" class="size-3" />

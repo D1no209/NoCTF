@@ -15,14 +15,14 @@ const sortedChallenges = computed(() => [...props.challenges].sort((a, b) => b.a
 
 function categoryClass(category: AwdpChallengeCategory) {
   if (category === 'web')
-    return 'text-cyan-100 bg-cyan-300/10 border-cyan-300/20'
+    return 'text-[var(--awdp-category-web)] bg-[var(--semantic-info-soft)] border-[var(--semantic-info-border)]'
   if (category === 'pwn')
-    return 'text-orange-100 bg-orange-300/10 border-orange-300/20'
+    return 'text-[var(--awdp-category-pwn)] bg-[var(--semantic-danger-soft)] border-[var(--semantic-danger-border)]'
   if (category === 'crypto')
-    return 'text-emerald-100 bg-emerald-300/10 border-emerald-300/20'
+    return 'text-[var(--awdp-category-crypto)] bg-[var(--semantic-neutral-soft)] border-[var(--awdp-border)]'
   if (category === 'reverse')
-    return 'text-violet-100 bg-violet-300/10 border-violet-300/20'
-  return 'text-slate-100 bg-slate-300/10 border-slate-300/20'
+    return 'text-[var(--awdp-category-reverse)] bg-[var(--semantic-success-soft)] border-[var(--semantic-success-border)]'
+  return 'text-[var(--awdp-category-misc)] bg-[var(--semantic-warning-soft)] border-[var(--semantic-warning-border)]'
 }
 
 function formatTime(value?: string) {
@@ -37,19 +37,19 @@ function formatTime(value?: string) {
 
 <template>
   <Panel variant="dark" class="flex min-h-0 flex-col">
-    <div class="flex items-center justify-between border-b border-slate-200/10 px-4 py-3">
+    <div class="flex items-center justify-between border-b border-[var(--awdp-border)] px-4 py-3">
       <div>
-        <h2 class="text-sm font-semibold uppercase text-slate-100">
+        <h2 class="text-sm font-semibold uppercase text-[var(--awdp-text-inverse)]">
           {{ t('awdpScreen.matrix.title') }}
         </h2>
-        <p class="text-xs text-slate-500">
+        <p class="text-xs text-[var(--awdp-text-muted)]">
           {{ t('awdpScreen.matrix.subtitle') }}
         </p>
       </div>
-      <Blocks class="size-5 text-cyan-100" />
+      <Blocks class="size-5 text-[var(--semantic-info)]" />
     </div>
 
-    <div v-if="sortedChallenges.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-500">
+    <div v-if="sortedChallenges.length === 0" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-[var(--awdp-text-muted)]">
       {{ t('awdpScreen.matrix.empty') }}
     </div>
 
@@ -58,14 +58,14 @@ function formatTime(value?: string) {
         <article
           v-for="challenge in sortedChallenges"
           :key="challenge.challengeId"
-          class="rounded-lg border border-slate-300/10 bg-slate-950/46 p-3"
+          class="rounded-lg border border-[var(--awdp-border)] bg-[var(--awdp-surface-deep)] p-3"
         >
           <div class="mb-2 flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <h3 class="truncate text-sm font-semibold text-slate-100">
+              <h3 class="truncate text-sm font-semibold text-[var(--awdp-text-inverse)]">
                 {{ challenge.challengeName }}
               </h3>
-              <p class="mt-1 text-[11px] text-slate-500">
+              <p class="mt-1 text-[11px] text-[var(--awdp-text-muted)]">
                 {{ t('awdpScreen.matrix.lastPrefix', { time: formatTime(challenge.lastEventAt) }) }}
               </p>
             </div>
@@ -75,34 +75,34 @@ function formatTime(value?: string) {
           </div>
 
           <div class="mb-3">
-            <div class="mb-1 flex justify-between text-[11px] text-slate-500">
+            <div class="mb-1 flex justify-between text-[11px] text-[var(--awdp-text-muted)]">
               <span>{{ t('awdpScreen.matrix.attackHeat') }}</span>
               <span class="font-mono">{{ challenge.attackHeat }}</span>
             </div>
-            <div class="h-1.5 overflow-hidden rounded-full bg-slate-800">
+            <div class="h-1.5 overflow-hidden rounded-full bg-[var(--awdp-surface-muted)]">
               <div
-                class="h-full rounded-full bg-cyan-200 transition-[width] duration-300"
+                class="h-full rounded-full bg-[var(--semantic-info)] transition-[width] duration-300"
                 :style="{ width: `${Math.min(100, challenge.attackHeat)}%` }"
               />
             </div>
           </div>
 
           <div class="grid grid-cols-4 gap-2 text-center">
-            <div class="rounded-[0.45rem] border border-slate-400/12 bg-slate-900/58 px-1 py-[0.35rem]">
-              <span class="block text-[0.62rem] font-bold text-slate-500">{{ t('awdpScreen.matrix.labels.dp') }}</span>
-              <strong class="mt-[0.15rem] block font-mono text-[0.82rem] text-slate-200">{{ challenge.defensePassedCount }}</strong>
+            <div class="rounded-[0.45rem] border border-[var(--awdp-border)] bg-[var(--awdp-surface-muted)] px-1 py-[0.35rem]">
+              <span class="block text-[0.62rem] font-bold text-[var(--awdp-text-muted)]">{{ t('awdpScreen.matrix.labels.dp') }}</span>
+              <strong class="mt-[0.15rem] block font-mono text-[0.82rem] text-[var(--awdp-text-inverse)]">{{ challenge.defensePassedCount }}</strong>
             </div>
-            <div class="rounded-[0.45rem] border border-slate-400/12 bg-slate-900/58 px-1 py-[0.35rem]">
-              <span class="block text-[0.62rem] font-bold text-slate-500">{{ t('awdpScreen.matrix.labels.df') }}</span>
-              <strong class="mt-[0.15rem] block font-mono text-[0.82rem] text-slate-200">{{ challenge.defenseFailedCount }}</strong>
+            <div class="rounded-[0.45rem] border border-[var(--awdp-border)] bg-[var(--awdp-surface-muted)] px-1 py-[0.35rem]">
+              <span class="block text-[0.62rem] font-bold text-[var(--awdp-text-muted)]">{{ t('awdpScreen.matrix.labels.df') }}</span>
+              <strong class="mt-[0.15rem] block font-mono text-[0.82rem] text-[var(--awdp-text-inverse)]">{{ challenge.defenseFailedCount }}</strong>
             </div>
-            <div class="rounded-[0.45rem] border border-slate-400/12 bg-slate-900/58 px-1 py-[0.35rem]">
-              <span class="block text-[0.62rem] font-bold text-slate-500">{{ t('awdpScreen.matrix.labels.ins') }}</span>
-              <strong class="mt-[0.15rem] block font-mono text-[0.82rem] text-slate-200">{{ challenge.instanceCount }}</strong>
+            <div class="rounded-[0.45rem] border border-[var(--awdp-border)] bg-[var(--awdp-surface-muted)] px-1 py-[0.35rem]">
+              <span class="block text-[0.62rem] font-bold text-[var(--awdp-text-muted)]">{{ t('awdpScreen.matrix.labels.ins') }}</span>
+              <strong class="mt-[0.15rem] block font-mono text-[0.82rem] text-[var(--awdp-text-inverse)]">{{ challenge.instanceCount }}</strong>
             </div>
-            <div class="rounded-[0.45rem] border border-slate-400/12 bg-slate-900/58 px-1 py-[0.35rem]">
-              <span class="block text-[0.62rem] font-bold text-slate-500">{{ t('awdpScreen.matrix.labels.act') }}</span>
-              <strong class="mt-[0.15rem] block font-mono text-[0.82rem] text-slate-200">{{ challenge.activeTeamCount }}</strong>
+            <div class="rounded-[0.45rem] border border-[var(--awdp-border)] bg-[var(--awdp-surface-muted)] px-1 py-[0.35rem]">
+              <span class="block text-[0.62rem] font-bold text-[var(--awdp-text-muted)]">{{ t('awdpScreen.matrix.labels.act') }}</span>
+              <strong class="mt-[0.15rem] block font-mono text-[0.82rem] text-[var(--awdp-text-inverse)]">{{ challenge.activeTeamCount }}</strong>
             </div>
           </div>
         </article>

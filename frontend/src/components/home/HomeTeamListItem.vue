@@ -31,8 +31,8 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
       class="flex h-full min-h-[inherit] items-center justify-between gap-4 px-4 py-3"
     >
       <div class="min-w-0">
-        <div class="truncate font-semibold text-black">{{ team.name }}</div>
-        <div class="mt-1 truncate text-xs text-zinc-600">{{ team.competitionTitle }}</div>
+        <div class="truncate font-semibold text-foreground">{{ team.name }}</div>
+        <div class="mt-1 truncate text-xs text-muted-foreground">{{ team.competitionTitle }}</div>
       </div>
       <Badge :variant="statusVariant(team.registrationStatus)">{{ team.registrationStatus }}</Badge>
     </RouterLink>

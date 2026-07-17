@@ -43,51 +43,51 @@ function goBack() {
           <span class="hidden sm:inline">{{ t('nav.back') }}</span>
         </Button>
 
-        <div class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-cyan-600/25 bg-cyan-100/40 text-cyan-700">
+        <div class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--semantic-info-border)] bg-[var(--semantic-info-soft)] text-[var(--semantic-info)]">
           <Activity class="size-5" />
         </div>
         <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase text-cyan-800/70">
+          <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase text-[var(--semantic-info)]">
             <span>{{ t('awdpScreen.headerTitle') }}</span>
-            <span class="rounded border border-cyan-600/25 px-2 py-0.5 text-cyan-900">{{ statusLabel }}</span>
-            <span class="rounded border border-slate-400/25 px-2 py-0.5 text-slate-700">{{ phaseLabel }}</span>
+            <span class="rounded border border-[var(--semantic-info-border)] px-2 py-0.5 text-[var(--semantic-info)]">{{ statusLabel }}</span>
+            <span class="rounded border border-[var(--awdp-border)] px-2 py-0.5 text-[var(--awdp-text-muted)]">{{ phaseLabel }}</span>
           </div>
-          <h1 class="mt-1 truncate text-xl font-semibold text-slate-900">
+          <h1 class="mt-1 truncate text-xl font-semibold text-[var(--awdp-text)]">
             {{ game.title }}
           </h1>
         </div>
       </div>
 
       <div class="grid grid-cols-4 gap-2">
-        <div class="grid min-h-12 grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 rounded-lg border border-slate-300/60 bg-white/60 px-[0.65rem] py-[0.42rem]">
-          <Clock3 class="row-span-2 size-4 text-cyan-600" />
-          <span class="text-[0.68rem] font-bold uppercase text-slate-500/80">{{ t('awdpScreen.metrics.round') }}</span>
-          <strong class="font-mono text-base text-slate-900">{{ game.currentRound }} / {{ game.totalRounds }}</strong>
+        <div class="grid min-h-12 grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 rounded-lg border border-[var(--awdp-border)] bg-[var(--awdp-surface)] px-[0.65rem] py-[0.42rem]">
+          <Clock3 class="row-span-2 size-4 text-[var(--semantic-info)]" />
+          <span class="text-[0.68rem] font-bold uppercase text-[var(--awdp-text-muted)]">{{ t('awdpScreen.metrics.round') }}</span>
+          <strong class="font-mono text-base text-[var(--awdp-text)]">{{ game.currentRound }} / {{ game.totalRounds }}</strong>
         </div>
-        <div class="grid min-h-12 grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 rounded-lg border border-slate-300/60 bg-white/60 px-[0.65rem] py-[0.42rem]">
-          <Users class="row-span-2 size-4 text-cyan-600" />
-          <span class="text-[0.68rem] font-bold uppercase text-slate-500/80">{{ t('awdpScreen.metrics.teams') }}</span>
-          <strong class="font-mono text-base text-slate-900">{{ stats.teamCount }}</strong>
+        <div class="grid min-h-12 grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 rounded-lg border border-[var(--awdp-border)] bg-[var(--awdp-surface)] px-[0.65rem] py-[0.42rem]">
+          <Users class="row-span-2 size-4 text-[var(--semantic-info)]" />
+          <span class="text-[0.68rem] font-bold uppercase text-[var(--awdp-text-muted)]">{{ t('awdpScreen.metrics.teams') }}</span>
+          <strong class="font-mono text-base text-[var(--awdp-text)]">{{ stats.teamCount }}</strong>
         </div>
-        <div class="grid min-h-12 grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 rounded-lg border border-slate-300/60 bg-white/60 px-[0.65rem] py-[0.42rem]">
-          <Flag class="row-span-2 size-4 text-cyan-600" />
-          <span class="text-[0.68rem] font-bold uppercase text-slate-500/80">{{ t('awdpScreen.metrics.challenges') }}</span>
-          <strong class="font-mono text-base text-slate-900">{{ stats.challengeCount }}</strong>
+        <div class="grid min-h-12 grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 rounded-lg border border-[var(--awdp-border)] bg-[var(--awdp-surface)] px-[0.65rem] py-[0.42rem]">
+          <Flag class="row-span-2 size-4 text-[var(--semantic-info)]" />
+          <span class="text-[0.68rem] font-bold uppercase text-[var(--awdp-text-muted)]">{{ t('awdpScreen.metrics.challenges') }}</span>
+          <strong class="font-mono text-base text-[var(--awdp-text)]">{{ stats.challengeCount }}</strong>
         </div>
-        <div class="grid min-h-12 grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 rounded-lg border border-slate-300/60 bg-white/60 px-[0.65rem] py-[0.42rem]">
-          <Swords class="row-span-2 size-4 text-cyan-600" />
-          <span class="text-[0.68rem] font-bold uppercase text-slate-500/80">{{ t('awdpScreen.metrics.attack') }}</span>
-          <strong class="font-mono text-base text-slate-900">{{ stats.totalAttackCount }}</strong>
+        <div class="grid min-h-12 grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 rounded-lg border border-[var(--awdp-border)] bg-[var(--awdp-surface)] px-[0.65rem] py-[0.42rem]">
+          <Swords class="row-span-2 size-4 text-[var(--semantic-info)]" />
+          <span class="text-[0.68rem] font-bold uppercase text-[var(--awdp-text-muted)]">{{ t('awdpScreen.metrics.attack') }}</span>
+          <strong class="font-mono text-base text-[var(--awdp-text)]">{{ stats.totalAttackCount }}</strong>
         </div>
       </div>
 
       <div class="flex items-center justify-end gap-3">
-        <div class="rounded-lg border border-orange-400/30 bg-orange-100/30 px-3 py-1.5 text-right">
-          <div class="flex items-center justify-end gap-2 text-[11px] font-semibold uppercase text-orange-900/70">
+        <div class="rounded-lg border border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)] px-3 py-1.5 text-right">
+          <div class="flex items-center justify-end gap-2 text-[11px] font-semibold uppercase text-[var(--semantic-warning)]">
             <Shield class="size-3.5" />
             {{ t('awdpScreen.metrics.roundTimer') }}
           </div>
-          <div class="font-mono text-2xl font-semibold tabular-nums text-orange-900">
+          <div class="font-mono text-2xl font-semibold tabular-nums text-[var(--semantic-warning)]">
             {{ timeText }}
           </div>
         </div>
