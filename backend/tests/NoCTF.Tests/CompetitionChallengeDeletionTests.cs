@@ -11,6 +11,56 @@ namespace NoCTF.Tests;
 public class CompetitionChallengeDeletionTests
 {
     [Fact]
+    public async Task CleanupCompetitionAsync_PersistsTrackedRuntimeRemovalsBeforeBulkDeletion()
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSharedInMemoryServiceProvider()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using (var db = new ApplicationDbContext(options, new FixedTenantContext(competitionId)))
+        {
+            db.AwdGameBoxes.Add(new AwdGameBox
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                ChallengeId = challengeId,
+                ProviderType = "docker",
+                CreatedAt = DateTime.UtcNow
+            });
+            db.TeamChallengeInstances.Add(new TeamChallengeInstance
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                ChallengeId = challengeId,
+                Status = PenetrationInstanceStatus.Stopped,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+
+            await ContainerCleanupRuntime.CleanupCompetitionAsync(
+                db,
+                new RecordingContainerManager(),
+                new RecordingExecutionLease(),
+                competitionId,
+                httpContext: null,
+                userId: null,
+                reason: "competition_deleted",
+                CancellationToken.None);
+        }
+
+        await using var verificationDb = new ApplicationDbContext(options, new FixedTenantContext(competitionId));
+        Assert.Empty(await verificationDb.AwdGameBoxes.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await verificationDb.TeamChallengeInstances.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
     public async Task DeleteChallengeArtifactsAsync_CleansScoresFlagsAndRunningInstances()
     {
         var competitionId = Guid.NewGuid();

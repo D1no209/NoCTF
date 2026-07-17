@@ -179,6 +179,11 @@ internal static class ContainerCleanupRuntime
             .Where(f => f.CompetitionId == competitionId && (!teamId.HasValue || f.TeamId == teamId.Value))
             .ToListAsync(ct);
         db.DynamicFlagInstances.RemoveRange(penetrationDynamicFlags);
+
+        // Persist the runtime cleanup before callers execute bulk artifact deletes. ExecuteDelete does not
+        // synchronize tracked entities; leaving these rows in Deleted state makes the caller attempt to
+        // delete them a second time and raises DbUpdateConcurrencyException on relational providers.
+        await db.SaveChangesAsync(ct);
     }
 
     internal static async Task CleanupDetachedAwdpContainersAsync(
