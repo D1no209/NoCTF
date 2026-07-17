@@ -67,52 +67,56 @@ onMounted(refreshPreview)
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
+  padding: 4px 2px 0;
 }
 
 .command-page-heading h1 {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text);
   font-size: 24px;
-  font-weight: 680;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
 .command-page-heading p {
   max-width: 720px;
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text-muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .command-page-heading__actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .command-page-heading__actions > span {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--v2-surface);
+  box-shadow: var(--v2-inset);
   color: var(--v2-text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  text-transform: uppercase;
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
 }
 
 .command-dashboard {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(390px, 0.85fr);
-  gap: 12px;
-  margin-top: 12px;
+  gap: 16px;
+  margin-top: 16px;
 }
 
 .command-dashboard__primary,
 .command-dashboard__secondary {
   display: grid;
   min-width: 0;
-  gap: 12px;
+  gap: 16px;
 }
 
 .command-dashboard__primary { grid-template-rows: minmax(300px, 0.9fr) minmax(350px, 1.1fr); }
@@ -122,15 +126,15 @@ onMounted(refreshPreview)
   display: grid;
   min-height: 220px;
   place-content: center;
-  gap: 9px;
-  padding: 24px;
+  gap: 10px;
+  padding: 26px;
 }
 
 .command-preview-state h1 {
   margin: 0;
   color: var(--v2-text);
-  font-size: 16px;
-  font-weight: 650;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 @media (max-width: 1120px) {

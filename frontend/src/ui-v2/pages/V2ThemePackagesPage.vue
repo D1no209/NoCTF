@@ -54,21 +54,22 @@ function handleApply(id: string) {
   align-items: end;
   justify-content: space-between;
   gap: 24px;
+  padding: 4px 2px 0;
 }
 
 .v2-theme-packages__heading h1 {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text);
   font-size: 24px;
-  font-weight: 680;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
 .v2-theme-packages__heading p {
   max-width: 760px;
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -77,30 +78,30 @@ function handleApply(id: string) {
   min-width: 255px;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--v2-line);
-  background: rgb(11 23 48 / 0.82);
-  padding: 11px 12px;
+  border-radius: 14px;
+  background: var(--v2-surface);
+  box-shadow: var(--v2-inset);
+  padding: 12px 14px;
   color: var(--v2-primary);
 }
 
 .v2-theme-packages__active > div {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: 3px;
 }
 
 .v2-theme-packages__active span {
   color: var(--v2-text-muted);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.05em;
 }
 
 .v2-theme-packages__active strong {
   overflow: hidden;
   color: var(--v2-text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--v2-font-mono);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;

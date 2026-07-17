@@ -74,13 +74,13 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.awd-flag-console__header { display: flex; min-height: 68px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--v2-line); padding: 12px 14px; }
-.awd-flag-console__header h2 { margin: 5px 0 0; font-size: 16px; font-weight: 650; }
-.awd-flag-console__body { display: grid; gap: 12px; padding: 14px; }
-.awd-flag-console__body > p { margin: 0; color: var(--v2-text-muted); font-size: 11px; line-height: 1.55; }
-.awd-flag-console__body label { display: grid; gap: 6px; }
-.awd-flag-console__body label > span { color: var(--v2-text-faint); font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+.awd-flag-console__header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; padding: 16px 18px 8px; }
+.awd-flag-console__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
+.awd-flag-console__body { display: grid; gap: 14px; padding: 8px 18px 18px; }
+.awd-flag-console__body > p { margin: 0; color: var(--v2-text-muted); font-size: 12px; line-height: 1.55; }
+.awd-flag-console__body label { display: grid; gap: 7px; }
+.awd-flag-console__body label > span { color: var(--v2-text-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
 .awd-flag-console__body :deep(.command-button) { width: 100%; }
-.awd-flag-console__message { border-left: 2px solid var(--v2-cyan); padding-left: 9px; color: var(--v2-cyan) !important; }
-.awd-flag-console__message--danger { border-color: var(--v2-danger); color: var(--v2-danger) !important; }
+.awd-flag-console__message { margin: 0; border-radius: 12px; padding: 10px 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); color: var(--v2-cyan) !important; font-size: 12px; }
+.awd-flag-console__message--danger { color: var(--v2-danger) !important; }
 </style>

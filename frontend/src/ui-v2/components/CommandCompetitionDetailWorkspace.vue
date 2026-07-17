@@ -187,7 +187,7 @@ function formatDate(value: string | null | undefined) {
 .competition-detail,
 .competition-detail-state {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .competition-detail__heading {
@@ -195,20 +195,21 @@ function formatDate(value: string | null | undefined) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
+  padding: 4px 2px 0;
 }
 
 .competition-detail__title h1 {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text);
   font-size: 24px;
-  font-weight: 680;
+  font-weight: 600;
 }
 
 .competition-detail__title p {
   max-width: 820px;
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
 }
 
@@ -217,41 +218,42 @@ function formatDate(value: string | null | undefined) {
   flex: none;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 7px;
+  gap: 8px;
 }
 
 .competition-detail__facts {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px;
 }
 
 .competition-detail__facts > div {
   display: grid;
   min-width: 0;
-  gap: 6px;
-  border-right: 1px solid var(--v2-line);
+  gap: 7px;
+  border-radius: 12px;
   padding: 13px 15px;
+  background: var(--v2-surface);
+  box-shadow: var(--v2-inset);
 }
-
-.competition-detail__facts > div:last-child { border-right: 0; }
 
 .competition-detail__facts span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--v2-text-faint);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
 }
 
 .competition-detail__facts strong {
   overflow: hidden;
   color: var(--v2-text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  font-weight: 650;
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -260,29 +262,29 @@ function formatDate(value: string | null | undefined) {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(330px, 0.8fr);
   align-items: start;
-  gap: 12px;
+  gap: 16px;
 }
 
 .competition-detail__mode-notice {
   display: grid;
   min-height: 226px;
   align-content: center;
-  gap: 8px;
-  padding: 22px;
+  gap: 10px;
+  padding: 24px;
 }
 
 .competition-detail__mode-notice h2 {
   margin: 0;
   color: var(--v2-text);
-  font-size: 16px;
-  font-weight: 650;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .competition-detail__mode-notice p {
   max-width: 570px;
   margin: 0;
   color: var(--v2-text-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
 }
 
@@ -291,12 +293,14 @@ function formatDate(value: string | null | undefined) {
   min-height: 260px;
   grid-template-rows: 14px 30px 1fr 56px;
   gap: 14px;
-  padding: 20px;
+  padding: 22px;
 }
 
 .competition-detail-state__skeleton span {
   display: block;
-  background: var(--v2-surface-hover);
+  border-radius: 12px;
+  background: var(--v2-surface-strong);
+  box-shadow: var(--v2-inset);
   animation: detail-pulse 1.1s ease-in-out infinite alternate;
 }
 
@@ -310,21 +314,21 @@ function formatDate(value: string | null | undefined) {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 24px;
+  padding: 26px;
 }
 
 .competition-detail-state__message h1 {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text);
-  font-size: 18px;
-  font-weight: 650;
+  font-size: 19px;
+  font-weight: 600;
 }
 
 .competition-detail-state__message p {
   max-width: 650px;
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
 }
 
@@ -340,8 +344,6 @@ function formatDate(value: string | null | undefined) {
 
 @media (max-width: 1080px) {
   .competition-detail__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .competition-detail__facts > div:nth-child(2) { border-right: 0; }
-  .competition-detail__facts > div:nth-child(-n + 2) { border-bottom: 1px solid var(--v2-line); }
   .competition-detail__content { grid-template-columns: 1fr; }
 }
 
@@ -360,8 +362,5 @@ function formatDate(value: string | null | undefined) {
 
 @media (max-width: 480px) {
   .competition-detail__facts { grid-template-columns: 1fr; }
-  .competition-detail__facts > div { border-right: 0; border-bottom: 1px solid var(--v2-line); }
-  .competition-detail__facts > div:last-child { border-bottom: 0; }
-  .competition-detail__facts > div:nth-child(2) { border-bottom: 1px solid var(--v2-line); }
 }
 </style>

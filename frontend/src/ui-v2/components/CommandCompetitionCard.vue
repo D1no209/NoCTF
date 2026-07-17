@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ArrowRight, CalendarDays, UsersRound } from 'lucide-vue-next'
+import CommandBadge from '../primitives/CommandBadge.vue'
 import CommandButton from '../primitives/CommandButton.vue'
 import CommandPanel from '../primitives/CommandPanel.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
@@ -53,7 +54,7 @@ function formatDateRange(startTime: string, endTime: string) {
         <CommandSignal :label="props.competition.status" :tone="statusTone(props.competition.status)" />
         <h2>{{ props.competition.title }}</h2>
       </div>
-      <span class="competition-card__mode">{{ (props.competition.gameModeType || 'CTF').toUpperCase() }}</span>
+      <CommandBadge :label="(props.competition.gameModeType || 'CTF').toUpperCase()" tone="primary" />
     </header>
 
     <p class="competition-card__description">
@@ -87,6 +88,7 @@ function formatDateRange(startTime: string, endTime: string) {
   display: grid;
   min-height: 286px;
   grid-template-rows: auto 1fr auto auto;
+  gap: 4px;
 }
 
 .competition-card__header {
@@ -94,40 +96,28 @@ function formatDateRange(startTime: string, endTime: string) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--v2-line);
-  padding: 15px 16px;
+  padding: 18px 18px 0;
 }
 
 .competition-card__header h2 {
   display: -webkit-box;
   overflow: hidden;
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--v2-text);
-  font-size: 16px;
-  font-weight: 680;
+  font-size: 17px;
+  font-weight: 600;
   letter-spacing: 0;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-
-.competition-card__mode {
-  flex: none;
-  border: 1px solid var(--v2-line-bright);
-  padding: 4px 6px;
-  color: var(--v2-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
 }
 
 .competition-card__description {
   display: -webkit-box;
   overflow: hidden;
   margin: 0;
-  padding: 14px 16px;
+  padding: 12px 18px;
   color: var(--v2-text-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -136,19 +126,21 @@ function formatDateRange(startTime: string, endTime: string) {
 .competition-card__facts {
   display: grid;
   gap: 8px;
-  border-top: 1px solid rgb(26 58 103 / 0.7);
-  padding: 12px 16px;
+  margin: 0 18px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--v2-surface);
+  box-shadow: var(--v2-inset);
 }
 
 .competition-card__facts > div { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 10px; }
-.competition-card__facts dt { display: inline-flex; align-items: center; gap: 5px; color: var(--v2-text-faint); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.competition-card__facts dd { overflow: hidden; margin: 0; color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.competition-card__facts dt { display: inline-flex; align-items: center; gap: 5px; color: var(--v2-text-faint); font-size: 10px; font-weight: 600; letter-spacing: 0.03em; }
+.competition-card__facts dd { overflow: hidden; margin: 0; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 
 .competition-card__footer {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
-  border-top: 1px solid var(--v2-line);
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 14px 18px 18px;
 }
 </style>

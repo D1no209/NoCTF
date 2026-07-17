@@ -89,17 +89,17 @@ function uniqueBy<T, R>(items: T[], key: (item: T) => string, map: (item: T) => 
 
 <style scoped>
 .awd-service-matrix { display: flex; min-height: 0; flex-direction: column; }
-.awd-service-matrix__header { display: flex; min-height: 68px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--v2-line); padding: 12px 14px; }
-.awd-service-matrix__header h2 { margin: 5px 0 0; font-size: 16px; font-weight: 650; }
-.awd-service-matrix__viewport { overflow-x: auto; }
-.awd-service-matrix__table { display: grid; min-width: 420px; }
+.awd-service-matrix__header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; padding: 16px 18px 8px; }
+.awd-service-matrix__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
+.awd-service-matrix__viewport { overflow-x: auto; padding: 4px 18px 18px; }
+.awd-service-matrix__table { display: grid; min-width: 420px; row-gap: 8px; }
 .awd-service-matrix__label,
 .awd-service-matrix__team,
-.awd-service-matrix__cell { display: flex; min-width: 0; align-items: center; border-right: 1px solid rgb(26 58 103 / 0.65); border-bottom: 1px solid rgb(26 58 103 / 0.65); padding: 0 10px; }
-.awd-service-matrix__label { min-height: 34px; justify-content: center; overflow: hidden; color: var(--v2-text-faint); font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-align: center; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.awd-service-matrix__cell { display: flex; min-width: 0; align-items: center; padding: 0 10px; }
+.awd-service-matrix__label { min-height: 30px; justify-content: center; overflow: hidden; color: var(--v2-text-faint); font-size: 10px; font-weight: 600; letter-spacing: 0.03em; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .awd-service-matrix__label:first-child { justify-content: flex-start; }
-.awd-service-matrix__team { min-height: 42px; overflow: hidden; color: var(--v2-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.awd-service-matrix__team { min-height: 42px; overflow: hidden; border-radius: 10px; color: var(--v2-text); background: var(--v2-surface); box-shadow: var(--v2-inset); font-family: var(--v2-font-mono); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .awd-service-matrix__cell { min-height: 42px; justify-content: center; padding: 0 5px; }
-.awd-service-matrix__cell :deep(.command-signal) { font-size: 9px; letter-spacing: 0.05em; }
-.awd-service-matrix__empty { display: grid; min-height: 220px; place-items: center; padding: 18px; color: var(--v2-text-muted); font-size: 12px; }
+.awd-service-matrix__cell :deep(.command-signal) { font-size: 9px; }
+.awd-service-matrix__empty { display: grid; min-height: 220px; place-items: center; padding: 18px; color: var(--v2-text-muted); font-size: 13px; }
 </style>

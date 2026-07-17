@@ -4,15 +4,18 @@ import { cn } from '@/lib/utils'
 
 const props = withDefaults(defineProps<{
   tone?: 'default' | 'primary' | 'signal' | 'warning'
+  inset?: boolean
   class?: HTMLAttributes['class']
 }>(), {
   tone: 'default',
+  inset: false,
 })
 </script>
 
 <template>
   <section
-    :class="cn('command-panel', `command-panel--${props.tone}`, props.class)"
+    :class="cn('command-panel', props.inset && 'command-panel--inset', props.class)"
+    :data-tone="props.tone"
   >
     <slot />
   </section>
@@ -22,26 +25,13 @@ const props = withDefaults(defineProps<{
 .command-panel {
   position: relative;
   min-width: 0;
-  border: 1px solid var(--v2-line);
+  border: 0;
+  border-radius: 16px;
   background: var(--v2-surface);
-  box-shadow: 0 10px 24px var(--v2-shadow);
+  box-shadow: var(--v2-raised-lg);
 }
 
-.command-panel::before {
-  position: absolute;
-  top: -1px;
-  left: -1px;
-  width: 42px;
-  height: 2px;
-  content: "";
-  background: var(--v2-line-bright);
-}
-
-.command-panel--signal::before {
-  background: var(--v2-cyan);
-}
-
-.command-panel--warning::before {
-  background: var(--v2-warning);
+.command-panel--inset {
+  box-shadow: var(--v2-inset);
 }
 </style>

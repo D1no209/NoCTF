@@ -30,7 +30,7 @@ function returnToCompetitions() {
 
 <style scoped>
 .route-mismatch__panel { display: grid; min-height: 220px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 24px; }
-.route-mismatch__panel h1 { margin: 7px 0 0; color: var(--v2-text); font-size: 18px; font-weight: 650; }
-.route-mismatch__panel p { margin: 7px 0 0; color: var(--v2-text-muted); font-size: 12px; }
+.route-mismatch__panel h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 18px; font-weight: 600; }
+.route-mismatch__panel p { margin: 8px 0 0; color: var(--v2-text-muted); font-size: 13px; }
 @media (max-width: 600px) { .route-mismatch__panel { grid-template-columns: auto minmax(0, 1fr); } .route-mismatch__panel :deep(.command-button) { grid-column: 2; justify-self: start; } }
 </style>

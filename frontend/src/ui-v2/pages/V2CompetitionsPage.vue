@@ -98,15 +98,14 @@ function registerForCompetition(id: string) {
 
 <style scoped>
 .v2-competitions { display: grid; gap: 18px; }
-.v2-competitions__heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
-.v2-competitions__heading h1 { margin: 7px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 680; letter-spacing: 0; }
-.v2-competitions__heading p { margin: 7px 0 0; color: var(--v2-text-muted); font-size: 12px; }
-.v2-competitions__count { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 8px; border-left: 1px solid var(--v2-line); padding-left: 13px; color: var(--v2-primary); }
-.v2-competitions__count strong { color: var(--v2-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; line-height: 1; }
-.v2-competitions__count span { grid-column: 2; color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.v2-competitions__heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 4px 2px 0; }
+.v2-competitions__heading h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; letter-spacing: 0; }
+.v2-competitions__heading p { margin: 8px 0 0; color: var(--v2-text-muted); font-size: 13px; }
+.v2-competitions__count { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 9px; border-radius: 12px; padding: 10px 14px; background: var(--v2-surface); box-shadow: var(--v2-inset); color: var(--v2-primary); }
+.v2-competitions__count strong { color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 22px; line-height: 1; }
+.v2-competitions__count span { grid-column: 2; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 10px; font-weight: 600; }
 
 @media (max-width: 560px) {
   .v2-competitions__heading { align-items: flex-start; flex-direction: column; }
-  .v2-competitions__count { border-left: 0; padding-left: 0; }
 }
 </style>

@@ -72,30 +72,30 @@ function trendTone(trend: AwdpTeamScore['trend']) {
 
 <style scoped>
 .awdp-scoreboard { display: flex; min-height: 0; flex-direction: column; }
-.awdp-scoreboard__header { display: flex; min-height: 68px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--v2-line); padding: 12px 14px; }
-.awdp-scoreboard__header h2 { margin: 5px 0 0; font-size: 16px; font-weight: 650; }
+.awdp-scoreboard__header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; padding: 16px 18px 8px; }
+.awdp-scoreboard__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
 .awdp-scoreboard__labels,
 .awdp-scoreboard__row { display: grid; grid-template-columns: 42px minmax(112px, 1fr) 58px 58px 76px; align-items: center; gap: 8px; }
-.awdp-scoreboard__labels { min-height: 32px; border-bottom: 1px solid rgb(26 58 103 / 0.72); padding: 0 14px; color: var(--v2-text-faint); font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.awdp-scoreboard__labels { min-height: 32px; padding: 0 18px; color: var(--v2-text-faint); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
 .awdp-scoreboard__labels span:not(:nth-child(2)) { text-align: right; }
-.awdp-scoreboard__rows { padding: 0 14px; }
-.awdp-scoreboard__row { min-height: 48px; border-bottom: 1px solid rgb(26 58 103 / 0.62); color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
-.awdp-scoreboard__row:last-child { border-bottom: 0; }
+.awdp-scoreboard__rows { padding: 0 18px 12px; }
+.awdp-scoreboard__row { min-height: 50px; box-shadow: inset 0 -2px 0 rgb(184 188 194 / 0.5), inset 0 -1px 0 rgb(255 255 255 / 0.85); color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 12px; }
+.awdp-scoreboard__row:last-child { box-shadow: none; }
 .awdp-scoreboard__row > *:not(:nth-child(2)) { text-align: right; }
 .awdp-scoreboard__row > strong { color: var(--v2-text-faint); font-weight: 600; }
 .awdp-scoreboard__leader { color: var(--v2-warning) !important; }
-.awdp-scoreboard__team { display: flex; min-width: 0; align-items: center; gap: 5px; color: var(--v2-text); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-weight: 650; }
+.awdp-scoreboard__team { display: flex; min-width: 0; align-items: center; gap: 6px; color: var(--v2-text); font-family: var(--v2-font-sans); font-weight: 600; }
 .awdp-scoreboard__team span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.awdp-scoreboard__team i { width: 5px; height: 5px; flex: none; background: var(--v2-text-faint); }
-.awdp-scoreboard__team .awdp-scoreboard__active { background: var(--v2-cyan); box-shadow: 0 0 8px var(--v2-cyan); }
+.awdp-scoreboard__team i { width: 6px; height: 6px; flex: none; border-radius: 999px; background: var(--v2-text-faint); }
+.awdp-scoreboard__team .awdp-scoreboard__active { background: var(--v2-cyan); }
 .awdp-scoreboard__trend--success { color: var(--v2-cyan); }
 .awdp-scoreboard__trend--danger { color: var(--v2-danger); }
 .awdp-scoreboard__trend--info { color: var(--v2-text-faint); }
-.awdp-scoreboard__score { display: grid; justify-items: end; gap: 4px; }
+.awdp-scoreboard__score { display: grid; justify-items: end; gap: 5px; }
 .awdp-scoreboard__score b { color: var(--v2-cyan); font-weight: 700; }
-.awdp-scoreboard__score i { display: block; width: 100%; height: 2px; overflow: hidden; background: var(--v2-surface-hover); }
-.awdp-scoreboard__score i span { display: block; height: 100%; background: var(--v2-cyan); }
-.awdp-scoreboard__empty { display: grid; min-height: 180px; place-items: center; padding: 18px; color: var(--v2-text-muted); font-size: 12px; }
+.awdp-scoreboard__score i { display: block; width: 100%; height: 6px; overflow: hidden; border-radius: 999px; background: var(--v2-surface-strong); box-shadow: var(--v2-inset); }
+.awdp-scoreboard__score i span { display: block; height: 100%; border-radius: 999px; background: var(--v2-cyan); }
+.awdp-scoreboard__empty { display: grid; min-height: 180px; place-items: center; padding: 18px; color: var(--v2-text-muted); font-size: 13px; }
 
 @media (max-width: 620px) {
   .awdp-scoreboard__labels,

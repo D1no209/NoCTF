@@ -27,21 +27,25 @@ const icons = [Activity, UsersRound, Flag, AlertTriangle]
 .metric-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 .metric-strip__item {
   display: flex;
-  min-height: 100px;
+  min-height: 104px;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
+  gap: 14px;
+  padding: 18px;
 }
 
 .metric-strip__icon {
-  width: 18px;
-  height: 18px;
-  margin-top: 3px;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 999px;
+  padding: 8px;
+  background: var(--v2-surface);
+  box-shadow: var(--v2-inset);
   color: var(--v2-primary);
 }
 
@@ -51,7 +55,7 @@ const icons = [Activity, UsersRound, Flag, AlertTriangle]
 
 .metric-strip__body {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -61,13 +65,12 @@ const icons = [Activity, UsersRound, Flag, AlertTriangle]
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .metric-strip__body strong {
   color: var(--v2-text);
   font-size: 28px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: 0;
 }

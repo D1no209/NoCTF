@@ -18,26 +18,31 @@ const props = withDefaults(defineProps<{
 .command-signal {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 11px;
+  background: var(--v2-surface);
+  box-shadow: var(--v2-inset);
   color: var(--v2-text-muted);
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .command-signal i {
-  width: 6px;
-  height: 6px;
-  background: var(--v2-primary);
-  box-shadow: 0 0 10px currentColor;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--v2-info);
 }
 
-.command-signal--info { color: var(--v2-primary); }
+.command-signal--info { color: var(--v2-info); }
 .command-signal--success { color: var(--v2-cyan); }
 .command-signal--warning { color: var(--v2-warning); }
 .command-signal--danger { color: var(--v2-danger); }
-.command-signal--info i { background: var(--v2-primary); }
+.command-signal--info i { background: var(--v2-info); }
 .command-signal--success i { background: var(--v2-cyan); }
 .command-signal--warning i { background: var(--v2-warning); }
 .command-signal--danger i { background: var(--v2-danger); }

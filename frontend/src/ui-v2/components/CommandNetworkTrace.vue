@@ -43,28 +43,28 @@ defineProps<{
 
 <style scoped>
 .network-trace { display: flex; min-height: 300px; flex-direction: column; }
-.network-trace__header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--v2-line); padding: 14px 16px; }
-.network-trace__header h2 { margin: 5px 0 0; font-size: 16px; font-weight: 650; }
-.network-trace__canvas { position: relative; min-height: 230px; flex: 1; overflow: hidden; background-image: linear-gradient(90deg, rgb(47 140 255 / 0.05) 1px, transparent 1px), linear-gradient(rgb(47 140 255 / 0.05) 1px, transparent 1px); background-size: 18px 18px; }
-.network-trace__line { position: absolute; display: block; height: 1px; transform-origin: left; background: var(--v2-line-bright); opacity: 0.72; }
+.network-trace__header { display: flex; min-height: 76px; align-items: center; justify-content: space-between; padding: 16px 18px 10px; }
+.network-trace__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
+.network-trace__canvas { position: relative; min-height: 230px; flex: 1; overflow: hidden; margin: 0 18px; border-radius: 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
+.network-trace__line { position: absolute; display: block; height: 2px; border-radius: 999px; transform-origin: left; background: var(--v2-info); opacity: 0.55; }
 .network-trace__line--one { top: 50%; left: 25%; width: 34%; transform: rotate(-28deg); }
 .network-trace__line--two { top: 50%; left: 25%; width: 34%; transform: rotate(31deg); background: var(--v2-cyan); }
 .network-trace__line--three { top: 50%; left: 25%; width: 24%; transform: rotate(2deg); background: var(--v2-magenta); }
-.network-trace__node { position: absolute; display: grid; min-width: 72px; place-items: center; gap: 5px; color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
-.network-trace__node i { width: 11px; height: 11px; border: 2px solid var(--v2-primary); background: var(--v2-canvas); box-shadow: 0 0 14px rgb(47 140 255 / 0.72); }
+.network-trace__node { position: absolute; display: grid; min-width: 72px; place-items: center; gap: 5px; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 10px; }
+.network-trace__node i { width: 12px; height: 12px; border-radius: 999px; background: var(--v2-info); box-shadow: var(--v2-raised-sm); }
 .network-trace__node small { font-size: 9px; }
-.network-trace__node--origin { top: calc(50% - 25px); left: 17%; width: 48px; min-width: 48px; height: 48px; border: 1px solid var(--v2-cyan); color: var(--v2-cyan); background: rgb(34 245 199 / 0.08); }
+.network-trace__node--origin { top: calc(50% - 25px); left: 17%; width: 48px; min-width: 48px; height: 48px; border-radius: 999px; place-items: center; color: var(--v2-cyan); background: var(--v2-surface); box-shadow: var(--v2-raised); }
 .network-trace__node--1 { top: 14%; left: 59%; }
 .network-trace__node--2 { top: 47%; left: 58%; }
 .network-trace__node--3 { top: 65%; left: 70%; }
 .network-trace__node--4 { top: 16%; left: 82%; }
 .network-trace__node--stable { color: var(--v2-cyan); }
-.network-trace__node--stable i { border-color: var(--v2-cyan); box-shadow: 0 0 14px rgb(34 245 199 / 0.72); }
+.network-trace__node--stable i { background: var(--v2-cyan); }
 .network-trace__node--degraded { color: var(--v2-warning); }
-.network-trace__node--degraded i { border-color: var(--v2-warning); box-shadow: 0 0 14px rgb(255 209 102 / 0.72); }
+.network-trace__node--degraded i { background: var(--v2-warning); }
 .network-trace__node--critical { color: var(--v2-danger); }
-.network-trace__node--critical i { border-color: var(--v2-danger); box-shadow: 0 0 14px rgb(255 84 112 / 0.72); }
-.network-trace__footer { display: flex; flex-wrap: wrap; gap: 12px 20px; border-top: 1px solid var(--v2-line); padding: 10px 16px; color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; text-transform: uppercase; }
+.network-trace__node--critical i { background: var(--v2-danger); }
+.network-trace__footer { display: flex; flex-wrap: wrap; gap: 12px 20px; padding: 14px 18px 16px; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
 .network-trace__danger { color: var(--v2-danger); }
 
 @media (max-width: 560px) {

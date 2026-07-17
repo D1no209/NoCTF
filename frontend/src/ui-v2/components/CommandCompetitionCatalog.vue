@@ -125,43 +125,45 @@ const modeOptions: CommandSelectOption[] = [
 </template>
 
 <style scoped>
-.competition-catalog { display: grid; gap: 12px; }
+.competition-catalog { display: grid; gap: 16px; }
 
 .competition-catalog__filters {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px 150px 34px;
+  grid-template-columns: minmax(0, 1fr) 180px 160px 38px;
   align-items: center;
-  gap: 8px;
-  padding: 10px;
+  gap: 10px;
+  padding: 14px;
 }
 
 .competition-catalog__search { position: relative; min-width: 0; }
-.competition-catalog__search > svg { position: absolute; z-index: 1; top: 10px; left: 10px; color: var(--v2-text-faint); pointer-events: none; }
-.competition-catalog__search :deep(.command-input) { padding-left: 32px; }
-.competition-catalog__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.competition-catalog__search > svg { position: absolute; z-index: 1; top: 11px; left: 12px; color: var(--v2-text-faint); pointer-events: none; }
+.competition-catalog__search :deep(.command-input) { padding-left: 34px; }
+.competition-catalog__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 
 .competition-catalog__skeleton {
   display: grid;
   min-height: 286px;
   grid-template-rows: 56px 1fr 52px 54px;
   gap: 14px;
-  padding: 16px;
+  padding: 18px;
 }
 
 .competition-catalog__skeleton span {
   display: block;
-  background: linear-gradient(90deg, var(--v2-surface) 0%, var(--v2-surface-hover) 50%, var(--v2-surface) 100%);
-  background-size: 200% 100%;
-  animation: command-skeleton 1.3s linear infinite;
+  border-radius: 12px;
+  background: var(--v2-surface-strong);
+  box-shadow: var(--v2-inset);
+  animation: command-skeleton 1.4s ease-in-out infinite alternate;
 }
 
 .competition-catalog__skeleton span:nth-child(3) { width: 74%; }
-.competition-catalog__state { display: grid; min-height: 180px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 24px; }
-.competition-catalog__state h2 { margin: 5px 0 0; color: var(--v2-text); font-size: 16px; font-weight: 650; }
-.competition-catalog__state p { margin: 5px 0 0; color: var(--v2-text-muted); font-size: 12px; }
+.competition-catalog__state { display: grid; min-height: 180px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 26px; }
+.competition-catalog__state h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
+.competition-catalog__state p { margin: 6px 0 0; color: var(--v2-text-muted); font-size: 13px; }
 
 @keyframes command-skeleton {
-  to { background-position: -200% 0; }
+  from { opacity: 1; }
+  to { opacity: 0.45; }
 }
 
 @media (max-width: 1120px) {
@@ -169,7 +171,7 @@ const modeOptions: CommandSelectOption[] = [
 }
 
 @media (max-width: 760px) {
-  .competition-catalog__filters { grid-template-columns: minmax(0, 1fr) 34px; }
+  .competition-catalog__filters { grid-template-columns: minmax(0, 1fr) 38px; }
   .competition-catalog__search { grid-column: 1 / -1; }
   .competition-catalog__state { grid-template-columns: auto minmax(0, 1fr); }
   .competition-catalog__state :deep(.command-button) { grid-column: 2; justify-self: start; }

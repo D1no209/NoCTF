@@ -58,23 +58,21 @@ function categoryTone(category: AwdpChallengeStatus['category']) {
 </template>
 
 <style scoped>
-.awdp-challenge-matrix__header { display: flex; min-height: 68px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--v2-line); padding: 12px 14px; }
-.awdp-challenge-matrix__header h2 { margin: 5px 0 0; font-size: 16px; font-weight: 650; }
-.awdp-challenge-matrix__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.awdp-challenge-matrix__cell { min-width: 0; border-right: 1px solid rgb(26 58 103 / 0.7); border-bottom: 1px solid rgb(26 58 103 / 0.7); padding: 12px 14px; }
-.awdp-challenge-matrix__cell:nth-child(2n) { border-right: 0; }
+.awdp-challenge-matrix__header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; padding: 16px 18px 8px; }
+.awdp-challenge-matrix__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
+.awdp-challenge-matrix__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 6px 18px 18px; }
+.awdp-challenge-matrix__cell { min-width: 0; border-radius: 12px; padding: 14px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
 .awdp-challenge-matrix__top { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; }
-.awdp-challenge-matrix__top strong { overflow: hidden; color: var(--v2-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.awdp-challenge-matrix__heat { display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; margin-top: 13px; color: var(--v2-text-muted); font-size: 10px; }
-.awdp-challenge-matrix__heat b { color: var(--v2-warning); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.awdp-challenge-matrix__heat i { grid-column: 1 / -1; display: block; height: 3px; overflow: hidden; background: var(--v2-surface-hover); }
-.awdp-challenge-matrix__heat em { display: block; height: 100%; background: var(--v2-warning); box-shadow: 0 0 8px rgb(255 209 102 / 0.65); }
-.awdp-challenge-matrix__stats { display: flex; flex-wrap: wrap; gap: 6px 11px; margin-top: 11px; color: var(--v2-text-faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; }
+.awdp-challenge-matrix__top strong { overflow: hidden; color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.awdp-challenge-matrix__heat { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; margin-top: 13px; color: var(--v2-text-muted); font-size: 11px; }
+.awdp-challenge-matrix__heat b { color: var(--v2-warning); font-family: var(--v2-font-mono); }
+.awdp-challenge-matrix__heat i { grid-column: 1 / -1; display: block; height: 8px; overflow: hidden; border-radius: 999px; background: var(--v2-surface-strong); box-shadow: var(--v2-inset); }
+.awdp-challenge-matrix__heat em { display: block; height: 100%; border-radius: 999px; background: var(--v2-warning); }
+.awdp-challenge-matrix__stats { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; color: var(--v2-text-faint); font-family: var(--v2-font-mono); font-size: 10px; }
 .awdp-challenge-matrix__stats b { color: var(--v2-text); font-weight: 700; }
-.awdp-challenge-matrix__empty { display: grid; min-height: 180px; place-items: center; padding: 18px; color: var(--v2-text-muted); font-size: 12px; }
+.awdp-challenge-matrix__empty { display: grid; min-height: 180px; place-items: center; padding: 18px; color: var(--v2-text-muted); font-size: 13px; }
 
 @media (max-width: 600px) {
   .awdp-challenge-matrix__grid { grid-template-columns: 1fr; }
-  .awdp-challenge-matrix__cell { border-right: 0; }
 }
 </style>

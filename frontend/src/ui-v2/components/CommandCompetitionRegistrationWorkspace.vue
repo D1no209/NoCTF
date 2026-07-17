@@ -303,75 +303,64 @@ function formatDate(value: string | null | undefined) {
 
 <style scoped>
 .registration-workspace,
-.registration-state { display: grid; gap: 14px; }
-.registration-workspace__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
-.registration-workspace__heading h1 { margin: 7px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 680; }
-.registration-workspace__heading p { max-width: 780px; margin: 7px 0 0; color: var(--v2-text-muted); font-size: 12px; line-height: 1.6; }
-.registration-workspace__actions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
-.registration-workspace__facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.registration-workspace__facts > div { display: grid; min-width: 0; gap: 6px; border-right: 1px solid var(--v2-line); padding: 13px 15px; }
-.registration-workspace__facts > div:last-child { border-right: 0; }
-.registration-workspace__facts span { display: inline-flex; align-items: center; gap: 6px; color: var(--v2-text-faint); font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
-.registration-workspace__facts strong { overflow: hidden; color: var(--v2-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-.registration-workspace__message { margin: 0; border: 1px solid var(--v2-cyan); padding: 10px 12px; color: var(--v2-cyan); background: rgb(34 245 199 / 0.07); font-size: 12px; }
-.registration-workspace__message--danger { border-color: var(--v2-danger); color: var(--v2-danger); background: rgb(255 84 112 / 0.07); }
-.registration-workspace__content { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr); align-items: start; gap: 12px; }
+.registration-state { display: grid; gap: 16px; }
+.registration-workspace__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 4px 2px 0; }
+.registration-workspace__heading h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; }
+.registration-workspace__heading p { max-width: 780px; margin: 8px 0 0; color: var(--v2-text-muted); font-size: 13px; line-height: 1.6; }
+.registration-workspace__actions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.registration-workspace__facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 10px; }
+.registration-workspace__facts > div { display: grid; min-width: 0; gap: 7px; border-radius: 12px; padding: 13px 15px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
+.registration-workspace__facts span { display: inline-flex; align-items: center; gap: 6px; color: var(--v2-text-faint); font-size: 10px; font-weight: 600; letter-spacing: 0.05em; }
+.registration-workspace__facts strong { overflow: hidden; color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.registration-workspace__message { margin: 0; border-radius: 12px; padding: 12px 14px; color: var(--v2-cyan); background: var(--v2-surface); box-shadow: var(--v2-inset); font-size: 13px; }
+.registration-workspace__message--danger { color: var(--v2-danger); }
+.registration-workspace__content { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr); align-items: start; gap: 16px; }
 .registration-workspace__primary { display: grid; }
-.registration-workspace__primary > header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--v2-line); padding: 14px 16px; }
-.registration-workspace__primary h2 { margin: 5px 0 0; color: var(--v2-text); font-size: 16px; font-weight: 650; }
-.registration-workspace__loading { display: grid; min-height: 220px; place-content: center; gap: 12px; padding: 28px 16px; color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; text-align: center; }
+.registration-workspace__primary > header { display: flex; min-height: 76px; align-items: center; justify-content: space-between; padding: 16px 18px 10px; }
+.registration-workspace__primary h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
+.registration-workspace__loading { display: grid; min-height: 220px; place-content: center; gap: 12px; padding: 28px 18px; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 12px; text-align: center; }
 .registration-workspace__loading--error { color: var(--v2-danger); }
-.registration-team { display: grid; gap: 16px; padding: 16px; }
+.registration-team { display: grid; gap: 16px; padding: 8px 18px 18px; }
 .registration-team__topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-.registration-team__topline h3, .registration-form h3 { margin: 6px 0 0; color: var(--v2-text); font-size: 15px; font-weight: 650; }
-.registration-team__topline > span { border: 1px solid var(--v2-line-bright); padding: 4px 6px; color: var(--v2-primary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.registration-team__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border: 1px solid var(--v2-line); }
-.registration-team__facts div { display: grid; gap: 5px; border-right: 1px solid var(--v2-line); padding: 10px; }
-.registration-team__facts div:last-child { border-right: 0; }
-.registration-team__facts dt { color: var(--v2-text-faint); font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.registration-team__facts dd { margin: 0; color: var(--v2-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 650; }
-.registration-team__token { display: grid; grid-template-columns: minmax(0, 1fr) auto; border: 1px solid var(--v2-line); }
-.registration-team__token code { overflow: hidden; padding: 9px 10px; color: var(--v2-text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.registration-team__token :deep(.command-icon-button) { border-left: 1px solid var(--v2-line); }
-.registration-team__alert { margin: 0; border-left: 2px solid var(--v2-warning); padding: 9px 10px; color: var(--v2-text-muted); background: rgb(255 209 102 / 0.05); font-size: 12px; line-height: 1.5; }
-.registration-team__alert--danger { border-color: var(--v2-danger); color: var(--v2-danger); background: rgb(255 84 112 / 0.06); }
-.registration-forms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.registration-form { display: grid; min-width: 0; gap: 12px; border-right: 1px solid var(--v2-line); padding: 16px; }
-.registration-form:last-child { border-right: 0; }
+.registration-team__topline h3, .registration-form h3 { margin: 8px 0 0; color: var(--v2-text); font-size: 16px; font-weight: 600; }
+.registration-team__topline > span { border-radius: 999px; padding: 4px 10px; background: var(--v2-surface); box-shadow: var(--v2-raised-sm); color: var(--v2-primary); font-family: var(--v2-font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.03em; }
+.registration-team__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.registration-team__facts div { display: grid; gap: 6px; border-radius: 12px; padding: 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
+.registration-team__facts dt { color: var(--v2-text-faint); font-size: 10px; font-weight: 600; letter-spacing: 0.05em; }
+.registration-team__facts dd { margin: 0; color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 12px; font-weight: 600; }
+.registration-team__token { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; border-radius: 12px; padding: 6px 6px 6px 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
+.registration-team__token code { overflow: hidden; color: var(--v2-text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.registration-team__alert { margin: 0; border-radius: 12px; padding: 11px 13px; color: var(--v2-warning); background: var(--v2-surface); box-shadow: var(--v2-inset); font-size: 13px; line-height: 1.5; }
+.registration-team__alert--danger { color: var(--v2-danger); }
+.registration-forms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 8px 18px 18px; }
+.registration-form { display: grid; min-width: 0; align-content: start; gap: 13px; border-radius: 14px; padding: 16px; background: var(--v2-surface); box-shadow: var(--v2-raised-sm); }
 .registration-form :deep(.command-button) { width: 100%; }
-.registration-workspace__policy { display: grid; align-content: start; gap: 12px; padding: 16px; }
-.registration-workspace__policy h2 { margin: 0; color: var(--v2-text); font-size: 16px; font-weight: 650; }
-.registration-workspace__policy dl { display: grid; gap: 0; margin: 0; }
-.registration-workspace__policy dl div { display: grid; gap: 5px; border-top: 1px solid var(--v2-line); padding: 12px 0; }
-.registration-workspace__policy dt { color: var(--v2-text); font-size: 12px; font-weight: 650; }
+.registration-workspace__policy { display: grid; align-content: start; gap: 12px; padding: 18px; }
+.registration-workspace__policy h2 { margin: 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
+.registration-workspace__policy dl { display: grid; gap: 10px; margin: 0; }
+.registration-workspace__policy dl div { display: grid; gap: 6px; border-radius: 12px; padding: 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
+.registration-workspace__policy dt { color: var(--v2-text); font-size: 13px; font-weight: 600; }
 .registration-workspace__policy dd { margin: 0; color: var(--v2-text-muted); font-size: 12px; line-height: 1.55; }
-.registration-state__skeleton { display: grid; min-height: 260px; grid-template-rows: 14px 30px 1fr 56px; gap: 14px; padding: 20px; }
-.registration-state__skeleton span { display: block; background: var(--v2-surface-hover); animation: registration-pulse 1.1s ease-in-out infinite alternate; }
+.registration-state__skeleton { display: grid; min-height: 260px; grid-template-rows: 14px 30px 1fr 56px; gap: 14px; padding: 22px; }
+.registration-state__skeleton span { display: block; border-radius: 12px; background: var(--v2-surface-strong); box-shadow: var(--v2-inset); animation: registration-pulse 1.1s ease-in-out infinite alternate; }
 .registration-state__skeleton span:nth-child(1) { width: 21%; }
 .registration-state__skeleton span:nth-child(2) { width: 42%; }
 .registration-state__skeleton span:nth-child(4) { width: 76%; }
-.registration-state__message { display: flex; min-height: 210px; align-items: center; justify-content: space-between; gap: 20px; padding: 24px; }
-.registration-state__message h1 { margin: 7px 0 0; color: var(--v2-text); font-size: 18px; font-weight: 650; }
-.registration-state__message p { max-width: 650px; margin: 7px 0 0; color: var(--v2-text-muted); font-size: 12px; line-height: 1.6; }
+.registration-state__message { display: flex; min-height: 210px; align-items: center; justify-content: space-between; gap: 20px; padding: 26px; }
+.registration-state__message h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 19px; font-weight: 600; }
+.registration-state__message p { max-width: 650px; margin: 8px 0 0; color: var(--v2-text-muted); font-size: 13px; line-height: 1.6; }
 .registration-state__actions { display: flex; flex: none; gap: 8px; }
 @keyframes registration-pulse { to { opacity: 0.45; } }
 @media (max-width: 1080px) {
   .registration-workspace__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .registration-workspace__facts > div:nth-child(2) { border-right: 0; }
-  .registration-workspace__facts > div:nth-child(-n + 2) { border-bottom: 1px solid var(--v2-line); }
   .registration-workspace__content { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
   .registration-workspace__heading, .registration-state__message { align-items: flex-start; flex-direction: column; }
   .registration-workspace__actions, .registration-state__actions { justify-content: flex-start; }
   .registration-forms { grid-template-columns: 1fr; }
-  .registration-form { border-right: 0; border-bottom: 1px solid var(--v2-line); }
-  .registration-form:last-child { border-bottom: 0; }
 }
 @media (max-width: 480px) {
   .registration-workspace__facts, .registration-team__facts { grid-template-columns: 1fr; }
-  .registration-workspace__facts > div, .registration-team__facts div { border-right: 0; border-bottom: 1px solid var(--v2-line); }
-  .registration-workspace__facts > div:last-child, .registration-team__facts div:last-child { border-bottom: 0; }
-  .registration-workspace__facts > div:nth-child(2) { border-bottom: 1px solid var(--v2-line); }
 }
 </style>

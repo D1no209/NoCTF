@@ -30,24 +30,52 @@ defineEmits<{
 .command-button {
   display: inline-flex;
   min-width: 0;
-  height: 34px;
+  height: 38px;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid transparent;
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 16px;
+  background: var(--v2-surface);
+  box-shadow: var(--v2-raised);
+  color: var(--v2-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: box-shadow 200ms ease, color 200ms ease, background-color 200ms ease;
 }
 
 .command-button:enabled { cursor: pointer; }
 .command-button:disabled { cursor: not-allowed; opacity: 0.52; }
-.command-button--primary { border-color: var(--v2-primary); color: var(--v2-canvas); background: var(--v2-primary); }
-.command-button--primary:hover:enabled { border-color: var(--v2-cyan); background: var(--v2-cyan); }
-.command-button--outline { border-color: var(--v2-line-bright); color: var(--v2-text); background: transparent; }
-.command-button--outline:hover:enabled { background: var(--v2-surface-hover); }
-.command-button--ghost { color: var(--v2-text-muted); background: transparent; }
-.command-button--ghost:hover:enabled { color: var(--v2-text); background: var(--v2-surface-hover); }
+.command-button:hover:enabled { box-shadow: var(--v2-raised-hover); }
+.command-button:active:enabled { box-shadow: var(--v2-inset); }
+
+.command-button--primary {
+  background: var(--v2-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.command-button--primary:active:enabled {
+  box-shadow: inset 4px 4px 8px rgb(0 0 0 / 0.28), inset -4px -4px 8px rgb(255 255 255 / 0.22);
+}
+
+.command-button--outline {
+  color: var(--v2-primary);
+}
+
+.command-button--ghost {
+  background: transparent;
+  box-shadow: none;
+  color: var(--v2-text-muted);
+}
+
+.command-button--ghost:hover:enabled {
+  background: var(--v2-surface);
+  box-shadow: var(--v2-raised-sm);
+  color: var(--v2-text);
+}
+
+.command-button--ghost:active:enabled { box-shadow: var(--v2-inset); }
 </style>

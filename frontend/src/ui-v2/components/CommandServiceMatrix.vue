@@ -44,27 +44,21 @@ function toneFor(status: CommandService['status']) {
 <style scoped>
 .service-matrix__header {
   display: flex;
-  min-height: 72px;
+  min-height: 76px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--v2-line);
-  padding: 14px 16px;
+  padding: 16px 18px 10px;
 }
 
-.service-matrix__header h2 { margin: 5px 0 0; font-size: 16px; font-weight: 650; }
-.service-matrix__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.service-matrix__cell { min-width: 0; border-right: 1px solid rgb(26 58 103 / 0.7); border-bottom: 1px solid rgb(26 58 103 / 0.7); padding: 13px 14px; }
-.service-matrix__cell:nth-child(2n) { border-right: 0; }
-.service-matrix__cell:nth-last-child(-n + 2) { border-bottom: 0; }
+.service-matrix__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
+.service-matrix__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 6px 18px 18px; }
+.service-matrix__cell { min-width: 0; border-radius: 12px; padding: 13px 14px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
 .service-matrix__top, .service-matrix__details { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.service-matrix__top strong { overflow: hidden; color: var(--v2-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.service-matrix__top strong { overflow: hidden; color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .service-matrix__details { margin-top: 9px; color: var(--v2-text-muted); font-size: 11px; }
-.service-matrix__details b { color: var(--v2-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
+.service-matrix__details b { color: var(--v2-text); font-family: var(--v2-font-mono); font-weight: 600; }
 
 @media (max-width: 560px) {
   .service-matrix__grid { grid-template-columns: 1fr; }
-  .service-matrix__cell { border-right: 0; }
-  .service-matrix__cell:nth-last-child(-n + 2) { border-bottom: 1px solid rgb(26 58 103 / 0.7); }
-  .service-matrix__cell:last-child { border-bottom: 0; }
 }
 </style>

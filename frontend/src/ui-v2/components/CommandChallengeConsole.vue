@@ -116,22 +116,22 @@ async function submitFlag() {
 
 <style scoped>
 .challenge-console { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 18px; }
-.challenge-console__backdrop { position: absolute; inset: 0; border: 0; background: rgb(0 3 12 / 0.78); cursor: default; }
+.challenge-console__backdrop { position: absolute; inset: 0; border: 0; background: rgb(31 41 55 / 0.38); cursor: default; }
 .challenge-console__dialog { position: relative; z-index: 1; width: min(620px, 100%); max-height: min(720px, calc(100dvh - 36px)); overflow-y: auto; }
-.challenge-console__dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--v2-line); padding: 16px; }
-.challenge-console__dialog h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 18px; font-weight: 680; }
-.challenge-console__body { display: grid; gap: 18px; padding: 16px; }
-.challenge-console__body > p { margin: 0; color: var(--v2-text-muted); font-size: 12px; line-height: 1.65; white-space: pre-wrap; }
-.challenge-console__body dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
-.challenge-console__body dl div { border: 1px solid var(--v2-line); padding: 10px; }
-.challenge-console__body dt { color: var(--v2-text-faint); font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.challenge-console__body dd { margin: 5px 0 0; color: var(--v2-text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 700; }
-.challenge-console__submit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
-.challenge-console__submit label { grid-column: 1 / -1; color: var(--v2-text-muted); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.challenge-console__result { display: flex; align-items: flex-start; gap: 8px; border: 1px solid var(--v2-line); padding: 10px; font-size: 12px; line-height: 1.45; }
-.challenge-console__result--correct { border-color: var(--v2-cyan); color: var(--v2-cyan); background: rgb(34 245 199 / 0.07); }
-.challenge-console__result--incorrect, .challenge-console__result--error { border-color: var(--v2-danger); color: var(--v2-danger); background: rgb(255 84 112 / 0.07); }
-.challenge-console__notice { margin: -8px 0 0; color: var(--v2-warning); font-size: 11px; line-height: 1.5; }
+.challenge-console__dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 18px 4px; }
+.challenge-console__dialog h2 { margin: 8px 0 0; color: var(--v2-text); font-size: 19px; font-weight: 600; }
+.challenge-console__body { display: grid; gap: 18px; padding: 14px 18px 20px; }
+.challenge-console__body > p { margin: 0; color: var(--v2-text-muted); font-size: 13px; line-height: 1.65; white-space: pre-wrap; }
+.challenge-console__body dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.challenge-console__body dl div { border-radius: 12px; padding: 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
+.challenge-console__body dt { color: var(--v2-text-faint); font-size: 10px; font-weight: 600; letter-spacing: 0.03em; }
+.challenge-console__body dd { margin: 6px 0 0; color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 14px; font-weight: 600; }
+.challenge-console__submit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.challenge-console__submit label { grid-column: 1 / -1; color: var(--v2-text-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+.challenge-console__result { display: flex; align-items: flex-start; gap: 8px; border-radius: 12px; padding: 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); font-size: 13px; line-height: 1.45; }
+.challenge-console__result--correct { color: var(--v2-cyan); }
+.challenge-console__result--incorrect, .challenge-console__result--error { color: var(--v2-danger); }
+.challenge-console__notice { margin: -8px 0 0; color: var(--v2-warning); font-size: 12px; line-height: 1.5; }
 
 @media (max-width: 520px) {
   .challenge-console__submit { grid-template-columns: 1fr; }

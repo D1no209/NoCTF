@@ -97,7 +97,7 @@ function handleApply(theme: ThemePackage) {
 <style scoped>
 .theme-selector {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .theme-selector__summary {
@@ -105,55 +105,44 @@ function handleApply(theme: ThemePackage) {
   align-items: end;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--v2-line);
-  padding: 0 2px 12px;
+  padding: 0 2px;
 }
 
 .theme-selector__summary h2 {
-  margin: 5px 0 0;
+  margin: 7px 0 0;
   color: var(--v2-text);
-  font-size: 16px;
-  font-weight: 650;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .theme-selector__summary > span {
   color: var(--v2-text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .theme-selector__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .theme-selector__package {
   display: grid;
   min-height: 310px;
-  grid-template-rows: 122px 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  padding: 12px;
 }
 
 .theme-selector__preview {
   position: relative;
   overflow: hidden;
-  border-bottom: 1px solid var(--v2-line);
+  min-height: 122px;
+  border-radius: 12px;
   padding: 12px;
-}
-
-.theme-selector__preview::after {
-  position: absolute;
-  inset: 0;
-  content: '';
-  background-image:
-    linear-gradient(rgb(255 255 255 / 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.12) 1px, transparent 1px);
-  background-size: 14px 14px;
-  opacity: 0.34;
-  pointer-events: none;
+  box-shadow: var(--v2-inset);
 }
 
 .theme-selector__preview-top,
@@ -172,6 +161,7 @@ function handleApply(theme: ThemePackage) {
   display: block;
   width: 38px;
   height: 6px;
+  border-radius: 999px;
 }
 
 .theme-selector__preview-layout {
@@ -184,6 +174,7 @@ function handleApply(theme: ThemePackage) {
 .theme-selector__preview-layout > i {
   display: block;
   min-height: 58px;
+  border-radius: 10px;
   opacity: 0.9;
 }
 
@@ -196,6 +187,7 @@ function handleApply(theme: ThemePackage) {
 .theme-selector__preview-layout b {
   display: block;
   min-width: 0;
+  border-radius: 8px;
   opacity: 0.92;
 }
 
@@ -206,10 +198,10 @@ function handleApply(theme: ThemePackage) {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--v2-font-mono);
   font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
 }
 
 .theme-selector__content {
@@ -217,7 +209,7 @@ function handleApply(theme: ThemePackage) {
   min-height: 0;
   grid-template-rows: auto 1fr auto;
   gap: 14px;
-  padding: 14px;
+  padding: 14px 4px 2px;
 }
 
 .theme-selector__header,
@@ -236,21 +228,21 @@ function handleApply(theme: ThemePackage) {
 .theme-selector__header h3 {
   margin: 0;
   color: var(--v2-text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--v2-font-mono);
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .theme-selector__header > div > span,
 .theme-selector__footer > span {
   color: var(--v2-text-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .theme-selector__header > div > span {
   display: block;
   margin-top: 4px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--v2-font-mono);
 }
 
 .theme-selector__content > p {
@@ -258,11 +250,6 @@ function handleApply(theme: ThemePackage) {
   color: var(--v2-text-muted);
   font-size: 12px;
   line-height: 1.55;
-}
-
-.theme-selector__footer {
-  border-top: 1px solid rgb(26 58 103 / 0.7);
-  padding-top: 10px;
 }
 
 .theme-selector__footer > span {

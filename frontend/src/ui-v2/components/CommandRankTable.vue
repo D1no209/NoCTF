@@ -44,23 +44,21 @@ defineProps<{
 <style scoped>
 .rank-table__header {
   display: flex;
-  min-height: 72px;
+  min-height: 76px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--v2-line);
-  padding: 14px 16px;
+  padding: 16px 18px 10px;
 }
 
 .rank-table__header span,
 .rank-table__labels {
   color: var(--v2-text-muted);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
-.rank-table__header h2 { margin: 5px 0 0; font-size: 16px; font-weight: 650; }
+.rank-table__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
 
 .rank-table__labels,
 .rank-table__row {
@@ -70,15 +68,15 @@ defineProps<{
   gap: 10px;
 }
 
-.rank-table__labels { min-height: 34px; border-bottom: 1px solid rgb(26 58 103 / 0.72); padding: 0 16px; }
+.rank-table__labels { min-height: 34px; padding: 0 18px; }
 .rank-table__labels span:not(:nth-child(2)) { text-align: right; }
-.rank-table__rows { padding: 0 16px; }
-.rank-table__row { min-height: 48px; border-bottom: 1px solid rgb(26 58 103 / 0.65); color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-.rank-table__row:last-child { border-bottom: 0; }
+.rank-table__rows { padding: 0 18px 12px; }
+.rank-table__row { min-height: 48px; box-shadow: inset 0 -2px 0 rgb(184 188 194 / 0.5), inset 0 -1px 0 rgb(255 255 255 / 0.85); color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 12px; }
+.rank-table__row:last-child { box-shadow: none; }
 .rank-table__row > *:not(:nth-child(2)) { text-align: right; }
 .rank-table__row > strong { color: var(--v2-text-faint); font-weight: 600; }
 .rank-table__rank--leader { color: var(--v2-warning) !important; }
-.rank-table__team { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--v2-text); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-weight: 650; }
+.rank-table__team { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--v2-text); font-family: var(--v2-font-sans); font-weight: 600; }
 .rank-table__team span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rank-table__row b { color: var(--v2-cyan); font-weight: 700; }
 

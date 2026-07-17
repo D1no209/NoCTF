@@ -59,18 +59,18 @@ function score(entry: CommandLeaderboardEntry) {
 
 <style scoped>
 .leaderboard-table { display: grid; min-height: 0; align-content: start; }
-.leaderboard-table__header { display: flex; min-height: 72px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--v2-line); padding: 14px 16px; }
-.leaderboard-table__header h2 { margin: 5px 0 0; color: var(--v2-text); font-size: 16px; font-weight: 650; }
+.leaderboard-table__header { display: flex; min-height: 76px; align-items: center; justify-content: space-between; padding: 16px 18px 10px; }
+.leaderboard-table__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
 .leaderboard-table__labels, .leaderboard-table__row { display: grid; grid-template-columns: 42px minmax(110px, 1fr) 54px 76px; align-items: center; gap: 8px; }
-.leaderboard-table__labels { min-height: 34px; border-bottom: 1px solid rgb(26 58 103 / 0.72); padding: 0 16px; color: var(--v2-text-faint); font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.leaderboard-table__labels { min-height: 34px; padding: 0 18px; color: var(--v2-text-faint); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
 .leaderboard-table__labels > :not(:nth-child(2)), .leaderboard-table__row > :not(:nth-child(2)) { text-align: right; }
-.leaderboard-table__rows { padding: 0 16px; }
-.leaderboard-table__row { min-height: 42px; border-bottom: 1px solid rgb(26 58 103 / 0.6); color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
-.leaderboard-table__row:last-child { border-bottom: 0; }
+.leaderboard-table__rows { padding: 0 18px 12px; }
+.leaderboard-table__row { min-height: 44px; box-shadow: inset 0 -2px 0 rgb(184 188 194 / 0.5), inset 0 -1px 0 rgb(255 255 255 / 0.85); color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 12px; }
+.leaderboard-table__row:last-child { box-shadow: none; }
 .leaderboard-table__row strong { color: var(--v2-text-faint); font-weight: 600; }
-.leaderboard-table__row span:nth-child(2) { overflow: hidden; color: var(--v2-text); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard-table__row span:nth-child(2) { overflow: hidden; color: var(--v2-text); font-family: var(--v2-font-sans); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .leaderboard-table__row b { color: var(--v2-cyan); font-weight: 700; }
 .leaderboard-table__leader { color: var(--v2-warning) !important; }
-.leaderboard-table__loading { padding: 24px 16px; color: var(--v2-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; text-align: center; }
+.leaderboard-table__loading { padding: 26px 18px; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 12px; text-align: center; }
 .leaderboard-table__loading--error { display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--v2-danger); }
 </style>
