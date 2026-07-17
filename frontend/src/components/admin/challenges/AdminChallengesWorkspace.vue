@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, ref } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
@@ -16,9 +16,9 @@ import {
 import { adminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import ChallengeTemplateForm from '@/components/admin/ChallengeTemplateForm.vue'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -76,6 +83,9 @@ const qc = useQueryClient()
 const router = useRouter()
 const { t } = useI18n()
 const globalFilter = ref('')
+const challengeTypeFilter = ref('all')
+const attachmentFilter = ref('all')
+const deploymentTypeFilter = ref('all')
 const sorting = ref<SortingState>([])
 const editDialog = ref(false)
 const deleteDialog = ref(false)
@@ -172,14 +182,19 @@ const columns = [
   columnHelper.accessor('typeId', {
     header: () => t('admin.challenges.challengeMode'),
     enableSorting: true,
+    filterFn: (row, columnId, filterValue) => normalizeChallengeType(row.getValue<string>(columnId)) === filterValue,
     cell: (info) => h(Badge, { variant: 'secondary', class: 'font-bold text-[10px]' }, () => challengeTypeLabel(info.getValue())),
   }),
   columnHelper.accessor('attachmentUrl', {
     header: () => t('admin.challenges.attachment'),
+    filterFn: (row, columnId, filterValue) => filterValue === 'attached'
+      ? Boolean(row.getValue(columnId))
+      : !row.getValue(columnId),
     cell: (info) => info.getValue() ? h('span', { class: 'text-xs text-foreground' }, t('admin.challenges.attached')) : h('span', { class: 'text-muted-foreground' }, '-'),
   }),
   columnHelper.accessor('deploymentType', {
     header: () => t('admin.challenges.deploymentType'),
+    filterFn: (row, columnId, filterValue) => deploymentTypeKey(row.getValue<ChallengeTemplateDto['deploymentType']>(columnId)) === filterValue,
     cell: (info) => h(Badge, { variant: 'outline' }, () => t(`admin.challenges.deploymentTypes.${deploymentTypeKey(info.getValue())}`)),
   }),
   columnHelper.accessor('containerMode', {
@@ -208,6 +223,23 @@ const table = useVueTable({
   getFilteredRowModel: getFilteredRowModel(),
   getSortedRowModel: getSortedRowModel(),
 })
+
+watch(globalFilter, () => table.setPageIndex(0))
+watch(challengeTypeFilter, (value) => {
+  table.getColumn('typeId')?.setFilterValue(value === 'all' ? undefined : value)
+  table.setPageIndex(0)
+})
+watch(attachmentFilter, (value) => {
+  table.getColumn('attachmentUrl')?.setFilterValue(value === 'all' ? undefined : value)
+  table.setPageIndex(0)
+})
+watch(deploymentTypeFilter, (value) => {
+  table.getColumn('deploymentType')?.setFilterValue(value === 'all' ? undefined : value)
+  table.setPageIndex(0)
+})
+
+const filteredTemplateCount = computed(() => table.getFilteredRowModel().rows.length)
+const pageCount = computed(() => Math.max(1, table.getPageCount()))
 </script>
 
 <template>
@@ -223,11 +255,53 @@ const table = useVueTable({
       </Button>
     </div>
 
-    <Card class="grid gap-3 p-3 md:grid-cols-[minmax(0,24rem)]">
-      <div class="relative w-full max-w-sm">
-      <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input v-model="globalFilter" :placeholder="t('admin.challenges.searchPlaceholder')" class="pl-10" />
+    <Card class="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_repeat(3,minmax(8rem,0.55fr))]">
+      <div class="relative w-full">
+        <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input v-model="globalFilter" :placeholder="t('admin.challenges.searchPlaceholder')" class="pl-10" />
       </div>
+      <Select v-model="challengeTypeFilter">
+        <SelectTrigger :aria-label="t('admin.challenges.filterChallengeType')">
+          <SelectValue :placeholder="t('admin.challenges.allChallengeTypes')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">
+            {{ t('admin.challenges.allChallengeTypes') }}
+          </SelectItem>
+          <SelectItem v-for="option in challengeTypeOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="attachmentFilter">
+        <SelectTrigger :aria-label="t('admin.challenges.filterAttachment')">
+          <SelectValue :placeholder="t('admin.challenges.allAttachmentStates')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">
+            {{ t('admin.challenges.allAttachmentStates') }}
+          </SelectItem>
+          <SelectItem value="attached">
+            {{ t('admin.challenges.withAttachment') }}
+          </SelectItem>
+          <SelectItem value="none">
+            {{ t('admin.challenges.withoutAttachment') }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="deploymentTypeFilter">
+        <SelectTrigger :aria-label="t('admin.challenges.filterDeploymentType')">
+          <SelectValue :placeholder="t('admin.challenges.allDeploymentTypes')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">
+            {{ t('admin.challenges.allDeploymentTypes') }}
+          </SelectItem>
+          <SelectItem v-for="key in deploymentTypeKeys" :key="key" :value="key">
+            {{ t(`admin.challenges.deploymentTypes.${key}`) }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </Card>
 
     <Card class="p-0 overflow-hidden">
@@ -297,6 +371,21 @@ const table = useVueTable({
         </TableBody>
       </Table>
     </Card>
+
+    <div class="flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <p class="text-xs text-muted-foreground">
+        {{ t('common.pageOf', { page: table.getState().pagination.pageIndex + 1, total: pageCount }) }}
+        · {{ t('admin.challenges.filteredCount', { filtered: filteredTemplateCount, total: templates?.length ?? 0 }) }}
+      </p>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
+          {{ t('common.previous') }}
+        </Button>
+        <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
+          {{ t('common.next') }}
+        </Button>
+      </div>
+    </div>
 
     <Dialog v-model:open="editDialog">
       <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-[680px]">
