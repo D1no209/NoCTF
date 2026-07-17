@@ -36,12 +36,6 @@ public class UpdateUserRoleEndpoint(
             ThrowError("Invalid role value.");
         }
 
-        // Prevent promoting to Admin via this endpoint
-        if (newRole == UserRole.Admin)
-        {
-            ThrowError("Cannot promote to Admin via this endpoint.");
-        }
-
         user.Role = newRole;
         user.TokenVersion++;
         user.UpdatedAt = DateTime.UtcNow;
