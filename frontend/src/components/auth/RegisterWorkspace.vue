@@ -40,9 +40,20 @@ const form = useForm({
 const onSubmit = form.handleSubmit(async (values) => {
   loading.value = true
   try {
-    await auth.register(values.userName, values.email, values.password)
+    const result = await auth.register(values.userName, values.email, values.password)
     toast.success(t('auth.registerSuccess', { name: values.userName }))
-    await router.push('/login')
+    if (result.requiresEmailVerification) {
+      await router.push({
+        name: 'verify-email',
+        query: {
+          email: values.email,
+          delivery: result.verificationEmailSent ? 'sent' : 'failed',
+        },
+      })
+    }
+    else {
+      await router.push('/login')
+    }
   } catch (error: any) {
     toast.error(t('errors.registerFailed'))
   } finally {

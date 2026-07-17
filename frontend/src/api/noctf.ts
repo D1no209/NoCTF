@@ -98,6 +98,18 @@ export const authApi = {
   async register(userName: string, email: string, password: string) {
     return unwrap(await sdk.noCtfapiEndpointsAuthRegisterEndpoint({ body: { userName, email, password } }), tt('errors.registration'))
   },
+  async verifyEmail(token: string) {
+    return unwrap(await client.post<{ 200: { status: string } }, unknown, false>({
+      url: '/api/auth/email-verification/verify',
+      body: { token },
+    }), tt('errors.verifyEmail'))
+  },
+  async resendEmailVerification(email: string) {
+    return unwrap(await client.post<{ 202: string }, unknown, false>({
+      url: '/api/auth/email-verification/resend',
+      body: { email },
+    }), tt('errors.resendVerification'))
+  },
   async refresh() {
     return unwrap(await sdk.noCtfapiEndpointsAuthRefreshTokenEndpoint(), tt('errors.refreshToken'))
   },
