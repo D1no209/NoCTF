@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:5000"
+      "url": "http://127.0.0.1:5000"
     }
   ],
   "paths": {
@@ -2105,6 +2105,65 @@
                   "items": {
                     "$ref": "#/components/schemas/NoCTFApplicationScoringScoreboardRow"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/email-verification/resend": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAuthResendEmailVerificationEndpoint",
+        "requestBody": {
+          "x-name": "ResendEmailVerificationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthResendEmailVerificationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/auth/email-verification/verify": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAuthVerifyEmailEndpoint",
+        "requestBody": {
+          "x-name": "VerifyEmailRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthVerifyEmailRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthVerifyEmailResponse"
                 }
               }
             }
@@ -7487,6 +7546,33 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAuthResendEmailVerificationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthVerifyEmailResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthVerifyEmailRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAuthLoginResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -7524,6 +7610,12 @@
           },
           "userName": {
             "type": "string"
+          },
+          "requiresEmailVerification": {
+            "type": "boolean"
+          },
+          "verificationEmailSent": {
+            "type": "boolean"
           }
         }
       },

@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/verify-email',
+      name: 'verify-email',
+      component: () => import('@/views/VerifyEmailView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/competitions',
       name: 'competitions',
       component: () => import('@/views/CompetitionsView.vue'),

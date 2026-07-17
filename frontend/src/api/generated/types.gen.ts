@@ -635,6 +635,18 @@ export type NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAuthResendEmailVerificationRequest = {
+    email?: string;
+};
+
+export type NoCtfapiEndpointsAuthVerifyEmailResponse = {
+    status?: string;
+};
+
+export type NoCtfapiEndpointsAuthVerifyEmailRequest = {
+    token?: string;
+};
+
 export type NoCtfapiEndpointsAuthLoginResponse = {
     accessToken?: string;
     userName?: string;
@@ -649,6 +661,8 @@ export type NoCtfapiEndpointsAuthLoginRequest = {
 export type NoCtfapiEndpointsAuthRegisterResponse = {
     id?: string;
     userName?: string;
+    requiresEmailVerification?: boolean;
+    verificationEmailSent?: boolean;
 };
 
 export type NoCtfapiEndpointsAuthRegisterRequest = {
@@ -2577,6 +2591,38 @@ export type NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointRespons
 };
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointResponse = NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointResponses[keyof NoCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpointResponses];
+
+export type NoCtfapiEndpointsAuthResendEmailVerificationEndpointData = {
+    body: NoCtfapiEndpointsAuthResendEmailVerificationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/auth/email-verification/resend';
+};
+
+export type NoCtfapiEndpointsAuthResendEmailVerificationEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type NoCtfapiEndpointsAuthResendEmailVerificationEndpointResponse = NoCtfapiEndpointsAuthResendEmailVerificationEndpointResponses[keyof NoCtfapiEndpointsAuthResendEmailVerificationEndpointResponses];
+
+export type NoCtfapiEndpointsAuthVerifyEmailEndpointData = {
+    body: NoCtfapiEndpointsAuthVerifyEmailRequest;
+    path?: never;
+    query?: never;
+    url: '/api/auth/email-verification/verify';
+};
+
+export type NoCtfapiEndpointsAuthVerifyEmailEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthVerifyEmailResponse;
+};
+
+export type NoCtfapiEndpointsAuthVerifyEmailEndpointResponse = NoCtfapiEndpointsAuthVerifyEmailEndpointResponses[keyof NoCtfapiEndpointsAuthVerifyEmailEndpointResponses];
 
 export type NoCtfapiEndpointsAuthLoginEndpointData = {
     body: NoCtfapiEndpointsAuthLoginRequest;
