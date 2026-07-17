@@ -11,18 +11,34 @@ namespace NoCTF.Tests;
 public class AdminUserRoleTests
 {
     [Fact]
+    public async Task DataSeeder_RepairsUnverifiedConfiguredAdministrator()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = CreateDb();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            UserName = "bootstrap-admin",
+            Email = "bootstrap-admin@example.test",
+            Role = UserRole.Admin,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(ct);
+        var configuration = BootstrapAdminConfiguration();
+
+        await DataSeeder.SeedAsync(db, configuration);
+
+        var admin = await db.Users.SingleAsync(ct);
+        Assert.NotNull(admin.EmailVerifiedAt);
+    }
+
+    [Fact]
     public async Task DataSeeder_SeedsBootstrapAdministratorAsEmailVerified()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var db = CreateDb();
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["SeedAdmin:Email"] = "bootstrap-admin@example.test",
-                ["SeedAdmin:UserName"] = "bootstrap-admin",
-                ["SeedAdmin:Password"] = "BootstrapAdmin123!"
-            })
-            .Build();
+        var configuration = BootstrapAdminConfiguration();
 
         await DataSeeder.SeedAsync(db, configuration);
 
@@ -30,6 +46,16 @@ public class AdminUserRoleTests
         Assert.Equal(UserRole.Admin, admin.Role);
         Assert.NotNull(admin.EmailVerifiedAt);
     }
+
+    private static IConfiguration BootstrapAdminConfiguration()
+        => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SeedAdmin:Email"] = "bootstrap-admin@example.test",
+                ["SeedAdmin:UserName"] = "bootstrap-admin",
+                ["SeedAdmin:Password"] = "BootstrapAdmin123!"
+            })
+            .Build();
 
     [Fact]
     public async Task UpdateUserRole_AllowsAdminPromotionAndRevokesExistingSessions()

@@ -39,6 +39,13 @@ public static class DataSeeder
                 if (existingAdmin.Role != UserRole.Admin)
                     throw new SeedConfigurationException(
                         "SeedAdmin:Email belongs to an existing non-admin user; automatic promotion is forbidden.");
+                if (!existingAdmin.EmailVerifiedAt.HasValue)
+                {
+                    var recoveryTime = DateTime.UtcNow;
+                    existingAdmin.EmailVerifiedAt = recoveryTime;
+                    existingAdmin.UpdatedAt = recoveryTime;
+                    await db.SaveChangesAsync();
+                }
                 return;
             }
 
