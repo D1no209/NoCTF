@@ -63,7 +63,7 @@ curl http://localhost/api/health
 - Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
 - Penetration Challenge ranges can run through the Docker Runner or the Kubernetes Runner. Set `NOCTF_PUBLIC_HOST` / `InstanceAccess:PublicHost` for Docker NodePort-style entry URLs, or `K8s:PublicEntry` / `K8s:IngressBaseDomain` for Kubernetes entries.
 - QQ group broadcasts are optional. Set `NOCTF_QQBOT_PUBLIC_BASE_URL` to the public competition origin used in message links, then configure the global and per-competition policy in WEB administration. The separately deployed BOT agent needs only outbound HTTPS access; follow [QQBot Integration](qqbot-integration.md) and keep its private key off the platform host.
-- Email verification is disabled until SMTP is configured. Set `EMAIL_VERIFICATION_ENABLED=true`, `NOCTF_PUBLIC_BASE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENABLE_SSL`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_ADDRESS`, and `SMTP_FROM_NAME`. SMTP credentials are read only by the backend and are never returned to the browser. Production startup requires HTTPS verification links and TLS-enabled SMTP. Existing accounts are marked verified by the migration; only accounts registered after activation require verification.
+- Email verification is disabled until SMTP is configured. The environment variables `EMAIL_VERIFICATION_ENABLED`, `NOCTF_PUBLIC_BASE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENABLE_SSL`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_ADDRESS`, and `SMTP_FROM_NAME` provide deployment defaults. A system administrator can then review or replace those values from **Admin → Email verification** without restarting the platform. SMTP credentials are read only by the backend and are never returned to the browser. Production configuration requires HTTPS verification links and TLS-enabled SMTP. Existing accounts are marked verified by the migration; only accounts registered after activation require verification.
 
 ## Kubernetes
 
@@ -95,7 +95,7 @@ kubectl create secret generic noctf-secrets \
   --from-literal=smtp-password='your-smtp-password'
 ```
 
-The SMTP secret keys are optional while `EmailVerification__Enabled` is `false`. Before enabling it, set the SMTP host/from fields and public HTTPS URL in `deploy/k8s/configmap.yaml`, populate these secret keys, then restart the backend deployment.
+The SMTP secret keys are optional while `EmailVerification__Enabled` is `false`. They may be supplied as bootstrap defaults before the first start, or configured later through **Admin → Email verification**. Administrator-saved SMTP passwords are AES-GCM protected in PostgreSQL with a purpose-specific key derived from the deployment JWT secret. Rotating `JwtSettings__Secret` therefore requires re-entering the SMTP password in the admin page; the password is never returned by the API or written to the audit log.
 
 ### Build and Load Images
 

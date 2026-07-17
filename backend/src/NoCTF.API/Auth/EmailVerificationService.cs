@@ -45,33 +45,37 @@ public enum EmailVerificationAttempt
 
 public interface IEmailVerificationService
 {
-    bool IsEnabled { get; }
+    Task<bool> IsEnabledAsync(CancellationToken ct);
     Task<EmailVerificationDispatchResult> SendForRegistrationAsync(User user, CancellationToken ct);
     Task ResendAsync(string email, CancellationToken ct);
     Task<EmailVerificationAttempt> VerifyAsync(string token, CancellationToken ct);
 }
 
-internal interface IVerificationEmailSender
+public interface IVerificationEmailSender
 {
     Task SendAsync(string recipient, string verificationUrl, CancellationToken ct);
+    Task SendTestAsync(string recipient, CancellationToken ct);
 }
 
 internal sealed class EmailVerificationService(
     ApplicationDbContext db,
     IVerificationEmailSender emailSender,
-    IOptions<EmailVerificationOptions> options,
+    IEmailVerificationSettingsStore settingsStore,
     ILogger<EmailVerificationService> logger) : IEmailVerificationService
 {
-    private readonly EmailVerificationOptions _options = options.Value;
+    public async Task<bool> IsEnabledAsync(CancellationToken ct)
+        => await settingsStore.IsEnabledAsync(ct);
 
-    public bool IsEnabled => _options.Enabled;
-
-    public Task<EmailVerificationDispatchResult> SendForRegistrationAsync(User user, CancellationToken ct)
-        => CreateAndSendAsync(user, enforceCooldown: false, ct);
+    public async Task<EmailVerificationDispatchResult> SendForRegistrationAsync(User user, CancellationToken ct)
+    {
+        var options = await settingsStore.GetAsync(ct);
+        return await CreateAndSendAsync(user, options, enforceCooldown: false, ct);
+    }
 
     public async Task ResendAsync(string email, CancellationToken ct)
     {
-        if (!IsEnabled)
+        var options = await settingsStore.GetAsync(ct);
+        if (!options.Enabled)
             return;
 
         var normalizedEmail = email.Trim().ToLowerInvariant();
@@ -88,12 +92,12 @@ internal sealed class EmailVerificationService(
         if (user is null || user.EmailVerifiedAt.HasValue)
             return;
 
-        await CreateAndSendAsync(user, enforceCooldown: true, ct);
+        await CreateAndSendAsync(user, options, enforceCooldown: true, ct);
     }
 
     public async Task<EmailVerificationAttempt> VerifyAsync(string token, CancellationToken ct)
     {
-        if (!IsEnabled)
+        if (!await settingsStore.IsEnabledAsync(ct))
             return EmailVerificationAttempt.Disabled;
         if (string.IsNullOrWhiteSpace(token) || token.Length > 128)
             return EmailVerificationAttempt.Invalid;
@@ -133,16 +137,17 @@ internal sealed class EmailVerificationService(
 
     private async Task<EmailVerificationDispatchResult> CreateAndSendAsync(
         User user,
+        EmailVerificationOptions options,
         bool enforceCooldown,
         CancellationToken ct)
     {
-        if (!IsEnabled)
+        if (!options.Enabled)
             return new EmailVerificationDispatchResult(Required: false, Sent: false);
 
         var now = DateTime.UtcNow;
         if (enforceCooldown)
         {
-            var cooldownStart = now.AddSeconds(-_options.ResendCooldownSeconds);
+            var cooldownStart = now.AddSeconds(-options.ResendCooldownSeconds);
             var recentlyIssued = await db.EmailVerificationTokens.AnyAsync(
                 token => token.UserId == user.Id &&
                          token.ConsumedAt == null &&
@@ -165,12 +170,12 @@ internal sealed class EmailVerificationService(
             UserId = user.Id,
             TokenHash = HashToken(rawToken),
             CreatedAt = now,
-            ExpiresAt = now.AddMinutes(_options.TokenLifetimeMinutes)
+            ExpiresAt = now.AddMinutes(options.TokenLifetimeMinutes)
         };
         db.EmailVerificationTokens.Add(token);
         await db.SaveChangesAsync(ct);
 
-        var verificationUrl = $"{_options.PublicBaseUrl.TrimEnd('/')}/verify-email?token={Uri.EscapeDataString(rawToken)}";
+        var verificationUrl = $"{options.PublicBaseUrl.TrimEnd('/')}/verify-email?token={Uri.EscapeDataString(rawToken)}";
         try
         {
             await emailSender.SendAsync(user.Email, verificationUrl, ct);
@@ -205,14 +210,12 @@ internal sealed class EmailVerificationService(
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }
 
-internal sealed class SmtpVerificationEmailSender(IOptions<EmailVerificationOptions> options)
+internal sealed class SmtpVerificationEmailSender(IEmailVerificationSettingsStore settingsStore)
     : IVerificationEmailSender
 {
-    private readonly EmailVerificationOptions _options = options.Value;
-
     public async Task SendAsync(string recipient, string verificationUrl, CancellationToken ct)
     {
-        var smtp = _options.Smtp;
+        var smtp = (await settingsStore.GetAsync(ct)).Smtp;
         using var message = new MailMessage
         {
             From = new MailAddress(smtp.FromAddress, smtp.FromName),
@@ -223,6 +226,25 @@ internal sealed class SmtpVerificationEmailSender(IOptions<EmailVerificationOpti
         };
         message.To.Add(new MailAddress(recipient));
 
+        await SendAsync(message, smtp, ct);
+    }
+
+    public async Task SendTestAsync(string recipient, CancellationToken ct)
+    {
+        var smtp = (await settingsStore.GetAsync(ct)).Smtp;
+        using var message = new MailMessage
+        {
+            From = new MailAddress(smtp.FromAddress, smtp.FromName),
+            Subject = "NoCTF SMTP configuration test",
+            Body = "NoCTF successfully connected to the configured SMTP server and sent this test message.",
+            IsBodyHtml = false
+        };
+        message.To.Add(new MailAddress(recipient));
+        await SendAsync(message, smtp, ct);
+    }
+
+    private static async Task SendAsync(MailMessage message, SmtpOptions smtp, CancellationToken ct)
+    {
         using var client = new SmtpClient(smtp.Host, smtp.Port)
         {
             EnableSsl = smtp.EnableSsl,
@@ -231,7 +253,6 @@ internal sealed class SmtpVerificationEmailSender(IOptions<EmailVerificationOpti
         };
         if (!string.IsNullOrWhiteSpace(smtp.UserName))
             client.Credentials = new NetworkCredential(smtp.UserName, smtp.Password);
-
         await client.SendMailAsync(message, ct);
     }
 }

@@ -41,6 +41,16 @@ Content-Type: application/json
 
 Clients can request another message with `POST /api/auth/email-verification/resend`. That endpoint always returns the same accepted response for unknown, already verified, cooling-down, and pending addresses to avoid account enumeration.
 
+Administrators can manage the effective verification and SMTP settings through:
+
+```text
+GET  /api/admin/email-verification
+PUT  /api/admin/email-verification
+POST /api/admin/email-verification/test
+```
+
+These endpoints require the `Admin` role. The read response reports only whether an SMTP password is configured; it never returns the credential. A blank password on update preserves the current value. The test endpoint sends only to the authenticated administrator's own account email and is limited to three requests per ten minutes.
+
 ### Use the Token
 
 Include the token in the `Authorization` header for all protected endpoints:

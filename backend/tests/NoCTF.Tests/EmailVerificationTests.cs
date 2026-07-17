@@ -1,7 +1,6 @@
 using System.Net.Mail;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NoCTF.API.Auth;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -120,7 +119,7 @@ public class EmailVerificationTests
         => new(
             db,
             sender,
-            Options.Create(new EmailVerificationOptions
+            new StaticSettingsStore(new EmailVerificationOptions
             {
                 Enabled = true,
                 PublicBaseUrl = "https://ctf.example.test",
@@ -146,12 +145,34 @@ public class EmailVerificationTests
             VerificationUrls.Add(verificationUrl);
             return Task.CompletedTask;
         }
+
+        public Task SendTestAsync(string recipient, CancellationToken ct) => Task.CompletedTask;
     }
 
     private sealed class ThrowingEmailSender : IVerificationEmailSender
     {
         public Task SendAsync(string recipient, string verificationUrl, CancellationToken ct)
             => throw new SmtpException("offline");
+
+        public Task SendTestAsync(string recipient, CancellationToken ct)
+            => throw new SmtpException("offline");
+    }
+
+    private sealed class StaticSettingsStore(EmailVerificationOptions options)
+        : IEmailVerificationSettingsStore
+    {
+        public Task<bool> IsEnabledAsync(CancellationToken ct)
+            => Task.FromResult(options.Enabled);
+
+        public Task<EmailVerificationOptions> GetAsync(CancellationToken ct)
+            => Task.FromResult(options);
+
+        public Task<EmailVerificationSettingsView> GetViewAsync(CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<EmailVerificationSettingsView> UpdateAsync(
+            EmailVerificationSettingsUpdate update,
+            CancellationToken ct) => throw new NotSupportedException();
     }
 }
 

@@ -3760,6 +3760,131 @@
         ]
       }
     },
+    "/api/admin/email-verification": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminGetEmailVerificationSettingsEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIAuthEmailVerificationSettingsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminUpdateEmailVerificationSettingsEndpoint",
+        "requestBody": {
+          "x-name": "EmailVerificationSettingsUpdate",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIAuthEmailVerificationSettingsUpdate"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIAuthEmailVerificationSettingsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/email-verification/test": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdminTestEmailVerificationSettingsEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIAuthEmailVerificationTestResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "JWTBearerAuth": [
+              "Admin"
+            ]
+          },
+          {
+            "Bearer": [
+              "Admin"
+            ]
+          }
+        ]
+      }
+    },
     "/api/admin/logs": {
       "get": {
         "tags": [
@@ -8701,6 +8826,119 @@
       "NoCTFAPIEndpointsAdminDestroyContainerRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIAuthEmailVerificationSettingsView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "publicBaseUrl": {
+            "type": "string"
+          },
+          "tokenLifetimeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "resendCooldownSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "smtpHost": {
+            "type": "string"
+          },
+          "smtpPort": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "smtpEnableSsl": {
+            "type": "boolean"
+          },
+          "smtpUserName": {
+            "type": "string"
+          },
+          "smtpPasswordConfigured": {
+            "type": "boolean"
+          },
+          "smtpFromAddress": {
+            "type": "string"
+          },
+          "smtpFromName": {
+            "type": "string"
+          },
+          "smtpTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "persisted": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIAuthEmailVerificationSettingsUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "publicBaseUrl": {
+            "type": "string"
+          },
+          "tokenLifetimeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "resendCooldownSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "smtpHost": {
+            "type": "string"
+          },
+          "smtpPort": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "smtpEnableSsl": {
+            "type": "boolean"
+          },
+          "smtpUserName": {
+            "type": "string"
+          },
+          "smtpPassword": {
+            "type": "string",
+            "nullable": true
+          },
+          "smtpFromAddress": {
+            "type": "string"
+          },
+          "smtpFromName": {
+            "type": "string"
+          },
+          "smtpTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIAuthEmailVerificationTestResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
       },
       "NoCTFAPISignalRLogEntryDto": {
         "type": "object",

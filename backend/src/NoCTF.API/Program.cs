@@ -2,7 +2,6 @@ using System.Text;
 using System.Threading.RateLimiting;
 using System.Security.Claims;
 using System.Net;
-using System.Net.Mail;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -39,7 +38,7 @@ var usesLocalStorage = StorageProviderFactory.UsesLocalStorage(builder.Configura
 var emailVerificationOptions = builder.Configuration
     .GetSection(EmailVerificationOptions.SectionName)
     .Get<EmailVerificationOptions>() ?? new EmailVerificationOptions();
-ValidateEmailVerificationOptions(emailVerificationOptions, builder.Environment.IsDevelopment());
+EmailVerificationOptionsValidator.Validate(emailVerificationOptions, builder.Environment.IsDevelopment());
 builder.Services.Configure<EmailVerificationOptions>(
     builder.Configuration.GetSection(EmailVerificationOptions.SectionName));
 builder.Services.AddHttpClient();
@@ -206,6 +205,19 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+    options.AddPolicy("admin-email-test", httpContext =>
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            userId,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
     options.AddPolicy("auth-refresh", httpContext =>
     {
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
@@ -357,7 +369,8 @@ builder.Services.AddSingleton<IStorageProvider>(_ => StorageProviderFactory.Crea
 // JWT token service
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();
-builder.Services.AddSingleton<IVerificationEmailSender, SmtpVerificationEmailSender>();
+builder.Services.AddScoped<IEmailVerificationSettingsStore, EmailVerificationSettingsStore>();
+builder.Services.AddScoped<IVerificationEmailSender, SmtpVerificationEmailSender>();
 
 // Permission services
 builder.Services.AddScoped<ICompetitionPermissionService, CompetitionPermissionService>();
@@ -629,42 +642,4 @@ static string NormalizeCorsOrigin(string configuredOrigin)
     }
 
     return origin.GetLeftPart(UriPartial.Authority);
-}
-
-static void ValidateEmailVerificationOptions(EmailVerificationOptions options, bool isDevelopment)
-{
-    if (!options.Enabled)
-        return;
-
-    if (!Uri.TryCreate(options.PublicBaseUrl, UriKind.Absolute, out var publicBaseUri) ||
-        (publicBaseUri.Scheme != Uri.UriSchemeHttp && publicBaseUri.Scheme != Uri.UriSchemeHttps) ||
-        string.IsNullOrWhiteSpace(publicBaseUri.Host) ||
-        !string.IsNullOrEmpty(publicBaseUri.UserInfo) ||
-        !string.IsNullOrEmpty(publicBaseUri.Query) ||
-        !string.IsNullOrEmpty(publicBaseUri.Fragment) ||
-        (!isDevelopment && publicBaseUri.Scheme != Uri.UriSchemeHttps))
-    {
-        throw new InvalidOperationException(
-            "EmailVerification:PublicBaseUrl must be an absolute HTTP(S) URL without credentials, query, or fragment; HTTPS is required outside Development.");
-    }
-
-    if (string.IsNullOrWhiteSpace(options.Smtp.Host) ||
-        options.Smtp.Host.Contains("://", StringComparison.Ordinal) ||
-        options.Smtp.Port is < 1 or > 65535 ||
-        options.Smtp.TimeoutSeconds is < 1 or > 120 ||
-        options.TokenLifetimeMinutes is < 5 or > 10080 ||
-        options.ResendCooldownSeconds is < 1 or > 3600 ||
-        (!isDevelopment && !options.Smtp.EnableSsl))
-    {
-        throw new InvalidOperationException("EmailVerification SMTP or token settings are invalid.");
-    }
-
-    try
-    {
-        _ = new MailAddress(options.Smtp.FromAddress);
-    }
-    catch (FormatException exception)
-    {
-        throw new InvalidOperationException("EmailVerification:Smtp:FromAddress is invalid.", exception);
-    }
 }

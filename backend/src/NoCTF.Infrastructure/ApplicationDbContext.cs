@@ -9,6 +9,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    public DbSet<EmailVerificationSettings> EmailVerificationSettings => Set<EmailVerificationSettings>();
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
@@ -98,6 +99,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(token => token.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<EmailVerificationSettings>()
+            .Property(settings => settings.SmtpPasswordProtected)
+            .HasMaxLength(2048);
 
         modelBuilder.Entity<Submission>()
             .HasIndex(s => new { s.CompetitionId, s.TeamId })

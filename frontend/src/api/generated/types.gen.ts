@@ -967,6 +967,43 @@ export type NoCtfapiEndpointsAdminDestroyContainerRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiAuthEmailVerificationSettingsView = {
+    enabled?: boolean;
+    publicBaseUrl?: string;
+    tokenLifetimeMinutes?: number;
+    resendCooldownSeconds?: number;
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpEnableSsl?: boolean;
+    smtpUserName?: string;
+    smtpPasswordConfigured?: boolean;
+    smtpFromAddress?: string;
+    smtpFromName?: string;
+    smtpTimeoutSeconds?: number;
+    persisted?: boolean;
+    updatedAt?: string | null;
+};
+
+export type NoCtfapiAuthEmailVerificationSettingsUpdate = {
+    enabled?: boolean;
+    publicBaseUrl?: string;
+    tokenLifetimeMinutes?: number;
+    resendCooldownSeconds?: number;
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpEnableSsl?: boolean;
+    smtpUserName?: string;
+    smtpPassword?: string | null;
+    smtpFromAddress?: string;
+    smtpFromName?: string;
+    smtpTimeoutSeconds?: number;
+};
+
+export type NoCtfapiAuthEmailVerificationTestResult = {
+    success?: boolean;
+    code?: string;
+};
+
 export type NoCtfapiSignalRLogEntryDto = {
     level?: string;
     message?: string;
@@ -3490,6 +3527,87 @@ export type NoCtfapiEndpointsAdminDestroyContainerEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsAdminDestroyContainerEndpointResponse = NoCtfapiEndpointsAdminDestroyContainerEndpointResponses[keyof NoCtfapiEndpointsAdminDestroyContainerEndpointResponses];
+
+export type NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/email-verification';
+};
+
+export type NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiAuthEmailVerificationSettingsView;
+};
+
+export type NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointResponse = NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointResponses[keyof NoCtfapiEndpointsAdminGetEmailVerificationSettingsEndpointResponses];
+
+export type NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointData = {
+    body: NoCtfapiAuthEmailVerificationSettingsUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/admin/email-verification';
+};
+
+export type NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiAuthEmailVerificationSettingsView;
+};
+
+export type NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointResponse = NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointResponses[keyof NoCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpointResponses];
+
+export type NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/email-verification/test';
+};
+
+export type NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiAuthEmailVerificationTestResult;
+};
+
+export type NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointResponse = NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointResponses[keyof NoCtfapiEndpointsAdminTestEmailVerificationSettingsEndpointResponses];
 
 export type NoCtfapiEndpointsAdminGetAdminLogsEndpointData = {
     body?: never;

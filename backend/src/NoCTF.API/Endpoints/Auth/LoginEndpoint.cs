@@ -1,7 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using NoCTF.API.Auth;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
@@ -24,7 +23,7 @@ public class LoginResponse
 public class LoginEndpoint(
     ApplicationDbContext dbContext,
     JwtTokenService jwtService,
-    IOptions<EmailVerificationOptions> emailVerificationOptions) : Endpoint<LoginRequest, LoginResponse>, IAuditableEndpoint
+    IEmailVerificationService emailVerification) : Endpoint<LoginRequest, LoginResponse>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -54,7 +53,7 @@ public class LoginEndpoint(
             return;
         }
 
-        if (emailVerificationOptions.Value.Enabled && !user.EmailVerifiedAt.HasValue)
+        if (await emailVerification.IsEnabledAsync(ct) && !user.EmailVerifiedAt.HasValue)
         {
             await SendStringAsync("email_not_verified", StatusCodes.Status403Forbidden, cancellation: ct);
             return;
