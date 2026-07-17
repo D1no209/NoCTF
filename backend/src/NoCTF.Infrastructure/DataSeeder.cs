@@ -60,6 +60,7 @@ public static class DataSeeder
             }
 
             var hasher = new PasswordHasher<User>();
+            var now = DateTime.UtcNow;
             var admin = new User
             {
                 Id = Guid.NewGuid(),
@@ -67,8 +68,9 @@ public static class DataSeeder
                 UserName = adminUserName,
                 PasswordHash = hasher.HashPassword(null!, adminPassword),
                 Role = UserRole.Admin,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
+                EmailVerifiedAt = now,
+                CreatedAt = now,
+                UpdatedAt = now,
             };
 
             db.Users.Add(admin);

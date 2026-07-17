@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NoCTF.API.Auth;
 using NoCTF.API.Endpoints.Admin;
 using NoCTF.Core;
@@ -9,6 +10,27 @@ namespace NoCTF.Tests;
 
 public class AdminUserRoleTests
 {
+    [Fact]
+    public async Task DataSeeder_SeedsBootstrapAdministratorAsEmailVerified()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = CreateDb();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SeedAdmin:Email"] = "bootstrap-admin@example.test",
+                ["SeedAdmin:UserName"] = "bootstrap-admin",
+                ["SeedAdmin:Password"] = "BootstrapAdmin123!"
+            })
+            .Build();
+
+        await DataSeeder.SeedAsync(db, configuration);
+
+        var admin = await db.Users.SingleAsync(ct);
+        Assert.Equal(UserRole.Admin, admin.Role);
+        Assert.NotNull(admin.EmailVerifiedAt);
+    }
+
     [Fact]
     public async Task UpdateUserRole_AllowsAdminPromotionAndRevokesExistingSessions()
     {
