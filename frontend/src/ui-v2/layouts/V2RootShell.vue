@@ -1,29 +1,34 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Bell, Blocks, Command, LayoutDashboard, Palette, Search, Settings, UsersRound } from 'lucide-vue-next'
+import { Bell, Blocks, Command, LayoutDashboard, Palette, Search, UsersRound } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import CommandIconButton from '../primitives/CommandIconButton.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
 
 const route = useRoute()
 const router = useRouter()
-const navigation = [
+const workspaceNavigation = [
   { label: 'Overview', icon: LayoutDashboard, to: '/' },
   { label: 'Competitions', icon: Blocks, to: '/competitions' },
   { label: 'Teams', icon: UsersRound, to: '/teams' },
+]
+const systemNavigation = [
   { label: 'Theme packages', icon: Palette, to: '/admin/theme-packs' },
 ]
 
 const activeItem = computed(() => {
-  if (route.name === 'competitions' || route.name === 'competition-detail' || route.name === 'competition-register' || route.name === 'awd-dashboard')
-    return navigation[1]!
+  const all = [...workspaceNavigation, ...systemNavigation]
+  if (route.name === 'competitions' || route.name === 'competition-detail' || route.name === 'competition-register'
+    || route.name === 'awd-dashboard' || route.name === 'koh-dashboard' || route.name === 'penetration-dashboard')
+    return workspaceNavigation[1]!
   if (route.name === 'teams')
-    return navigation[2]!
-  return navigation.find(item => item.to === route.path) ?? navigation[0]!
+    return workspaceNavigation[2]!
+  return all.find(item => item.to === route.path) ?? workspaceNavigation[0]!
 })
 const sectionTitle = computed(() => activeItem.value.label.toUpperCase())
 const contextSignal = computed(() => {
-  if (route.name === 'competitions' || route.name === 'competition-detail' || route.name === 'competition-register' || route.name === 'awd-dashboard')
+  if (route.name === 'competitions' || route.name === 'competition-detail' || route.name === 'competition-register'
+    || route.name === 'awd-dashboard' || route.name === 'koh-dashboard' || route.name === 'penetration-dashboard')
     return { label: 'Competition API / contract data', tone: 'success' as const }
   if (route.name === 'teams')
     return { label: 'Team API / account data', tone: 'success' as const }
@@ -39,15 +44,28 @@ function navigate(to: string) {
 </script>
 
 <template>
-  <div class="ui-v2">
-    <aside class="v2-rail">
-      <div class="v2-rail__brand">
+  <div class="ui-v2 v2-deck">
+    <header class="v2-topbar">
+      <div class="v2-topbar__brand" @click="navigate('/')">
         <img src="/logo.png" alt="NoCTF" />
-        <span>COMMAND</span>
+        <div class="v2-topbar__brand-text">
+          <strong>NoCTF</strong>
+          <span>Command Suite</span>
+        </div>
       </div>
-      <nav class="v2-rail__nav" aria-label="Command navigation">
+
+      <nav class="v2-topbar__nav" aria-label="Command navigation">
         <CommandIconButton
-          v-for="item in navigation"
+          v-for="item in workspaceNavigation"
+          :key="item.label"
+          :icon="item.icon"
+          :label="item.label"
+          :active="item === activeItem"
+          @click="navigate(item.to)"
+        />
+        <span class="v2-topbar__divider" aria-hidden="true" />
+        <CommandIconButton
+          v-for="item in systemNavigation"
           :key="item.label"
           :icon="item.icon"
           :label="item.label"
@@ -55,83 +73,99 @@ function navigate(to: string) {
           @click="navigate(item.to)"
         />
       </nav>
-      <div class="v2-rail__footer">
-        <CommandIconButton :icon="Settings" label="Theme packages" compact @click="navigate('/admin/theme-packs')" />
-      </div>
-    </aside>
 
-    <div class="v2-main">
-      <header class="v2-command-bar">
-        <div class="v2-command-bar__title">
-          <Command class="size-4 text-[var(--v2-primary)]" />
+      <div class="v2-topbar__actions">
+        <CommandIconButton :icon="Search" label="Search" compact />
+        <CommandIconButton :icon="Bell" label="Notifications" compact />
+        <span class="v2-topbar__operator">OP-01</span>
+      </div>
+    </header>
+
+    <div class="v2-context">
+      <div class="v2-context__inner">
+        <div class="v2-context__title">
+          <Command class="size-3.5 text-[var(--v2-primary)]" />
           <span>{{ sectionTitle }}</span>
+        </div>
+        <div class="v2-context__meta">
           <CommandSignal :label="contextSignal.label" :tone="contextSignal.tone" />
+          <span class="v2-context__version">Neon Command v0.2.0</span>
         </div>
-        <div class="v2-command-bar__actions">
-          <CommandIconButton :icon="Search" label="Search" compact />
-          <CommandIconButton :icon="Bell" label="Notifications" compact />
-          <span class="v2-command-bar__operator">OP-01</span>
-        </div>
-      </header>
-      <main class="v2-main__content">
-        <slot />
-      </main>
+      </div>
     </div>
+
+    <main class="v2-content">
+      <slot />
+    </main>
   </div>
 </template>
 
 <style scoped>
-.v2-rail {
-  position: fixed;
+.v2-deck {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.v2-topbar {
+  position: sticky;
   z-index: 10;
   top: 0;
-  bottom: 0;
-  left: 0;
   display: flex;
-  width: 224px;
-  flex-direction: column;
+  min-height: 64px;
+  align-items: center;
+  gap: 22px;
   background: var(--v2-canvas);
-  box-shadow: 1px 0 0 var(--v2-shadow-light), 8px 0 18px rgb(184 188 194 / 0.38);
-}
-
-.v2-rail__brand {
-  display: flex;
-  height: 76px;
-  align-items: center;
-  gap: 12px;
-  margin: 14px 14px 6px;
-  border-radius: 14px;
-  padding: 0 16px;
-  background: var(--v2-surface);
-  box-shadow: var(--v2-raised-sm);
-}
-
-.v2-rail__brand img { width: 92px; height: auto; filter: brightness(0) opacity(0.72); }
-.v2-rail__brand span { color: var(--v2-primary); font-family: var(--v2-font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; }
-.v2-rail__nav { display: grid; gap: 6px; padding: 14px; }
-.v2-rail__nav :deep(.command-icon-button) { width: 100%; }
-.v2-rail__footer { margin-top: auto; display: flex; justify-content: flex-end; padding: 14px; }
-
-.v2-main { min-height: 100dvh; padding-left: 224px; }
-.v2-command-bar {
-  position: sticky;
-  z-index: 5;
-  top: 0;
-  display: flex;
-  min-height: 56px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  background: rgb(224 229 236 / 0.86);
   padding: 0 22px;
-  box-shadow: 0 1px 0 var(--v2-shadow-light), 0 8px 16px rgb(184 188 194 / 0.3);
-  backdrop-filter: blur(14px);
+  box-shadow: 0 1px 0 var(--v2-shadow-light), 0 10px 20px rgb(184 188 194 / 0.42);
 }
-.v2-command-bar__title, .v2-command-bar__actions { display: flex; min-width: 0; align-items: center; gap: 12px; }
-.v2-command-bar__title > span:first-of-type { color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; }
-.v2-command-bar__operator {
+
+.v2-topbar__brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 11px;
+  border-radius: 12px;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+
+.v2-topbar__brand img { width: 36px; height: auto; filter: brightness(0) opacity(0.72); }
+.v2-topbar__brand-text { display: grid; gap: 2px; }
+.v2-topbar__brand-text strong { color: var(--v2-text); font-size: 14px; font-weight: 600; letter-spacing: 0.01em; line-height: 1; }
+.v2-topbar__brand-text span { color: var(--v2-primary); font-family: var(--v2-font-mono); font-size: 8px; font-weight: 600; letter-spacing: 0.09em; }
+
+.v2-topbar__nav {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.v2-topbar__nav::-webkit-scrollbar { display: none; }
+
+.v2-topbar__divider {
+  width: 2px;
+  height: 22px;
+  flex: none;
+  margin: 0 6px;
   border-radius: 999px;
-  padding: 4px 11px;
+  background: var(--v2-surface);
+  box-shadow: inset 1px 1px 2px rgb(184 188 194 / 0.75), inset -1px -1px 2px rgb(255 255 255 / 0.9);
+}
+
+.v2-topbar__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2-topbar__operator {
+  border-radius: 999px;
+  padding: 5px 12px;
   background: var(--v2-surface);
   box-shadow: var(--v2-inset);
   color: var(--v2-text-muted);
@@ -139,19 +173,49 @@ function navigate(to: string) {
   font-size: 11px;
   font-weight: 600;
 }
-.v2-main__content { width: min(1720px, 100%); margin: 0 auto; padding: 22px; }
 
-@media (max-width: 880px) {
-  .v2-rail { width: 64px; }
-  .v2-rail__brand { justify-content: center; margin: 10px; padding: 0; height: 56px; }
-  .v2-rail__brand img, .v2-rail__brand span, .v2-rail__nav :deep(.command-icon-button__label) { display: none; }
-  .v2-rail__nav { padding: 10px; }
-  .v2-rail__nav :deep(.command-icon-button) { width: 40px; padding: 0; justify-content: center; }
-  .v2-main { padding-left: 64px; }
+.v2-context {
+  position: sticky;
+  z-index: 5;
+  top: 64px;
+  background: rgb(224 229 236 / 0.86);
+  box-shadow: 0 1px 0 var(--v2-shadow-light), 0 6px 12px rgb(184 188 194 / 0.24);
+  backdrop-filter: blur(14px);
+}
+
+.v2-context__inner {
+  display: flex;
+  min-height: 40px;
+  width: min(1440px, 100%);
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 auto;
+  padding: 0 clamp(18px, 3vw, 32px);
+}
+
+.v2-context__title { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.v2-context__title > span { color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; }
+.v2-context__meta { display: flex; flex: none; align-items: center; gap: 12px; }
+.v2-context__version { color: var(--v2-text-faint); font-family: var(--v2-font-mono); font-size: 9px; letter-spacing: 0.05em; }
+
+.v2-content {
+  width: min(1440px, 100%);
+  flex: 1;
+  margin: 0 auto;
+  padding: 26px clamp(18px, 3vw, 32px) 44px;
+}
+
+@media (max-width: 960px) {
+  .v2-topbar { gap: 12px; padding: 0 14px; }
+  .v2-topbar__brand-text, .v2-topbar__divider { display: none; }
+  .v2-topbar__nav :deep(.command-icon-button__label) { display: none; }
+  .v2-topbar__nav :deep(.command-icon-button) { width: 40px; padding: 0; justify-content: center; }
 }
 
 @media (max-width: 680px) {
-  .v2-command-bar__title .command-signal { display: none; }
-  .v2-main__content { padding: 14px; }
+  .v2-context__version, .v2-context__meta .command-signal { display: none; }
+  .v2-topbar__operator { display: none; }
+  .v2-content { padding: 16px 14px 32px; }
 }
 </style>

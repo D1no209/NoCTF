@@ -27,6 +27,18 @@
       }
     },
     {
+      "method": "POST",
+      "path": "/api/auth/email-verification/verify",
+      "status": 200,
+      "body": { "status": "verified" }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/email-verification/resend",
+      "status": 202,
+      "body": "queued"
+    },
+    {
       "method": "GET",
       "path": "/api/competitions",
       "status": 200,

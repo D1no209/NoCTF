@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { RadioTower, RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import CommandEventFeed from '../components/CommandEventFeed.vue'
 import CommandMetricStrip from '../components/CommandMetricStrip.vue'
 import CommandNetworkTrace from '../components/CommandNetworkTrace.vue'
+import CommandPageHeader from '../components/CommandPageHeader.vue'
 import CommandRankTable from '../components/CommandRankTable.vue'
 import CommandServiceMatrix from '../components/CommandServiceMatrix.vue'
+import CommandBadge from '../primitives/CommandBadge.vue'
 import CommandIconButton from '../primitives/CommandIconButton.vue'
 import CommandPanel from '../primitives/CommandPanel.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
@@ -29,17 +31,15 @@ onMounted(refreshPreview)
 
 <template>
   <template v-if="preview">
-    <section class="command-page-heading">
-      <div>
-        <CommandSignal label="NoCTF / Operational overview" tone="success" />
-        <h1>Competition command center</h1>
-        <p>Shared development mock from the first UI package, rendered through the independent Neon Command UI package.</p>
-      </div>
-      <div class="command-page-heading__actions">
-        <span><RadioTower class="size-4" /> snapshot {{ preview.snapshotTime }}</span>
-        <CommandIconButton :icon="RefreshCw" :label="isRefreshing ? 'Refreshing mock' : 'Refresh mock'" @click="refreshPreview" />
-      </div>
-    </section>
+    <CommandPageHeader
+      signal-label="NoCTF / Operational overview"
+      signal-tone="success"
+      title="Competition command center"
+      description="Shared development mock from the first UI package, rendered through the independent Neon Command UI package."
+    >
+      <CommandBadge :label="`Snapshot ${preview.snapshotTime}`" tone="info" />
+      <CommandIconButton :icon="RefreshCw" :label="isRefreshing ? 'Refreshing mock' : 'Refresh mock'" compact @click="refreshPreview" />
+    </CommandPageHeader>
 
     <CommandMetricStrip :metrics="preview.metrics" />
 
@@ -62,61 +62,18 @@ onMounted(refreshPreview)
 </template>
 
 <style scoped>
-.command-page-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 20px;
-  padding: 4px 2px 0;
-}
-
-.command-page-heading h1 {
-  margin: 8px 0 0;
-  color: var(--v2-text);
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.command-page-heading p {
-  max-width: 720px;
-  margin: 8px 0 0;
-  color: var(--v2-text-muted);
-  font-size: 13px;
-}
-
-.command-page-heading__actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.command-page-heading__actions > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border-radius: 999px;
-  padding: 6px 12px;
-  background: var(--v2-surface);
-  box-shadow: var(--v2-inset);
-  color: var(--v2-text-muted);
-  font-family: var(--v2-font-mono);
-  font-size: 11px;
-}
-
 .command-dashboard {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(390px, 0.85fr);
-  gap: 16px;
-  margin-top: 16px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(380px, 0.8fr);
+  gap: 18px;
+  margin-top: 18px;
 }
 
 .command-dashboard__primary,
 .command-dashboard__secondary {
   display: grid;
   min-width: 0;
-  gap: 16px;
+  gap: 18px;
 }
 
 .command-dashboard__primary { grid-template-rows: minmax(300px, 0.9fr) minmax(350px, 1.1fr); }
@@ -141,10 +98,5 @@ onMounted(refreshPreview)
   .command-dashboard { grid-template-columns: 1fr; }
   .command-dashboard__primary,
   .command-dashboard__secondary { grid-template-rows: auto; }
-}
-
-@media (max-width: 680px) {
-  .command-page-heading { align-items: flex-start; flex-direction: column; }
-  .command-page-heading__actions { width: 100%; justify-content: space-between; }
 }
 </style>

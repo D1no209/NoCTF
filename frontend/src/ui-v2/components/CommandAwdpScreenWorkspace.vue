@@ -130,7 +130,7 @@ const metricItems = computed(() => {
 .awdp-workspace,
 .awdp-workspace__state { display: grid; gap: 16px; }
 .awdp-workspace__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 4px 2px 0; }
-.awdp-workspace__title h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; }
+.awdp-workspace__title h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
 .awdp-workspace__status { display: flex; align-items: center; gap: 14px; }
 .awdp-workspace__status > div { display: grid; min-width: 122px; gap: 3px; border-radius: 12px; padding: 10px 14px; background: var(--v2-surface); box-shadow: var(--v2-inset); text-align: right; }
 .awdp-workspace__status span { color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 10px; }

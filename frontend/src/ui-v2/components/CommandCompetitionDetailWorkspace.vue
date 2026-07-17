@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, CalendarDays, Gauge, MonitorPlay, Network, Radar, RefreshCw, UserPlus, UsersRound } from 'lucide-vue-next'
+import { ArrowLeft, CalendarDays, Crosshair, Gauge, MonitorPlay, Network, Radar, RefreshCw, Trophy, UserPlus, UsersRound } from 'lucide-vue-next'
 import { computed } from 'vue'
 import CommandChallengeGrid, { type CommandChallenge } from './CommandChallengeGrid.vue'
 import CommandLeaderboardTable, { type CommandLeaderboardEntry } from './CommandLeaderboardTable.vue'
@@ -40,15 +40,20 @@ defineEmits<{
   retry: []
   'open-awdp-screen': []
   'open-awd-dashboard': []
+  'open-koh-dashboard': []
+  'open-penetration-dashboard': []
   'select-challenge': [challenge: CommandChallenge]
 }>()
 
 const isAwdp = computed(() => props.competition?.gameModeType.toLowerCase() === 'awdp')
 const isAwd = computed(() => props.competition?.gameModeType.toLowerCase() === 'awd')
+const isKoh = computed(() => props.competition?.gameModeType.toLowerCase() === 'koh')
+const isPenetration = computed(() => props.competition?.gameModeType.toLowerCase() === 'penetration')
 const supportsChallengeConsole = computed(() => {
   const mode = props.competition?.gameModeType.toLowerCase()
   return mode === 'ctf' || mode === 'awdp'
 })
+const hasDedicatedWorkspace = computed(() => isAwd.value || isKoh.value || isPenetration.value)
 
 function signalTone(status: string): 'info' | 'success' | 'warning' | 'danger' {
   const normalized = status.toLowerCase()
@@ -136,6 +141,12 @@ function formatDate(value: string | null | undefined) {
         <CommandButton v-if="isAwd" label="Open AWD dashboard" @click="$emit('open-awd-dashboard')">
           <template #icon><Radar class="size-4" /></template>
         </CommandButton>
+        <CommandButton v-if="isKoh" label="Open KoH dashboard" @click="$emit('open-koh-dashboard')">
+          <template #icon><Trophy class="size-4" /></template>
+        </CommandButton>
+        <CommandButton v-if="isPenetration" label="Open penetration range" @click="$emit('open-penetration-dashboard')">
+          <template #icon><Crosshair class="size-4" /></template>
+        </CommandButton>
       </div>
     </header>
 
@@ -168,7 +179,7 @@ function formatDate(value: string | null | undefined) {
         @select="$emit('select-challenge', $event)"
       />
 
-      <CommandPanel v-else class="competition-detail__mode-notice" tone="warning">
+      <CommandPanel v-else-if="!hasDedicatedWorkspace" class="competition-detail__mode-notice" tone="warning">
         <CommandSignal label="Mode-specific workspace" tone="warning" />
         <h2>{{ props.competition.gameModeType.toUpperCase() }} controls are not migrated yet</h2>
         <p>The competition record and live scoreboard remain available here. Its mode-specific operational workspace will arrive as a dedicated V2 page.</p>
@@ -203,6 +214,7 @@ function formatDate(value: string | null | undefined) {
   color: var(--v2-text);
   font-size: 24px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .competition-detail__title p {

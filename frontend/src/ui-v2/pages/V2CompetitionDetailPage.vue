@@ -174,6 +174,14 @@ function openAwdDashboard() {
   router.push({ name: 'awd-dashboard', params: { id: competitionId.value } })
 }
 
+function openKohDashboard() {
+  router.push({ name: 'koh-dashboard', params: { id: competitionId.value } })
+}
+
+function openPenetrationDashboard() {
+  router.push({ name: 'penetration-dashboard', params: { id: competitionId.value } })
+}
+
 function selectChallenge(challenge: CommandChallenge) {
   selectedChallenge.value = challenge
   challengeConsoleOpen.value = true
@@ -211,6 +219,8 @@ function refreshCompetitionData() {
     @retry="retry"
     @open-awdp-screen="openAwdpScreen"
     @open-awd-dashboard="openAwdDashboard"
+    @open-koh-dashboard="openKohDashboard"
+    @open-penetration-dashboard="openPenetrationDashboard"
     @select-challenge="selectChallenge"
   />
 

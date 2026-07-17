@@ -3,14 +3,19 @@ const props = withDefaults(defineProps<{
   modelValue: string
   placeholder?: string
   label: string
-  type?: 'search' | 'text'
+  type?: 'search' | 'text' | 'email' | 'password'
+  disabled?: boolean
+  autocomplete?: string
 }>(), {
   placeholder: '',
   type: 'search',
+  disabled: false,
+  autocomplete: undefined,
 })
 
 defineEmits<{
   'update:modelValue': [value: string]
+  enter: []
 }>()
 </script>
 
@@ -21,7 +26,10 @@ defineEmits<{
     :type="props.type"
     :aria-label="props.label"
     :placeholder="props.placeholder"
+    :disabled="props.disabled"
+    :autocomplete="props.autocomplete"
     @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+    @keyup.enter="$emit('enter')"
   >
 </template>
 
@@ -43,4 +51,5 @@ defineEmits<{
 
 .command-input::placeholder { color: var(--v2-text-faint); }
 .command-input:focus { box-shadow: var(--v2-inset-strong); }
+.command-input:disabled { cursor: not-allowed; opacity: 0.52; }
 </style>

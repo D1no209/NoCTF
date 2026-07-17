@@ -305,7 +305,7 @@ function formatDate(value: string | null | undefined) {
 .registration-workspace,
 .registration-state { display: grid; gap: 16px; }
 .registration-workspace__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 4px 2px 0; }
-.registration-workspace__heading h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; }
+.registration-workspace__heading h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
 .registration-workspace__heading p { max-width: 780px; margin: 8px 0 0; color: var(--v2-text-muted); font-size: 13px; line-height: 1.6; }
 .registration-workspace__actions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .registration-workspace__facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 10px; }

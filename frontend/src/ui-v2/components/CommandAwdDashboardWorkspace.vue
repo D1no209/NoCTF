@@ -120,7 +120,7 @@ const downCount = computed(() => props.services.filter(service => service.status
 .awd-dashboard,
 .awd-dashboard__state { display: grid; gap: 16px; }
 .awd-dashboard__heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 4px 2px 0; }
-.awd-dashboard__heading h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; }
+.awd-dashboard__heading h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
 .awd-dashboard__round { display: grid; grid-template-columns: minmax(150px, 0.7fr) minmax(230px, 1.4fr) minmax(100px, 0.45fr) minmax(90px, 0.4fr); align-items: center; gap: 8px; padding: 8px; }
 .awd-dashboard__round-main,
 .awd-dashboard__round-stat { display: flex; min-height: 76px; align-items: center; gap: 12px; border-radius: 12px; padding: 13px 16px; }

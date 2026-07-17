@@ -7,7 +7,7 @@ import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import CommandCompetitionCatalog from '../components/CommandCompetitionCatalog.vue'
 import type { CommandCompetition } from '../components/CommandCompetitionCard.vue'
-import CommandSignal from '../primitives/CommandSignal.vue'
+import CommandPageHeader from '../components/CommandPageHeader.vue'
 
 const router = useRouter()
 const search = ref('')
@@ -68,18 +68,15 @@ function registerForCompetition(id: string) {
 
 <template>
   <section class="v2-competitions">
-    <header class="v2-competitions__heading">
-      <div>
-        <CommandSignal label="Competition service / live contract data" tone="success" />
-        <h1>Competition registry</h1>
-        <p>Filter and enter the competitions exposed by the platform service.</p>
-      </div>
-      <div class="v2-competitions__count">
-        <Blocks class="size-4" />
-        <strong>{{ String(competitions?.length ?? 0).padStart(2, '0') }}</strong>
-        <span>records</span>
-      </div>
-    </header>
+    <CommandPageHeader
+      signal-label="Competition service / live contract data"
+      signal-tone="success"
+      title="Competition registry"
+      description="Filter and enter the competitions exposed by the platform service."
+      :stat-icon="Blocks"
+      :stat-value="String(competitions?.length ?? 0).padStart(2, '0')"
+      stat-label="records"
+    />
 
     <CommandCompetitionCatalog
       v-model:search="search"
@@ -98,14 +95,4 @@ function registerForCompetition(id: string) {
 
 <style scoped>
 .v2-competitions { display: grid; gap: 18px; }
-.v2-competitions__heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 4px 2px 0; }
-.v2-competitions__heading h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; letter-spacing: 0; }
-.v2-competitions__heading p { margin: 8px 0 0; color: var(--v2-text-muted); font-size: 13px; }
-.v2-competitions__count { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 9px; border-radius: 12px; padding: 10px 14px; background: var(--v2-surface); box-shadow: var(--v2-inset); color: var(--v2-primary); }
-.v2-competitions__count strong { color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 22px; line-height: 1; }
-.v2-competitions__count span { grid-column: 2; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 10px; font-weight: 600; }
-
-@media (max-width: 560px) {
-  .v2-competitions__heading { align-items: flex-start; flex-direction: column; }
-}
 </style>

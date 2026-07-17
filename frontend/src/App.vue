@@ -11,13 +11,19 @@ const { activeTheme } = useThemePackages()
 const route = useRoute()
 const v2RouteNames = new Set([
   'home',
+  'login',
+  'register',
+  'verify-email',
   'competitions',
   'competition-detail',
   'competition-register',
   'teams',
   'awdp-screen',
   'awd-dashboard',
+  'koh-dashboard',
+  'penetration-dashboard',
   'admin-theme-packs',
+  'not-found',
 ])
 const isV2Package = computed(() => activeTheme.value.uiPackage === 'v2' && v2RouteNames.has(String(route.name)))
 const effectColor = computed(() => activeTheme.value.tokens['--app-effect-color'] || activeTheme.value.tokens['--primary'])

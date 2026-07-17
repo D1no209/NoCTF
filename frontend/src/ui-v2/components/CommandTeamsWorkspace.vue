@@ -7,6 +7,7 @@ import CommandInput from '../primitives/CommandInput.vue'
 import CommandPanel from '../primitives/CommandPanel.vue'
 import CommandSelect, { type CommandSelectOption } from '../primitives/CommandSelect.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
+import CommandPageHeader from './CommandPageHeader.vue'
 
 export interface CommandMyTeam {
   id: string
@@ -104,18 +105,15 @@ function canEnter(team: CommandMyTeam) {
 
 <template>
   <section class="teams-workspace">
-    <header class="teams-workspace__heading">
-      <div>
-        <CommandSignal label="Team service / member operations" tone="success" />
-        <h1>My teams</h1>
-        <p>Create, join, and enter the teams associated with your account.</p>
-      </div>
-      <div class="teams-workspace__count">
-        <UsersRound class="size-4" />
-        <strong>{{ String(props.teams.length).padStart(2, '0') }}</strong>
-        <span>records</span>
-      </div>
-    </header>
+    <CommandPageHeader
+      signal-label="Team service / member operations"
+      signal-tone="success"
+      title="My teams"
+      description="Create, join, and enter the teams associated with your account."
+      :stat-icon="UsersRound"
+      :stat-value="String(props.teams.length).padStart(2, '0')"
+      stat-label="records"
+    />
 
     <p
       v-if="props.operationMessage"
@@ -277,12 +275,6 @@ function canEnter(team: CommandMyTeam) {
 
 <style scoped>
 .teams-workspace { display: grid; gap: 16px; }
-.teams-workspace__heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 4px 2px 0; }
-.teams-workspace__heading h1 { margin: 8px 0 0; color: var(--v2-text); font-size: 24px; font-weight: 600; }
-.teams-workspace__heading p { margin: 8px 0 0; color: var(--v2-text-muted); font-size: 13px; }
-.teams-workspace__count { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 9px; border-radius: 12px; padding: 10px 14px; background: var(--v2-surface); box-shadow: var(--v2-inset); color: var(--v2-primary); }
-.teams-workspace__count strong { color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 22px; line-height: 1; }
-.teams-workspace__count span { grid-column: 2; color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 10px; font-weight: 600; }
 .teams-workspace__message { margin: 0; border-radius: 12px; padding: 12px 14px; color: var(--v2-cyan); background: var(--v2-surface); box-shadow: var(--v2-inset); font-size: 13px; }
 .teams-workspace__message--danger { color: var(--v2-danger); }
 .teams-workspace__commands { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr); gap: 16px; }
@@ -314,7 +306,6 @@ function canEnter(team: CommandMyTeam) {
 .team-card > footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; padding: 0 16px 16px; }
 @media (max-width: 1120px) { .teams-workspace__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
-  .teams-workspace__heading { align-items: flex-start; flex-direction: column; }
   .teams-workspace__commands, .teams-workspace__grid { grid-template-columns: 1fr; }
 }
 </style>
