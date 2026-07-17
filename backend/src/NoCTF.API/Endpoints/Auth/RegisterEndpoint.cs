@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.API.Auth;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using Npgsql;
@@ -18,9 +19,13 @@ public class RegisterResponse
 {
     public Guid Id { get; set; }
     public string UserName { get; set; } = string.Empty;
+    public bool RequiresEmailVerification { get; set; }
+    public bool VerificationEmailSent { get; set; }
 }
 
-public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<RegisterRequest, RegisterResponse>, IAuditableEndpoint
+public class RegisterEndpoint(
+    ApplicationDbContext dbContext,
+    IEmailVerificationService emailVerification) : Endpoint<RegisterRequest, RegisterResponse>, IAuditableEndpoint
 {
     public override void Configure()
     {
@@ -90,6 +95,7 @@ public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<Registe
             Email = email,
             PasswordHash = hasher.HashPassword(null!, password),
             Role = UserRole.User,
+            EmailVerifiedAt = emailVerification.IsEnabled ? null : DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -107,7 +113,14 @@ public class RegisterEndpoint(ApplicationDbContext dbContext) : Endpoint<Registe
             return;
         }
 
-        await SendAsync(new RegisterResponse { Id = user.Id, UserName = user.UserName }, 201, ct);
+        var verification = await emailVerification.SendForRegistrationAsync(user, ct);
+        await SendAsync(new RegisterResponse
+        {
+            Id = user.Id,
+            UserName = user.UserName,
+            RequiresEmailVerification = verification.Required,
+            VerificationEmailSent = verification.Sent
+        }, 201, ct);
     }
 
     internal static bool IsUserUniquenessConflict(DbUpdateException exception)
