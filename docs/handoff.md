@@ -402,11 +402,11 @@ The current work covers plugin-host fail-fast behavior, score and task idempoten
 Latest verification status:
 
 - Release solution build: 0 warnings, 0 errors.
-- Complete Release suite with real PostgreSQL 16 and Redis 7: 484/484 passed. The EF InMemory test helper now reuses option-compatible service providers without suppressing the production warning; the notification payload boundary and email-verification regressions are included in this count.
+- Complete Release suite with real PostgreSQL 16 and Redis 7: 487/487 passed. The EF InMemory test helper now reuses option-compatible service providers without suppressing the production warning; the notification payload boundary, email-verification flow, and Admin email-settings regressions are included in this count.
 - `SubmissionMutationGuard` lease, transaction, cancellation, rollback, and release paths were manually reviewed for CTF, Penetration, AWDP, and AWD. AWD rollback remains available after mutation-token cancellation.
 - Analyzer and whitespace checks passed; the EF migration model has no pending changes.
 - An empty PostgreSQL database passed full upgrade, latest-migration rollback/reapply, full downgrade to `0`, and full re-upgrade.
-- OpenAPI was fetched from a running API and regenerated idempotently. Contract changes are the expected `before`/`limit` pagination on AWDP patch submissions, authenticated notification inbox endpoints, and email-verification request/response contracts; generator template changes follow the security upgrade to `@hey-api/openapi-ts` 0.97.3.
+- OpenAPI was fetched from a running API and regenerated idempotently. Contract changes are the expected `before`/`limit` pagination on AWDP patch submissions, authenticated notification inbox endpoints, email-verification request/response contracts, and the three Admin email-settings endpoints; generator template changes follow the security upgrade to `@hey-api/openapi-ts` 0.97.3.
 - Frontend frozen install, all 8 tracked tests, type-check, and production build passed. NuGet vulnerability/deprecation scans and `bun audit` are clean. The repository-wide ESLint run still reports the pre-existing generated/UI-scaffold baseline; the newly added notification and email-verification views pass targeted lint and no unrelated bulk formatting was applied.
 - Compose parsing and kubeconform strict passed (47 valid resources, 0 invalid/errors/skipped). Local `kubectl apply --dry-run=client` could not perform API discovery because no cluster is configured at `localhost:8080`; this is not a manifest validation failure.
 - API and Worker publish outputs contain the five required game/challenge plugin assemblies plus the optional QQBot assembly. Temporary PostgreSQL/Redis validation containers were removed.
