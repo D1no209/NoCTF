@@ -2,6 +2,10 @@ using FastEndpoints;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
+using NoCTF.Runtime.Kubernetes.Compose;
+using NoCTF.Runtime.Kubernetes.Configuration;
+using NoCTF.Runtime.Kubernetes.Containers;
+using k8s;
 
 namespace NoCTF.Runner.Composition;
 
@@ -15,9 +19,15 @@ public static class ServiceRegistration
             configuration["Runtime:Docker:PublicHost"] ?? "localhost");
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
-        services.AddSingleton<IContainerLifecycle>(sp => sp.GetRequiredService<DockerContainerLifecycle>());
-        services.AddSingleton<IOneShotJobRunner>(sp => sp.GetRequiredService<DockerContainerLifecycle>());
-        services.AddSingleton<IComposeRuntime>(new DockerComposeRuntime());
+        services.AddSingleton<DockerComposeRuntime>();
+        services.AddSingleton(new KubernetesRuntimeOptions(
+            configuration["Runtime:Kubernetes:Namespace"] ?? "noctf",
+            configuration["Runtime:Kubernetes:PublicHost"] ?? "localhost",
+            configuration["Runtime:Kubernetes:ImagePullPolicy"] ?? "IfNotPresent"));
+        services.AddSingleton<IKubernetes>(_ => new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile()));
+        services.AddSingleton<KubernetesContainerLifecycle>();
+        services.AddSingleton<KubernetesComposeRuntime>();
+        services.AddSingleton<RuntimeProviderCatalog>();
         services.AddFastEndpoints();
         return services;
     }

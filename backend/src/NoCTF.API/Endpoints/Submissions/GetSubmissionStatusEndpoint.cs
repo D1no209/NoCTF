@@ -1,12 +1,20 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Submissions.Ports;
 
 namespace NoCTF.API.Endpoints.Submissions;
 
+public sealed class GetSubmissionStatusRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid SubmissionId { get; set; }
+}
+
 public sealed class GetSubmissionStatusEndpoint(
     ISubmissionStatusReader statusReader,
-    IUserContext userContext) : Endpoint<GetSubmissionStatusRequest, SubmissionStatusResponse>
+    IUserContext userContext) : Endpoint<GetSubmissionStatusRequest, Results<Ok<SubmissionStatusResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -14,7 +22,9 @@ public sealed class GetSubmissionStatusEndpoint(
         AuthSchemes("Bearer");
     }
 
-    public override async Task HandleAsync(GetSubmissionStatusRequest request, CancellationToken cancellationToken)
+    public override async Task<Results<Ok<SubmissionStatusResponse>, NotFound>> ExecuteAsync(
+        GetSubmissionStatusRequest request,
+        CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         request.SubmissionId = Route<Guid>("submissionId");
@@ -25,15 +35,14 @@ public sealed class GetSubmissionStatusEndpoint(
             cancellationToken);
         if (result is null)
         {
-            await HttpContext.Response.SendNotFoundAsync(cancellationToken);
-            return;
+            return TypedResults.NotFound();
         }
-        await HttpContext.Response.SendAsync<SubmissionStatusResponse>(new(
+        return TypedResults.Ok(new SubmissionStatusResponse(
             result.SubmissionId,
             result.Kind,
             result.Outcome,
             result.ReceivedAt,
             result.CompletedAt,
-            result.ErrorCode), StatusCodes.Status200OK, null, cancellationToken);
+            result.ErrorCode));
     }
 }

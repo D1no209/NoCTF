@@ -23,6 +23,9 @@ using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Notifications;
 using StackExchange.Redis;
 using Wolverine;
+using Amazon.S3;
+using NoCTF.Application.Storage;
+using NoCTF.Infrastructure.Storage;
 
 namespace NoCTF.Infrastructure;
 
@@ -62,6 +65,7 @@ public static class ServiceRegistration
 
         services.AddScoped<ISubmissionIntakeStore, MartenSubmissionIntakeStore>();
         services.AddScoped<ISubmissionStatusReader, MartenSubmissionStatusReader>();
+        services.AddScoped<ICompetitionInputAppender, MartenCompetitionInputAppender>();
         services.AddScoped<ISubmissionProcessor, MartenSubmissionProcessor>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
         services.AddScoped<ISubmissionQueue, WolverineSubmissionQueue>();
@@ -69,6 +73,21 @@ public static class ServiceRegistration
         services.AddScoped<IScoringRebuildQueue, WolverineScoringRebuildQueue>();
         services.AddScoped<ILeaderboardStore, MartenLeaderboardStore>();
         services.AddScoped<ITeamModerationStore, EfTeamModerationStore>();
+        services.AddScoped<ICompetitionModerationAuthorizer, EfCompetitionModerationAuthorizer>();
+        services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();
+        if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config
+            {
+                ServiceURL = configuration["Storage:S3:ServiceUrl"],
+                ForcePathStyle = configuration.GetValue("Storage:S3:ForcePathStyle", true)
+            }));
+            services.AddSingleton<IObjectStorage, S3ObjectStorage>();
+        }
+        else
+        {
+            services.AddSingleton<IObjectStorage, LocalObjectStorage>();
+        }
         services.AddScoped<ICompetitionLifecycleStore, EfCompetitionLifecycleStore>();
         services.AddScoped<RebuildScoring>();
         services.AddScoped<AdvanceCompetitionLifecycle>();

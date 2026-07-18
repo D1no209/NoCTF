@@ -1,28 +1,41 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.Runner.Composition;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Endpoints;
 
 public sealed class ComposeDownRequest
 {
     public Guid OperationId { get; set; }
-    public string Provider { get; set; } = "docker";
+    public RuntimeProvider Provider { get; set; } = RuntimeProvider.Docker;
     public string ProjectName { get; set; } = string.Empty;
     public string Namespace { get; set; } = string.Empty;
 }
 
-public sealed class ComposeDownEndpoint(IComposeRuntime runtime) : Endpoint<ComposeDownRequest>
+public sealed class ComposeDownEndpoint(RuntimeProviderCatalog providers)
+    : Endpoint<ComposeDownRequest, Results<NoContent, ProblemHttpResult>>
 {
     public override void Configure() => Post("/compose/down");
 
-    public override async Task HandleAsync(ComposeDownRequest request, CancellationToken cancellationToken)
+    public override async Task<Results<NoContent, ProblemHttpResult>> ExecuteAsync(
+        ComposeDownRequest request,
+        CancellationToken cancellationToken)
     {
-        await runtime.DownAsync(new(
-            request.OperationId,
-            request.Provider,
-            request.ProjectName,
-            request.Namespace,
-            DateTimeOffset.UtcNow), cancellationToken);
-        await HttpContext.Response.SendNoContentAsync(cancellationToken);
+        try
+        {
+            await providers.Compose(request.Provider).DownAsync(new(
+                request.OperationId,
+                request.Provider,
+                request.ProjectName,
+                request.Namespace,
+                DateTimeOffset.UtcNow), cancellationToken);
+            return TypedResults.NoContent();
+        }
+        catch (UnsupportedRuntimeProviderException exception)
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, detail: exception.Message);
+        }
     }
 }

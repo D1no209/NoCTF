@@ -1,21 +1,36 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.Runner.Composition;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Endpoints;
 
 public sealed class DestroyContainerRequest
 {
-    public string Provider { get; set; } = "docker";
+    public RuntimeProvider Provider { get; set; } = RuntimeProvider.Docker;
     public string ResourceId { get; set; } = string.Empty;
 }
 
-public sealed class DestroyContainerEndpoint(IContainerLifecycle lifecycle) : Endpoint<DestroyContainerRequest>
+public sealed class DestroyContainerEndpoint(RuntimeProviderCatalog providers)
+    : Endpoint<DestroyContainerRequest, Results<NoContent, ProblemHttpResult>>
 {
     public override void Configure() => Post("/containers/destroy");
 
-    public override async Task HandleAsync(DestroyContainerRequest request, CancellationToken cancellationToken)
+    public override async Task<Results<NoContent, ProblemHttpResult>> ExecuteAsync(
+        DestroyContainerRequest request,
+        CancellationToken cancellationToken)
     {
-        await lifecycle.DestroyAsync(new(Guid.Empty, request.Provider, request.ResourceId, "running", new Dictionary<int, int>(), null, null), cancellationToken);
-        await HttpContext.Response.SendNoContentAsync(cancellationToken);
+        try
+        {
+            await providers.Containers(request.Provider).DestroyAsync(
+                new(Guid.Empty, request.Provider, request.ResourceId, RuntimeStatus.Running, new Dictionary<int, int>(), null, null),
+                cancellationToken);
+            return TypedResults.NoContent();
+        }
+        catch (UnsupportedRuntimeProviderException exception)
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, detail: exception.Message);
+        }
     }
 }

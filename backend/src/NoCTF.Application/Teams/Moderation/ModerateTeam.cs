@@ -16,6 +16,11 @@ public interface ITeamModerationStore
     Task<OperationResult> ApplyAsync(TeamModerationCommand command, CancellationToken cancellationToken);
 }
 
+public interface ICompetitionModerationAuthorizer
+{
+    Task<bool> CanModerateAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken);
+}
+
 /// <summary>Applies a relational ban ruling and schedules retroactive score reconstruction.</summary>
 public sealed class ModerateTeam(ITeamModerationStore store, IScoringRebuildQueue rebuildQueue)
 {
@@ -32,7 +37,7 @@ public sealed class ModerateTeam(ITeamModerationStore store, IScoringRebuildQueu
 
         await rebuildQueue.EnqueueAsync(
             command.CompetitionId,
-            command.Ban ? "team_banned" : "team_unbanned",
+            command.Ban ? ScoringRebuildReason.TeamBanned : ScoringRebuildReason.TeamUnbanned,
             cancellationToken);
         return OperationResult.Success();
     }

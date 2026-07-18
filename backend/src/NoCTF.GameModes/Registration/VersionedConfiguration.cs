@@ -8,6 +8,7 @@ internal static class VersionedConfiguration
 {
     internal static readonly JsonSerializerOptions StrictOptions = new()
     {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = false,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };

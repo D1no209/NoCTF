@@ -1,25 +1,40 @@
 using FastEndpoints;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.API.Security;
 using NoCTF.Application.Submissions.Intake;
 
 namespace NoCTF.API.Endpoints.Submissions;
 
+public sealed class SubmitFlagRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public string Flag { get; set; } = string.Empty;
+}
+
 public sealed class SubmitFlagEndpoint(
     SubmitFlag submitFlag,
     IUserContext userContext,
-    IHttpContextAccessor httpContextAccessor) : Endpoint<SubmitFlagRequest, AcceptedSubmissionResponse>
+    IHttpContextAccessor httpContextAccessor) : Endpoint<SubmitFlagRequest,
+        Microsoft.AspNetCore.Http.HttpResults.Results<Accepted<AcceptedSubmissionResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/competitions/{competitionId}/submissions/flags");
         AuthSchemes("Bearer");
         Options(options => options.WithMetadata(new EnableRateLimitingAttribute("submission")));
+        Description(builder => builder.ProducesProblemFE(StatusCodes.Status400BadRequest)
+            .ProducesProblemFE(StatusCodes.Status403Forbidden)
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary => summary.Summary = "Accept a Flag submission for asynchronous processing.");
     }
 
-    public override async Task HandleAsync(SubmitFlagRequest request, CancellationToken cancellationToken)
+    public override async Task<Microsoft.AspNetCore.Http.HttpResults.Results<Accepted<AcceptedSubmissionResponse>, ProblemHttpResult>> ExecuteAsync(
+        SubmitFlagRequest request,
+        CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var result = await submitFlag.ExecuteAsync(new(
@@ -32,17 +47,11 @@ public sealed class SubmitFlagEndpoint(
             DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
         {
-            await SubmissionProblemDetails.WriteAsync(HttpContext.Response, MapStatus(result.ErrorCode),
-                result.ErrorCode, result.ErrorMessage, cancellationToken);
-            return;
+            return SubmissionProblemDetails.Create(SubmissionProblemDetails.StatusFor(result.ErrorCode), result.ErrorCode, result.ErrorMessage);
         }
-        await HttpContext.Response.SendAsync<AcceptedSubmissionResponse>(new(result.Value!.SubmissionId, result.Value.ReceivedAt), StatusCodes.Status202Accepted, null, cancellationToken);
+        return TypedResults.Accepted<AcceptedSubmissionResponse>(
+            uri: (string?)null,
+            value: new AcceptedSubmissionResponse(result.Value!.SubmissionId, result.Value.ReceivedAt));
     }
 
-    private static int MapStatus(string? code) => code switch
-    {
-        "team_banned" or "team_forbidden" => StatusCodes.Status403Forbidden,
-        "competition_finished" or "competition_not_started" => StatusCodes.Status409Conflict,
-        _ => StatusCodes.Status400BadRequest
-    };
 }

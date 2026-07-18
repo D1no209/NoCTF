@@ -1,3 +1,5 @@
+using NoCTF.Domain.Runtime;
+
 namespace NoCTF.Application.Runtime.Ports;
 
 public sealed record ContainerResourceLimits(long MemoryBytes, long NanoCpus, long PidsLimit);
@@ -21,9 +23,9 @@ public sealed record ContainerRequest(
 
 public sealed record ContainerReceipt(
     Guid OperationId,
-    string Provider,
+    RuntimeProvider Provider,
     string ResourceId,
-    string Status,
+    RuntimeStatus Status,
     IReadOnlyDictionary<int, int> PortMappings,
     string? PublicHost,
     string? InternalHost);

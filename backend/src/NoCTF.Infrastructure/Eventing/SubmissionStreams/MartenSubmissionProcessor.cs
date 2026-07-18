@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using Amazon.S3;
 using Marten;
 using Marten.Events;
 using JasperFx.Events;
@@ -8,6 +10,7 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.Application.Storage;
 using EF = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 
 namespace NoCTF.Infrastructure.Eventing.SubmissionStreams;
@@ -15,7 +18,8 @@ namespace NoCTF.Infrastructure.Eventing.SubmissionStreams;
 /// <summary>Resolves queued submissions from the permanent stream and appends exactly one outcome.</summary>
 public sealed class MartenSubmissionProcessor(
     IDocumentSession session,
-    NoCtfDbContext db) : ISubmissionProcessor
+    NoCtfDbContext db,
+    IObjectStorage storage) : ISubmissionProcessor
 {
     public Task ProcessFlagAsync(Guid competitionId, Guid submissionId, CancellationToken cancellationToken) =>
         ProcessAsync(competitionId, submissionId, cancellationToken, ProcessFlag);
@@ -27,7 +31,7 @@ public sealed class MartenSubmissionProcessor(
         Guid competitionId,
         Guid submissionId,
         CancellationToken cancellationToken,
-        Func<IReadOnlyList<IEvent>, Guid, CancellationToken, Task<object>> resolver)
+        Func<IReadOnlyList<IEvent>, Guid, CancellationToken, Task<ISubmissionStreamEvent>> resolver)
     {
         var events = await session.Events.FetchStreamAsync(StreamIds.Submission(competitionId), token: cancellationToken);
         var existing = events.Select(item => item.Data).FirstOrDefault(item =>
@@ -46,7 +50,7 @@ public sealed class MartenSubmissionProcessor(
         await session.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<object> ProcessFlag(
+    private async Task<ISubmissionStreamEvent> ProcessFlag(
         IReadOnlyList<IEvent> events,
         Guid submissionId,
         CancellationToken cancellationToken)
@@ -80,7 +84,7 @@ public sealed class MartenSubmissionProcessor(
             DateTimeOffset.UtcNow);
     }
 
-    private async Task<object> ProcessFix(
+    private async Task<ISubmissionStreamEvent> ProcessFix(
         IReadOnlyList<IEvent> events,
         Guid submissionId,
         CancellationToken cancellationToken)
@@ -92,20 +96,56 @@ public sealed class MartenSubmissionProcessor(
         var maxAttempts = ReadMaxFixAttempts(configuration?.Json);
         var priorFailures = events.Select(item => item.Data).OfType<FixSubmissionEvaluated>()
             .Count(item => item.TeamId == received.TeamId && item.ChallengeId == received.ChallengeId
-                && item.Outcome is SubmissionOutcome.Wrong or SubmissionOutcome.PlatformFailed);
-        var valid = received.Archive.Length > 0 && !string.IsNullOrWhiteSpace(received.Archive.ObjectKey);
+                && item.ConsumedAttempt);
         var exhausted = priorFailures >= maxAttempts;
-        var outcome = exhausted
-            ? SubmissionOutcome.AttemptsExhausted
-            : valid ? SubmissionOutcome.Correct : SubmissionOutcome.Wrong;
+        var validation = exhausted
+            ? (SubmissionOutcome.AttemptsExhausted, false, (string?)"fix_attempts_exhausted")
+            : await ValidateArchiveAsync(received.Archive, cancellationToken);
         return new FixSubmissionEvaluated(
             submissionId,
             received.CompetitionId,
             received.TeamId,
             received.ChallengeId,
-            outcome,
-            outcome == SubmissionOutcome.Wrong,
-            DateTimeOffset.UtcNow);
+            validation.Item1,
+            validation.Item2,
+            DateTimeOffset.UtcNow,
+            validation.Item3);
+    }
+
+    private async Task<(SubmissionOutcome Outcome, bool ConsumedAttempt, string? ErrorCode)> ValidateArchiveAsync(
+        FixArchiveReference expected,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var actual = await storage.InspectAsync(expected.ObjectKey, cancellationToken);
+            if (actual is null)
+                return (SubmissionOutcome.Wrong, true, "fix_archive_missing");
+            if (actual.Length != expected.Length)
+                return (SubmissionOutcome.Wrong, true, "fix_archive_length_mismatch");
+
+            var actualHash = actual.Sha256;
+            if (string.IsNullOrWhiteSpace(actualHash))
+            {
+                await using var content = await storage.OpenReadAsync(expected.ObjectKey, cancellationToken);
+                actualHash = Convert.ToHexString(await SHA256.HashDataAsync(content, cancellationToken));
+            }
+            if (!string.Equals(actualHash, expected.Sha256, StringComparison.OrdinalIgnoreCase))
+                return (SubmissionOutcome.Wrong, true, "fix_archive_hash_mismatch");
+            return (SubmissionOutcome.Correct, false, null);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return (SubmissionOutcome.PlatformFailed, false, "storage_timeout");
+        }
+        catch (IOException)
+        {
+            return (SubmissionOutcome.PlatformFailed, false, "storage_unavailable");
+        }
+        catch (AmazonS3Exception)
+        {
+            return (SubmissionOutcome.PlatformFailed, false, "storage_unavailable");
+        }
     }
 
     private static string? ReadFlag(string? json)

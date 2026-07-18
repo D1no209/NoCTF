@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runtime.Docker.Compose;
 
@@ -22,7 +23,7 @@ public sealed class DockerComposeRuntime : IComposeRuntime
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(Path.Combine(directory, "compose.yaml"), request.ComposeYaml, cancellationToken);
         await RunDockerAsync(directory, request.ProjectName, "up", cancellationToken, "-d");
-        return new(request.OperationId, "docker", request.ProjectName, directory, DateTimeOffset.UtcNow);
+        return new(request.OperationId, RuntimeProvider.Docker, request.ProjectName, directory, DateTimeOffset.UtcNow);
     }
 
     public Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken) =>
@@ -34,9 +35,9 @@ public sealed class DockerComposeRuntime : IComposeRuntime
         var services = result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Split('|', 2))
             .Where(parts => parts.Length == 2)
-            .Select(parts => new ComposeServiceStatus(parts[0], parts[0], parts[1], new Dictionary<int, int>(), null))
+            .Select(parts => new ComposeServiceStatus(parts[0], parts[0], ToRuntimeStatus(parts[1]), new Dictionary<int, int>(), null))
             .ToList();
-        return new(receipt.ProjectName, services.Count == 0 ? "stopped" : "running", services);
+        return new(receipt.ProjectName, services.Count == 0 ? RuntimeStatus.Stopped : RuntimeStatus.Running, services);
     }
 
     private async Task<string> RunDockerAsync(
@@ -73,4 +74,13 @@ public sealed class DockerComposeRuntime : IComposeRuntime
             throw new InvalidOperationException(await process.StandardError.ReadToEndAsync(cancellationToken));
         return output;
     }
+
+    private static RuntimeStatus ToRuntimeStatus(string status) => status.ToLowerInvariant() switch
+    {
+        "running" => RuntimeStatus.Running,
+        "created" => RuntimeStatus.Pending,
+        "restarting" => RuntimeStatus.Starting,
+        "exited" or "dead" => RuntimeStatus.Stopped,
+        _ => RuntimeStatus.Failed
+    };
 }

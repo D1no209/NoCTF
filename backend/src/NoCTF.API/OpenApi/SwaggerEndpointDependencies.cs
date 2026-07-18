@@ -53,9 +53,15 @@ internal sealed class SwaggerModerationStore : ITeamModerationStore
         Task.FromResult(OperationResult.Success());
 }
 
+internal sealed class SwaggerModerationAuthorizer : ICompetitionModerationAuthorizer
+{
+    public Task<bool> CanModerateAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
+        Task.FromResult(false);
+}
+
 internal sealed class SwaggerRebuildQueue : IScoringRebuildQueue
 {
-    public Task EnqueueAsync(Guid competitionId, string reason, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task EnqueueAsync(Guid competitionId, ScoringRebuildReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 internal sealed class SwaggerLeaderboardStore : ILeaderboardStore

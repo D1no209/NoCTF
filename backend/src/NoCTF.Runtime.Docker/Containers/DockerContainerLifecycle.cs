@@ -1,6 +1,7 @@
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runtime.Docker.Containers;
 
@@ -43,7 +44,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             }
         }, cancellationToken);
         await client.Containers.StartContainerAsync(response.ID, new ContainerStartParameters(), cancellationToken);
-        return new(request.OperationId, "docker", response.ID, "running", request.PortMappings, options.PublicHost, null);
+        return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running, request.PortMappings, options.PublicHost, null);
     }
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
@@ -57,7 +58,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         try
         {
             var container = await client.Containers.InspectContainerAsync(resourceId, cancellationToken);
-            return new(Guid.Empty, "docker", resourceId, container.State?.Status ?? "unknown", new Dictionary<int, int>(),
+            return new(Guid.Empty, RuntimeProvider.Docker, resourceId, ToRuntimeStatus(container.State?.Status), new Dictionary<int, int>(),
                 options.PublicHost, null);
         }
         catch (DockerContainerNotFoundException)
@@ -83,4 +84,14 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     }
 
     public void Dispose() => client.Dispose();
+
+    private static RuntimeStatus ToRuntimeStatus(string? status) => status?.ToLowerInvariant() switch
+    {
+        "created" => RuntimeStatus.Pending,
+        "restarting" => RuntimeStatus.Starting,
+        "running" => RuntimeStatus.Running,
+        "paused" or "removing" => RuntimeStatus.Stopping,
+        "exited" or "dead" => RuntimeStatus.Stopped,
+        _ => RuntimeStatus.Failed
+    };
 }

@@ -29,7 +29,6 @@ if (exportSwagger)
     return;
 }
 app.MapHub<CompetitionHub>("/hubs/competition");
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.Run();
 
 public partial class Program;

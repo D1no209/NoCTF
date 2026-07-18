@@ -41,9 +41,9 @@ public sealed class MartenSubmissionStatusReader(IQuerySession session, Persiste
             .LastOrDefault();
 
         return flag is not null
-            ? new(submissionId, competitionId, flag.TeamId, flag.ChallengeId, "flag",
+            ? new(submissionId, competitionId, flag.TeamId, flag.ChallengeId, SubmissionKind.Flag,
                 outcome.Outcome, flag.ReceivedAt, outcome.EvaluatedAt == default ? null : outcome.EvaluatedAt, outcome.ErrorCode)
-            : new(submissionId, competitionId, fix!.TeamId, fix.ChallengeId, "fix",
+            : new(submissionId, competitionId, fix!.TeamId, fix.ChallengeId, SubmissionKind.Fix,
                 outcome.Outcome, fix.ReceivedAt, outcome.EvaluatedAt == default ? null : outcome.EvaluatedAt, outcome.ErrorCode);
     }
 }

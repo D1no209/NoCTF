@@ -31,4 +31,28 @@ public class CtfScoringRulesTests
 
         await Assert.That(result).IsEqualTo(expected);
     }
+
+    [Test]
+    public async Task Configuration_parser_accepts_strict_camel_case_schema()
+    {
+        const string json = """
+            {"schemaVersion":1,"flag":"flag{ok}","points":null,"bloodRewards":null}
+            """;
+
+        var result = CtfConfigurationUpgrader.ParseChallenge(json);
+
+        await Assert.That(result.Flag).IsEqualTo("flag{ok}");
+    }
+
+    [Test]
+    public async Task Configuration_parser_rejects_unknown_fields()
+    {
+        const string json = """
+            {"schemaVersion":1,"flag":"flag{ok}","points":null,"bloodRewards":null,"unknown":true}
+            """;
+
+        void Act() => CtfConfigurationUpgrader.ParseChallenge(json);
+
+        await Assert.That(Act).Throws<NoCTF.GameModes.Registration.GameModeConfigurationException>();
+    }
 }

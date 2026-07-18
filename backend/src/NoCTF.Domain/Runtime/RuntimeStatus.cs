@@ -16,3 +16,13 @@ public enum RuntimeProvider
     Kubernetes,
     Runner
 }
+
+public enum RuntimeOperationKind
+{
+    CreateContainer,
+    DestroyContainer,
+    ComposeUp,
+    ComposeDown,
+    ComposeStatus,
+    OneShot
+}

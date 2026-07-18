@@ -1,3 +1,5 @@
+using NoCTF.Domain.Runtime;
+
 namespace NoCTF.Application.Runtime.Ports;
 
 public sealed record ComposeRequest(
@@ -11,12 +13,12 @@ public sealed record ComposeRequest(
 public sealed record ComposeServiceStatus(
     string Name,
     string ResourceId,
-    string Status,
+    RuntimeStatus Status,
     IReadOnlyDictionary<int, int> PublishedPorts,
     string? InternalHost);
 
-public sealed record ComposeReceipt(Guid OperationId, string Provider, string ProjectName, string Namespace, DateTimeOffset CreatedAt);
-public sealed record ComposeStatus(string ProjectName, string Status, IReadOnlyList<ComposeServiceStatus> Services);
+public sealed record ComposeReceipt(Guid OperationId, RuntimeProvider Provider, string ProjectName, string Namespace, DateTimeOffset CreatedAt);
+public sealed record ComposeStatus(string ProjectName, RuntimeStatus Status, IReadOnlyList<ComposeServiceStatus> Services);
 
 public interface IComposeRuntime
 {

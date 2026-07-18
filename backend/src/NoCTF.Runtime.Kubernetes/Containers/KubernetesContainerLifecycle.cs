@@ -1,6 +1,7 @@
 using k8s;
 using k8s.Models;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Kubernetes.Configuration;
 
 namespace NoCTF.Runtime.Kubernetes.Containers;
@@ -38,7 +39,7 @@ public sealed class KubernetesContainerLifecycle(
             }
         };
         await client.CoreV1.CreateNamespacedPodAsync(pod, options.Namespace, cancellationToken: cancellationToken);
-        return new(request.OperationId, "kubernetes", name, "pending", request.PortMappings, options.PublicHost, $"{name}.{options.Namespace}.svc");
+        return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending, request.PortMappings, options.PublicHost, $"{name}.{options.Namespace}.svc");
     }
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken) =>
@@ -53,8 +54,8 @@ public sealed class KubernetesContainerLifecycle(
         try
         {
             var pod = await client.CoreV1.ReadNamespacedPodAsync(resourceId, options.Namespace, cancellationToken: cancellationToken);
-            var phase = pod.Status?.Phase ?? "Unknown";
-            return new(Guid.Empty, "kubernetes", resourceId, phase, new Dictionary<int, int>(), options.PublicHost,
+            var phase = ToRuntimeStatus(pod.Status?.Phase);
+            return new(Guid.Empty, RuntimeProvider.Kubernetes, resourceId, phase, new Dictionary<int, int>(), options.PublicHost,
                 $"{resourceId}.{options.Namespace}.svc");
         }
         catch (k8s.Autorest.HttpOperationException exception) when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -62,4 +63,13 @@ public sealed class KubernetesContainerLifecycle(
             return null;
         }
     }
+
+    private static RuntimeStatus ToRuntimeStatus(string? phase) => phase?.ToLowerInvariant() switch
+    {
+        "pending" => RuntimeStatus.Pending,
+        "running" => RuntimeStatus.Running,
+        "succeeded" => RuntimeStatus.Stopped,
+        "failed" => RuntimeStatus.Failed,
+        _ => RuntimeStatus.Failed
+    };
 }
