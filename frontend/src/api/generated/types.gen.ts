@@ -770,6 +770,7 @@ export type NoCtfapiEndpointsAdminBindCompetitionChallengeRequest = {
 };
 
 export type NoCtfapiEndpointsAdminUpdateCompetitionChallengeRequest = {
+    direction?: string | null;
     description?: string | null;
     descriptionFormat?: string;
     flagPrefix?: string | null;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowLeft, Loader2, RefreshCw, Save, Trash2 } from 'lucide-vue-next'
+import { ArrowLeft, Loader2, Plus, RefreshCw, Save, Trash2 } from 'lucide-vue-next'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -39,6 +39,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { challengeDirectionsForType, normalizeDirection } from '@/lib/challengeDirections'
 
 interface PointsConfigDto {
   initialPoints: number
@@ -240,6 +241,7 @@ const bindForm = reactive({
 })
 
 const selectedEdit = reactive({
+  direction: 'WEB',
   description: '',
   initialPoints: 500,
   minimumPoints: 100,
@@ -416,10 +418,12 @@ watch(templates, (items) => {
 }, { immediate: true })
 
 const selectedChallenge = computed(() => competitionChallenges.value?.find(c => c.id === selectedChallengeId.value) ?? null)
+const selectedDirectionOptions = computed(() => challengeDirectionsForType(selectedChallenge.value?.typeId))
 
 watch(selectedChallenge, (challenge) => {
   if (!challenge)
     return
+  selectedEdit.direction = normalizeDirection(challenge.direction)
   selectedEdit.description = challenge.description ?? ''
   selectedEdit.initialPoints = challenge.pointsConfig?.initialPoints ?? 500
   selectedEdit.minimumPoints = challenge.pointsConfig?.minimumPoints ?? 100
@@ -484,6 +488,7 @@ const bindMutation = useMutation({
 
 const updateChallengeMutation = useMutation({
   mutationFn: () => adminApi.updateCompetitionChallenge(competitionId.value, selectedChallenge.value!.id, {
+    direction: normalizeDirection(selectedEdit.direction),
     description: selectedEdit.description.trim() || undefined,
     descriptionFormat: 'markdown',
     pointsConfig: {
@@ -578,9 +583,11 @@ const rebuildScoreboardMutation = useMutation({
   mutationFn: () => adminApi.rebuildScoreboard(competitionId.value) as Promise<{ rows?: number }>,
   onSuccess: (result) => {
     qc.invalidateQueries({ queryKey: queryKeys.leaderboard(competitionId.value) })
-    toast.success(`Scoreboard rebuilt${result.rows === undefined ? '' : ` (${result.rows} teams)`}`)
+    toast.success(result.rows === undefined
+      ? t('admin.competitionDetail.scoreboardRebuilt')
+      : t('admin.competitionDetail.scoreboardRebuiltWithTeams', { count: result.rows }))
   },
-  onError: () => toast.error('Unable to rebuild scoreboard'),
+  onError: () => toast.error(t('admin.competitionDetail.scoreboardRebuildError')),
 })
 
 function isStaticContainer(challenge: CompetitionChallengeDto) {
@@ -645,20 +652,10 @@ function sectionRoute(section: CompetitionDetailSection) {
         >
           <Loader2 v-if="rebuildScoreboardMutation.isPending.value" class="size-4 animate-spin" />
           <RefreshCw v-else class="size-4" />
-          Rebuild scoreboard
-        </Button>
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'admin-competition-operations', params: { id: competitionId } }">
-            Operations
-          </RouterLink>
-        </Button>
-        <Button v-if="canOpenAwdpScreen" variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'awdp-screen', params: { gameId: competitionId } }">
-            {{ t('awdp.screenEntry') }}
-          </RouterLink>
+          {{ t('admin.competitionDetail.rebuildScoreboard') }}
         </Button>
         <Badge v-if="competition?.status" variant="outline" class="capitalize">
-          {{ competition.status }}
+          {{ t(`competitions.status.${competition.status.toLowerCase()}`, competition.status) }}
         </Badge>
       </div>
     </div>
@@ -673,9 +670,26 @@ function sectionRoute(section: CompetitionDetailSection) {
       :model-value="activeSection"
       @update:model-value="(value: string | undefined) => value && router.replace(sectionRoute(value as CompetitionDetailSection))"
     >
-      <TabsList>
+      <TabsList class="h-auto flex-wrap justify-start">
         <TabsTrigger
-          v-for="section in competitionDetailSections"
+          v-for="section in competitionDetailSections.slice(0, 3)"
+          :key="section.key"
+          :value="section.key"
+        >
+          {{ t(section.labelKey) }}
+        </TabsTrigger>
+        <Button variant="ghost" size="sm" class="h-8 rounded-none px-3" as-child>
+          <RouterLink :to="{ name: 'admin-competition-operations', params: { id: competitionId } }">
+            {{ t('admin.competitionDetail.navOperations') }}
+          </RouterLink>
+        </Button>
+        <Button v-if="canOpenAwdpScreen" variant="ghost" size="sm" class="h-8 rounded-none px-3" as-child>
+          <RouterLink :to="{ name: 'awdp-screen', params: { gameId: competitionId } }">
+            {{ t('awdp.screenEntry') }}
+          </RouterLink>
+        </Button>
+        <TabsTrigger
+          v-for="section in competitionDetailSections.slice(3)"
           :key="section.key"
           :value="section.key"
         >
@@ -783,7 +797,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                       {{ challenge.title }}
                     </div>
                     <div class="text-xs text-muted-foreground">
-                      {{ challenge.typeId }} · {{ challenge.direction || 'Uncategorized' }}
+                      {{ challenge.typeId }} · {{ normalizeDirection(challenge.direction) }}
                     </div>
                   </TableCell>
                   <TableCell class="text-xs">
@@ -825,6 +839,17 @@ function sectionRoute(section: CompetitionDetailSection) {
             </div>
 
             <div class="space-y-4">
+              <div class="grid gap-2">
+                <Label>{{ t('admin.challenges.direction') }}</Label>
+                <Select v-model="selectedEdit.direction">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="direction in selectedDirectionOptions" :key="direction" :value="direction">
+                      {{ direction }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div class="grid gap-2">
                 <Label>{{ t('admin.competitionDetail.markdownDescriptionShort') }}</Label>
                 <Textarea v-model="selectedEdit.description" class="font-mono text-xs" rows="7" />

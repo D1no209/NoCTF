@@ -41,6 +41,7 @@ public class UpdateCompetitionChallengeRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid ChallengeId { get; set; }
+    public string? Direction { get; set; }
     public string? Description { get; set; }
     public string DescriptionFormat { get; set; } = "markdown";
     public string? FlagPrefix { get; set; }
@@ -389,6 +390,8 @@ public class UpdateCompetitionChallengeEndpoint(
             return;
         }
 
+        if (req.Direction is not null)
+            challenge.Direction = ChallengeTemplateRequestRules.NormalizeDirection(req.Direction);
         challenge.Description = req.Description;
         challenge.DescriptionFormat = string.IsNullOrWhiteSpace(req.DescriptionFormat) ? "markdown" : req.DescriptionFormat;
         challenge.FlagPrefix = string.IsNullOrWhiteSpace(req.FlagPrefix) ? "flag" : req.FlagPrefix.Trim();
