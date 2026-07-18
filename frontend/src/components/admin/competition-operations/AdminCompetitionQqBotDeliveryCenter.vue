@@ -24,6 +24,7 @@ interface QqRule {
 }
 
 interface QqBinding {
+  id?: string | null
   agentId: string
   groupId: string
   qqGroupId: number
@@ -111,13 +112,13 @@ const form = reactive<QqConfig>({
 
 const eventLabels = computed<Record<QqEventType, string>>(() => ({
   0: t('admin.qqBot.competition.events.competitionStart'),
-  1: t('admin.qqBot.competition.events.competitionEnd'),
-  2: t('admin.qqBot.competition.events.challengeSolved'),
+  1: t('admin.qqBot.competition.events.challengePublished'),
+  2: t('admin.qqBot.competition.events.hintPublished'),
   3: t('admin.qqBot.competition.events.firstBlood'),
-  4: t('admin.qqBot.competition.events.teamPenalty'),
-  5: t('admin.qqBot.competition.events.systemNotice'),
-  6: t('admin.qqBot.competition.events.manualAnnouncement'),
-  7: t('admin.qqBot.competition.events.scoreboardUpdate'),
+  4: t('admin.qqBot.competition.events.secondBlood'),
+  5: t('admin.qqBot.competition.events.thirdBlood'),
+  6: t('admin.qqBot.competition.events.teamPenalty'),
+  7: t('admin.qqBot.competition.events.manualAnnouncement'),
 }))
 const deliveryOptions: Array<{ key: BooleanConfigKey, label: string }> = [
   { key: 'enabled', label: 'admin.qqBot.competition.enableDelivery' },
@@ -244,7 +245,24 @@ function warningLabel(code: string) {
 }
 
 const saveConfig = useMutation({
-  mutationFn: () => adminApi.updateCompetitionQqBot(props.competitionId, { ...form, groupBindings: bindings.value }),
+  mutationFn: () => adminApi.updateCompetitionQqBot(props.competitionId, {
+    enabled: form.enabled,
+    allowMessages: form.allowMessages,
+    allowManualNotifications: form.allowManualNotifications,
+    stopNormalEventsAfterFinished: form.stopNormalEventsAfterFinished,
+    mentionAll: form.mentionAll,
+    showTeamName: form.showTeamName,
+    showUserName: form.showUserName,
+    showChallengeCategory: form.showChallengeCategory,
+    includeCompetitionLink: form.includeCompetitionLink,
+    includeChallengeLink: form.includeChallengeLink,
+    hidePenaltyDetails: form.hidePenaltyDetails,
+    eventRules: form.eventRules.map(rule => ({ ...rule })),
+    groupBindings: bindings.value.map(binding => ({
+      ...binding,
+      eventTypes: binding.eventTypes ?? [],
+    })),
+  }),
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: ['competition-qqbot', props.competitionId] })
     toast.success(t('admin.qqBot.competition.configurationSaved'))
@@ -352,7 +370,7 @@ const retryDelivery = useMutation({
         </div>
 
         <div class="flex justify-end border-t bg-muted/20 p-4">
-          <Button :disabled="saveConfig.isPending.value" @click="saveConfig.mutate()"><Loader2 v-if="saveConfig.isPending.value" class="size-4 animate-spin" /><Save v-else class="size-4" />{{ t('admin.qqBot.competition.saveConfiguration') }}</Button>
+          <Button :disabled="saveConfig.isPending" @click="saveConfig.mutate()"><Loader2 v-if="saveConfig.isPending" class="size-4 animate-spin" /><Save v-else class="size-4" />{{ t('admin.qqBot.competition.saveConfiguration') }}</Button>
         </div>
       </CardContent>
     </Card>

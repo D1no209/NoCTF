@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application.Events;
+using NoCTF.Application.QqBot;
 using NoCTF.Core;
 using NoCTF.Infrastructure;
 using NoCTF.Plugins.QQBot;
@@ -78,6 +79,82 @@ public sealed class QqBotPluginTests
             "NoCTF.Plugins.CTF.dll", "NoCTF.Plugins.AWD.dll", "NoCTF.Plugins.AWDP.dll",
             "NoCTF.Plugins.KoH.dll", "NoCTF.Plugins.Penetration.dll"
         });
+    }
+
+    [Fact]
+    public async Task Administration_UpdateConfiguration_PreservesExistingRuleAndBindingRows()
+    {
+        await using var db = CreateDb();
+        var now = DateTime.UtcNow;
+        var competitionId = Guid.NewGuid();
+        var agentId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var ruleId = Guid.NewGuid();
+        var bindingId = Guid.NewGuid();
+        db.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            CompetitionId = competitionId,
+            Title = "Configuration Test",
+            Status = CompetitionStatus.Draft,
+            ModeKey = "ctf",
+            StartTime = now.AddHours(1),
+            EndTime = now.AddHours(2)
+        });
+        db.QqBotAgents.Add(new QqBotAgent
+        {
+            Id = agentId,
+            Name = "configuration-agent",
+            Enabled = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.QqBotGroups.Add(new QqBotGroup
+        {
+            Id = groupId,
+            AgentId = agentId,
+            GroupId = 1095173403,
+            GroupName = "configuration-group",
+            IsPresent = true,
+            IsAuthorized = true,
+            LastSeenAt = now,
+            UpdatedAt = now
+        });
+        db.CompetitionQqBotEventRules.Add(new CompetitionQqBotEventRule
+        {
+            Id = ruleId,
+            CompetitionId = competitionId,
+            EventType = QqBotEventType.ThirdBlood,
+            Enabled = false,
+            UpdatedAt = now
+        });
+        db.CompetitionQqBotGroupBindings.Add(new CompetitionQqBotGroupBinding
+        {
+            Id = bindingId,
+            CompetitionId = competitionId,
+            AgentId = agentId,
+            GroupId = groupId,
+            EventTypesJson = "[]",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        await db.SaveChangesAsync();
+
+        var service = new QqBotAdministrationService(db, new RecordingOutbox(), new QqBotTemplateRenderer());
+        var update = new CompetitionQqBotConfigurationUpdate(
+            true, true, true, true, false, true, false, true, true, true, true,
+            [new QqBotEventRuleView(QqBotEventType.ThirdBlood, true, null)],
+            [new QqBotGroupBindingView(bindingId, agentId, groupId, 1095173403, "configuration-group", true,
+                [QqBotEventType.ThirdBlood])]);
+
+        var result = await service.UpdateCompetitionConfigurationAsync(competitionId, update);
+
+        var persistedRule = await db.CompetitionQqBotEventRules.IgnoreQueryFilters().SingleAsync();
+        var persistedBinding = await db.CompetitionQqBotGroupBindings.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal(ruleId, persistedRule.Id);
+        Assert.True(persistedRule.Enabled);
+        Assert.Equal(bindingId, persistedBinding.Id);
+        Assert.Contains(QqBotEventType.ThirdBlood, result.GroupBindings.Single().EventTypes);
     }
 
     [Theory]
@@ -243,6 +320,11 @@ public sealed class QqBotPluginTests
     }
 
     private sealed record DispatchFixture(BackgroundTaskItem Task);
+
+    private sealed class RecordingOutbox : ICompetitionNotificationOutbox
+    {
+        public void Add(CompetitionNotification notification) { }
+    }
 
     private static ApplicationDbContext CreateDb()
     {
