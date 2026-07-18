@@ -88,6 +88,8 @@ const onSubmit = form.handleSubmit(async (values) => {
                   v-bind="componentField"
                   :disabled="loading"
                   autocomplete="username"
+                  autocapitalize="none"
+                  :spellcheck="false"
                 />
               </FormControl>
               <FormMessage />
