@@ -2,6 +2,10 @@
 
 This handoff is the fastest path for a new collaborator to understand the current project, run it, and make changes without breaking the plugin-style architecture.
 
+## 2026-07-18 Admin challenge taxonomy readability
+
+- The challenge-library table keeps the existing badge treatment for runtime type and direction, but both labels now use the same readable text size as the challenge title instead of the previous 10-pixel rendering.
+
 ## 2026-07-18 QQ Bot competition event configuration
 
 - Competition QQ Bot event switches now map exactly to the backend `QqBotEventType` enum: competition start, challenge publish, hint publish, first/second/third blood, team penalty, and announcement.
