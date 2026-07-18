@@ -53,6 +53,7 @@ import {
 import { Edit, Key, Loader2, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-vue-next'
 import { Card } from '@/components/ui/card'
 import { toast } from 'vue-sonner'
+import { challengeDeploymentTypes, challengeDeploymentTypeKey, hasContainerDeployment } from '@/lib/challengeDeployment'
 
 interface CheckerConfigDto {
   image?: string
@@ -94,7 +95,7 @@ const deleteDialog = ref(false)
 const revealDialog = ref(false)
 const selectedTemplate = ref<ChallengeTemplateDto | null>(null)
 const revealedSecret = ref('')
-const deploymentTypeKeys = ['NoAttachment', 'StaticAttachment', 'DynamicContainer', 'StaticContainer'] as const
+const deploymentTypeKeys = challengeDeploymentTypes
 const challengeTypeOptions = [
   { value: 'Ctf', label: 'CTF' },
   { value: 'Awd', label: 'AWD' },
@@ -104,8 +105,9 @@ const challengeTypeOptions = [
 type ChallengeTypeKey = typeof challengeTypeOptions[number]['value']
 
 function deploymentTypeKey(value: ChallengeTemplateDto['deploymentType']) {
-  return typeof value === 'number' ? deploymentTypeKeys[value] ?? 'NoAttachment' : value
+  return challengeDeploymentTypeKey(value)
 }
+
 function normalizeChallengeType(value?: string | null): ChallengeTypeKey {
   const key = (value ?? 'Ctf').trim().toLowerCase()
   if (key === 'awd') return 'Awd'
@@ -155,7 +157,7 @@ const deleteMutation = useMutation({
 const revealMutation = useMutation({
   mutationFn: async (id: string) => adminApi.revealChallengeSecret<{ flagSecret?: string }>(id),
   onSuccess: (data) => { revealedSecret.value = data.flagSecret ?? '' },
-  onError: () => toast.error(t('admin.challenges.revealError')),
+  onError: () => toast.error(t('admin.challenges.revealFlagError')),
 })
 
 function openCreate() {
@@ -175,7 +177,9 @@ function openDelete(template: ChallengeTemplateDto) {
 function openReveal(template: ChallengeTemplateDto) {
   selectedTemplate.value = template
   revealedSecret.value = ''
+  revealMutation.reset()
   revealDialog.value = true
+  revealMutation.mutate(template.id)
 }
 
 const columnHelper = createColumnHelper<ChallengeTemplateDto>()
@@ -207,7 +211,9 @@ const columns = [
   }),
   columnHelper.accessor('containerMode', {
     header: () => t('admin.challenges.containerMode'),
-    cell: (info) => h(Badge, { variant: 'outline' }, () => (info.getValue() === 1 || info.getValue() === 'DockerCompose') ? t('admin.challenges.dockerCompose') : t('admin.challenges.singleImage')),
+    cell: (info) => hasContainerDeployment(info.row.original.deploymentType)
+      ? h(Badge, { variant: 'outline' }, () => (info.getValue() === 1 || info.getValue() === 'DockerCompose') ? t('admin.challenges.dockerCompose') : t('admin.challenges.singleImage'))
+      : h('span', { class: 'text-muted-foreground' }, '-'),
   }),
   columnHelper.accessor('containerImage', {
     header: () => t('admin.challenges.containerImage'),
@@ -381,7 +387,7 @@ const pageCount = computed(() => Math.max(1, table.getPageCount()))
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="openReveal(row.original)">
                     <Key class="mr-2 size-4" />
-                    {{ t('admin.challenges.revealSecret') }}
+                    {{ t('admin.challenges.revealFlag') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem class="text-destructive focus:text-destructive" @click="openDelete(row.original)">
@@ -448,15 +454,25 @@ const pageCount = computed(() => Math.max(1, table.getPageCount()))
     <Dialog v-model:open="revealDialog">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ t('admin.challenges.revealSecret') }}</DialogTitle>
-          <DialogDescription>{{ t('admin.challenges.revealSecretAuditHint') }}</DialogDescription>
+          <DialogTitle>{{ t('admin.challenges.revealFlag') }}</DialogTitle>
+          <DialogDescription>{{ t('admin.challenges.revealFlagAuditHint') }}</DialogDescription>
         </DialogHeader>
-        <pre v-if="revealedSecret" class="rounded-lg border bg-muted p-4 text-sm whitespace-pre-wrap break-all">{{ revealedSecret }}</pre>
+        <div v-if="revealMutation.isPending.value" class="flex min-h-24 items-center justify-center border bg-muted/40 text-sm text-muted-foreground">
+          <Loader2 class="mr-2 size-4 animate-spin" />
+          {{ t('admin.challenges.loadingFlag') }}
+        </div>
+        <pre v-else-if="revealedSecret" class="border bg-muted p-4 text-sm whitespace-pre-wrap break-all">{{ revealedSecret }}</pre>
+        <p v-else-if="revealMutation.isError.value" class="border border-destructive p-4 text-sm text-destructive">
+          {{ t('admin.challenges.revealFlagError') }}
+        </p>
+        <p v-else class="border bg-muted/40 p-4 text-sm text-muted-foreground">
+          {{ t('admin.challenges.flagNotConfigured') }}
+        </p>
         <DialogFooter>
           <Button variant="outline" @click="revealDialog = false">{{ t('common.close') }}</Button>
-          <Button variant="destructive" :disabled="revealMutation.isPending.value" @click="revealMutation.mutate(selectedTemplate!.id)">
+          <Button v-if="revealMutation.isError.value" variant="destructive" :disabled="revealMutation.isPending.value" @click="revealMutation.mutate(selectedTemplate!.id)">
             <Loader2 v-if="revealMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-            {{ t('admin.challenges.revealSecret') }}
+            {{ t('common.retry') }}
           </Button>
         </DialogFooter>
       </DialogContent>
