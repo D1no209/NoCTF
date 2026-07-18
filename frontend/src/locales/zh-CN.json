@@ -1283,6 +1283,11 @@
         "deliveryRetryQueued": "投递已加入重试队列",
         "deliveryRetryFailed": "投递重试失败",
         "noDeliveries": "暂无投递记录",
+        "warnings": {
+          "global_plugin_disabled": "全局 QQ 机器人投递尚未启用。",
+          "no_online_agent": "当前没有在线的 QQ 机器人代理。",
+          "no_bound_group": "本场比赛尚未绑定播报群聊。"
+        },
         "events": {
           "competitionStart": "比赛开始",
           "competitionEnd": "比赛结束",
