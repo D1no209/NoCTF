@@ -132,6 +132,7 @@ async function submitPatch() {
   try {
     const data = await competitionApi.submitPatch<{ submissionId?: string }>(
       competitionId.value,
+      scoreStore.teamId ?? '',
       patchChallenge.value,
       patchFile.value,
     )
@@ -161,6 +162,7 @@ async function submitFlag() {
   try {
     const data = await competitionApi.submitFlag<{ correct?: boolean, message?: string }>(
       competitionId.value,
+      scoreStore.teamId ?? '',
       selectedChallenge.value,
       flagInput.value.trim(),
     )

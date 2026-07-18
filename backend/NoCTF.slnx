@@ -1,21 +1,15 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/NoCTF.API/NoCTF.API.csproj" />
+    <Project Path="src/NoCTF.Domain/NoCTF.Domain.csproj" />
     <Project Path="src/NoCTF.Application/NoCTF.Application.csproj" />
-    <Project Path="src/NoCTF.Container.Docker/NoCTF.Container.Docker.csproj" />
-    <Project Path="src/NoCTF.Container.K8s/NoCTF.Container.K8s.csproj" />
-    <Project Path="src/NoCTF.Core/NoCTF.Core.csproj" />
+    <Project Path="src/NoCTF.GameModes/NoCTF.GameModes.csproj" />
+    <Project Path="src/NoCTF.Integrations.QQBot/NoCTF.Integrations.QQBot.csproj" />
     <Project Path="src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
-    <Project Path="src/NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
-    <Project Path="src/NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
-    <Project Path="src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
-    <Project Path="src/NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj" />
-    <Project Path="src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
-    <Project Path="src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
-    <Project Path="src/NoCTF.Plugins.QQBot/NoCTF.Plugins.QQBot.csproj" />
-    <Project Path="src/NoCTF.Runner.Client/NoCTF.Runner.Client.csproj" />
-    <Project Path="src/NoCTF.Runner/NoCTF.Runner.csproj" />
+    <Project Path="src/NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
+    <Project Path="src/NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
+    <Project Path="src/NoCTF.API/NoCTF.API.csproj" />
     <Project Path="src/NoCTF.Worker/NoCTF.Worker.csproj" />
+    <Project Path="src/NoCTF.Runner/NoCTF.Runner.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NoCTF.Tests/NoCTF.Tests.csproj" />

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+    <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
+  </ItemGroup>
+</Project>

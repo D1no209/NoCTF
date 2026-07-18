@@ -2,11 +2,12 @@ import type { AwdpScreenEvent, AwdpScreenEventLevel, AwdpScreenEventType, AwdpSc
 import { ApiError, apiUrl } from '@/api/noctf'
 import { createMockAwareFetch } from '@/mocks/runtime'
 import { translate as tt } from '@/i18n'
+import { readAuthSession } from './auth-session'
 
 const appFetch = import.meta.env.DEV ? createMockAwareFetch(globalThis.fetch) : globalThis.fetch
 
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('accessToken')
+  const token = readAuthSession()?.accessToken
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 

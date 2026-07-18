@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Docker.DotNet" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+</Project>

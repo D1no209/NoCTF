@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="KubernetesClient" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+</Project>
