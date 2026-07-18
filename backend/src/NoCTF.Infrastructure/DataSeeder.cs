@@ -23,9 +23,10 @@ public static class DataSeeder
             var adminPassword = configuration?["SeedAdmin:Password"];
 
             if (adminEmail.Length > UserInputLimits.EmailMaxLength ||
-                adminUserName.Length is < UserInputLimits.UserNameMinLength or > UserInputLimits.UserNameMaxLength)
+                adminUserName.Length is < UserInputLimits.UserNameMinLength or > UserInputLimits.UserNameMaxLength ||
+                adminUserName.Any(char.IsWhiteSpace))
             {
-                throw new SeedConfigurationException("SeedAdmin email or user name exceeds the supported length.");
+                throw new SeedConfigurationException("SeedAdmin email or user name is invalid.");
             }
 
             var normalizedAdminEmail = adminEmail.ToLowerInvariant();

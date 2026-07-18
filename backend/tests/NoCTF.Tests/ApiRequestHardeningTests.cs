@@ -147,6 +147,48 @@ public class ApiRequestHardeningTests
         Assert.False(RegisterEndpoint.IsUserUniquenessConflict(unrelatedConflict));
     }
 
+    [Theory]
+    [InlineData(" player ", "player")]
+    [InlineData("\tplayer\r\n", "player")]
+    public void RegisterUserName_NormalizationRemovesSurroundingWhitespace(string input, string expected)
+    {
+        Assert.Equal(expected, RegisterEndpoint.NormalizeUserName(input));
+    }
+
+    [Theory]
+    [InlineData("player one")]
+    [InlineData("player\tone")]
+    [InlineData("player\none")]
+    public void RegisterUserName_RejectsRemainingWhitespace(string userName)
+    {
+        Assert.True(RegisterEndpoint.ContainsWhitespace(userName));
+    }
+
+    [Theory]
+    [InlineData(" PLAYER ")]
+    [InlineData("PLAYER@EXAMPLE.TEST")]
+    public async Task LoginLookup_AcceptsEmailOrUserNameCaseInsensitively(string identifier)
+    {
+        await using var db = CreateDb();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            UserName = "Player",
+            Email = "player@example.test",
+            PasswordHash = "unused",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var result = await LoginEndpoint.FindUserAsync(
+            db,
+            LoginEndpoint.NormalizeIdentifier(identifier));
+
+        Assert.Same(user, result);
+    }
+
     [Fact]
     public void CollaboratorConflictDetector_RecognizesOnlyCollaboratorUniqueIndex()
     {

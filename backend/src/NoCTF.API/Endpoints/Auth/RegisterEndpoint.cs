@@ -36,7 +36,7 @@ public class RegisterEndpoint(
 
     public override async Task HandleAsync(RegisterRequest req, CancellationToken ct)
     {
-        var userName = req.UserName?.Trim() ?? string.Empty;
+        var userName = NormalizeUserName(req.UserName);
         var email = req.Email?.Trim().ToLowerInvariant() ?? string.Empty;
         var password = req.Password ?? string.Empty;
         var normalizedUserName = userName.ToLowerInvariant();
@@ -48,6 +48,10 @@ public class RegisterEndpoint(
         else if (userName.Length > UserInputLimits.UserNameMaxLength)
         {
             AddError(r => r.UserName, $"User name must be at most {UserInputLimits.UserNameMaxLength} characters.");
+        }
+        else if (ContainsWhitespace(userName))
+        {
+            AddError(r => r.UserName, "User name must not contain whitespace.");
         }
 
         if (password.Length < UserInputLimits.PasswordMinLength)
@@ -138,4 +142,8 @@ public class RegisterEndpoint(
         return constraintName.Equals("ix_users_email", StringComparison.Ordinal) ||
                constraintName.Equals("ix_users_username", StringComparison.Ordinal);
     }
+
+    internal static string NormalizeUserName(string? userName) => userName?.Trim() ?? string.Empty;
+
+    internal static bool ContainsWhitespace(string userName) => userName.Any(char.IsWhiteSpace);
 }

@@ -34,9 +34,8 @@ public class LoginEndpoint(
 
     public override async Task HandleAsync(LoginRequest req, CancellationToken ct)
     {
-        var email = req.Email.Trim().ToLowerInvariant();
-        var user = await dbContext.Users
-            .FirstOrDefaultAsync(u => EF.Property<string>(u, "NormalizedEmail") == email, ct);
+        var identifier = NormalizeIdentifier(req.Email);
+        var user = await FindUserAsync(dbContext, identifier, ct);
 
         if (user is null)
         {
@@ -66,4 +65,21 @@ public class LoginEndpoint(
             Role = user.Role.ToString()
         }, cancellation: ct);
     }
+
+    internal static string NormalizeIdentifier(string? identifier)
+        => identifier?.Trim().ToLowerInvariant() ?? string.Empty;
+
+    internal static Task<User?> FindUserAsync(
+        ApplicationDbContext dbContext,
+        string normalizedIdentifier,
+        CancellationToken ct = default)
+        => dbContext.Database.IsRelational()
+            ? dbContext.Users.FirstOrDefaultAsync(
+                user => EF.Property<string>(user, "NormalizedEmail") == normalizedIdentifier ||
+                        EF.Property<string>(user, "NormalizedUserName") == normalizedIdentifier,
+                ct)
+            : dbContext.Users.FirstOrDefaultAsync(
+                user => user.Email.ToLower() == normalizedIdentifier ||
+                        user.UserName.ToLower() == normalizedIdentifier,
+                ct);
 }

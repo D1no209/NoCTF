@@ -3,6 +3,8 @@
     "login": "登录",
     "register": "注册",
     "email": "电子邮箱",
+    "loginIdentifier": "电子邮箱或用户名",
+    "loginIdentifierPlaceholder": "name@example.com 或 johndoe",
     "password": "密码",
     "userName": "用户名",
     "loginTitle": "欢迎回来",
@@ -44,12 +46,15 @@
   "validation": {
     "emailRequired": "请输入电子邮箱",
     "emailInvalid": "请输入有效的电子邮箱地址",
+    "loginIdentifierRequired": "请输入电子邮箱或用户名",
     "passwordRequired": "请输入密码",
     "passwordMin": "密码长度至少为 8 个字符",
-    "userNameRequired": "请输入用户名"
+    "userNameRequired": "请输入用户名",
+    "userNameLength": "用户名长度必须为 3 至 64 个字符",
+    "userNameWhitespace": "用户名不能包含空格、换行或制表符"
   },
   "errors": {
-    "loginFailed": "邮箱或密码错误",
+    "loginFailed": "邮箱、用户名或密码错误",
     "registerFailed": "注册失败，请重试",
     "loadFailed": "加载数据失败",
     "saveFailed": "保存失败",

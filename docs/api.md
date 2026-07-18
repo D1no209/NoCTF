@@ -23,12 +23,12 @@ POST /api/auth/login
 Content-Type: application/json
 
 {
-  "username": "your_username",
+  "email": "your_email_or_username",
   "password": "your_password"
 }
 ```
 
-The response contains an `accessToken` string.
+The backward-compatible `email` field accepts either an email address or a username. Both are matched case-insensitively after surrounding whitespace is removed. The response contains an `accessToken` string.
 
 When email verification is enabled, registration returns `requiresEmailVerification: true` and login returns `403 email_not_verified` until the address is verified. Verification tokens are submitted in the request body rather than in an API URL:
 

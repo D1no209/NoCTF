@@ -32,7 +32,7 @@ const loading = ref(false)
 const loginError = ref('')
 
 const formSchema = toTypedSchema(z.object({
-  email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
+  email: z.string().trim().min(1, t('validation.loginIdentifierRequired')),
   password: z.string().min(8, t('validation.passwordMin')),
 }))
 
@@ -52,7 +52,8 @@ const onSubmit = form.handleSubmit(async (values) => {
     await router.push(redirect)
   } catch (error: any) {
     if (error instanceof ApiError && error.status === 403) {
-      await router.push({ name: 'verify-email', query: { email: values.email } })
+      const query = values.email.includes('@') ? { email: values.email } : undefined
+      await router.push({ name: 'verify-email', query })
       return
     }
     loginError.value = t('errors.loginFailed')
@@ -79,14 +80,14 @@ const onSubmit = form.handleSubmit(async (values) => {
 
           <FormField v-slot="{ componentField }" name="email">
             <FormItem>
-              <FormLabel>{{ t('auth.email') }}</FormLabel>
+              <FormLabel>{{ t('auth.loginIdentifier') }}</FormLabel>
               <FormControl>
                 <Input
-                  type="email"
-                  placeholder="name@example.com"
+                  type="text"
+                  :placeholder="t('auth.loginIdentifierPlaceholder')"
                   v-bind="componentField"
                   :disabled="loading"
-                  autocomplete="email"
+                  autocomplete="username"
                 />
               </FormControl>
               <FormMessage />
