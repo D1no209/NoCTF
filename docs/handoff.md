@@ -2,6 +2,12 @@
 
 This handoff is the fastest path for a new collaborator to understand the current project, run it, and make changes without breaking the plugin-style architecture.
 
+## 2026-07-18 Login identifier input rendering
+
+- The shared `Input` component now declares its native `type` prop and explicitly forwards remaining HTML attributes to the underlying `<input>` element.
+- The login identifier remains a real text input because it accepts either an email address or a username; it disables capitalization and spellcheck while preserving `autocomplete="username"`.
+- This keeps labels, generated form IDs, accessibility attributes, validation handlers, and browser autofill attached to the native control instead of relying on implicit component attribute fallthrough.
+
 ## 2026-07-18 Challenge type/direction separation
 
 - Challenge templates and competition-bound challenges now store `TypeId` (runtime type such as CTF, AWD, or AWDP) separately from `Direction` (for example WEB, PWN, MISC, or AI).
