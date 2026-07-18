@@ -189,13 +189,13 @@ const columns = [
     header: () => t('admin.challenges.challengeMode'),
     enableSorting: true,
     filterFn: (row, columnId, filterValue) => normalizeChallengeType(row.getValue<string>(columnId)) === filterValue,
-    cell: (info) => h(Badge, { variant: 'secondary', class: 'font-bold text-[10px]' }, () => challengeTypeLabel(info.getValue())),
+    cell: (info) => h(Badge, { variant: 'secondary', class: 'text-sm font-bold' }, () => challengeTypeLabel(info.getValue())),
   }),
   columnHelper.accessor('direction', {
     header: () => t('admin.challenges.direction'),
     enableSorting: true,
     filterFn: (row, columnId, filterValue) => String(row.getValue<string>(columnId) ?? '').toLowerCase() === String(filterValue).toLowerCase(),
-    cell: (info) => h(Badge, { variant: 'outline', class: 'font-bold text-[10px] uppercase' }, () => info.getValue() || 'Uncategorized'),
+    cell: (info) => h(Badge, { variant: 'outline', class: 'text-sm font-bold uppercase' }, () => info.getValue() || 'Uncategorized'),
   }),
   columnHelper.accessor('attachmentUrl', {
     header: () => t('admin.challenges.attachment'),
