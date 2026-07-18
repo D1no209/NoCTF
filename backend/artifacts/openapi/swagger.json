@@ -8101,6 +8101,10 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "direction": {
+            "type": "string",
+            "nullable": true
+          },
           "description": {
             "type": "string",
             "nullable": true
