@@ -1,10 +1,40 @@
 using NoCTF.API.Logging;
 using NoCTF.API.SignalR;
+using Microsoft.Extensions.Logging;
 
 namespace NoCTF.Tests;
 
 public class LogBufferTests
 {
+    [Fact]
+    public async Task LogStreamer_SuppressesRoutineEntityFrameworkCommands()
+    {
+        await using var buffer = new LogBuffer(4, static (_, _) => Task.CompletedTask);
+        var logger = new LogStreamerLogger("Microsoft.EntityFrameworkCore.Database.Command", buffer);
+
+        logger.LogInformation("Executed DbCommand");
+        logger.LogWarning("Database command warning");
+
+        var entry = Assert.Single(buffer.GetRecent());
+        Assert.Equal("Warning", entry.Level);
+        Assert.Equal("Database command warning", entry.Message);
+        Assert.Equal("Command", entry.Source);
+    }
+
+    [Fact]
+    public async Task LogStreamer_KeepsApplicationInformationLogs()
+    {
+        await using var buffer = new LogBuffer(4, static (_, _) => Task.CompletedTask);
+        var logger = new LogStreamerLogger("NoCTF.API.Example", buffer);
+
+        logger.LogInformation("Application event");
+
+        var entry = Assert.Single(buffer.GetRecent());
+        Assert.Equal("Information", entry.Level);
+        Assert.Equal("Application event", entry.Message);
+        Assert.Equal("Example", entry.Source);
+    }
+
     [Fact]
     public async Task Enqueue_UsesOneBoundedConsumerAndShedsOverload()
     {
