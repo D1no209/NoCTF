@@ -32,7 +32,7 @@ public class AuditLogPostProcessor : IGlobalPostProcessor
                    ?? user.FindFirst("name")?.Value
                    ?? user.Identity?.Name;
 
-        var ipAddress = httpCtx.Connection.RemoteIpAddress?.ToString();
+        var ipAddress = ClientIpAddress.Normalize(httpCtx.Connection.RemoteIpAddress);
         var userAgent = Limit(httpCtx.Request.Headers.UserAgent.ToString(), 512);
         var method = httpCtx.Request.Method;
         var path = Limit(httpCtx.Request.Path.Value ?? string.Empty, 2_048);

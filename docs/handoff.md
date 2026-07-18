@@ -2,6 +2,12 @@
 
 This handoff is the fastest path for a new collaborator to understand the current project, run it, and make changes without breaking the plugin-style architecture.
 
+## 2026-07-18 Audit client IP normalization
+
+- Audit writers now normalize IPv4-mapped IPv6 values such as `::ffff:139.200.81.205` to canonical IPv4 before persistence.
+- The audit-log query also normalizes previously stored mapped addresses when returning them, so historical rows display consistently without a data migration.
+- Native IPv6 addresses are preserved; forwarded-header trust and proxy selection rules are unchanged.
+
 ## 2026-07-18 Admin challenge taxonomy readability
 
 - The challenge-library table keeps the existing badge treatment for runtime type and direction, but both labels now use the same readable text size as the challenge title instead of the previous 10-pixel rendering.
