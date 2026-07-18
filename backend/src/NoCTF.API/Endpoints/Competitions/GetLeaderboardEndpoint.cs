@@ -1,4 +1,6 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Scoring.Ports;
 
@@ -10,7 +12,7 @@ public sealed class GetLeaderboardRequest
 }
 
 public sealed class GetLeaderboardEndpoint(ILeaderboardStore leaderboard)
-    : Endpoint<GetLeaderboardRequest, LeaderboardSnapshot>
+    : Endpoint<GetLeaderboardRequest, Results<Ok<LeaderboardSnapshot>, NotFound>>
 {
     public override void Configure()
     {
@@ -18,15 +20,16 @@ public sealed class GetLeaderboardEndpoint(ILeaderboardStore leaderboard)
         AllowAnonymous();
     }
 
-    public override async Task HandleAsync(GetLeaderboardRequest request, CancellationToken cancellationToken)
+    public override async Task<Results<Ok<LeaderboardSnapshot>, NotFound>> ExecuteAsync(
+        GetLeaderboardRequest request,
+        CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var snapshot = await leaderboard.GetAuthoritativeAsync(request.CompetitionId, cancellationToken);
         if (snapshot is null)
         {
-            await HttpContext.Response.SendNotFoundAsync(cancellationToken);
-            return;
+            return TypedResults.NotFound();
         }
-        await HttpContext.Response.SendAsync<LeaderboardSnapshot>(snapshot, StatusCodes.Status200OK, null, cancellationToken);
+        return TypedResults.Ok(snapshot);
     }
 }

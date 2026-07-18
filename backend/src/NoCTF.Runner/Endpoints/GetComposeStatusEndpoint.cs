@@ -1,33 +1,41 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.Runner.Composition;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Endpoints;
 
 public sealed class GetComposeStatusRequest
 {
     public Guid OperationId { get; set; }
-    public string Provider { get; set; } = "docker";
+    public RuntimeProvider Provider { get; set; } = RuntimeProvider.Docker;
     public string ProjectName { get; set; } = string.Empty;
     public string Namespace { get; set; } = string.Empty;
 }
 
-public sealed class GetComposeStatusEndpoint(IComposeRuntime runtime) : Endpoint<GetComposeStatusRequest, ComposeStatus>
+public sealed class GetComposeStatusEndpoint(RuntimeProviderCatalog providers)
+    : Endpoint<GetComposeStatusRequest, Results<Ok<ComposeStatus>, NotFound, ProblemHttpResult>>
 {
     public override void Configure() => Post("/compose/status");
 
-    public override async Task HandleAsync(GetComposeStatusRequest request, CancellationToken cancellationToken)
+    public override async Task<Results<Ok<ComposeStatus>, NotFound, ProblemHttpResult>> ExecuteAsync(
+        GetComposeStatusRequest request,
+        CancellationToken cancellationToken)
     {
-        var status = await runtime.GetStatusAsync(new(
-            request.OperationId,
-            request.Provider,
-            request.ProjectName,
-            request.Namespace,
-            DateTimeOffset.UtcNow), cancellationToken);
-        if (status is null)
+        try
         {
-            await HttpContext.Response.SendNotFoundAsync(cancellationToken);
-            return;
+            var status = await providers.Compose(request.Provider).GetStatusAsync(new(
+                request.OperationId,
+                request.Provider,
+                request.ProjectName,
+                request.Namespace,
+                DateTimeOffset.UtcNow), cancellationToken);
+            return status is null ? TypedResults.NotFound() : TypedResults.Ok(status);
         }
-        await HttpContext.Response.SendAsync<ComposeStatus>(status, StatusCodes.Status200OK, null, cancellationToken);
+        catch (UnsupportedRuntimeProviderException exception)
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, detail: exception.Message);
+        }
     }
 }

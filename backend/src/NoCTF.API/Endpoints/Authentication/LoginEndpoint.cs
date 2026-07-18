@@ -1,10 +1,18 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.Login;
 using Microsoft.AspNetCore.Http;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
-public sealed class LoginEndpoint(LoginUser login) : Endpoint<LoginRequest, LoginResponse>
+public sealed class LoginRequest
+{
+    public string Login { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
+
+public sealed class LoginEndpoint(LoginUser login)
+    : Endpoint<LoginRequest, Results<Ok<LoginResponse>, UnauthorizedHttpResult>>
 {
     public override void Configure()
     {
@@ -12,13 +20,14 @@ public sealed class LoginEndpoint(LoginUser login) : Endpoint<LoginRequest, Logi
         AllowAnonymous();
     }
 
-    public override async Task HandleAsync(LoginRequest request, CancellationToken cancellationToken)
+    public override async Task<Results<Ok<LoginResponse>, UnauthorizedHttpResult>> ExecuteAsync(
+        LoginRequest request,
+        CancellationToken cancellationToken)
     {
         var result = await login.ExecuteAsync(new(request.Login, request.Password), cancellationToken);
         if (!result.Succeeded)
         {
-            await HttpContext.Response.SendUnauthorizedAsync(cancellationToken);
-            return;
+            return TypedResults.Unauthorized();
         }
         HttpContext.Response.Cookies.Append("noctf_refresh", result.Value!.RefreshToken, new CookieOptions
         {
@@ -27,11 +36,11 @@ public sealed class LoginEndpoint(LoginUser login) : Endpoint<LoginRequest, Logi
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddDays(7)
         });
-        await HttpContext.Response.SendAsync<LoginResponse>(new(
+        return TypedResults.Ok(new LoginResponse(
             result.Value!.UserId,
             result.Value.UserName,
             result.Value.Role,
             result.Value.AccessToken,
-            result.Value.AccessTokenExpiresAt), StatusCodes.Status200OK, null, cancellationToken);
+            result.Value.AccessTokenExpiresAt));
     }
 }

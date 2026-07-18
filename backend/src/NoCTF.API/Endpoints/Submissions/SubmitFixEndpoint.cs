@@ -1,25 +1,40 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.API.Security;
-using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 
 namespace NoCTF.API.Endpoints.Submissions;
 
+public sealed class SubmitFixRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public Guid UploadId { get; set; }
+}
+
 public sealed class SubmitFixEndpoint(
     SubmitFix submitFix,
     IUserContext userContext,
-    IHttpContextAccessor httpContextAccessor) : Endpoint<SubmitFixRequest, AcceptedSubmissionResponse>
+    IHttpContextAccessor httpContextAccessor) : Endpoint<SubmitFixRequest,
+        Microsoft.AspNetCore.Http.HttpResults.Results<Accepted<AcceptedSubmissionResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/competitions/{competitionId}/submissions/fixes");
         AuthSchemes("Bearer");
         Options(options => options.WithMetadata(new EnableRateLimitingAttribute("submission")));
+        Description(builder => builder.ProducesProblemFE(StatusCodes.Status400BadRequest)
+            .ProducesProblemFE(StatusCodes.Status403Forbidden)
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary => summary.Summary = "Accept a Fix archive reference for asynchronous processing.");
     }
 
-    public override async Task HandleAsync(SubmitFixRequest request, CancellationToken cancellationToken)
+    public override async Task<Microsoft.AspNetCore.Http.HttpResults.Results<Accepted<AcceptedSubmissionResponse>, ProblemHttpResult>> ExecuteAsync(
+        SubmitFixRequest request,
+        CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var result = await submitFix.ExecuteAsync(new(
@@ -27,15 +42,15 @@ public sealed class SubmitFixEndpoint(
             request.TeamId,
             request.ChallengeId,
             userContext.UserId,
-            new FixArchiveReference(request.ObjectKey, request.FileName, request.ContentType, request.Length, request.Sha256),
+            request.UploadId,
             httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
         {
-            await SubmissionProblemDetails.WriteAsync(HttpContext.Response, StatusCodes.Status400BadRequest,
-                result.ErrorCode, result.ErrorMessage, cancellationToken);
-            return;
+            return SubmissionProblemDetails.Create(SubmissionProblemDetails.StatusFor(result.ErrorCode), result.ErrorCode, result.ErrorMessage);
         }
-        await HttpContext.Response.SendAsync<AcceptedSubmissionResponse>(new(result.Value!.SubmissionId, result.Value.ReceivedAt), StatusCodes.Status202Accepted, null, cancellationToken);
+        return TypedResults.Accepted<AcceptedSubmissionResponse>(
+            uri: (string?)null,
+            value: new AcceptedSubmissionResponse(result.Value!.SubmissionId, result.Value.ReceivedAt));
     }
 }

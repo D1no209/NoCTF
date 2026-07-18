@@ -6,6 +6,7 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.Storage;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -27,6 +28,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<RuntimeOperation> RuntimeOperations => Set<RuntimeOperation>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<FixUploadSession> FixUploadSessions => Set<FixUploadSession>();
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NoCtfDbContext).Assembly);
 }

@@ -245,14 +245,49 @@ export const competitionApi = {
     }), tt('errors.loadMyTeams'))
   },
   async submitPatch<T = unknown>(competitionId: string, teamId: string, challengeId: string, file: File) {
-    return postJson<T>(`/competitions/${competitionId}/submissions/fixes`, {
+    const checksum = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())))
+      .map(byte => byte.toString(16).padStart(2, '0'))
+      .join('')
+    const upload = await postJson<{
+      uploadId: string
+      uploadUrl: string
+      expiresAt: string
+    }>(`/competitions/${competitionId}/submissions/fixes/uploads`, {
       teamId,
       challengeId,
-      objectKey: `pending/${crypto.randomUUID()}/${file.name}`,
       fileName: file.name,
       contentType: file.type || 'application/octet-stream',
       length: file.size,
-      sha256: '',
+      sha256: checksum,
+    })
+    const applicationOrigin = globalThis.location?.origin ?? 'http://localhost'
+    const uploadUrl = new URL(upload.uploadUrl, applicationOrigin)
+    const token = readAuthSession()?.accessToken
+    const apiOrigin = new URL(apiUrl('/'), applicationOrigin).origin
+    const isApiUpload = uploadUrl.origin === apiOrigin && uploadUrl.pathname.startsWith('/storage/uploads/')
+    const uploadBody = isApiUpload
+      ? (() => {
+          const form = new FormData()
+          form.append('file', file, file.name)
+          return form
+        })()
+      : file
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        ...(isApiUpload ? {} : { 'Content-Type': file.type || 'application/octet-stream' }),
+        ...(isApiUpload && token
+          ? { Authorization: `Bearer ${token}` }
+          : {}),
+      },
+      body: uploadBody,
+    })
+    if (!uploadResponse.ok)
+      throw new ApiError(tt('errors.requestFailed'), uploadResponse.status)
+    return postJson<T>(`/competitions/${competitionId}/submissions/fixes`, {
+      teamId,
+      challengeId,
+      uploadId: upload.uploadId,
     })
   },
   async patchSubmissions<T = unknown[]>(competitionId: string) {

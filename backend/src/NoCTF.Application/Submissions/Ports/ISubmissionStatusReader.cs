@@ -7,7 +7,7 @@ public sealed record SubmissionStatusView(
     Guid CompetitionId,
     Guid TeamId,
     Guid ChallengeId,
-    string Kind,
+    SubmissionKind Kind,
     SubmissionOutcome Outcome,
     DateTimeOffset ReceivedAt,
     DateTimeOffset? CompletedAt,

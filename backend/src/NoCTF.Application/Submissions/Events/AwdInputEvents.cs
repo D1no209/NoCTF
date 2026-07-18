@@ -13,7 +13,8 @@ public sealed record AwdFlagRotated(
     Guid ChallengeId,
     int Round,
     string Flag,
-    DateTimeOffset OccurredAt) : ISubmissionStreamEvent;
+    DateTimeOffset OccurredAt,
+    string IdempotencyKey) : ISubmissionStreamEvent;
 
 public sealed record AwdServiceChecked(
     Guid CompetitionId,
@@ -21,4 +22,5 @@ public sealed record AwdServiceChecked(
     Guid ChallengeId,
     int Round,
     AwdServiceObservation Observation,
-    DateTimeOffset OccurredAt) : ISubmissionStreamEvent;
+    DateTimeOffset OccurredAt,
+    string IdempotencyKey) : ISubmissionStreamEvent;

@@ -34,6 +34,6 @@ public sealed record FixSubmissionCommand(
     Guid TeamId,
     Guid ChallengeId,
     Guid UserId,
-    Events.FixArchiveReference Archive,
+    Guid UploadId,
     string IpAddress,
     DateTimeOffset ReceivedAt);

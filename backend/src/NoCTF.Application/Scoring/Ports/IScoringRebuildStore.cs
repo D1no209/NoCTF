@@ -7,6 +7,17 @@ public sealed record ScoringRebuildLease(
     Guid StagingStreamId,
     long SubmissionHighWaterMark);
 
+public enum ScoringRebuildReason
+{
+    AwdFlagRotated,
+    AwdServiceChecked,
+    KohControlObserved,
+    SystemScoringInput,
+    PenetrationStageCompleted,
+    TeamBanned,
+    TeamUnbanned
+}
+
 public interface IScoringRebuildStore
 {
     Task<ScoringRebuildLease> BeginAsync(Guid competitionId, CancellationToken cancellationToken);
@@ -26,5 +37,5 @@ public interface IScoringRebuildStore
 
 public interface IScoringRebuildQueue
 {
-    Task EnqueueAsync(Guid competitionId, string reason, CancellationToken cancellationToken);
+    Task EnqueueAsync(Guid competitionId, ScoringRebuildReason reason, CancellationToken cancellationToken);
 }

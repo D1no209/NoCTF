@@ -70,11 +70,23 @@ public sealed class MartenSubmissionIntakeStore(NoCtfDbContext db, IDocumentSess
         FixSubmissionReceived received,
         long expectedRevision,
         CancellationToken cancellationToken) =>
-        TryAppendAsync(received.CompetitionId, received, expectedRevision, cancellationToken);
+        TryAppendFixAsync(received, expectedRevision, cancellationToken);
+
+    private async Task<bool> TryAppendFixAsync(
+        FixSubmissionReceived received,
+        long expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        var existing = await session.Events.FetchStreamAsync(StreamIds.Submission(received.CompetitionId), token: cancellationToken);
+        if (existing.Select(item => item.Data).OfType<FixSubmissionReceived>()
+            .Any(item => item.UploadId == received.UploadId))
+            return false;
+        return await TryAppendAsync(received.CompetitionId, received, expectedRevision, cancellationToken);
+    }
 
     private async Task<bool> TryAppendAsync(
         Guid competitionId,
-        object @event,
+        ISubmissionStreamEvent @event,
         long expectedRevision,
         CancellationToken cancellationToken)
     {

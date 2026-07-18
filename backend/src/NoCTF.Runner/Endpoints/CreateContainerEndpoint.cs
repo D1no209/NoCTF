@@ -1,11 +1,15 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.Runner.Composition;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Endpoints;
 
 public sealed class CreateContainerRequest
 {
     public Guid OperationId { get; set; }
+    public RuntimeProvider Provider { get; set; } = RuntimeProvider.Docker;
     public string Image { get; set; } = string.Empty;
     public List<string> Command { get; set; } = [];
     public Dictionary<string, string> Environment { get; set; } = [];
@@ -13,15 +17,24 @@ public sealed class CreateContainerRequest
     public Dictionary<int, int> PortMappings { get; set; } = [];
 }
 
-public sealed class CreateContainerEndpoint(IContainerLifecycle lifecycle)
-    : Endpoint<CreateContainerRequest, ContainerReceipt>
+public sealed class CreateContainerEndpoint(RuntimeProviderCatalog providers)
+    : Endpoint<CreateContainerRequest, Results<Created<ContainerReceipt>, ProblemHttpResult>>
 {
     public override void Configure() => Post("/containers");
 
-    public override async Task HandleAsync(CreateContainerRequest request, CancellationToken cancellationToken)
+    public override async Task<Results<Created<ContainerReceipt>, ProblemHttpResult>> ExecuteAsync(
+        CreateContainerRequest request,
+        CancellationToken cancellationToken)
     {
-        var receipt = await lifecycle.CreateAsync(Create(request), cancellationToken);
-        await HttpContext.Response.SendAsync<ContainerReceipt>(receipt, StatusCodes.Status201Created, null, cancellationToken);
+        try
+        {
+            var receipt = await providers.Containers(request.Provider).CreateAsync(Create(request), cancellationToken);
+            return TypedResults.Created($"/containers/{receipt.ResourceId}", receipt);
+        }
+        catch (UnsupportedRuntimeProviderException exception)
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, detail: exception.Message);
+        }
     }
 
     private static ContainerRequest Create(CreateContainerRequest request) => new(

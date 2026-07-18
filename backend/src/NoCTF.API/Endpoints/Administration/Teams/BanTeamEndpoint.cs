@@ -1,4 +1,6 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Teams.Moderation;
 
@@ -11,20 +13,26 @@ public sealed class BanTeamRequest
     public string Reason { get; set; } = string.Empty;
 }
 
-public sealed class BanTeamEndpoint(ModerateTeam moderate, IUserContext userContext)
-    : Endpoint<BanTeamRequest>
+public sealed class BanTeamEndpoint(
+    ModerateTeam moderate,
+    ICompetitionModerationAuthorizer authorizer,
+    IUserContext userContext)
+    : Endpoint<BanTeamRequest, Results<NoContent, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/ban");
         AuthSchemes("Bearer");
-        Roles("Administrator", "Organizer");
     }
 
-    public override async Task HandleAsync(BanTeamRequest request, CancellationToken cancellationToken)
+    public override async Task<Results<NoContent, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+        BanTeamRequest request,
+        CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         request.TeamId = Route<Guid>("teamId");
+        if (!await authorizer.CanModerateAsync(userContext.UserId, request.CompetitionId, cancellationToken))
+            return TypedResults.Forbid();
         var result = await moderate.ExecuteAsync(new(
             request.CompetitionId,
             request.TeamId,
@@ -34,9 +42,9 @@ public sealed class BanTeamEndpoint(ModerateTeam moderate, IUserContext userCont
             DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
         {
-            await HttpContext.Response.SendStatusCodeAsync(StatusCodes.Status400BadRequest, cancellationToken);
-            return;
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest,
+                title: "Team ban was rejected.", detail: result.ErrorMessage);
         }
-        await HttpContext.Response.SendNoContentAsync(cancellationToken);
+        return TypedResults.NoContent();
     }
 }
