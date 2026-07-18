@@ -475,6 +475,7 @@ export const adminApi = {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
       url: '/api/admin/challenges/{id}/reveal-secret',
       path: { id },
+      body: {},
     }), tt('errors.revealSecret'))
   },
   async competitionChallenges<T = unknown[]>(competitionId: string) {
