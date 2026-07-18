@@ -2,6 +2,7 @@
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ApiError, competitionApi } from '@/api/noctf'
+import { useScoreStore } from '@/stores/score'
 import {
   Dialog,
   DialogContent,
@@ -128,6 +129,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const scoreStore = useScoreStore()
 
 const flagInput = ref('')
 const submitting = ref(false)
@@ -343,6 +345,7 @@ async function submitFlag() {
   try {
     const data = await competitionApi.submitFlag<SubmitResponse>(
       props.competitionId,
+      scoreStore.teamId ?? '',
       props.challenge.id,
       flagInput.value.trim(),
     )
@@ -378,7 +381,7 @@ async function submitPatch() {
   patchUploading.value = true
 
   try {
-    await competitionApi.submitPatch(props.competitionId, props.challenge.id, patchFile.value)
+    await competitionApi.submitPatch(props.competitionId, scoreStore.teamId ?? '', props.challenge.id, patchFile.value)
     toast.success(t('awd.patchSubmitted'))
     patchFile.value = null
     emit('patch-uploaded')

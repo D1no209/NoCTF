@@ -1,26 +1,24 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
-
   <ItemGroup>
-    <ProjectReference Include="../NoCTF.Core/NoCTF.Core.csproj" />
-    <ProjectReference Include="../NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
+    <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+    <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
+    <ProjectReference Include="../NoCTF.GameModes/NoCTF.GameModes.csproj" />
+    <ProjectReference Include="../NoCTF.Integrations.QQBot/NoCTF.Integrations.QQBot.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
-    <PackageReference Include="System.Collections.Immutable" Version="10.0.9" />
+    <PackageReference Include="AWSSDK.S3" />
+    <PackageReference Include="Marten" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.Marten" />
+    <PackageReference Include="WolverineFx.Postgresql" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" />
   </ItemGroup>
-
 </Project>

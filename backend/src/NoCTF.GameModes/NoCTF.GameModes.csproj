@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+    <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
+  </ItemGroup>
+</Project>

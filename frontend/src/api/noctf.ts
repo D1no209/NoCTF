@@ -1,6 +1,7 @@
 import { client } from './generated/client.gen'
 import * as sdk from './generated/sdk.gen'
 import { translate as tt } from '@/i18n'
+import { readAuthSession } from './auth-session'
 
 export class ApiError extends Error {
   readonly status?: number
@@ -55,6 +56,26 @@ export function setAuthToken(token: string | null) {
   })
 }
 
+async function postJson<T>(path: string, body?: unknown): Promise<T> {
+  const token = readAuthSession()?.accessToken
+  const response = await fetch(apiUrl(path), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token
+        ? { Authorization: `Bearer ${token}` }
+        : {}),
+    },
+    credentials: 'include',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const data = await response.json().catch(() => undefined)
+  if (!response.ok)
+    throw new ApiError(tt('errors.requestFailed'), response.status, data)
+  return data as T
+}
+
 export interface UserNotification {
   id: string
   competitionId?: string | null
@@ -93,7 +114,10 @@ export const notificationApi = {
 
 export const authApi = {
   async login(email: string, password: string) {
-    return unwrap(await sdk.noCtfapiEndpointsAuthLoginEndpoint({ body: { email, password } }), tt('errors.login'))
+    return postJson<{ userId: string, userName: string, role: string, accessToken: string, accessTokenExpiresAt: string }>(
+      '/auth/login',
+      { login: email, password },
+    )
   },
   async register(userName: string, email: string, password: string) {
     return unwrap(await sdk.noCtfapiEndpointsAuthRegisterEndpoint({ body: { userName, email, password } }), tt('errors.registration'))
@@ -111,7 +135,7 @@ export const authApi = {
     }), tt('errors.resendVerification'))
   },
   async refresh() {
-    return unwrap(await sdk.noCtfapiEndpointsAuthRefreshTokenEndpoint(), tt('errors.refreshToken'))
+    return postJson<{ accessToken: string, accessTokenExpiresAt: string }>('/auth/refresh')
   },
 }
 
@@ -157,12 +181,12 @@ export const competitionApi = {
       path: { competitionId, teamId },
     }), tt('errors.loadLeaderboardTeam'))
   },
-  async submitFlag<T = unknown>(competitionId: string, challengeId: string, flag: string) {
-    return unwrap(await client.post<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/submit',
-      path: { id: competitionId, challengeId },
-      body: { flag },
-    }), tt('errors.submitFlag'))
+  async submitFlag<T = unknown>(competitionId: string, teamId: string, challengeId: string, flag: string) {
+    return postJson<T>(`/competitions/${competitionId}/submissions/flags`, {
+      teamId,
+      challengeId,
+      flag,
+    })
   },
   async createInstance<T = unknown>(competitionId: string, challengeId: string) {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
@@ -220,14 +244,16 @@ export const competitionApi = {
       path: { id: competitionId },
     }), tt('errors.loadMyTeams'))
   },
-  async submitPatch<T = unknown>(competitionId: string, challengeId: string, file: File) {
-    const body = new FormData()
-    body.append('file', file)
-    return unwrap(await client.post<{ 202: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/patch',
-      path: { id: competitionId, challengeId },
-      body,
-    }), tt('errors.submitPatch'))
+  async submitPatch<T = unknown>(competitionId: string, teamId: string, challengeId: string, file: File) {
+    return postJson<T>(`/competitions/${competitionId}/submissions/fixes`, {
+      teamId,
+      challengeId,
+      objectKey: `pending/${crypto.randomUUID()}/${file.name}`,
+      fileName: file.name,
+      contentType: file.type || 'application/octet-stream',
+      length: file.size,
+      sha256: '',
+    })
   },
   async patchSubmissions<T = unknown[]>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({

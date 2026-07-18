@@ -1,54 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <OutputType>Exe</OutputType>
-    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
-
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="10.0.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.11" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
-    <PackageReference Include="System.Security.AccessControl" Version="6.0.1" />
-    <PackageReference Include="xunit.v3.mtp-off" Version="3.2.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.Redis" />
+    <PackageReference Include="TngTech.ArchUnitNET" />
+    <PackageReference Include="TUnit" />
+    <PackageReference Include="TUnit.Assertions" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Using Include="Xunit" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="../../src/NoCTF.API/NoCTF.API.csproj" />
     <ProjectReference Include="../../src/NoCTF.Application/NoCTF.Application.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Core/NoCTF.Core.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Domain/NoCTF.Domain.csproj" />
+    <ProjectReference Include="../../src/NoCTF.GameModes/NoCTF.GameModes.csproj" />
     <ProjectReference Include="../../src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
-    <ProjectReference Include="../../src/NoCTF.PluginBase/NoCTF.PluginBase.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Container.K8s/NoCTF.Container.K8s.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Plugins.QQBot/NoCTF.Plugins.QQBot.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Runner.Client/NoCTF.Runner.Client.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Integrations.QQBot/NoCTF.Integrations.QQBot.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runner/NoCTF.Runner.csproj" />
     <ProjectReference Include="../../src/NoCTF.Worker/NoCTF.Worker.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <NoCtfPluginProject Include="../../src/NoCTF.Plugins.CTF/NoCTF.Plugins.CTF.csproj" />
-    <NoCtfPluginProject Include="../../src/NoCTF.Plugins.AWD/NoCTF.Plugins.AWD.csproj" />
-    <NoCtfPluginProject Include="../../src/NoCTF.Plugins.AWDP/NoCTF.Plugins.AWDP.csproj" />
-    <NoCtfPluginProject Include="../../src/NoCTF.Plugins.KoH/NoCTF.Plugins.KoH.csproj" />
-    <NoCtfPluginProject Include="../../src/NoCTF.Plugins.Penetration/NoCTF.Plugins.Penetration.csproj" />
-    <NoCtfPluginProject Include="../../src/NoCTF.Plugins.QQBot/NoCTF.Plugins.QQBot.csproj" />
-  </ItemGroup>
-
 </Project>

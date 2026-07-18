@@ -1,7 +1,5 @@
-using NoCTF.Worker;
+using NoCTF.Worker.Composition;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.AddNoCtfWorkerServices();
-
-var app = builder.Build();
-await app.RunAsync();
+builder.AddNoCtfWorker();
+await builder.Build().RunAsync();

@@ -1,0 +1,11 @@
+namespace NoCTF.GameModes.Koh.Configuration;
+
+public sealed record KohConfiguration(int SchemaVersion, int PollIntervalSeconds, long ControlPointsPerInterval)
+{
+    public const int CurrentSchemaVersion = 1;
+}
+
+public sealed record KohChallengeConfiguration(int SchemaVersion, string AgentUrl)
+{
+    public const int CurrentSchemaVersion = 1;
+}

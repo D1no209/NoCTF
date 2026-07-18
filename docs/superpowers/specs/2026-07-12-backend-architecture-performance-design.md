@@ -1,4 +1,6 @@
-# Backend Architecture and Performance Remediation Design
+# Superseded: Backend Architecture and Performance Remediation Design
+
+> Historical dynamic-plugin design. The accepted Big Bang architecture is in `docs/architecture.md` and ADR-0001 through ADR-0003.
 
 ## Objective
 
@@ -147,4 +149,3 @@ Acceptance requires:
 4. Query, cache, SSE, and index optimization.
 5. Runtime idempotency, cleanup leases, backpressure, and bounded I/O.
 6. Full integration, benchmark, deployment, and compatibility verification.
-
