@@ -1283,6 +1283,11 @@
         "deliveryRetryQueued": "Delivery queued for retry",
         "deliveryRetryFailed": "Unable to retry this delivery",
         "noDeliveries": "No deliveries have been recorded yet.",
+        "warnings": {
+          "global_plugin_disabled": "Global QQ Bot delivery is not enabled.",
+          "no_online_agent": "No QQ Bot agent is currently online.",
+          "no_bound_group": "No broadcast group is bound to this competition."
+        },
         "events": {
           "competitionStart": "Competition start",
           "competitionEnd": "Competition end",

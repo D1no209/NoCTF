@@ -84,7 +84,7 @@ interface QqDelivery {
 type BooleanConfigKey = Exclude<keyof QqConfig, 'eventRules' | 'groupBindings' | 'warnings'>
 
 const props = defineProps<{ competitionId: string }>()
-const { t } = useI18n()
+const { t, te } = useI18n()
 const qc = useQueryClient()
 const noTemplateValue = '__none__'
 const selectedTemplateId = ref(noTemplateValue)
@@ -238,6 +238,11 @@ function statusVariant(status?: number): 'default' | 'secondary' | 'destructive'
   return 'outline'
 }
 
+function warningLabel(code: string) {
+  const key = `admin.qqBot.competition.warnings.${code}`
+  return te(key) ? t(key) : code
+}
+
 const saveConfig = useMutation({
   mutationFn: () => adminApi.updateCompetitionQqBot(props.competitionId, { ...form, groupBindings: bindings.value }),
   onSuccess: () => {
@@ -307,7 +312,11 @@ const retryDelivery = useMutation({
         <Button variant="outline" size="sm" @click="refetch()"><RefreshCw class="size-4" />{{ t('common.refresh') }}</Button>
       </CardHeader>
       <CardContent class="p-0">
-        <div v-if="form.warnings.length" class="m-5 border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800">{{ form.warnings.join(' ') }}</div>
+        <div v-if="form.warnings.length" class="m-5 border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800">
+          <ul class="list-disc space-y-1 pl-5">
+            <li v-for="warning in form.warnings" :key="warning">{{ warningLabel(warning) }}</li>
+          </ul>
+        </div>
 
         <div class="grid xl:grid-cols-2">
           <section class="space-y-4 p-5 xl:border-r">
@@ -358,7 +367,7 @@ const retryDelivery = useMutation({
           <div class="grid gap-2"><Label>{{ t('admin.qqBot.competition.content') }}</Label><Textarea v-model="templateForm.content" rows="10" class="font-mono text-xs" :placeholder="t('admin.qqBot.competition.templateContentPlaceholder')" /></div>
           <label class="flex items-center gap-2 text-sm"><input v-model="templateForm.isDefault" type="checkbox" class="size-4">{{ t('admin.qqBot.competition.useAsEventDefault') }}</label>
           <div class="flex flex-wrap gap-2"><Button :disabled="!templateForm.name.trim() || !templateForm.content.trim() || saveTemplate.isPending.value" @click="saveTemplate.mutate()"><Loader2 v-if="saveTemplate.isPending.value" class="size-4 animate-spin" /><Save v-else class="size-4" />{{ t('admin.qqBot.competition.saveTemplate') }}</Button><Button variant="outline" :disabled="previewTemplate.isPending.value" @click="previewTemplate.mutate()"><Loader2 v-if="previewTemplate.isPending.value" class="size-4 animate-spin" /><Eye v-else class="size-4" />{{ t('admin.qqBot.competition.preview') }}</Button></div>
-          <Panel v-if="preview" class="space-y-2 p-4"><div class="flex items-center justify-between text-sm"><span class="font-medium">{{ t('admin.qqBot.competition.preview') }}</span><Badge variant="outline">{{ t('admin.qqBot.competition.characterCount', { count: preview.characterCount ?? 0 }) }}</Badge></div><pre class="whitespace-pre-wrap break-words text-sm">{{ preview.renderedText }}</pre><p v-if="preview.warnings?.length" class="text-xs text-amber-700">{{ preview.warnings.join(' ') }}</p></Panel>
+          <Panel v-if="preview" class="space-y-2 p-4"><div class="flex items-center justify-between text-sm"><span class="font-medium">{{ t('admin.qqBot.competition.preview') }}</span><Badge variant="outline">{{ t('admin.qqBot.competition.characterCount', { count: preview.characterCount ?? 0 }) }}</Badge></div><pre class="whitespace-pre-wrap break-words text-sm">{{ preview.renderedText }}</pre><ul v-if="preview.warnings?.length" class="list-disc space-y-1 pl-5 text-xs text-amber-700"><li v-for="warning in preview.warnings" :key="warning">{{ warningLabel(warning) }}</li></ul></Panel>
         </CardContent>
       </Card>
 

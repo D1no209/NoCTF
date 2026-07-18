@@ -17,5 +17,8 @@ describe('competition operations localization', () => {
     expect(i18n.global.t('admin.competitionDetail.navOperations')).toBe(navigation)
     expect(i18n.global.t('admin.competitionOperations.title')).toBe(title)
     expect(i18n.global.t('admin.qqBot.competition.deliveryControls')).not.toContain('admin.qqBot')
+    expect(i18n.global.t('admin.qqBot.competition.warnings.global_plugin_disabled')).not.toContain('global_plugin_disabled')
+    expect(i18n.global.t('admin.qqBot.competition.warnings.no_online_agent')).not.toContain('no_online_agent')
+    expect(i18n.global.t('admin.qqBot.competition.warnings.no_bound_group')).not.toContain('no_bound_group')
   })
 })
