@@ -12,8 +12,24 @@ public enum SubmissionOutcome
     PlatformFailed
 }
 
+public enum SubmissionErrorCode
+{
+    FlagNotSupported,
+    FixNotSupported,
+    BreakAttemptsExhausted,
+    FixAttemptsExhausted,
+    BreakRequired,
+    ArchiveValidationUnavailable,
+    FixArchiveMissing,
+    FixArchiveLengthMismatch,
+    FixArchiveContentTypeMismatch,
+    FixArchiveHashMismatch,
+    StorageTimeout,
+    StorageUnavailable
+}
+
 /// <summary>The permanent input event for a Flag submission. The Flag is intentionally retained here only.</summary>
-public sealed class FlagSubmissionReceived : ISubmissionStreamEvent
+public sealed record FlagSubmissionReceived : ISubmissionStreamEvent
 {
     public required Guid SubmissionId { get; init; }
     public required Guid CompetitionId { get; init; }
@@ -23,6 +39,7 @@ public sealed class FlagSubmissionReceived : ISubmissionStreamEvent
     public required string Flag { get; init; }
     public required string IpAddress { get; init; }
     public required DateTimeOffset ReceivedAt { get; init; }
+    public string? ExpectedFlagAtReceipt { get; init; }
 
     public override string ToString() =>
         $"{nameof(FlagSubmissionReceived)} {{ SubmissionId = {SubmissionId}, Flag = [REDACTED] }}";
@@ -35,5 +52,6 @@ public sealed record FlagSubmissionEvaluated(
     Guid ChallengeId,
     SubmissionOutcome Outcome,
     DateTimeOffset EvaluatedAt,
-    string? ErrorCode = null,
-    int? OriginalRound = null) : ISubmissionStreamEvent;
+    SubmissionErrorCode? ErrorCode = null,
+    int? OriginalRound = null,
+    bool ConsumedAttempt = false) : ISubmissionStreamEvent;

@@ -16,4 +16,6 @@ public sealed class FixUploadSession
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public bool Consumed { get; set; }
+    public Guid? ConsumedBySubmissionId { get; set; }
+    public DateTimeOffset? ConsumedAt { get; set; }
 }

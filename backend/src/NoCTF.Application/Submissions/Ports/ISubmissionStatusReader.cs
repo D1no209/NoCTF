@@ -11,7 +11,7 @@ public sealed record SubmissionStatusView(
     SubmissionOutcome Outcome,
     DateTimeOffset ReceivedAt,
     DateTimeOffset? CompletedAt,
-    string? ErrorCode);
+    SubmissionErrorCode? ErrorCode);
 
 public interface ISubmissionStatusReader
 {

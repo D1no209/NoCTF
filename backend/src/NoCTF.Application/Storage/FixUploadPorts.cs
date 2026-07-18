@@ -35,8 +35,6 @@ public interface IFixUploadSessionStore
         Guid userId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task<bool> TryConsumeAsync(Guid uploadId, DateTimeOffset consumedAt, CancellationToken cancellationToken);
-    Task ReleaseAsync(Guid uploadId, CancellationToken cancellationToken);
 }
 
 public interface IObjectStorage

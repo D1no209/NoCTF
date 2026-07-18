@@ -89,8 +89,5 @@ public class CreateFixUploadTests
         public Task<FixUploadMetadata?> GetAuthorizedMetadataAsync(Guid uploadId, Guid competitionId, Guid teamId,
             Guid challengeId, Guid userId, DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
-        public Task<bool> TryConsumeAsync(Guid uploadId, DateTimeOffset consumedAt, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-        public Task ReleaseAsync(Guid uploadId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

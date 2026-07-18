@@ -25,7 +25,7 @@ public sealed class RebuildScoring(IScoringRebuildStore store, IScoringRuleEvalu
             var latest = await store.GetSubmissionHighWaterMarkAsync(competitionId, cancellationToken);
             if (latest == highWaterMark)
             {
-                await store.ActivateAsync(lease, highWaterMark, cancellationToken);
+                await store.ActivateAsync(lease, context, highWaterMark, cancellationToken);
                 return;
             }
 

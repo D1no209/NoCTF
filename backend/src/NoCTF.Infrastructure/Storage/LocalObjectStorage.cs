@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Storage;
 
@@ -24,6 +25,8 @@ public sealed class LocalObjectStorage(IConfiguration configuration) : IObjectSt
             await content.CopyToAsync(output, cancellationToken);
         await using var input = File.OpenRead(path);
         var hash = Convert.ToHexString(await SHA256.HashDataAsync(input, cancellationToken));
+        await File.WriteAllTextAsync(MetadataPath(path),
+            JsonSerializer.Serialize(new LocalObjectMetadata(fileName, contentType, hash)), cancellationToken);
         return new(objectKey, fileName, contentType, new FileInfo(path).Length, hash);
     }
 
@@ -33,7 +36,10 @@ public sealed class LocalObjectStorage(IConfiguration configuration) : IObjectSt
         if (!File.Exists(path)) return null;
         await using var input = File.OpenRead(path);
         var hash = Convert.ToHexString(await SHA256.HashDataAsync(input, cancellationToken));
-        return new(objectKey, Path.GetFileName(path), "application/octet-stream", new FileInfo(path).Length, hash);
+        var metadata = await ReadMetadataAsync(path, cancellationToken);
+        return new(objectKey, metadata?.FileName ?? Path.GetFileName(path),
+            metadata?.ContentType ?? "application/octet-stream", new FileInfo(path).Length,
+            metadata?.Sha256 ?? hash);
     }
 
     public Task<Stream> OpenReadAsync(string objectKey, CancellationToken cancellationToken) =>
@@ -43,8 +49,22 @@ public sealed class LocalObjectStorage(IConfiguration configuration) : IObjectSt
     {
         var path = Resolve(objectKey);
         if (File.Exists(path)) File.Delete(path);
+        var metadataPath = MetadataPath(path);
+        if (File.Exists(metadataPath)) File.Delete(metadataPath);
         return Task.CompletedTask;
     }
+
+    private static string MetadataPath(string path) => $"{path}.metadata";
+
+    private static async Task<LocalObjectMetadata?> ReadMetadataAsync(string path, CancellationToken cancellationToken)
+    {
+        var metadataPath = MetadataPath(path);
+        if (!File.Exists(metadataPath)) return null;
+        await using var stream = File.OpenRead(metadataPath);
+        return await JsonSerializer.DeserializeAsync<LocalObjectMetadata>(stream, cancellationToken: cancellationToken);
+    }
+
+    private sealed record LocalObjectMetadata(string FileName, string ContentType, string Sha256);
 
     private string Resolve(string objectKey)
     {

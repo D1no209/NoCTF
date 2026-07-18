@@ -32,7 +32,11 @@ public interface IScoringRebuildStore
         IReadOnlyList<DerivedScoringEvent> events,
         CancellationToken cancellationToken);
     Task<long> GetSubmissionHighWaterMarkAsync(Guid competitionId, CancellationToken cancellationToken);
-    Task ActivateAsync(ScoringRebuildLease lease, long caughtUpSequence, CancellationToken cancellationToken);
+    Task ActivateAsync(
+        ScoringRebuildLease lease,
+        ScoringContext context,
+        long caughtUpSequence,
+        CancellationToken cancellationToken);
 }
 
 public interface IScoringRebuildQueue

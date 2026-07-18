@@ -2,12 +2,26 @@ using NoCTF.Application.Submissions.Events;
 
 namespace NoCTF.Application.Scoring.Events;
 
+public enum ScoringReason
+{
+    Solve,
+    Blood,
+    AwdServiceUp,
+    AwdServiceDown,
+    AwdAttack,
+    AwdCompromised,
+    AwdpBreak,
+    AwdpFix,
+    KohControlInterval,
+    PenetrationStage
+}
+
 public sealed record ScoreAwarded(
     Guid CompetitionId,
     Guid TeamId,
     Guid? ChallengeId,
     long Points,
-    string Reason,
+    ScoringReason Reason,
     DateTimeOffset ScoredAt,
     Guid SourceSubmissionId) : IScoringStreamEvent;
 
@@ -16,11 +30,11 @@ public sealed record ScoreDeducted(
     Guid TeamId,
     Guid? ChallengeId,
     long Points,
-    string Reason,
+    ScoringReason Reason,
     DateTimeOffset ScoredAt,
     Guid SourceSubmissionId) : IScoringStreamEvent;
 
-public sealed record SolveRecorded(
+public sealed record CtfSolveRecorded(
     Guid CompetitionId,
     Guid TeamId,
     Guid ChallengeId,

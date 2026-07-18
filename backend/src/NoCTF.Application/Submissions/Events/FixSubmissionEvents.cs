@@ -26,5 +26,5 @@ public sealed record FixSubmissionEvaluated(
     SubmissionOutcome Outcome,
     bool ConsumedAttempt,
     DateTimeOffset EvaluatedAt,
-    string? ErrorCode = null,
+    SubmissionErrorCode? ErrorCode = null,
     int? Round = null) : ISubmissionStreamEvent;

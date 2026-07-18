@@ -1,4 +1,6 @@
 using NoCTF.Application.Submissions.Intake;
+using NoCTF.Application.Scoring.Events;
+using NoCTF.Application.Submissions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.GameModes.Registration;
 using ArchUnitNET.Loader;
@@ -35,6 +37,15 @@ public class DependencyRulesTests
         await Assert.That(GameModeCatalog.All).Count().IsEqualTo(5);
         await Assert.That(typeof(GameModeCatalog).Assembly.GetReferencedAssemblies().Select(reference => reference.Name))
             .DoesNotContain("Marten");
+    }
+
+    [Test]
+    public async Task Bounded_event_concepts_use_enums()
+    {
+        await Assert.That(typeof(ScoreAwarded).GetProperty(nameof(ScoreAwarded.Reason))!.PropertyType)
+            .IsEqualTo(typeof(ScoringReason));
+        await Assert.That(typeof(FlagSubmissionEvaluated).GetProperty(nameof(FlagSubmissionEvaluated.ErrorCode))!.PropertyType)
+            .IsEqualTo(typeof(SubmissionErrorCode?));
     }
 
     [Test]

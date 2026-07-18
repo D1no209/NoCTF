@@ -10,6 +10,9 @@ internal static class StreamIds
     public static Guid Scoring(Guid competitionId) =>
         CreateDeterministic($"scoring:{competitionId:N}");
 
+    public static Guid InputReceipt(Guid competitionId, string idempotencyKey) =>
+        CreateDeterministic($"input:{competitionId:N}:{idempotencyKey}");
+
     private static Guid CreateDeterministic(string name)
     {
         var namespaceBytes = NamespaceId.ToByteArray();

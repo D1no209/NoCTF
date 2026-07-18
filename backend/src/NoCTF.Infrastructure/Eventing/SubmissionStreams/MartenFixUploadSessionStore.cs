@@ -1,11 +1,13 @@
-using Microsoft.EntityFrameworkCore;
+using Marten;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Persistence;
+using EF = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 
-namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+namespace NoCTF.Infrastructure.Eventing.SubmissionStreams;
 
-public sealed class EfFixUploadSessionStore(
+public sealed class MartenFixUploadSessionStore(
+    IDocumentSession session,
     NoCtfDbContext db,
     IObjectStorage storage) : IFixUploadSessionStore
 {
@@ -13,7 +15,7 @@ public sealed class EfFixUploadSessionStore(
         CreateFixUploadCommand command,
         CancellationToken cancellationToken)
     {
-        var scopeExists = await db.Challenges.AnyAsync(item =>
+        var scopeExists = await EF.AnyAsync(db.Challenges, item =>
             item.Id == command.ChallengeId && item.CompetitionId == command.CompetitionId,
             cancellationToken);
         if (!scopeExists)
@@ -28,7 +30,7 @@ public sealed class EfFixUploadSessionStore(
             command.Length,
             TimeSpan.FromMinutes(15),
             cancellationToken);
-        db.FixUploadSessions.Add(new FixUploadSession
+        session.Insert(new FixUploadSession
         {
             Id = uploadId,
             CompetitionId = command.CompetitionId,
@@ -43,7 +45,7 @@ public sealed class EfFixUploadSessionStore(
             CreatedAt = command.RequestedAt,
             ExpiresAt = grant.ExpiresAt
         });
-        await db.SaveChangesAsync(cancellationToken);
+        await session.SaveChangesAsync(cancellationToken);
         return grant with { UploadId = uploadId };
     }
 
@@ -56,30 +58,16 @@ public sealed class EfFixUploadSessionStore(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var upload = await db.FixUploadSessions.AsNoTracking().SingleOrDefaultAsync(item =>
-            item.Id == uploadId
-            && (competitionId == Guid.Empty || item.CompetitionId == competitionId)
-            && (teamId == Guid.Empty || item.TeamId == teamId)
-            && (challengeId == Guid.Empty || item.ChallengeId == challengeId)
-            && item.UserId == userId
-            && !item.Consumed
-            && item.ExpiresAt > now,
-            cancellationToken);
-        return upload is null
-            ? null
-            : new(upload.ObjectKey, upload.FileName, upload.ContentType, upload.ExpectedLength, upload.ExpectedSha256);
+        var upload = await session.LoadAsync<FixUploadSession>(uploadId, cancellationToken);
+        if (upload is null
+            || upload.CompetitionId != competitionId && competitionId != Guid.Empty
+            || upload.TeamId != teamId && teamId != Guid.Empty
+            || upload.ChallengeId != challengeId && challengeId != Guid.Empty
+            || upload.UserId != userId
+            || upload.Consumed
+            || upload.ExpiresAt <= now)
+            return null;
+        return new(upload.ObjectKey, upload.FileName, upload.ContentType, upload.ExpectedLength, upload.ExpectedSha256);
     }
 
-    public async Task<bool> TryConsumeAsync(Guid uploadId, DateTimeOffset consumedAt, CancellationToken cancellationToken)
-    {
-        var updated = await db.FixUploadSessions
-            .Where(item => item.Id == uploadId && !item.Consumed && item.ExpiresAt > consumedAt)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Consumed, true), cancellationToken);
-        return updated == 1;
-    }
-
-    public Task ReleaseAsync(Guid uploadId, CancellationToken cancellationToken) =>
-        db.FixUploadSessions
-            .Where(item => item.Id == uploadId && item.Consumed)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Consumed, false), cancellationToken);
 }

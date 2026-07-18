@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260718203917_InitialBaseline")]
+    [Migration("20260718215333_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -500,65 +500,6 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                     b.HasIndex("CompetitionId", "Status");
 
                     b.ToTable("runtime_operations", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Storage.FixUploadSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("Consumed")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("ExpectedLength")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("ExpectedSha256")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<string>("ObjectKey")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ObjectKey", "Consumed");
-
-                    b.HasIndex("UserId", "ExpiresAt");
-
-                    b.ToTable("fix_upload_sessions", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Teams.Team", b =>
