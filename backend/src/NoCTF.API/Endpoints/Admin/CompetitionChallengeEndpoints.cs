@@ -21,6 +21,7 @@ public class BindCompetitionChallengeRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid TemplateId { get; set; }
+    public string? Direction { get; set; }
     public string? Description { get; set; }
     public string DescriptionFormat { get; set; } = "markdown";
     public string? FlagPrefix { get; set; }
@@ -182,7 +183,9 @@ public class BindCompetitionChallengeEndpoint(
             Description = string.IsNullOrWhiteSpace(req.Description) ? template.Description : req.Description,
             DescriptionFormat = string.IsNullOrWhiteSpace(req.DescriptionFormat) ? "markdown" : req.DescriptionFormat,
             TypeId = template.TypeId,
-            Direction = template.Direction,
+            Direction = req.Direction is null
+                ? template.Direction
+                : ChallengeTemplateRequestRules.NormalizeDirection(req.Direction),
             ContainerImage = template.ContainerImage,
             ContainerMode = template.ContainerMode,
             ComposeYaml = template.ComposeYaml,
