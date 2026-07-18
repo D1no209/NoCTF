@@ -10,7 +10,7 @@ namespace NoCTF.Plugins.CTF;
 public class CtfModule : IHostAwarePluginModule
 {
     public string Name => "NoCTF.Plugins.CTF";
-    public string Version => "1.0.0";
+    public string Version => "1.0.1";
 
     public void ConfigureServices(IServiceCollection services)
         => ConfigureApiServices(services);

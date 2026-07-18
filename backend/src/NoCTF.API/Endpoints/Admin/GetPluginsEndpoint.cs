@@ -1,6 +1,6 @@
 using FastEndpoints;
-using Microsoft.Extensions.DependencyInjection;
-using NoCTF.PluginBase;
+using NoCTF.Application.Plugins;
+using NoCTF.Core;
 
 namespace NoCTF.API.Endpoints.Admin;
 
@@ -11,7 +11,7 @@ public class PluginDto
     public string Version { get; set; } = string.Empty;
 }
 
-public class GetPluginsEndpoint(IServiceProvider serviceProvider) : Endpoint<EmptyRequest, List<PluginDto>>
+public class GetPluginsEndpoint(PluginCatalog pluginCatalog) : Endpoint<EmptyRequest, List<PluginDto>>
 {
     public override void Configure()
     {
@@ -21,51 +21,22 @@ public class GetPluginsEndpoint(IServiceProvider serviceProvider) : Endpoint<Emp
 
     public override async Task HandleAsync(EmptyRequest req, CancellationToken ct)
     {
-        var plugins = new List<PluginDto>();
-
-        var gameModes = serviceProvider.GetServices<IGameMode>();
-        foreach (var gm in gameModes)
-        {
-            plugins.Add(new PluginDto
+        var plugins = pluginCatalog.Plugins
+            .OrderBy(plugin => plugin.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(plugin => new PluginDto
             {
-                Name = gm.GetType().Name,
-                Type = "GameMode",
-                Version = gm.GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0",
-            });
-        }
+                Name = plugin.Name,
+                Type = "PluginModule",
+                Version = plugin.Version,
+            })
+            .ToList();
 
-        var challengeTypes = serviceProvider.GetServices<IChallengeType>();
-        foreach (var ct2 in challengeTypes)
+        plugins.Insert(0, new PluginDto
         {
-            plugins.Add(new PluginDto
-            {
-                Name = ct2.GetType().Name,
-                Type = "ChallengeType",
-                Version = ct2.GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0",
-            });
-        }
-
-        var storageProviders = serviceProvider.GetServices<IStorageProvider>();
-        foreach (var sp in storageProviders)
-        {
-            plugins.Add(new PluginDto
-            {
-                Name = sp.GetType().Name,
-                Type = "StorageProvider",
-                Version = sp.GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0",
-            });
-        }
-
-        var containerManagers = serviceProvider.GetServices<IContainerManager>();
-        foreach (var cm in containerManagers)
-        {
-            plugins.Add(new PluginDto
-            {
-                Name = cm.GetType().Name,
-                Type = "ContainerProvider",
-                Version = cm.GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0",
-            });
-        }
+            Name = "NoCTF.Core",
+            Type = "CoreEngine",
+            Version = typeof(Competition).Assembly.GetName().Version?.ToString() ?? "unknown",
+        });
 
         await SendAsync(plugins, cancellation: ct);
     }

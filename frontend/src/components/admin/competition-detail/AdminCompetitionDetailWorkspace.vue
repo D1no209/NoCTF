@@ -148,6 +148,7 @@ interface CompetitionLogDto {
   message: string
   teamName?: string | null
   challengeTitle?: string | null
+  submittedFlag?: string | null
   createdAt: string
 }
 

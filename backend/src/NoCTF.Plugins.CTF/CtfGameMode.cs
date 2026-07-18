@@ -190,7 +190,11 @@ public class CtfGameMode : IGameMode
                 TeamId = context.TeamId,
                 UserId = context.UserId,
                 ChallengeId = context.ChallengeId,
-                MetadataJson = stolenFlag is null ? "{}" : ScoringJson.Serialize(new { victimTeamId = stolenFlag.TeamId }),
+                MetadataJson = ScoringJson.Serialize(new
+                {
+                    submittedFlag = context.FlagContent,
+                    victimTeamId = stolenFlag?.TeamId
+                }),
                 CreatedAt = submission.SubmittedAt,
             });
 

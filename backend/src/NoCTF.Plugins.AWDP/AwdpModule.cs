@@ -13,7 +13,7 @@ namespace NoCTF.Plugins.AWDP;
 public class AwdpModule : IHostAwarePluginModule
 {
     public string Name => "NoCTF.Plugins.AWDP";
-    public string Version => "1.0.0";
+    public string Version => "1.0.1";
 
     public void ConfigureServices(IServiceCollection services)
     {
