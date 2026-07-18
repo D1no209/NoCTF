@@ -1290,13 +1290,13 @@
         },
         "events": {
           "competitionStart": "Competition start",
-          "competitionEnd": "Competition end",
-          "challengeSolved": "Challenge solved",
+          "challengePublished": "Challenge published",
+          "hintPublished": "Hint published",
           "firstBlood": "First blood",
+          "secondBlood": "Second blood",
+          "thirdBlood": "Third blood",
           "teamPenalty": "Team penalty",
-          "systemNotice": "System notice",
-          "manualAnnouncement": "Manual announcement",
-          "scoreboardUpdate": "Scoreboard update"
+          "manualAnnouncement": "Manual announcement"
         },
         "statuses": {
           "queued": "Queued",

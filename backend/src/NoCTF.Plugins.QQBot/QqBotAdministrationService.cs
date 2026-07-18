@@ -176,33 +176,51 @@ internal sealed class QqBotAdministrationService(
         settings.HidePenaltyDetails = update.HidePenaltyDetails;
         settings.UpdatedAt = now;
 
-        var oldRules = await db.CompetitionQqBotEventRules.IgnoreQueryFilters()
+        var existingRules = await db.CompetitionQqBotEventRules.IgnoreQueryFilters()
             .Where(item => item.CompetitionId == competitionId).ToListAsync(ct);
-        db.CompetitionQqBotEventRules.RemoveRange(oldRules);
-        db.CompetitionQqBotEventRules.AddRange(update.EventRules.Select(rule => new CompetitionQqBotEventRule
+        var requestedRuleTypes = update.EventRules.Select(rule => rule.EventType).ToHashSet();
+        db.CompetitionQqBotEventRules.RemoveRange(existingRules.Where(rule => !requestedRuleTypes.Contains(rule.EventType)));
+        foreach (var rule in update.EventRules)
         {
-            Id = Guid.NewGuid(),
-            CompetitionId = competitionId,
-            EventType = rule.EventType,
-            Enabled = rule.Enabled,
-            TemplateId = rule.TemplateId,
-            UpdatedAt = now
-        }));
+            var entity = existingRules.FirstOrDefault(item => item.EventType == rule.EventType);
+            if (entity is null)
+            {
+                entity = new CompetitionQqBotEventRule
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = competitionId,
+                    EventType = rule.EventType
+                };
+                db.CompetitionQqBotEventRules.Add(entity);
+            }
+            entity.Enabled = rule.Enabled;
+            entity.TemplateId = rule.TemplateId;
+            entity.UpdatedAt = now;
+        }
 
-        var oldBindings = await db.CompetitionQqBotGroupBindings.IgnoreQueryFilters()
+        var existingBindings = await db.CompetitionQqBotGroupBindings.IgnoreQueryFilters()
             .Where(item => item.CompetitionId == competitionId).ToListAsync(ct);
-        db.CompetitionQqBotGroupBindings.RemoveRange(oldBindings);
-        db.CompetitionQqBotGroupBindings.AddRange(update.GroupBindings.Select(binding => new CompetitionQqBotGroupBinding
+        var requestedBindingGroupIds = update.GroupBindings.Select(binding => binding.GroupId).ToHashSet();
+        db.CompetitionQqBotGroupBindings.RemoveRange(existingBindings.Where(binding => !requestedBindingGroupIds.Contains(binding.GroupId)));
+        foreach (var binding in update.GroupBindings)
         {
-            Id = Guid.NewGuid(),
-            CompetitionId = competitionId,
-            AgentId = binding.AgentId,
-            GroupId = binding.GroupId,
-            IsDefault = binding.IsDefault,
-            EventTypesJson = JsonSerializer.Serialize(binding.EventTypes.Distinct().Order().ToArray(), JsonOptions),
-            CreatedAt = now,
-            UpdatedAt = now
-        }));
+            var entity = existingBindings.FirstOrDefault(item => item.GroupId == binding.GroupId);
+            if (entity is null)
+            {
+                entity = new CompetitionQqBotGroupBinding
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = competitionId,
+                    GroupId = binding.GroupId,
+                    CreatedAt = now
+                };
+                db.CompetitionQqBotGroupBindings.Add(entity);
+            }
+            entity.AgentId = binding.AgentId;
+            entity.IsDefault = binding.IsDefault;
+            entity.EventTypesJson = JsonSerializer.Serialize(binding.EventTypes.Distinct().Order().ToArray(), JsonOptions);
+            entity.UpdatedAt = now;
+        }
         await db.SaveChangesAsync(ct);
         return await BuildCompetitionConfigurationAsync(competitionId, ct);
     }

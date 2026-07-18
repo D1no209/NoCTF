@@ -2,6 +2,12 @@
 
 This handoff is the fastest path for a new collaborator to understand the current project, run it, and make changes without breaking the plugin-style architecture.
 
+## 2026-07-18 QQ Bot competition event configuration
+
+- Competition QQ Bot event switches now map exactly to the backend `QqBotEventType` enum: competition start, challenge publish, hint publish, first/second/third blood, team penalty, and announcement.
+- Saving a competition configuration now sends only the update contract and always supplies each binding's event list.
+- The QQ Bot administration service updates existing event rules and group bindings in place instead of deleting and recreating rows that share unique competition/event or competition/group keys. Stable row IDs are retained and repeat saves no longer collide with those unique indexes.
+
 ## 2026-07-18 Login identifier input rendering
 
 - The missing login identifier control was caused by Vue I18n interpreting the unescaped `@` in the localized example address as linked-message syntax. That render exception replaced the field with comment nodes while leaving the password field visible.

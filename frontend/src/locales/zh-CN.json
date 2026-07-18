@@ -1290,13 +1290,13 @@
         },
         "events": {
           "competitionStart": "比赛开始",
-          "competitionEnd": "比赛结束",
-          "challengeSolved": "题目解出",
+          "challengePublished": "新题发布",
+          "hintPublished": "新增提示",
           "firstBlood": "一血",
+          "secondBlood": "二血",
+          "thirdBlood": "三血",
           "teamPenalty": "队伍处罚",
-          "systemNotice": "系统通知",
-          "manualAnnouncement": "手动公告",
-          "scoreboardUpdate": "排行榜更新"
+          "manualAnnouncement": "手动公告"
         },
         "statuses": {
           "queued": "排队中",
