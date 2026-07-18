@@ -190,6 +190,7 @@ public class Challenge : ITenantEntity
     public string? Description { get; set; }
     public string DescriptionFormat { get; set; } = "markdown";
     public string TypeId { get; set; } = string.Empty;
+    public string Direction { get; set; } = "Uncategorized";
     public PointsConfig PointsConfig { get; set; } = new();
     public double DifficultyCoefficient { get; set; } = 1.0;
     public bool EnableBloodBonus { get; set; }
@@ -225,6 +226,7 @@ public class ChallengeTemplate
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string TypeId { get; set; } = "ctf";
+    public string Direction { get; set; } = "Uncategorized";
     public string? AttachmentUrl { get; set; }
     public string? PatchTemplateUrl { get; set; }
     public string? AttachmentStorageKey { get; set; }

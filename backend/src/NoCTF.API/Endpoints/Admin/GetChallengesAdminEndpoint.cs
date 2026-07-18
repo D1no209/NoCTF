@@ -13,6 +13,7 @@ public class ChallengeTemplateAdminDto
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string TypeId { get; set; } = string.Empty;
+    public string Direction { get; set; } = string.Empty;
     public string? ContainerImage { get; set; }
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
@@ -38,6 +39,7 @@ public class CompetitionChallengeAdminDto
     public string? Description { get; set; }
     public string DescriptionFormat { get; set; } = "markdown";
     public string TypeId { get; set; } = string.Empty;
+    public string Direction { get; set; } = string.Empty;
     public string? ContainerImage { get; set; }
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
@@ -95,6 +97,7 @@ public static class ChallengeAdminMapping
         Title = challenge.Title,
         Description = challenge.Description,
         TypeId = challenge.TypeId,
+        Direction = challenge.Direction,
         ContainerImage = challenge.ContainerImage,
         ContainerMode = challenge.ContainerMode,
         ComposeYaml = includeSensitive ? challenge.ComposeYaml : null,
@@ -133,6 +136,7 @@ public static class ChallengeAdminMapping
         Description = challenge.Description,
         DescriptionFormat = string.IsNullOrWhiteSpace(challenge.DescriptionFormat) ? "markdown" : challenge.DescriptionFormat,
         TypeId = challenge.TypeId,
+        Direction = challenge.Direction,
         ContainerImage = challenge.ContainerImage,
         ContainerMode = challenge.ContainerMode,
         ComposeYaml = challenge.ComposeYaml,

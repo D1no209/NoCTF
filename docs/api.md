@@ -112,6 +112,15 @@ Clients receive:
 
 ## Common Endpoints
 
+### Challenge type and direction
+
+Challenge template, competition challenge, and public challenge payloads expose two separate fields:
+
+- `typeId` selects the runtime challenge behavior, such as `Ctf`, `Awd`, `Awdp`, or a plugin-owned type such as `Penetration`.
+- `direction` is the subject direction shown to participants and reports, such as `WEB`, `PWN`, `MISC`, or `AI`.
+
+Clients must not use `direction` for runtime dispatch and must not display `typeId` as the challenge direction. Legacy rows whose direction could not be proven are returned as `Uncategorized`.
+
 ### User Notifications
 
 Authenticated users receive an inbox derived from competition events that have already been accepted by the platform. Notifications are scoped to the current user; clients cannot request or mutate another user's inbox.

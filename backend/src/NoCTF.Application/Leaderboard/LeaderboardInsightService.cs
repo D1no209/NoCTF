@@ -81,7 +81,7 @@ public class LeaderboardInsightService(
     private sealed record ChallengeInfo(
         Guid Id,
         string Title,
-        string TypeId,
+        string Direction,
         PointsConfig PointsConfig,
         double DifficultyCoefficient);
 
@@ -194,7 +194,7 @@ public class LeaderboardInsightService(
             .Select(c => new ChallengeInfo(
                 c.Id,
                 c.Title,
-                c.TypeId,
+                c.Direction,
                 c.PointsConfig,
                 c.DifficultyCoefficient
             ))
@@ -256,13 +256,13 @@ public class LeaderboardInsightService(
             .GroupBy(e =>
             {
                 challengeMap.TryGetValue(e.ChallengeId!.Value, out var challenge);
-                return NormalizeDirection(challenge?.TypeId);
+                return NormalizeDirection(challenge?.Direction);
             })
             .Select(g => new LeaderboardDirectionScore(
                 g.Key,
                 g.Sum(e => e.Points),
                 teamCorrectSubmissions
-                    .Where(s => challengeMap.TryGetValue(s.ChallengeId, out var c) && NormalizeDirection(c.TypeId) == g.Key)
+                    .Where(s => challengeMap.TryGetValue(s.ChallengeId, out var c) && NormalizeDirection(c.Direction) == g.Key)
                     .Select(s => s.ChallengeId)
                     .Distinct()
                     .Count()))
@@ -280,7 +280,7 @@ public class LeaderboardInsightService(
             .ToDictionary(group => group.Key, group => group.ToList());
 
         var challengeScores = allChallenges
-            .OrderBy(c => NormalizeDirection(c.TypeId))
+            .OrderBy(c => NormalizeDirection(c.Direction))
             .ThenBy(c => c.Title)
             .Select(c =>
             {
@@ -306,7 +306,7 @@ public class LeaderboardInsightService(
                 return new LeaderboardChallengeScore(
                     c.Id,
                     c.Title,
-                    NormalizeDirection(c.TypeId),
+                    NormalizeDirection(c.Direction),
                     currentPoints,
                     baseScore,
                     bonusScore,
@@ -340,7 +340,7 @@ public class LeaderboardInsightService(
                         return new LeaderboardMemberSolve(
                             s.ChallengeId,
                             challenge?.Title ?? s.ChallengeId.ToString(),
-                            NormalizeDirection(challenge?.TypeId),
+                            NormalizeDirection(challenge?.Direction),
                             s.SubmittedAt);
                     }).ToList());
 

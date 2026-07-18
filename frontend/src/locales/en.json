@@ -859,6 +859,8 @@
       "searchPlaceholder": "Search challenges...",
       "filterChallengeType": "Filter challenge type",
       "allChallengeTypes": "All challenge types",
+      "filterDirection": "Filter challenge direction",
+      "allDirections": "All challenge directions",
       "filterAttachment": "Filter attachment status",
       "allAttachmentStates": "All attachment states",
       "withAttachment": "With attachment",

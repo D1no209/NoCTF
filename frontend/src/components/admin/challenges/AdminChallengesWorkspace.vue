@@ -67,6 +67,7 @@ interface ChallengeTemplateDto {
   title: string
   description?: string
   typeId: string
+  direction: string
   containerImage?: string
   containerMode: 'SingleImage' | 'DockerCompose' | number
   composeYaml?: string
@@ -84,6 +85,7 @@ const router = useRouter()
 const { t } = useI18n()
 const globalFilter = ref('')
 const challengeTypeFilter = ref('all')
+const directionFilter = ref('all')
 const attachmentFilter = ref('all')
 const deploymentTypeFilter = ref('all')
 const sorting = ref<SortingState>([])
@@ -185,6 +187,12 @@ const columns = [
     filterFn: (row, columnId, filterValue) => normalizeChallengeType(row.getValue<string>(columnId)) === filterValue,
     cell: (info) => h(Badge, { variant: 'secondary', class: 'font-bold text-[10px]' }, () => challengeTypeLabel(info.getValue())),
   }),
+  columnHelper.accessor('direction', {
+    header: () => t('admin.challenges.direction'),
+    enableSorting: true,
+    filterFn: (row, columnId, filterValue) => String(row.getValue<string>(columnId) ?? '').toLowerCase() === String(filterValue).toLowerCase(),
+    cell: (info) => h(Badge, { variant: 'outline', class: 'font-bold text-[10px] uppercase' }, () => info.getValue() || 'Uncategorized'),
+  }),
   columnHelper.accessor('attachmentUrl', {
     header: () => t('admin.challenges.attachment'),
     filterFn: (row, columnId, filterValue) => filterValue === 'attached'
@@ -229,6 +237,10 @@ watch(challengeTypeFilter, (value) => {
   table.getColumn('typeId')?.setFilterValue(value === 'all' ? undefined : value)
   table.setPageIndex(0)
 })
+watch(directionFilter, (value) => {
+  table.getColumn('direction')?.setFilterValue(value === 'all' ? undefined : value)
+  table.setPageIndex(0)
+})
 watch(attachmentFilter, (value) => {
   table.getColumn('attachmentUrl')?.setFilterValue(value === 'all' ? undefined : value)
   table.setPageIndex(0)
@@ -239,6 +251,7 @@ watch(deploymentTypeFilter, (value) => {
 })
 
 const filteredTemplateCount = computed(() => table.getFilteredRowModel().rows.length)
+const availableDirections = computed(() => Array.from(new Set((templates.value ?? []).map(template => template.direction || 'Uncategorized'))).sort())
 const pageCount = computed(() => Math.max(1, table.getPageCount()))
 </script>
 
@@ -255,7 +268,7 @@ const pageCount = computed(() => Math.max(1, table.getPageCount()))
       </Button>
     </div>
 
-    <Card class="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_repeat(3,minmax(8rem,0.55fr))]">
+    <Card class="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_repeat(4,minmax(8rem,0.55fr))]">
       <div class="relative w-full">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input v-model="globalFilter" :placeholder="t('admin.challenges.searchPlaceholder')" class="pl-10" />
@@ -270,6 +283,17 @@ const pageCount = computed(() => Math.max(1, table.getPageCount()))
           </SelectItem>
           <SelectItem v-for="option in challengeTypeOptions" :key="option.value" :value="option.value">
             {{ option.label }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="directionFilter">
+        <SelectTrigger :aria-label="t('admin.challenges.filterDirection')">
+          <SelectValue :placeholder="t('admin.challenges.allDirections')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{{ t('admin.challenges.allDirections') }}</SelectItem>
+          <SelectItem v-for="direction in availableDirections" :key="direction" :value="direction">
+            {{ direction }}
           </SelectItem>
         </SelectContent>
       </Select>

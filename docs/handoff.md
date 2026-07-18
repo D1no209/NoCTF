@@ -2,6 +2,13 @@
 
 This handoff is the fastest path for a new collaborator to understand the current project, run it, and make changes without breaking the plugin-style architecture.
 
+## 2026-07-18 Challenge type/direction separation
+
+- Challenge templates and competition-bound challenges now store `TypeId` (runtime type such as CTF, AWD, or AWDP) separately from `Direction` (for example WEB, PWN, MISC, or AI).
+- The admin challenge form offers mode-aware direction choices: AWD uses WEB/PWN, AWDP uses WEB/PWN/AI, and CTF/KoH expose the established common direction list.
+- Public challenge cards, leaderboard direction aggregation, AWDP screen categories, and QQ Bot `problem_category` messages now read `Direction`; runtime dispatch continues to use `TypeId` unchanged.
+- Migration `20260718025047_AddChallengeDirections` adds the two non-null columns. It preserves exact legacy direction values when `TypeId` is one of the established directions; rows whose direction cannot be proven remain `Uncategorized`.
+
 ## Project Snapshot
 
 NoCTF is a multi-mode competition platform for CTF, AWD, AWDP, and KoH events.

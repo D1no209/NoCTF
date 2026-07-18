@@ -349,6 +349,7 @@ export type NoCtfapiEndpointsCompetitionsChallengeDto = {
     description?: string | null;
     descriptionFormat?: string;
     typeId?: string;
+    direction?: string;
     points?: number;
     solveCount?: number;
     totalStageCount?: number | null;
@@ -699,6 +700,7 @@ export type NoCtfapiEndpointsAdminCompetitionChallengeAdminDto = {
     description?: string | null;
     descriptionFormat?: string;
     typeId?: string;
+    direction?: string;
     containerImage?: string | null;
     containerMode?: NoCtfCoreChallengeContainerMode;
     composeYaml?: string | null;
@@ -844,6 +846,7 @@ export type NoCtfapiEndpointsAdminChallengeTemplateAdminDto = {
     title?: string;
     description?: string | null;
     typeId?: string;
+    direction?: string;
     containerImage?: string | null;
     containerMode?: NoCtfCoreChallengeContainerMode;
     composeYaml?: string | null;
@@ -864,6 +867,7 @@ export type NoCtfapiEndpointsAdminCreateChallengeRequest = {
     title?: string;
     description?: string | null;
     typeId?: string;
+    direction?: string;
     containerImage?: string | null;
     containerMode?: NoCtfCoreChallengeContainerMode;
     composeYaml?: string | null;
@@ -1351,6 +1355,7 @@ export type NoCtfapiEndpointsAdminUpdateChallengeRequest = {
     title?: string;
     description?: string | null;
     typeId?: string;
+    direction?: string;
     containerImage?: string | null;
     containerMode?: NoCtfCoreChallengeContainerMode;
     composeYaml?: string | null;

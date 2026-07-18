@@ -44,7 +44,9 @@ const { t } = useI18n()
         <Select v-model="bindForm.templateId">
           <SelectTrigger><SelectValue :placeholder="t('admin.competitionDetail.selectTemplate')" /></SelectTrigger>
           <SelectContent>
-            <SelectItem v-for="template in templates" :key="template.id" :value="template.id">{{ template.title }}</SelectItem>
+            <SelectItem v-for="template in templates" :key="template.id" :value="template.id">
+              {{ template.title }} · {{ template.typeId }} / {{ template.direction || 'Uncategorized' }}
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>

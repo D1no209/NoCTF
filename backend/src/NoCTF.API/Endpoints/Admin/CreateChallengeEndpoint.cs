@@ -9,6 +9,7 @@ public class CreateChallengeRequest
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string TypeId { get; set; } = "ctf";
+    public string Direction { get; set; } = "Uncategorized";
     public string? ContainerImage { get; set; }
     public ChallengeContainerMode ContainerMode { get; set; } = ChallengeContainerMode.SingleImage;
     public string? ComposeYaml { get; set; }
@@ -69,6 +70,7 @@ public class CreateChallengeEndpoint(ApplicationDbContext db) : Endpoint<CreateC
             Title = req.Title.Trim(),
             Description = ChallengeTemplateRequestRules.CleanOptional(req.Description),
             TypeId = string.IsNullOrWhiteSpace(req.TypeId) ? "ctf" : req.TypeId.Trim(),
+            Direction = ChallengeTemplateRequestRules.NormalizeDirection(req.Direction),
             ContainerImage = usesRuntimeContainer && !isPenetration ? resolvedImage : null,
             ContainerMode = isPenetration ? ChallengeContainerMode.DockerCompose : usesRuntimeContainer ? req.ContainerMode : ChallengeContainerMode.SingleImage,
             ComposeYaml = usesRuntimeContainer ? ChallengeTemplateRequestRules.CleanOptional(req.ComposeYaml) : null,

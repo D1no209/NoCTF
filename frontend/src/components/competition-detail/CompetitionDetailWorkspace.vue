@@ -47,6 +47,7 @@ interface Challenge {
   id: string
   title: string
   typeId: string
+  direction: string
   points: number
   solveCount: number
   deploymentType?: string | number | null
@@ -291,7 +292,7 @@ const awdpStateData = computed(() => awdpStateView.value?.data ?? null)
 const filteredChallenges = computed(() => {
   return effectiveChallenges.value.filter((challenge) => {
     const solved = solvedIds.value.has(challenge.id)
-    const matchesDirection = activeDirection.value === 'ALL' || normalizeDirection(challenge.typeId) === activeDirection.value
+    const matchesDirection = activeDirection.value === 'ALL' || normalizeDirection(challenge.direction) === activeDirection.value
     const matchesSolved = !hideSolved.value || !solved
     return matchesDirection && matchesSolved
   })
@@ -316,7 +317,7 @@ async function recalcConnectionLines() {
   const containerRect = container.getBoundingClientRect()
   const groups = new Map<string, Challenge[]>()
   for (const challenge of filteredChallenges.value) {
-    const dir = normalizeDirection(challenge.typeId)
+    const dir = normalizeDirection(challenge.direction)
     if (!groups.has(dir))
       groups.set(dir, [])
     groups.get(dir)!.push(challenge)
@@ -372,7 +373,7 @@ const directionOptions = computed(() => {
     counts.set(dir, { total: 0, unsolved: 0 })
 
   for (const challenge of effectiveChallenges.value) {
-    const direction = normalizeDirection(challenge.typeId)
+    const direction = normalizeDirection(challenge.direction)
     const current = counts.get(direction) ?? { total: 0, unsolved: 0 }
     current.total += 1
     if (!solvedIds.value.has(challenge.id))
@@ -722,7 +723,7 @@ function bloodStampClass(rank: number) {
                 <!-- Pin -->
                 <div
                   class="absolute -top-1.5 left-1/2 z-20 size-3 -translate-x-1/2 rounded-full border-2 border-background shadow-sm"
-                  :class="challengeTypeLabel(challenge.typeId).pinClassName"
+                  :class="challengeTypeLabel(challenge.direction).pinClassName"
                 />
 
                 <!-- Photo area -->
@@ -744,7 +745,7 @@ function bloodStampClass(rank: number) {
                     <span
                       class="pointer-events-none absolute bottom-1 right-2 select-none text-2xl font-black uppercase tracking-[0.15em] text-foreground/30 rotate-[-12deg]"
                     >
-                      {{ normalizeDirection(challenge.typeId) }}
+                      {{ normalizeDirection(challenge.direction) }}
                     </span>
                   </Panel>
                 </CardContent>

@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { challengeDirectionsForType, normalizeDirection } from '@/lib/challengeDirections'
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ interface ChallengeTemplateDto {
   title?: string
   description?: string
   typeId?: string
+  direction?: string
   containerImage?: string
   containerMode?: 'SingleImage' | 'DockerCompose' | number
   composeYaml?: string
@@ -64,6 +66,7 @@ const defaultForm = () => ({
   title: '',
   description: '',
   typeId: 'Ctf',
+  direction: 'WEB',
   attachmentUrl: '',
   patchTemplateUrl: '',
   deploymentType: 'StaticAttachment',
@@ -112,6 +115,7 @@ function normalizeChallengeType(value?: string | null): ChallengeTypeKey {
 }
 
 const selectedChallengeType = computed(() => normalizeChallengeType(form.value.typeId))
+const directionOptions = computed(() => challengeDirectionsForType(selectedChallengeType.value))
 const deploymentOptions = computed(() => selectedChallengeType.value === 'Ctf'
   ? ctfDeploymentTypes
   : containerDeploymentTypes)
@@ -145,6 +149,7 @@ watch(() => props.template, (template) => {
     title: template.title ?? '',
     description: template.description ?? '',
     typeId: normalizeChallengeType(template.typeId),
+    direction: normalizeDirection(template.direction),
     attachmentUrl: template.attachmentUrl ?? '',
     patchTemplateUrl: template.patchTemplateUrl ?? '',
     deploymentType: deploymentTypeKey(template.deploymentType),
@@ -169,6 +174,10 @@ watch(selectedChallengeType, (mode) => {
   }
   if (mode === 'Ctf' && !ctfDeploymentTypes.includes(form.value.deploymentType as typeof ctfDeploymentTypes[number])) {
     form.value.deploymentType = 'StaticAttachment'
+  }
+  const availableDirections = challengeDirectionsForType(mode)
+  if (!availableDirections.includes(normalizeDirection(form.value.direction))) {
+    form.value.direction = availableDirections[0]
   }
 })
 
@@ -196,6 +205,7 @@ function buildPayload() {
     title: form.value.title.trim(),
     description: form.value.description.trim() || undefined,
     typeId: normalizeChallengeType(form.value.typeId),
+    direction: normalizeDirection(form.value.direction),
     attachmentUrl: form.value.attachmentUrl.trim() || undefined,
     patchTemplateUrl: usesPatchTemplate.value ? form.value.patchTemplateUrl.trim() || undefined : undefined,
     deploymentType: deploymentTypeValue(effectiveDeploymentType),
@@ -243,6 +253,17 @@ function submit() {
           <SelectContent>
             <SelectItem v-for="option in challengeTypeOptions" :key="option.value" :value="option.value">
               {{ option.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div class="grid gap-2">
+        <Label>{{ t('admin.challenges.direction') }}</Label>
+        <Select v-model="form.direction">
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="direction in directionOptions" :key="direction" :value="direction">
+              {{ direction }}
             </SelectItem>
           </SelectContent>
         </Select>
