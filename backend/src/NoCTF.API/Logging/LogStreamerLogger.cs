@@ -8,9 +8,14 @@ namespace NoCTF.API.Logging;
 /// </summary>
 internal sealed class LogStreamerLogger(string categoryName, LogBuffer buffer) : ILogger
 {
+    private const string EntityFrameworkCommandCategory = "Microsoft.EntityFrameworkCore.Database.Command";
+
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+    public bool IsEnabled(LogLevel logLevel)
+        => logLevel >= (categoryName == EntityFrameworkCommandCategory
+            ? LogLevel.Warning
+            : LogLevel.Information);
 
     public void Log<TState>(
         LogLevel logLevel,

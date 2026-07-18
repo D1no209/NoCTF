@@ -479,3 +479,9 @@ The authoritative continuation instructions, architecture reading map, four crit
 - [Penetration Operations](penetration-operations.md)
 - [API Reference](api.md)
 - [Quickstart Test Guide](quickstart-test.md)
+# 2026-07-18 — reduce real-time EF command log noise
+
+- The admin real-time log stream now drops routine `Information` events from `Microsoft.EntityFrameworkCore.Database.Command`, including the high-frequency QQ bot lease polling SQL.
+- EF Core database warnings and errors remain visible, and application `Information` events continue to stream unchanged.
+- The QQ bot polling cadence, lease transaction, retry, and acknowledgement behavior were not changed.
+- Added focused logger tests covering both the EF command suppression and preservation of normal application information logs.
