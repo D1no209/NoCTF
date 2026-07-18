@@ -94,6 +94,9 @@ public class GetAuditLogsEndpoint(ApplicationDbContext db) : Endpoint<GetAuditLo
             })
             .ToListAsync(ct);
 
+        foreach (var item in items)
+            item.IpAddress = ClientIpAddress.Normalize(item.IpAddress);
+
         await SendAsync(new GetAuditLogsResponse
         {
             Items = items,

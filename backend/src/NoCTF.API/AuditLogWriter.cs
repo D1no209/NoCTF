@@ -35,7 +35,7 @@ public static class AuditLogWriter
             Id = Guid.NewGuid(),
             UserId = userId,
             UserName = userName,
-            IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+            IpAddress = ClientIpAddress.Normalize(httpContext.Connection.RemoteIpAddress),
             UserAgent = httpContext.Request.Headers.UserAgent.ToString(),
             Action = action,
             EntityType = entityType,

@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -13,6 +14,14 @@ namespace NoCTF.Tests;
 
 public class ApiRequestHardeningTests
 {
+    [Fact]
+    public void ClientIpAddress_NormalizesIpv4MappedIpv6Addresses()
+    {
+        Assert.Equal("139.200.81.205", ClientIpAddress.Normalize(IPAddress.Parse("::ffff:139.200.81.205")));
+        Assert.Equal("139.200.81.205", ClientIpAddress.Normalize("::ffff:139.200.81.205"));
+        Assert.Equal("2001:db8::1", ClientIpAddress.Normalize(IPAddress.Parse("2001:db8::1")));
+    }
+
     [Fact]
     public void RequestBodyLimits_ResolveFlagAndMultipartRoutes()
     {

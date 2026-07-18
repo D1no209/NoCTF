@@ -48,7 +48,7 @@ public class RevealChallengeSecretEndpoint(ApplicationDbContext db) : Endpoint<R
             Id = Guid.NewGuid(),
             UserId = userId,
             UserName = User.Identity?.Name,
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            IpAddress = ClientIpAddress.Normalize(HttpContext.Connection.RemoteIpAddress),
             UserAgent = HttpContext.Request.Headers.UserAgent.ToString(),
             Action = "RevealChallengeSecret",
             EntityType = "Challenge",
