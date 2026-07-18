@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import DecayCurvePreview from '@/components/admin/DecayCurvePreview.vue'
+import { Save } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,8 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Save } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
 
 defineProps<{
   competitionForm: any
@@ -45,102 +44,105 @@ const { t } = useI18n()
       </Button>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-2">
-      <div class="grid gap-2">
-        <Label>{{ t('admin.competitions.titleColumn') }}</Label>
-        <Input v-model="competitionForm.title" />
-      </div>
-      <div class="grid gap-2">
-        <Label>{{ t('admin.competitions.status') }}</Label>
-        <Select v-model="competitionForm.status">
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Draft">{{ t('competitions.status.draft') }}</SelectItem>
-            <SelectItem value="Published">{{ t('competitions.status.published') }}</SelectItem>
-            <SelectItem value="Running">{{ t('competitions.status.running') }}</SelectItem>
-            <SelectItem value="Paused">{{ t('competitions.status.paused') }}</SelectItem>
-            <SelectItem value="Finished">{{ t('competitions.status.finished') }}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div class="grid gap-2 lg:col-span-2">
-        <Label>{{ t('admin.competitions.description') }}</Label>
-        <Textarea v-model="competitionForm.description" rows="3" />
-      </div>
-      <div class="grid gap-2">
-        <Label>{{ t('admin.competitions.gameMode') }}</Label>
-        <Select v-model="competitionForm.gameModeType">
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Ctf">CTF</SelectItem>
-            <SelectItem value="Awd">AWD</SelectItem>
-            <SelectItem value="Awdp">AWDP</SelectItem>
-            <SelectItem value="Koh">KoH</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div class="grid gap-2">
-        <Label>{{ t('admin.competitionDetail.difficultyCoefficient') }}</Label>
-        <Input v-model.number="competitionForm.difficultyCoefficient" type="number" min="0.1" step="0.1" />
-      </div>
-      <div class="grid gap-2">
-        <Label>{{ t('admin.competitionDetail.maxTeamMembers') }}</Label>
-        <Input v-model.number="competitionForm.maxTeamMembers" type="number" min="1" />
-      </div>
-      <Panel>
-        <label class="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm">
-          <input v-model="competitionForm.teamRegistrationAutoApprove" type="checkbox" class="size-4">
-          <span>{{ t('admin.competitionDetail.autoApproveTeams') }}</span>
-        </label>
-      </Panel>
-      <Panel>
-        <label class="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm">
-          <input v-model="competitionForm.tracksEnabled" type="checkbox" class="size-4">
-          <span>{{ t('admin.competitionDetail.enableTracks') }}</span>
-        </label>
-      </Panel>
-      <div v-if="competitionForm.tracksEnabled" class="grid gap-2 lg:col-span-2">
-        <Label>{{ t('admin.competitionDetail.trackNames') }}</Label>
-        <Textarea v-model="competitionForm.trackNamesText" rows="3" :placeholder="t('admin.competitionDetail.trackNamesPlaceholder')" />
-      </div>
-      <div class="grid gap-2">
-        <Label>{{ t('admin.competitions.startTime') }}</Label>
-        <Input v-model="competitionForm.startTime" type="datetime-local" />
-      </div>
-      <div class="grid gap-2">
-        <Label>{{ t('admin.competitions.endTime') }}</Label>
-        <Input v-model="competitionForm.endTime" type="datetime-local" />
-      </div>
-    </div>
+    <div class="grid gap-4 xl:grid-cols-2">
+      <Card class="p-0">
+        <CardContent class="space-y-4 p-4">
+          <div class="border-b pb-3">
+            <h4 class="font-semibold">{{ t('admin.competitionDetail.identitySection') }}</h4>
+            <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.identitySectionDescription') }}</p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitions.titleColumn') }}</Label>
+              <Input v-model="competitionForm.title" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitions.status') }}</Label>
+              <Select v-model="competitionForm.status">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Draft">{{ t('competitions.status.draft') }}</SelectItem>
+                  <SelectItem value="Published">{{ t('competitions.status.published') }}</SelectItem>
+                  <SelectItem value="Running">{{ t('competitions.status.running') }}</SelectItem>
+                  <SelectItem value="Paused">{{ t('competitions.status.paused') }}</SelectItem>
+                  <SelectItem value="Finished">{{ t('competitions.status.finished') }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="grid gap-2 sm:col-span-2">
+              <Label>{{ t('admin.competitions.description') }}</Label>
+              <Textarea v-model="competitionForm.description" rows="5" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-    <Card v-if="competitionForm.gameModeType !== 'Awdp'" class="mt-6 p-0">
-      <CardContent class="grid gap-4 lg:grid-cols-4 p-4">
-        <div class="grid gap-2">
-          <Label>{{ t('admin.competitionDetail.initialPoints') }}</Label>
-          <Input v-model.number="competitionForm.initialPoints" type="number" />
-        </div>
-        <div class="grid gap-2">
-          <Label>{{ t('admin.competitionDetail.minimumPoints') }}</Label>
-          <Input v-model.number="competitionForm.minimumPoints" type="number" />
-        </div>
-        <div class="grid gap-2">
-          <Label>{{ t('admin.competitionDetail.decayFactor') }}</Label>
-          <Input v-model.number="competitionForm.decayFactor" type="number" />
-        </div>
-        <div class="grid gap-2">
-          <Label>{{ t('admin.competitionDetail.decayFunction') }}</Label>
-          <Select v-model="competitionForm.decayFunction">
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sigmoid">{{ t('admin.competitionDetail.decaySigmoid') }}</SelectItem>
-              <SelectItem value="quadratic">{{ t('admin.competitionDetail.decayQuadratic') }}</SelectItem>
-              <SelectItem value="logarithmic">{{ t('admin.competitionDetail.decayLogarithmic') }}</SelectItem>
-              <SelectItem value="linear">{{ t('admin.competitionDetail.decayLinear') }}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardContent>
-    </Card>
+      <Card class="p-0">
+        <CardContent class="space-y-4 p-4">
+          <div class="border-b pb-3">
+            <h4 class="font-semibold">{{ t('admin.competitionDetail.formatSection') }}</h4>
+            <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.formatSectionDescription') }}</p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitions.gameMode') }}</Label>
+              <Select v-model="competitionForm.gameModeType">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Ctf">CTF</SelectItem>
+                  <SelectItem value="Awd">AWD</SelectItem>
+                  <SelectItem value="Awdp">AWDP</SelectItem>
+                  <SelectItem value="Koh">KoH</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.difficultyCoefficient') }}</Label>
+              <Input v-model.number="competitionForm.difficultyCoefficient" type="number" min="0.1" step="0.1" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitionDetail.maxTeamMembers') }}</Label>
+              <Input v-model.number="competitionForm.maxTeamMembers" type="number" min="1" />
+            </div>
+            <Panel>
+              <label class="flex min-h-10 cursor-pointer items-center gap-3 px-3 py-2 text-sm">
+                <input v-model="competitionForm.teamRegistrationAutoApprove" type="checkbox" class="size-4">
+                <span>{{ t('admin.competitionDetail.autoApproveTeams') }}</span>
+              </label>
+            </Panel>
+            <Panel class="sm:col-span-2">
+              <label class="flex min-h-10 cursor-pointer items-center gap-3 px-3 py-2 text-sm">
+                <input v-model="competitionForm.tracksEnabled" type="checkbox" class="size-4">
+                <span>{{ t('admin.competitionDetail.enableTracks') }}</span>
+              </label>
+            </Panel>
+            <div v-if="competitionForm.tracksEnabled" class="grid gap-2 sm:col-span-2">
+              <Label>{{ t('admin.competitionDetail.trackNames') }}</Label>
+              <Textarea v-model="competitionForm.trackNamesText" rows="3" :placeholder="t('admin.competitionDetail.trackNamesPlaceholder')" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card class="p-0 xl:col-span-2">
+        <CardContent class="space-y-4 p-4">
+          <div class="border-b pb-3">
+            <h4 class="font-semibold">{{ t('admin.competitionDetail.scheduleSection') }}</h4>
+            <p class="text-sm text-muted-foreground">{{ t('admin.competitionDetail.scheduleSectionDescription') }}</p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitions.startTime') }}</Label>
+              <Input v-model="competitionForm.startTime" type="datetime-local" />
+            </div>
+            <div class="grid gap-2">
+              <Label>{{ t('admin.competitions.endTime') }}</Label>
+              <Input v-model="competitionForm.endTime" type="datetime-local" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
 
     <Card v-if="competitionForm.gameModeType === 'Ctf'" class="mt-4 p-0">
       <CardContent class="grid gap-4 lg:grid-cols-3 p-4">
@@ -211,6 +213,5 @@ const { t } = useI18n()
       </CardContent>
     </Card>
 
-    <DecayCurvePreview v-if="competitionForm.gameModeType !== 'Awdp'" class="mt-4" :config="competitionForm" />
   </Card>
 </template>

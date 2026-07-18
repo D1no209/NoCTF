@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using NoCTF.API;
 using NoCTF.API.Permissions;
 using NoCTF.Application;
@@ -22,6 +23,7 @@ public class CompetitionLogDto
     public Guid? UserId { get; set; }
     public Guid? ChallengeId { get; set; }
     public string? ChallengeTitle { get; set; }
+    public string? SubmittedFlag { get; set; }
     public string MetadataJson { get; set; } = "{}";
     public DateTime CreatedAt { get; set; }
 }
@@ -88,7 +90,36 @@ public class GetCompetitionLogsAdminEndpoint(ApplicationDbContext db, ICompetiti
             })
             .ToListAsync(ct);
 
+        foreach (var log in logs)
+            log.SubmittedFlag = CompetitionLogMetadata.ReadSubmittedFlag(log.MetadataJson);
+
         await SendAsync(logs, cancellation: ct);
+    }
+}
+
+public static class CompetitionLogMetadata
+{
+    public static string? ReadSubmittedFlag(string? metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(metadataJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("submittedFlag", out var value) ||
+                value.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            return value.GetString();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }
 

@@ -114,7 +114,11 @@ public class PenetrationSubmissionHandler(
                         "penetration.flag.rate_limited",
                         "Team submitted penetration flags too frequently.",
                         "warning",
-                        new { submitted = PenetrationFlagService.RedactSubmittedFlag(context.FlagContent) });
+                        new
+                        {
+                            submittedFlag = context.FlagContent,
+                            submitted = PenetrationFlagService.RedactSubmittedFlag(context.FlagContent)
+                        });
                     await db.SaveChangesAsync(mutationCt);
                     return new ChallengeSubmissionResult(SubmissionResult.FlagRateLimited);
                 }
@@ -161,7 +165,14 @@ public class PenetrationSubmissionHandler(
                 "penetration.flag.accepted",
                 $"Team solved penetration stage {flag.Stage} for challenge {challenge.Title}.",
                 "info",
-                new { flagId = flag.Id, flag.Stage, flagName = flag.Name, submissionId = submission.Id });
+                new
+                {
+                    submittedFlag = context.FlagContent,
+                    flagId = flag.Id,
+                    flag.Stage,
+                    flagName = flag.Name,
+                    submissionId = submission.Id
+                });
             await flagService.MarkSolvedAsync(
                 context.CompetitionId,
                 context.TeamId,
@@ -312,6 +323,7 @@ public class PenetrationSubmissionHandler(
             match.IsCrossTeamDynamicFlag ? "error" : "warning",
             new
             {
+                submittedFlag = context.FlagContent,
                 submitted = PenetrationFlagService.RedactSubmittedFlag(context.FlagContent),
                 victimTeamId = match.VictimTeamId,
                 flagId = match.Flag?.Id

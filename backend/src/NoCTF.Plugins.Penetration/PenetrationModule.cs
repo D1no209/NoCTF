@@ -9,7 +9,7 @@ namespace NoCTF.Plugins.Penetration;
 public class PenetrationModule : IHostAwarePluginModule
 {
     public string Name => "NoCTF.Plugins.Penetration";
-    public string Version => "1.0.0";
+    public string Version => "1.0.1";
 
     public void ConfigureServices(IServiceCollection services)
     {

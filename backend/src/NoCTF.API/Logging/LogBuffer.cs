@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.SignalR;
+using System.Text.RegularExpressions;
 using System.Threading.Channels;
 
 namespace NoCTF.API.Logging;
@@ -12,8 +13,15 @@ public sealed class LogBuffer : IAsyncDisposable
 {
     private const int Capacity = 500;
     internal const int DefaultBroadcastCapacity = 256;
-    private static readonly string[] RedactKeywords =
-        ["jwt", "secret", "password", "token", "flag{"];
+    private static readonly Regex FlagPattern = new(
+        @"\b[a-z0-9_]*flag\{[^}\r\n]*\}",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex BearerPattern = new(
+        @"\bBearer\s+[^\s,;]+",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex SensitiveAssignmentPattern = new(
+        "(?<prefix>[\"']?\\b(?:jwt|secret|password|token)\\b[\"']?\\s*[:=]\\s*)(?<quote>[\"']?)(?<value>[^\"',;\\s}\\]]+)(?:\\k<quote>)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private readonly LogEntryDto[] _buffer = new LogEntryDto[Capacity];
     private int _head;
@@ -143,11 +151,10 @@ public sealed class LogBuffer : IAsyncDisposable
 
     public static string Redact(string message)
     {
-        foreach (var kw in RedactKeywords)
-        {
-            if (message.Contains(kw, StringComparison.OrdinalIgnoreCase))
-                return "[REDACTED]";
-        }
-        return message;
+        var redacted = FlagPattern.Replace(message, "[REDACTED_FLAG]");
+        redacted = BearerPattern.Replace(redacted, "Bearer [REDACTED]");
+        return SensitiveAssignmentPattern.Replace(
+            redacted,
+            match => $"{match.Groups["prefix"].Value}{match.Groups["quote"].Value}[REDACTED]{match.Groups["quote"].Value}");
     }
 }

@@ -197,6 +197,7 @@ public class AwdpGameMode(
             ChallengeId = context.ChallengeId,
             MetadataJson = ScoringJson.Serialize(new
             {
+                submittedFlag = context.FlagContent,
                 submissionId = submission.Id,
                 attackAttempts = state.AttackAttempts,
                 maxAttackAttempts = config.MaxAttackAttempts

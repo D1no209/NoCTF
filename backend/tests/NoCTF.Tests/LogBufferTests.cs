@@ -40,6 +40,26 @@ public class LogBufferTests
         release.TrySetResult();
     }
 
+    [Fact]
+    public void Redact_DoesNotHideSchemaIdentifiers()
+    {
+        const string sql = "SELECT \"TokenVersion\", \"PasswordHash\", \"SecretConfigured\" FROM \"Users\"";
+
+        Assert.Equal(sql, LogBuffer.Redact(sql));
+    }
+
+    [Theory]
+    [InlineData("password=actual-value", "actual-value")]
+    [InlineData("Authorization: Bearer abc.def.ghi", "abc.def.ghi")]
+    [InlineData("submitted flag{private-value}", "flag{private-value}")]
+    public void Redact_MasksSensitiveValues(string message, string secret)
+    {
+        var redacted = LogBuffer.Redact(message);
+
+        Assert.DoesNotContain(secret, redacted, StringComparison.Ordinal);
+        Assert.Contains("REDACTED", redacted, StringComparison.Ordinal);
+    }
+
     private static LogEntryDto Entry(int index)
         => new("Information", $"message-{index}", "test", DateTimeOffset.UtcNow);
 }
