@@ -17,8 +17,6 @@ import CommandCompetitionDetailWorkspace, {
 import type { CommandChallenge } from '../components/CommandChallengeGrid.vue'
 import type { CommandLeaderboardEntry } from '../components/CommandLeaderboardTable.vue'
 
-const guidPattern = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i
-
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -26,7 +24,7 @@ const selectedChallenge = ref<CommandChallenge | null>(null)
 const challengeConsoleOpen = ref(false)
 
 const competitionId = computed(() => typeof route.params.id === 'string' ? route.params.id.trim() : '')
-const hasValidCompetitionId = computed(() => guidPattern.test(competitionId.value))
+const hasValidCompetitionId = computed(() => competitionId.value.length > 0)
 
 const competitionQuery = useQuery({
   queryKey: computed(() => queryKeys.competition(competitionId.value)),

@@ -9,13 +9,11 @@ import { useSignalR } from '@/composables/useSignalR'
 import { useAuthStore } from '@/stores/auth'
 import CommandKohDashboardWorkspace, { type CommandKohHill } from '../components/CommandKohDashboardWorkspace.vue'
 
-const guidPattern = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i
-
 const route = useRoute()
 const auth = useAuthStore()
 
 const competitionId = computed(() => typeof route.params.id === 'string' ? route.params.id.trim() : '')
-const hasValidCompetitionId = computed(() => guidPattern.test(competitionId.value))
+const hasValidCompetitionId = computed(() => competitionId.value.length > 0)
 
 const dashboardQuery = useQuery({
   queryKey: computed(() => queryKeys.kohDashboard(competitionId.value)),

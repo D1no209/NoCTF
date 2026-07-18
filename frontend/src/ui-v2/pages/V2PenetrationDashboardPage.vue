@@ -8,8 +8,6 @@ import { queryKeys } from '@/api/queryKeys'
 import type { CommandAwdChallenge } from '../components/awd-contract'
 import CommandPenetrationWorkspace, { type CommandPenetrationDetail } from '../components/CommandPenetrationWorkspace.vue'
 
-const guidPattern = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i
-
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -19,7 +17,7 @@ const operationMessage = ref('')
 const operationTone = ref<'success' | 'danger'>('success')
 
 const competitionId = computed(() => typeof route.params.id === 'string' ? route.params.id.trim() : '')
-const hasValidCompetitionId = computed(() => guidPattern.test(competitionId.value))
+const hasValidCompetitionId = computed(() => competitionId.value.length > 0)
 
 const challengesQuery = useQuery({
   queryKey: computed(() => queryKeys.challenges(competitionId.value)),
