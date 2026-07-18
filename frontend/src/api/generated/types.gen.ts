@@ -753,6 +753,7 @@ export type NoCtfapiEndpointsAdminChallengeHintDto = {
 
 export type NoCtfapiEndpointsAdminBindCompetitionChallengeRequest = {
     templateId?: string;
+    direction?: string | null;
     description?: string | null;
     descriptionFormat?: string;
     flagPrefix?: string | null;
@@ -797,6 +798,7 @@ export type NoCtfapiEndpointsAdminCompetitionLogDto = {
     userId?: string | null;
     challengeId?: string | null;
     challengeTitle?: string | null;
+    submittedFlag?: string | null;
     metadataJson?: string;
     createdAt?: string;
 };

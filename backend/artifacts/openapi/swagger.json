@@ -8030,6 +8030,10 @@
             "type": "string",
             "format": "guid"
           },
+          "direction": {
+            "type": "string",
+            "nullable": true
+          },
           "description": {
             "type": "string",
             "nullable": true
@@ -8209,6 +8213,10 @@
             "nullable": true
           },
           "challengeTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedFlag": {
             "type": "string",
             "nullable": true
           },
