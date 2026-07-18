@@ -2,9 +2,14 @@
 
 This handoff is the fastest path for a new collaborator to understand the current project, run it, and make changes without breaking the plugin-style architecture.
 
+## 2026-07-18 Documentation deployment privacy
+
+- Tracked documentation uses operator-supplied placeholders for public origins, host paths, test-group identifiers, and deployment credentials.
+- Environment-specific production details remain outside version control. Examples use reserved documentation addresses or generic domains only.
+
 ## 2026-07-18 Audit client IP normalization
 
-- Audit writers now normalize IPv4-mapped IPv6 values such as `::ffff:139.200.81.205` to canonical IPv4 before persistence.
+- Audit writers now normalize IPv4-mapped IPv6 values such as `::ffff:192.0.2.10` to canonical IPv4 before persistence.
 - The audit-log query also normalizes previously stored mapped addresses when returning them, so historical rows display consistently without a data migration.
 - Native IPv6 addresses are preserved; forwarded-header trust and proxy selection rules are unchanged.
 
@@ -466,9 +471,9 @@ Latest verification status:
 
 QQ broadcast integration is now implemented as an optional sixth platform plugin plus a separately deployed outbound NoneBot/Milky agent. Platform code is C#; the Python agent lives under `integrations/qqbot` and the read-only reference checkout at `E:\SourceCode\QQBOT` is never modified. Configuration is global-policy plus explicit per-competition opt-in and group/event binding. PostgreSQL owns the durable outbox, leases, ACK/failure history, idempotency, and audit; Redis owns only replay protection and short cooldowns. See [`qqbot-integration.md`](qqbot-integration.md) for deployment, security, triggers, permissions, test-group restrictions, and rollback.
 
-The QQBot agent requirements pass `pip-audit`, and an ephemeral Python 3.12 container successfully imported the plugin and built the allowlisted Milky `mention_all`/`text` message segments. No live QQ message was sent during automated verification; the authorized manual smoke-test target remains group `1095173403`.
+The QQBot agent requirements pass `pip-audit`, and an ephemeral Python 3.12 container successfully imported the plugin and built the allowlisted Milky `mention_all`/`text` message segments. No live QQ message is sent during automated verification; operators must provide an explicitly approved test group outside version control for manual smoke tests.
 
-The production NoneBot/Milky agent is registered against `https://noctf.fa1lsnow.com` and locally allowlists only group `1095173403`. Milky 1.2 requires the `no_cache` field on `get_group_list`; the agent supplies `false` explicitly so group synchronization works with the deployed Lagrange implementation instead of failing request deserialization. Existing QQBOT matchers remain untouched.
+The production NoneBot/Milky agent must be registered against the operator-provided HTTPS platform origin and locally allowlist only explicitly approved groups. Milky 1.2 requires the `no_cache` field on `get_group_list`; the agent supplies `false` explicitly so group synchronization works with the deployed Lagrange implementation instead of failing request deserialization. Existing QQBOT matchers remain untouched.
 
 The authoritative continuation instructions, architecture reading map, four critical request flows, collaborator protocol, exact risk list, validation caveats, and required execution order are in [`HANDOFF_PROMPT.md`](../HANDOFF_PROMPT.md). A new collaborator should follow its 20–30 minute quick-start sequence before changing the working tree.
 

@@ -95,7 +95,7 @@ Both sides must authorize a group:
 2. After group synchronization, authorize the group globally in NoCTF.
 3. Bind it to the intended competition and events.
 
-For the approved test environment, restrict both allowlists to `1095173403`. Start with a test notification from the competition page. Do not use another group without explicit approval.
+For a test environment, restrict both allowlists to a single operator-approved test group supplied outside version control. Start with a test notification from the competition page. Do not use another group without explicit approval.
 
 ## Operations and rollback
 
