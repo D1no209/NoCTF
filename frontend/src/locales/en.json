@@ -3,6 +3,8 @@
     "login": "Login",
     "register": "Register",
     "email": "Email",
+    "loginIdentifier": "Email or username",
+    "loginIdentifierPlaceholder": "name@example.com or johndoe",
     "password": "Password",
     "userName": "Username",
     "loginTitle": "Welcome back",
@@ -44,12 +46,15 @@
   "validation": {
     "emailRequired": "Email is required",
     "emailInvalid": "Enter a valid email address",
+    "loginIdentifierRequired": "Email or username is required",
     "passwordRequired": "Password is required",
     "passwordMin": "Password must be at least 8 characters",
-    "userNameRequired": "Username is required"
+    "userNameRequired": "Username is required",
+    "userNameLength": "Username must be between 3 and 64 characters",
+    "userNameWhitespace": "Username cannot contain spaces, line breaks, or tabs"
   },
   "errors": {
-    "loginFailed": "Invalid email or password",
+    "loginFailed": "Invalid email, username, or password",
     "registerFailed": "Registration failed. Please try again.",
     "loadFailed": "Failed to load data.",
     "saveFailed": "Failed to save.",

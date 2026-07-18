@@ -26,9 +26,14 @@ const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const loading = ref(false)
+const userNameWhitespacePattern = /\s/u
 
 const formSchema = toTypedSchema(z.object({
-  userName: z.string().min(2, t('validation.userNameRequired')),
+  userName: z.string()
+    .trim()
+    .min(3, t('validation.userNameLength'))
+    .max(64, t('validation.userNameLength'))
+    .refine(value => !userNameWhitespacePattern.test(value), t('validation.userNameWhitespace')),
   email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
   password: z.string().min(8, t('validation.passwordMin')),
 }))
