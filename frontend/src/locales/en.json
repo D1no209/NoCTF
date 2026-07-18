@@ -4,7 +4,7 @@
     "register": "Register",
     "email": "Email",
     "loginIdentifier": "Email or username",
-    "loginIdentifierPlaceholder": "name@example.com or johndoe",
+    "loginIdentifierPlaceholder": "name{'@'}example.com or johndoe",
     "password": "Password",
     "userName": "Username",
     "loginTitle": "Welcome back",

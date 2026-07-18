@@ -4,9 +4,9 @@ This handoff is the fastest path for a new collaborator to understand the curren
 
 ## 2026-07-18 Login identifier input rendering
 
-- The shared `Input` component now declares its native `type` prop and explicitly forwards remaining HTML attributes to the underlying `<input>` element.
-- The login identifier remains a real text input because it accepts either an email address or a username; it disables capitalization and spellcheck while preserving `autocomplete="username"`.
-- This keeps labels, generated form IDs, accessibility attributes, validation handlers, and browser autofill attached to the native control instead of relying on implicit component attribute fallthrough.
+- The missing login identifier control was caused by Vue I18n interpreting the unescaped `@` in the localized example address as linked-message syntax. That render exception replaced the field with comment nodes while leaving the password field visible.
+- Both localized placeholders now encode the literal at-sign with Vue I18n message syntax and render as `name@example.com or johndoe` (localized conjunction in Chinese).
+- The unrelated shared `Input` component changes from the initial diagnosis were reverted. The field remains the existing native text control with `autocomplete="username"`.
 
 ## 2026-07-18 Challenge type/direction separation
 

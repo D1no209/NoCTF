@@ -4,7 +4,7 @@
     "register": "注册",
     "email": "电子邮箱",
     "loginIdentifier": "电子邮箱或用户名",
-    "loginIdentifierPlaceholder": "name@example.com 或 johndoe",
+    "loginIdentifierPlaceholder": "name{'@'}example.com 或 johndoe",
     "password": "密码",
     "userName": "用户名",
     "loginTitle": "欢迎回来",
