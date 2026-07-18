@@ -859,6 +859,8 @@
       "searchPlaceholder": "搜索题目...",
       "filterChallengeType": "筛选题目类型",
       "allChallengeTypes": "全部题目类型",
+      "filterDirection": "筛选题目方向",
+      "allDirections": "全部题目方向",
       "filterAttachment": "筛选附件状态",
       "allAttachmentStates": "全部附件状态",
       "withAttachment": "有附件",

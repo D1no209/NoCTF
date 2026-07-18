@@ -10,6 +10,15 @@ const LABELS: Record<
     lineClassName: string
   }
 > = {
+  UNCATEGORIZED: {
+    text: 'UNCATEGORIZED',
+    className: 'px-3 bg-muted text-foreground border-border',
+    neonClassName: 'border-l-muted-foreground',
+    modalClassName: 'border-t-muted-foreground',
+    cabinetClassName: 'border-t-muted-foreground',
+    pinClassName: 'bg-muted-foreground',
+    lineClassName: 'stroke-muted-foreground',
+  },
   WEB: {
     text: 'WEB-01',
     className: 'px-3 bg-neon-web text-black border-black/25',
@@ -121,6 +130,6 @@ const LABELS: Record<
 }
 
 export function challengeTypeLabel(value?: string | null) {
-  const key = (value ?? 'MISC').trim().toUpperCase()
-  return LABELS[key] ?? LABELS.MISC
+  const key = (value ?? 'UNCATEGORIZED').trim().toUpperCase()
+  return LABELS[key] ?? LABELS.UNCATEGORIZED
 }

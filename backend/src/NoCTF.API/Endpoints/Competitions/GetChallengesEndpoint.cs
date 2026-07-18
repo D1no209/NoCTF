@@ -19,6 +19,7 @@ public class ChallengeDto
     public string? Description { get; set; }
     public string DescriptionFormat { get; set; } = "markdown";
     public string TypeId { get; set; } = string.Empty;
+    public string Direction { get; set; } = string.Empty;
     public int Points { get; set; }
     public int SolveCount { get; set; }
     public int? TotalStageCount { get; set; }
@@ -78,6 +79,7 @@ public class GetChallengesEndpoint(ApplicationDbContext dbContext, IStorageProvi
                     Description = c.Description,
                     DescriptionFormat = c.DescriptionFormat,
                     TypeId = c.TypeId,
+                    Direction = c.Direction,
                     Points = c.PointsConfig.InitialPoints,
                     AttachmentUrl = c.AttachmentUrl,
                     PatchTemplateUrl = c.PatchTemplateUrl,

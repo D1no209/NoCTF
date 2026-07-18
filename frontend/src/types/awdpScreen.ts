@@ -2,7 +2,7 @@ export type AwdpGameStatus = 'pending' | 'running' | 'paused' | 'ended'
 
 export type AwdpGamePhase = 'waiting' | 'running' | 'settling' | 'ended'
 
-export type AwdpChallengeCategory = 'web' | 'pwn' | 'crypto' | 'reverse' | 'misc'
+export type AwdpChallengeCategory = 'web' | 'pwn' | 'ai' | 'crypto' | 'reverse' | 'misc'
 
 export type AwdpScreenEventType
   = | 'ROUND_STARTED'

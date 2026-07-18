@@ -26,6 +26,7 @@ interface Challenge {
   id: string
   title: string
   typeId: string
+  direction: string
   points: number
   solveCount: number
   deploymentType?: string | number | null
@@ -154,7 +155,7 @@ const renderedDescription = computed(() => {
   if (!props.challenge?.description) return ''
   return renderMarkdown(props.challenge.description)
 })
-const challengeType = computed(() => challengeTypeLabel(props.challenge?.typeId))
+const challengeType = computed(() => challengeTypeLabel(props.challenge?.direction))
 
 const visibleHints = computed(() => props.challenge?.hints?.filter(Boolean) ?? [])
 const patchStatuses = computed(() => props.patchSubmissions ?? [])
@@ -162,7 +163,7 @@ const isDynamicContainer = computed(() => {
   const dt = props.challenge?.deploymentType
   if (dt === 2) return true
   if (typeof dt === 'string' && dt.toLowerCase() === 'dynamiccontainer') return true
-  const dir = normalizeDirection(props.challenge?.typeId)
+  const dir = normalizeDirection(props.challenge?.direction)
   if (dir === 'WEB' || dir === 'PWN') return true
   return false
 })

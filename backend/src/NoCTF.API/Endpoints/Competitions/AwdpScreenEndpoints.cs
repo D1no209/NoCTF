@@ -534,7 +534,7 @@ internal static class AwdpScreenSnapshotBuilder
 
         var teamNames = teams.ToDictionary(t => t.Id, t => t.Name);
         var challengeNames = challenges.ToDictionary(c => c.Id, c => c.Title);
-        var challengeCategories = challenges.ToDictionary(c => c.Id, c => NormalizeCategory(c.TypeId));
+        var challengeCategories = challenges.ToDictionary(c => c.Id, c => NormalizeCategory(c.Direction));
 
         var roundScoreByTeam = currentRoundScores
             .GroupBy(s => s.TeamId)
@@ -591,7 +591,7 @@ internal static class AwdpScreenSnapshotBuilder
             {
                 ChallengeId = challenge.Id,
                 ChallengeName = challenge.Title,
-                Category = NormalizeCategory(challenge.TypeId),
+                Category = NormalizeCategory(challenge.Direction),
                 AttackHeat = Math.Min(100, challengeStates.Sum(s => s.AttackAttempts) * 10),
                 DefensePassedCount = challengeStates.Count(s => s.FixStatus == AwdpFixStatus.FixSuccess),
                 DefenseFailedCount = challengeStates.Count(s => IsDefenseFailure(s.FixStatus)),
@@ -813,18 +813,17 @@ internal static class AwdpScreenSnapshotBuilder
             or AwdpFixStatus.FixRuleViolation
             or AwdpFixStatus.DefenseAttemptsExhausted;
 
-    private static string NormalizeCategory(string? typeId)
+    private static string NormalizeCategory(string? direction)
     {
-        var value = (typeId ?? "misc").ToLowerInvariant();
-        if (value.Contains("web"))
-            return "web";
-        if (value.Contains("pwn"))
-            return "pwn";
-        if (value.Contains("crypto"))
-            return "crypto";
-        if (value.Contains("reverse") || value.Contains("rev"))
-            return "reverse";
-        return "misc";
+        return direction?.Trim().ToLowerInvariant() switch
+        {
+            "web" => "web",
+            "pwn" => "pwn",
+            "ai" => "ai",
+            "crypto" => "crypto",
+            "reverse" or "rev" => "reverse",
+            _ => "misc"
+        };
     }
 
     private static string MapCompetitionStatus(CompetitionStatus status)

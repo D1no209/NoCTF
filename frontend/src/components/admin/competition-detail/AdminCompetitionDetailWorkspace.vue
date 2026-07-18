@@ -92,6 +92,7 @@ interface ChallengeTemplateDto {
   title: string
   description?: string
   typeId: string
+  direction: string
 }
 
 interface ChallengeHintDto {
@@ -107,6 +108,7 @@ interface CompetitionChallengeDto {
   description?: string
   descriptionFormat: string
   typeId: string
+  direction: string
   deploymentType?: string | number
   exposedPort?: number | null
   flagPrefix?: string
@@ -781,7 +783,7 @@ function sectionRoute(section: CompetitionDetailSection) {
                       {{ challenge.title }}
                     </div>
                     <div class="text-xs text-muted-foreground">
-                      {{ challenge.typeId }}
+                      {{ challenge.typeId }} · {{ challenge.direction || 'Uncategorized' }}
                     </div>
                   </TableCell>
                   <TableCell class="text-xs">

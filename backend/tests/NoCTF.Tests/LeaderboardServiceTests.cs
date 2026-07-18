@@ -269,6 +269,7 @@ public class LeaderboardServiceTests
             CompetitionId = competitionId,
             Title = "babystack",
             TypeId = "PWN",
+            Direction = "PWN",
             PointsConfig = new PointsConfig(InitialPoints: 500, MinimumPoints: 100, DecayFactor: 450),
             DifficultyCoefficient = 1,
             CreatedAt = DateTime.UtcNow
@@ -623,6 +624,7 @@ public class LeaderboardServiceTests
             CompetitionId = competitionId,
             Title = title,
             TypeId = typeId,
+            Direction = typeId,
             PointsConfig = new PointsConfig(InitialPoints: 500, MinimumPoints: 100, DecayFactor: 450),
             DifficultyCoefficient = 1,
             CreatedAt = DateTime.UtcNow

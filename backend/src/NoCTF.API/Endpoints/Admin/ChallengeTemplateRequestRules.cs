@@ -6,6 +6,12 @@ namespace NoCTF.API.Endpoints.Admin;
 
 internal static class ChallengeTemplateRequestRules
 {
+    internal static string NormalizeDirection(string? value)
+    {
+        var direction = value?.Trim();
+        return string.IsNullOrEmpty(direction) ? "Uncategorized" : direction.ToUpperInvariant();
+    }
+
     private const int MaxJsonBytes = 64 * 1024;
 
     public static bool UsesRuntimeContainer(ChallengeDeploymentType deploymentType)

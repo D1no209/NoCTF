@@ -181,6 +181,7 @@ public class BindCompetitionChallengeEndpoint(
             Description = string.IsNullOrWhiteSpace(req.Description) ? template.Description : req.Description,
             DescriptionFormat = string.IsNullOrWhiteSpace(req.DescriptionFormat) ? "markdown" : req.DescriptionFormat,
             TypeId = template.TypeId,
+            Direction = template.Direction,
             ContainerImage = template.ContainerImage,
             ContainerMode = template.ContainerMode,
             ComposeYaml = template.ComposeYaml,
@@ -251,7 +252,7 @@ public class BindCompetitionChallengeEndpoint(
                     new
                     {
                         problem_title = challenge.Title,
-                        problem_category = challenge.TypeId,
+                        problem_category = challenge.Direction,
                         occurred_at = DateTime.UtcNow.ToString("O")
                     }));
             }

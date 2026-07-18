@@ -121,6 +121,7 @@ public class AwdpScreenSnapshotCacheTests
             CompetitionId = competitionId,
             Title = "Challenge",
             TypeId = "web",
+            Direction = "web",
             CreatedAt = now
         });
         db.AwdpRounds.AddRange(

@@ -6827,6 +6827,9 @@
           "typeId": {
             "type": "string"
           },
+          "direction": {
+            "type": "string"
+          },
           "points": {
             "type": "integer",
             "format": "int32"
@@ -7825,6 +7828,9 @@
           "typeId": {
             "type": "string"
           },
+          "direction": {
+            "type": "string"
+          },
           "containerImage": {
             "type": "string",
             "nullable": true
@@ -8357,6 +8363,9 @@
           "typeId": {
             "type": "string"
           },
+          "direction": {
+            "type": "string"
+          },
           "containerImage": {
             "type": "string",
             "nullable": true
@@ -8427,6 +8436,9 @@
             "nullable": true
           },
           "typeId": {
+            "type": "string"
+          },
+          "direction": {
             "type": "string"
           },
           "containerImage": {
@@ -10021,6 +10033,9 @@
             "nullable": true
           },
           "typeId": {
+            "type": "string"
+          },
+          "direction": {
             "type": "string"
           },
           "containerImage": {

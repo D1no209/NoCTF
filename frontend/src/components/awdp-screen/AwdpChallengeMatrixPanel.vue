@@ -18,6 +18,8 @@ function categoryClass(category: AwdpChallengeCategory) {
     return 'text-cyan-100 bg-cyan-300/10 border-cyan-300/20'
   if (category === 'pwn')
     return 'text-orange-100 bg-orange-300/10 border-orange-300/20'
+  if (category === 'ai')
+    return 'text-fuchsia-100 bg-fuchsia-300/10 border-fuchsia-300/20'
   if (category === 'crypto')
     return 'text-emerald-100 bg-emerald-300/10 border-emerald-300/20'
   if (category === 'reverse')
