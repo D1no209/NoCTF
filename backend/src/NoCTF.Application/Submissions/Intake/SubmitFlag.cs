@@ -5,7 +5,7 @@ using NoCTF.Application.Submissions.Ports;
 namespace NoCTF.Application.Submissions.Intake;
 
 /// <summary>Accepts a Flag into the permanent stream and schedules asynchronous processing.</summary>
-public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionQueue queue)
+public sealed class SubmitFlag(ISubmissionIntakeStore store)
 {
     private const int MaxConcurrencyRetries = 3;
 
@@ -47,9 +47,6 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionQueue qu
             if (!await store.TryAcceptFlagAsync(received, snapshot.Revision, cancellationToken))
                 continue;
 
-            await queue.EnqueueAsync(
-                new ProcessFlagSubmission(command.CompetitionId, command.TeamId, command.UserId, submissionId),
-                cancellationToken);
             return OperationResult<SubmissionAccepted>.Success(new(submissionId, command.ReceivedAt));
         }
 

@@ -7,6 +7,7 @@ using NoCTF.Application.Scoring.Ports;
 using NoCTF.Infrastructure.Eventing.ProjectionCheckpoints;
 using NoCTF.Infrastructure.Eventing.Projections;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.GameModes.Leaderboard;
 using EF = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 
 namespace NoCTF.Infrastructure.Eventing.ScoringStreams;
@@ -93,6 +94,7 @@ public sealed class MartenScoringRebuildStore(
 
     public async Task ActivateAsync(
         ScoringRebuildLease lease,
+        ScoringContext context,
         long caughtUpSequence,
         CancellationToken cancellationToken)
     {
@@ -100,19 +102,19 @@ public sealed class MartenScoringRebuildStore(
             ?? throw new InvalidOperationException("Scoring rebuild checkpoint was not found.");
         if (checkpoint.StagingScoringStreamId != lease.StagingStreamId)
             throw new InvalidOperationException("Scoring rebuild lease is no longer active.");
+        var currentSubmissionVersion = (await session.Events.FetchStreamStateAsync(
+            StreamIds.Submission(lease.CompetitionId), cancellationToken))?.Version ?? 0;
+        if (currentSubmissionVersion != caughtUpSequence)
+            throw new InvalidOperationException("Submission stream changed during scoring activation; rebuild must retry.");
 
         var oldStream = checkpoint.ActiveScoringStreamId;
         var scoringEvents = await session.Events.FetchStreamAsync(lease.StagingStreamId, token: cancellationToken);
-        var teamNames = await EF.ToDictionaryAsync(
-            db.Teams.AsNoTracking().Where(team => team.CompetitionId == lease.CompetitionId),
-            team => team.Id,
-            team => team.Name,
-            cancellationToken);
-        var leaderboard = BuildLeaderboard(
-            lease.CompetitionId,
+        var leaderboard = GameModeLeaderboardProjectorCatalog.Get(context.Mode).Project(
+            context,
             checkpoint.ProjectionVersion + 1,
-            teamNames,
-            scoringEvents.Select(item => item.Data).OfType<NoCTF.Application.Submissions.Events.IScoringStreamEvent>());
+            scoringEvents.Select(item => item.Data)
+                .OfType<NoCTF.Application.Submissions.Events.IScoringStreamEvent>()
+                .ToList());
 
         checkpoint.ActiveScoringStreamId = lease.StagingStreamId;
         checkpoint.StagingScoringStreamId = null;
@@ -124,76 +126,8 @@ public sealed class MartenScoringRebuildStore(
         session.Store(leaderboard);
         await session.SaveChangesAsync(cancellationToken);
 
-        if (oldStream != Guid.Empty && oldStream != lease.StagingStreamId)
-            await store.Advanced.Clean.DeleteSingleEventStreamAsync(oldStream, null, cancellationToken);
+        // Old scoring streams are retained until a maintenance sweep confirms the
+        // checkpoint switch. Activation itself stays short and atomic.
     }
 
-    private static LeaderboardDocument BuildLeaderboard(
-        Guid competitionId,
-        long version,
-        IReadOnlyDictionary<Guid, string> teamNames,
-        IEnumerable<NoCTF.Application.Submissions.Events.IScoringStreamEvent> events)
-    {
-        var scores = new Dictionary<Guid, long>();
-        var solves = new Dictionary<Guid, List<SolveRecorded>>();
-        foreach (var @event in events)
-        {
-            if (@event is ScoreAwarded awarded)
-                scores[awarded.TeamId] = scores.GetValueOrDefault(awarded.TeamId) + awarded.Points;
-            else if (@event is ScoreDeducted deducted)
-                scores[deducted.TeamId] = scores.GetValueOrDefault(deducted.TeamId) - deducted.Points;
-            else if (@event is SolveRecorded solve)
-                solves.GetOrAdd(solve.TeamId).Add(solve);
-        }
-
-        var ranked = teamNames.Keys.Select(teamId =>
-            {
-                var teamSolves = solves.GetValueOrDefault(teamId) ?? [];
-                return new
-                {
-                    TeamId = teamId,
-                    Name = teamNames[teamId],
-                    Score = scores.GetValueOrDefault(teamId),
-                    Solves = teamSolves
-                };
-            })
-            .OrderByDescending(item => item.Score)
-            .ThenByDescending(item => item.Solves.Count)
-            .ThenBy(item => item.Solves.Count == 0 ? DateTimeOffset.MaxValue : item.Solves.Max(solve => solve.SolvedAt))
-            .ThenBy(item => item.Name, StringComparer.Ordinal)
-            .ToList();
-
-        var entries = ranked.Select((item, index) => new LeaderboardEntry(
-            index + 1,
-            item.TeamId,
-            item.Name,
-            item.Score,
-            item.Solves.Count,
-            item.Solves.Count == 0 ? null : item.Solves.Max(solve => solve.SolvedAt),
-            item.Solves.GroupBy(solve => solve.ChallengeId)
-                .Select(group => new LeaderboardChallengeSummary(group.Key, string.Empty, group.Count()))
-                .ToList())).ToList();
-        return new()
-        {
-            Id = competitionId,
-            CompetitionId = competitionId,
-            ProjectionVersion = version,
-            GeneratedAt = DateTimeOffset.UtcNow,
-            Entries = entries
-        };
-    }
-}
-
-internal static class DictionaryListExtensions
-{
-    public static List<TValue> GetOrAdd<TKey, TValue>(this Dictionary<TKey, List<TValue>> dictionary, TKey key)
-        where TKey : notnull
-    {
-        if (!dictionary.TryGetValue(key, out var values))
-        {
-            values = [];
-            dictionary[key] = values;
-        }
-        return values;
-    }
 }

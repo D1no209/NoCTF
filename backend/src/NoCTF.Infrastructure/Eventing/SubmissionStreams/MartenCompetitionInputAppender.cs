@@ -43,17 +43,20 @@ public sealed class MartenCompetitionInputAppender(IDocumentSession session) : I
         if (string.IsNullOrWhiteSpace(idempotencyKey))
             throw new ArgumentException("An idempotency key is required.", nameof(idempotencyKey));
 
-        var streamId = StreamIds.Submission(competitionId);
-        var events = await session.Events.FetchStreamAsync(streamId, token: cancellationToken);
-        if (events.Any(item => item.Data is SystemScoringInput existing && existing.IdempotencyKey == idempotencyKey)
-            || events.Any(item => item.Data is AwdFlagRotated existing && existing.IdempotencyKey == idempotencyKey)
-            || events.Any(item => item.Data is AwdServiceChecked existing && existing.IdempotencyKey == idempotencyKey)
-            || events.Any(item => item.Data is KohControlObserved existing && existing.IdempotencyKey == idempotencyKey)
-            || events.Any(item => item.Data is PenetrationStageCompleted existing && existing.IdempotencyKey == idempotencyKey))
+        var receiptId = StreamIds.InputReceipt(competitionId, idempotencyKey);
+        if (await session.LoadAsync<CompetitionInputReceipt>(receiptId, cancellationToken) is not null)
             return false;
 
-        var version = events.Count == 0 ? 0 : events.Max(item => item.Version);
-        session.Events.Append(streamId, version, @event);
+        var streamId = StreamIds.Submission(competitionId);
+        var state = await session.Events.FetchStreamStateAsync(streamId, cancellationToken);
+        session.Insert(new CompetitionInputReceipt
+        {
+            Id = receiptId,
+            CompetitionId = competitionId,
+            IdempotencyKey = idempotencyKey,
+            RecordedAt = DateTimeOffset.UtcNow
+        });
+        session.Events.Append(streamId, state?.Version ?? 0, @event);
         await session.SaveChangesAsync(cancellationToken);
         return true;
     }

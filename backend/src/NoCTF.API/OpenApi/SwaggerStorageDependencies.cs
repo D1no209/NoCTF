@@ -16,9 +16,6 @@ internal sealed class SwaggerFixUploadStore : IFixUploadSessionStore
         DateTimeOffset now,
         CancellationToken cancellationToken) => Task.FromResult<FixUploadMetadata?>(null);
 
-    public Task<bool> TryConsumeAsync(Guid uploadId, DateTimeOffset consumedAt, CancellationToken cancellationToken) =>
-        Task.FromResult(false);
-    public Task ReleaseAsync(Guid uploadId, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 internal sealed class SwaggerObjectStorage : IObjectStorage

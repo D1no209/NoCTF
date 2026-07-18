@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Infrastructure.Eventing.Projections;
 using NoCTF.Infrastructure.Eventing.ProjectionCheckpoints;
+using NoCTF.Infrastructure.Eventing.SubmissionStreams;
 using Wolverine.Marten;
 
 namespace NoCTF.Infrastructure.Eventing;
@@ -23,6 +24,8 @@ internal static class MartenConfiguration
             options.Events.StreamIdentity = StreamIdentity.AsGuid;
             options.Schema.For<LeaderboardDocument>().Identity(document => document.Id);
             options.Schema.For<ScoringProjectionCheckpoint>().Identity(checkpoint => checkpoint.Id);
+            options.Schema.For<SubmissionOutcomeReceipt>().Identity(receipt => receipt.Id);
+            options.Schema.For<CompetitionInputReceipt>().Identity(receipt => receipt.Id);
         }).IntegrateWithWolverine();
     }
 }

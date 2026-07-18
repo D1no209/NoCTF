@@ -43,7 +43,6 @@ public static class ServiceRegistration
         else
         {
             services.AddScoped<ISubmissionIntakeStore, SwaggerSubmissionStore>();
-            services.AddScoped<ISubmissionQueue, SwaggerSubmissionQueue>();
             services.AddScoped<ISubmissionStatusReader, SwaggerStatusReader>();
             services.AddScoped<IUserAuthenticationStore, SwaggerAuthenticationStore>();
             services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();

@@ -1,17 +1,25 @@
 using Marten;
+using Marten.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
+using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Persistence;
+using Wolverine.Marten;
 using EF = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 
 namespace NoCTF.Infrastructure.Eventing.SubmissionStreams;
 
 /// <summary>Combines relational admission state with optimistic appends to the permanent Marten stream.</summary>
-public sealed class MartenSubmissionIntakeStore(NoCtfDbContext db, IDocumentSession session) : ISubmissionIntakeStore
+public sealed class MartenSubmissionIntakeStore(
+    NoCtfDbContext db,
+    IDocumentSession session,
+    IMartenOutbox outbox,
+    IChallengeInstanceFlagReader flagReader) : ISubmissionIntakeStore
 {
     public async Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
         Guid competitionId,
@@ -63,8 +71,18 @@ public sealed class MartenSubmissionIntakeStore(NoCtfDbContext db, IDocumentSess
     public Task<bool> TryAcceptFlagAsync(
         FlagSubmissionReceived received,
         long expectedRevision,
-        CancellationToken cancellationToken) =>
-        TryAppendAsync(received.CompetitionId, received, expectedRevision, cancellationToken);
+        CancellationToken cancellationToken) => TryAcceptFlagWithSnapshotAsync(received, expectedRevision, cancellationToken);
+
+    private async Task<bool> TryAcceptFlagWithSnapshotAsync(
+        FlagSubmissionReceived received,
+        long expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        var expectedFlag = await flagReader.ReadAsync(received.CompetitionId, received.TeamId,
+            received.ChallengeId, received.ReceivedAt, cancellationToken);
+        return await TryAppendAsync(received.CompetitionId,
+            received with { ExpectedFlagAtReceipt = expectedFlag }, expectedRevision, cancellationToken);
+    }
 
     public Task<bool> TryAcceptFixAsync(
         FixSubmissionReceived received,
@@ -77,10 +95,20 @@ public sealed class MartenSubmissionIntakeStore(NoCtfDbContext db, IDocumentSess
         long expectedRevision,
         CancellationToken cancellationToken)
     {
-        var existing = await session.Events.FetchStreamAsync(StreamIds.Submission(received.CompetitionId), token: cancellationToken);
-        if (existing.Select(item => item.Data).OfType<FixSubmissionReceived>()
-            .Any(item => item.UploadId == received.UploadId))
+        var upload = await session.LoadAsync<FixUploadSession>(received.UploadId, cancellationToken);
+        if (upload is null
+            || upload.Consumed
+            || upload.ExpiresAt <= received.ReceivedAt
+            || upload.CompetitionId != received.CompetitionId
+            || upload.TeamId != received.TeamId
+            || upload.ChallengeId != received.ChallengeId
+            || upload.UserId != received.UserId)
             return false;
+
+        upload.Consumed = true;
+        upload.ConsumedBySubmissionId = received.SubmissionId;
+        upload.ConsumedAt = received.ReceivedAt;
+        session.Store(upload);
         return await TryAppendAsync(received.CompetitionId, received, expectedRevision, cancellationToken);
     }
 
@@ -92,13 +120,25 @@ public sealed class MartenSubmissionIntakeStore(NoCtfDbContext db, IDocumentSess
     {
         try
         {
+            outbox.Enroll(session);
             session.Events.Append(StreamIds.Submission(competitionId), expectedRevision, @event);
+            switch (@event)
+            {
+                case FlagSubmissionReceived flag:
+                    await outbox.SendAsync(new ProcessFlagSubmission(
+                        flag.CompetitionId, flag.TeamId, flag.UserId, flag.SubmissionId));
+                    break;
+                case FixSubmissionReceived fix:
+                    await outbox.SendAsync(new ProcessFixSubmission(
+                        fix.CompetitionId, fix.TeamId, fix.UserId, fix.SubmissionId));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(@event));
+            }
             await session.SaveChangesAsync(cancellationToken);
             return true;
         }
-        catch (Exception exception) when (
-            exception.GetType().Name.Contains("Concurrency", StringComparison.OrdinalIgnoreCase)
-            || exception.GetType().Name.Contains("Unexpected", StringComparison.OrdinalIgnoreCase))
+        catch (MartenCommandException)
         {
             return false;
         }

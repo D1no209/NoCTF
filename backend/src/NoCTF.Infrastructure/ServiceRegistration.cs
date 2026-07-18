@@ -68,13 +68,16 @@ public static class ServiceRegistration
         services.AddScoped<ICompetitionInputAppender, MartenCompetitionInputAppender>();
         services.AddScoped<ISubmissionProcessor, MartenSubmissionProcessor>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
-        services.AddScoped<ISubmissionQueue, WolverineSubmissionQueue>();
         services.AddScoped<IScoringRebuildStore, MartenScoringRebuildStore>();
         services.AddScoped<IScoringRebuildQueue, WolverineScoringRebuildQueue>();
         services.AddScoped<ILeaderboardStore, MartenLeaderboardStore>();
         services.AddScoped<ITeamModerationStore, EfTeamModerationStore>();
         services.AddScoped<ICompetitionModerationAuthorizer, EfCompetitionModerationAuthorizer>();
-        services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();
+        services.AddScoped<IFixUploadSessionStore, MartenFixUploadSessionStore>();
+        services.AddScoped<IChallengeInstanceFlagReader, ConfiguredChallengeInstanceFlagReader>();
+        services.AddScoped<SubmissionEvaluationContextLoader>();
+        services.AddScoped<FixArchiveValidator>();
+        services.AddScoped<IFixSubmissionVerifier, ArchiveOnlyFixSubmissionVerifier>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config

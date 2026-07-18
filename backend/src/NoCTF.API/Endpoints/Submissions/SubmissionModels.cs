@@ -10,4 +10,4 @@ public sealed record SubmissionStatusResponse(
     SubmissionOutcome Outcome,
     DateTimeOffset ReceivedAt,
     DateTimeOffset? CompletedAt,
-    string? ErrorCode);
+    SubmissionErrorCode? ErrorCode);

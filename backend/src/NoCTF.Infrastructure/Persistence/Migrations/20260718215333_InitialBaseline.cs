@@ -146,29 +146,6 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "fix_upload_sessions",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    CompetitionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TeamId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ChallengeId = table.Column<Guid>(type: "uuid", nullable: false),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ObjectKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    FileName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    ContentType = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ExpectedLength = table.Column<long>(type: "bigint", nullable: false),
-                    ExpectedSha256 = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    Consumed = table.Column<bool>(type: "boolean", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_fix_upload_sessions", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "notifications",
                 columns: table => new
                 {
@@ -366,16 +343,6 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                 columns: new[] { "Status", "StartTime" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_fix_upload_sessions_ObjectKey_Consumed",
-                table: "fix_upload_sessions",
-                columns: new[] { "ObjectKey", "Consumed" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_fix_upload_sessions_UserId_ExpiresAt",
-                table: "fix_upload_sessions",
-                columns: new[] { "UserId", "ExpiresAt" });
-
-            migrationBuilder.CreateIndex(
                 name: "IX_notifications_UserId_IsRead_CreatedAt",
                 table: "notifications",
                 columns: new[] { "UserId", "IsRead", "CreatedAt" });
@@ -455,9 +422,6 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "competition_configurations");
-
-            migrationBuilder.DropTable(
-                name: "fix_upload_sessions");
 
             migrationBuilder.DropTable(
                 name: "notifications");

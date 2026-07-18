@@ -3,11 +3,14 @@ using NoCTF.Application.Scoring.Events;
 using NoCTF.Application.Submissions.Events;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Ctf.Scoring;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.GameModes.Scoring;
 
-internal sealed class CtfModeScoringEvaluator
+internal sealed class CtfModeScoringEvaluator : IGameModeScoringEvaluator
 {
+    public GameMode Mode => GameMode.Ctf;
+
     public IReadOnlyList<DerivedScoringEvent> Evaluate(ScoringContext context, IReadOnlyList<SubmissionEventEnvelope> history)
     {
         var competition = CtfConfigurationUpgrader.ParseCompetition(context.CompetitionConfigurationJson);
@@ -34,13 +37,13 @@ internal sealed class CtfModeScoringEvaluator
                     continue;
                 var solvePoints = CtfScoringRules.CalculatePoints(points, priorSolves);
                 output.Add(new(new ScoreAwarded(context.CompetitionId, item.Result.TeamId, item.Result.ChallengeId,
-                    solvePoints, "solve", input.ReceivedAt, item.Result.SubmissionId), item.Result.SubmissionId));
-                output.Add(new(new SolveRecorded(context.CompetitionId, item.Result.TeamId, item.Result.ChallengeId,
+                    solvePoints, ScoringReason.Solve, input.ReceivedAt, item.Result.SubmissionId), item.Result.SubmissionId));
+                output.Add(new(new CtfSolveRecorded(context.CompetitionId, item.Result.TeamId, item.Result.ChallengeId,
                     input.ReceivedAt, item.Result.SubmissionId), item.Result.SubmissionId));
                 if (priorSolves < bloodRewards.Count)
                     output.Add(new(new ScoreAwarded(context.CompetitionId, item.Result.TeamId, item.Result.ChallengeId,
                         CtfScoringRules.CalculateBlood(bloodRewards[priorSolves], points, solvePoints),
-                        $"blood_{priorSolves + 1}", input.ReceivedAt, item.Result.SubmissionId), item.Result.SubmissionId));
+                        ScoringReason.Blood, input.ReceivedAt, item.Result.SubmissionId), item.Result.SubmissionId));
                 priorSolves++;
             }
         }

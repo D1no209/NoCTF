@@ -19,12 +19,6 @@ internal sealed class SwaggerSubmissionStore : ISubmissionIntakeStore
         Task.FromResult(false);
 }
 
-internal sealed class SwaggerSubmissionQueue : ISubmissionQueue
-{
-    public Task EnqueueAsync(ProcessFlagSubmission message, CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task EnqueueAsync(ProcessFixSubmission message, CancellationToken cancellationToken) => Task.CompletedTask;
-}
-
 internal sealed class SwaggerStatusReader : ISubmissionStatusReader
 {
     public Task<SubmissionStatusView?> FindAsync(Guid competitionId, Guid submissionId, Guid userId, CancellationToken cancellationToken) =>
