@@ -18,3 +18,17 @@ public sealed record SubmissionStatusResponse(
     DateTimeOffset ReceivedAt,
     DateTimeOffset? CompletedAt,
     ScoringFailureCode? FailureCode);
+
+public sealed record AdminSubmissionStatusResponse(
+    Guid SubmissionId,
+    Guid? TeamId,
+    Guid? ChallengeId,
+    SubmissionKind Kind,
+    ScoringResult? Result,
+    ScoringFailureCode? FailureCode,
+    DateTimeOffset ReceivedAt,
+    DateTimeOffset? ProcessedAt,
+    string? ProcessedWorkerId,
+    string? EvaluatorVersion,
+    bool IsCurrentEventDeleted,
+    long ProcessingVersion);

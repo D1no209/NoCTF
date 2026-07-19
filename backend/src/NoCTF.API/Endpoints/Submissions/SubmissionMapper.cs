@@ -23,4 +23,7 @@ public static partial class SubmissionMapper
             : result == ScoringResult.Correct
                 ? SubmissionStatusState.Success
                 : SubmissionStatusState.Failure;
+
+    [MapperIgnoreSource(nameof(AdminSubmissionStatusView.CompetitionId))]
+    public static partial AdminSubmissionStatusResponse ToAdminStatusResponse(AdminSubmissionStatusView view);
 }
