@@ -89,6 +89,7 @@ public static class ServiceRegistration
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
         services.AddScoped<ISubmissionResultPublisher, SignalRSubmissionResultPublisher>();
+        services.AddScoped<ILeaderboardRefreshPublisher, SignalRLeaderboardRefreshPublisher>();
         if (includeInfrastructure
             && !configuration.GetValue<bool>("OpenApi:Exporting")
             && !string.IsNullOrWhiteSpace(redis))
