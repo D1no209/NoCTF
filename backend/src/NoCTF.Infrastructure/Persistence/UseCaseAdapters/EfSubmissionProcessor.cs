@@ -102,6 +102,9 @@ public sealed class EfSubmissionProcessor(
         }
 
         var prior = await db.ScoringEvents.Where(x => x.CompetitionId == submission.CompetitionId && x.SubmissionId != submission.Id).ToListAsync(ct);
+        var priorSubmissions = await db.Submissions.AsNoTracking()
+            .Where(x => x.CompetitionId == submission.CompetitionId && x.Id != submission.Id)
+            .ToListAsync(ct);
         var flags = await db.ChallengeFlags.Where(x => x.CompetitionId == submission.CompetitionId
             && x.ChallengeId == submission.ChallengeId && (x.TeamId == null || x.TeamId == submission.TeamId)
             && (x.ValidStart == null || x.ValidStart <= submission.ReceivedAt)
@@ -113,6 +116,7 @@ public sealed class EfSubmissionProcessor(
             flags,
             fix,
             configuration.CompetitionJson,
-            configuration.ChallengeJson));
+            configuration.ChallengeJson,
+            priorSubmissions));
     }
 }

@@ -41,10 +41,29 @@ public sealed class CtfSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmis
 
 public sealed class AwdSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmissionEvaluator
 {
-    public ScoringEventDecision Evaluate(SubmissionProcessingContext context) =>
-        context.Submission.Kind == SubmissionKind.Fix
-            ? ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.FixNotSupported)
+    public ScoringEventDecision Evaluate(SubmissionProcessingContext context)
+    {
+        if (context.Submission.Kind == SubmissionKind.Fix)
+            return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.FixNotSupported);
+        if (context.Submission.SubjectTeamId is { } subject && subject == context.Submission.TeamId
+            || context.Submission.VictimTeamId is { } victim && victim == context.Submission.TeamId)
+            return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.SelfAttackRejected);
+        var duplicate = context.PriorSubmissions?.Any(previous =>
+            previous.Kind == SubmissionKind.Flag
+            && previous.TeamId == context.Submission.TeamId
+            && previous.SubjectTeamId == context.Submission.SubjectTeamId
+            && previous.VictimTeamId == context.Submission.VictimTeamId
+            && previous.ServiceId == context.Submission.ServiceId
+            && context.PriorEvents.Any(@event => @event.SubmissionId == previous.Id && @event.Result == ScoringResult.Correct)) == true;
+        return duplicate
+            ? new ScoringEventDecision(
+                ScoringEventKind.SubmissionEvaluation,
+                ScoringResult.Duplicate,
+                ScoringFailureCode.DuplicateAttack,
+                context.Submission.ReceivedAt,
+                "awd-evaluator-v1")
             : inner.Evaluate(context);
+    }
 }
 
 public sealed class AwdpSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmissionEvaluator

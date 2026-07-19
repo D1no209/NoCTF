@@ -41,4 +41,54 @@ public class GameModeSubmissionEvaluatorTests
         await Assert.That(result.Result).IsEqualTo(ScoringResult.Rejected);
         await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.FixNotSupported);
     }
+
+    [Test]
+    public async Task AwdEvaluator_RejectsSelfAttack()
+    {
+        var teamId = Guid.NewGuid();
+        var submission = new Submission
+        {
+            TeamId = teamId,
+            VictimTeamId = teamId,
+            Kind = SubmissionKind.Flag,
+            ReceivedAt = DateTimeOffset.UtcNow
+        };
+
+        var result = new AwdSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+            .Evaluate(new(submission, [], [], null, "{}", "{}"));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Rejected);
+        await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.SelfAttackRejected);
+    }
+
+    [Test]
+    public async Task AwdEvaluator_DetectsDuplicateAttackDimensions()
+    {
+        var teamId = Guid.NewGuid();
+        var victimId = Guid.NewGuid();
+        var serviceId = Guid.NewGuid();
+        var prior = new Submission
+        {
+            Id = Guid.NewGuid(),
+            TeamId = teamId,
+            VictimTeamId = victimId,
+            ServiceId = serviceId,
+            Kind = SubmissionKind.Flag
+        };
+        var priorEvent = new ScoringEvent { SubmissionId = prior.Id, Result = ScoringResult.Correct };
+        var submission = new Submission
+        {
+            TeamId = teamId,
+            VictimTeamId = victimId,
+            ServiceId = serviceId,
+            Kind = SubmissionKind.Flag,
+            ReceivedAt = DateTimeOffset.UtcNow
+        };
+
+        var result = new AwdSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+            .Evaluate(new(submission, [priorEvent], [], null, "{}", "{}", [prior]));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Duplicate);
+        await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.DuplicateAttack);
+    }
 }

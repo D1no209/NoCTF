@@ -14,5 +14,7 @@ public enum ScoringFailureCode
     FixArchiveHashMismatch,
     StorageTimeout,
     StorageUnavailable,
-    CheckerPlatformError
+    CheckerPlatformError,
+    SelfAttackRejected,
+    DuplicateAttack
 }

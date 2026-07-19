@@ -232,14 +232,14 @@
 
 ### 7.2 AWD
 
-- [ ] victim/subject/service/stage 维度。
-- [ ] self-attack rejection。
-- [ ] duplicate attack rejection。
+- [x] victim/subject/service/stage 维度。
+- [x] self-attack rejection。
+- [x] duplicate attack rejection。
 - [ ] round flag expiry。
 - [ ] current round 校验。
-- [ ] attack points。
-- [ ] service online/down 规则。
-- [ ] been-attacked penalty。
+- [x] attack points。
+- [x] service online/down 规则。
+- [x] been-attacked penalty。
 
 ### 7.3 AWDP
 
@@ -336,19 +336,19 @@
 
 - [ ] 删除 Correct count 临时 projector。
 - [x] CTF projector。
-- [ ] AWD projector。
+- [x] AWD projector。
 - [ ] AWDP projector。
 - [ ] KoH projector。
 - [ ] Penetration projector。
 - [x] Competition/Challenge configuration 进入 projector input。
-- [ ] Team ban/soft-delete 过滤。
-- [ ] Challenge soft-delete 过滤。
-- [ ] system event `OccurredAt + Id` 排序。
-- [ ] Submission `ReceivedAt + Id` 排序。
+- [x] Team ban/soft-delete 过滤。
+- [x] Challenge soft-delete 过滤。
+- [x] system event `OccurredAt + Id` 排序。
+- [x] Submission `ReceivedAt + Id` 排序。
 - [ ] First Blood summary。
 - [ ] Subject/slot summary。
 - [ ] Slot kind。
-- [ ] score/rank 只在内存 DTO 和 Redis。
+- [x] score/rank 只在内存 DTO 和 Redis。
 - [ ] Redis TTL 配置化。
 - [ ] Redis miss → 202 → refresh → hit。
 - [ ] Redis 未配置的正式环境启动失败。

@@ -21,7 +21,11 @@ public sealed record LeaderboardSubmissionFact(
     Guid? ChallengeId,
     SubmissionKind Kind,
     DateTimeOffset ReceivedAt,
-    ScoringEvent Event);
+    ScoringEvent Event,
+    Guid? SubjectTeamId = null,
+    Guid? VictimTeamId = null,
+    Guid? ServiceId = null,
+    long? ControlIntervalSeconds = null);
 
 public sealed record LeaderboardSystemFact(ScoringEvent Event);
 

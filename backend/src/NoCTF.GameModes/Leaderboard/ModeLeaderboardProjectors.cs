@@ -3,6 +3,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using System.Text.Json;
 using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.GameModes.Awd.Configuration;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -109,10 +110,73 @@ public sealed class AwdLeaderboardProjector : IGameModeLeaderboardProjector
     public GameMode Mode => GameMode.Awd;
 
     public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
-        ModeLeaderboardProjection.Project(
-            input,
-            submission => submission.Kind == SubmissionKind.Flag,
-            includeSystemFacts: true);
+        AwdLeaderboardProjection.Project(input);
+}
+
+internal static class AwdLeaderboardProjection
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.CompetitionConfigurationJson))
+            return ModeLeaderboardProjection.Project(input, submission => submission.Kind == SubmissionKind.Flag, includeSystemFacts: true);
+        var configuration = TryParse(input.CompetitionConfigurationJson)
+            ?? new AwdConfiguration(1, 300, 10, 2, 50, 100, 50, 50);
+        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var values = teams.Keys.ToDictionary(team => team, _ => 0L);
+        var solves = input.Submissions
+            .Where(fact => teams.ContainsKey(fact.TeamId)
+                          && fact.Kind == SubmissionKind.Flag
+                          && fact.Event is { IsDeleted: false, Result: ScoringResult.Correct })
+            .OrderBy(fact => fact.ReceivedAt)
+            .ThenBy(fact => fact.SubmissionId)
+            .ToList();
+        foreach (var solve in solves)
+        {
+            values[solve.TeamId] += configuration.AttackPoints;
+            if (solve.VictimTeamId is { } victim
+                && victim != solve.TeamId
+                && values.ContainsKey(victim))
+                values[victim] -= configuration.VictimPenalty;
+        }
+        foreach (var system in input.SystemEvents.Where(fact => !fact.Event.IsDeleted && fact.Event.Kind == ScoringEventKind.AwdServiceCheck && fact.Event.TeamId is not null))
+        {
+            var team = system.Event.TeamId!.Value;
+            if (!values.ContainsKey(team)) continue;
+            values[team] += system.Event.Result == ScoringResult.Correct
+                ? configuration.ServiceOnlinePoints
+                : -configuration.ServiceDownPenalty;
+        }
+        var rows = teams.Values.Select(team => new LeaderboardEntry(
+            0,
+            team.Id,
+            team.Name,
+            values[team.Id],
+            solves.Count(solve => solve.TeamId == team.Id),
+            LastSolve(solves, team.Id),
+            []));
+        return rows.OrderByDescending(row => row.Score)
+            .ThenByDescending(row => row.LastScoreAt)
+            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
+            .Select((row, index) => row with { Rank = index + 1 })
+            .ToList();
+    }
+
+    private static DateTimeOffset? LastSolve(IReadOnlyList<LeaderboardSubmissionFact> solves, Guid teamId)
+    {
+        var last = solves.Where(solve => solve.TeamId == teamId)
+            .Select(solve => solve.Event.OccurredAt)
+            .OrderByDescending(value => value)
+            .FirstOrDefault();
+        return last == default ? null : last;
+    }
+
+    private static AwdConfiguration? TryParse(string? json)
+    {
+        try { return JsonSerializer.Deserialize<AwdConfiguration>(json!, JsonOptions); }
+        catch (JsonException) { return null; }
+    }
 }
 
 public sealed class AwdpLeaderboardProjector : IGameModeLeaderboardProjector
