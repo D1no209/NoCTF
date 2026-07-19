@@ -107,7 +107,6 @@ async function refreshAuthSession(session: AuthSession): Promise<AuthSession | n
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${session.accessToken}`,
       },
       credentials: 'include',
       signal: controller.signal,
