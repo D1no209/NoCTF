@@ -19,6 +19,8 @@ public interface ITeamRegistrationStore
     Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken cancellationToken);
     Task<bool?> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken cancellationToken);
     Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken cancellationToken);
+    Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken cancellationToken) =>
+        Task.FromResult<TeamView?>(null);
     Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken cancellationToken);
     Task<TeamView?> UpdateAsync(UpdateTeamCommand command, CancellationToken cancellationToken);
     Task<string?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken);
@@ -54,6 +56,12 @@ public sealed class GetTeam(ITeamRegistrationStore store)
 {
     public Task<TeamView?> ExecuteAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken ct = default) =>
         store.FindAsync(competitionId, teamId, includePending, ct);
+}
+
+public sealed class GetMyTeam(ITeamRegistrationStore store)
+{
+    public Task<TeamView?> ExecuteAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct = default) =>
+        store.FindForUserAsync(competitionId, userId, includePending, ct);
 }
 
 public sealed class UpdateTeam(ITeamRegistrationStore store, ILeaderboardCache cache, IBackgroundWorkScheduler scheduler)

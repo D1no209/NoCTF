@@ -67,6 +67,15 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
             .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId,
                 x.RegistrationStatus, x.IsLocked, x.RegisteredAt)).SingleOrDefaultAsync(ct);
 
+    public Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct) =>
+        (from team in db.Teams.AsNoTracking()
+         join member in db.TeamMembers.AsNoTracking() on team.Id equals member.TeamId
+         where team.CompetitionId == competitionId && member.UserId == userId
+               && !team.Deletion.IsDeleted
+               && (includePending || team.RegistrationStatus == TeamRegistrationStatus.Approved)
+         select new TeamView(team.Id, team.CompetitionId, team.Name, team.AvatarUrl, team.CaptainId,
+             team.RegistrationStatus, team.IsLocked, team.RegisteredAt)).SingleOrDefaultAsync(ct);
+
     public async Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken ct) =>
         await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId && x.CompetitionId == competitionId
             && !x.Deletion.IsDeleted && x.CaptainId == actorId, ct)
