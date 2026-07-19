@@ -133,7 +133,7 @@
 - [x] Running 后默认禁止新报名。
 - [x] Finished 后禁止成员变更。
 - [x] 一个 User 在同一 Competition 只能属于一个 Team。
-- [ ] Team ban 后禁止 Submission。
+- [x] Team ban 后禁止 Submission。
 - [x] Team soft-delete 后不进入 leaderboard，但保留历史事实。
 - [x] ban/unban/delete 统一触发 leaderboard invalidate + rebuild。
 
