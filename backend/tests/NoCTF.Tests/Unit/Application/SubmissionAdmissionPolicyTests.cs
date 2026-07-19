@@ -36,6 +36,16 @@ public class SubmissionAdmissionPolicyTests
         await Assert.That(result.ErrorCode).IsEqualTo("team_banned");
     }
 
+    [Test]
+    public async Task NonRunning_competitions_are_rejected()
+    {
+        foreach (var status in new[] { CompetitionStatus.Draft, CompetitionStatus.Published, CompetitionStatus.Paused, CompetitionStatus.Finished })
+        {
+            var result = SubmissionAdmissionPolicy.Check(Snapshot(status), DateTimeOffset.UtcNow);
+            await Assert.That(result.Succeeded).IsFalse();
+        }
+    }
+
     private static SubmissionAdmissionSnapshot Snapshot(CompetitionStatus status) => new(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 0, status,
         DateTimeOffset.UtcNow.AddMinutes(-1),
