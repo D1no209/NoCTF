@@ -16,7 +16,7 @@ public sealed class ResumeCompetitionEndpoint(TransitionCompetitionLifecycle tra
     {
         var id = Route<Guid>("competitionId");
         if (!await authorizer.CanModerateAsync(user.UserId, id, ct)) return TypedResults.Forbid();
-        var result = await transition.ExecuteAsync(id, CompetitionStatus.Running, ct);
+        var result = await transition.ExecuteAsync(id, CompetitionStatus.Running, user.UserId, "manual_resume", ct);
         if (result.ErrorCode == "competition_not_found") return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Competition cannot be resumed.", detail: result.ErrorMessage);
         return TypedResults.NoContent();

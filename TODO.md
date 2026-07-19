@@ -40,7 +40,7 @@
 - [x] 完善 `ICompetitionLifecyclePolicy`。
 - [x] 实现 Publish、Pause、Resume、Finish use case。
 - [x] 每个状态转换使用 expected-status 条件更新，保证并发幂等。
-- [ ] 状态转换记录 actor、时间和原因审计信息。
+- [x] 状态转换记录 actor、时间和原因审计信息。
 - [x] 状态变化统一 invalidate leaderboard 并 enqueue refresh。
 - [x] Finished 状态触发 runtime cleanup work item。
 - [ ] 状态变化发布脱敏 SignalR competition notification。

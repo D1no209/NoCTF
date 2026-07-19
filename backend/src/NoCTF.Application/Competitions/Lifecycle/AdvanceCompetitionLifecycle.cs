@@ -16,6 +16,15 @@ public interface ICompetitionLifecycleStore
     Task<CompetitionStatus?> GetStatusAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<IReadOnlyList<CompetitionLifecycleSnapshot>> GetDueAsync(DateTimeOffset now, CancellationToken cancellationToken);
     Task<bool> TryTransitionAsync(Guid competitionId, CompetitionStatus from, CompetitionStatus to, CancellationToken cancellationToken);
+    Task<bool> TryTransitionWithAuditAsync(
+        Guid competitionId,
+        CompetitionStatus from,
+        CompetitionStatus to,
+        Guid? actorId,
+        string? reason,
+        bool automatic,
+        CancellationToken cancellationToken) =>
+        TryTransitionAsync(competitionId, from, to, cancellationToken);
 }
 
 /// <summary>Advances published and running competitions using wall-clock deadlines without extending pauses.</summary>
@@ -28,14 +37,14 @@ public sealed class AdvanceCompetitionLifecycle(ICompetitionLifecycleStore store
         {
             if (competition.Status == CompetitionStatus.Published && now >= competition.StartTime)
             {
-                if (await store.TryTransitionAsync(competition.CompetitionId, competition.Status, CompetitionStatus.Running, cancellationToken))
+                if (await store.TryTransitionWithAuditAsync(competition.CompetitionId, competition.Status, CompetitionStatus.Running, null, "start_time_reached", true, cancellationToken))
                     transitions.Add(new(competition.CompetitionId, competition.Status, CompetitionStatus.Running));
             }
 
             if (competition.Status is CompetitionStatus.Published or CompetitionStatus.Running or CompetitionStatus.Paused
                 && now >= competition.EndTime)
             {
-                if (await store.TryTransitionAsync(competition.CompetitionId, competition.Status, CompetitionStatus.Finished, cancellationToken))
+                if (await store.TryTransitionWithAuditAsync(competition.CompetitionId, competition.Status, CompetitionStatus.Finished, null, "end_time_reached", true, cancellationToken))
                     transitions.Add(new(competition.CompetitionId, competition.Status, CompetitionStatus.Finished));
             }
         }
@@ -51,6 +60,8 @@ public sealed class TransitionCompetitionLifecycle(
     public async Task<OperationResult> ExecuteAsync(
         Guid competitionId,
         CompetitionStatus target,
+        Guid? actorId,
+        string? reason,
         CancellationToken cancellationToken = default)
     {
         var current = await store.GetStatusAsync(competitionId, cancellationToken);
@@ -59,7 +70,7 @@ public sealed class TransitionCompetitionLifecycle(
         var validation = CompetitionLifecyclePolicy.ValidateTransition(current.Value, target);
         if (!validation.Succeeded)
             return validation;
-        if (!await store.TryTransitionAsync(competitionId, current.Value, target, cancellationToken))
+        if (!await store.TryTransitionWithAuditAsync(competitionId, current.Value, target, actorId, reason, false, cancellationToken))
             return OperationResult.Failure("lifecycle_conflict", "Competition status changed concurrently.");
         await cache.InvalidateAsync(competitionId, cancellationToken);
         await scheduler.EnqueueLeaderboardRefreshAsync(competitionId, cancellationToken);

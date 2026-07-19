@@ -39,4 +39,37 @@ public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitio
                 cancellationToken);
         return changed == 1;
     }
+
+    public async Task<bool> TryTransitionWithAuditAsync(
+        Guid competitionId,
+        CompetitionStatus from,
+        CompetitionStatus to,
+        Guid? actorId,
+        string? reason,
+        bool automatic,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        var changed = await db.Competitions
+            .Where(item => item.Id == competitionId && item.Status == from && !item.Deletion.IsDeleted)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.Status, to)
+                .SetProperty(item => item.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken);
+        if (changed != 1)
+            return false;
+        db.CompetitionLifecycleAudits.Add(new CompetitionLifecycleAudit
+        {
+            Id = Guid.CreateVersion7(DateTimeOffset.UtcNow),
+            CompetitionId = competitionId,
+            From = from,
+            To = to,
+            ActorId = actorId,
+            Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
+            Automatic = automatic,
+            OccurredAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
 }
