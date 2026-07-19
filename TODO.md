@@ -215,7 +215,7 @@
 - [ ] runner failure 不写入 Flag 或 archive 内容日志。
 - [x] Fix retry 的旧 event soft-delete 和 record 状态重置规则。
 - [ ] 原始 runtime 恢复逻辑。
-- [ ] CleanupPending 扫描和清理。
+- [x] CleanupPending 扫描和清理。
 
 ## 7. 五种 GameMode evaluator
 
