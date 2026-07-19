@@ -16,15 +16,4 @@ public sealed record FixSubmissionReceived(
     Guid UploadId,
     FixArchiveReference Archive,
     string IpAddress,
-    DateTimeOffset ReceivedAt) : ISubmissionStreamEvent;
-
-public sealed record FixSubmissionEvaluated(
-    Guid SubmissionId,
-    Guid CompetitionId,
-    Guid TeamId,
-    Guid ChallengeId,
-    SubmissionOutcome Outcome,
-    bool ConsumedAttempt,
-    DateTimeOffset EvaluatedAt,
-    SubmissionErrorCode? ErrorCode = null,
-    int? Round = null) : ISubmissionStreamEvent;
+    DateTimeOffset ReceivedAt);

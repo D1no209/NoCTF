@@ -136,7 +136,7 @@ backend/src/
   NoCTF.Container.Docker/  # Docker orchestration
   NoCTF.Runner.Client/ # HTTP client and contracts for runner calls
   NoCTF.Runner/        # Runtime boundary that owns Docker access
-  NoCTF.Worker/        # Background task processor
+  NoCTF.API/            # HTTP API and in-process Channel consumers
   NoCTF.Plugins.CTF/   # CTF plugin
   NoCTF.Plugins.AWD/   # AWD plugin
   NoCTF.Plugins.AWDP/  # AWDP plugin

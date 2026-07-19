@@ -2,12 +2,13 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Submissions;
+using NoCTF.GameModes.Leaderboard;
 using NoCTF.Infrastructure.Persistence;
 using StackExchange.Redis;
 
 namespace NoCTF.Infrastructure.Caching;
 
-public sealed class RedisLeaderboardCache(NoCtfDbContext db, IConnectionMultiplexer? redis = null) : ILeaderboardCache
+public sealed class RedisLeaderboardCache(NoCtfDbContext db, ILeaderboardProjectorCatalog projectors, IConnectionMultiplexer? redis = null) : ILeaderboardCache
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct)
@@ -20,19 +21,15 @@ public sealed class RedisLeaderboardCache(NoCtfDbContext db, IConnectionMultiple
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
     {
         if (redis is null) return;
-        var teams = await db.Teams.AsNoTracking().Where(x => x.CompetitionId == competitionId && !x.Deletion.IsDeleted && !x.Ban.IsBanned)
-            .Select(x => new { x.Id, x.Name }).ToListAsync(ct);
-        var facts = await db.ScoringEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.Result == ScoringResult.Correct && x.TeamId != null)
-            .Select(x => new { TeamId = x.TeamId!.Value, x.ChallengeId, x.OccurredAt }).ToListAsync(ct);
-        var entries = teams.Select(team =>
-        {
-            var successful = facts.Where(x => x.TeamId == team.Id).OrderBy(x => x.OccurredAt).ToList();
-            return new LeaderboardEntry(0, team.Id, team.Name, successful.Count, successful.Count,
-                successful.LastOrDefault()?.OccurredAt,
-                successful.Where(x => x.ChallengeId is not null).GroupBy(x => x.ChallengeId!.Value)
-                    .Select(x => new LeaderboardChallengeSummary(x.Key, string.Empty, x.Count())).ToList());
-        }).OrderByDescending(x => x.Score).ThenByDescending(x => x.SolveCount).ThenBy(x => x.LastScoreAt ?? DateTimeOffset.MaxValue)
-          .ThenBy(x => x.TeamName, StringComparer.Ordinal).Select((x, index) => x with { Rank = index + 1 }).ToList();
+        var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == competitionId, ct);
+        if (competition is null) return;
+        var teams = await db.Teams.AsNoTracking().Where(x => x.CompetitionId == competitionId)
+            .Select(x => new LeaderboardTeamFact(x.Id, x.Name, x.Ban.IsBanned, x.Deletion.IsDeleted)).ToListAsync(ct);
+        var submissions = await db.Submissions.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.ScoringEventId != null)
+            .Join(db.ScoringEvents.AsNoTracking(), s => s.ScoringEventId, e => e.Id, (s, e) => new LeaderboardSubmissionFact(s.Id, s.TeamId!.Value, s.ChallengeId, s.Kind, s.ReceivedAt, e)).ToListAsync(ct);
+        var system = await db.ScoringEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.SubmissionId == null)
+            .Select(x => new LeaderboardSystemFact(x)).ToListAsync(ct);
+        var entries = projectors.Get(competition.Mode).Project(new(competitionId, competition.Mode, teams, submissions, system));
         var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, entries);
         await redis.GetDatabase().StringSetAsync(Key(competitionId), JsonSerializer.Serialize(response, JsonOptions), TimeSpan.FromMinutes(1));
     }

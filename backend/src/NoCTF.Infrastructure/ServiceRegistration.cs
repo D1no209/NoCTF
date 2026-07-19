@@ -9,6 +9,7 @@ using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.GameModes.Submission;
+using NoCTF.GameModes.Leaderboard;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 using NoCTF.Infrastructure.Authentication;
@@ -59,7 +60,10 @@ public static class ServiceRegistration
         services.AddScoped<ISubmissionStatusReader, EfSubmissionStatusReader>();
         services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
         services.AddSingleton<ISubmissionEvaluator, DefaultEfSubmissionEvaluator>();
+        services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddScoped<ISubmissionRetryStore, EfSubmissionRetryStore>();
+        services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();
+        services.AddScoped<RecordSystemScoringEvent>();
         services.AddScoped<RetrySubmission>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
         services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();

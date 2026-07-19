@@ -7,7 +7,7 @@ public sealed record KohControlObserved(
     string? ControllerName,
     bool IsAuthoritative,
     DateTimeOffset ObservedAt,
-    string IdempotencyKey) : ISubmissionStreamEvent;
+    string IdempotencyKey);
 
 public sealed record SystemScoringInput(
     Guid CompetitionId,
@@ -15,4 +15,4 @@ public sealed record SystemScoringInput(
     SystemScoreKind Kind,
     long Points,
     DateTimeOffset OccurredAt,
-    string IdempotencyKey) : ISubmissionStreamEvent;
+    string IdempotencyKey);
