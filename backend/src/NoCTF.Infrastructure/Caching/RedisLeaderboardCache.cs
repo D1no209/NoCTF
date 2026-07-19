@@ -5,12 +5,20 @@ using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.Infrastructure.Persistence;
 using StackExchange.Redis;
+using Microsoft.Extensions.Configuration;
+using NoCTF.Application.Notifications;
 
 namespace NoCTF.Infrastructure.Caching;
 
-public sealed class RedisLeaderboardCache(NoCtfDbContext db, ILeaderboardProjectorCatalog projectors, IConnectionMultiplexer? redis = null) : ILeaderboardCache
+public sealed class RedisLeaderboardCache(
+    NoCtfDbContext db,
+    ILeaderboardProjectorCatalog projectors,
+    IConfiguration configuration,
+    ILeaderboardRefreshPublisher publisher,
+    IConnectionMultiplexer? redis = null) : ILeaderboardCache
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly TimeSpan ttl = TimeSpan.FromSeconds(Math.Max(5, configuration.GetValue("Leaderboard:CacheTtlSeconds", 60)));
     public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct)
     {
         if (redis is null) return null;
@@ -50,7 +58,8 @@ public sealed class RedisLeaderboardCache(NoCtfDbContext db, ILeaderboardProject
         var entries = projectors.Get(competition.Mode).Project(
             new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration, competition.StartTime));
         var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, entries);
-        await redis.GetDatabase().StringSetAsync(Key(competitionId), JsonSerializer.Serialize(response, JsonOptions), TimeSpan.FromMinutes(1));
+        await redis.GetDatabase().StringSetAsync(Key(competitionId), JsonSerializer.Serialize(response, JsonOptions), ttl);
+        await publisher.PublishAsync(competitionId, response.GeneratedAt, ct);
     }
 
     public Task InvalidateAsync(Guid competitionId, CancellationToken ct) => redis is null ? Task.CompletedTask : redis.GetDatabase().KeyDeleteAsync(Key(competitionId));
