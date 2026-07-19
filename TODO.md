@@ -25,45 +25,45 @@
 
 ### 1.1 状态不变量
 
-- [ ] 定义并测试唯一状态图：`Draft -> Published -> Running -> Paused -> Running -> Finished`。
-- [ ] 禁止 Finished 重新进入其他状态。
-- [ ] 禁止 Draft、Published、Paused、Finished 接受 Submission。
-- [ ] 只有 Running 接受普通 Flag/Fix Submission。
-- [ ] 明确 `StartTime < EndTime` 校验。
-- [ ] 明确 StartTime/EndTime 边界为服务器 `ReceivedAt` 判断。
+- [x] 定义并测试唯一状态图：`Draft -> Published -> Running -> Paused -> Running -> Finished`。
+- [x] 禁止 Finished 重新进入其他状态。
+- [x] 禁止 Draft、Published、Paused、Finished 接受 Submission。
+- [x] 只有 Running 接受普通 Flag/Fix Submission。
+- [x] 明确 `StartTime < EndTime` 校验。
+- [x] 明确 StartTime/EndTime 边界为服务器 `ReceivedAt` 判断。
 - [ ] 规定 Running 后哪些字段不可修改。
 - [ ] 规定 Finished 后只允许查询和审计。
-- [ ] 为状态转换建立 Application policy，不让 endpoint 自行判断。
+- [x] 为状态转换建立 Application policy，不让 endpoint 自行判断。
 
 ### 1.2 Lifecycle use case
 
-- [ ] 完善 `ICompetitionLifecyclePolicy`。
-- [ ] 实现 Publish、Pause、Resume、Finish use case。
-- [ ] 每个状态转换使用 expected-status 条件更新，保证并发幂等。
+- [x] 完善 `ICompetitionLifecyclePolicy`。
+- [x] 实现 Publish、Pause、Resume、Finish use case。
+- [x] 每个状态转换使用 expected-status 条件更新，保证并发幂等。
 - [ ] 状态转换记录 actor、时间和原因审计信息。
-- [ ] 状态变化统一 invalidate leaderboard 并 enqueue refresh。
+- [x] 状态变化统一 invalidate leaderboard 并 enqueue refresh。
 - [ ] Finished 状态触发 runtime cleanup work item。
 - [ ] 状态变化发布脱敏 SignalR competition notification。
 
 ### 1.3 Lifecycle hosted service
 
-- [ ] 新增 `CompetitionLifecycleHostedService`。
-- [ ] 配置扫描间隔，默认 5 秒。
-- [ ] Published 到 StartTime 自动转 Running。
-- [ ] Published/Running/Paused 到 EndTime 自动转 Finished。
+- [x] 新增 `CompetitionLifecycleHostedService`。
+- [x] 配置扫描间隔，默认 5 秒。
+- [x] Published 到 StartTime 自动转 Running。
+- [x] Published/Running/Paused 到 EndTime 自动转 Finished。
 - [ ] 加入 shutdown cancellation 和有限 drain。
 - [ ] 记录 structured log：CompetitionId、from、to、耗时、结果。
 - [ ] 不记录 Flag、SourceKey、archive metadata。
 
 ### 1.4 Lifecycle API
 
-- [ ] `POST /admin/competitions/{id}/publish`。
-- [ ] `POST /admin/competitions/{id}/pause`。
-- [ ] `POST /admin/competitions/{id}/resume`。
-- [ ] `POST /admin/competitions/{id}/finish`。
-- [ ] 全部 endpoint 使用 typed FastEndpoints `ExecuteAsync`。
-- [ ] 全部 endpoint 使用 Bearer JWT + collaborator policy。
-- [ ] 状态冲突返回 typed `409 Problem`。
+- [x] `POST /admin/competitions/{id}/publish`。
+- [x] `POST /admin/competitions/{id}/pause`。
+- [x] `POST /admin/competitions/{id}/resume`。
+- [x] `POST /admin/competitions/{id}/finish`。
+- [x] 全部 endpoint 使用 typed FastEndpoints `ExecuteAsync`。
+- [x] 全部 endpoint 使用 Bearer JWT + collaborator policy。
+- [x] 状态冲突返回 typed `409 Problem`。
 - [ ] 补 OpenAPI summary、authorization 和 response schema。
 
 ## 2. Competition CRUD 和配置

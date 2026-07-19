@@ -6,6 +6,12 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitionLifecycleStore
 {
+    public Task<CompetitionStatus?> GetStatusAsync(Guid competitionId, CancellationToken cancellationToken) =>
+        db.Competitions.AsNoTracking()
+            .Where(item => item.Id == competitionId && !item.Deletion.IsDeleted)
+            .Select(item => (CompetitionStatus?)item.Status)
+            .SingleOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<CompetitionLifecycleSnapshot>> GetDueAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken) =>

@@ -52,6 +52,7 @@ public static class ServiceRegistration
             serviceProvider.GetRequiredService<ChannelBackgroundWorkScheduler>());
         services.AddHostedService<SubmissionProcessingHostedService>();
         services.AddHostedService<LeaderboardRefreshHostedService>();
+        services.AddHostedService<CompetitionLifecycleHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redis))
@@ -87,6 +88,7 @@ public static class ServiceRegistration
         }
         services.AddScoped<ICompetitionLifecycleStore, EfCompetitionLifecycleStore>();
         services.AddScoped<AdvanceCompetitionLifecycle>();
+        services.AddScoped<TransitionCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
         services.AddSingleton<IAccessTokenIssuer, JwtIssuer>();
         return services;
