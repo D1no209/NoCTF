@@ -72,8 +72,9 @@ public static class ServiceRegistration
         services.AddHostedService<FixArchiveCleanupHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrWhiteSpace(redis))
-            services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redis));
+        if (string.IsNullOrWhiteSpace(redis))
+            throw new InvalidOperationException("ConnectionStrings:Redis is required for the API host.");
+        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redis));
 
         services.AddScoped<ISubmissionIntakeStore, EfSubmissionIntakeStore>();
         services.AddScoped<ISubmissionStatusReader, EfSubmissionStatusReader>();
