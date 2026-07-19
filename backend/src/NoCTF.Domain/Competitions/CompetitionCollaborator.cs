@@ -3,6 +3,7 @@ namespace NoCTF.Domain.Competitions;
 public enum CompetitionCollaboratorRole
 {
     Manager,
+    Judge,
     Observer
 }
 

@@ -11,8 +11,11 @@ public sealed class EfCompetitionModerationAuthorizer(NoCtfDbContext db) : IComp
         var privileged = await db.Users.AsNoTracking().AnyAsync(user =>
             user.Id == userId && (user.Role == UserRole.Administrator || user.Role == UserRole.Organizer),
             cancellationToken);
-        return privileged || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(collaborator =>
-            collaborator.CompetitionId == competitionId && collaborator.UserId == userId,
+        return privileged || await db.Competitions.AsNoTracking().AnyAsync(competition =>
+            competition.Id == competitionId && competition.OwnerId == userId && !competition.Deletion.IsDeleted,
+            cancellationToken) || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(collaborator =>
+            collaborator.CompetitionId == competitionId && collaborator.UserId == userId
+                && collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager,
             cancellationToken);
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Competitions.Configuration;
+using NoCTF.Application.Competitions.Collaborators;
 using NoCTF.Application.Authentication.Ports;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Teams.Moderation;
@@ -105,6 +106,10 @@ public static class ServiceRegistration
         services.AddSingleton<ICompetitionConfigurationValidator, GameModeCompetitionConfigurationValidator>();
         services.AddScoped<GetCompetitionConfiguration>();
         services.AddScoped<UpdateCompetitionConfiguration>();
+        services.AddScoped<ICompetitionCollaboratorStore, EfCompetitionCollaboratorStore>();
+        services.AddScoped<ListCompetitionCollaborators>();
+        services.AddScoped<AddCompetitionCollaborator>();
+        services.AddScoped<RemoveCompetitionCollaborator>();
         services.AddScoped<AdvanceCompetitionLifecycle>();
         services.AddScoped<TransitionCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
