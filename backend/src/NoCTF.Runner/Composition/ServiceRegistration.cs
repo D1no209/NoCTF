@@ -1,5 +1,6 @@
 using FastEndpoints;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Authentication;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Runtime.Kubernetes.Compose;
@@ -28,6 +29,7 @@ public static class ServiceRegistration
         services.AddSingleton<KubernetesContainerLifecycle>();
         services.AddSingleton<KubernetesComposeRuntime>();
         services.AddSingleton<RuntimeProviderCatalog>();
+        services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddFastEndpoints();
         return services;
     }

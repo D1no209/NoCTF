@@ -7,5 +7,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FastEndpoints" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
   </ItemGroup>
 </Project>
