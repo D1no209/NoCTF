@@ -142,9 +142,9 @@
 - [x] `GET /admin/competitions/{id}/collaborators`。
 - [x] `POST /admin/competitions/{id}/collaborators`。
 - [x] `DELETE /admin/competitions/{id}/collaborators/{userId}`。
-- [ ] 实现 Owner、Manager、Judge、Observer 权限矩阵。
-- [ ] Judge 可 retry/rebuild，但不能修改 Competition owner/config secret。
-- [ ] Observer 只能读取管理员视图。
+- [x] 实现 Owner、Manager、Judge、Observer 权限矩阵。
+- [x] Judge 可 retry/rebuild，但不能修改 Competition owner/config secret。
+- [x] Observer 只能读取管理员视图。
 
 ## 4. Challenge、Flag 和题目配置
 
