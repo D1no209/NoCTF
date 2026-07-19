@@ -302,7 +302,7 @@
 - [ ] `CompetitionRuntimeProvisioner`。
 - [x] `ChallengeRuntimeProvisioner`。
 - [x] `CompetitionRuntimeCleaner`。
-- [ ] `ChallengeRuntimeHealthChecker`。
+- [x] `ChallengeRuntimeHealthChecker`。
 - [x] runtime operation idempotency key。
 - [x] runtime operation timeout。
 - [x] Docker runtime 接线。
