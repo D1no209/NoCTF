@@ -22,6 +22,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.BackgroundWork;
 using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Submissions.Retry;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Caching;
 
@@ -60,6 +61,8 @@ public static class ServiceRegistration
         services.AddScoped<ISubmissionIntakeStore, EfSubmissionIntakeStore>();
         services.AddScoped<ISubmissionStatusReader, EfSubmissionStatusReader>();
         services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
+        services.AddScoped<ISubmissionRetryStore, EfSubmissionRetryStore>();
+        services.AddScoped<RetrySubmission>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
         services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
