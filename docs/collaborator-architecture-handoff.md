@@ -80,7 +80,7 @@ NoCTF/
 │   │   ├── NoCTF.Container.K8s/
 │   │   ├── NoCTF.Runner/
 │   │   ├── NoCTF.Runner.Client/
-│   │   ├── NoCTF.Worker/
+│   │   ├── API-hosted Channel consumers/
 │   │   ├── NoCTF.Plugins.CTF/
 │   │   ├── NoCTF.Plugins.AWD/
 │   │   ├── NoCTF.Plugins.AWDP/
@@ -154,7 +154,7 @@ backend/src/NoCTF.API/Program.cs
 3. 配置 SignalR 和 Redis backplane。
 4. 注册应用服务、排行榜、后台任务、文件校验。
 5. 注册 EF Core `ApplicationDbContext`。
-6. 注册 `IStorageProvider`。
+6. 注册 `IStorage:Provider`。
 7. 注册 Docker 容器管理器。
 8. 调用 `PluginLoader.LoadAndRegisterAll(...)` 加载插件。
 9. 执行数据库迁移和数据种子。
@@ -282,7 +282,7 @@ IGameMode
 IChallengeType
 IContainerManager
 IContainerProvider<TClient, TMetadata>
-IStorageProvider
+IStorage:Provider
 IPluginModule
 ```
 
@@ -315,12 +315,12 @@ backend/src/NoCTF.Container.Docker
 
 插件不应该直接依赖 Docker.DotNet，而是通过 `IContainerManager` 调度。
 
-### 5.7 NoCTF.Worker
+### 5.7 API-hosted Channel consumers
 
 位置：
 
 ```text
-backend/src/NoCTF.Worker
+backend/src/API-hosted Channel consumers
 ```
 
 职责：
@@ -640,7 +640,7 @@ AWDP：
 
 - 每轮按 BreakSuccess 和 FixSuccess 是否有效结算。
 - 没有初始分。
-- `totalScore = sum(roundScoreDelta)`。
+- `totalScore = sum(roundScore)`。
 
 ## 9. 容器与文件存储
 
@@ -682,7 +682,7 @@ AwdGameBox
 统一走：
 
 ```csharp
-IStorageProvider
+IStorage:Provider
 ```
 
 用途：

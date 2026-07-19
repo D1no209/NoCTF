@@ -25,7 +25,7 @@ Player operations:
 
 The default instance TTL is 7200 seconds. The default action cooldown is 5 seconds.
 
-The worker runs Penetration instance maintenance from the plugin registration. Each sweep:
+The API-hosted Channel consumer runs Penetration instance maintenance from the plugin registration. Each sweep:
 
 - destroys expired Compose projects through the runner/container manager
 - marks expired records as `Expired`

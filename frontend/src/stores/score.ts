@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { NoCtfapiEndpointsCompetitionsLeaderboardEntryDto } from '@/api/generated/types.gen'
+import type { NoCtfApplicationScoringLeaderboardLeaderboardEntry } from '@/api/generated/types.gen'
 
 export const useScoreStore = defineStore('score', () => {
   const myTeamScore = ref<number | null>(null)
   const myTeamName = ref<string | null>(null)
   const competitionId = ref<string | null>(null)
   const teamId = ref<string | null>(null)
-  const leaderboardEntries = ref<NoCtfapiEndpointsCompetitionsLeaderboardEntryDto[]>([])
+  const leaderboardEntries = ref<NoCtfApplicationScoringLeaderboardLeaderboardEntry[]>([])
 
   function setCurrentTeamScore(nextCompetitionId: string | null, nextTeamId: string | null, nextTeamName: string | null, score: number | null) {
     competitionId.value = nextCompetitionId
@@ -17,7 +17,7 @@ export const useScoreStore = defineStore('score', () => {
   }
 
   function updateFromLeaderboard(
-    entries: NoCtfapiEndpointsCompetitionsLeaderboardEntryDto[],
+    entries: NoCtfApplicationScoringLeaderboardLeaderboardEntry[],
     nextTeamId?: string | null,
     nextCompetitionId?: string | null,
   ) {
@@ -28,7 +28,7 @@ export const useScoreStore = defineStore('score', () => {
     if (nextTeamId) {
       const myEntry = entries.find((e) => e.teamId === nextTeamId)
       if (myEntry) {
-        myTeamScore.value = myEntry.totalScore ?? null
+        myTeamScore.value = myEntry.score ?? null
         myTeamName.value = myEntry.teamName ?? null
         return
       }

@@ -2,22 +2,22 @@
 
 ## Phase 1: Restore valid host composition
 
-1. Extract API/Worker service registration into testable composition helpers.
+1. Extract API/API-hosted Channel consumer service registration into testable composition helpers.
 2. Remove unconditional local-storage directory initialization in S3 mode.
 3. Add dedicated Local URL signing configuration and Docker Compose parity.
-4. Preserve Penetration public endpoints during Worker synchronization.
-5. Add API/Worker/Runner composition smoke tests with scope validation.
+4. Preserve Penetration public endpoints during API-hosted Channel consumer synchronization.
+5. Add API/API-hosted Channel consumer/Runner composition smoke tests with scope validation.
 6. Fix clean project plugin build/copy dependencies.
 
 ## Phase 2: Make plugins host-aware
 
 1. Add additive `PluginHostRole` and host-aware module interface.
 2. Move plugin loader/load context to a shared host-neutral assembly.
-3. Split built-in module registration into common, API, and Worker capabilities.
+3. Split built-in module registration into common, API, and API-hosted Channel consumer capabilities.
 4. Add lightweight challenge scoring-owner metadata and remove submission-handler discovery from rebuilds.
-5. Load the same plugin catalog from API and Worker outputs.
-6. Move AWD/AWDP/KoH engines out of API and into Worker.
-7. Add Redis Stream Worker notifier and API relay with consumer-group recovery.
+5. Load the same plugin catalog from API and API-hosted Channel consumer outputs.
+6. Move AWD/AWDP/KoH engines out of API and into API-hosted Channel consumer.
+7. Add Redis Stream API-hosted Channel consumer notifier and API relay with consumer-group recovery.
 
 ## Phase 3: Repair scoring hot paths
 
@@ -45,7 +45,7 @@
 2. Add distributed generic instance transition locking.
 3. Make Penetration counter updates atomic and dynamic flag lookup indexed.
 4. Make background-task recovery conditional and task claiming use PostgreSQL skip-locked semantics.
-5. Add bounded Worker pools by task class.
+5. Add bounded API-hosted Channel consumer pools by task class.
 6. Add Runner operation IDs, receipts, and concurrency admission.
 7. Bound Kubernetes/Docker output and use independent cleanup cancellation.
 8. Replace fire-and-forget log broadcast with a bounded channel.
@@ -57,7 +57,7 @@
 2. Run PostgreSQL and Redis integration suites plus query-count/performance regression tests.
 3. Verify migrations from an empty PostgreSQL database and check model drift.
 4. Regenerate OpenAPI/client and build the frontend.
-5. Validate Compose/Kubernetes manifests and build API/Worker/Runner Docker images.
+5. Validate Compose/Kubernetes manifests and build API/API-hosted Channel consumer/Runner Docker images.
 6. Review the complete diff for plugin/API compatibility, unintended secrets, and unbounded paths.
 7. Commit changes by logical phase; do not push or create a PR unless explicitly requested.
 

@@ -8,15 +8,15 @@ Internal contracts, database migrations, indexes, concurrency tokens, deployment
 
 ## Architectural Direction
 
-NoCTF will retain its existing API, Application, Infrastructure, PluginBase, plugin, Worker, and Runner boundaries. Background execution will become plugin-driven and host-aware:
+NoCTF will retain its existing API, Application, Infrastructure, PluginBase, plugin, API-hosted Channel consumer, and Runner boundaries. Background execution will become plugin-driven and host-aware:
 
 - API hosts endpoints, authentication, authorization, SignalR, public queries, and command admission.
-- Worker loads the same plugin modules and hosts competition engines, durable jobs, and instance maintenance.
+- API-hosted Channel consumer loads the same plugin modules and hosts competition engines, durable jobs, and instance maintenance.
 - Runner remains the only production container-orchestration boundary.
 - Plugins register game modes, challenge handlers, scoring contributors, background engines, runtime configuration providers, and maintenance services through stable abstractions.
-- Worker discovers plugin background capabilities instead of hard-coding individual plugins.
+- API-hosted Channel consumer discovers plugin background capabilities instead of hard-coding individual plugins.
 
-All competition engines also acquire a PostgreSQL advisory lease before processing a competition. This protects rolling deployments and accidental Worker scaling. Non-relational unit tests use a process-local keyed lock with equivalent mutual-exclusion semantics.
+All competition engines also acquire a PostgreSQL advisory lease before processing a competition. This protects rolling deployments and accidental API-hosted Channel consumer scaling. Non-relational unit tests use a process-local keyed lock with equivalent mutual-exclusion semantics.
 
 ## Scoring Ownership and Rebuilds
 
@@ -32,7 +32,7 @@ Accepted submissions commit their canonical submission and scoring transaction b
 
 ## Plugin Engines and Runtime Configuration
 
-AWD, AWDP, and KoH engines move from API-hosted services to Worker-hosted plugin background engines. A shared plugin loader is used by both hosts, and deployment output places plugin assemblies where both hosts can discover them.
+AWD, AWDP, and KoH engines move from API-hosted services to API-hosted Channel consumer-hosted plugin background engines. A shared plugin loader is used by both hosts, and deployment output places plugin assemblies where both hosts can discover them.
 
 AWD registers a challenge runtime configuration provider. It converts the persisted Challenge container fields and orchestration specification into a `ContainerConfig`, injects the round flag, and preserves the existing `IContainerManager` boundary. Static challenges without runtime configuration are rejected during competition validation rather than silently skipped.
 
@@ -51,7 +51,7 @@ KoH polling uses the internal endpoint. Cleanup selects `DestroyContainerAsync` 
 
 Penetration instance transitions acquire a keyed PostgreSQL advisory lock for `(competition, team, challenge)` and use a database concurrency token. Only short state-claim and state-finalization transactions hold database locks; Runner calls remain outside database transactions. Conflicting requests receive the existing `instance_busy` behavior.
 
-Background tasks gain renewable leases with an owner token. A worker renews a running task periodically and only that owner may complete or fail it. Expired tasks are recoverable, while a slow healthy task is not executed twice.
+Background tasks gain renewable leases with an owner token. A API-hosted Channel consumer renews a running task periodically and only that owner may complete or fail it. Expired tasks are recoverable, while a slow healthy task is not executed twice.
 
 Competition engines, score emission, Redis leaderboard publication, and initialization operations are made idempotent at database boundaries. Unique conflicts are handled as competing successful executions, not generic failures.
 
@@ -99,7 +99,7 @@ Configuration validation enforces competition time order, non-empty bounded name
 
 ## Deployment Hardening
 
-Kubernetes manifests will use non-root, read-only filesystems, dropped capabilities, seccomp, explicit service-account-token settings, and separate liveness/readiness probes for API and Worker where applicable. Secret manifests contain no usable shared credentials. TLS and forwarded-header settings are documented and validated.
+Kubernetes manifests will use non-root, read-only filesystems, dropped capabilities, seccomp, explicit service-account-token settings, and separate liveness/readiness probes for API and API-hosted Channel consumer where applicable. Secret manifests contain no usable shared credentials. TLS and forwarded-header settings are documented and validated.
 
 Database migration execution is separated from horizontally scaled API startup through an explicit migration job or deployment step. Automatic API migration remains available only as an opt-in compatibility setting.
 
