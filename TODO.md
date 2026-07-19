@@ -317,18 +317,18 @@
 
 ## 10. Maintenance、rebuild 和 lifecycle Channel
 
-- [ ] 完成 Maintenance hosted service。
-- [ ] CompetitionId rebuild 去重。
-- [ ] stable Submission order：`ReceivedAt + SubmissionId`。
-- [ ] stable system fact order：`OccurredAt + ScoringEventId`。
-- [ ] old current event soft-delete。
-- [ ] replacement event rebind。
-- [ ] rebuild success/failure/cancel 释放去重标记。
-- [ ] rebuild 最后只触发一次 leaderboard refresh。
+- [x] 完成 Maintenance hosted service。
+- [x] CompetitionId rebuild 去重。
+- [x] stable Submission order：`ReceivedAt + SubmissionId`。
+- [x] stable system fact order：`OccurredAt + ScoringEventId`。
+- [x] old current event soft-delete。
+- [x] replacement event rebind。
+- [x] rebuild success/failure/cancel 释放去重标记。
+- [x] rebuild 最后只触发一次 leaderboard refresh。
 - [ ] lifecycle work item 接入 Maintenance/专用 channel。
 - [ ] runtime cleanup work item 接入 Maintenance channel。
-- [ ] Processing/Projection/Maintenance 统一 1/5/15 秒 retry。
-- [ ] consumer scope、耗时和结果 structured logging。
+- [x] Processing/Projection/Maintenance 统一 1/5/15 秒 retry。
+- [x] consumer scope、耗时和结果 structured logging。
 - [ ] shutdown drain。
 - [ ] 记录已知限制：Channel 不跨进程、不持久化、不恢复崩溃窗口。
 
