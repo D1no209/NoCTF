@@ -351,7 +351,7 @@
 - [x] score/rank 只在内存 DTO 和 Redis。
 - [x] Redis TTL 配置化。
 - [ ] Redis miss → 202 → refresh → hit。
-- [ ] Redis 未配置的正式环境启动失败。
+- [x] Redis 未配置的正式环境启动失败。
 - [x] leaderboard visibility 按 Draft/Published/Running/Paused/Finished 处理。
 - [x] refresh 成功广播 CompetitionId 和 GeneratedAt。
 
