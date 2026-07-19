@@ -4,14 +4,27 @@ using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Application.Submissions.Processing;
 
-public enum FixVerificationStatus
+public enum FixVerificationDecision
 {
     Valid,
     TeamFailure,
     PlatformFailed
 }
 
-public sealed record FixVerificationResult(FixVerificationStatus Status, ScoringFailureCode? ErrorCode = null);
+public sealed record FixVerificationResult(FixVerificationDecision Status, ScoringFailureCode? ErrorCode = null);
+
+public enum FixVerificationError
+{
+    None,
+    NotVerifiable,
+    Concurrency
+}
+
+public sealed record FixVerificationOperationResult(bool Succeeded, FixVerificationError Error = FixVerificationError.None)
+{
+    public static FixVerificationOperationResult Success() => new(true);
+    public static FixVerificationOperationResult Failure(FixVerificationError error) => new(false, error);
+}
 
 public sealed record FixVerificationContext(
     Guid SubmissionId,
@@ -48,14 +61,14 @@ public sealed class VerifyFixSubmission(
     IFixVerificationStore store,
     IFixSubmissionVerifier verifier)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<FixVerificationOperationResult> ExecuteAsync(
         Guid submissionId,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
         var context = await store.BeginVerifyingAsync(submissionId, now, ct);
         if (context is null)
-            return OperationResult.Failure("fix_not_verifiable", "The Fix submission is not ready for verification.");
+            return FixVerificationOperationResult.Failure(FixVerificationError.NotVerifiable);
 
         FixVerificationResult result;
         try
@@ -68,7 +81,7 @@ public sealed class VerifyFixSubmission(
         }
         catch
         {
-            result = new(FixVerificationStatus.PlatformFailed, ScoringFailureCode.StorageUnavailable);
+            result = new(FixVerificationDecision.PlatformFailed, ScoringFailureCode.StorageUnavailable);
         }
 
         var completed = await store.CompleteAsync(
@@ -79,7 +92,7 @@ public sealed class VerifyFixSubmission(
             now,
             ct);
         return completed
-            ? OperationResult.Success()
-            : OperationResult.Failure("fix_concurrency", "Fix verification state changed concurrently.");
+            ? FixVerificationOperationResult.Success()
+            : FixVerificationOperationResult.Failure(FixVerificationError.Concurrency);
     }
 }
