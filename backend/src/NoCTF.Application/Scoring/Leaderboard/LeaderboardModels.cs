@@ -10,9 +10,3 @@ public sealed record LeaderboardEntry(
     int SolveCount,
     DateTimeOffset? LastScoreAt,
     IReadOnlyList<LeaderboardChallengeSummary> Challenges);
-
-public sealed record LeaderboardSnapshot(
-    Guid CompetitionId,
-    long ProjectionVersion,
-    DateTimeOffset GeneratedAt,
-    IReadOnlyList<LeaderboardEntry> Entries);
