@@ -5,6 +5,8 @@ RUN bun install --frozen-lockfile
 COPY frontend/ ./
 RUN bun run build
 
+FROM docker:28-cli AS docker-cli
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY backend/ ./backend/
@@ -26,5 +28,7 @@ ENTRYPOINT ["dotnet", "NoCTF.API.dll"]
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runner
 WORKDIR /app
 COPY --from=build /app/runner .
+COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "NoCTF.Runner.dll"]

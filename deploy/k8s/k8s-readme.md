@@ -5,7 +5,6 @@
 - Kubernetes cluster (v1.25+)
 - `kubectl` configured to point at your cluster
 - NGINX Ingress Controller installed
-- Metrics Server installed (required for HPA)
 - `/etc/hosts` entry: `<ingress-ip> noctf.local minio.noctf.local`
 
 ## Creating Real Secrets
@@ -36,7 +35,6 @@ kubectl create secret tls noctf-tls --namespace noctf --cert=tls.crt --key=tls.k
 ```bash
 # From repo root
 docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
-docker build -f backend/Dockerfile --target worker -t noctf-worker:latest .
 docker build -f backend/Dockerfile --target runner -t noctf-runner:latest .
 ```
 
@@ -45,12 +43,10 @@ For local clusters (kind/minikube), load images:
 ```bash
 # kind
 kind load docker-image noctf-backend:latest
-kind load docker-image noctf-worker:latest
 kind load docker-image noctf-runner:latest
 
 # minikube
 minikube image load noctf-backend:latest
-minikube image load noctf-worker:latest
 minikube image load noctf-runner:latest
 ```
 
