@@ -150,16 +150,16 @@
 
 ### 4.1 Challenge CRUD
 
-- [ ] 创建 Challenge。
-- [ ] 查询公开 Challenge 列表。
-- [ ] 查询管理员 Challenge 详情。
-- [ ] 更新 Challenge。
-- [ ] 删除 Challenge soft-delete。
-- [ ] 调整 Challenge Order。
-- [ ] Publish/Unpublish Challenge。
-- [ ] `(CompetitionId, Order)` 冲突返回 typed problem。
-- [ ] 未发布 Challenge 不进入公开 API 和 Submission admission。
-- [ ] Running 后禁止修改影响 evaluator 的字段。
+- [x] 创建 Challenge。
+- [x] 查询公开 Challenge 列表。
+- [x] 查询管理员 Challenge 详情。
+- [x] 更新 Challenge。
+- [x] 删除 Challenge soft-delete。
+- [x] 调整 Challenge Order。
+- [x] Publish/Unpublish Challenge。
+- [x] `(CompetitionId, Order)` 冲突返回 typed problem。
+- [x] 未发布 Challenge 不进入公开 API 和 Submission admission。
+- [x] Running 后禁止修改影响 evaluator 的字段。
 
 ### 4.2 ChallengeConfiguration
 
@@ -361,7 +361,7 @@
 
 - [ ] `GET /competitions`。
 - [ ] `GET /competitions/{id}`。
-- [ ] `GET /competitions/{id}/challenges`。
+- [x] `GET /competitions/{id}/challenges`。
 - [ ] `GET /competitions/{id}/teams/me`。
 - [ ] `GET /competitions/{id}/leaderboard`。
 - [ ] `GET /competitions/{id}/submissions/{submissionId}`。
@@ -370,7 +370,7 @@
 
 - [ ] Competition CRUD。
 - [ ] lifecycle publish/pause/resume/finish。
-- [ ] Challenge CRUD/publish。
+- [x] Challenge CRUD/publish。
 - [ ] Flag CRUD/window update。
 - [ ] Competition/Challenge configuration update。
 - [ ] Team approval/member management。
