@@ -89,6 +89,7 @@ kubectl create secret generic noctf-secrets \
   --from-literal=db-password='your-db-password' \
   --from-literal=seed-admin-password='your-initial-admin-password' \
   --from-literal=runner-api-key='your-runner-internal-api-key' \
+  --from-literal=runner-scoring-key='your-runner-scoring-jwt-key-at-least-32-chars' \
   --from-literal=minio-access-key='your-minio-access-key' \
   --from-literal=minio-secret-key='your-minio-secret-key' \
   --from-literal=smtp-username='your-smtp-user' \
@@ -103,7 +104,6 @@ From the repo root:
 
 ```bash
 docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
-docker build -f backend/Dockerfile --target worker -t noctf-worker:latest .
 docker build -f backend/Dockerfile --target runner -t noctf-runner:latest .
 ```
 
