@@ -26,13 +26,27 @@ public sealed class RedisLeaderboardCache(NoCtfDbContext db, ILeaderboardProject
         var teams = await db.Teams.AsNoTracking().Where(x => x.CompetitionId == competitionId)
             .Select(x => new LeaderboardTeamFact(x.Id, x.Name, x.Ban.IsBanned, x.Deletion.IsDeleted)).ToListAsync(ct);
         var challenges = await db.Challenges.AsNoTracking().Where(x => x.CompetitionId == competitionId)
-            .Select(x => new LeaderboardChallengeFact(x.Id, x.Direction, x.Deletion.IsDeleted)).ToListAsync(ct);
+            .GroupJoin(
+                db.ChallengeConfigurations.AsNoTracking(),
+                challenge => challenge.Id,
+                configuration => configuration.ChallengeId,
+                (challenge, configurations) => new { challenge, configuration = configurations.Select(item => item.Json).FirstOrDefault() })
+            .Select(x => new LeaderboardChallengeFact(
+                x.challenge.Id,
+                x.challenge.Direction,
+                x.challenge.Deletion.IsDeleted,
+                x.configuration))
+            .ToListAsync(ct);
+        var competitionConfiguration = await db.CompetitionConfigurations.AsNoTracking()
+            .Where(x => x.CompetitionId == competitionId)
+            .Select(x => x.Json)
+            .SingleOrDefaultAsync(ct);
         var submissions = await db.Submissions.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.ScoringEventId != null)
             .Join(db.ScoringEvents.AsNoTracking(), s => s.ScoringEventId, e => e.Id, (s, e) => new LeaderboardSubmissionFact(s.Id, s.TeamId!.Value, s.ChallengeId, s.Kind, s.ReceivedAt, e)).ToListAsync(ct);
         var system = await db.ScoringEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.SubmissionId == null)
             .Select(x => new LeaderboardSystemFact(x)).ToListAsync(ct);
         var entries = projectors.Get(competition.Mode).Project(
-            new(competitionId, competition.Mode, teams, submissions, system, challenges));
+            new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration));
         var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, entries);
         await redis.GetDatabase().StringSetAsync(Key(competitionId), JsonSerializer.Serialize(response, JsonOptions), TimeSpan.FromMinutes(1));
     }

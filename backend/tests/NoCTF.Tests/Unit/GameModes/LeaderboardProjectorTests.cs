@@ -2,6 +2,8 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Leaderboard;
+using NoCTF.GameModes.Ctf.Configuration;
+using System.Text.Json;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -24,7 +26,7 @@ public class LeaderboardProjectorTests
 
         await Assert.That(result).HasSingleItem();
         await Assert.That(result[0].TeamId).IsEqualTo(first);
-        await Assert.That(result[0].Score).IsEqualTo(2L);
+        await Assert.That(result[0].Score).IsEqualTo(1000L);
         await Assert.That(result[0].Rank).IsEqualTo(1);
     }
 
@@ -108,8 +110,36 @@ public class LeaderboardProjectorTests
 
         var result = new CtfLeaderboardProjector().Project(input);
 
-        await Assert.That(result[0].Score).IsEqualTo(1L);
+        await Assert.That(result[0].Score).IsEqualTo(500L);
         await Assert.That(result[0].Challenges[0].Direction).IsEqualTo("web");
+    }
+
+    [Test]
+    public async Task CtfProjector_AppliesDecayMinimumAndFirstBloodInStableOrder()
+    {
+        var firstTeam = Guid.NewGuid();
+        var secondTeam = Guid.NewGuid();
+        var challenge = Guid.NewGuid();
+        var json = JsonSerializer.Serialize(new CtfConfiguration(
+            1,
+            new(500, 100, 0.5m),
+            [new(BloodRewardPolicy.FixedPoints, 50)]),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var result = new CtfLeaderboardProjector().Project(new LeaderboardProjectionInput(
+            Guid.NewGuid(),
+            GameMode.Ctf,
+            [new(firstTeam, "first", false, false), new(secondTeam, "second", false, false)],
+            [
+                Fact(firstTeam, challenge, 1),
+                Fact(secondTeam, challenge, 2)
+            ],
+            [],
+            [new(challenge, "web", false)],
+            json));
+
+        await Assert.That(result[0].TeamId).IsEqualTo(firstTeam);
+        await Assert.That(result[0].Score).IsEqualTo(550L);
+        await Assert.That(result[1].Score).IsEqualTo(250L);
     }
 
     [Test]
@@ -126,4 +156,8 @@ public class LeaderboardProjectorTests
     private static LeaderboardSubmissionFact Fact(Guid team, int seconds, ScoringResult result) =>
         new(Guid.NewGuid(), team, Guid.NewGuid(), SubmissionKind.Flag, DateTimeOffset.UnixEpoch.AddSeconds(seconds),
             new ScoringEvent { Id = Guid.NewGuid(), TeamId = team, Result = result, OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds) });
+
+    private static LeaderboardSubmissionFact Fact(Guid team, Guid challenge, int seconds) =>
+        new(Guid.NewGuid(), team, challenge, SubmissionKind.Flag, DateTimeOffset.UnixEpoch.AddSeconds(seconds),
+            new ScoringEvent { Id = Guid.NewGuid(), TeamId = team, Result = ScoringResult.Correct, OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds) });
 }
