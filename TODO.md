@@ -42,7 +42,7 @@
 - [x] 每个状态转换使用 expected-status 条件更新，保证并发幂等。
 - [ ] 状态转换记录 actor、时间和原因审计信息。
 - [x] 状态变化统一 invalidate leaderboard 并 enqueue refresh。
-- [ ] Finished 状态触发 runtime cleanup work item。
+- [x] Finished 状态触发 runtime cleanup work item。
 - [ ] 状态变化发布脱敏 SignalR competition notification。
 
 ### 1.3 Lifecycle hosted service
@@ -301,7 +301,7 @@
 
 - [ ] `CompetitionRuntimeProvisioner`。
 - [x] `ChallengeRuntimeProvisioner`。
-- [ ] `CompetitionRuntimeCleaner`。
+- [x] `CompetitionRuntimeCleaner`。
 - [ ] `ChallengeRuntimeHealthChecker`。
 - [x] runtime operation idempotency key。
 - [x] runtime operation timeout。
@@ -326,7 +326,7 @@
 - [x] rebuild success/failure/cancel 释放去重标记。
 - [x] rebuild 最后只触发一次 leaderboard refresh。
 - [ ] lifecycle work item 接入 Maintenance/专用 channel。
-- [ ] runtime cleanup work item 接入 Maintenance channel。
+- [x] runtime cleanup work item 接入 Maintenance channel。
 - [x] Processing/Projection/Maintenance 统一 1/5/15 秒 retry。
 - [x] consumer scope、耗时和结果 structured logging。
 - [ ] shutdown drain。

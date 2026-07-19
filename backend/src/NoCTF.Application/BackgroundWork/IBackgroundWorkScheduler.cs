@@ -7,4 +7,5 @@ public interface IBackgroundWorkScheduler
     ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken);
     ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken);
     ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken);
+    ValueTask EnqueueRuntimeCleanupAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }

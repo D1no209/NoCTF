@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Infrastructure.BackgroundWork;
 
@@ -35,6 +36,8 @@ public sealed class CompetitionLifecycleHostedService(
                 {
                     await cache.InvalidateAsync(transition.CompetitionId, ct);
                     await scheduler.EnqueueLeaderboardRefreshAsync(transition.CompetitionId, ct);
+                    if (transition.To == CompetitionStatus.Finished)
+                        await scheduler.EnqueueRuntimeCleanupAsync(transition.CompetitionId, ct);
                     logger.LogInformation("Competition {CompetitionId} transitioned from {From} to {To}",
                         transition.CompetitionId, transition.From, transition.To);
                 }

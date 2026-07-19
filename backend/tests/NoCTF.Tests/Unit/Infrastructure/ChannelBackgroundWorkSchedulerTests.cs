@@ -43,4 +43,34 @@ public class ChannelBackgroundWorkSchedulerTests
         var item = await scheduler.ProjectionReader.ReadAsync();
         await Assert.That(item.CompetitionId).IsEqualTo(competitionId);
     }
+
+    [Test]
+    public async Task EnqueueRuntimeCleanupAsync_CoalescesPendingCompetitionWork()
+    {
+        var scheduler = new ChannelBackgroundWorkScheduler(new BackgroundQueueOptions { MaintenanceCapacity = 2 });
+        var competitionId = Guid.NewGuid();
+
+        await scheduler.EnqueueRuntimeCleanupAsync(competitionId, CancellationToken.None);
+        await scheduler.EnqueueRuntimeCleanupAsync(competitionId, CancellationToken.None);
+
+        var item = await scheduler.MaintenanceReader.ReadAsync();
+        await Assert.That(item).IsTypeOf<CleanupCompetitionRuntimeWorkItem>();
+        await Assert.That(item.CompetitionId).IsEqualTo(competitionId);
+        await Assert.That(scheduler.MaintenanceReader.TryRead(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task RuntimeCleanupAndRebuild_AreIndependentMaintenanceItems()
+    {
+        var scheduler = new ChannelBackgroundWorkScheduler(new BackgroundQueueOptions { MaintenanceCapacity = 2 });
+        var competitionId = Guid.NewGuid();
+
+        await scheduler.EnqueueRuntimeCleanupAsync(competitionId, CancellationToken.None);
+        await scheduler.EnqueueCompetitionRebuildAsync(competitionId, CancellationToken.None);
+
+        var first = await scheduler.MaintenanceReader.ReadAsync();
+        var second = await scheduler.MaintenanceReader.ReadAsync();
+        await Assert.That(new[] { first.GetType(), second.GetType() })
+            .IsEquivalentTo(new[] { typeof(CleanupCompetitionRuntimeWorkItem), typeof(RebuildCompetitionWorkItem) });
+    }
 }
