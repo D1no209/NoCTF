@@ -22,6 +22,8 @@ using NoCTF.Application.Storage;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.BackgroundWork;
 using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Infrastructure.Caching;
 
 namespace NoCTF.Infrastructure;
 
@@ -49,6 +51,7 @@ public static class ServiceRegistration
         services.AddSingleton<IBackgroundWorkScheduler>(serviceProvider =>
             serviceProvider.GetRequiredService<ChannelBackgroundWorkScheduler>());
         services.AddHostedService<SubmissionProcessingHostedService>();
+        services.AddHostedService<LeaderboardRefreshHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redis))
@@ -57,6 +60,7 @@ public static class ServiceRegistration
         services.AddScoped<ISubmissionIntakeStore, EfSubmissionIntakeStore>();
         services.AddScoped<ISubmissionStatusReader, EfSubmissionStatusReader>();
         services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
+        services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
         services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
         services.AddScoped<ITeamModerationStore, EfTeamModerationStore>();
