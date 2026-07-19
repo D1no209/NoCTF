@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Auditing;
-using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Challenges;
@@ -28,6 +28,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<ChallengeFlag> ChallengeFlags => Set<ChallengeFlag>();
     public DbSet<ChallengeInstance> ChallengeInstances => Set<ChallengeInstance>();
     public DbSet<RuntimeOperation> RuntimeOperations => Set<RuntimeOperation>();
+    public DbSet<CompetitionLifecycleAudit> CompetitionLifecycleAudits => Set<CompetitionLifecycleAudit>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<Submission> Submissions => Set<Submission>();
