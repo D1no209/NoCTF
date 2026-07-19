@@ -139,9 +139,9 @@
 
 ### 3.3 Collaborator
 
-- [ ] `GET /admin/competitions/{id}/collaborators`。
-- [ ] `POST /admin/competitions/{id}/collaborators`。
-- [ ] `DELETE /admin/competitions/{id}/collaborators/{userId}`。
+- [x] `GET /admin/competitions/{id}/collaborators`。
+- [x] `POST /admin/competitions/{id}/collaborators`。
+- [x] `DELETE /admin/competitions/{id}/collaborators/{userId}`。
 - [ ] 实现 Owner、Manager、Judge、Observer 权限矩阵。
 - [ ] Judge 可 retry/rebuild，但不能修改 Competition owner/config secret。
 - [ ] Observer 只能读取管理员视图。
