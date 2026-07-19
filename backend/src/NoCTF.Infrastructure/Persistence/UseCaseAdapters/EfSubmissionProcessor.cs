@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.Submissions.Intake;
 using NoCTF.Domain.Submissions;
 using Microsoft.Extensions.Logging;
 
@@ -11,6 +12,7 @@ public sealed class EfSubmissionProcessor(
     NoCtfDbContext db,
     IBackgroundWorkScheduler scheduler,
     ISubmissionEvaluator evaluator,
+    ISubmissionAdmissionModePolicy admissionModePolicy,
     ILogger<EfSubmissionProcessor> logger) : ISubmissionProcessor
 {
     public async Task ProcessAsync(Guid submissionId, CancellationToken ct)
@@ -42,12 +44,59 @@ public sealed class EfSubmissionProcessor(
 
     private async Task<ScoringEventDecision> EvaluateAsync(Submission submission, CancellationToken ct)
     {
+        var configuration = await (
+            from competition in db.Competitions.AsNoTracking()
+            join competitionConfiguration in db.CompetitionConfigurations.AsNoTracking()
+                on competition.Id equals competitionConfiguration.CompetitionId
+            join challengeConfiguration in db.ChallengeConfigurations.AsNoTracking()
+                on submission.ChallengeId equals challengeConfiguration.ChallengeId
+            where competition.Id == submission.CompetitionId
+            select new
+            {
+                competition.Mode,
+                CompetitionJson = competitionConfiguration.Json,
+                ChallengeJson = challengeConfiguration.Json
+            }).SingleAsync(ct);
+        var rules = admissionModePolicy.GetRules(
+            configuration.Mode,
+            configuration.CompetitionJson,
+            configuration.ChallengeJson);
+        var maxAttempts = submission.Kind == SubmissionKind.Flag
+            ? rules.MaxFlagAttempts
+            : rules.MaxFixAttempts;
+        if (maxAttempts is > 0)
+        {
+            var acceptedIds = await db.Submissions.AsNoTracking()
+                .Where(candidate => candidate.CompetitionId == submission.CompetitionId
+                                    && candidate.TeamId == submission.TeamId
+                                    && candidate.ChallengeId == submission.ChallengeId
+                                    && candidate.Kind == submission.Kind)
+                .OrderBy(candidate => candidate.ReceivedAt)
+                .ThenBy(candidate => candidate.Id)
+                .Select(candidate => candidate.Id)
+                .ToListAsync(ct);
+            var ordinal = acceptedIds.IndexOf(submission.Id) + 1;
+            if (ordinal > maxAttempts)
+                return new(
+                    ScoringEventKind.SubmissionEvaluation,
+                    ScoringResult.AttemptsExhausted,
+                    null,
+                    submission.ReceivedAt,
+                    "admission-v1");
+        }
+
         var prior = await db.ScoringEvents.Where(x => x.CompetitionId == submission.CompetitionId && x.SubmissionId != submission.Id).ToListAsync(ct);
         var flags = await db.ChallengeFlags.Where(x => x.CompetitionId == submission.CompetitionId
             && x.ChallengeId == submission.ChallengeId && (x.TeamId == null || x.TeamId == submission.TeamId)
             && (x.ValidStart == null || x.ValidStart <= submission.ReceivedAt)
             && (x.ValidEnd == null || x.ValidEnd >= submission.ReceivedAt)).ToListAsync(ct);
         var fix = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id, ct);
-        return evaluator.Evaluate(new(submission, prior, flags, fix, string.Empty, string.Empty));
+        return evaluator.Evaluate(new(
+            submission,
+            prior,
+            flags,
+            fix,
+            configuration.CompetitionJson,
+            configuration.ChallengeJson));
     }
 }

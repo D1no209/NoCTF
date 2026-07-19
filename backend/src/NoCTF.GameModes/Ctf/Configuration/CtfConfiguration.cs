@@ -21,7 +21,8 @@ public sealed record CtfConfiguration(
 public sealed record CtfChallengeConfiguration(
     int SchemaVersion,
     CtfPointConfiguration? Points,
-    IReadOnlyList<BloodReward>? BloodRewards)
+    IReadOnlyList<BloodReward>? BloodRewards,
+    int? MaxFlagAttempts = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

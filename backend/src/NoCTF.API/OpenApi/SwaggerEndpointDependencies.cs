@@ -11,12 +11,20 @@ namespace NoCTF.API.OpenApi;
 
 internal sealed class SwaggerSubmissionStore : ISubmissionIntakeStore
 {
+    public Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
+        Guid competitionId, string idempotencyKey, Guid teamId, Guid challengeId, Guid userId,
+        NoCTF.Domain.Submissions.SubmissionKind kind, CancellationToken cancellationToken) =>
+        Task.FromResult<SubmissionAcceptanceResult?>(null);
     public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(Guid competitionId, Guid teamId, Guid challengeId, Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult<SubmissionAdmissionSnapshot?>(null);
-    public Task<bool> TryAcceptFlagAsync(FlagSubmissionReceived received, long expectedRevision, CancellationToken cancellationToken) =>
-        Task.FromResult(false);
-    public Task<bool> TryAcceptFixAsync(FixSubmissionReceived received, long expectedRevision, CancellationToken cancellationToken) =>
-        Task.FromResult(false);
+    public Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
+        FlagSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
+    public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
+        FixSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
 }
 
 internal sealed class SwaggerStatusReader : ISubmissionStatusReader

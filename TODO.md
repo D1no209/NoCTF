@@ -186,21 +186,21 @@
 
 ## 5. Submission admission、Idempotency 和 MaxAttempt
 
-- [ ] `SubmissionAdmissionSnapshot` 增加 Competition.Mode。
-- [ ] 增加 Competition/Challenge configuration revision。
-- [ ] 增加 SubmissionKind 支持矩阵。
-- [ ] 增加 MaxFlagAttempts/MaxFixAttempts。
-- [ ] 增加当前 accepted attempts 快速计数。
-- [ ] 修复 Draft/Published/Finished 状态误接受问题。
-- [ ] Flag/Fix command 增加 IdempotencyKey。
-- [ ] 建立 `(CompetitionId, IdempotencyKey)` unique 行为。
-- [ ] 相同 key 重试返回原 Submission。
-- [ ] 相同 key 不允许绑定不同 User/Team/Challenge。
-- [ ] Intake transaction 内执行快速 MaxAttempt 检查。
-- [ ] Processor Serializable transaction 内再次执行最终 MaxAttempt 检查。
-- [ ] Flag/Fix attempt 是否消耗由 GameMode policy 决定。
-- [ ] 正确结果普通 retry 拒绝。
-- [ ] `AttemptsExhausted` 生成 score-free ScoringEvent。
+- [x] `SubmissionAdmissionSnapshot` 增加 Competition.Mode。
+- [x] 增加 Competition/Challenge configuration revision。
+- [x] 增加 SubmissionKind 支持矩阵。
+- [x] 增加 MaxFlagAttempts/MaxFixAttempts。
+- [x] 增加当前 accepted attempts 快速计数。
+- [x] 修复 Draft/Published/Finished 状态误接受问题。
+- [x] Flag/Fix command 增加 IdempotencyKey。
+- [x] 建立 `(CompetitionId, IdempotencyKey)` unique 行为。
+- [x] 相同 key 重试返回原 Submission。
+- [x] 相同 key 不允许绑定不同 User/Team/Challenge。
+- [x] Intake transaction 内执行快速 MaxAttempt 检查。
+- [x] Processor Serializable transaction 内再次执行最终 MaxAttempt 检查。
+- [x] Flag/Fix attempt 是否消耗由 GameMode policy 决定。
+- [x] 正确结果普通 retry 拒绝。
+- [x] `AttemptsExhausted` 生成 score-free ScoringEvent。
 - [ ] 并发提交测试保证不超过 MaxAttempt。
 
 ## 6. Fix submission 完整状态机

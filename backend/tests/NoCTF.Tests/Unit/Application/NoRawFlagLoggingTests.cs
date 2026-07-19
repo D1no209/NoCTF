@@ -15,6 +15,7 @@ public class NoRawFlagLoggingTests
             ChallengeId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             Flag = "flag{do-not-leak}",
+            IdempotencyKey = "test-1",
             IpAddress = "127.0.0.1",
             ReceivedAt = DateTimeOffset.UtcNow
         };

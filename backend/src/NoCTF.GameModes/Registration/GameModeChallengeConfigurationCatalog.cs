@@ -16,10 +16,10 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
     public string GetDefaultJson(GameMode mode) => mode switch
     {
         GameMode.Ctf => JsonSerializer.Serialize(
-            new CtfChallengeConfiguration(CtfChallengeConfiguration.CurrentSchemaVersion, null, null),
+            new CtfChallengeConfiguration(CtfChallengeConfiguration.CurrentSchemaVersion, null, null, null),
             JsonOptions),
         GameMode.Awd => JsonSerializer.Serialize(
-            new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion, "flag{round_team_service}"),
+            new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion, "flag{round_team_service}", null),
             JsonOptions),
         GameMode.Awdp => JsonSerializer.Serialize(
             new AwdpChallengeConfiguration(
@@ -34,7 +34,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             new KohChallengeConfiguration(KohChallengeConfiguration.CurrentSchemaVersion, "http://localhost"),
             JsonOptions),
         GameMode.Penetration => JsonSerializer.Serialize(
-            new PenetrationChallengeConfiguration(PenetrationChallengeConfiguration.CurrentSchemaVersion, []),
+            new PenetrationChallengeConfiguration(PenetrationChallengeConfiguration.CurrentSchemaVersion, [], null),
             JsonOptions),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };

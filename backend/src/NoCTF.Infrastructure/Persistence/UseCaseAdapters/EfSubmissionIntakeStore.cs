@@ -1,64 +1,248 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
-using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
+using DomainSubmissionKind = NoCTF.Domain.Submissions.SubmissionKind;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
-/// <summary>EF transaction seam for accepting immutable submission facts.</summary>
-public sealed class EfSubmissionIntakeStore(NoCtfDbContext db, IBackgroundWorkScheduler scheduler) : ISubmissionIntakeStore
+/// <summary>Accepts Submission facts atomically with idempotency and attempt-limit checks.</summary>
+public sealed class EfSubmissionIntakeStore(NoCtfDbContext db, IBackgroundWorkScheduler scheduler)
+    : ISubmissionIntakeStore
 {
-    public async Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(Guid competitionId, Guid teamId, Guid challengeId, Guid userId, CancellationToken ct)
+    public async Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
+        Guid competitionId,
+        string idempotencyKey,
+        Guid teamId,
+        Guid challengeId,
+        Guid userId,
+        DomainSubmissionKind kind,
+        CancellationToken ct)
     {
-        var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == competitionId, ct);
-        var team = await db.Teams.AsNoTracking().SingleOrDefaultAsync(x => x.Id == teamId && x.CompetitionId == competitionId, ct);
-        var challenge = await db.Challenges.AsNoTracking().SingleOrDefaultAsync(x => x.Id == challengeId && x.CompetitionId == competitionId, ct);
-        if (competition is null || team is null || challenge is null) return null;
-        var belongs = await db.TeamMembers.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId && x.TeamId == teamId && x.UserId == userId, ct);
-        return new(competitionId, teamId, challengeId, 0, competition.Status, competition.StartTime, competition.EndTime,
-            competition.Deletion.IsDeleted, challenge.Deletion.IsDeleted, challenge.IsPublished, team.Deletion.IsDeleted,
-            team.Ban.IsBanned, team.RegistrationStatus == NoCTF.Domain.Teams.TeamRegistrationStatus.Approved, belongs);
+        var existing = await db.Submissions.AsNoTracking().SingleOrDefaultAsync(
+            submission => submission.CompetitionId == competitionId
+                          && submission.IdempotencyKey == idempotencyKey,
+            ct);
+        if (existing is null)
+            return null;
+        return Matches(existing, teamId, challengeId, userId, kind)
+            ? new(SubmissionAcceptanceState.Existing, existing.Id, existing.ReceivedAt)
+            : new(SubmissionAcceptanceState.IdempotencyConflict);
     }
 
-    public async Task<bool> TryAcceptFlagAsync(FlagSubmissionReceived received, long _, CancellationToken ct)
+    public async Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
+        Guid competitionId,
+        Guid teamId,
+        Guid challengeId,
+        Guid userId,
+        CancellationToken ct)
     {
+        var scope = await (
+            from competition in db.Competitions.AsNoTracking()
+            join competitionConfiguration in db.CompetitionConfigurations.AsNoTracking()
+                on competition.Id equals competitionConfiguration.CompetitionId
+            join challenge in db.Challenges.AsNoTracking()
+                on competition.Id equals challenge.CompetitionId
+            join challengeConfiguration in db.ChallengeConfigurations.AsNoTracking()
+                on challenge.Id equals challengeConfiguration.ChallengeId
+            join team in db.Teams.AsNoTracking()
+                on competition.Id equals team.CompetitionId
+            where competition.Id == competitionId && challenge.Id == challengeId && team.Id == teamId
+            select new
+            {
+                Competition = competition,
+                CompetitionConfiguration = competitionConfiguration,
+                Challenge = challenge,
+                ChallengeConfiguration = challengeConfiguration,
+                Team = team
+            }).SingleOrDefaultAsync(ct);
+        if (scope is null)
+            return null;
+
+        var belongs = await db.TeamMembers.AsNoTracking().AnyAsync(
+            member => member.CompetitionId == competitionId
+                      && member.TeamId == teamId
+                      && member.UserId == userId,
+            ct);
+        var attempts = await db.Submissions.AsNoTracking()
+            .Where(submission => submission.CompetitionId == competitionId
+                                 && submission.TeamId == teamId
+                                 && submission.ChallengeId == challengeId)
+            .GroupBy(submission => submission.Kind)
+            .Select(group => new { Kind = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.Kind, item => item.Count, ct);
+
+        return new(
+            competitionId,
+            teamId,
+            challengeId,
+            scope.Competition.Mode,
+            scope.CompetitionConfiguration.Revision,
+            scope.ChallengeConfiguration.Revision,
+            scope.CompetitionConfiguration.Json,
+            scope.ChallengeConfiguration.Json,
+            attempts.GetValueOrDefault(DomainSubmissionKind.Flag),
+            attempts.GetValueOrDefault(DomainSubmissionKind.Fix),
+            scope.Competition.Status,
+            scope.Competition.StartTime,
+            scope.Competition.EndTime,
+            scope.Competition.Deletion.IsDeleted,
+            scope.Challenge.Deletion.IsDeleted,
+            scope.Challenge.IsPublished,
+            scope.Team.Deletion.IsDeleted,
+            scope.Team.Ban.IsBanned,
+            scope.Team.RegistrationStatus == NoCTF.Domain.Teams.TeamRegistrationStatus.Approved,
+            belongs);
+    }
+
+    public async Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
+        FlagSubmissionReceived received,
+        SubmissionAdmissionSnapshot snapshot,
+        int? maxAttempts,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var existing = await FindAcceptedAsync(
+            received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
+            received.UserId, DomainSubmissionKind.Flag, ct);
+        if (existing is not null)
+            return existing;
+
+        var current = await LoadAdmissionAsync(
+            received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
+        if (!MatchesSnapshot(snapshot, current))
+            return new(SubmissionAcceptanceState.SnapshotChanged);
+        if (maxAttempts is > 0 && current!.AcceptedFlagAttempts >= maxAttempts)
+            return new(SubmissionAcceptanceState.AttemptsExhausted);
+
         var entity = new Submission
         {
-            Id = received.SubmissionId, CompetitionId = received.CompetitionId, TeamId = received.TeamId,
-            ChallengeId = received.ChallengeId, UserId = received.UserId, Kind = NoCTF.Domain.Submissions.SubmissionKind.Flag,
-            Flag = received.Flag, ReceivedAt = received.ReceivedAt, CreatedAt = received.ReceivedAt, UpdatedAt = received.ReceivedAt
+            Id = received.SubmissionId,
+            CompetitionId = received.CompetitionId,
+            TeamId = received.TeamId,
+            ChallengeId = received.ChallengeId,
+            UserId = received.UserId,
+            Kind = DomainSubmissionKind.Flag,
+            Flag = received.Flag,
+            IdempotencyKey = received.IdempotencyKey,
+            ReceivedAt = received.ReceivedAt,
+            CreatedAt = received.ReceivedAt,
+            UpdatedAt = received.ReceivedAt
         };
         db.Submissions.Add(entity);
-        try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { return false; }
-        await scheduler.EnqueueSubmissionAsync(entity.Id, ct);
-        return true;
+        var result = await SaveAsync(entity, transaction, received.IdempotencyKey, received.TeamId,
+            received.ChallengeId, received.UserId, DomainSubmissionKind.Flag, ct);
+        if (result.State == SubmissionAcceptanceState.Created)
+            await scheduler.EnqueueSubmissionAsync(entity.Id, ct);
+        return result;
     }
 
-    public async Task<bool> TryAcceptFixAsync(FixSubmissionReceived received, long _, CancellationToken ct)
+    public async Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
+        FixSubmissionReceived received,
+        SubmissionAdmissionSnapshot snapshot,
+        int? maxAttempts,
+        CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var record = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.UploadId == received.UploadId, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var existing = await FindAcceptedAsync(
+            received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
+            received.UserId, DomainSubmissionKind.Fix, ct);
+        if (existing is not null)
+            return existing;
+
+        var current = await LoadAdmissionAsync(
+            received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
+        if (!MatchesSnapshot(snapshot, current))
+            return new(SubmissionAcceptanceState.SnapshotChanged);
+        if (maxAttempts is > 0 && current!.AcceptedFixAttempts >= maxAttempts)
+            return new(SubmissionAcceptanceState.AttemptsExhausted);
+
+        var record = await db.FixSubmissionRecords.SingleOrDefaultAsync(
+            item => item.UploadId == received.UploadId,
+            ct);
         if (record is null || record.SubmissionId is not null || record.ExpiresAt <= received.ReceivedAt
-            || record.CompetitionId != received.CompetitionId || record.TeamId != received.TeamId || record.ChallengeId != received.ChallengeId)
-            return false;
+            || record.CompetitionId != received.CompetitionId || record.TeamId != received.TeamId
+            || record.ChallengeId != received.ChallengeId)
+            return new(SubmissionAcceptanceState.UploadUnavailable);
+
         var entity = new Submission
         {
-            Id = received.SubmissionId, CompetitionId = received.CompetitionId, TeamId = received.TeamId,
-            ChallengeId = received.ChallengeId, UserId = received.UserId, Kind = NoCTF.Domain.Submissions.SubmissionKind.Fix,
-            ReceivedAt = received.ReceivedAt, CreatedAt = received.ReceivedAt, UpdatedAt = received.ReceivedAt
+            Id = received.SubmissionId,
+            CompetitionId = received.CompetitionId,
+            TeamId = received.TeamId,
+            ChallengeId = received.ChallengeId,
+            UserId = received.UserId,
+            Kind = DomainSubmissionKind.Fix,
+            IdempotencyKey = received.IdempotencyKey,
+            ReceivedAt = received.ReceivedAt,
+            CreatedAt = received.ReceivedAt,
+            UpdatedAt = received.ReceivedAt
         };
         record.SubmissionId = entity.Id;
         record.ClaimedAt = received.ReceivedAt;
         record.VerificationStatus = FixVerificationStatus.Claimed;
         record.UpdatedAt = received.ReceivedAt;
         db.Submissions.Add(entity);
-        try { await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); }
-        catch (DbUpdateException) { await transaction.RollbackAsync(ct); return false; }
-        await scheduler.EnqueueSubmissionAsync(entity.Id, ct);
-        return true;
+
+        var result = await SaveAsync(entity, transaction, received.IdempotencyKey, received.TeamId,
+            received.ChallengeId, received.UserId, DomainSubmissionKind.Fix, ct);
+        if (result.State == SubmissionAcceptanceState.Created)
+            await scheduler.EnqueueSubmissionAsync(entity.Id, ct);
+        return result;
     }
+
+    private async Task<SubmissionAcceptanceResult> SaveAsync(
+        Submission entity,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
+        string idempotencyKey,
+        Guid teamId,
+        Guid challengeId,
+        Guid userId,
+        DomainSubmissionKind kind,
+        CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return new(SubmissionAcceptanceState.Created, entity.Id, entity.ReceivedAt);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return await FindAcceptedAsync(entity.CompetitionId, idempotencyKey, teamId, challengeId, userId, kind, ct)
+                ?? new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged);
+        }
+    }
+
+    private static bool Matches(
+        Submission submission,
+        Guid teamId,
+        Guid challengeId,
+        Guid userId,
+        DomainSubmissionKind kind) =>
+        submission.TeamId == teamId
+        && submission.ChallengeId == challengeId
+        && submission.UserId == userId
+        && submission.Kind == kind;
+
+    private static bool MatchesSnapshot(
+        SubmissionAdmissionSnapshot expected,
+        SubmissionAdmissionSnapshot? current) =>
+        current is not null
+        && current.Mode == expected.Mode
+        && current.CompetitionConfigurationRevision == expected.CompetitionConfigurationRevision
+        && current.ChallengeConfigurationRevision == expected.ChallengeConfigurationRevision
+        && current.CompetitionStatus == expected.CompetitionStatus
+        && current.CompetitionDeleted == expected.CompetitionDeleted
+        && current.ChallengeDeleted == expected.ChallengeDeleted
+        && current.ChallengePublished == expected.ChallengePublished
+        && current.TeamDeleted == expected.TeamDeleted
+        && current.TeamBanned == expected.TeamBanned
+        && current.TeamApproved == expected.TeamApproved
+        && current.UserBelongsToTeam == expected.UserBelongsToTeam;
 }

@@ -15,7 +15,7 @@ public class CreateFixUploadTests
     {
         var admission = AllowedAdmission();
         var grant = new FixUploadGrant(Guid.NewGuid(), "fix/archive.zip", new("https://storage/upload"), Now.AddMinutes(15));
-        var useCase = new CreateFixUpload(new AdmissionStore(admission), new UploadStore(grant), () => Now);
+        var useCase = new CreateFixUpload(new AdmissionStore(admission), new UploadStore(grant), new Policy(), () => Now);
 
         var result = await useCase.ExecuteAsync(Command());
 
@@ -28,7 +28,7 @@ public class CreateFixUploadTests
     {
         var admission = AllowedAdmission() with { TeamBanned = true };
         var store = new UploadStore(new(Guid.NewGuid(), "fix/archive.zip", new("https://storage/upload"), Now.AddMinutes(15)));
-        var useCase = new CreateFixUpload(new AdmissionStore(admission), store, () => Now);
+        var useCase = new CreateFixUpload(new AdmissionStore(admission), store, new Policy(), () => Now);
 
         var result = await useCase.ExecuteAsync(Command());
 
@@ -40,7 +40,7 @@ public class CreateFixUploadTests
     public async Task ExecuteAsync_InvalidSha256_RejectsRequest()
     {
         var store = new UploadStore(new(Guid.NewGuid(), "fix/archive.zip", new("https://storage/upload"), Now.AddMinutes(15)));
-        var useCase = new CreateFixUpload(new AdmissionStore(AllowedAdmission()), store, () => Now);
+        var useCase = new CreateFixUpload(new AdmissionStore(AllowedAdmission()), store, new Policy(), () => Now);
 
         var result = await useCase.ExecuteAsync(Command() with { Sha256 = "invalid" });
 
@@ -52,7 +52,7 @@ public class CreateFixUploadTests
     public async Task ExecuteAsync_NonHexSha256_RejectsRequest()
     {
         var store = new UploadStore(new(Guid.NewGuid(), "fix/archive.zip", new("https://storage/upload"), Now.AddMinutes(15)));
-        var useCase = new CreateFixUpload(new AdmissionStore(AllowedAdmission()), store, () => Now);
+        var useCase = new CreateFixUpload(new AdmissionStore(AllowedAdmission()), store, new Policy(), () => Now);
 
         var result = await useCase.ExecuteAsync(Command() with { Sha256 = new string('z', 64) });
 
@@ -65,17 +65,28 @@ public class CreateFixUploadTests
         "application/zip", 128, new string('a', 64), Now);
 
     private static SubmissionAdmissionSnapshot AllowedAdmission() => new(
-        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 0, CompetitionStatus.Running,
+        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), GameMode.Awdp, 0, 0, "{}", "{}", 0, 0, CompetitionStatus.Running,
         Now.AddHours(-1), Now.AddHours(1), false, false, true, false, false, true, true);
 
     private sealed class AdmissionStore(SubmissionAdmissionSnapshot snapshot) : ISubmissionIntakeStore
     {
+        public Task<SubmissionAcceptanceResult?> FindAcceptedAsync(Guid competitionId, string idempotencyKey,
+            Guid teamId, Guid challengeId, Guid userId, NoCTF.Domain.Submissions.SubmissionKind kind,
+            CancellationToken cancellationToken) => Task.FromResult<SubmissionAcceptanceResult?>(null);
         public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(Guid competitionId, Guid teamId, Guid challengeId,
             Guid userId, CancellationToken cancellationToken) => Task.FromResult<SubmissionAdmissionSnapshot?>(snapshot);
-        public Task<bool> TryAcceptFlagAsync(FlagSubmissionReceived received, long expectedRevision,
+        public Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(FlagSubmissionReceived received,
+            SubmissionAdmissionSnapshot admission, int? maxAttempts,
             CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<bool> TryAcceptFixAsync(FixSubmissionReceived received, long expectedRevision,
+        public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(FixSubmissionReceived received,
+            SubmissionAdmissionSnapshot admission, int? maxAttempts,
             CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class Policy : ISubmissionAdmissionModePolicy
+    {
+        public SubmissionAdmissionRules GetRules(GameMode mode, string competitionConfigurationJson,
+            string challengeConfigurationJson) => new(false, true, null, 10);
     }
 
     private sealed class UploadStore(FixUploadGrant grant) : IFixUploadSessionStore

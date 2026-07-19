@@ -5,6 +5,8 @@ public static class PenetrationConfigurationValidator
     public static IReadOnlyList<string> Validate(PenetrationChallengeConfiguration configuration)
     {
         var errors = new List<string>();
+        if (configuration.MaxFlagAttempts is <= 0)
+            errors.Add("MaxFlagAttempts must be positive when configured.");
         var ids = configuration.Stages.Select(stage => stage.Id).ToHashSet();
         if (ids.Count != configuration.Stages.Count)
             errors.Add("Stage IDs must be unique.");

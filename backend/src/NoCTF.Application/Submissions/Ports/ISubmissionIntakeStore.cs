@@ -6,6 +6,15 @@ namespace NoCTF.Application.Submissions.Ports;
 /// <summary>Provides the concurrency-aware transaction seam for accepting submissions.</summary>
 public interface ISubmissionIntakeStore
 {
+    Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
+        Guid competitionId,
+        string idempotencyKey,
+        Guid teamId,
+        Guid challengeId,
+        Guid userId,
+        NoCTF.Domain.Submissions.SubmissionKind kind,
+        CancellationToken cancellationToken);
+
     Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
         Guid competitionId,
         Guid teamId,
@@ -13,13 +22,15 @@ public interface ISubmissionIntakeStore
         Guid userId,
         CancellationToken cancellationToken);
 
-    Task<bool> TryAcceptFlagAsync(
+    Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
         FlagSubmissionReceived received,
-        long expectedRevision,
+        SubmissionAdmissionSnapshot snapshot,
+        int? maxAttempts,
         CancellationToken cancellationToken);
 
-    Task<bool> TryAcceptFixAsync(
+    Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
         FixSubmissionReceived received,
-        long expectedRevision,
+        SubmissionAdmissionSnapshot snapshot,
+        int? maxAttempts,
         CancellationToken cancellationToken);
 }

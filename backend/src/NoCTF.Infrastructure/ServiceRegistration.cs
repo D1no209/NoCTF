@@ -8,6 +8,7 @@ using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Application.Competitions.Collaborators;
 using NoCTF.Application.Authentication.Ports;
 using NoCTF.Application.Submissions.Ports;
+using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Application.Teams.Membership;
@@ -72,6 +73,7 @@ public static class ServiceRegistration
         services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
         services.AddSingleton<ISubmissionEvaluator, DefaultEfSubmissionEvaluator>();
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
+        services.AddSingleton<ISubmissionAdmissionModePolicy, GameModeSubmissionAdmissionPolicy>();
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddScoped<ISubmissionRetryStore, EfSubmissionRetryStore>();
         services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();

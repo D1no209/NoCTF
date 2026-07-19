@@ -23,7 +23,10 @@ public static class CtfConfigurationValidator
             ? []
             : ValidatePoints(configuration.Points).ToList();
         if (configuration.BloodRewards is null)
+        {
+            ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
             return errors;
+        }
         if (configuration.BloodRewards.Count > 3)
             errors.Add("At most three blood rewards are supported.");
         foreach (var reward in configuration.BloodRewards)
@@ -33,7 +36,14 @@ public static class CtfConfigurationValidator
             if (reward.Policy != BloodRewardPolicy.FixedPoints && reward.Value > 100)
                 errors.Add("Blood reward percentages cannot exceed 100.");
         }
+        ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
         return errors;
+    }
+
+    private static void ValidateMaxAttempts(int? maxAttempts, ICollection<string> errors)
+    {
+        if (maxAttempts is <= 0)
+            errors.Add("MaxFlagAttempts must be positive when configured.");
     }
 
     public static IReadOnlyList<string> ValidatePoints(CtfPointConfiguration points)
