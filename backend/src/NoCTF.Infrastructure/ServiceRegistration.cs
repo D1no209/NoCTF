@@ -68,6 +68,7 @@ public static class ServiceRegistration
         services.AddHostedService<LeaderboardRefreshHostedService>();
         services.AddHostedService<CompetitionLifecycleHostedService>();
         services.AddHostedService<CompetitionRebuildHostedService>();
+        services.AddHostedService<FixUploadExpiryHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redis))
@@ -80,6 +81,7 @@ public static class ServiceRegistration
         services.AddScoped<UnavailableFixSubmissionVerifier>();
         services.AddScoped<IFixSubmissionVerifier, ValidatingFixSubmissionVerifier>();
         services.AddScoped<VerifyFixSubmission>();
+        services.AddScoped<ExpireFixUploads>();
         services.AddSingleton<ISubmissionEvaluatorCatalog, GameModeSubmissionEvaluatorCatalog>();
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
         services.AddSingleton<ISubmissionAdmissionModePolicy, GameModeSubmissionAdmissionPolicy>();

@@ -96,3 +96,9 @@ public sealed class VerifyFixSubmission(
             : FixVerificationOperationResult.Failure(FixVerificationError.Concurrency);
     }
 }
+
+public sealed class ExpireFixUploads(IFixVerificationStore store)
+{
+    public Task<int> ExecuteAsync(DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        store.ExpireAsync(now, cancellationToken);
+}
