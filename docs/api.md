@@ -81,7 +81,7 @@ For WebSocket connections, pass the JWT token via the `access_token` query param
 
 Clients receive:
 
-- `LeaderboardSnapshot` — full leaderboard payload (rank, team name, total score, solve count)
+- `LeaderboardResponse` — Redis-backed leaderboard payload (rank, team name, total score, solve count)
 - `LeaderboardDelta` — incremental updates when a single score changes
 
 ### GameHub

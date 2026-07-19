@@ -4,14 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Authentication.Ports;
-using NoCTF.Application.Scoring.Evaluation;
-using NoCTF.Application.Scoring.Ports;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
-using NoCTF.Application.Scoring.Rebuild;
-using NoCTF.GameModes.Scoring;
 using NoCTF.GameModes.Submission;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
@@ -87,7 +83,6 @@ public static class ServiceRegistration
         services.AddScoped<AdvanceCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
         services.AddSingleton<IAccessTokenIssuer, JwtIssuer>();
-        services.AddSingleton<IScoringRuleEvaluator, GameModeScoringEvaluator>();
         return services;
     }
 }
