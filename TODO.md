@@ -300,11 +300,11 @@
 ## 9. Runner 和 runtime lifecycle
 
 - [ ] `CompetitionRuntimeProvisioner`。
-- [ ] `ChallengeRuntimeProvisioner`。
+- [x] `ChallengeRuntimeProvisioner`。
 - [ ] `CompetitionRuntimeCleaner`。
 - [ ] `ChallengeRuntimeHealthChecker`。
 - [x] runtime operation idempotency key。
-- [ ] runtime operation timeout。
+- [x] runtime operation timeout。
 - [ ] Docker runtime 接线。
 - [ ] Kubernetes runtime 接线。
 - [ ] AWD game box provision。
@@ -413,7 +413,7 @@
 - [ ] Submission stable ordering index。
 - [ ] ScoringEvent current/source filtered unique indexes。
 - [ ] RefreshSession token hash unique index。
-- [ ] runtime operation idempotency index。
+- [x] runtime operation idempotency index。
 - [ ] 所有 schema 变更只通过 `dotnet ef migrations add`。
 - [ ] 空 PostgreSQL 执行唯一 baseline。
 - [ ] `dotnet ef migrations has-pending-model-changes` 通过。
@@ -435,7 +435,7 @@
 - [ ] 五种 projector。
 - [ ] system SourceKey dedupe。
 - [ ] retry/rebuild ordering。
-- [ ] runtime failure mapping。
+- [x] runtime failure mapping。
 - [ ] Channel capacity/cancel/retry/dedup。
 - [ ] JWT/Runner JWT policy。
 - [ ] Mapperly mapping。

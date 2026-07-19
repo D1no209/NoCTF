@@ -37,12 +37,6 @@ public sealed class GetSubmissionStatusEndpoint(
         {
             return TypedResults.NotFound();
         }
-        return TypedResults.Ok(new SubmissionStatusResponse(
-            result.SubmissionId,
-            result.Kind,
-            result.Result is null ? "Unprocessed" : result.Result == NoCTF.Domain.Submissions.ScoringResult.Correct ? "Success" : "Failure",
-            result.ReceivedAt,
-            result.CompletedAt,
-            result.FailureCode));
+        return TypedResults.Ok(SubmissionMapper.ToStatusResponse(result));
     }
 }

@@ -40,7 +40,8 @@ public sealed record ProvisionChallengeRuntimeCommand(
     Guid ChallengeId,
     Guid? TeamId,
     string OperationKey,
-    ContainerRequest Container);
+    ContainerRequest Container,
+    TimeSpan? OperationTimeout = null);
 
 public sealed record ProvisionChallengeRuntimeResult(
     Guid OperationId,
@@ -70,9 +71,16 @@ public sealed class ChallengeRuntimeProvisioner(
             return new(lease.OperationId, lease.Status, null, true);
 
         var request = command.Container with { OperationId = lease.OperationId };
+        using var operationTimeout = command.OperationTimeout is { } timeout
+            ? new CancellationTokenSource(timeout)
+            : null;
+        using var linked = operationTimeout is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(ct, operationTimeout.Token);
+        var operationToken = linked?.Token ?? ct;
         try
         {
-            var receipt = await runtime.CreateAsync(request, ct);
+            var receipt = await runtime.CreateAsync(request, operationToken);
             if (!await operations.CompleteAsync(
                     lease,
                     receipt,
@@ -89,6 +97,11 @@ public sealed class ChallengeRuntimeProvisioner(
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException)
+        {
+            await operations.FailAsync(lease, "runtime_create_timeout", DateTimeOffset.UtcNow, ct);
+            return new(lease.OperationId, RuntimeStatus.Failed, null, false);
         }
         catch (Exception)
         {

@@ -19,6 +19,7 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Maintenance;
 using NoCTF.Application.Runtime;
+using NoCTF.Application.Runtime.Ports;
 using NoCTF.GameModes.Submission;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Registration;
@@ -36,6 +37,7 @@ using NoCTF.Application.Submissions.Retry;
 using NoCTF.Application.Authentication.Logout;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Runtime;
 
 namespace NoCTF.Infrastructure;
 
@@ -118,6 +120,7 @@ public static class ServiceRegistration
         services.AddScoped<ICompetitionRebuildProcessor, EfCompetitionRebuildProcessor>();
         services.AddScoped<IRuntimeOperationStore, EfRuntimeOperationStore>();
         services.AddScoped<ChallengeRuntimeProvisioner>();
+        services.AddScoped<IContainerLifecycle, UnavailableContainerLifecycle>();
         services.AddScoped<ListChallengeFlags>();
         services.AddScoped<GetChallengeFlag>();
         services.AddScoped<CreateChallengeFlag>();
