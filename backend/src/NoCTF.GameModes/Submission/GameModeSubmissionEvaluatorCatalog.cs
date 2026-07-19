@@ -4,6 +4,7 @@ using NoCTF.Domain.Submissions;
 using SubmissionEntity = NoCTF.Domain.Submissions.Submission;
 using System.Text.Json;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Penetration.Configuration;
 
 namespace NoCTF.GameModes.Submission;
 
@@ -125,8 +126,43 @@ public sealed class KohSubmissionEvaluator : ISubmissionEvaluator
 
 public sealed class PenetrationSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmissionEvaluator
 {
-    public ScoringEventDecision Evaluate(SubmissionProcessingContext context) =>
-        context.Submission.Kind == SubmissionKind.Fix
-            ? ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.FixNotSupported)
-            : inner.Evaluate(context);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public ScoringEventDecision Evaluate(SubmissionProcessingContext context)
+    {
+        if (context.Submission.Kind == SubmissionKind.Fix)
+            return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.FixNotSupported);
+        if (context.Submission.StageId is not { } stageId)
+            return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.StageRequired);
+        var configuration = Parse(context.ChallengeConfigurationJson);
+        var stage = configuration.Stages.SingleOrDefault(item => item.Id == stageId);
+        if (stage is null)
+            return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.StageNotFound);
+        var completedStages = context.PriorSubmissions?
+            .Where(previous => previous.TeamId == context.Submission.TeamId
+                               && previous.ChallengeId == context.Submission.ChallengeId
+                               && previous.StageId is not null
+                               && context.PriorEvents.Any(@event => @event.SubmissionId == previous.Id && @event.Result == ScoringResult.Correct))
+            .Select(previous => previous.StageId!.Value)
+            .ToHashSet() ?? [];
+        if (completedStages.Contains(stageId))
+            return new(ScoringEventKind.SubmissionEvaluation, ScoringResult.Duplicate,
+                ScoringFailureCode.AchievementAlreadyCompleted, context.Submission.ReceivedAt, "penetration-evaluator-v1");
+        if (stage.PrerequisiteIds.Any(required => !completedStages.Contains(required)))
+            return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.StagePrerequisiteIncomplete);
+        return inner.Evaluate(context);
+    }
+
+    private static PenetrationChallengeConfiguration Parse(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<PenetrationChallengeConfiguration>(json, JsonOptions)
+                ?? new(1, [], null);
+        }
+        catch (JsonException)
+        {
+            return new(1, [], null);
+        }
+    }
 }

@@ -6,6 +6,7 @@ using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.GameModes.Penetration.Configuration;
 using System.Text.Json;
 
 namespace NoCTF.Tests.Unit.GameModes;
@@ -228,6 +229,35 @@ public class LeaderboardProjectorTests
     }
 
     [Test]
+    public async Task PenetrationProjector_AwardsDistinctStagesWithoutCompletingWholeChallengeEarly()
+    {
+        var team = Guid.NewGuid();
+        var challenge = Guid.NewGuid();
+        var firstStage = Guid.NewGuid();
+        var secondStage = Guid.NewGuid();
+        var competition = JsonSerializer.Serialize(new PenetrationConfiguration(1, new(500, 100, 0.5m), []),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var challengeConfiguration = JsonSerializer.Serialize(new PenetrationChallengeConfiguration(
+            1,
+            [new(firstStage, 1, "entry", [], new(200, 100, 0.5m)), new(secondStage, 2, "root", [firstStage], new(300, 100, 0.5m))]),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var facts = new[]
+        {
+            Stage(team, challenge, firstStage, 1),
+            Stage(team, challenge, firstStage, 2),
+            Stage(team, challenge, secondStage, 3)
+        };
+
+        var result = new PenetrationLeaderboardProjector().Project(new LeaderboardProjectionInput(
+            Guid.NewGuid(), GameMode.Penetration, [new(team, "team", false, false)], facts, [],
+            [new(challenge, "pentest", false, challengeConfiguration)], competition));
+
+        await Assert.That(result[0].Score).IsEqualTo(500L);
+        await Assert.That(result[0].SolveCount).IsEqualTo(2);
+        await Assert.That(result[0].Challenges[0].SolveCount).IsEqualTo(2);
+    }
+
+    [Test]
     public async Task AllModesHaveProjector()
     {
         var catalog = new LeaderboardProjectorCatalog();
@@ -258,4 +288,12 @@ public class LeaderboardProjectorTests
         Result = ScoringResult.Correct,
         OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds)
     });
+
+    private static LeaderboardSubmissionFact Stage(Guid team, Guid challenge, Guid stage, int seconds) =>
+        new(Guid.NewGuid(), team, challenge, SubmissionKind.Flag, DateTimeOffset.UnixEpoch.AddSeconds(seconds),
+            new ScoringEvent
+            {
+                Id = Guid.NewGuid(), TeamId = team, ChallengeId = challenge, Result = ScoringResult.Correct,
+                OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds)
+            }, StageId: stage);
 }
