@@ -1,6 +1,6 @@
 namespace NoCTF.Domain.Submissions;
 
-public enum FixVerificationStatus { Created, Claimed, Verifying, Valid, TeamFailure, PlatformFailed, Expired, CleanupPending }
+public enum FixVerificationStatus { Created, Claimed, Verifying, Valid, TeamFailure, PlatformFailed, Expired, CleanupPending, Cleaned }
 
 public sealed class FixSubmissionRecord
 {

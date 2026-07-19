@@ -17,6 +17,9 @@ public static class FixVerificationStateMachine
             (FixVerificationStatus.Verifying, FixVerificationStatus.PlatformFailed) => true,
             (FixVerificationStatus.Created, FixVerificationStatus.Expired) => true,
             (FixVerificationStatus.Claimed, FixVerificationStatus.Expired) => true,
+            (FixVerificationStatus.Valid or FixVerificationStatus.TeamFailure or FixVerificationStatus.PlatformFailed or FixVerificationStatus.Expired,
+                FixVerificationStatus.CleanupPending) => true,
+            (FixVerificationStatus.CleanupPending, FixVerificationStatus.Cleaned) => true,
             _ => false
         };
 }

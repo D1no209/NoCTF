@@ -4,6 +4,7 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
 using ApplicationFixVerificationStatus = NoCTF.Application.Submissions.Processing.FixVerificationDecision;
 using DomainFixVerificationStatus = NoCTF.Domain.Submissions.FixVerificationStatus;
+using NoCTF.Application.Storage;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -47,6 +48,37 @@ public class FixVerificationTests
         bool expected)
     {
         await Assert.That(FixVerificationStateMachine.CanResetForRetry(status)).IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task CleanupFixArchives_DeletesClaimedObjectsAndCompletesRecord()
+    {
+        var item = new FixArchiveCleanupItem(Guid.NewGuid(), "fix/competition/upload", 4);
+        var store = new CleanupStore([item]);
+        var storage = new CleanupStorage();
+
+        var result = await new CleanupFixArchives(store, storage)
+            .ExecuteAsync(10, DateTimeOffset.UtcNow);
+
+        await Assert.That(result.DeletedCount).IsEqualTo(1);
+        await Assert.That(result.FailedCount).IsEqualTo(0);
+        await Assert.That(storage.DeletedKeys).Contains(item.ObjectKey);
+        await Assert.That(store.CompletedUploadId).IsEqualTo(item.UploadId);
+    }
+
+    [Test]
+    public async Task CleanupFixArchives_StorageFailure_RemainsPendingForRetry()
+    {
+        var item = new FixArchiveCleanupItem(Guid.NewGuid(), "fix/competition/upload", 4);
+        var store = new CleanupStore([item]);
+        var storage = new CleanupStorage { ThrowOnDelete = true };
+
+        var result = await new CleanupFixArchives(store, storage)
+            .ExecuteAsync(10, DateTimeOffset.UtcNow);
+
+        await Assert.That(result.DeletedCount).IsEqualTo(0);
+        await Assert.That(result.FailedCount).IsEqualTo(1);
+        await Assert.That(store.CompletedUploadId).IsNull();
     }
 
     [Test]
@@ -135,6 +167,38 @@ public class FixVerificationTests
         public Task<FixVerificationResult> VerifyAsync(
             FixSubmissionReceived submission,
             CancellationToken cancellationToken) => Task.FromResult(result);
+    }
+
+    private sealed class CleanupStore(IReadOnlyList<FixArchiveCleanupItem> items) : IFixArchiveCleanupStore
+    {
+        public Guid? CompletedUploadId { get; private set; }
+
+        public Task<IReadOnlyList<FixArchiveCleanupItem>> ClaimAsync(int batchSize, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(items);
+
+        public Task<bool> CompleteAsync(Guid uploadId, long expectedRowVersion, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            CompletedUploadId = uploadId;
+            return Task.FromResult(true);
+        }
+    }
+
+    private sealed class CleanupStorage : IObjectStorage
+    {
+        public bool ThrowOnDelete { get; init; }
+        public List<string> DeletedKeys { get; } = [];
+
+        public Task DeleteAsync(string objectKey, CancellationToken cancellationToken)
+        {
+            if (ThrowOnDelete) throw new IOException("storage unavailable");
+            DeletedKeys.Add(objectKey);
+            return Task.CompletedTask;
+        }
+
+        public Task<FixUploadGrant> CreateUploadAsync(Guid uploadId, string objectKey, string contentType, long length, TimeSpan lifetime, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredObject?> InspectAsync(string objectKey, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredObject> PutAsync(string objectKey, string fileName, string contentType, Stream content, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Stream> OpenReadAsync(string objectKey, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class ThrowingVerifier : IFixSubmissionVerifier
