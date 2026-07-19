@@ -395,29 +395,29 @@
 - [x] Runner scoring scheme、issuer、audience、scope 校验。
 - [x] 用户 token_version 即时吊销 policy。
 - [ ] Refresh Origin/Referer 与部署域名配置统一。
-- [ ] SignalR Bearer token provider。
-- [ ] 仅 Hub path 允许 access_token query。
-- [ ] query token 不进入日志和代理访问日志。
+- [x] SignalR Bearer token provider。
+- [x] 仅 Hub path 允许 access_token query。
+- [x] query token 不进入日志和代理访问日志。
 - [ ] User JWT 不能访问 system endpoint。
 - [ ] Runner JWT 不能访问普通用户/管理员 endpoint。
 - [ ] Owner/Manager/Judge/Observer policy matrix。
 
 ## 14. EF、migration 和索引
 
-- [ ] Competition status/time index。
-- [ ] Competition soft-delete filter/index。
-- [ ] Team/TeamMember unique indexes。
-- [ ] Challenge order index。
-- [ ] ChallengeFlag time-window index。
-- [ ] Submission idempotency index。
-- [ ] Submission stable ordering index。
-- [ ] ScoringEvent current/source filtered unique indexes。
-- [ ] RefreshSession token hash unique index。
+- [x] Competition status/time index。
+- [x] Competition soft-delete filter/index。
+- [x] Team/TeamMember unique indexes。
+- [x] Challenge order index。
+- [x] ChallengeFlag time-window index。
+- [x] Submission idempotency index。
+- [x] Submission stable ordering index。
+- [x] ScoringEvent current/source filtered unique indexes。
+- [x] RefreshSession token hash unique index。
 - [x] runtime operation idempotency index。
-- [ ] 所有 schema 变更只通过 `dotnet ef migrations add`。
+- [x] 所有 schema 变更只通过 `dotnet ef migrations add`。
 - [ ] 空 PostgreSQL 执行唯一 baseline。
-- [ ] `dotnet ef migrations has-pending-model-changes` 通过。
-- [ ] 禁止手改 migration/snapshot。
+- [x] `dotnet ef migrations has-pending-model-changes` 通过。
+- [x] 禁止手改 migration/snapshot。
 
 ## 15. 测试
 
@@ -501,7 +501,7 @@
 ## 17. 最终验收
 
 - [ ] `dotnet restore backend/NoCTF.slnx`。
-- [ ] `dotnet build backend/NoCTF.slnx --configuration Release --no-restore`。
+- [x] `dotnet build backend/NoCTF.slnx --configuration Release --no-restore`。
 - [ ] 完整 TUnit suite 通过。
 - [ ] Testcontainers PostgreSQL/Redis suite 通过。
 - [ ] `dotnet ef database update` 空库通过。

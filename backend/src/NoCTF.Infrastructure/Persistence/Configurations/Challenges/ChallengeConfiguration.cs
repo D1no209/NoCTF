@@ -10,6 +10,7 @@ internal sealed class ChallengeEntityConfiguration : IEntityTypeConfiguration<Ch
     {
         builder.ToTable("challenges");
         builder.HasKey(challenge => challenge.Id);
+        builder.HasQueryFilter(challenge => !challenge.Deletion.IsDeleted);
         builder.Property(challenge => challenge.Title).HasMaxLength(160);
         builder.Property(challenge => challenge.Direction).HasMaxLength(96);
         builder.OwnsOne(challenge => challenge.Deletion);

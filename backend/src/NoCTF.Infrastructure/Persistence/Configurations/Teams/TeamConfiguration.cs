@@ -10,6 +10,7 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
     {
         builder.ToTable("teams");
         builder.HasKey(team => team.Id);
+        builder.HasQueryFilter(team => !team.Deletion.IsDeleted);
         builder.Property(team => team.Name).HasMaxLength(128);
         builder.OwnsOne(team => team.Ban);
         builder.OwnsOne(team => team.Deletion);

@@ -12,6 +12,7 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.HasKey(competition => competition.Id);
         builder.Property(competition => competition.Title).HasMaxLength(160);
         builder.OwnsOne(competition => competition.Deletion);
+        builder.HasQueryFilter(competition => !competition.Deletion.IsDeleted);
         builder.HasIndex(competition => new { competition.Status, competition.StartTime });
     }
 }
