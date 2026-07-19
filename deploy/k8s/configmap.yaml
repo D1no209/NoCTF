@@ -42,8 +42,6 @@ data:
   Runner__OperationReceiptLimit: "512"
   Runner__MaxOperationSeconds: "1800"
   Runner__MaxRequestBodyBytes: "4194304"
-  Worker__Concurrency: "4"
-  Worker__LongRunningConcurrency: "1"
   Notifications__RedisStream__MaxPayloadBytes: "65536"
   Koh__MaxConcurrentPolls: "8"
   Awd__MaxConcurrentContainerRefreshes: "4"

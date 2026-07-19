@@ -6,6 +6,7 @@ using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.API.OpenApi;
 
@@ -25,6 +26,14 @@ internal sealed class SwaggerSubmissionStore : ISubmissionIntakeStore
         FixSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts,
         CancellationToken cancellationToken) =>
         Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
+}
+
+internal sealed class SwaggerSubmissionAdmissionModePolicy : ISubmissionAdmissionModePolicy
+{
+    public SubmissionAdmissionRules GetRules(
+        GameMode mode,
+        string competitionConfigurationJson,
+        string challengeConfigurationJson) => new(true, true, null, null);
 }
 
 internal sealed class SwaggerStatusReader : ISubmissionStatusReader

@@ -1,1 +1,0 @@
-# The API hosts bounded in-process Channels. Do not add an HPA until durable cross-instance dispatch exists.
