@@ -19,7 +19,8 @@ public sealed record PenetrationStage(
 
 public sealed record PenetrationChallengeConfiguration(
     int SchemaVersion,
-    IReadOnlyList<PenetrationStage> Stages)
+    IReadOnlyList<PenetrationStage> Stages,
+    int? MaxFlagAttempts = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

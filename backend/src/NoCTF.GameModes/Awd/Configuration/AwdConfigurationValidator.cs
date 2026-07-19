@@ -20,6 +20,8 @@ public static class AwdConfigurationValidator
             return ["FlagFormat is required."];
         if (configuration.FlagFormat.Length > 256)
             return ["FlagFormat cannot exceed 256 characters."];
+        if (configuration.MaxFlagAttempts is <= 0)
+            return ["MaxFlagAttempts must be positive when configured."];
         return [];
     }
 }

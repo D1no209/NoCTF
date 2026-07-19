@@ -9,6 +9,7 @@ public sealed record FixUploadCreated(FixUploadGrant Grant);
 public sealed class CreateFixUpload(
     ISubmissionIntakeStore admissionStore,
     IFixUploadSessionStore sessions,
+    ISubmissionAdmissionModePolicy modePolicy,
     Func<DateTimeOffset>? clock = null)
 {
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
@@ -42,7 +43,15 @@ public sealed class CreateFixUpload(
             cancellationToken);
         if (admission is null)
             return OperationResult<FixUploadCreated>.Failure("upload_scope_not_found", "The upload scope was not found.");
-        var decision = SubmissionAdmissionPolicy.Check(admission, now);
+        var rules = modePolicy.GetRules(
+            admission.Mode,
+            admission.CompetitionConfigurationJson,
+            admission.ChallengeConfigurationJson);
+        var decision = SubmissionAdmissionPolicy.Check(
+            admission,
+            NoCTF.Domain.Submissions.SubmissionKind.Fix,
+            rules,
+            now);
         if (!decision.Succeeded)
             return OperationResult<FixUploadCreated>.Failure(decision.ErrorCode!, decision.ErrorMessage!);
 

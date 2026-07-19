@@ -13,7 +13,7 @@ public sealed record AwdConfiguration(
     public const int CurrentSchemaVersion = 1;
 }
 
-public sealed record AwdChallengeConfiguration(int SchemaVersion, string FlagFormat)
+public sealed record AwdChallengeConfiguration(int SchemaVersion, string FlagFormat, int? MaxFlagAttempts = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

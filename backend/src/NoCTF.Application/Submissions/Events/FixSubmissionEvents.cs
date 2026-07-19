@@ -14,6 +14,11 @@ public sealed record FixSubmissionReceived(
     Guid ChallengeId,
     Guid UserId,
     Guid UploadId,
+    string IdempotencyKey,
     FixArchiveReference Archive,
     string IpAddress,
-    DateTimeOffset ReceivedAt);
+    DateTimeOffset ReceivedAt)
+{
+    public override string ToString() =>
+        $"{nameof(FixSubmissionReceived)} {{ SubmissionId = {SubmissionId}, UploadId = {UploadId}, Archive = [REDACTED] }}";
+}

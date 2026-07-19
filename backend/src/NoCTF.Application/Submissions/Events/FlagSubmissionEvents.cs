@@ -9,6 +9,7 @@ public sealed record FlagSubmissionReceived
     public required Guid ChallengeId { get; init; }
     public required Guid UserId { get; init; }
     public required string Flag { get; init; }
+    public required string IdempotencyKey { get; init; }
     public required string IpAddress { get; init; }
     public required DateTimeOffset ReceivedAt { get; init; }
     public string? ExpectedFlagAtReceipt { get; init; }

@@ -13,6 +13,7 @@ public sealed class SubmitFixRequest
     public Guid TeamId { get; set; }
     public Guid ChallengeId { get; set; }
     public Guid UploadId { get; set; }
+    public string IdempotencyKey { get; set; } = string.Empty;
 }
 
 public sealed class SubmitFixEndpoint(
@@ -38,7 +39,7 @@ public sealed class SubmitFixEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var result = await submitFix.ExecuteAsync(new(
-            request.CompetitionId, request.TeamId, request.ChallengeId, userContext.UserId, request.UploadId,
+            request.CompetitionId, request.TeamId, request.ChallengeId, userContext.UserId, request.UploadId, request.IdempotencyKey,
             httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown", DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
         {
