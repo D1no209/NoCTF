@@ -105,6 +105,7 @@ public static class ServiceRegistration
         services.AddScoped<ListCompetitionTeams>();
         services.AddScoped<ReviewTeamRegistration>();
         services.AddScoped<GetTeam>();
+        services.AddScoped<GetMyTeam>();
         services.AddScoped<UpdateTeam>();
         services.AddScoped<DeleteTeam>();
         services.AddScoped<ITeamMembershipStore, EfTeamMembershipStore>();

@@ -359,26 +359,26 @@
 
 ### 12.1 公开 API
 
-- [ ] `GET /competitions`。
-- [ ] `GET /competitions/{id}`。
+- [x] `GET /competitions`。
+- [x] `GET /competitions/{id}`。
 - [x] `GET /competitions/{id}/challenges`。
-- [ ] `GET /competitions/{id}/teams/me`。
-- [ ] `GET /competitions/{id}/leaderboard`。
-- [ ] `GET /competitions/{id}/submissions/{submissionId}`。
+- [x] `GET /competitions/{id}/teams/me`。
+- [x] `GET /competitions/{id}/leaderboard`。
+- [x] `GET /competitions/{id}/submissions/{submissionId}`。
 
 ### 12.2 管理 API
 
-- [ ] Competition CRUD。
-- [ ] lifecycle publish/pause/resume/finish。
+- [x] Competition CRUD。
+- [x] lifecycle publish/pause/resume/finish。
 - [x] Challenge CRUD/publish。
 - [x] Flag CRUD/window update。
 - [x] Competition/Challenge configuration update。
-- [ ] Team approval/member management。
-- [ ] Collaborator management。
+- [x] Team approval/member management。
+- [x] Collaborator management。
 - [x] Admin detailed submission status。
 - [x] Admin retry。
 - [x] Admin rebuild。
-- [ ] system event internal endpoint。
+- [x] system event internal endpoint。
 - [x] 全部 endpoint 使用 typed `ExecuteAsync`。
 - [x] 全部 endpoint 使用 `Results<T...>`/`TypedResults`。
 - [x] 全部 request/response 使用 DTO。
