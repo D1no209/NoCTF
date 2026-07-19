@@ -88,6 +88,31 @@ public class LeaderboardProjectorTests
     }
 
     [Test]
+    public async Task Project_FiltersDeletedChallengesAndMapsDirection()
+    {
+        var team = Guid.NewGuid();
+        var visibleChallenge = Guid.NewGuid();
+        var deletedChallenge = Guid.NewGuid();
+        var input = new LeaderboardProjectionInput(
+            Guid.NewGuid(),
+            GameMode.Ctf,
+            [new(team, "alpha", false, false)],
+            [
+                new(Guid.NewGuid(), team, visibleChallenge, SubmissionKind.Flag, DateTimeOffset.UtcNow,
+                    new ScoringEvent { Result = ScoringResult.Correct, OccurredAt = DateTimeOffset.UtcNow }),
+                new(Guid.NewGuid(), team, deletedChallenge, SubmissionKind.Flag, DateTimeOffset.UtcNow,
+                    new ScoringEvent { Result = ScoringResult.Correct, OccurredAt = DateTimeOffset.UtcNow })
+            ],
+            [],
+            [new(visibleChallenge, "web", false), new(deletedChallenge, "old", true)]);
+
+        var result = new CtfLeaderboardProjector().Project(input);
+
+        await Assert.That(result[0].Score).IsEqualTo(1L);
+        await Assert.That(result[0].Challenges[0].Direction).IsEqualTo("web");
+    }
+
+    [Test]
     public async Task AllModesHaveProjector()
     {
         var catalog = new LeaderboardProjectorCatalog();

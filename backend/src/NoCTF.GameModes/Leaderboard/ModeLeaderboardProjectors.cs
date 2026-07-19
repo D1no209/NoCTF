@@ -66,9 +66,15 @@ internal static class ModeLeaderboardProjection
         var validTeams = input.Teams
             .Where(team => !team.IsBanned && !team.IsDeleted)
             .ToDictionary(team => team.Id);
+        var challenges = (input.Challenges ?? [])
+            .Where(challenge => !challenge.IsDeleted)
+            .ToDictionary(challenge => challenge.Id);
         var submissions = input.Submissions
             .Where(fact => validTeams.ContainsKey(fact.TeamId)
                           && includeSubmission(fact)
+                          && (challenges.Count == 0
+                              || fact.ChallengeId is null
+                              || challenges.ContainsKey(fact.ChallengeId.Value))
                           && !fact.Event.IsDeleted
                           && fact.Event.Result == ScoringResult.Correct)
             .OrderBy(fact => fact.ReceivedAt)
@@ -92,7 +98,10 @@ internal static class ModeLeaderboardProjection
             var challengeSummaries = ownSubmissions
                 .Where(fact => fact.ChallengeId.HasValue)
                 .GroupBy(fact => fact.ChallengeId!.Value)
-                .Select(group => new LeaderboardChallengeSummary(group.Key, string.Empty, group.Count()))
+                .Select(group => new LeaderboardChallengeSummary(
+                    group.Key,
+                    challenges.TryGetValue(group.Key, out var challenge) ? challenge.Direction : string.Empty,
+                    group.Count()))
                 .OrderBy(summary => summary.ChallengeId)
                 .ToList();
             var score = ownSubmissions.Count + ownSystem.Count;
