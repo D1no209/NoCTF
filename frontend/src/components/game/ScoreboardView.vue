@@ -298,9 +298,10 @@ function stopPolling() {
 }
 
 const { connection, isConnected, start } = useSignalR({
-  hubUrl: `/hubs/leaderboard?competitionId=${props.competitionId}`,
+  hubUrl: '/hubs/competition',
   accessToken: () => auth.accessToken,
   onConnected: () => {
+    connection.value?.invoke('JoinCompetition', props.competitionId).catch(() => undefined)
     stopPolling()
   },
   onDisconnected: () => {
@@ -315,13 +316,10 @@ const { connection, isConnected, start } = useSignalR({
 watch(connection, (conn) => {
   if (!conn)
     return
-  conn.on('ReceiveLeaderboardSnapshot', (data: LeaderboardEntry[]) => {
-    applyLeaderboard(data ?? [])
-    competitionApi.leaderboardTrend<TrendResponse>(props.competitionId)
-      .then((nextTrend) => {
-        trend.value = nextTrend?.series ?? []
-      })
-      .catch(() => undefined)
+  conn.on('leaderboardRefreshed', (notification: { competitionId?: string }) => {
+    if (notification?.competitionId && notification.competitionId !== props.competitionId)
+      return
+    fetchLeaderboard()
   })
   conn.on('ReceiveScoreUpdate', () => {
     fetchLeaderboard()

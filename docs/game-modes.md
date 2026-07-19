@@ -174,7 +174,7 @@ If validation rejects a patched container, the platform destroys it and restores
 Total score is the sum of round deltas:
 
 ```
-totalScore = sum(roundScoreDelta)
+totalScore = sum(roundScore)
 ```
 
 AWDP does not use:

@@ -77,7 +77,7 @@ Before sending, the agent records `sending` in SQLite. A successful Milky respon
 
 ## Platform deployment
 
-Apply the EF Core migration and deploy both API and Worker with the QQBot plugin assembly present:
+Apply the EF Core migration and deploy both API and API-hosted Channel consumer with the QQBot plugin assembly present:
 
 ```bash
 dotnet ef database update --project backend/src/NoCTF.Infrastructure --startup-project backend/src/NoCTF.API

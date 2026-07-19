@@ -25,9 +25,9 @@
 
 ## Phase 3: Background Execution
 
-1. Introduce plugin background capability registration shared by API and Worker.
+1. Introduce plugin background capability registration shared by API and API-hosted Channel consumer.
 2. Stop starting competition engines in the API host.
-3. Load built-in plugin background capabilities in Worker without mode-specific dispatch logic.
+3. Load built-in plugin background capabilities in API-hosted Channel consumer without mode-specific dispatch logic.
 4. Add PostgreSQL advisory competition leases.
 5. Add task owner tokens and renewable leases.
 
