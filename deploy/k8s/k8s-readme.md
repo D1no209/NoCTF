@@ -85,7 +85,6 @@ kubectl apply -f migration-job.yaml
 kubectl wait --for=condition=complete job/noctf-db-migrate -n noctf --timeout=300s
 kubectl apply -f backend-deployment.yaml
 kubectl apply -f backend-service.yaml
-kubectl apply -f backend-hpa.yaml
 
 # 6. Networking
 kubectl apply -f ingress.yaml
@@ -103,7 +102,6 @@ kubectl apply -f deploy/k8s/
 ```bash
 kubectl get all -n noctf
 kubectl get ingress -n noctf
-kubectl get hpa -n noctf
 ```
 
 ## Kubernetes Runner

@@ -51,6 +51,7 @@ public static class ServiceRegistration
             services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();
             services.AddScoped<SubmitFlag>();
             services.AddScoped<SubmitFix>();
+            services.AddSingleton<ISubmissionAdmissionModePolicy, SwaggerSubmissionAdmissionModePolicy>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
             services.AddScoped<LogoutUser>();
