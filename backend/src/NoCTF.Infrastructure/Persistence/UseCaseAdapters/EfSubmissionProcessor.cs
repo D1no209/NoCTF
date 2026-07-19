@@ -10,6 +10,7 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 public sealed class EfSubmissionProcessor(
     NoCtfDbContext db,
     IBackgroundWorkScheduler scheduler,
+    ISubmissionEvaluator evaluator,
     ILogger<EfSubmissionProcessor> logger) : ISubmissionProcessor
 {
     public async Task ProcessAsync(Guid submissionId, CancellationToken ct)
@@ -26,8 +27,8 @@ public sealed class EfSubmissionProcessor(
         {
             Id = Guid.CreateVersion7(now), CompetitionId = submission.CompetitionId, TeamId = teamId,
             ChallengeId = challengeId, SubmissionId = submission.Id, Kind = ScoringEventKind.SubmissionEvaluation,
-            Result = result.Result, FailureCode = result.FailureCode, OccurredAt = submission.ReceivedAt,
-            ProcessedAt = now, ProcessedWorkerId = Environment.MachineName, EvaluatorVersion = "ef-v1", CreatedAt = now
+            Result = result.Result, FailureCode = result.FailureCode, OccurredAt = result.OccurredAt,
+            ProcessedAt = now, ProcessedWorkerId = Environment.MachineName, EvaluatorVersion = result.EvaluatorVersion, CreatedAt = now
         };
         db.ScoringEvents.Add(scoringEvent);
         submission.ScoringEventId = scoringEvent.Id;
@@ -39,28 +40,14 @@ public sealed class EfSubmissionProcessor(
         logger.LogInformation("Processed submission {SubmissionId} as {Result}", submissionId, result.Result);
     }
 
-    private async Task<(ScoringResult Result, ScoringFailureCode? FailureCode)> EvaluateAsync(Submission submission, CancellationToken ct)
+    private async Task<ScoringEventDecision> EvaluateAsync(Submission submission, CancellationToken ct)
     {
-        if (submission.Kind == SubmissionKind.Fix)
-        {
-            var fix = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id, ct);
-            return fix?.VerificationStatus switch
-            {
-                NoCTF.Domain.Submissions.FixVerificationStatus.Valid => (ScoringResult.Correct, null),
-                NoCTF.Domain.Submissions.FixVerificationStatus.PlatformFailed => (ScoringResult.PlatformFailed, ScoringFailureCode.CheckerPlatformError),
-                _ => (ScoringResult.Rejected, ScoringFailureCode.FixArchiveMissing)
-            };
-        }
-
-        var hasPriorCorrect = await db.ScoringEvents.AnyAsync(x => x.CompetitionId == submission.CompetitionId
-            && x.TeamId == submission.TeamId && x.ChallengeId == submission.ChallengeId
-            && x.SubmissionId != submission.Id && x.Result == ScoringResult.Correct, ct);
-        if (hasPriorCorrect) return (ScoringResult.Duplicate, null);
-        var valid = await db.ChallengeFlags.AnyAsync(x => x.CompetitionId == submission.CompetitionId
+        var prior = await db.ScoringEvents.Where(x => x.CompetitionId == submission.CompetitionId && x.SubmissionId != submission.Id).ToListAsync(ct);
+        var flags = await db.ChallengeFlags.Where(x => x.CompetitionId == submission.CompetitionId
             && x.ChallengeId == submission.ChallengeId && (x.TeamId == null || x.TeamId == submission.TeamId)
             && (x.ValidStart == null || x.ValidStart <= submission.ReceivedAt)
-            && (x.ValidEnd == null || x.ValidEnd >= submission.ReceivedAt)
-            && x.Flag == submission.Flag, ct);
-        return valid ? (ScoringResult.Correct, null) : (ScoringResult.Wrong, null);
+            && (x.ValidEnd == null || x.ValidEnd >= submission.ReceivedAt)).ToListAsync(ct);
+        var fix = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id, ct);
+        return evaluator.Evaluate(new(submission, prior, flags, fix, string.Empty, string.Empty));
     }
 }

@@ -12,6 +12,7 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Scoring.Rebuild;
 using NoCTF.GameModes.Scoring;
+using NoCTF.GameModes.Submission;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 using NoCTF.Infrastructure.Authentication;
@@ -61,6 +62,7 @@ public static class ServiceRegistration
         services.AddScoped<ISubmissionIntakeStore, EfSubmissionIntakeStore>();
         services.AddScoped<ISubmissionStatusReader, EfSubmissionStatusReader>();
         services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
+        services.AddSingleton<ISubmissionEvaluator, DefaultEfSubmissionEvaluator>();
         services.AddScoped<ISubmissionRetryStore, EfSubmissionRetryStore>();
         services.AddScoped<RetrySubmission>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
