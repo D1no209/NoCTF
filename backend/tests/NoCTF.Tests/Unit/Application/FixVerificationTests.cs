@@ -34,6 +34,22 @@ public class FixVerificationTests
     }
 
     [Test]
+    [Arguments(DomainFixVerificationStatus.Valid, true)]
+    [Arguments(DomainFixVerificationStatus.TeamFailure, true)]
+    [Arguments(DomainFixVerificationStatus.PlatformFailed, true)]
+    [Arguments(DomainFixVerificationStatus.Created, false)]
+    [Arguments(DomainFixVerificationStatus.Claimed, false)]
+    [Arguments(DomainFixVerificationStatus.Verifying, false)]
+    [Arguments(DomainFixVerificationStatus.Expired, false)]
+    [Arguments(DomainFixVerificationStatus.CleanupPending, false)]
+    public async Task StateMachine_RetryReset_AllowsOnlyCompletedVerification(
+        DomainFixVerificationStatus status,
+        bool expected)
+    {
+        await Assert.That(FixVerificationStateMachine.CanResetForRetry(status)).IsEqualTo(expected);
+    }
+
+    [Test]
     public async Task VerifyFixSubmission_ValidResult_CompletesWithVerifierVersion()
     {
         var store = new Store();

@@ -2,6 +2,11 @@ namespace NoCTF.Domain.Submissions;
 
 public static class FixVerificationStateMachine
 {
+    public static bool CanResetForRetry(FixVerificationStatus status) =>
+        status is FixVerificationStatus.Valid
+            or FixVerificationStatus.TeamFailure
+            or FixVerificationStatus.PlatformFailed;
+
     public static bool CanTransition(FixVerificationStatus from, FixVerificationStatus to) =>
         (from, to) switch
         {
