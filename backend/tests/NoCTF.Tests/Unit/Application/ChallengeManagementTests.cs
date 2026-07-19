@@ -1,4 +1,5 @@
 using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
@@ -15,7 +16,7 @@ public class ChallengeManagementTests
     {
         var store = new Store { Status = status };
 
-        var result = await new CreateChallenge(store).ExecuteAsync(CreateCommand());
+        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
 
         await Assert.That(result.ErrorCode).IsEqualTo("challenge_locked");
         await Assert.That(store.CreateCalls).IsEqualTo(0);
@@ -33,7 +34,7 @@ public class ChallengeManagementTests
     {
         var store = new Store();
 
-        var result = await new CreateChallenge(store).ExecuteAsync(
+        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
             CreateCommand() with { Title = title, Direction = direction, Order = order });
 
         await Assert.That(result.ErrorCode).IsEqualTo(expectedError);
@@ -48,7 +49,7 @@ public class ChallengeManagementTests
             CreateResult = new ChallengeMutationResult(null, "challenge_order_conflict")
         };
 
-        var result = await new CreateChallenge(store).ExecuteAsync(CreateCommand());
+        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
 
         await Assert.That(result.ErrorCode).IsEqualTo("challenge_order_conflict");
     }
@@ -167,12 +168,14 @@ public class ChallengeManagementTests
         public int MutationCalls { get; private set; }
         public bool? LastIncludeUnpublished { get; private set; }
 
-        public Task<CompetitionStatus?> GetCompetitionStatusAsync(
+        public Task<ChallengeCompetitionContext?> GetCompetitionAsync(
             Guid competitionId,
-            CancellationToken cancellationToken) => Task.FromResult(Status);
+            CancellationToken cancellationToken) => Task.FromResult(
+                Status is null ? null : new ChallengeCompetitionContext(GameMode.Ctf, Status.Value));
 
         public Task<ChallengeMutationResult> CreateAsync(
             CreateChallengeCommand command,
+            string configurationJson,
             CancellationToken cancellationToken)
         {
             CreateCalls++;
@@ -227,6 +230,13 @@ public class ChallengeManagementTests
             MutationCalls++;
             return Task.FromResult<string?>(null);
         }
+    }
+
+    private sealed class Catalog : IChallengeConfigurationCatalog
+    {
+        public string GetDefaultJson(GameMode mode) => """{"schemaVersion":1}""";
+
+        public IReadOnlyList<string> Validate(GameMode mode, string json) => [];
     }
 
     private sealed class Cache : ILeaderboardCache

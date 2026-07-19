@@ -13,4 +13,13 @@ public static class AwdConfigurationValidator
             errors.Add("Scoring values cannot be negative.");
         return errors;
     }
+
+    public static IReadOnlyList<string> Validate(AwdChallengeConfiguration configuration)
+    {
+        if (string.IsNullOrWhiteSpace(configuration.FlagFormat))
+            return ["FlagFormat is required."];
+        if (configuration.FlagFormat.Length > 256)
+            return ["FlagFormat cannot exceed 256 characters."];
+        return [];
+    }
 }
