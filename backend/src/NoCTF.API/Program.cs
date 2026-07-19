@@ -10,8 +10,6 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContext, HttpUserContext>();
 builder.Services.AddNoCtfApi(builder.Configuration, !exportSwagger);
 builder.Services.AddNoCtfAuthentication(builder.Configuration);
-if (!exportSwagger)
-    builder.AddNoCtfMessaging(builder.Configuration);
 
 var app = builder.Build();
 if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))

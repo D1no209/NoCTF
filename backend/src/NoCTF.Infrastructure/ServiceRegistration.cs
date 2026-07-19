@@ -12,42 +12,26 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Scoring.Rebuild;
 using NoCTF.GameModes.Scoring;
-using NoCTF.Infrastructure.Eventing;
-using NoCTF.Infrastructure.Eventing.Projections;
-using NoCTF.Infrastructure.Eventing.ScoringStreams;
-using NoCTF.Infrastructure.Eventing.SubmissionStreams;
-using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Notifications;
 using StackExchange.Redis;
-using Wolverine;
 using Amazon.S3;
 using NoCTF.Application.Storage;
 using NoCTF.Infrastructure.Storage;
+using NoCTF.Infrastructure.BackgroundWork;
+using NoCTF.Application.BackgroundWork;
 
 namespace NoCTF.Infrastructure;
 
 public static class ServiceRegistration
 {
-    public static IHostApplicationBuilder AddNoCtfMessaging(
-        this IHostApplicationBuilder builder,
-        IConfiguration configuration)
-    {
-        var postgres = configuration.GetConnectionString("PostgreSql")
-            ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-        builder.UseWolverine(options => options.ConfigureNoCtf(postgres));
-        return builder;
-    }
-
     public static async Task MigrateNoCtfAsync(this IServiceProvider services, CancellationToken cancellationToken = default)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<Persistence.NoCtfDbContext>();
         await db.Database.MigrateAsync(cancellationToken);
-        var store = scope.ServiceProvider.GetRequiredService<Marten.IDocumentStore>();
-        await store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
     }
 
     public static IServiceCollection AddNoCtfInfrastructure(
@@ -57,27 +41,26 @@ public static class ServiceRegistration
         var postgres = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
         services.AddDbContext<NoCtfDbContext>(options => options.UseNpgsql(postgres));
-        services.AddNoCtfMarten(configuration);
+        services.Configure<BackgroundQueueOptions>(configuration.GetSection(BackgroundQueueOptions.SectionName));
+        var queueOptions = configuration.GetSection(BackgroundQueueOptions.SectionName).Get<BackgroundQueueOptions>()
+            ?? new BackgroundQueueOptions();
+        services.AddSingleton(queueOptions);
+        services.AddSingleton<ChannelBackgroundWorkScheduler>();
+        services.AddSingleton<IBackgroundWorkScheduler>(serviceProvider =>
+            serviceProvider.GetRequiredService<ChannelBackgroundWorkScheduler>());
+        services.AddHostedService<SubmissionProcessingHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redis))
             services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redis));
 
-        services.AddScoped<ISubmissionIntakeStore, MartenSubmissionIntakeStore>();
-        services.AddScoped<ISubmissionStatusReader, MartenSubmissionStatusReader>();
-        services.AddScoped<ICompetitionInputAppender, MartenCompetitionInputAppender>();
-        services.AddScoped<ISubmissionProcessor, MartenSubmissionProcessor>();
+        services.AddScoped<ISubmissionIntakeStore, EfSubmissionIntakeStore>();
+        services.AddScoped<ISubmissionStatusReader, EfSubmissionStatusReader>();
+        services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
+        services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
-        services.AddScoped<IScoringRebuildStore, MartenScoringRebuildStore>();
-        services.AddScoped<IScoringRebuildQueue, WolverineScoringRebuildQueue>();
-        services.AddScoped<ILeaderboardStore, MartenLeaderboardStore>();
         services.AddScoped<ITeamModerationStore, EfTeamModerationStore>();
         services.AddScoped<ICompetitionModerationAuthorizer, EfCompetitionModerationAuthorizer>();
-        services.AddScoped<IFixUploadSessionStore, MartenFixUploadSessionStore>();
-        services.AddScoped<IChallengeInstanceFlagReader, ConfiguredChallengeInstanceFlagReader>();
-        services.AddScoped<SubmissionEvaluationContextLoader>();
-        services.AddScoped<FixArchiveValidator>();
-        services.AddScoped<IFixSubmissionVerifier, ArchiveOnlyFixSubmissionVerifier>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config
@@ -92,7 +75,6 @@ public static class ServiceRegistration
             services.AddSingleton<IObjectStorage, LocalObjectStorage>();
         }
         services.AddScoped<ICompetitionLifecycleStore, EfCompetitionLifecycleStore>();
-        services.AddScoped<RebuildScoring>();
         services.AddScoped<AdvanceCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
         services.AddSingleton<IAccessTokenIssuer, JwtIssuer>();

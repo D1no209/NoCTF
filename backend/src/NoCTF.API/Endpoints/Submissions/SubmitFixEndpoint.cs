@@ -38,19 +38,14 @@ public sealed class SubmitFixEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var result = await submitFix.ExecuteAsync(new(
-            request.CompetitionId,
-            request.TeamId,
-            request.ChallengeId,
-            userContext.UserId,
-            request.UploadId,
-            httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            DateTimeOffset.UtcNow), cancellationToken);
+            request.CompetitionId, request.TeamId, request.ChallengeId, userContext.UserId, request.UploadId,
+            httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown", DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
         {
             return SubmissionProblemDetails.Create(SubmissionProblemDetails.StatusFor(result.ErrorCode), result.ErrorCode, result.ErrorMessage);
         }
         return TypedResults.Accepted<AcceptedSubmissionResponse>(
             uri: (string?)null,
-            value: new AcceptedSubmissionResponse(result.Value!.SubmissionId, result.Value.ReceivedAt));
+            value: SubmissionMapper.ToResponse(result.Value!));
     }
 }

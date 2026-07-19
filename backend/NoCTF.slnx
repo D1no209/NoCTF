@@ -8,7 +8,6 @@
     <Project Path="src/NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
     <Project Path="src/NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
     <Project Path="src/NoCTF.API/NoCTF.API.csproj" />
-    <Project Path="src/NoCTF.Worker/NoCTF.Worker.csproj" />
     <Project Path="src/NoCTF.Runner/NoCTF.Runner.csproj" />
   </Folder>
   <Folder Name="/tests/">

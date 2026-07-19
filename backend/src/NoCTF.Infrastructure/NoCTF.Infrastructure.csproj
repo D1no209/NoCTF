@@ -3,6 +3,10 @@
     <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Eventing\**\*.cs" />
+    <Compile Remove="Messaging\Wolverine*.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
     <ProjectReference Include="../NoCTF.GameModes/NoCTF.GameModes.csproj" />
@@ -11,14 +15,9 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="AWSSDK.S3" />
-    <PackageReference Include="Marten" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="StackExchange.Redis" />
-    <PackageReference Include="WolverineFx" />
-    <PackageReference Include="WolverineFx.Marten" />
-    <PackageReference Include="WolverineFx.Postgresql" />
-    <PackageReference Include="WolverineFx.RuntimeCompilation" />
   </ItemGroup>
 </Project>
