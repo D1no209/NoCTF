@@ -10,6 +10,7 @@ using NoCTF.Application.Authentication.Ports;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Teams.Registration;
+using NoCTF.Application.Teams.Membership;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.GameModes.Submission;
@@ -85,6 +86,9 @@ public static class ServiceRegistration
         services.AddScoped<GetTeam>();
         services.AddScoped<UpdateTeam>();
         services.AddScoped<DeleteTeam>();
+        services.AddScoped<ITeamMembershipStore, EfTeamMembershipStore>();
+        services.AddScoped<InviteTeamMember>();
+        services.AddScoped<RespondToTeamInvitation>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config
