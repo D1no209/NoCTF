@@ -17,6 +17,7 @@ using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Maintenance;
 using NoCTF.GameModes.Submission;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Registration;
@@ -63,6 +64,7 @@ public static class ServiceRegistration
         services.AddHostedService<SubmissionProcessingHostedService>();
         services.AddHostedService<LeaderboardRefreshHostedService>();
         services.AddHostedService<CompetitionLifecycleHostedService>();
+        services.AddHostedService<CompetitionRebuildHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redis))
@@ -112,6 +114,7 @@ public static class ServiceRegistration
         services.AddScoped<GetChallengeConfiguration>();
         services.AddScoped<UpdateChallengeConfiguration>();
         services.AddScoped<IChallengeFlagStore, EfChallengeFlagStore>();
+        services.AddScoped<ICompetitionRebuildProcessor, EfCompetitionRebuildProcessor>();
         services.AddScoped<ListChallengeFlags>();
         services.AddScoped<GetChallengeFlag>();
         services.AddScoped<CreateChallengeFlag>();
