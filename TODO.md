@@ -208,9 +208,9 @@
 - [x] `Created -> Claimed -> Verifying -> Valid/TeamFailure/PlatformFailed` 状态机。
 - [x] Upload expiry 检查。
 - [x] Upload claim transaction。
-- [ ] archive path 安全校验。
-- [ ] archive metadata 读取和 hash 校验。
-- [ ] verifier timeout。
+- [x] archive path 安全校验。
+- [x] archive metadata 读取和 hash 校验。
+- [x] verifier timeout。
 - [x] verifier failure category 映射。
 - [ ] runner failure 不写入 Flag 或 archive 内容日志。
 - [ ] Fix retry 的旧 event soft-delete 和 record 状态重置规则。
