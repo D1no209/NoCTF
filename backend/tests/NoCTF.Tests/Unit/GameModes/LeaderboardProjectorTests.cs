@@ -43,6 +43,51 @@ public class LeaderboardProjectorTests
     }
 
     [Test]
+    public async Task CtfProjector_IgnoresSystemFacts()
+    {
+        var team = Guid.NewGuid();
+        var system = new ScoringEvent
+        {
+            Id = Guid.NewGuid(),
+            TeamId = team,
+            Result = ScoringResult.Correct,
+            OccurredAt = DateTimeOffset.UtcNow
+        };
+
+        var result = new CtfLeaderboardProjector().Project(new(
+            Guid.NewGuid(),
+            GameMode.Ctf,
+            [new(team, "alpha", false, false)],
+            [],
+            [new(system)]));
+
+        await Assert.That(result[0].Score).IsEqualTo(0L);
+    }
+
+    [Test]
+    public async Task KohProjector_UsesSystemFactsWithoutManualSubmissions()
+    {
+        var team = Guid.NewGuid();
+        var system = new ScoringEvent
+        {
+            Id = Guid.NewGuid(),
+            TeamId = team,
+            Result = ScoringResult.Correct,
+            OccurredAt = DateTimeOffset.UtcNow
+        };
+
+        var result = new KohLeaderboardProjector().Project(new(
+            Guid.NewGuid(),
+            GameMode.Koh,
+            [new(team, "alpha", false, false)],
+            [Fact(team, 1, ScoringResult.Correct)],
+            [new(system)]));
+
+        await Assert.That(result[0].Score).IsEqualTo(1L);
+        await Assert.That(result[0].SolveCount).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task AllModesHaveProjector()
     {
         var catalog = new LeaderboardProjectorCatalog();

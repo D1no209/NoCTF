@@ -4,37 +4,118 @@ using NoCTF.Domain.Submissions;
 
 namespace NoCTF.GameModes.Leaderboard;
 
-/// <summary>Shared deterministic fact projector. Game modes can specialize this strategy without persistence changes.</summary>
-public abstract class FactLeaderboardProjector(GameMode mode) : IGameModeLeaderboardProjector
+public sealed class CtfLeaderboardProjector : IGameModeLeaderboardProjector
 {
-    public GameMode Mode => mode;
+    public GameMode Mode => GameMode.Ctf;
 
-    public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
-    {
-        var validTeams = input.Teams.Where(x => !x.IsBanned && !x.IsDeleted).ToDictionary(x => x.Id);
-        var facts = input.Submissions
-            .Where(x => validTeams.ContainsKey(x.TeamId) && !x.Event.IsDeleted && x.Event.Result == ScoringResult.Correct)
-            .OrderBy(x => x.ReceivedAt).ThenBy(x => x.SubmissionId)
-            .ToList();
-        var system = input.SystemEvents
-            .Where(x => !x.Event.IsDeleted && x.Event.Result == ScoringResult.Correct)
-            .OrderBy(x => x.Event.OccurredAt).ThenBy(x => x.Event.Id)
-            .ToList();
-        var rows = validTeams.Values.Select(team =>
-        {
-            var own = facts.Where(x => x.TeamId == team.Id).ToList();
-            var ownSystem = system.Where(x => x.Event.TeamId == team.Id).ToList();
-            var challenges = own.Where(x => x.ChallengeId.HasValue).GroupBy(x => x.ChallengeId!.Value)
-                .Select(g => new LeaderboardChallengeSummary(g.Key, string.Empty, g.Count())).ToList();
-            var last = own.Select(x => x.Event.OccurredAt).Concat(ownSystem.Select(x => x.Event.OccurredAt)).OrderByDescending(x => x).FirstOrDefault();
-            return new LeaderboardEntry(0, team.Id, team.Name, own.Count + ownSystem.Count, own.Count, last == default ? null : last, challenges);
-        }).OrderByDescending(x => x.Score).ThenByDescending(x => x.SolveCount).ThenBy(x => x.LastScoreAt ?? DateTimeOffset.MaxValue).ThenBy(x => x.TeamName, StringComparer.Ordinal).ToList();
-        return rows.Select((x, i) => x with { Rank = i + 1 }).ToList();
-    }
+    public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
+        ModeLeaderboardProjection.Project(
+            input,
+            submission => submission.Kind == SubmissionKind.Flag,
+            includeSystemFacts: false);
 }
 
-public sealed class CtfLeaderboardProjector() : FactLeaderboardProjector(GameMode.Ctf);
-public sealed class AwdLeaderboardProjector() : FactLeaderboardProjector(GameMode.Awd);
-public sealed class AwdpLeaderboardProjector() : FactLeaderboardProjector(GameMode.Awdp);
-public sealed class KohLeaderboardProjector() : FactLeaderboardProjector(GameMode.Koh);
-public sealed class PenetrationLeaderboardProjector() : FactLeaderboardProjector(GameMode.Penetration);
+public sealed class AwdLeaderboardProjector : IGameModeLeaderboardProjector
+{
+    public GameMode Mode => GameMode.Awd;
+
+    public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
+        ModeLeaderboardProjection.Project(
+            input,
+            submission => submission.Kind == SubmissionKind.Flag,
+            includeSystemFacts: true);
+}
+
+public sealed class AwdpLeaderboardProjector : IGameModeLeaderboardProjector
+{
+    public GameMode Mode => GameMode.Awdp;
+
+    public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
+        ModeLeaderboardProjection.Project(
+            input,
+            submission => submission.Kind is SubmissionKind.Flag or SubmissionKind.Fix,
+            includeSystemFacts: true);
+}
+
+public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
+{
+    public GameMode Mode => GameMode.Koh;
+
+    public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
+        ModeLeaderboardProjection.Project(input, _ => false, includeSystemFacts: true);
+}
+
+public sealed class PenetrationLeaderboardProjector : IGameModeLeaderboardProjector
+{
+    public GameMode Mode => GameMode.Penetration;
+
+    public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
+        ModeLeaderboardProjection.Project(
+            input,
+            submission => submission.Kind == SubmissionKind.Flag,
+            includeSystemFacts: true);
+}
+
+internal static class ModeLeaderboardProjection
+{
+    public static IReadOnlyList<LeaderboardEntry> Project(
+        LeaderboardProjectionInput input,
+        Func<LeaderboardSubmissionFact, bool> includeSubmission,
+        bool includeSystemFacts)
+    {
+        var validTeams = input.Teams
+            .Where(team => !team.IsBanned && !team.IsDeleted)
+            .ToDictionary(team => team.Id);
+        var submissions = input.Submissions
+            .Where(fact => validTeams.ContainsKey(fact.TeamId)
+                          && includeSubmission(fact)
+                          && !fact.Event.IsDeleted
+                          && fact.Event.Result == ScoringResult.Correct)
+            .OrderBy(fact => fact.ReceivedAt)
+            .ThenBy(fact => fact.SubmissionId)
+            .ToList();
+        var system = includeSystemFacts
+            ? input.SystemEvents
+                .Where(fact => !fact.Event.IsDeleted
+                               && fact.Event.Result == ScoringResult.Correct
+                               && fact.Event.TeamId is not null
+                               && validTeams.ContainsKey(fact.Event.TeamId.Value))
+                .OrderBy(fact => fact.Event.OccurredAt)
+                .ThenBy(fact => fact.Event.Id)
+                .ToList()
+            : [];
+
+        var rows = validTeams.Values.Select(team =>
+        {
+            var ownSubmissions = submissions.Where(fact => fact.TeamId == team.Id).ToList();
+            var ownSystem = system.Where(fact => fact.Event.TeamId == team.Id).ToList();
+            var challengeSummaries = ownSubmissions
+                .Where(fact => fact.ChallengeId.HasValue)
+                .GroupBy(fact => fact.ChallengeId!.Value)
+                .Select(group => new LeaderboardChallengeSummary(group.Key, string.Empty, group.Count()))
+                .OrderBy(summary => summary.ChallengeId)
+                .ToList();
+            var score = ownSubmissions.Count + ownSystem.Count;
+            var last = ownSubmissions.Select(fact => fact.Event.OccurredAt)
+                .Concat(ownSystem.Select(fact => fact.Event.OccurredAt))
+                .OrderByDescending(value => value)
+                .FirstOrDefault();
+            return new LeaderboardEntry(
+                0,
+                team.Id,
+                team.Name,
+                score,
+                ownSubmissions.Count,
+                last == default ? null : last,
+                challengeSummaries);
+        });
+
+        return rows
+            .OrderByDescending(row => row.Score)
+            .ThenByDescending(row => row.SolveCount)
+            .ThenBy(row => row.LastScoreAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
+            .Select((row, index) => row with { Rank = index + 1 })
+            .ToList();
+    }
+}
