@@ -32,4 +32,20 @@ public class SubmissionMapperTests
         await Assert.That(response.Kind).IsEqualTo(view.Kind);
         await Assert.That(response.FailureCode).IsEqualTo(view.FailureCode);
     }
+
+    [Test]
+    public async Task AdminStatusMapping_PreservesProcessingMetadataWithoutPrivateInput()
+    {
+        var view = new AdminSubmissionStatusView(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), SubmissionKind.Flag,
+            ScoringResult.Wrong, ScoringFailureCode.FlagNotSupported, DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow, "worker-1", "evaluator-v1", false, 3);
+
+        var response = SubmissionMapper.ToAdminStatusResponse(view);
+
+        await Assert.That(response.SubmissionId).IsEqualTo(view.SubmissionId);
+        await Assert.That(response.Result).IsEqualTo(ScoringResult.Wrong);
+        await Assert.That(response.ProcessedWorkerId).IsEqualTo("worker-1");
+        await Assert.That(response.ProcessingVersion).IsEqualTo(3);
+    }
 }

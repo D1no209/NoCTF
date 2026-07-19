@@ -77,6 +77,7 @@ public static class ServiceRegistration
 
         services.AddScoped<ISubmissionIntakeStore, EfSubmissionIntakeStore>();
         services.AddScoped<ISubmissionStatusReader, EfSubmissionStatusReader>();
+        services.AddScoped<IAdminSubmissionStatusReader, EfAdminSubmissionStatusReader>();
         services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
         services.AddScoped<IFixVerificationStore, EfFixVerificationStore>();
         services.AddScoped<UnavailableFixSubmissionVerifier>();

@@ -375,14 +375,14 @@
 - [x] Competition/Challenge configuration update。
 - [ ] Team approval/member management。
 - [ ] Collaborator management。
-- [ ] Admin detailed submission status。
-- [ ] Admin retry。
-- [ ] Admin rebuild。
+- [x] Admin detailed submission status。
+- [x] Admin retry。
+- [x] Admin rebuild。
 - [ ] system event internal endpoint。
-- [ ] 全部 endpoint 使用 typed `ExecuteAsync`。
-- [ ] 全部 endpoint 使用 `Results<T...>`/`TypedResults`。
-- [ ] 全部 request/response 使用 DTO。
-- [ ] 全部 structural mapping 使用 Mapperly。
+- [x] 全部 endpoint 使用 typed `ExecuteAsync`。
+- [x] 全部 endpoint 使用 `Results<T...>`/`TypedResults`。
+- [x] 全部 request/response 使用 DTO。
+- [x] 全部 structural mapping 使用 Mapperly。
 - [ ] endpoint 不直接访问 EF、Redis 或 Channel。
 
 ## 13. JWT、Cookie、SignalR 和权限
