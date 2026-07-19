@@ -7,17 +7,29 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 public sealed class EfChallengeManagementStore(NoCtfDbContext db) : IChallengeManagementStore
 {
-    public Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken ct) => db.Competitions.AsNoTracking()
-        .Where(x => x.Id == competitionId && !x.Deletion.IsDeleted).Select(x => (CompetitionStatus?)x.Status).SingleOrDefaultAsync(ct);
+    public Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken ct) =>
+        db.Competitions.AsNoTracking()
+            .Where(x => x.Id == competitionId && !x.Deletion.IsDeleted)
+            .Select(x => new ChallengeCompetitionContext(x.Mode, x.Status))
+            .SingleOrDefaultAsync(ct);
 
-    public async Task<ChallengeMutationResult> CreateAsync(CreateChallengeCommand command, CancellationToken ct)
+    public async Task<ChallengeMutationResult> CreateAsync(
+        CreateChallengeCommand command,
+        string configurationJson,
+        CancellationToken ct)
     {
         var id = Guid.CreateVersion7(command.CreatedAt);
         var entity = new Challenge { Id = id, CompetitionId = command.CompetitionId, Title = command.Title,
             Description = command.Description?.Trim(), Direction = command.Direction, Order = command.Order,
             CreatedAt = command.CreatedAt, UpdatedAt = command.CreatedAt };
         db.Challenges.Add(entity);
-        db.ChallengeConfigurations.Add(new ChallengeConfiguration { ChallengeId = id, Revision = 0, UpdatedAt = command.CreatedAt });
+        db.ChallengeConfigurations.Add(new ChallengeConfiguration
+        {
+            ChallengeId = id,
+            Json = configurationJson,
+            Revision = 0,
+            UpdatedAt = command.CreatedAt
+        });
         try { await db.SaveChangesAsync(ct); return new(Map(entity), null); }
         catch (DbUpdateException) { return new(null, "challenge_order_conflict"); }
     }

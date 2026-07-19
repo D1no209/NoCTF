@@ -163,13 +163,13 @@
 
 ### 4.2 ChallengeConfiguration
 
-- [ ] `GET /admin/competitions/{competitionId}/challenges/{challengeId}/configuration`。
-- [ ] `PUT /admin/competitions/{competitionId}/challenges/{challengeId}/configuration`。
-- [ ] 按 Competition.Mode 选择 configuration parser。
-- [ ] schemaVersion 校验。
-- [ ] revision concurrency。
-- [ ] 配置修改后 enqueue rebuild。
-- [ ] 配置修改后只刷新受影响 Competition 的 leaderboard。
+- [x] `GET /admin/competitions/{competitionId}/challenges/{challengeId}/configuration`。
+- [x] `PUT /admin/competitions/{competitionId}/challenges/{challengeId}/configuration`。
+- [x] 按 Competition.Mode 选择 configuration parser。
+- [x] schemaVersion 校验。
+- [x] revision concurrency。
+- [x] 配置修改后 enqueue rebuild。
+- [x] 配置修改后只刷新受影响 Competition 的 leaderboard。
 
 ### 4.3 ChallengeFlag
 
@@ -372,7 +372,7 @@
 - [ ] lifecycle publish/pause/resume/finish。
 - [x] Challenge CRUD/publish。
 - [ ] Flag CRUD/window update。
-- [ ] Competition/Challenge configuration update。
+- [x] Competition/Challenge configuration update。
 - [ ] Team approval/member management。
 - [ ] Collaborator management。
 - [ ] Admin detailed submission status。

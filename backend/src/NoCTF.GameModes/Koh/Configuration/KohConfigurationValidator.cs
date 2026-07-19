@@ -9,4 +9,12 @@ public static class KohConfigurationValidator
         if (configuration.ControlPointsPerInterval < 0) errors.Add("ControlPointsPerInterval cannot be negative.");
         return errors;
     }
+
+    public static IReadOnlyList<string> Validate(KohChallengeConfiguration configuration)
+    {
+        if (!Uri.TryCreate(configuration.AgentUrl, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https"))
+            return ["AgentUrl must be an absolute HTTP or HTTPS URL."];
+        return [];
+    }
 }

@@ -1,4 +1,5 @@
 using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Common;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
@@ -9,11 +10,15 @@ public sealed record CreateChallengeCommand(Guid CompetitionId, string Title, st
 public sealed record UpdateChallengeCommand(Guid CompetitionId, Guid ChallengeId, string Title, string? Description, string Direction, int Order, DateTimeOffset UpdatedAt);
 public sealed record ChallengeView(Guid Id, Guid CompetitionId, string Title, string? Description, string Direction, int Order, bool IsPublished, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 public sealed record ChallengeMutationResult(ChallengeView? Challenge, string? ErrorCode);
+public sealed record ChallengeCompetitionContext(GameMode Mode, CompetitionStatus Status);
 
 public interface IChallengeManagementStore
 {
-    Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken);
-    Task<ChallengeMutationResult> CreateAsync(CreateChallengeCommand command, CancellationToken cancellationToken);
+    Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken cancellationToken);
+    Task<ChallengeMutationResult> CreateAsync(
+        CreateChallengeCommand command,
+        string configurationJson,
+        CancellationToken cancellationToken);
     Task<ChallengeView?> FindAsync(Guid competitionId, Guid challengeId, bool includeUnpublished, CancellationToken cancellationToken);
     Task<IReadOnlyList<ChallengeView>> ListAsync(Guid competitionId, bool includeUnpublished, CancellationToken cancellationToken);
     Task<ChallengeMutationResult> UpdateAsync(UpdateChallengeCommand command, CancellationToken cancellationToken);
@@ -21,17 +26,21 @@ public interface IChallengeManagementStore
     Task<string?> SoftDeleteAsync(Guid competitionId, Guid challengeId, Guid actorId, DateTimeOffset now, CancellationToken cancellationToken);
 }
 
-public sealed class CreateChallenge(IChallengeManagementStore store)
+public sealed class CreateChallenge(IChallengeManagementStore store, IChallengeConfigurationCatalog configurationCatalog)
 {
     public async Task<OperationResult<ChallengeView>> ExecuteAsync(CreateChallengeCommand command, CancellationToken ct = default)
     {
         var error = Validate(command.Title, command.Direction, command.Order);
         if (error is not null) return OperationResult<ChallengeView>.Failure(error.Value.Code, error.Value.Message);
-        var status = await store.GetCompetitionStatusAsync(command.CompetitionId, ct);
-        if (status is null) return OperationResult<ChallengeView>.Failure("competition_not_found", "Competition was not found.");
-        if (ChallengeMutationPolicy.IsLocked(status.Value))
+        var competition = await store.GetCompetitionAsync(command.CompetitionId, ct);
+        if (competition is null) return OperationResult<ChallengeView>.Failure("competition_not_found", "Competition was not found.");
+        if (ChallengeMutationPolicy.IsLocked(competition.Status))
             return OperationResult<ChallengeView>.Failure("challenge_locked", "Challenge definitions are locked for this competition.");
-        var result = await store.CreateAsync(command with { Title = command.Title.Trim(), Direction = command.Direction.Trim() }, ct);
+        var configurationJson = configurationCatalog.GetDefaultJson(competition.Mode);
+        var result = await store.CreateAsync(
+            command with { Title = command.Title.Trim(), Direction = command.Direction.Trim() },
+            configurationJson,
+            ct);
         return result.Challenge is not null ? OperationResult<ChallengeView>.Success(result.Challenge)
             : OperationResult<ChallengeView>.Failure(result.ErrorCode ?? "challenge_conflict", "Challenge was not created.");
     }
@@ -61,10 +70,10 @@ public sealed class UpdateChallenge(IChallengeManagementStore store, ILeaderboar
         var error = CreateChallenge.Validate(command.Title, command.Direction, command.Order);
         if (error is not null) return OperationResult<ChallengeView>.Failure(error.Value.Code, error.Value.Message);
 
-        var status = await store.GetCompetitionStatusAsync(command.CompetitionId, ct);
-        if (status is null)
+        var competition = await store.GetCompetitionAsync(command.CompetitionId, ct);
+        if (competition is null)
             return OperationResult<ChallengeView>.Failure("competition_not_found", "Competition was not found.");
-        if (ChallengeMutationPolicy.IsLocked(status.Value))
+        if (ChallengeMutationPolicy.IsLocked(competition.Status))
             return OperationResult<ChallengeView>.Failure("challenge_locked", "Challenge definitions are locked for this competition.");
 
         var result = await store.UpdateAsync(command with { Title = command.Title.Trim(), Direction = command.Direction.Trim() }, ct);
@@ -79,10 +88,10 @@ public sealed class SetChallengePublished(IChallengeManagementStore store, ILead
 {
     public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid challengeId, bool published, DateTimeOffset now, CancellationToken ct = default)
     {
-        var status = await store.GetCompetitionStatusAsync(competitionId, ct);
-        if (status is null)
+        var competition = await store.GetCompetitionAsync(competitionId, ct);
+        if (competition is null)
             return OperationResult.Failure("competition_not_found", "Competition was not found.");
-        if (ChallengeMutationPolicy.IsLocked(status.Value))
+        if (ChallengeMutationPolicy.IsLocked(competition.Status))
             return OperationResult.Failure("challenge_locked", "Challenge definitions are locked for this competition.");
 
         var error = await store.SetPublishedAsync(competitionId, challengeId, published, now, ct);
@@ -97,10 +106,10 @@ public sealed class DeleteChallenge(IChallengeManagementStore store, ILeaderboar
 {
     public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid challengeId, Guid actorId, DateTimeOffset now, CancellationToken ct = default)
     {
-        var status = await store.GetCompetitionStatusAsync(competitionId, ct);
-        if (status is null)
+        var competition = await store.GetCompetitionAsync(competitionId, ct);
+        if (competition is null)
             return OperationResult.Failure("competition_not_found", "Competition was not found.");
-        if (ChallengeMutationPolicy.IsLocked(status.Value))
+        if (ChallengeMutationPolicy.IsLocked(competition.Status))
             return OperationResult.Failure("challenge_locked", "Challenge definitions are locked for this competition.");
 
         var error = await store.SoftDeleteAsync(competitionId, challengeId, actorId, now, ct);

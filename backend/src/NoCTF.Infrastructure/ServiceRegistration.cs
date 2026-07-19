@@ -12,6 +12,7 @@ using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Application.Teams.Membership;
 using NoCTF.Application.Challenges.Management;
+using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.GameModes.Submission;
@@ -69,6 +70,7 @@ public static class ServiceRegistration
         services.AddScoped<ISubmissionStatusReader, EfSubmissionStatusReader>();
         services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
         services.AddSingleton<ISubmissionEvaluator, DefaultEfSubmissionEvaluator>();
+        services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddScoped<ISubmissionRetryStore, EfSubmissionRetryStore>();
         services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();
@@ -94,8 +96,15 @@ public static class ServiceRegistration
         services.AddScoped<LeaveTeam>();
         services.AddScoped<TransferTeamCaptain>();
         services.AddScoped<IChallengeManagementStore, EfChallengeManagementStore>();
-        services.AddScoped<CreateChallenge>(); services.AddScoped<GetChallenge>(); services.AddScoped<ListChallenges>();
-        services.AddScoped<UpdateChallenge>(); services.AddScoped<SetChallengePublished>(); services.AddScoped<DeleteChallenge>();
+        services.AddScoped<CreateChallenge>();
+        services.AddScoped<GetChallenge>();
+        services.AddScoped<ListChallenges>();
+        services.AddScoped<UpdateChallenge>();
+        services.AddScoped<SetChallengePublished>();
+        services.AddScoped<DeleteChallenge>();
+        services.AddScoped<IChallengeConfigurationStore, EfChallengeConfigurationStore>();
+        services.AddScoped<GetChallengeConfiguration>();
+        services.AddScoped<UpdateChallengeConfiguration>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config

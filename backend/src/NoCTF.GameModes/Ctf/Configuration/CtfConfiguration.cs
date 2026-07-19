@@ -20,7 +20,6 @@ public sealed record CtfConfiguration(
 
 public sealed record CtfChallengeConfiguration(
     int SchemaVersion,
-    string Flag,
     CtfPointConfiguration? Points,
     IReadOnlyList<BloodReward>? BloodRewards)
 {

@@ -17,6 +17,25 @@ public static class CtfConfigurationValidator
         return errors;
     }
 
+    public static IReadOnlyList<string> Validate(CtfChallengeConfiguration configuration)
+    {
+        var errors = configuration.Points is null
+            ? []
+            : ValidatePoints(configuration.Points).ToList();
+        if (configuration.BloodRewards is null)
+            return errors;
+        if (configuration.BloodRewards.Count > 3)
+            errors.Add("At most three blood rewards are supported.");
+        foreach (var reward in configuration.BloodRewards)
+        {
+            if (reward.Value < 0)
+                errors.Add("Blood reward values cannot be negative.");
+            if (reward.Policy != BloodRewardPolicy.FixedPoints && reward.Value > 100)
+                errors.Add("Blood reward percentages cannot exceed 100.");
+        }
+        return errors;
+    }
+
     public static IReadOnlyList<string> ValidatePoints(CtfPointConfiguration points)
     {
         var errors = new List<string>();
