@@ -40,9 +40,9 @@ public sealed class GetSubmissionStatusEndpoint(
         return TypedResults.Ok(new SubmissionStatusResponse(
             result.SubmissionId,
             result.Kind,
-            result.Outcome,
+            result.Result is null ? "Unprocessed" : result.Result == NoCTF.Domain.Submissions.ScoringResult.Correct ? "Success" : "Failure",
             result.ReceivedAt,
             result.CompletedAt,
-            result.ErrorCode));
+            result.FailureCode));
     }
 }

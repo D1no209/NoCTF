@@ -1,4 +1,4 @@
-using NoCTF.Application.Submissions.Events;
+using NoCTF.Domain.Submissions;
 
 namespace NoCTF.API.Endpoints.Submissions;
 
@@ -7,7 +7,7 @@ public sealed record AcceptedSubmissionResponse(Guid SubmissionId, DateTimeOffse
 public sealed record SubmissionStatusResponse(
     Guid SubmissionId,
     SubmissionKind Kind,
-    SubmissionOutcome Outcome,
+    string State,
     DateTimeOffset ReceivedAt,
     DateTimeOffset? CompletedAt,
-    SubmissionErrorCode? ErrorCode);
+    ScoringFailureCode? FailureCode);

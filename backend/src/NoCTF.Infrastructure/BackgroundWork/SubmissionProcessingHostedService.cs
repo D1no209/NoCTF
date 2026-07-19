@@ -25,7 +25,7 @@ public sealed class SubmissionProcessingHostedService(
                 {
                     await using var scope = scopeFactory.CreateAsyncScope();
                     var processor = scope.ServiceProvider.GetRequiredService<ISubmissionProcessor>();
-                    await processor.ProcessFlagAsync(Guid.Empty, item.SubmissionId, ct);
+                    await processor.ProcessAsync(item.SubmissionId, ct);
                     break;
                 }
                 catch (Exception exception) when (attempt < 3 && !ct.IsCancellationRequested)
