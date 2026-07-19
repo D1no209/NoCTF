@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NoCTF.Application.Competitions.Lifecycle;
+using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Authentication.Ports;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Teams.Moderation;
@@ -87,6 +88,10 @@ public static class ServiceRegistration
             services.AddSingleton<IObjectStorage, LocalObjectStorage>();
         }
         services.AddScoped<ICompetitionLifecycleStore, EfCompetitionLifecycleStore>();
+        services.AddScoped<ICompetitionManagementStore, EfCompetitionManagementStore>();
+        services.AddScoped<CreateCompetition>();
+        services.AddScoped<GetCompetition>();
+        services.AddScoped<ListCompetitions>();
         services.AddScoped<AdvanceCompetitionLifecycle>();
         services.AddScoped<TransitionCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
