@@ -4,6 +4,7 @@ using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Awdp.Configuration;
 using System.Text.Json;
 
 namespace NoCTF.Tests.Unit.GameModes;
@@ -175,6 +176,34 @@ public class LeaderboardProjectorTests
     }
 
     [Test]
+    public async Task AwdpProjector_AppliesMilestoneAndPerRoundSettlement()
+    {
+        var team = Guid.NewGuid();
+        var challenge = Guid.NewGuid();
+        var start = DateTimeOffset.UnixEpoch;
+        var configuration = JsonSerializer.Serialize(new AwdpConfiguration(
+            1,
+            60,
+            new(AchievementSettlement.Milestone, 100),
+            new(AchievementSettlement.PerRound, 50)),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var facts = new[]
+        {
+            Achievement(team, challenge, SubmissionKind.Flag, start.AddSeconds(1)),
+            Achievement(team, challenge, SubmissionKind.Flag, start.AddSeconds(61)),
+            Achievement(team, challenge, SubmissionKind.Fix, start.AddSeconds(2)),
+            Achievement(team, challenge, SubmissionKind.Fix, start.AddSeconds(62))
+        };
+
+        var result = new AwdpLeaderboardProjector().Project(new LeaderboardProjectionInput(
+            Guid.NewGuid(), GameMode.Awdp, [new(team, "team", false, false)], facts, [],
+            [new(challenge, "pwn", false)], configuration, start));
+
+        await Assert.That(result[0].Score).IsEqualTo(200L);
+        await Assert.That(result[0].SolveCount).IsEqualTo(3);
+    }
+
+    [Test]
     public async Task AllModesHaveProjector()
     {
         var catalog = new LeaderboardProjectorCatalog();
@@ -192,4 +221,8 @@ public class LeaderboardProjectorTests
     private static LeaderboardSubmissionFact Fact(Guid team, Guid challenge, int seconds) =>
         new(Guid.NewGuid(), team, challenge, SubmissionKind.Flag, DateTimeOffset.UnixEpoch.AddSeconds(seconds),
             new ScoringEvent { Id = Guid.NewGuid(), TeamId = team, Result = ScoringResult.Correct, OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds) });
+
+    private static LeaderboardSubmissionFact Achievement(Guid team, Guid challenge, SubmissionKind kind, DateTimeOffset occurredAt) =>
+        new(Guid.NewGuid(), team, challenge, kind, occurredAt,
+            new ScoringEvent { Id = Guid.NewGuid(), TeamId = team, Result = ScoringResult.Correct, OccurredAt = occurredAt });
 }

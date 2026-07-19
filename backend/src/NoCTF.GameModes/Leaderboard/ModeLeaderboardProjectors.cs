@@ -4,6 +4,7 @@ using NoCTF.Domain.Submissions;
 using System.Text.Json;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Awdp.Configuration;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -184,10 +185,82 @@ public sealed class AwdpLeaderboardProjector : IGameModeLeaderboardProjector
     public GameMode Mode => GameMode.Awdp;
 
     public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
-        ModeLeaderboardProjection.Project(
-            input,
-            submission => submission.Kind is SubmissionKind.Flag or SubmissionKind.Fix,
-            includeSystemFacts: true);
+        AwdpLeaderboardProjection.Project(input);
+}
+
+internal static class AwdpLeaderboardProjection
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.CompetitionConfigurationJson))
+            return ModeLeaderboardProjection.Project(input, submission => submission.Kind is SubmissionKind.Flag or SubmissionKind.Fix, includeSystemFacts: true);
+        var competition = ParseCompetition(input.CompetitionConfigurationJson);
+        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
+        var facts = input.Submissions
+            .Where(fact => teams.ContainsKey(fact.TeamId)
+                          && fact.Kind is SubmissionKind.Flag or SubmissionKind.Fix
+                          && fact.Event is { IsDeleted: false, Result: ScoringResult.Correct }
+                          && fact.ChallengeId is not null
+                          && (challenges.Count == 0 || challenges.ContainsKey(fact.ChallengeId.Value)))
+            .OrderBy(fact => fact.ReceivedAt)
+            .ThenBy(fact => fact.SubmissionId)
+            .ToList();
+        var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points)>>();
+        var milestones = new HashSet<(Guid TeamId, Guid ChallengeId, SubmissionKind Kind, int Round)>();
+        foreach (var fact in facts)
+        {
+            var challengeId = fact.ChallengeId!.Value;
+            var challenge = ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
+            var achievement = fact.Kind == SubmissionKind.Flag
+                ? challenge.Break ?? competition.Break
+                : challenge.Fix ?? competition.Fix;
+            var round = achievement.Settlement == AchievementSettlement.Milestone
+                ? 0
+                : Round(fact.ReceivedAt, input.CompetitionStartTime, competition.RoundDurationSeconds);
+            if (!milestones.Add((fact.TeamId, challengeId, fact.Kind, round)))
+                continue;
+            if (!awarded.TryGetValue(fact.TeamId, out var teamFacts))
+                awarded[fact.TeamId] = teamFacts = [];
+            teamFacts.Add((fact, achievement.Points));
+        }
+        var rows = teams.Values.Select(team =>
+        {
+            var own = awarded.GetValueOrDefault(team.Id) ?? [];
+            var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
+            return new LeaderboardEntry(0, team.Id, team.Name, own.Sum(item => item.Points), own.Count,
+                last == default ? null : last, []);
+        });
+        return rows.OrderByDescending(row => row.Score)
+            .ThenBy(row => row.LastScoreAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
+            .Select((row, index) => row with { Rank = index + 1 })
+            .ToList();
+    }
+
+    private static int Round(DateTimeOffset occurredAt, DateTimeOffset? start, int durationSeconds)
+    {
+        if (start is null || durationSeconds <= 0) return 1;
+        var seconds = Math.Max(0, (occurredAt - start.Value).TotalSeconds);
+        return checked((int)(seconds / durationSeconds) + 1);
+    }
+
+    private static AwdpConfiguration ParseCompetition(string? json) =>
+        TryParse<AwdpConfiguration>(json)
+        ?? new(1, 300, new(AchievementSettlement.PerRound, 50), new(AchievementSettlement.PerRound, 50));
+
+    private static AwdpChallengeConfiguration ParseChallenge(string? json) =>
+        TryParse<AwdpChallengeConfiguration>(json)
+        ?? new(1, null, null, true, 10, 10);
+
+    private static T? TryParse<T>(string? json) where T : class
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<T>(json, JsonOptions); }
+        catch (JsonException) { return null; }
+    }
 }
 
 public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
