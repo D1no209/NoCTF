@@ -53,6 +53,12 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
     public Task RevokeRefreshTokenAsync(string tokenHash, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReader
+{
+    public Task<bool> IsCurrentAsync(Guid userId, int tokenVersion, CancellationToken cancellationToken) =>
+        Task.FromResult(false);
+}
+
 internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
 {
     public IssuedAccessToken Issue(AuthenticatedUser user) =>

@@ -393,7 +393,7 @@
 - [x] Logout。
 - [x] Runner scoring JWT issuer。
 - [x] Runner scoring scheme、issuer、audience、scope 校验。
-- [ ] 用户 token_version 即时吊销 policy。
+- [x] 用户 token_version 即时吊销 policy。
 - [ ] Refresh Origin/Referer 与部署域名配置统一。
 - [ ] SignalR Bearer token provider。
 - [ ] 仅 Hub path 允许 access_token query。

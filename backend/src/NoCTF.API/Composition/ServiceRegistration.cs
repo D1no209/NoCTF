@@ -69,6 +69,7 @@ public static class ServiceRegistration
             services.AddScoped<ISubmissionIntakeStore, SwaggerSubmissionStore>();
             services.AddScoped<ISubmissionStatusReader, SwaggerStatusReader>();
             services.AddScoped<IUserAuthenticationStore, SwaggerAuthenticationStore>();
+            services.AddScoped<IAccessTokenVersionReader, SwaggerAccessTokenVersionReader>();
             services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();
             services.AddScoped<SubmitFlag>();
             services.AddScoped<SubmitFix>();

@@ -1,6 +1,8 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
+using NoCTF.API.Security;
 
 namespace NoCTF.API.Composition;
 
@@ -59,11 +61,18 @@ public static class AuthenticationRegistration
                     NameClaimType = "runner_id"
                 };
             });
+        services.AddScoped<IAuthorizationHandler, CurrentTokenVersionHandler>();
         services.AddAuthorization(options =>
+        {
+            options.DefaultPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+                .RequireAuthenticatedUser()
+                .AddRequirements(new CurrentTokenVersionRequirement())
+                .Build();
             options.AddPolicy("ScoringInput", policy => policy
                 .AddAuthenticationSchemes(RunnerScoringScheme)
                 .RequireAuthenticatedUser()
-                .RequireClaim("scope", "scoring.write")));
+                .RequireClaim("scope", "scoring.write"));
+        });
         return services;
     }
 

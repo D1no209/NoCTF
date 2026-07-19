@@ -160,6 +160,7 @@ public static class ServiceRegistration
         services.AddScoped<AdvanceCompetitionLifecycle>();
         services.AddScoped<TransitionCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
+        services.AddScoped<IAccessTokenVersionReader, EfAccessTokenVersionReader>();
         services.AddSingleton<IAccessTokenIssuer, JwtIssuer>();
         return services;
     }
