@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+    <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
     <ProjectReference Include="../NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
     <ProjectReference Include="../NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
   </ItemGroup>

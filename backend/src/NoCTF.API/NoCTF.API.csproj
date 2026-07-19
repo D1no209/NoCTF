@@ -17,5 +17,6 @@
     <PackageReference Include="FastEndpoints.Swagger" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Riok.Mapperly" PrivateAssets="all" />
   </ItemGroup>
 </Project>

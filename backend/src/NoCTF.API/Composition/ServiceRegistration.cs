@@ -10,7 +10,6 @@ using NoCTF.API.OpenApi;
 using NoCTF.Application.Authentication.Ports;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Teams.Moderation;
-using NoCTF.Application.Scoring.Ports;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Notifications;
 using NoCTF.API.SignalR.Publishing;
@@ -54,8 +53,6 @@ public static class ServiceRegistration
             services.AddScoped<CreateFixUpload>();
             services.AddScoped<ITeamModerationStore, SwaggerModerationStore>();
             services.AddScoped<ICompetitionModerationAuthorizer, SwaggerModerationAuthorizer>();
-            services.AddScoped<IScoringRebuildQueue, SwaggerRebuildQueue>();
-            services.AddScoped<ILeaderboardStore, SwaggerLeaderboardStore>();
             services.AddScoped<IFixUploadSessionStore, SwaggerFixUploadStore>();
             services.AddSingleton<IObjectStorage, SwaggerObjectStorage>();
         }

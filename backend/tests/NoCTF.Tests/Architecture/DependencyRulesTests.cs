@@ -1,6 +1,5 @@
 using NoCTF.Application.Submissions.Intake;
-using NoCTF.Application.Scoring.Events;
-using NoCTF.Application.Submissions.Events;
+using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Identity;
 using NoCTF.GameModes.Registration;
 using ArchUnitNET.Loader;
@@ -19,6 +18,7 @@ public class DependencyRulesTests
         await Assert.That(references).DoesNotContain("Microsoft.EntityFrameworkCore");
         await Assert.That(references).DoesNotContain("Marten");
         await Assert.That(references).DoesNotContain("Wolverine");
+        await Assert.That(references).DoesNotContain("Rebus");
     }
 
     [Test]
@@ -29,6 +29,7 @@ public class DependencyRulesTests
         await Assert.That(references).DoesNotContain("Microsoft.EntityFrameworkCore");
         await Assert.That(references).DoesNotContain("Marten");
         await Assert.That(references).DoesNotContain("Wolverine");
+        await Assert.That(references).DoesNotContain("Rebus");
     }
 
     [Test]
@@ -40,12 +41,12 @@ public class DependencyRulesTests
     }
 
     [Test]
-    public async Task Bounded_event_concepts_use_enums()
+    public async Task Scoring_facts_do_not_persist_scores()
     {
-        await Assert.That(typeof(ScoreAwarded).GetProperty(nameof(ScoreAwarded.Reason))!.PropertyType)
-            .IsEqualTo(typeof(ScoringReason));
-        await Assert.That(typeof(FlagSubmissionEvaluated).GetProperty(nameof(FlagSubmissionEvaluated.ErrorCode))!.PropertyType)
-            .IsEqualTo(typeof(SubmissionErrorCode?));
+        await Assert.That(typeof(ScoringEvent).GetProperty(nameof(ScoringEvent.Result))!.PropertyType)
+            .IsEqualTo(typeof(ScoringResult));
+        await Assert.That(typeof(ScoringEvent).GetProperty("Score")).IsNull();
+        await Assert.That(typeof(ScoringEvent).GetProperty("ScoreDelta")).IsNull();
     }
 
     [Test]
@@ -68,18 +69,14 @@ public class DependencyRulesTests
             .LoadAssemblies(
                 typeof(User).Assembly,
                 typeof(SubmitFlag).Assembly,
-                typeof(Microsoft.EntityFrameworkCore.DbContext).Assembly,
-                typeof(Marten.IDocumentSession).Assembly,
-                typeof(Wolverine.IMessageBus).Assembly)
+                typeof(Microsoft.EntityFrameworkCore.DbContext).Assembly)
             .Build();
         var rule = Types()
             .That()
             .ResideInAssembly(typeof(SubmitFlag).Assembly)
             .Should()
             .NotDependOnAny(
-                typeof(Microsoft.EntityFrameworkCore.DbContext),
-                typeof(Marten.IDocumentSession),
-                typeof(Wolverine.IMessageBus));
+                typeof(Microsoft.EntityFrameworkCore.DbContext));
 
         await Assert.That(rule.HasNoViolations(architecture)).IsTrue();
     }

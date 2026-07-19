@@ -24,6 +24,5 @@
     <ProjectReference Include="../../src/NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runner/NoCTF.Runner.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Worker/NoCTF.Worker.csproj" />
   </ItemGroup>
 </Project>

@@ -1,5 +1,5 @@
 using NoCTF.Application.Common;
-using NoCTF.Application.Scoring.Ports;
+using NoCTF.Application.BackgroundWork;
 
 namespace NoCTF.Application.Teams.Moderation;
 
@@ -21,8 +21,8 @@ public interface ICompetitionModerationAuthorizer
     Task<bool> CanModerateAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken);
 }
 
-/// <summary>Applies a relational ban ruling and schedules retroactive score reconstruction.</summary>
-public sealed class ModerateTeam(ITeamModerationStore store, IScoringRebuildQueue rebuildQueue)
+/// <summary>Applies a relational ban ruling and schedules an in-process reconstruction.</summary>
+public sealed class ModerateTeam(ITeamModerationStore store, IBackgroundWorkScheduler scheduler)
 {
     public async Task<OperationResult> ExecuteAsync(
         TeamModerationCommand command,
@@ -35,10 +35,7 @@ public sealed class ModerateTeam(ITeamModerationStore store, IScoringRebuildQueu
         if (!result.Succeeded)
             return result;
 
-        await rebuildQueue.EnqueueAsync(
-            command.CompetitionId,
-            command.Ban ? ScoringRebuildReason.TeamBanned : ScoringRebuildReason.TeamUnbanned,
-            cancellationToken);
+        await scheduler.EnqueueCompetitionRebuildAsync(command.CompetitionId, cancellationToken);
         return OperationResult.Success();
     }
 }

@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace NoCTF.Infrastructure.Persistence.Migrations
+namespace NoCTF.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialBaseline : Migration
+    public partial class InitialEfBaseline : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -45,6 +45,26 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_challenge_attachments", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "challenge_flags",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompetitionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ChallengeId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TeamId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Flag = table.Column<string>(type: "text", nullable: false),
+                    ValidStart = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ValidEnd = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    RowVersion = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_challenge_flags", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -304,6 +324,95 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "fix_submission_records",
+                columns: table => new
+                {
+                    UploadId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SubmissionId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CompetitionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TeamId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ChallengeId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ObjectKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ClaimedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ObjectMetadata = table.Column<string>(type: "jsonb", nullable: true),
+                    VerificationStatus = table.Column<int>(type: "integer", nullable: false),
+                    FailureCategory = table.Column<int>(type: "integer", nullable: true),
+                    VerifiedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    VerifierVersion = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    RowVersion = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_fix_submission_records", x => x.UploadId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "scoring_events",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompetitionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TeamId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ChallengeId = table.Column<Guid>(type: "uuid", nullable: true),
+                    SubmissionId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Kind = table.Column<int>(type: "integer", nullable: false),
+                    Result = table.Column<int>(type: "integer", nullable: false),
+                    FailureCode = table.Column<int>(type: "integer", nullable: true),
+                    OccurredAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ProcessedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ProcessedWorkerId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    EvaluatorVersion = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    SourceKey = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedById = table.Column<Guid>(type: "uuid", nullable: true),
+                    RowVersion = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_scoring_events", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "submissions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CompetitionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TeamId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ChallengeId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Kind = table.Column<int>(type: "integer", nullable: false),
+                    ReceivedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    Flag = table.Column<string>(type: "text", nullable: true),
+                    IdempotencyKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    SubjectTeamId = table.Column<Guid>(type: "uuid", nullable: true),
+                    VictimTeamId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ServiceId = table.Column<Guid>(type: "uuid", nullable: true),
+                    StageId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ControlIntervalSeconds = table.Column<long>(type: "bigint", nullable: true),
+                    CheckerPlatformError = table.Column<bool>(type: "boolean", nullable: false),
+                    ScoringEventId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ProcessingVersion = table.Column<long>(type: "bigint", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_submissions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_submissions_scoring_events_ScoringEventId",
+                        column: x => x.ScoringEventId,
+                        principalTable: "scoring_events",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_audit_entries_CompetitionId_OccurredAt",
                 table: "audit_entries",
@@ -314,6 +423,11 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                 table: "challenge_attachments",
                 column: "ObjectKey",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_challenge_flags_CompetitionId_ChallengeId_TeamId_ValidStart~",
+                table: "challenge_flags",
+                columns: new[] { "CompetitionId", "ChallengeId", "TeamId", "ValidStart", "ValidEnd" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_challenge_hints_ChallengeId",
@@ -343,6 +457,17 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                 columns: new[] { "Status", "StartTime" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_fix_submission_records_CompetitionId_TeamId_ChallengeId_Exp~",
+                table: "fix_submission_records",
+                columns: new[] { "CompetitionId", "TeamId", "ChallengeId", "ExpiresAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_fix_submission_records_SubmissionId",
+                table: "fix_submission_records",
+                column: "SubmissionId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_notifications_UserId_IsRead_CreatedAt",
                 table: "notifications",
                 columns: new[] { "UserId", "IsRead", "CreatedAt" });
@@ -362,6 +487,46 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                 name: "IX_runtime_operations_CompetitionId_Status",
                 table: "runtime_operations",
                 columns: new[] { "CompetitionId", "Status" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_scoring_events_CompetitionId_Kind_SourceKey",
+                table: "scoring_events",
+                columns: new[] { "CompetitionId", "Kind", "SourceKey" },
+                unique: true,
+                filter: "\"IsDeleted\" = FALSE AND \"SourceKey\" IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_scoring_events_CompetitionId_OccurredAt_Id",
+                table: "scoring_events",
+                columns: new[] { "CompetitionId", "OccurredAt", "Id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_scoring_events_CompetitionId_TeamId_ChallengeId_Kind_Occurr~",
+                table: "scoring_events",
+                columns: new[] { "CompetitionId", "TeamId", "ChallengeId", "Kind", "OccurredAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_scoring_events_SubmissionId",
+                table: "scoring_events",
+                column: "SubmissionId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_submissions_CompetitionId_IdempotencyKey",
+                table: "submissions",
+                columns: new[] { "CompetitionId", "IdempotencyKey" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_submissions_CompetitionId_TeamId_ChallengeId_Kind_ReceivedA~",
+                table: "submissions",
+                columns: new[] { "CompetitionId", "TeamId", "ChallengeId", "Kind", "ReceivedAt", "Id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_submissions_ScoringEventId",
+                table: "submissions",
+                column: "ScoringEventId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_team_members_CompetitionId_UserId",
@@ -397,11 +562,31 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
                 table: "users",
                 column: "NormalizedUserName",
                 unique: true);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_fix_submission_records_submissions_SubmissionId",
+                table: "fix_submission_records",
+                column: "SubmissionId",
+                principalTable: "submissions",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_scoring_events_submissions_SubmissionId",
+                table: "scoring_events",
+                column: "SubmissionId",
+                principalTable: "submissions",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropForeignKey(
+                name: "FK_scoring_events_submissions_SubmissionId",
+                table: "scoring_events");
+
             migrationBuilder.DropTable(
                 name: "audit_entries");
 
@@ -410,6 +595,9 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "challenge_configurations");
+
+            migrationBuilder.DropTable(
+                name: "challenge_flags");
 
             migrationBuilder.DropTable(
                 name: "challenge_hints");
@@ -422,6 +610,9 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "competition_configurations");
+
+            migrationBuilder.DropTable(
+                name: "fix_submission_records");
 
             migrationBuilder.DropTable(
                 name: "notifications");
@@ -446,6 +637,12 @@ namespace NoCTF.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "competitions");
+
+            migrationBuilder.DropTable(
+                name: "submissions");
+
+            migrationBuilder.DropTable(
+                name: "scoring_events");
         }
     }
 }

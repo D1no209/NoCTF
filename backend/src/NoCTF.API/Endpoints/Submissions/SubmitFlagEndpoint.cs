@@ -38,20 +38,15 @@ public sealed class SubmitFlagEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var result = await submitFlag.ExecuteAsync(new(
-            request.CompetitionId,
-            request.TeamId,
-            request.ChallengeId,
-            userContext.UserId,
-            request.Flag,
-            httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            DateTimeOffset.UtcNow), cancellationToken);
+            request.CompetitionId, request.TeamId, request.ChallengeId, userContext.UserId, request.Flag,
+            httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown", DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
         {
             return SubmissionProblemDetails.Create(SubmissionProblemDetails.StatusFor(result.ErrorCode), result.ErrorCode, result.ErrorMessage);
         }
         return TypedResults.Accepted<AcceptedSubmissionResponse>(
             uri: (string?)null,
-            value: new AcceptedSubmissionResponse(result.Value!.SubmissionId, result.Value.ReceivedAt));
+            value: SubmissionMapper.ToResponse(result.Value!));
     }
 
 }
