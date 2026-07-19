@@ -221,12 +221,12 @@
 
 ### 7.1 CTF
 
-- [ ] CTF Flag evaluator。
-- [ ] Duplicate solve。
-- [ ] First Blood。
-- [ ] Dynamic score 参数解析。
-- [ ] minimum/initial/decay 规则。
-- [ ] solve count 和 solve time 排序。
+- [x] CTF Flag evaluator。
+- [x] Duplicate solve。
+- [x] First Blood。
+- [x] Dynamic score 参数解析。
+- [x] minimum/initial/decay 规则。
+- [x] solve count 和 solve time 排序。
 - [ ] Penetration stage challenge 支持。
 - [ ] stage completion 不等同于整个 Challenge completion。
 
@@ -335,12 +335,12 @@
 ## 11. Leaderboard 完整投影
 
 - [ ] 删除 Correct count 临时 projector。
-- [ ] CTF projector。
+- [x] CTF projector。
 - [ ] AWD projector。
 - [ ] AWDP projector。
 - [ ] KoH projector。
 - [ ] Penetration projector。
-- [ ] Competition/Challenge configuration 进入 projector input。
+- [x] Competition/Challenge configuration 进入 projector input。
 - [ ] Team ban/soft-delete 过滤。
 - [ ] Challenge soft-delete 过滤。
 - [ ] system event `OccurredAt + Id` 排序。

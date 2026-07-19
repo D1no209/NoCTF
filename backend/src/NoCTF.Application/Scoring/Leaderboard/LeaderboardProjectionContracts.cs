@@ -9,10 +9,11 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardTeamFact> Teams,
     IReadOnlyList<LeaderboardSubmissionFact> Submissions,
     IReadOnlyList<LeaderboardSystemFact> SystemEvents,
-    IReadOnlyList<LeaderboardChallengeFact>? Challenges = null);
+    IReadOnlyList<LeaderboardChallengeFact>? Challenges = null,
+    string? CompetitionConfigurationJson = null);
 
 public sealed record LeaderboardTeamFact(Guid Id, string Name, bool IsBanned, bool IsDeleted);
-public sealed record LeaderboardChallengeFact(Guid Id, string Direction, bool IsDeleted);
+public sealed record LeaderboardChallengeFact(Guid Id, string Direction, bool IsDeleted, string? ConfigurationJson = null);
 
 public sealed record LeaderboardSubmissionFact(
     Guid SubmissionId,
