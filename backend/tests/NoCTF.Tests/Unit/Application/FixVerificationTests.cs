@@ -10,6 +10,17 @@ namespace NoCTF.Tests.Unit.Application;
 public class FixVerificationTests
 {
     [Test]
+    public async Task ExpireFixUploads_DelegatesCurrentTimeToStore()
+    {
+        var store = new Store { ExpiredCount = 3 };
+        var now = DateTimeOffset.UtcNow;
+
+        var count = await new ExpireFixUploads(store).ExecuteAsync(now);
+
+        await Assert.That(count).IsEqualTo(3);
+        await Assert.That(store.ExpiredAt).IsEqualTo(now);
+    }
+    [Test]
     public async Task StateMachine_AllowsOnlyExpectedTransitions()
     {
         await Assert.That(FixVerificationStateMachine.CanTransition(
@@ -58,6 +69,8 @@ public class FixVerificationTests
 
     private sealed class Store : IFixVerificationStore
     {
+        public int ExpiredCount { get; init; }
+        public DateTimeOffset? ExpiredAt { get; private set; }
         public bool CompleteResult { get; init; } = true;
         public bool Completed { get; private set; }
         public string? Version { get; private set; }
@@ -94,8 +107,11 @@ public class FixVerificationTests
             return Task.FromResult(CompleteResult);
         }
 
-        public Task<int> ExpireAsync(DateTimeOffset now, CancellationToken cancellationToken) =>
-            Task.FromResult(0);
+        public Task<int> ExpireAsync(DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            ExpiredAt = now;
+            return Task.FromResult(ExpiredCount);
+        }
     }
 
     private sealed class Verifier(FixVerificationResult result) : IFixSubmissionVerifier
