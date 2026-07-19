@@ -33,6 +33,7 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
     public Task<string> CreateRefreshTokenAsync(Guid userId, string? ipAddress, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(string.Empty);
     public Task<RefreshRotation?> RotateRefreshAsync(string tokenHash, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult<RefreshRotation?>(null);
     public Task RevokeRefreshFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task RevokeRefreshTokenAsync(string tokenHash, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer

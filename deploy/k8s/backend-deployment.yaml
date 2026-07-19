@@ -39,7 +39,7 @@ spec:
             - configMapRef:
                 name: noctf-config
           env:
-            - name: JwtSettings__Secret
+            - name: Authentication__SigningKey
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets
@@ -49,24 +49,24 @@ spec:
                 secretKeyRef:
                   name: noctf-secrets
                   key: db-password
-            - name: ConnectionStrings__DefaultConnection
+            - name: ConnectionStrings__PostgreSql
               value: "Host=postgres;Port=5432;Database=noctf;Username=postgres;Password=$(DB_PASSWORD)"
             - name: SeedAdmin__Password
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets
                   key: seed-admin-password
-            - name: Runner__ApiKey
+            - name: RunnerScoring__SigningKey
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets
-                  key: runner-api-key
-            - name: StorageProvider__S3__AccessKey
+                  key: runner-scoring-key
+            - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets
                   key: minio-access-key
-            - name: StorageProvider__S3__SecretKey
+            - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets

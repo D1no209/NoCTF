@@ -3,10 +3,11 @@ using System.Text;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.RefreshSession;
+using Microsoft.Extensions.Configuration;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
-public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh)
+public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfiguration configuration)
     : EndpointWithoutRequest<Results<Ok<LoginResponse>, UnauthorizedHttpResult>>
 {
     public override void Configure()
@@ -18,6 +19,8 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh)
     public override async Task<Results<Ok<LoginResponse>, UnauthorizedHttpResult>> ExecuteAsync(
         CancellationToken cancellationToken)
     {
+        if (!RefreshRequestGuard.IsSameOrigin(HttpContext.Request))
+            return TypedResults.Unauthorized();
         if (!HttpContext.Request.Cookies.TryGetValue("noctf_refresh", out var refreshToken)
             || string.IsNullOrWhiteSpace(refreshToken))
         {
@@ -35,9 +38,10 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh)
         HttpContext.Response.Cookies.Append("noctf_refresh", result.Value!.RefreshToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = configuration.GetValue("Authentication:RefreshCookieSecure", true),
             SameSite = SameSiteMode.Strict,
-            Expires = DateTimeOffset.UtcNow.AddDays(7)
+            Path = "/auth/refresh",
+            MaxAge = TimeSpan.FromDays(7)
         });
         return TypedResults.Ok(new LoginResponse(
             result.Value.UserId,

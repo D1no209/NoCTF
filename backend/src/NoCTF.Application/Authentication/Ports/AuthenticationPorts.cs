@@ -19,6 +19,7 @@ public interface IUserAuthenticationStore
     Task<string> CreateRefreshTokenAsync(Guid userId, string? ipAddress, DateTimeOffset now, CancellationToken cancellationToken);
     Task<RefreshRotation?> RotateRefreshAsync(string tokenHash, DateTimeOffset now, CancellationToken cancellationToken);
     Task RevokeRefreshFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task RevokeRefreshTokenAsync(string tokenHash, DateTimeOffset now, CancellationToken cancellationToken);
     Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken);
 }
 

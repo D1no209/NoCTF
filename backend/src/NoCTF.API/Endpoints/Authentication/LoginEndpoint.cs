@@ -11,7 +11,7 @@ public sealed class LoginRequest
     public string Password { get; set; } = string.Empty;
 }
 
-public sealed class LoginEndpoint(LoginUser login)
+public sealed class LoginEndpoint(LoginUser login, IConfiguration configuration)
     : Endpoint<LoginRequest, Results<Ok<LoginResponse>, UnauthorizedHttpResult>>
 {
     public override void Configure()
@@ -32,9 +32,10 @@ public sealed class LoginEndpoint(LoginUser login)
         HttpContext.Response.Cookies.Append("noctf_refresh", result.Value!.RefreshToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = configuration.GetValue("Authentication:RefreshCookieSecure", true),
             SameSite = SameSiteMode.Strict,
-            Expires = DateTimeOffset.UtcNow.AddDays(7)
+            Path = "/auth/refresh",
+            MaxAge = TimeSpan.FromDays(7)
         });
         return TypedResults.Ok(new LoginResponse(
             result.Value!.UserId,

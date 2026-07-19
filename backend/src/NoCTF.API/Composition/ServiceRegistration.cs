@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.Application.Authentication.Login;
 using NoCTF.Application.Authentication.RefreshSession;
+using NoCTF.Application.Authentication.Logout;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Infrastructure;
 using NoCTF.API.OpenApi;
@@ -38,6 +39,7 @@ public static class ServiceRegistration
             services.AddScoped<SubmitFix>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
+            services.AddScoped<LogoutUser>();
             services.AddScoped<ModerateTeam>();
             services.AddScoped<CreateFixUpload>();
         }
@@ -51,6 +53,7 @@ public static class ServiceRegistration
             services.AddScoped<SubmitFix>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
+            services.AddScoped<LogoutUser>();
             services.AddScoped<ModerateTeam>();
             services.AddScoped<CreateFixUpload>();
             services.AddScoped<ITeamModerationStore, SwaggerModerationStore>();

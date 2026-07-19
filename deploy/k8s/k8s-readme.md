@@ -18,6 +18,7 @@ kubectl create secret generic noctf-secrets \
   --from-literal=db-password='your-db-password' \
   --from-literal=seed-admin-password='your-initial-admin-password' \
   --from-literal=runner-api-key='your-runner-internal-api-key' \
+  --from-literal=runner-scoring-key='your-runner-scoring-jwt-key-at-least-32-chars' \
   --from-literal=minio-access-key='your-minio-access-key' \
   --from-literal=minio-secret-key='your-minio-secret-key'
 ```
@@ -84,7 +85,6 @@ kubectl apply -f migration-job.yaml
 kubectl wait --for=condition=complete job/noctf-db-migrate -n noctf --timeout=300s
 kubectl apply -f backend-deployment.yaml
 kubectl apply -f backend-service.yaml
-kubectl apply -f worker-deployment.yaml
 kubectl apply -f backend-hpa.yaml
 
 # 6. Networking
@@ -146,13 +146,13 @@ volumes:
       type: Socket
 ```
 
-Do not mount the Docker socket into backend or worker pods. Consider using a dedicated node pool with taints for Runner workloads.
+Do not mount the Docker socket into backend pods. Consider using a dedicated node pool with taints for Runner workloads.
 
 ## Network Policy Notes
 
 The `networkpolicy.yaml` enforces a default-deny posture:
 - All ingress/egress is denied by default
-- Backend and worker can reach postgres (5432), redis (6379), MinIO (9000), and runner (8080)
+- Backend can reach postgres (5432), redis (6379), MinIO (9000), and runner (8080)
 - Backend accepts traffic only from the ingress-nginx namespace and serves both API and SPA static files
 - AWD challenge pods accept traffic only from pods labeled `app=noctf-checker`
 - DNS (port 53) egress is allowed for all pods

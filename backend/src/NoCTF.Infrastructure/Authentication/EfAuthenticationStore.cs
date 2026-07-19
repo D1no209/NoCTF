@@ -60,6 +60,7 @@ public sealed class EfAuthenticationStore(NoCtfDbContext db) : IUserAuthenticati
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
         var session = await db.RefreshSessions.SingleOrDefaultAsync(
             item => item.TokenHash == tokenHash,
             cancellationToken);
@@ -81,12 +82,23 @@ public sealed class EfAuthenticationStore(NoCtfDbContext db) : IUserAuthenticati
         session.ReplacedBySessionId = replacement.Id;
         db.RefreshSessions.Add(replacement);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return new(replacement.Id, replacement.UserId, replacement.FamilyId, refreshToken, replacement.ExpiresAt, false);
     }
 
     public Task RevokeRefreshFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken) =>
         db.RefreshSessions.Where(item => item.FamilyId == familyId && item.RevokedAt == null)
             .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.RevokedAt, now), cancellationToken);
+
+    public async Task RevokeRefreshTokenAsync(string tokenHash, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var familyId = await db.RefreshSessions.AsNoTracking()
+            .Where(item => item.TokenHash == tokenHash)
+            .Select(item => (Guid?)item.FamilyId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (familyId is not null)
+            await RevokeRefreshFamilyAsync(familyId.Value, now, cancellationToken);
+    }
 
     private static class PasswordHash
     {

@@ -66,7 +66,7 @@ jobs:
         shell: bash
         run: |
           dotnet publish backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build --no-restore --output artifacts/api /p:BuildSpaOnPublish=false
-          for host in api worker; do
+          for host in api; do
             for plugin in CTF AWD AWDP KoH Penetration QQBot; do
               test -f "artifacts/$host/plugins/NoCTF.Plugins.$plugin.dll"
             done
@@ -118,9 +118,10 @@ jobs:
         env:
           ASPNETCORE_ENVIRONMENT: Development
           ASPNETCORE_URLS: http://localhost:5000
-          ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=noctf_test_password
+          ConnectionStrings__PostgreSql: Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=noctf_test_password
           ConnectionStrings__Redis: localhost:6379
-          JwtSettings__Secret: ci_secret_value_with_at_least_32_chars
+          Authentication__SigningKey: ci_secret_value_with_at_least_32_chars
+          RunnerScoring__SigningKey: ci_runner_scoring_value_with_at_least_32_chars
           Database__AutoMigrate: 'true'
         run: |
           dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj &

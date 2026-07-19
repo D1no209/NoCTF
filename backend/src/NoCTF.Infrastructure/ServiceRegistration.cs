@@ -21,6 +21,7 @@ using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.BackgroundWork;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Retry;
+using NoCTF.Application.Authentication.Logout;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Caching;
 
@@ -65,6 +66,7 @@ public static class ServiceRegistration
         services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();
         services.AddScoped<RecordSystemScoringEvent>();
         services.AddScoped<RetrySubmission>();
+        services.AddScoped<LogoutUser>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
         services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
