@@ -213,7 +213,7 @@
 - [x] verifier timeout。
 - [x] verifier failure category 映射。
 - [ ] runner failure 不写入 Flag 或 archive 内容日志。
-- [ ] Fix retry 的旧 event soft-delete 和 record 状态重置规则。
+- [x] Fix retry 的旧 event soft-delete 和 record 状态重置规则。
 - [ ] 原始 runtime 恢复逻辑。
 - [ ] CleanupPending 扫描和清理。
 
