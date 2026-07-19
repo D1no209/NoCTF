@@ -70,6 +70,7 @@ public static class ServiceRegistration
         services.AddHostedService<CompetitionRebuildHostedService>();
         services.AddHostedService<FixUploadExpiryHostedService>();
         services.AddHostedService<FixArchiveCleanupHostedService>();
+        services.AddHostedService<RuntimeHealthHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (string.IsNullOrWhiteSpace(redis))
@@ -132,6 +133,8 @@ public static class ServiceRegistration
         services.AddScoped<IRuntimeCleanupStore, EfRuntimeCleanupStore>();
         services.AddScoped<ChallengeRuntimeProvisioner>();
         services.AddScoped<CompetitionRuntimeCleaner>();
+        services.AddScoped<IRuntimeHealthStore, EfRuntimeHealthStore>();
+        services.AddScoped<ChallengeRuntimeHealthChecker>();
         var runnerBaseUrl = configuration["Runtime:Runner:BaseUrl"];
         if (string.IsNullOrWhiteSpace(runnerBaseUrl))
         {
