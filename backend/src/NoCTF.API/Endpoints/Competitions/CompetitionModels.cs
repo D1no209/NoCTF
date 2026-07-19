@@ -24,3 +24,14 @@ public sealed record CompetitionResponse(
     bool TeamRegistrationAutoApprove,
     int MaxTeamMembers,
     Guid OwnerId);
+
+public sealed class UpdateCompetitionRequest
+{
+    public Guid CompetitionId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public DateTimeOffset StartTime { get; set; }
+    public DateTimeOffset EndTime { get; set; }
+    public bool TeamRegistrationAutoApprove { get; set; }
+    public int MaxTeamMembers { get; set; }
+}

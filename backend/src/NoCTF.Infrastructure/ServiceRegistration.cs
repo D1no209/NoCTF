@@ -92,6 +92,8 @@ public static class ServiceRegistration
         services.AddScoped<CreateCompetition>();
         services.AddScoped<GetCompetition>();
         services.AddScoped<ListCompetitions>();
+        services.AddScoped<UpdateCompetition>();
+        services.AddScoped<DeleteCompetition>();
         services.AddScoped<AdvanceCompetitionLifecycle>();
         services.AddScoped<TransitionCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
