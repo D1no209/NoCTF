@@ -173,16 +173,16 @@
 
 ### 4.3 ChallengeFlag
 
-- [ ] 创建 Flag。
-- [ ] 查询管理员 Flag。
-- [ ] 更新 Flag。
-- [ ] 删除/失效 Flag。
-- [ ] 支持 global Flag 和 Team-specific Flag。
-- [ ] 校验 ValidStart/ValidEnd。
-- [ ] 阻止同一范围的有效时间窗口冲突。
-- [ ] Flag 更新使用 RowVersion。
-- [ ] Flag 更新触发 rebuild。
-- [ ] Flag 绝不进入日志、Redis、SignalR、Channel payload、公开 DTO。
+- [x] 创建 Flag。
+- [x] 查询管理员 Flag。
+- [x] 更新 Flag。
+- [x] 删除/失效 Flag。
+- [x] 支持 global Flag 和 Team-specific Flag。
+- [x] 校验 ValidStart/ValidEnd。
+- [x] 阻止同一范围的有效时间窗口冲突。
+- [x] Flag 更新使用 RowVersion。
+- [x] Flag 更新触发 rebuild。
+- [x] Flag 绝不进入日志、Redis、SignalR、Channel payload、公开 DTO。
 
 ## 5. Submission admission、Idempotency 和 MaxAttempt
 
@@ -371,7 +371,7 @@
 - [ ] Competition CRUD。
 - [ ] lifecycle publish/pause/resume/finish。
 - [x] Challenge CRUD/publish。
-- [ ] Flag CRUD/window update。
+- [x] Flag CRUD/window update。
 - [x] Competition/Challenge configuration update。
 - [ ] Team approval/member management。
 - [ ] Collaborator management。
