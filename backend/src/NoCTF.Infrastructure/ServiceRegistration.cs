@@ -82,6 +82,9 @@ public static class ServiceRegistration
         services.AddScoped<CreateTeam>();
         services.AddScoped<ListCompetitionTeams>();
         services.AddScoped<ReviewTeamRegistration>();
+        services.AddScoped<GetTeam>();
+        services.AddScoped<UpdateTeam>();
+        services.AddScoped<DeleteTeam>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config
