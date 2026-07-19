@@ -1073,6 +1073,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       }
@@ -1415,6 +1418,149 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/admin/competitions/{competitionId}/submissions/{submissionId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsGetAdminSubmissionStatusEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "submissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsAdminSubmissionStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/admin/competitions/{competitionId}/rebuild": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsRebuildCompetitionEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationSubmissionsRebuildCompetitionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/admin/competitions/{competitionId}/submissions/{submissionId}/retry": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsRetrySubmissionEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "submissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -3024,7 +3170,13 @@
           "FixArchiveHashMismatch",
           "StorageTimeout",
           "StorageUnavailable",
-          "CheckerPlatformError"
+          "CheckerPlatformError",
+          "SelfAttackRejected",
+          "DuplicateAttack",
+          "AchievementAlreadyCompleted",
+          "StageRequired",
+          "StageNotFound",
+          "StagePrerequisiteIncomplete"
         ],
         "enum": [
           0,
@@ -3039,7 +3191,13 @@
           9,
           10,
           11,
-          12
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
         ]
       },
       "NoCTFAPIEndpointsSubmissionsGetSubmissionStatusRequest": {
@@ -3512,6 +3670,94 @@
         }
       },
       "NoCTFAPIEndpointsAdministrationTeamsUnbanTeamRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsSubmissionsAdminSubmissionStatusResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+          },
+          "result": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+              }
+            ]
+          },
+          "failureCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+              }
+            ]
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "processedWorkerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "evaluatorVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "isCurrentEventDeleted": {
+            "type": "boolean"
+          },
+          "processingVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationSubmissionsGetAdminSubmissionStatusRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationSubmissionsRebuildCompetitionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationSubmissionsRebuildCompetitionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationSubmissionsRetrySubmissionRequest": {
         "type": "object",
         "additionalProperties": false
       },
