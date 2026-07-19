@@ -12,17 +12,11 @@ public sealed class EfSubmissionProcessor(
     IBackgroundWorkScheduler scheduler,
     ILogger<EfSubmissionProcessor> logger) : ISubmissionProcessor
 {
-    public Task ProcessFlagAsync(Guid competitionId, Guid submissionId, CancellationToken cancellationToken) =>
-        ProcessAsync(competitionId, submissionId, cancellationToken);
-
-    public Task ProcessFixAsync(Guid competitionId, Guid submissionId, CancellationToken cancellationToken) =>
-        ProcessAsync(competitionId, submissionId, cancellationToken);
-
-    private async Task ProcessAsync(Guid competitionId, Guid submissionId, CancellationToken ct)
+    public async Task ProcessAsync(Guid submissionId, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var submission = await db.Submissions.Include(x => x.ScoringEvent)
-            .SingleOrDefaultAsync(x => x.Id == submissionId && (competitionId == Guid.Empty || x.CompetitionId == competitionId), ct);
+            .SingleOrDefaultAsync(x => x.Id == submissionId, ct);
         if (submission is null || submission.ScoringEvent is not null) return;
         if (submission.TeamId is not Guid teamId || submission.ChallengeId is not Guid challengeId) return;
 
@@ -41,7 +35,7 @@ public sealed class EfSubmissionProcessor(
         submission.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await scheduler.EnqueueLeaderboardRefreshAsync(competitionId, ct);
+        await scheduler.EnqueueLeaderboardRefreshAsync(submission.CompetitionId, ct);
         logger.LogInformation("Processed submission {SubmissionId} as {Result}", submissionId, result.Result);
     }
 

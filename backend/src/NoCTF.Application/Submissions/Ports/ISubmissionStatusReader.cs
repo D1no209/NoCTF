@@ -1,4 +1,4 @@
-using NoCTF.Application.Submissions.Events;
+using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Application.Submissions.Ports;
 
@@ -8,10 +8,11 @@ public sealed record SubmissionStatusView(
     Guid TeamId,
     Guid ChallengeId,
     SubmissionKind Kind,
-    SubmissionOutcome Outcome,
+    ScoringResult? Result,
     DateTimeOffset ReceivedAt,
     DateTimeOffset? CompletedAt,
-    SubmissionErrorCode? ErrorCode);
+    ScoringFailureCode? FailureCode,
+    string? EvaluatorVersion);
 
 public interface ISubmissionStatusReader
 {
