@@ -5,6 +5,7 @@ using System.Text.Json;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Koh.Configuration;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -268,7 +269,59 @@ public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
     public GameMode Mode => GameMode.Koh;
 
     public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
-        ModeLeaderboardProjection.Project(input, _ => false, includeSystemFacts: true);
+        KohLeaderboardProjection.Project(input);
+}
+
+internal static class KohLeaderboardProjection
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.CompetitionConfigurationJson))
+            return ModeLeaderboardProjection.Project(input, _ => false, includeSystemFacts: true);
+        var configuration = Parse(input.CompetitionConfigurationJson);
+        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var observations = input.SystemEvents
+            .Where(fact => fact.Event is
+            {
+                IsDeleted: false,
+                Kind: ScoringEventKind.KohObservation,
+                Result: ScoringResult.Correct,
+                TeamId: not null
+            } && teams.ContainsKey(fact.Event.TeamId!.Value))
+            .OrderBy(fact => fact.Event.OccurredAt)
+            .ThenBy(fact => fact.Event.Id)
+            .ToList();
+        var rows = teams.Values.Select(team =>
+        {
+            var own = observations.Where(fact => fact.Event.TeamId == team.Id).ToList();
+            var last = own.Select(fact => fact.Event.OccurredAt).LastOrDefault();
+            return new LeaderboardEntry(0, team.Id, team.Name,
+                own.Count * configuration.ControlPointsPerInterval,
+                0,
+                last == default ? null : last,
+                []);
+        });
+        return rows.OrderByDescending(row => row.Score)
+            .ThenBy(row => row.LastScoreAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
+            .Select((row, index) => row with { Rank = index + 1 })
+            .ToList();
+    }
+
+    private static KohConfiguration Parse(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<KohConfiguration>(json, JsonOptions)
+                ?? new(1, 5, 10);
+        }
+        catch (JsonException)
+        {
+            return new(1, 5, 10);
+        }
+    }
 }
 
 public sealed class PenetrationLeaderboardProjector : IGameModeLeaderboardProjector

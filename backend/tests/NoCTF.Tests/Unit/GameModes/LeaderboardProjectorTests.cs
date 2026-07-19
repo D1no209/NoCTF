@@ -5,6 +5,7 @@ using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Koh.Configuration;
 using System.Text.Json;
 
 namespace NoCTF.Tests.Unit.GameModes;
@@ -204,6 +205,29 @@ public class LeaderboardProjectorTests
     }
 
     [Test]
+    public async Task KohProjector_AwardsEachStableControlObservation()
+    {
+        var controller = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var configuration = JsonSerializer.Serialize(new KohConfiguration(1, 5, 25),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var observations = new[]
+        {
+            Observation(controller, 2),
+            Observation(controller, 1),
+            Observation(other, 3)
+        };
+
+        var result = new KohLeaderboardProjector().Project(new LeaderboardProjectionInput(
+            Guid.NewGuid(), GameMode.Koh,
+            [new(controller, "controller", false, false), new(other, "other", false, false)],
+            [], observations, [], configuration));
+
+        await Assert.That(result.Single(item => item.TeamId == controller).Score).IsEqualTo(50L);
+        await Assert.That(result.Single(item => item.TeamId == other).Score).IsEqualTo(25L);
+    }
+
+    [Test]
     public async Task AllModesHaveProjector()
     {
         var catalog = new LeaderboardProjectorCatalog();
@@ -225,4 +249,13 @@ public class LeaderboardProjectorTests
     private static LeaderboardSubmissionFact Achievement(Guid team, Guid challenge, SubmissionKind kind, DateTimeOffset occurredAt) =>
         new(Guid.NewGuid(), team, challenge, kind, occurredAt,
             new ScoringEvent { Id = Guid.NewGuid(), TeamId = team, Result = ScoringResult.Correct, OccurredAt = occurredAt });
+
+    private static LeaderboardSystemFact Observation(Guid team, int seconds) => new(new ScoringEvent
+    {
+        Id = Guid.NewGuid(),
+        TeamId = team,
+        Kind = ScoringEventKind.KohObservation,
+        Result = ScoringResult.Correct,
+        OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds)
+    });
 }

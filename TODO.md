@@ -259,14 +259,14 @@
 
 ### 7.4 KoH
 
-- [ ] 不接受普通 Flag Submission。
+- [x] 不接受普通 Flag Submission。
 - [ ] Agent observation parser。
 - [ ] Team identifier 映射。
 - [ ] unknown/invalid identifier 处理。
 - [ ] polling timeout。
 - [ ] control transition。
-- [ ] control interval score。
-- [ ] banned/deleted Team 过滤。
+- [x] control interval score。
+- [x] banned/deleted Team 过滤。
 
 ### 7.5 Penetration
 
@@ -338,7 +338,7 @@
 - [x] CTF projector。
 - [x] AWD projector。
 - [x] AWDP projector。
-- [ ] KoH projector。
+- [x] KoH projector。
 - [ ] Penetration projector。
 - [x] Competition/Challenge configuration 进入 projector input。
 - [x] Team ban/soft-delete 过滤。
