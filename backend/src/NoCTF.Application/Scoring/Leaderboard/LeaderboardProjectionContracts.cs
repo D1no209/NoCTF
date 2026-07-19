@@ -10,7 +10,8 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardSubmissionFact> Submissions,
     IReadOnlyList<LeaderboardSystemFact> SystemEvents,
     IReadOnlyList<LeaderboardChallengeFact>? Challenges = null,
-    string? CompetitionConfigurationJson = null);
+    string? CompetitionConfigurationJson = null,
+    DateTimeOffset? CompetitionStartTime = null);
 
 public sealed record LeaderboardTeamFact(Guid Id, string Name, bool IsBanned, bool IsDeleted);
 public sealed record LeaderboardChallengeFact(Guid Id, string Direction, bool IsDeleted, string? ConfigurationJson = null);

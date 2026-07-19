@@ -2,6 +2,8 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using SubmissionEntity = NoCTF.Domain.Submissions.Submission;
+using System.Text.Json;
+using NoCTF.GameModes.Awdp.Configuration;
 
 namespace NoCTF.GameModes.Submission;
 
@@ -68,7 +70,47 @@ public sealed class AwdSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmis
 
 public sealed class AwdpSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmissionEvaluator
 {
-    public ScoringEventDecision Evaluate(SubmissionProcessingContext context) => inner.Evaluate(context);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public ScoringEventDecision Evaluate(SubmissionProcessingContext context)
+    {
+        var configuration = Parse(context.ChallengeConfigurationJson);
+        if (context.Submission.Kind == SubmissionKind.Fix
+            && configuration.RequireBreakBeforeFix
+            && !HasCorrectPrior(context, SubmissionKind.Flag))
+            return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.BreakRequired);
+        if (HasCorrectPrior(context, context.Submission.Kind))
+            return new(
+                ScoringEventKind.SubmissionEvaluation,
+                ScoringResult.Duplicate,
+                ScoringFailureCode.AchievementAlreadyCompleted,
+                context.Submission.ReceivedAt,
+                "awdp-evaluator-v1");
+        return inner.Evaluate(context);
+    }
+
+    private static bool HasCorrectPrior(SubmissionProcessingContext context, SubmissionKind kind) =>
+        context.PriorSubmissions?.Any(previous =>
+            previous.Kind == kind
+            && previous.TeamId == context.Submission.TeamId
+            && previous.ChallengeId == context.Submission.ChallengeId
+            && context.PriorEvents.Any(@event => @event.SubmissionId == previous.Id && @event.Result == ScoringResult.Correct)) == true;
+
+    private static AwdpChallengeConfiguration Parse(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<AwdpChallengeConfiguration>(json, JsonOptions)
+                ?? Default();
+        }
+        catch (JsonException)
+        {
+            return Default();
+        }
+    }
+
+    private static AwdpChallengeConfiguration Default() =>
+        new(1, null, null, true, 10, 10);
 }
 
 public sealed class KohSubmissionEvaluator : ISubmissionEvaluator

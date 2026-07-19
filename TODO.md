@@ -243,19 +243,19 @@
 
 ### 7.3 AWDP
 
-- [ ] Break evaluator。
-- [ ] Fix evaluator。
-- [ ] BreakRequired。
-- [ ] Break/Fix attempt limits。
-- [ ] BreakSuccess 后禁止普通 Break。
-- [ ] FixSuccess 后禁止普通 Fix。
-- [ ] Fix archive verification mapping。
+- [x] Break evaluator。
+- [x] Fix evaluator。
+- [x] BreakRequired。
+- [x] Break/Fix attempt limits。
+- [x] BreakSuccess 后禁止普通 Break。
+- [x] FixSuccess 后禁止普通 Fix。
+- [x] Fix archive verification mapping。
 - [ ] Check exit code mapping。
-- [ ] round settlement。
+- [x] round settlement。
 - [ ] attack/defense/violation/service penalty 配置。
-- [ ] Break 只来自 Correct Flag event。
-- [ ] Fix 只来自 Correct Fix event。
-- [ ] Checkdown 只使用独立 system event。
+- [x] Break 只来自 Correct Flag event。
+- [x] Fix 只来自 Correct Fix event。
+- [x] Checkdown 只使用独立 system event。
 
 ### 7.4 KoH
 
@@ -337,7 +337,7 @@
 - [ ] 删除 Correct count 临时 projector。
 - [x] CTF projector。
 - [x] AWD projector。
-- [ ] AWDP projector。
+- [x] AWDP projector。
 - [ ] KoH projector。
 - [ ] Penetration projector。
 - [x] Competition/Challenge configuration 进入 projector input。

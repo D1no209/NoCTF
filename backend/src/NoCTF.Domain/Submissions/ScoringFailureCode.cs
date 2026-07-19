@@ -16,5 +16,6 @@ public enum ScoringFailureCode
     StorageUnavailable,
     CheckerPlatformError,
     SelfAttackRejected,
-    DuplicateAttack
+    DuplicateAttack,
+    AchievementAlreadyCompleted
 }

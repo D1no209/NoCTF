@@ -91,4 +91,43 @@ public class GameModeSubmissionEvaluatorTests
         await Assert.That(result.Result).IsEqualTo(ScoringResult.Duplicate);
         await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.DuplicateAttack);
     }
+
+    [Test]
+    public async Task AwdpEvaluator_RequiresBreakBeforeFix()
+    {
+        var submission = new Submission
+        {
+            TeamId = Guid.NewGuid(),
+            ChallengeId = Guid.NewGuid(),
+            Kind = SubmissionKind.Fix,
+            ReceivedAt = DateTimeOffset.UtcNow
+        };
+        var result = new AwdpSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+            .Evaluate(new(submission, [], [], null, "{}", """{"schemaVersion":1,"requireBreakBeforeFix":true,"maxBreakAttempts":10,"maxFixAttempts":10}"""));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Rejected);
+        await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.BreakRequired);
+    }
+
+    [Test]
+    public async Task AwdpEvaluator_PreventsSecondSuccessfulFix()
+    {
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var prior = new Submission { Id = Guid.NewGuid(), TeamId = teamId, ChallengeId = challengeId, Kind = SubmissionKind.Fix };
+        var priorEvent = new ScoringEvent { SubmissionId = prior.Id, Result = ScoringResult.Correct };
+        var submission = new Submission
+        {
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            Kind = SubmissionKind.Fix,
+            ReceivedAt = DateTimeOffset.UtcNow
+        };
+
+        var result = new AwdpSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+            .Evaluate(new(submission, [priorEvent], [], null, "{}", """{"schemaVersion":1,"requireBreakBeforeFix":false,"maxBreakAttempts":10,"maxFixAttempts":10}""", [prior]));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Duplicate);
+        await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.AchievementAlreadyCompleted);
+    }
 }

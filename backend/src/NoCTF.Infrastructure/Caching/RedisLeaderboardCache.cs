@@ -48,7 +48,7 @@ public sealed class RedisLeaderboardCache(NoCtfDbContext db, ILeaderboardProject
         var system = await db.ScoringEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.SubmissionId == null)
             .Select(x => new LeaderboardSystemFact(x)).ToListAsync(ct);
         var entries = projectors.Get(competition.Mode).Project(
-            new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration));
+            new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration, competition.StartTime));
         var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, entries);
         await redis.GetDatabase().StringSetAsync(Key(competitionId), JsonSerializer.Serialize(response, JsonOptions), TimeSpan.FromMinutes(1));
     }
