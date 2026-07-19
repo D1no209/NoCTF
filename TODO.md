@@ -303,7 +303,7 @@
 - [ ] `ChallengeRuntimeProvisioner`。
 - [ ] `CompetitionRuntimeCleaner`。
 - [ ] `ChallengeRuntimeHealthChecker`。
-- [ ] runtime operation idempotency key。
+- [x] runtime operation idempotency key。
 - [ ] runtime operation timeout。
 - [ ] Docker runtime 接线。
 - [ ] Kubernetes runtime 接线。
@@ -313,7 +313,7 @@
 - [ ] Penetration stage instance provision。
 - [ ] orphan runtime cleanup。
 - [ ] competition finish cleanup。
-- [ ] runtime failure → ScoringEvent/PlatformFailed。
+- [x] runtime failure → ScoringEvent/PlatformFailed。
 
 ## 10. Maintenance、rebuild 和 lifecycle Channel
 

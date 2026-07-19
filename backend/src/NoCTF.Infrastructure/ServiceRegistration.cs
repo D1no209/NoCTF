@@ -18,6 +18,7 @@ using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Maintenance;
+using NoCTF.Application.Runtime;
 using NoCTF.GameModes.Submission;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Registration;
@@ -115,6 +116,8 @@ public static class ServiceRegistration
         services.AddScoped<UpdateChallengeConfiguration>();
         services.AddScoped<IChallengeFlagStore, EfChallengeFlagStore>();
         services.AddScoped<ICompetitionRebuildProcessor, EfCompetitionRebuildProcessor>();
+        services.AddScoped<IRuntimeOperationStore, EfRuntimeOperationStore>();
+        services.AddScoped<ChallengeRuntimeProvisioner>();
         services.AddScoped<ListChallengeFlags>();
         services.AddScoped<GetChallengeFlag>();
         services.AddScoped<CreateChallengeFlag>();
