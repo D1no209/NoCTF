@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
-using ApplicationFixVerificationStatus = NoCTF.Application.Submissions.Processing.FixVerificationStatus;
+using ApplicationFixVerificationStatus = NoCTF.Application.Submissions.Processing.FixVerificationDecision;
 using DomainFixVerificationStatus = NoCTF.Domain.Submissions.FixVerificationStatus;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;

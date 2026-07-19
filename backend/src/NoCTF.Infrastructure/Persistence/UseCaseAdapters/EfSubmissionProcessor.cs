@@ -20,12 +20,16 @@ public sealed class EfSubmissionProcessor(
     {
         var kind = await db.Submissions.AsNoTracking()
             .Where(submission => submission.Id == submissionId)
-            .Select(submission => (SubmissionKind?)submission.Kind)
+            .Select(submission => new { submission.Kind, submission.ScoringEventId })
             .SingleOrDefaultAsync(ct);
-        if (kind == SubmissionKind.Fix)
+        if (kind is null)
+            return;
+        if (kind.ScoringEventId is not null)
+            return;
+        if (kind.Kind == SubmissionKind.Fix)
         {
             var verification = await verifyFixSubmission.ExecuteAsync(submissionId, DateTimeOffset.UtcNow, ct);
-            if (!verification.Succeeded && verification.ErrorCode == "fix_concurrency")
+            if (!verification.Succeeded && verification.Error == FixVerificationError.Concurrency)
                 return;
         }
 

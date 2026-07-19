@@ -2,7 +2,7 @@ using NoCTF.Application.Common;
 using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
-using ApplicationFixVerificationStatus = NoCTF.Application.Submissions.Processing.FixVerificationStatus;
+using ApplicationFixVerificationStatus = NoCTF.Application.Submissions.Processing.FixVerificationDecision;
 using DomainFixVerificationStatus = NoCTF.Domain.Submissions.FixVerificationStatus;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -53,7 +53,7 @@ public class FixVerificationTests
         var result = await new VerifyFixSubmission(store, new Verifier(
             new(ApplicationFixVerificationStatus.TeamFailure))).ExecuteAsync(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("fix_concurrency");
+        await Assert.That(result.Error).IsEqualTo(FixVerificationError.Concurrency);
     }
 
     private sealed class Store : IFixVerificationStore
