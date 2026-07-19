@@ -305,8 +305,8 @@
 - [ ] `ChallengeRuntimeHealthChecker`。
 - [x] runtime operation idempotency key。
 - [x] runtime operation timeout。
-- [ ] Docker runtime 接线。
-- [ ] Kubernetes runtime 接线。
+- [x] Docker runtime 接线。
+- [x] Kubernetes runtime 接线。
 - [ ] AWD game box provision。
 - [ ] AWDP patch/recreate/check 流程。
 - [ ] KoH agent provision/poll。
