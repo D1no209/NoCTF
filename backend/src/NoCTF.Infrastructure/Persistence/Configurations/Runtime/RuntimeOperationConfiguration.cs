@@ -10,6 +10,8 @@ internal sealed class RuntimeOperationConfiguration : IEntityTypeConfiguration<R
     {
         builder.ToTable("runtime_operations");
         builder.HasKey(operation => operation.Id);
+        builder.Property(operation => operation.OperationKey).HasMaxLength(256);
+        builder.HasIndex(operation => new { operation.CompetitionId, operation.OperationKey }).IsUnique();
         builder.HasIndex(operation => new { operation.CompetitionId, operation.Status });
     }
 }
