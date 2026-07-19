@@ -49,6 +49,19 @@ public class RuntimeOperationTests
         await Assert.That(operations.Failed).IsTrue();
     }
 
+    [Test]
+    public async Task Provision_OperationTimeout_MarksOperationFailed()
+    {
+        var operations = new Operations();
+        var runtime = new Runtime { Delay = TimeSpan.FromSeconds(1) };
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command() with { OperationTimeout = TimeSpan.FromMilliseconds(10) });
+
+        await Assert.That(result.Status).IsEqualTo(RuntimeStatus.Failed);
+        await Assert.That(operations.Failed).IsTrue();
+    }
+
     private static ProvisionChallengeRuntimeCommand Command() => new(
         Guid.NewGuid(),
         Guid.NewGuid(),
@@ -95,6 +108,7 @@ public class RuntimeOperationTests
     private sealed class Runtime : IContainerLifecycle
     {
         public bool Throw { get; init; }
+        public TimeSpan? Delay { get; init; }
         public int CreateCalls { get; private set; }
 
         public Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken)
@@ -102,14 +116,21 @@ public class RuntimeOperationTests
             CreateCalls++;
             if (Throw)
                 throw new InvalidOperationException("runtime failure");
-            return Task.FromResult(new ContainerReceipt(
+            return CreateAsyncCore(request, cancellationToken);
+        }
+
+        private async Task<ContainerReceipt> CreateAsyncCore(ContainerRequest request, CancellationToken cancellationToken)
+        {
+            if (Delay is { } delay)
+                await Task.Delay(delay, cancellationToken);
+            return new ContainerReceipt(
                 request.OperationId,
                 RuntimeProvider.Docker,
                 "container-id",
                 RuntimeStatus.Running,
                 request.PortMappings,
                 "localhost",
-                null));
+                null);
         }
 
         public Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken) => Task.CompletedTask;
