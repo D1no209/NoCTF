@@ -13,10 +13,22 @@ public sealed class EfSubmissionProcessor(
     IBackgroundWorkScheduler scheduler,
     ISubmissionEvaluator evaluator,
     ISubmissionAdmissionModePolicy admissionModePolicy,
+    VerifyFixSubmission verifyFixSubmission,
     ILogger<EfSubmissionProcessor> logger) : ISubmissionProcessor
 {
     public async Task ProcessAsync(Guid submissionId, CancellationToken ct)
     {
+        var kind = await db.Submissions.AsNoTracking()
+            .Where(submission => submission.Id == submissionId)
+            .Select(submission => (SubmissionKind?)submission.Kind)
+            .SingleOrDefaultAsync(ct);
+        if (kind == SubmissionKind.Fix)
+        {
+            var verification = await verifyFixSubmission.ExecuteAsync(submissionId, DateTimeOffset.UtcNow, ct);
+            if (!verification.Succeeded && verification.ErrorCode == "fix_concurrency")
+                return;
+        }
+
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var submission = await db.Submissions.Include(x => x.ScoringEvent)
             .SingleOrDefaultAsync(x => x.Id == submissionId, ct);

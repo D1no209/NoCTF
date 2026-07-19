@@ -10,10 +10,19 @@ public sealed class DefaultEfSubmissionEvaluator : ISubmissionEvaluator
         var submission = context.Submission;
         if (submission.Kind == SubmissionKind.Fix)
         {
-            var result = context.FixRecord?.VerificationStatus == NoCTF.Domain.Submissions.FixVerificationStatus.Valid
-                ? ScoringResult.Correct : ScoringResult.Rejected;
+            var result = context.FixRecord?.VerificationStatus switch
+            {
+                NoCTF.Domain.Submissions.FixVerificationStatus.Valid => ScoringResult.Correct,
+                NoCTF.Domain.Submissions.FixVerificationStatus.PlatformFailed => ScoringResult.PlatformFailed,
+                _ => ScoringResult.Rejected
+            };
             return new(ScoringEventKind.SubmissionEvaluation, result,
-                result == ScoringResult.Correct ? null : ScoringFailureCode.FixArchiveMissing,
+                result switch
+                {
+                    ScoringResult.Correct => null,
+                    ScoringResult.PlatformFailed => context.FixRecord?.FailureCategory ?? ScoringFailureCode.StorageUnavailable,
+                    _ => ScoringFailureCode.FixArchiveMissing
+                },
                 submission.ReceivedAt, "ef-v1");
         }
         var duplicate = context.PriorEvents.Any(x => x.TeamId == submission.TeamId && x.ChallengeId == submission.ChallengeId && x.Result == ScoringResult.Correct);
