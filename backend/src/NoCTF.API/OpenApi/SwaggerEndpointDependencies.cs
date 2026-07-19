@@ -4,7 +4,7 @@ using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Application.Scoring.Ports;
+using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.OpenApi;
@@ -53,17 +53,17 @@ internal sealed class SwaggerModerationAuthorizer : ICompetitionModerationAuthor
         Task.FromResult(false);
 }
 
-internal sealed class SwaggerRebuildQueue : IScoringRebuildQueue
+internal sealed class SwaggerBackgroundWorkScheduler : IBackgroundWorkScheduler
 {
-    public Task EnqueueAsync(Guid competitionId, ScoringRebuildReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
+    public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
-internal sealed class SwaggerLeaderboardStore : ILeaderboardStore
+internal sealed class SwaggerLeaderboardCache : ILeaderboardCache
 {
-    public Task<LeaderboardSnapshot?> GetAuthoritativeAsync(Guid competitionId, CancellationToken cancellationToken) =>
-        Task.FromResult<LeaderboardSnapshot?>(null);
-    public Task PublishCacheAsync(LeaderboardSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task<IReadOnlyList<Guid>> GetDirtyCompetitionsAsync(CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<Guid>>([]);
-    public Task MarkCleanAsync(Guid competitionId, long projectionVersion, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
+    public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
 }
