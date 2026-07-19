@@ -73,24 +73,24 @@
 - [x] 实现 `CreateCompetition`。
 - [x] 实现 `GetCompetition`。
 - [x] 实现 `ListCompetitions`。
-- [ ] 实现 `UpdateCompetition`。
-- [ ] 实现 `DeleteCompetition` soft-delete。
+- [x] 实现 `UpdateCompetition`。
+- [x] 实现 `DeleteCompetition` soft-delete。
 - [x] 创建时强制 OwnerId 使用认证用户。
 - [x] 创建时状态固定为 Draft。
 - [x] GameMode 创建后 immutable。
 - [x] MaxTeamMembers 必须大于 0。
-- [ ] 删除时禁止级联删除 Submission/ScoringEvent。
-- [ ] 补公开 competition DTO 与管理员 DTO。
+- [x] 删除时禁止级联删除 Submission/ScoringEvent。
+- [x] 补公开 competition DTO 与管理员 DTO。
 
 ### 2.2 Competition API
 
 - [x] `POST /admin/competitions`。
 - [x] `GET /competitions`。
 - [x] `GET /competitions/{id}`。
-- [ ] `PUT /admin/competitions/{id}`。
-- [ ] `DELETE /admin/competitions/{id}`。
-- [ ] 公开 DTO 不包含私有配置、Flag、Runner secret、Fix metadata。
-- [ ] 使用 Mapperly 完成 command/response mapping。
+- [x] `PUT /admin/competitions/{id}`。
+- [x] `DELETE /admin/competitions/{id}`。
+- [x] 公开 DTO 不包含私有配置、Flag、Runner secret、Fix metadata。
+- [x] 使用 Mapperly 完成 command/response mapping。
 
 ### 2.3 CompetitionConfiguration
 
