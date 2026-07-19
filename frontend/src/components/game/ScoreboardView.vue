@@ -321,6 +321,10 @@ watch(connection, (conn) => {
       return
     fetchLeaderboard()
   })
+  conn.on('competitionLifecycleChanged', (notification: { competitionId?: string }) => {
+    if (notification?.competitionId === props.competitionId)
+      fetchLeaderboard()
+  })
   conn.on('ReceiveScoreUpdate', () => {
     fetchLeaderboard()
   })

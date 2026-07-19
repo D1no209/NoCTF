@@ -2,6 +2,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Application.Common;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Notifications;
 
 namespace NoCTF.Application.Competitions.Lifecycle;
 
@@ -55,7 +56,8 @@ public sealed class AdvanceCompetitionLifecycle(ICompetitionLifecycleStore store
 public sealed class TransitionCompetitionLifecycle(
     ICompetitionLifecycleStore store,
     ILeaderboardCache cache,
-    IBackgroundWorkScheduler scheduler)
+    IBackgroundWorkScheduler scheduler,
+    ICompetitionLifecycleNotificationPublisher? notifications = null)
 {
     public async Task<OperationResult> ExecuteAsync(
         Guid competitionId,
@@ -74,6 +76,8 @@ public sealed class TransitionCompetitionLifecycle(
             return OperationResult.Failure("lifecycle_conflict", "Competition status changed concurrently.");
         await cache.InvalidateAsync(competitionId, cancellationToken);
         await scheduler.EnqueueLeaderboardRefreshAsync(competitionId, cancellationToken);
+        if (notifications is not null)
+            await notifications.PublishAsync(competitionId, current.Value, target, DateTimeOffset.UtcNow, cancellationToken);
         return OperationResult.Success();
     }
 }

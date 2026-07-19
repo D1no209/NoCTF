@@ -90,6 +90,7 @@ public static class ServiceRegistration
         var signalR = services.AddSignalR();
         services.AddScoped<ISubmissionResultPublisher, SignalRSubmissionResultPublisher>();
         services.AddScoped<ILeaderboardRefreshPublisher, SignalRLeaderboardRefreshPublisher>();
+        services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
         if (includeInfrastructure
             && !configuration.GetValue<bool>("OpenApi:Exporting")
             && !string.IsNullOrWhiteSpace(redis))

@@ -6,6 +6,8 @@ using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.Application.Notifications;
+using System.Diagnostics;
 
 namespace NoCTF.Infrastructure.BackgroundWork;
 
@@ -13,7 +15,8 @@ public sealed class CompetitionLifecycleHostedService(
     IServiceScopeFactory scopeFactory,
     IHostApplicationLifetime lifetime,
     IConfiguration configuration,
-    ILogger<CompetitionLifecycleHostedService> logger) : BackgroundService
+    ILogger<CompetitionLifecycleHostedService> logger,
+    ICompetitionLifecycleNotificationPublisher? notifications = null) : BackgroundService
 {
     private readonly TimeSpan interval = TimeSpan.FromSeconds(
         Math.Max(1, configuration.GetValue("CompetitionLifecycle:IntervalSeconds", 5)));
@@ -29,6 +32,7 @@ public sealed class CompetitionLifecycleHostedService(
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var lifecycle = scope.ServiceProvider.GetRequiredService<AdvanceCompetitionLifecycle>();
+                var stopwatch = Stopwatch.StartNew();
                 var transitions = await lifecycle.ExecuteAsync(DateTimeOffset.UtcNow, ct);
                 var scheduler = scope.ServiceProvider.GetRequiredService<IBackgroundWorkScheduler>();
                 var cache = scope.ServiceProvider.GetRequiredService<ILeaderboardCache>();
@@ -38,9 +42,14 @@ public sealed class CompetitionLifecycleHostedService(
                     await scheduler.EnqueueLeaderboardRefreshAsync(transition.CompetitionId, ct);
                     if (transition.To == CompetitionStatus.Finished)
                         await scheduler.EnqueueRuntimeCleanupAsync(transition.CompetitionId, ct);
+                    if (notifications is not null)
+                        await notifications.PublishAsync(transition.CompetitionId, transition.From, transition.To, DateTimeOffset.UtcNow, ct);
                     logger.LogInformation("Competition {CompetitionId} transitioned from {From} to {To}",
                         transition.CompetitionId, transition.From, transition.To);
                 }
+                stopwatch.Stop();
+                logger.LogInformation("Competition lifecycle sweep completed in {ElapsedMilliseconds}ms with {TransitionCount} transitions",
+                    stopwatch.ElapsedMilliseconds, transitions.Count);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {

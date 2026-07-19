@@ -43,7 +43,7 @@
 - [x] 状态转换记录 actor、时间和原因审计信息。
 - [x] 状态变化统一 invalidate leaderboard 并 enqueue refresh。
 - [x] Finished 状态触发 runtime cleanup work item。
-- [ ] 状态变化发布脱敏 SignalR competition notification。
+- [x] 状态变化发布脱敏 SignalR competition notification。
 
 ### 1.3 Lifecycle hosted service
 
@@ -52,7 +52,7 @@
 - [x] Published 到 StartTime 自动转 Running。
 - [x] Published/Running/Paused 到 EndTime 自动转 Finished。
 - [ ] 加入 shutdown cancellation 和有限 drain。
-- [ ] 记录 structured log：CompetitionId、from、to、耗时、结果。
+- [x] 记录 structured log：CompetitionId、from、to、耗时、结果。
 - [ ] 不记录 Flag、SourceKey、archive metadata。
 
 ### 1.4 Lifecycle API
