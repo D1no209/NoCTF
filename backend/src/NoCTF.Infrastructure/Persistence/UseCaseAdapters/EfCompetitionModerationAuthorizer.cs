@@ -33,4 +33,17 @@ public sealed class EfCompetitionModerationAuthorizer(NoCtfDbContext db) : IComp
                         || collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Judge),
                 cancellationToken);
     }
+
+    public async Task<bool> CanObserveAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken)
+    {
+        var privileged = await db.Users.AsNoTracking().AnyAsync(user =>
+            user.Id == userId && (user.Role == UserRole.Administrator || user.Role == UserRole.Organizer), cancellationToken);
+        return privileged
+            || await db.Competitions.AsNoTracking().AnyAsync(competition =>
+                competition.Id == competitionId && competition.OwnerId == userId && !competition.Deletion.IsDeleted,
+                cancellationToken)
+            || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(collaborator =>
+                collaborator.CompetitionId == competitionId && collaborator.UserId == userId,
+                cancellationToken);
+    }
 }

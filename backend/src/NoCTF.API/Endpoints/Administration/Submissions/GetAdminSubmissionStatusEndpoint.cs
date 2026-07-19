@@ -31,7 +31,7 @@ public sealed class GetAdminSubmissionStatusEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         request.SubmissionId = Route<Guid>("submissionId");
-        if (!await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken))
+        if (!await authorizer.CanObserveAsync(user.UserId, request.CompetitionId, cancellationToken))
             return TypedResults.Forbid();
         var view = await reader.FindAsync(request.CompetitionId, request.SubmissionId, cancellationToken);
         return view is null ? TypedResults.NotFound() : TypedResults.Ok(SubmissionMapper.ToAdminStatusResponse(view));

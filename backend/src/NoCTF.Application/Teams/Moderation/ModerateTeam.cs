@@ -22,6 +22,8 @@ public interface ICompetitionModerationAuthorizer
     Task<bool> CanModerateAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken);
     Task<bool> CanJudgeAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
         CanModerateAsync(userId, competitionId, cancellationToken);
+    Task<bool> CanObserveAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
+        CanJudgeAsync(userId, competitionId, cancellationToken);
 }
 
 /// <summary>Applies a relational ban ruling and schedules an in-process reconstruction.</summary>
