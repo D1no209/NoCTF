@@ -39,5 +39,9 @@ public class TeamRegistrationTests
         }
         public Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TeamView>>([]);
         public Task<bool?> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken cancellationToken) => Task.FromResult<bool?>(true);
+        public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken cancellationToken) => Task.FromResult<TeamView?>(null);
+        public Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<TeamView?> UpdateAsync(UpdateTeamCommand command, CancellationToken cancellationToken) => Task.FromResult<TeamView?>(null);
+        public Task<string?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
     }
 }

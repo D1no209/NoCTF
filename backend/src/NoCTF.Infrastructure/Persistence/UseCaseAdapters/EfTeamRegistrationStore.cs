@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
@@ -57,6 +59,46 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
                 && x.RegistrationStatus == TeamRegistrationStatus.Pending)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
         return changed == 1;
+    }
+
+    public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken ct) =>
+        db.Teams.AsNoTracking().Where(x => x.Id == teamId && x.CompetitionId == competitionId && !x.Deletion.IsDeleted
+                && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
+            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId,
+                x.RegistrationStatus, x.IsLocked, x.RegisteredAt)).SingleOrDefaultAsync(ct);
+
+    public async Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken ct) =>
+        await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId && x.CompetitionId == competitionId
+            && !x.Deletion.IsDeleted && x.CaptainId == actorId, ct)
+        || await db.Users.AsNoTracking().AnyAsync(x => x.Id == actorId && x.Role == UserRole.Administrator, ct)
+        || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId && x.OwnerId == actorId && !x.Deletion.IsDeleted, ct)
+        || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId
+            && x.UserId == actorId && x.Role == CompetitionCollaboratorRole.Manager, ct);
+
+    public async Task<TeamView?> UpdateAsync(UpdateTeamCommand command, CancellationToken ct)
+    {
+        var entity = await db.Teams.SingleOrDefaultAsync(x => x.Id == command.TeamId && x.CompetitionId == command.CompetitionId && !x.Deletion.IsDeleted, ct);
+        if (entity is null || entity.IsLocked) return null;
+        var finished = await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == command.CompetitionId && x.Status == CompetitionStatus.Finished, ct);
+        if (finished) return null;
+        entity.Name = command.Name;
+        entity.AvatarUrl = command.AvatarUrl;
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException) { return null; }
+        return Map(entity);
+    }
+
+    public async Task<string?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken ct)
+    {
+        var entity = await db.Teams.SingleOrDefaultAsync(x => x.Id == teamId && x.CompetitionId == competitionId && !x.Deletion.IsDeleted, ct);
+        if (entity is null) return "team_not_found";
+        var status = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId).Select(x => (CompetitionStatus?)x.Status).SingleOrDefaultAsync(ct);
+        if (status is CompetitionStatus.Running or CompetitionStatus.Paused) return "competition_active";
+        entity.Deletion.IsDeleted = true;
+        entity.Deletion.DeletedAt = deletedAt;
+        entity.Deletion.DeletedById = actorId;
+        await db.SaveChangesAsync(ct);
+        return null;
     }
 
     private static TeamView Map(Team x) => new(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId,

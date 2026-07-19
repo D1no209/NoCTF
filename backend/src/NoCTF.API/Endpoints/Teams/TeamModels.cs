@@ -13,3 +13,11 @@ public sealed record TeamResponse(Guid Id, Guid CompetitionId, string Name, stri
     Guid CaptainId, TeamRegistrationStatus RegistrationStatus, bool IsLocked, DateTimeOffset RegisteredAt);
 
 public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);
+
+public sealed class UpdateTeamRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? AvatarUrl { get; set; }
+}
