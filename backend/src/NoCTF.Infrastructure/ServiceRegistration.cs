@@ -120,7 +120,9 @@ public static class ServiceRegistration
         services.AddScoped<IChallengeFlagStore, EfChallengeFlagStore>();
         services.AddScoped<ICompetitionRebuildProcessor, EfCompetitionRebuildProcessor>();
         services.AddScoped<IRuntimeOperationStore, EfRuntimeOperationStore>();
+        services.AddScoped<IRuntimeCleanupStore, EfRuntimeCleanupStore>();
         services.AddScoped<ChallengeRuntimeProvisioner>();
+        services.AddScoped<CompetitionRuntimeCleaner>();
         services.AddScoped<IContainerLifecycle, UnavailableContainerLifecycle>();
         services.AddScoped<ListChallengeFlags>();
         services.AddScoped<GetChallengeFlag>();

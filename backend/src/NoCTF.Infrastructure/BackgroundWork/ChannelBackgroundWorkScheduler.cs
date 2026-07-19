@@ -7,7 +7,9 @@ namespace NoCTF.Infrastructure.BackgroundWork;
 public sealed record ProcessSubmissionWorkItem(Guid SubmissionId);
 public sealed record ProcessSystemEventWorkItem(Guid ScoringEventId);
 public sealed record RefreshLeaderboardWorkItem(Guid CompetitionId);
-public sealed record RebuildCompetitionWorkItem(Guid CompetitionId);
+public abstract record MaintenanceWorkItem(Guid CompetitionId);
+public sealed record RebuildCompetitionWorkItem(Guid CompetitionId) : MaintenanceWorkItem(CompetitionId);
+public sealed record CleanupCompetitionRuntimeWorkItem(Guid CompetitionId) : MaintenanceWorkItem(CompetitionId);
 
 /// <summary>Bounded, single-host Channels used by the API background services.</summary>
 public sealed class ChannelBackgroundWorkScheduler : IBackgroundWorkScheduler
@@ -15,22 +17,23 @@ public sealed class ChannelBackgroundWorkScheduler : IBackgroundWorkScheduler
     private readonly Channel<ProcessSubmissionWorkItem> processing;
     private readonly Channel<ProcessSystemEventWorkItem> systemEvents;
     private readonly Channel<RefreshLeaderboardWorkItem> projections;
-    private readonly Channel<RebuildCompetitionWorkItem> maintenance;
+    private readonly Channel<MaintenanceWorkItem> maintenance;
     private readonly ConcurrentDictionary<Guid, byte> pendingRefreshes = new();
     private readonly ConcurrentDictionary<Guid, byte> pendingRebuilds = new();
+    private readonly ConcurrentDictionary<Guid, byte> pendingRuntimeCleanups = new();
 
     public ChannelBackgroundWorkScheduler(BackgroundQueueOptions options)
     {
         processing = Create<ProcessSubmissionWorkItem>(options.ProcessingCapacity);
         systemEvents = Create<ProcessSystemEventWorkItem>(options.ProcessingCapacity);
         projections = Create<RefreshLeaderboardWorkItem>(options.ProjectionCapacity);
-        maintenance = Create<RebuildCompetitionWorkItem>(options.MaintenanceCapacity);
+        maintenance = Create<MaintenanceWorkItem>(options.MaintenanceCapacity);
     }
 
     public ChannelReader<ProcessSubmissionWorkItem> ProcessingReader => processing.Reader;
     public ChannelReader<ProcessSystemEventWorkItem> SystemEventReader => systemEvents.Reader;
     public ChannelReader<RefreshLeaderboardWorkItem> ProjectionReader => projections.Reader;
-    public ChannelReader<RebuildCompetitionWorkItem> MaintenanceReader => maintenance.Reader;
+    public ChannelReader<MaintenanceWorkItem> MaintenanceReader => maintenance.Reader;
 
     public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) =>
         processing.Writer.WriteAsync(new(submissionId), cancellationToken);
@@ -48,12 +51,20 @@ public sealed class ChannelBackgroundWorkScheduler : IBackgroundWorkScheduler
     public async ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken)
     {
         if (!pendingRebuilds.TryAdd(competitionId, 0)) return;
-        try { await maintenance.Writer.WriteAsync(new(competitionId), cancellationToken); }
+        try { await maintenance.Writer.WriteAsync(new RebuildCompetitionWorkItem(competitionId), cancellationToken); }
         catch { pendingRebuilds.TryRemove(competitionId, out _); throw; }
+    }
+
+    public async ValueTask EnqueueRuntimeCleanupAsync(Guid competitionId, CancellationToken cancellationToken)
+    {
+        if (!pendingRuntimeCleanups.TryAdd(competitionId, 0)) return;
+        try { await maintenance.Writer.WriteAsync(new CleanupCompetitionRuntimeWorkItem(competitionId), cancellationToken); }
+        catch { pendingRuntimeCleanups.TryRemove(competitionId, out _); throw; }
     }
 
     public void CompleteRefresh(Guid competitionId) => pendingRefreshes.TryRemove(competitionId, out _);
     public void CompleteRebuild(Guid competitionId) => pendingRebuilds.TryRemove(competitionId, out _);
+    public void CompleteRuntimeCleanup(Guid competitionId) => pendingRuntimeCleanups.TryRemove(competitionId, out _);
 
     private static Channel<T> Create<T>(int capacity) => Channel.CreateBounded<T>(new BoundedChannelOptions(capacity)
     {

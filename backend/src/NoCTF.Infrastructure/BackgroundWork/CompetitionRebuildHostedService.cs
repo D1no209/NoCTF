@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Maintenance;
 using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Runtime;
 
 namespace NoCTF.Infrastructure.BackgroundWork;
 
@@ -26,13 +27,16 @@ public sealed class CompetitionRebuildHostedService(
             }
             finally
             {
-                scheduler.CompleteRebuild(item.CompetitionId);
+                if (item is RebuildCompetitionWorkItem)
+                    scheduler.CompleteRebuild(item.CompetitionId);
+                else
+                    scheduler.CompleteRuntimeCleanup(item.CompetitionId);
             }
         }
     }
 
     private async Task ExecuteWithRetryAsync(
-        RebuildCompetitionWorkItem item,
+        MaintenanceWorkItem item,
         CancellationToken ct)
     {
         for (var attempt = 0; attempt < 4; attempt++)
@@ -40,19 +44,29 @@ public sealed class CompetitionRebuildHostedService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                await scope.ServiceProvider
-                    .GetRequiredService<ICompetitionRebuildProcessor>()
-                    .RebuildAsync(item.CompetitionId, ct);
-                await scope.ServiceProvider
-                    .GetRequiredService<IBackgroundWorkScheduler>()
-                    .EnqueueLeaderboardRefreshAsync(item.CompetitionId, ct);
-                logger.LogInformation("Competition rebuild completed for {CompetitionId}", item.CompetitionId);
+                if (item is RebuildCompetitionWorkItem)
+                {
+                    await scope.ServiceProvider
+                        .GetRequiredService<ICompetitionRebuildProcessor>()
+                        .RebuildAsync(item.CompetitionId, ct);
+                    await scope.ServiceProvider
+                        .GetRequiredService<IBackgroundWorkScheduler>()
+                        .EnqueueLeaderboardRefreshAsync(item.CompetitionId, ct);
+                }
+                else
+                {
+                    await scope.ServiceProvider
+                        .GetRequiredService<CompetitionRuntimeCleaner>()
+                        .ExecuteAsync(item.CompetitionId, ct);
+                }
+                logger.LogInformation("Maintenance item {WorkItemType} completed for {CompetitionId}", item.GetType().Name, item.CompetitionId);
                 return;
             }
             catch (Exception exception) when (attempt < 3 && !ct.IsCancellationRequested)
             {
                 logger.LogWarning(exception,
-                    "Competition rebuild {CompetitionId} failed on attempt {Attempt}",
+                    "Maintenance item {WorkItemType} for {CompetitionId} failed on attempt {Attempt}",
+                    item.GetType().Name,
                     item.CompetitionId,
                     attempt + 1);
                 await Task.Delay(TimeSpan.FromSeconds(attempt switch { 0 => 1, 1 => 5, _ => 15 }), ct);
@@ -60,7 +74,8 @@ public sealed class CompetitionRebuildHostedService(
             catch (Exception exception)
             {
                 logger.LogError(exception,
-                    "Competition rebuild {CompetitionId} exhausted retries",
+                    "Maintenance item {WorkItemType} for {CompetitionId} exhausted retries",
+                    item.GetType().Name,
                     item.CompetitionId);
                 return;
             }
