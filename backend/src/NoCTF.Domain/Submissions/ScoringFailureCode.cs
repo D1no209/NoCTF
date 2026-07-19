@@ -17,5 +17,8 @@ public enum ScoringFailureCode
     CheckerPlatformError,
     SelfAttackRejected,
     DuplicateAttack,
-    AchievementAlreadyCompleted
+    AchievementAlreadyCompleted,
+    StageRequired,
+    StageNotFound,
+    StagePrerequisiteIncomplete
 }

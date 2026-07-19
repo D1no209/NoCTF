@@ -6,6 +6,7 @@ using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.GameModes.Penetration.Configuration;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -329,10 +330,92 @@ public sealed class PenetrationLeaderboardProjector : IGameModeLeaderboardProjec
     public GameMode Mode => GameMode.Penetration;
 
     public IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input) =>
-        ModeLeaderboardProjection.Project(
-            input,
-            submission => submission.Kind == SubmissionKind.Flag,
-            includeSystemFacts: true);
+        PenetrationLeaderboardProjection.Project(input);
+}
+
+internal static class PenetrationLeaderboardProjection
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.CompetitionConfigurationJson))
+            return ModeLeaderboardProjection.Project(input, submission => submission.Kind == SubmissionKind.Flag, includeSystemFacts: true);
+        var competition = ParseCompetition(input.CompetitionConfigurationJson);
+        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
+        var facts = input.Submissions
+            .Where(fact => teams.ContainsKey(fact.TeamId)
+                          && fact.Kind == SubmissionKind.Flag
+                          && fact.StageId is not null
+                          && fact.Event is { IsDeleted: false, Result: ScoringResult.Correct }
+                          && fact.ChallengeId is not null
+                          && (challenges.Count == 0 || challenges.ContainsKey(fact.ChallengeId.Value)))
+            .OrderBy(fact => fact.ReceivedAt)
+            .ThenBy(fact => fact.SubmissionId)
+            .ToList();
+        var stageSolveCount = new Dictionary<(Guid ChallengeId, Guid StageId), int>();
+        var completed = new HashSet<(Guid TeamId, Guid ChallengeId, Guid StageId)>();
+        var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points)>>();
+        foreach (var fact in facts)
+        {
+            var challengeId = fact.ChallengeId!.Value;
+            var stageId = fact.StageId!.Value;
+            if (!completed.Add((fact.TeamId, challengeId, stageId))) continue;
+            var challengeConfiguration = ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
+            var stage = challengeConfiguration.Stages.SingleOrDefault(item => item.Id == stageId);
+            if (stage is null) continue;
+            var key = (challengeId, stageId);
+            var index = stageSolveCount.GetValueOrDefault(key);
+            stageSolveCount[key] = index + 1;
+            var points = stage.Points ?? competition.DefaultPoints;
+            var score = Math.Max(points.MinimumPoints,
+                (long)Math.Round(points.InitialPoints * Math.Pow((double)points.DecayFactor, index), MidpointRounding.AwayFromZero));
+            if (index == 0)
+                score += competition.BloodRewards.Sum(reward => reward.Policy switch
+                {
+                    BloodRewardPolicy.FixedPoints => (long)Math.Round(reward.Value, MidpointRounding.AwayFromZero),
+                    _ => (long)Math.Round(points.InitialPoints * reward.Value / 100m, MidpointRounding.AwayFromZero)
+                });
+            if (!awarded.TryGetValue(fact.TeamId, out var teamFacts))
+                awarded[fact.TeamId] = teamFacts = [];
+            teamFacts.Add((fact, score));
+        }
+        var rows = teams.Values.Select(team =>
+        {
+            var own = awarded.GetValueOrDefault(team.Id) ?? [];
+            var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
+            var summaries = own.GroupBy(item => item.Fact.ChallengeId!.Value)
+                .Select(group => new LeaderboardChallengeSummary(
+                    group.Key,
+                    challenges.GetValueOrDefault(group.Key)?.Direction ?? string.Empty,
+                    group.Count()))
+                .OrderBy(summary => summary.ChallengeId)
+                .ToList();
+            return new LeaderboardEntry(0, team.Id, team.Name, own.Sum(item => item.Points), own.Count,
+                last == default ? null : last, summaries);
+        });
+        return rows.OrderByDescending(row => row.Score)
+            .ThenBy(row => row.LastScoreAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
+            .Select((row, index) => row with { Rank = index + 1 })
+            .ToList();
+    }
+
+    private static PenetrationConfiguration ParseCompetition(string? json) =>
+        TryParse<PenetrationConfiguration>(json)
+        ?? new(1, new(500, 100, 0.5m), []);
+
+    private static PenetrationChallengeConfiguration ParseChallenge(string? json) =>
+        TryParse<PenetrationChallengeConfiguration>(json)
+        ?? new(1, [], null);
+
+    private static T? TryParse<T>(string? json) where T : class
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<T>(json, JsonOptions); }
+        catch (JsonException) { return null; }
+    }
 }
 
 internal static class ModeLeaderboardProjection

@@ -227,8 +227,8 @@
 - [x] Dynamic score 参数解析。
 - [x] minimum/initial/decay 规则。
 - [x] solve count 和 solve time 排序。
-- [ ] Penetration stage challenge 支持。
-- [ ] stage completion 不等同于整个 Challenge completion。
+- [x] Penetration stage challenge 支持。
+- [x] stage completion 不等同于整个 Challenge completion。
 
 ### 7.2 AWD
 
@@ -270,14 +270,14 @@
 
 ### 7.5 Penetration
 
-- [ ] Stage dependency evaluator。
+- [x] Stage dependency evaluator。
 - [ ] Stage flag 生成和窗口。
-- [ ] Stage submission evaluator。
-- [ ] stage completion。
+- [x] Stage submission evaluator。
+- [x] stage completion。
 - [ ] runtime stage lifecycle。
 - [ ] stage failure/platform failure。
 - [ ] 全部 stage 完成判定。
-- [ ] stage-specific leaderboard projection。
+- [x] stage-specific leaderboard projection。
 
 ## 8. Round engine 和 system producer
 
@@ -339,7 +339,7 @@
 - [x] AWD projector。
 - [x] AWDP projector。
 - [x] KoH projector。
-- [ ] Penetration projector。
+- [x] Penetration projector。
 - [x] Competition/Challenge configuration 进入 projector input。
 - [x] Team ban/soft-delete 过滤。
 - [x] Challenge soft-delete 过滤。

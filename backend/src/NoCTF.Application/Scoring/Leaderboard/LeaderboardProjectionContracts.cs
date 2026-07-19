@@ -26,7 +26,8 @@ public sealed record LeaderboardSubmissionFact(
     Guid? SubjectTeamId = null,
     Guid? VictimTeamId = null,
     Guid? ServiceId = null,
-    long? ControlIntervalSeconds = null);
+    long? ControlIntervalSeconds = null,
+    Guid? StageId = null);
 
 public sealed record LeaderboardSystemFact(ScoringEvent Event);
 
