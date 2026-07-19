@@ -27,5 +27,8 @@ public class TeamMembershipTests
         public Task<(TeamInvitationView? Invitation, string? Error)> InviteAsync(InviteTeamMemberCommand command, CancellationToken cancellationToken) =>
             Task.FromResult<(TeamInvitationView?, string?)>((new(Guid.NewGuid(), command.CompetitionId, command.TeamId, command.InvitedUserId, command.ExpiresAt, command.Now), null));
         public Task<string?> RespondAsync(Guid invitationId, Guid userId, bool accept, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(ResponseError);
+        public Task<string?> RemoveMemberAsync(Guid competitionId, Guid teamId, Guid targetUserId, Guid actorId, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+        public Task<string?> LeaveAsync(Guid competitionId, Guid userId, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+        public Task<string?> TransferCaptainAsync(Guid competitionId, Guid teamId, Guid actorId, Guid newCaptainId, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
     }
 }

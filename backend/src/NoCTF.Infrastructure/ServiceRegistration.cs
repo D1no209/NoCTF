@@ -89,6 +89,9 @@ public static class ServiceRegistration
         services.AddScoped<ITeamMembershipStore, EfTeamMembershipStore>();
         services.AddScoped<InviteTeamMember>();
         services.AddScoped<RespondToTeamInvitation>();
+        services.AddScoped<RemoveTeamMember>();
+        services.AddScoped<LeaveTeam>();
+        services.AddScoped<TransferTeamCaptain>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config

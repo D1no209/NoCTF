@@ -120,9 +120,9 @@
 - [x] `InviteTeamMember`。
 - [x] `AcceptTeamInvitation`。
 - [x] `RejectTeamInvitation`。
-- [ ] `RemoveTeamMember`。
-- [ ] `LeaveTeam`。
-- [ ] `TransferTeamCaptain`。
+- [x] `RemoveTeamMember`。
+- [x] `LeaveTeam`。
+- [x] `TransferTeamCaptain`。
 
 ### 3.2 Team 规则
 
@@ -131,7 +131,7 @@
 - [x] MaxTeamMembers 强制执行。
 - [x] 自动批准和人工批准两条路径都可用。
 - [x] Running 后默认禁止新报名。
-- [ ] Finished 后禁止成员变更。
+- [x] Finished 后禁止成员变更。
 - [x] 一个 User 在同一 Competition 只能属于一个 Team。
 - [ ] Team ban 后禁止 Submission。
 - [x] Team soft-delete 后不进入 leaderboard，但保留历史事实。
