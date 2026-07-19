@@ -74,7 +74,7 @@ public static class ServiceRegistration
         services.AddScoped<IFixVerificationStore, EfFixVerificationStore>();
         services.AddScoped<IFixSubmissionVerifier, UnavailableFixSubmissionVerifier>();
         services.AddScoped<VerifyFixSubmission>();
-        services.AddSingleton<ISubmissionEvaluator, DefaultEfSubmissionEvaluator>();
+        services.AddSingleton<ISubmissionEvaluatorCatalog, GameModeSubmissionEvaluatorCatalog>();
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
         services.AddSingleton<ISubmissionAdmissionModePolicy, GameModeSubmissionAdmissionPolicy>();
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
