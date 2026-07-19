@@ -117,9 +117,9 @@
 - [x] `RegisterTeamToCompetition`。
 - [x] `ApproveTeam`。
 - [x] `RejectTeam`。
-- [ ] `InviteTeamMember`。
-- [ ] `AcceptTeamInvitation`。
-- [ ] `RejectTeamInvitation`。
+- [x] `InviteTeamMember`。
+- [x] `AcceptTeamInvitation`。
+- [x] `RejectTeamInvitation`。
 - [ ] `RemoveTeamMember`。
 - [ ] `LeaveTeam`。
 - [ ] `TransferTeamCaptain`。
@@ -128,7 +128,7 @@
 
 - [x] 同一 Competition 内 Team name unique。
 - [x] 创建者自动成为 Captain。
-- [ ] MaxTeamMembers 强制执行。
+- [x] MaxTeamMembers 强制执行。
 - [x] 自动批准和人工批准两条路径都可用。
 - [x] Running 后默认禁止新报名。
 - [ ] Finished 后禁止成员变更。

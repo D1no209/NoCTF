@@ -20,6 +20,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<CompetitionCollaborator> CompetitionCollaborators => Set<CompetitionCollaborator>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<TeamInvitation> TeamInvitations => Set<TeamInvitation>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<ChallengeConfiguration> ChallengeConfigurations => Set<ChallengeConfiguration>();
     public DbSet<ChallengeHint> ChallengeHints => Set<ChallengeHint>();
