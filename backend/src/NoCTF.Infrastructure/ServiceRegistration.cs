@@ -8,6 +8,7 @@ using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Application.Authentication.Ports;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Application.Teams.Registration;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.GameModes.Submission;
@@ -76,6 +77,10 @@ public static class ServiceRegistration
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
         services.AddScoped<ITeamModerationStore, EfTeamModerationStore>();
         services.AddScoped<ICompetitionModerationAuthorizer, EfCompetitionModerationAuthorizer>();
+        services.AddScoped<ITeamRegistrationStore, EfTeamRegistrationStore>();
+        services.AddScoped<CreateTeam>();
+        services.AddScoped<ListCompetitionTeams>();
+        services.AddScoped<ReviewTeamRegistration>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config

@@ -109,14 +109,14 @@
 
 ### 3.1 Team use case
 
-- [ ] `CreateTeam`。
+- [x] `CreateTeam`。
 - [ ] `GetTeam`。
-- [ ] `ListCompetitionTeams`。
+- [x] `ListCompetitionTeams`。
 - [ ] `UpdateTeam`。
 - [ ] `DeleteTeam`。
-- [ ] `RegisterTeamToCompetition`。
-- [ ] `ApproveTeam`。
-- [ ] `RejectTeam`。
+- [x] `RegisterTeamToCompetition`。
+- [x] `ApproveTeam`。
+- [x] `RejectTeam`。
 - [ ] `InviteTeamMember`。
 - [ ] `AcceptTeamInvitation`。
 - [ ] `RejectTeamInvitation`。
@@ -126,13 +126,13 @@
 
 ### 3.2 Team 规则
 
-- [ ] 同一 Competition 内 Team name unique。
-- [ ] 创建者自动成为 Captain。
+- [x] 同一 Competition 内 Team name unique。
+- [x] 创建者自动成为 Captain。
 - [ ] MaxTeamMembers 强制执行。
-- [ ] 自动批准和人工批准两条路径都可用。
-- [ ] Running 后默认禁止新报名。
+- [x] 自动批准和人工批准两条路径都可用。
+- [x] Running 后默认禁止新报名。
 - [ ] Finished 后禁止成员变更。
-- [ ] 一个 User 在同一 Competition 只能属于一个 Team。
+- [x] 一个 User 在同一 Competition 只能属于一个 Team。
 - [ ] Team ban 后禁止 Submission。
 - [ ] Team soft-delete 后不进入 leaderboard，但保留历史事实。
 - [ ] ban/unban/delete 统一触发 leaderboard invalidate + rebuild。
