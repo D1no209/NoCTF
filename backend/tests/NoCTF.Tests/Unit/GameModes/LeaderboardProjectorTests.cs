@@ -3,6 +3,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.GameModes.Awd.Configuration;
 using System.Text.Json;
 
 namespace NoCTF.Tests.Unit.GameModes;
@@ -140,6 +141,37 @@ public class LeaderboardProjectorTests
         await Assert.That(result[0].TeamId).IsEqualTo(firstTeam);
         await Assert.That(result[0].Score).IsEqualTo(550L);
         await Assert.That(result[1].Score).IsEqualTo(250L);
+    }
+
+    [Test]
+    public async Task AwdProjector_AwardsAttackAndVictimPenaltyAndServiceFacts()
+    {
+        var attacker = Guid.NewGuid();
+        var victim = Guid.NewGuid();
+        var configuration = JsonSerializer.Serialize(
+            new AwdConfiguration(1, 300, 10, 2, 50, 100, 30, 20),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var submission = Fact(attacker, Guid.NewGuid(), 1) with { VictimTeamId = victim };
+        var service = new ScoringEvent
+        {
+            Id = Guid.NewGuid(),
+            TeamId = attacker,
+            Kind = ScoringEventKind.AwdServiceCheck,
+            Result = ScoringResult.Correct,
+            OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(2)
+        };
+
+        var result = new AwdLeaderboardProjector().Project(new LeaderboardProjectionInput(
+            Guid.NewGuid(),
+            GameMode.Awd,
+            [new(attacker, "attacker", false, false), new(victim, "victim", false, false)],
+            [submission],
+            [new(service)],
+            [],
+            configuration));
+
+        await Assert.That(result.Single(item => item.TeamId == attacker).Score).IsEqualTo(150L);
+        await Assert.That(result.Single(item => item.TeamId == victim).Score).IsEqualTo(-20L);
     }
 
     [Test]
