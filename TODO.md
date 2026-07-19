@@ -70,23 +70,23 @@
 
 ### 2.1 Competition CRUD
 
-- [ ] 实现 `CreateCompetition`。
-- [ ] 实现 `GetCompetition`。
-- [ ] 实现 `ListCompetitions`。
+- [x] 实现 `CreateCompetition`。
+- [x] 实现 `GetCompetition`。
+- [x] 实现 `ListCompetitions`。
 - [ ] 实现 `UpdateCompetition`。
 - [ ] 实现 `DeleteCompetition` soft-delete。
-- [ ] 创建时强制 OwnerId 使用认证用户。
-- [ ] 创建时状态固定为 Draft。
-- [ ] GameMode 创建后 immutable。
-- [ ] MaxTeamMembers 必须大于 0。
+- [x] 创建时强制 OwnerId 使用认证用户。
+- [x] 创建时状态固定为 Draft。
+- [x] GameMode 创建后 immutable。
+- [x] MaxTeamMembers 必须大于 0。
 - [ ] 删除时禁止级联删除 Submission/ScoringEvent。
 - [ ] 补公开 competition DTO 与管理员 DTO。
 
 ### 2.2 Competition API
 
-- [ ] `POST /admin/competitions`。
-- [ ] `GET /competitions`。
-- [ ] `GET /competitions/{id}`。
+- [x] `POST /admin/competitions`。
+- [x] `GET /competitions`。
+- [x] `GET /competitions/{id}`。
 - [ ] `PUT /admin/competitions/{id}`。
 - [ ] `DELETE /admin/competitions/{id}`。
 - [ ] 公开 DTO 不包含私有配置、Flag、Runner secret、Fix metadata。
