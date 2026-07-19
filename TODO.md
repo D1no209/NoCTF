@@ -492,8 +492,8 @@
 - [x] backend Deployment 固定 `replicas: 1`。
 - [x] Compose 只运行单 backend。
 - [ ] Runner 镜像保留 Docker CLI/Compose plugin。
-- [ ] OpenAPI 删除 LeaderboardSnapshot/旧 outcome schema。
-- [ ] OpenAPI 增加 Login/Refresh/Logout/Runner scoring security scheme。
+- [x] OpenAPI 删除 LeaderboardSnapshot/旧 outcome schema。
+- [x] OpenAPI 增加 Login/Refresh/Logout/Runner scoring security scheme。
 - [ ] 重新生成 frontend API client。
 - [ ] 更新 architecture、deployment、game-modes、handoff 文档。
 - [ ] 文档明确 Channel 丢失窗口和单副本限制。
@@ -506,7 +506,7 @@
 - [ ] Testcontainers PostgreSQL/Redis suite 通过。
 - [ ] `dotnet ef database update` 空库通过。
 - [ ] `dotnet ef migrations has-pending-model-changes` 通过。
-- [ ] OpenAPI export 通过。
+- [x] OpenAPI export 通过。
 - [ ] frontend `bun run generate-api` 通过。
 - [ ] frontend `bun run build` 通过。
 - [ ] `docker compose config` 通过。

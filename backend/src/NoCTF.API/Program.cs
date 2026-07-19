@@ -6,6 +6,7 @@ using FastEndpoints.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 var exportSwagger = args.Contains("--export-swagger-docs", StringComparer.OrdinalIgnoreCase);
+builder.Configuration["OpenApi:Exporting"] = exportSwagger.ToString();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContext, HttpUserContext>();
 // Swagger export uses the production composition so every endpoint has the same
