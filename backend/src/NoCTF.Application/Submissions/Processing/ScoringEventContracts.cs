@@ -1,5 +1,6 @@
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Submissions.Processing;
 
@@ -21,6 +22,11 @@ public sealed record SubmissionProcessingContext(
 public interface ISubmissionEvaluator
 {
     ScoringEventDecision Evaluate(SubmissionProcessingContext context);
+}
+
+public interface ISubmissionEvaluatorCatalog
+{
+    ISubmissionEvaluator Get(GameMode mode);
 }
 
 public interface ISystemScoringEventEvaluator

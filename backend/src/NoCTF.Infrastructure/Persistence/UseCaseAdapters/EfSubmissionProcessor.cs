@@ -11,7 +11,7 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 public sealed class EfSubmissionProcessor(
     NoCtfDbContext db,
     IBackgroundWorkScheduler scheduler,
-    ISubmissionEvaluator evaluator,
+    ISubmissionEvaluatorCatalog evaluatorCatalog,
     ISubmissionAdmissionModePolicy admissionModePolicy,
     VerifyFixSubmission verifyFixSubmission,
     ILogger<EfSubmissionProcessor> logger) : ISubmissionProcessor
@@ -107,7 +107,7 @@ public sealed class EfSubmissionProcessor(
             && (x.ValidStart == null || x.ValidStart <= submission.ReceivedAt)
             && (x.ValidEnd == null || x.ValidEnd >= submission.ReceivedAt)).ToListAsync(ct);
         var fix = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id, ct);
-        return evaluator.Evaluate(new(
+        return evaluatorCatalog.Get(configuration.Mode).Evaluate(new(
             submission,
             prior,
             flags,
