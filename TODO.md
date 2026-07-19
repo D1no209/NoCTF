@@ -94,16 +94,16 @@
 
 ### 2.3 CompetitionConfiguration
 
-- [ ] 配置 entity 与 Competition 建立唯一关系。
-- [ ] 实现 mode-specific configuration parser。
-- [ ] 实现 schemaVersion 校验和 upgrader。
-- [ ] 实现 `Revision` optimistic concurrency。
-- [ ] 更新配置必须传 expected revision。
-- [ ] revision 冲突返回 `409`。
+- [x] 配置 entity 与 Competition 建立唯一关系。
+- [x] 实现 mode-specific configuration parser。
+- [x] 实现 schemaVersion 校验和 upgrader。
+- [x] 实现 `Revision` optimistic concurrency。
+- [x] 更新配置必须传 expected revision。
+- [x] revision 冲突返回 `409`。
 - [ ] Running 状态只允许非破坏性配置修改。
-- [ ] Finished 状态拒绝配置修改。
-- [ ] 配置修改后 invalidate + rebuild。
-- [ ] 为 CTF/AWD/AWDP/KoH/Penetration 建立 validator catalog。
+- [x] Finished 状态拒绝配置修改。
+- [x] 配置修改后 invalidate + rebuild。
+- [x] 为 CTF/AWD/AWDP/KoH/Penetration 建立 validator catalog。
 
 ## 3. Team 报名和成员管理
 

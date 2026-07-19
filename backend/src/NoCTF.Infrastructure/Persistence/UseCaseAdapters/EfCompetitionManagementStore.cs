@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Competitions;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
@@ -19,7 +20,9 @@ public sealed class EfCompetitionManagementStore(NoCtfDbContext db) : ICompetiti
         db.Competitions.Add(competition);
         db.CompetitionConfigurations.Add(new CompetitionConfiguration
         {
-            CompetitionId = id, Mode = command.Mode, Revision = 0, UpdatedAt = command.CreatedAt
+            CompetitionId = id, Mode = command.Mode,
+            Json = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
+            Revision = 0, UpdatedAt = command.CreatedAt
         });
         await db.SaveChangesAsync(ct);
         return Map(competition);
