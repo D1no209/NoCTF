@@ -1,7 +1,4 @@
 namespace NoCTF.Application.Submissions.Events;
 
-/// <summary>Marker for values that are allowed in the permanent submission stream.</summary>
+// Transitional compile marker; remaining input DTOs are migrated to ScoringEvent in the next slice.
 public interface ISubmissionStreamEvent;
-
-/// <summary>Marker for values that are allowed in the rebuildable scoring stream.</summary>
-public interface IScoringStreamEvent;
