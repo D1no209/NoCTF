@@ -131,7 +131,20 @@ public static class ServiceRegistration
         services.AddScoped<IRuntimeCleanupStore, EfRuntimeCleanupStore>();
         services.AddScoped<ChallengeRuntimeProvisioner>();
         services.AddScoped<CompetitionRuntimeCleaner>();
-        services.AddScoped<IContainerLifecycle, UnavailableContainerLifecycle>();
+        var runnerBaseUrl = configuration["Runtime:Runner:BaseUrl"];
+        if (string.IsNullOrWhiteSpace(runnerBaseUrl))
+        {
+            services.AddScoped<IContainerLifecycle, UnavailableContainerLifecycle>();
+        }
+        else
+        {
+            services.AddHttpClient<RunnerContainerLifecycle>(client =>
+            {
+                client.BaseAddress = new Uri(runnerBaseUrl.EndsWith('/') ? runnerBaseUrl : runnerBaseUrl + "/");
+                client.Timeout = TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Runtime:Runner:TimeoutSeconds", 30), 1, 120));
+            });
+            services.AddScoped<IContainerLifecycle>(provider => provider.GetRequiredService<RunnerContainerLifecycle>());
+        }
         services.AddScoped<ListChallengeFlags>();
         services.AddScoped<GetChallengeFlag>();
         services.AddScoped<CreateChallengeFlag>();

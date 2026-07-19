@@ -15,6 +15,9 @@ public sealed class CreateContainerRequest
     public Dictionary<string, string> Environment { get; set; } = [];
     public Dictionary<string, string> Labels { get; set; } = [];
     public Dictionary<int, int> PortMappings { get; set; } = [];
+    public ContainerResourceLimits? Limits { get; set; }
+    public ContainerSecurityPolicy? Security { get; set; }
+    public TimeSpan? Ttl { get; set; }
 }
 
 public sealed class CreateContainerEndpoint(RuntimeProviderCatalog providers)
@@ -44,7 +47,7 @@ public sealed class CreateContainerEndpoint(RuntimeProviderCatalog providers)
         request.Environment,
         request.Labels,
         request.PortMappings,
-        new(268_435_456, 500_000_000, 128),
-        new(true, false, true, ["ALL"], []),
-        null);
+        request.Limits ?? new(268_435_456, 500_000_000, 128),
+        request.Security ?? new(true, false, true, ["ALL"], []),
+        request.Ttl);
 }
