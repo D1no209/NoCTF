@@ -50,6 +50,17 @@ public class DependencyRulesTests
     }
 
     [Test]
+    public async Task Legacy_stream_scoring_contracts_are_absent()
+    {
+        var application = typeof(SubmitFlag).Assembly;
+
+        await Assert.That(application.GetType("NoCTF.Application.Submissions.Events.ISubmissionStreamEvent")).IsNull();
+        await Assert.That(application.GetType("NoCTF.Application.Submissions.Events.SubmissionOutcome")).IsNull();
+        await Assert.That(application.GetType("NoCTF.Application.Submissions.Events.SubmissionErrorCode")).IsNull();
+        await Assert.That(application.GetType("NoCTF.Application.Scoring.Leaderboard.LeaderboardSnapshot")).IsNull();
+    }
+
+    [Test]
     public async Task ArchUnitNET_can_load_the_new_project_graph()
     {
         var architecture = new ArchLoader()
