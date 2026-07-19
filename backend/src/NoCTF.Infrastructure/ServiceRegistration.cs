@@ -13,6 +13,7 @@ using NoCTF.Application.Teams.Registration;
 using NoCTF.Application.Teams.Membership;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Challenges.Configuration;
+using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Notifications;
 using NoCTF.GameModes.Submission;
@@ -105,6 +106,12 @@ public static class ServiceRegistration
         services.AddScoped<IChallengeConfigurationStore, EfChallengeConfigurationStore>();
         services.AddScoped<GetChallengeConfiguration>();
         services.AddScoped<UpdateChallengeConfiguration>();
+        services.AddScoped<IChallengeFlagStore, EfChallengeFlagStore>();
+        services.AddScoped<ListChallengeFlags>();
+        services.AddScoped<GetChallengeFlag>();
+        services.AddScoped<CreateChallengeFlag>();
+        services.AddScoped<UpdateChallengeFlag>();
+        services.AddScoped<DeleteChallengeFlag>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config
