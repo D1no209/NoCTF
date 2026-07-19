@@ -66,7 +66,6 @@ jobs:
         shell: bash
         run: |
           dotnet publish backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build --no-restore --output artifacts/api /p:BuildSpaOnPublish=false
-          dotnet publish backend/src/NoCTF.Worker/NoCTF.Worker.csproj --configuration Release --no-build --no-restore --output artifacts/worker
           for host in api worker; do
             for plugin in CTF AWD AWDP KoH Penetration QQBot; do
               test -f "artifacts/$host/plugins/NoCTF.Plugins.$plugin.dll"

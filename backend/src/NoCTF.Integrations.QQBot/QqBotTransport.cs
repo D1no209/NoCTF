@@ -8,7 +8,7 @@ public interface IQqBotTransport
     Task SendAsync(CompetitionNotificationRequested message, CancellationToken cancellationToken);
 }
 
-/// <summary>Delivers QQBot notifications through a configured HTTP adapter; Wolverine owns retries/dead letters.</summary>
+/// <summary>Delivers QQBot notifications through a configured HTTP adapter.</summary>
 public sealed class QqBotTransport(HttpClient client) : IQqBotTransport
 {
     public async Task SendAsync(CompetitionNotificationRequested message, CancellationToken cancellationToken)
