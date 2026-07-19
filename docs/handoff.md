@@ -102,7 +102,7 @@ backend/src/NoCTF.Container.Docker
 backend/src/NoCTF.Runner
   Runtime boundary for Docker operations.
 
-backend/src/NoCTF.Worker
+backend/src/NoCTF.API (includes Channel consumers)
   Background jobs such as expired instance cleanup.
 
 backend/src/NoCTF.Plugins.CTF

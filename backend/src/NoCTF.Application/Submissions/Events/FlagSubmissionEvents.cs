@@ -1,35 +1,7 @@
 namespace NoCTF.Application.Submissions.Events;
 
-public enum SubmissionOutcome
-{
-    Pending,
-    Correct,
-    Wrong,
-    Duplicate,
-    CrossTeam,
-    AttemptsExhausted,
-    Rejected,
-    PlatformFailed
-}
-
-public enum SubmissionErrorCode
-{
-    FlagNotSupported,
-    FixNotSupported,
-    BreakAttemptsExhausted,
-    FixAttemptsExhausted,
-    BreakRequired,
-    ArchiveValidationUnavailable,
-    FixArchiveMissing,
-    FixArchiveLengthMismatch,
-    FixArchiveContentTypeMismatch,
-    FixArchiveHashMismatch,
-    StorageTimeout,
-    StorageUnavailable
-}
-
 /// <summary>The permanent input event for a Flag submission. The Flag is intentionally retained here only.</summary>
-public sealed record FlagSubmissionReceived : ISubmissionStreamEvent
+public sealed record FlagSubmissionReceived
 {
     public required Guid SubmissionId { get; init; }
     public required Guid CompetitionId { get; init; }
@@ -44,14 +16,3 @@ public sealed record FlagSubmissionReceived : ISubmissionStreamEvent
     public override string ToString() =>
         $"{nameof(FlagSubmissionReceived)} {{ SubmissionId = {SubmissionId}, Flag = [REDACTED] }}";
 }
-
-public sealed record FlagSubmissionEvaluated(
-    Guid SubmissionId,
-    Guid CompetitionId,
-    Guid TeamId,
-    Guid ChallengeId,
-    SubmissionOutcome Outcome,
-    DateTimeOffset EvaluatedAt,
-    SubmissionErrorCode? ErrorCode = null,
-    int? OriginalRound = null,
-    bool ConsumedAttempt = false) : ISubmissionStreamEvent;

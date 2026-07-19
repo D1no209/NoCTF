@@ -6,4 +6,4 @@ public sealed record PenetrationStageCompleted(
     Guid ChallengeId,
     Guid StageId,
     DateTimeOffset OccurredAt,
-    string IdempotencyKey) : ISubmissionStreamEvent;
+    string IdempotencyKey);

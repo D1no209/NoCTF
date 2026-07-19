@@ -1,5 +1,5 @@
-# ADR-0002: Permanent submissions and rebuildable scoring
+# ADR-0002: EF submissions and rebuildable scoring facts
 
-Status: accepted
+Status: superseded
 
-Every competition has a permanent Submission Stream and a disposable Scoring Stream. The latter is replayed from the former and current configuration, then atomically selected through a Marten checkpoint before the old stream is deleted. Team bans remain relational state plus audit entries and trigger a rebuild; they do not mutate history.
+The former stream-based design was replaced by EF Core tables. `Submission` stores accepted input facts and points to its current score-free `ScoringEvent`; replaced events are soft-deleted. Redis leaderboard data is rebuilt from EF facts. Rebuilds run through the API host's bounded in-process Channel and do not require a stream or checkpoint.
