@@ -8,9 +8,11 @@ public sealed record LeaderboardProjectionInput(
     GameMode Mode,
     IReadOnlyList<LeaderboardTeamFact> Teams,
     IReadOnlyList<LeaderboardSubmissionFact> Submissions,
-    IReadOnlyList<LeaderboardSystemFact> SystemEvents);
+    IReadOnlyList<LeaderboardSystemFact> SystemEvents,
+    IReadOnlyList<LeaderboardChallengeFact>? Challenges = null);
 
 public sealed record LeaderboardTeamFact(Guid Id, string Name, bool IsBanned, bool IsDeleted);
+public sealed record LeaderboardChallengeFact(Guid Id, string Direction, bool IsDeleted);
 
 public sealed record LeaderboardSubmissionFact(
     Guid SubmissionId,
