@@ -16,6 +16,7 @@ using NoCTF.Application.Notifications;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.API.SignalR.Publishing;
+using NSwag;
 
 namespace NoCTF.API.Composition;
 
@@ -31,7 +32,27 @@ public static class ServiceRegistration
     {
         services.AddProblemDetails();
         services.AddFastEndpoints();
-        services.SwaggerDocument();
+        services.SwaggerDocument(options =>
+        {
+            options.EnableJWTBearerAuth = false;
+            options.DocumentSettings = settings =>
+            {
+                settings.AddAuth("Bearer", new OpenApiSecurityScheme
+                {
+                    Type = OpenApiSecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    Description = "Short-lived NoCTF user access token."
+                }, []);
+                settings.AddAuth("RunnerScoringBearer", new OpenApiSecurityScheme
+                {
+                    Type = OpenApiSecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    Description = "Short-lived Runner token restricted to scoring.write."
+                }, []);
+            };
+        });
         if (includeInfrastructure)
         {
             services.AddNoCtfInfrastructure(configuration);
@@ -67,7 +88,9 @@ public static class ServiceRegistration
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
         services.AddScoped<ISubmissionResultPublisher, SignalRSubmissionResultPublisher>();
-        if (includeInfrastructure && !string.IsNullOrWhiteSpace(redis))
+        if (includeInfrastructure
+            && !configuration.GetValue<bool>("OpenApi:Exporting")
+            && !string.IsNullOrWhiteSpace(redis))
         {
             signalR.AddStackExchangeRedis(redis);
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisSubmissionResultRelay>();
