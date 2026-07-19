@@ -1,0 +1,29 @@
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Submissions;
+
+namespace NoCTF.Application.Submissions.Processing;
+
+public sealed record ScoringEventDecision(
+    ScoringEventKind Kind,
+    ScoringResult Result,
+    ScoringFailureCode? FailureCode,
+    DateTimeOffset OccurredAt,
+    string EvaluatorVersion);
+
+public sealed record SubmissionProcessingContext(
+    Submission Submission,
+    IReadOnlyList<ScoringEvent> PriorEvents,
+    IReadOnlyList<ChallengeFlag> ApplicableFlags,
+    FixSubmissionRecord? FixRecord,
+    string CompetitionConfigurationJson,
+    string ChallengeConfigurationJson);
+
+public interface ISubmissionEvaluator
+{
+    ScoringEventDecision Evaluate(SubmissionProcessingContext context);
+}
+
+public interface ISystemScoringEventEvaluator
+{
+    ScoringEventDecision Evaluate(ScoringEvent systemEvent);
+}
