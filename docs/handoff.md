@@ -42,7 +42,7 @@ NoCTF is a multi-mode competition platform for CTF, AWD, AWDP, and KoH events.
 
 - Backend: .NET 8, FastEndpoints, SignalR, EF Core, PostgreSQL, Redis.
 - Frontend: Vue 3, TypeScript, Vite, Bun, Tailwind CSS, shadcn-vue style components.
-- Runtime: Docker Compose for PostgreSQL, Redis, MinIO, API, worker, and runner.
+- Runtime: Docker Compose for PostgreSQL, Redis, MinIO, single API (including Channel consumers), and runner.
 - Architecture rule: keep game-mode and challenge-type behavior plugin-oriented. Put shared contracts in `NoCTF.PluginBase`, shared domain in `NoCTF.Core`, application services in `NoCTF.Application`, and mode-specific behavior in `NoCTF.Plugins.*`.
 
 Current maintainer expectation: after code changes, rebuild both frontend and backend, then verify the relevant browser flow before handing work back.
@@ -55,7 +55,7 @@ Current maintainer expectation: after code changes, rebuild both frontend and ba
 4. Run the stack and health check:
 
 ```powershell
-docker compose -f deploy/docker-compose.yml up -d --build backend worker runner
+docker compose -f deploy/docker-compose.yml up -d --build backend runner
 Invoke-RestMethod http://127.0.0.1/api/health
 ```
 
@@ -138,8 +138,7 @@ Services:
 - `redis`: Redis on `6379`
 - `minio`: S3-compatible storage on `9000`, console on `9001`
 - `runner`: Docker operation boundary
-- `worker`: background worker
-- `backend`: API and built SPA on host port `80`
+- `backend`: API, built SPA, and API-hosted Channel consumers on host port `80`
 
 ### Frontend Dev Server
 
@@ -320,7 +319,7 @@ Current lifecycle rules:
 - 30 minute extension
 - 5 second cooldown between create/destroy/extend operations for CTF dynamic instances
 - 30 second container-operation cooldown for AWDP create/destroy/extend and defense requests
-- expired instances are cleaned by the worker
+- expired instances are cleaned by the API-hosted maintenance service
 
 Dynamic flag environment variable:
 
@@ -415,7 +414,7 @@ dotnet test backend/tests/NoCTF.Tests
 For integrated validation:
 
 ```powershell
-docker compose -f deploy/docker-compose.yml up -d --build backend worker runner
+docker compose -f deploy/docker-compose.yml up -d --build backend runner
 Invoke-RestMethod http://127.0.0.1/api/health
 ```
 
@@ -443,7 +442,7 @@ Latest verification status:
 - OpenAPI was fetched from a running API and regenerated idempotently. Contract changes are the expected `before`/`limit` pagination on AWDP patch submissions, authenticated notification inbox endpoints, email-verification request/response contracts, and the three Admin email-settings endpoints; generator template changes follow the security upgrade to `@hey-api/openapi-ts` 0.97.3.
 - Frontend frozen install, all 8 tracked tests, type-check, and production build passed. NuGet vulnerability/deprecation scans and `bun audit` are clean. The repository-wide ESLint run still reports the pre-existing generated/UI-scaffold baseline; the newly added notification and email-verification views pass targeted lint and no unrelated bulk formatting was applied.
 - Compose parsing and kubeconform strict passed (47 valid resources, 0 invalid/errors/skipped). Local `kubectl apply --dry-run=client` could not perform API discovery because no cluster is configured at `localhost:8080`; this is not a manifest validation failure.
-- API and Worker publish outputs contain the five required game/challenge plugin assemblies plus the optional QQBot assembly. Temporary PostgreSQL/Redis validation containers were removed.
+- API publish output contains the five required game/challenge assemblies plus the optional QQBot assembly. Temporary PostgreSQL/Redis validation containers were removed.
 - Frontend authentication now refreshes active sessions two minutes before access-token expiry, coalesces concurrent refresh attempts, retries transient refresh failures without discarding a still-valid token, and updates route guards, API requests, and SignalR token callbacks from the renewed session. The backend's existing absolute session limit and unauthorized-response behavior remain unchanged. Focused auth tests, frontend type-check/production build, and a real login-refresh-admin API sequence pass.
 - Vite mock interception is opt-in through `VITE_ENABLE_MOCKS=true`. It must remain disabled for normal full-stack development: the mock login JWT is intentionally not accepted by the real backend, and mixing it with real admin endpoints causes an immediate 401 and session clear. A Playwright full-stack login-to-admin regression check now reaches `/admin/competitions` with the real admin identity and a retained session.
 - The global QQ Bot workspace, per-competition QQ Bot delivery center, Infrastructure workspace, and their admin navigation entries now use the existing Vue i18n layer. English and Simplified Chinese locale trees have matching keys; backend-provided names, connection types, diagnostic values, warnings, and safe error summaries remain unmodified runtime data.

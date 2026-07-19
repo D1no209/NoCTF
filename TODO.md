@@ -488,9 +488,9 @@
 - [ ] 统一配置键：`RunnerScoring__*`。
 - [ ] 统一配置键：`Storage__*`。
 - [ ] 删除 `DefaultConnection`、`JwtSettings`、`StorageProvider` 残留。
-- [ ] 删除 Kubernetes worker/HPA/network policy 残留。
-- [ ] backend Deployment 固定 `replicas: 1`。
-- [ ] Compose 只运行单 backend。
+- [x] 删除 Kubernetes worker/HPA/network policy 残留。
+- [x] backend Deployment 固定 `replicas: 1`。
+- [x] Compose 只运行单 backend。
 - [ ] Runner 镜像保留 Docker CLI/Compose plugin。
 - [ ] OpenAPI 删除 LeaderboardSnapshot/旧 outcome schema。
 - [ ] OpenAPI 增加 Login/Refresh/Logout/Runner scoring security scheme。
