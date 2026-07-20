@@ -34,31 +34,47 @@ public sealed class EfCompetitionManagementStore(NoCtfDbContext db) : ICompetiti
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken ct) =>
         await Query(includeDraft).OrderByDescending(x => x.StartTime).ToListAsync(ct);
 
-    public async Task<CompetitionView?> UpdateAsync(UpdateCompetitionCommand command, CancellationToken ct)
+    public async Task<CompetitionView?> UpdateAsync(
+        UpdateCompetitionCommand command,
+        CompetitionStatus expectedStatus,
+        CancellationToken ct)
     {
-        var entity = await db.Competitions.SingleOrDefaultAsync(x => x.Id == command.CompetitionId && !x.Deletion.IsDeleted, ct);
-        if (entity is null || entity.Status == CompetitionStatus.Finished) return null;
-        entity.Title = command.Title.Trim();
-        entity.Description = command.Description?.Trim();
-        entity.StartTime = command.StartTime;
-        entity.EndTime = command.EndTime;
-        entity.TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove;
-        entity.MaxTeamMembers = command.MaxTeamMembers;
-        entity.UpdatedAt = command.UpdatedAt;
-        await db.SaveChangesAsync(ct);
-        return Map(entity);
+        var affected = await db.Competitions
+            .Where(x => x.Id == command.CompetitionId
+                && !x.Deletion.IsDeleted
+                && x.Status == expectedStatus
+                && x.Status != CompetitionStatus.Finished)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Title, command.Title.Trim())
+                .SetProperty(x => x.Description, command.Description == null ? null : command.Description.Trim())
+                .SetProperty(x => x.StartTime, command.StartTime)
+                .SetProperty(x => x.EndTime, command.EndTime)
+                .SetProperty(x => x.TeamRegistrationAutoApprove, command.TeamRegistrationAutoApprove)
+                .SetProperty(x => x.MaxTeamMembers, command.MaxTeamMembers)
+                .SetProperty(x => x.UpdatedAt, command.UpdatedAt), ct);
+        return affected == 1 ? await FindAsync(command.CompetitionId, true, ct) : null;
     }
 
-    public async Task<bool> SoftDeleteAsync(Guid competitionId, Guid actorId, DateTimeOffset deletedAt, CancellationToken ct)
+    public async Task<bool> SoftDeleteAsync(
+        Guid competitionId,
+        CompetitionStatus expectedStatus,
+        Guid actorId,
+        DateTimeOffset deletedAt,
+        CancellationToken ct)
     {
-        var entity = await db.Competitions.SingleOrDefaultAsync(x => x.Id == competitionId && !x.Deletion.IsDeleted, ct);
-        if (entity is null || entity.Status is CompetitionStatus.Running or CompetitionStatus.Paused) return false;
-        entity.Deletion.IsDeleted = true;
-        entity.Deletion.DeletedAt = deletedAt;
-        entity.Deletion.DeletedById = actorId;
-        entity.UpdatedAt = deletedAt;
-        await db.SaveChangesAsync(ct);
-        return true;
+        var affected = await db.Competitions
+            .Where(x => x.Id == competitionId
+                && !x.Deletion.IsDeleted
+                && x.Status == expectedStatus
+                && x.Status != CompetitionStatus.Running
+                && x.Status != CompetitionStatus.Paused
+                && x.Status != CompetitionStatus.Finished)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Deletion.IsDeleted, true)
+                .SetProperty(x => x.Deletion.DeletedAt, deletedAt)
+                .SetProperty(x => x.Deletion.DeletedById, actorId)
+                .SetProperty(x => x.UpdatedAt, deletedAt), ct);
+        return affected == 1;
     }
 
     private IQueryable<CompetitionView> Query(bool includeDraft) =>

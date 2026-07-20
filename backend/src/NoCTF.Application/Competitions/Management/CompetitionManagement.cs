@@ -43,8 +43,33 @@ public interface ICompetitionManagementStore
     Task<CompetitionView> CreateAsync(CreateCompetitionCommand command, CancellationToken cancellationToken);
     Task<CompetitionView?> FindAsync(Guid competitionId, bool includeDraft, CancellationToken cancellationToken);
     Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken cancellationToken);
-    Task<CompetitionView?> UpdateAsync(UpdateCompetitionCommand command, CancellationToken cancellationToken);
-    Task<bool> SoftDeleteAsync(Guid competitionId, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken);
+    Task<CompetitionView?> UpdateAsync(UpdateCompetitionCommand command, CompetitionStatus expectedStatus, CancellationToken cancellationToken);
+    Task<bool> SoftDeleteAsync(Guid competitionId, CompetitionStatus expectedStatus, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken);
+}
+
+public static class CompetitionManagementPolicy
+{
+    public static OperationResult ValidateUpdate(CompetitionView current, UpdateCompetitionCommand command)
+    {
+        if (current.Status == CompetitionStatus.Finished)
+            return OperationResult.Failure("competition_finished", "Finished competitions are read-only.");
+        if (current.Status is CompetitionStatus.Running or CompetitionStatus.Paused
+            && (command.StartTime != current.StartTime
+                || command.EndTime != current.EndTime
+                || command.TeamRegistrationAutoApprove != current.TeamRegistrationAutoApprove
+                || command.MaxTeamMembers != current.MaxTeamMembers))
+            return OperationResult.Failure("active_configuration_locked", "Running or paused competitions can change only title and description.");
+        return OperationResult.Success();
+    }
+
+    public static OperationResult ValidateDelete(CompetitionStatus status) => status switch
+    {
+        CompetitionStatus.Running or CompetitionStatus.Paused =>
+            OperationResult.Failure("competition_active", "An active competition cannot be deleted."),
+        CompetitionStatus.Finished =>
+            OperationResult.Failure("competition_finished", "Finished competitions are read-only."),
+        _ => OperationResult.Success()
+    };
 }
 
 public sealed class CreateCompetition(ICompetitionManagementStore store)
@@ -83,8 +108,9 @@ public sealed class UpdateCompetition(ICompetitionManagementStore store)
     {
         var current = await store.FindAsync(command.CompetitionId, true, ct);
         if (current is null) return OperationResult<CompetitionView>.Failure("competition_not_found", "Competition was not found.");
-        if (current.Status == CompetitionStatus.Finished)
-            return OperationResult<CompetitionView>.Failure("competition_finished", "Finished competitions are read-only.");
+        var mutation = CompetitionManagementPolicy.ValidateUpdate(current, command);
+        if (!mutation.Succeeded)
+            return OperationResult<CompetitionView>.Failure(mutation.ErrorCode!, mutation.ErrorMessage!);
         if (string.IsNullOrWhiteSpace(command.Title) || command.Title.Length > 160)
             return OperationResult<CompetitionView>.Failure("invalid_title", "Competition title is required and must be at most 160 characters.");
         if (command.MaxTeamMembers < 1)
@@ -92,12 +118,7 @@ public sealed class UpdateCompetition(ICompetitionManagementStore store)
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
             return OperationResult<CompetitionView>.Failure(schedule.ErrorCode!, schedule.ErrorMessage!);
-        if (current.Status is CompetitionStatus.Running or CompetitionStatus.Paused
-            && (command.StartTime != current.StartTime
-                || command.TeamRegistrationAutoApprove != current.TeamRegistrationAutoApprove
-                || command.MaxTeamMembers != current.MaxTeamMembers))
-            return OperationResult<CompetitionView>.Failure("running_configuration_locked", "Running competitions cannot change start time or team registration rules.");
-        var updated = await store.UpdateAsync(command, ct);
+        var updated = await store.UpdateAsync(command, current.Status, ct);
         return updated is null
             ? OperationResult<CompetitionView>.Failure("competition_conflict", "Competition status changed concurrently.")
             : OperationResult<CompetitionView>.Success(updated);
@@ -110,9 +131,9 @@ public sealed class DeleteCompetition(ICompetitionManagementStore store)
     {
         var current = await store.FindAsync(competitionId, true, ct);
         if (current is null) return OperationResult.Failure("competition_not_found", "Competition was not found.");
-        if (current.Status is CompetitionStatus.Running or CompetitionStatus.Paused)
-            return OperationResult.Failure("competition_active", "An active competition cannot be deleted.");
-        return await store.SoftDeleteAsync(competitionId, actorId, now, ct)
+        var mutation = CompetitionManagementPolicy.ValidateDelete(current.Status);
+        if (!mutation.Succeeded) return mutation;
+        return await store.SoftDeleteAsync(competitionId, current.Status, actorId, now, ct)
             ? OperationResult.Success()
             : OperationResult.Failure("competition_conflict", "Competition changed concurrently.");
     }
