@@ -1,7 +1,6 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.BackgroundWork;
-using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Domain.Submissions;

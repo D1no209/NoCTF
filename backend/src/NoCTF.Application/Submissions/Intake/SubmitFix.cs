@@ -1,5 +1,4 @@
 using NoCTF.Application.Common;
-using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Ports;
 
 namespace NoCTF.Application.Submissions.Intake;

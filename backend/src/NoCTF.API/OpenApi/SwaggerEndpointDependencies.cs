@@ -1,6 +1,5 @@
 using NoCTF.Application.Authentication.Ports;
 using NoCTF.Application.Common;
-using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Scoring.Leaderboard;

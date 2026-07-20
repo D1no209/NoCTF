@@ -1,4 +1,4 @@
-using NoCTF.Application.Submissions.Events;
+using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Common;
 using NoCTF.Domain.Submissions;
 

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Storage;
-using NoCTF.Application.Submissions.Events;
+using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;

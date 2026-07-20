@@ -1,11 +1,11 @@
-using NoCTF.Application.Submissions.Events;
+using NoCTF.Application.Submissions.Intake;
 
 namespace NoCTF.Tests.Unit.Application;
 
 public class NoRawFlagLoggingTests
 {
     [Test]
-    public async Task Flag_event_string_representation_redacts_plaintext()
+    public async Task Flag_input_string_representation_redacts_plaintext()
     {
         var value = new FlagSubmissionReceived
         {
