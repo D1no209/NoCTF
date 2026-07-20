@@ -13,12 +13,19 @@ public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompet
          select new CompetitionConfigurationView(config.CompetitionId, config.Mode, config.Json, config.Revision,
              competition.Status, config.UpdatedAt)).SingleOrDefaultAsync(ct);
 
-    public async Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(Guid competitionId, int expectedRevision, string json, DateTimeOffset now, CancellationToken ct)
+    public async Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
+        Guid competitionId,
+        int expectedRevision,
+        string json,
+        bool allowWhileRunning,
+        DateTimeOffset now,
+        CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
         if (status is null) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
-        if (status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+        if (status is CompetitionStatus.Paused or CompetitionStatus.Finished
+            || status == CompetitionStatus.Running && !allowWhileRunning)
             return new(null, CompetitionConfigurationUpdateFailure.ConfigurationLocked);
         var changed = await db.CompetitionConfigurations
             .Where(x => x.CompetitionId == competitionId && x.Revision == expectedRevision)

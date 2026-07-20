@@ -18,10 +18,21 @@ public interface ICompetitionConfigurationValidator
     IReadOnlyList<string> Validate(GameMode mode, string json);
 }
 
+public interface ICompetitionConfigurationChangePolicy
+{
+    bool IsNonDestructive(GameMode mode, string currentJson, string proposedJson);
+}
+
 public interface ICompetitionConfigurationStore
 {
     Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken cancellationToken);
-    Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(Guid competitionId, int expectedRevision, string json, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
+        Guid competitionId,
+        int expectedRevision,
+        string json,
+        bool allowWhileRunning,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }
 
 public enum CompetitionConfigurationUpdateFailure
@@ -42,6 +53,7 @@ public sealed class GetCompetitionConfiguration(ICompetitionConfigurationStore s
 public sealed class UpdateCompetitionConfiguration(
     ICompetitionConfigurationStore store,
     ICompetitionConfigurationValidator validator,
+    ICompetitionConfigurationChangePolicy changePolicy,
     ILeaderboardCache cache,
     IBackgroundWorkScheduler scheduler)
 {
@@ -50,12 +62,18 @@ public sealed class UpdateCompetitionConfiguration(
     {
         var current = await store.FindAsync(competitionId, ct);
         if (current is null) return OperationResult<CompetitionConfigurationView>.Failure("competition_not_found", "Competition was not found.");
-        if (current.CompetitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
-            return OperationResult<CompetitionConfigurationView>.Failure("configuration_locked", "Active or finished competition configuration is read-only.");
         var errors = validator.Validate(current.Mode, json);
         if (errors.Count > 0)
             return OperationResult<CompetitionConfigurationView>.Failure("invalid_configuration", string.Join(" ", errors));
-        var result = await store.TryUpdateAsync(competitionId, expectedRevision, json, now, ct);
+        var allowWhileRunning = current.CompetitionStatus == CompetitionStatus.Running
+                                && changePolicy.IsNonDestructive(current.Mode, current.Json, json);
+        if (current.CompetitionStatus is CompetitionStatus.Paused or CompetitionStatus.Finished
+            || current.CompetitionStatus == CompetitionStatus.Running && !allowWhileRunning)
+            return OperationResult<CompetitionConfigurationView>.Failure(
+                "configuration_locked",
+                "The configuration change is not allowed in the current competition state.");
+        var result = await store.TryUpdateAsync(
+            competitionId, expectedRevision, json, allowWhileRunning, now, ct);
         if (result.Configuration is null)
         {
             var failure = result.Failure ?? CompetitionConfigurationUpdateFailure.RevisionConflict;
@@ -67,7 +85,7 @@ public sealed class UpdateCompetitionConfiguration(
             }, failure switch
             {
                 CompetitionConfigurationUpdateFailure.CompetitionNotFound => "Competition was not found.",
-                CompetitionConfigurationUpdateFailure.ConfigurationLocked => "Active or finished competition configuration is read-only.",
+                CompetitionConfigurationUpdateFailure.ConfigurationLocked => "The configuration change is not allowed in the current competition state.",
                 _ => "Configuration revision changed concurrently."
             });
         }

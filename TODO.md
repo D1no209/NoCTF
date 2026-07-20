@@ -103,7 +103,7 @@
 - [x] 实现 `Revision` optimistic concurrency。
 - [x] 更新配置必须传 expected revision。
 - [x] revision 冲突返回 `409`。
-- [ ] Running 状态只允许非破坏性配置修改。
+- [x] Running 状态只允许非破坏性配置修改。
 - [x] Finished 状态拒绝配置修改。
 - [x] 配置修改后 invalidate + rebuild。
 - [x] 为 CTF/AWD/AWDP/KoH/Penetration 建立 validator catalog。
