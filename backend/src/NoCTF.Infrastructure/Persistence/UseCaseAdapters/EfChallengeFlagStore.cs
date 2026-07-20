@@ -19,15 +19,16 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         Guid? challengeInstanceId,
         CancellationToken ct)
     {
-        var scope = await (
-            from challenge in db.Challenges.AsNoTracking()
-            join competition in db.Competitions.AsNoTracking() on challenge.CompetitionId equals competition.Id
-            join configuration in db.ChallengeConfigurations.AsNoTracking() on challenge.Id equals configuration.ChallengeId
-            where challenge.Id == challengeId
-                  && challenge.CompetitionId == competitionId
-                  && !challenge.Deletion.IsDeleted
-                  && !competition.Deletion.IsDeleted
-            select new { competition.Status, competition.Mode, configuration.Json })
+        var scope = await db.Challenges.AsNoTracking()
+            .Join(db.Competitions.AsNoTracking(), challenge => challenge.CompetitionId, competition => competition.Id,
+                (challenge, competition) => new { Challenge = challenge, Competition = competition })
+            .Join(db.ChallengeConfigurations.AsNoTracking(), item => item.Challenge.Id, configuration => configuration.ChallengeId,
+                (item, configuration) => new { item.Challenge, item.Competition, Configuration = configuration })
+            .Where(item => item.Challenge.Id == challengeId
+                           && item.Challenge.CompetitionId == competitionId
+                           && !item.Challenge.Deletion.IsDeleted
+                           && !item.Competition.Deletion.IsDeleted)
+            .Select(item => new { item.Competition.Status, item.Competition.Mode, item.Configuration.Json })
             .SingleOrDefaultAsync(ct);
         if (scope is null)
             return null;
@@ -286,12 +287,13 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
                     && (validEnd == null || flag.ValidStart == null || flag.ValidStart < validEnd),
             ct);
 
-    private IQueryable<ChallengeFlag> Query() =>
-        from flag in db.ChallengeFlags.AsNoTracking()
-        join challenge in db.Challenges.AsNoTracking() on flag.ChallengeId equals challenge.Id
-        join competition in db.Competitions.AsNoTracking() on flag.CompetitionId equals competition.Id
-        where !challenge.Deletion.IsDeleted && !competition.Deletion.IsDeleted
-        select flag;
+    private IQueryable<ChallengeFlag> Query() => db.ChallengeFlags.AsNoTracking()
+        .Join(db.Challenges.AsNoTracking(), flag => flag.ChallengeId, challenge => challenge.Id,
+            (flag, challenge) => new { Flag = flag, Challenge = challenge })
+        .Join(db.Competitions.AsNoTracking(), item => item.Flag.CompetitionId, competition => competition.Id,
+            (item, competition) => new { item.Flag, item.Challenge, Competition = competition })
+        .Where(item => !item.Challenge.Deletion.IsDeleted && !item.Competition.Deletion.IsDeleted)
+        .Select(item => item.Flag);
 
     private static ChallengeFlagView Map(ChallengeFlag flag) => new(
         flag.Id,

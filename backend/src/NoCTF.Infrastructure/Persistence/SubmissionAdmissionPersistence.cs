@@ -18,22 +18,15 @@ internal static class SubmissionAdmissionPersistence
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var scope = await (
-            from competition in db.Competitions.AsNoTracking()
-            join challenge in db.Challenges.AsNoTracking()
-                on competition.Id equals challenge.CompetitionId
-            join challengeConfiguration in db.ChallengeConfigurations.AsNoTracking()
-                on challenge.Id equals challengeConfiguration.ChallengeId
-            join team in db.Teams.AsNoTracking()
-                on competition.Id equals team.CompetitionId
-            where competition.Id == competitionId && challenge.Id == challengeId && team.Id == teamId
-            select new
-            {
-                Competition = competition,
-                Challenge = challenge,
-                ChallengeConfiguration = challengeConfiguration,
-                Team = team
-            }).SingleOrDefaultAsync(ct);
+        var scope = await db.Competitions.AsNoTracking()
+            .Join(db.Challenges.AsNoTracking(), competition => competition.Id, challenge => challenge.CompetitionId,
+                (competition, challenge) => new { Competition = competition, Challenge = challenge })
+            .Join(db.ChallengeConfigurations.AsNoTracking(), item => item.Challenge.Id, configuration => configuration.ChallengeId,
+                (item, configuration) => new { item.Competition, item.Challenge, ChallengeConfiguration = configuration })
+            .Join(db.Teams.AsNoTracking(), item => item.Competition.Id, team => team.CompetitionId,
+                (item, team) => new { item.Competition, item.Challenge, item.ChallengeConfiguration, Team = team })
+            .Where(item => item.Competition.Id == competitionId && item.Challenge.Id == challengeId && item.Team.Id == teamId)
+            .SingleOrDefaultAsync(ct);
         if (scope is null)
             return null;
 

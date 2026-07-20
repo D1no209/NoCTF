@@ -17,17 +17,17 @@ public sealed class EfCompetitionRuntimeProvisioningStore(NoCtfDbContext db)
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null) return null;
 
-        var challenges = await (
-                from challenge in db.Challenges.AsNoTracking()
-                join configuration in db.ChallengeConfigurations.AsNoTracking()
-                    on challenge.Id equals configuration.ChallengeId
-                where challenge.CompetitionId == competitionId && challenge.IsPublished
-                orderby challenge.Order, challenge.Id
-                select new RuntimeChallengeDefinition(
-                    challenge.Id,
-                    challenge.Order,
-                    configuration.Revision,
-                    configuration.Json))
+        var challenges = await db.Challenges.AsNoTracking()
+            .Join(db.ChallengeConfigurations.AsNoTracking(), challenge => challenge.Id, configuration => configuration.ChallengeId,
+                (challenge, configuration) => new { Challenge = challenge, Configuration = configuration })
+            .Where(item => item.Challenge.CompetitionId == competitionId && item.Challenge.IsPublished)
+            .OrderBy(item => item.Challenge.Order)
+            .ThenBy(item => item.Challenge.Id)
+            .Select(item => new RuntimeChallengeDefinition(
+                item.Challenge.Id,
+                item.Challenge.Order,
+                item.Configuration.Revision,
+                item.Configuration.Json))
             .ToListAsync(cancellationToken);
         var teamIds = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
