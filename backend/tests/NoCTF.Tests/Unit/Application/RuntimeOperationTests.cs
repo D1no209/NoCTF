@@ -11,14 +11,30 @@ public class RuntimeOperationTests
     {
         var operations = new Operations
         {
-            Lease = new(Guid.NewGuid(), Guid.NewGuid(), "challenge:1", RuntimeStatus.Running, false)
+            Lease = new(Guid.NewGuid(), Guid.NewGuid(), "challenge:1", Guid.NewGuid(), RuntimeStatus.Running, false)
         };
         var runtime = new Runtime();
 
         var result = await new ChallengeRuntimeProvisioner(operations, runtime)
             .ExecuteAsync(Command());
 
-        await Assert.That(result.AlreadyCompleted).IsTrue();
+        await Assert.That(result.AlreadyExists).IsTrue();
+        await Assert.That(runtime.CreateCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Provision_ExistingStartingOperation_DoesNotCreateDuplicateRuntime()
+    {
+        var operations = new Operations
+        {
+            Lease = new(Guid.NewGuid(), Guid.NewGuid(), "challenge:1", Guid.NewGuid(), RuntimeStatus.Starting, false)
+        };
+        var runtime = new Runtime();
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command());
+
+        await Assert.That(result.AlreadyExists).IsTrue();
         await Assert.That(runtime.CreateCalls).IsEqualTo(0);
     }
 
@@ -63,6 +79,75 @@ public class RuntimeOperationTests
         await Assert.That(operations.Failed).IsTrue();
     }
 
+    [Test]
+    public async Task Provision_CompetitionNoLongerRunning_DoesNotCreateRuntime()
+    {
+        var operations = new Operations { BeginFailure = RuntimeOperationBeginFailure.CompetitionNotRunning };
+        var runtime = new Runtime();
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command());
+
+        await Assert.That(result.Failure).IsEqualTo(RuntimeProvisionFailure.CompetitionNotRunning);
+        await Assert.That(runtime.CreateCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Provision_CompetitionFinishesBeforePersistence_DestroysCreatedRuntime()
+    {
+        var operations = new Operations { CompleteResult = false };
+        var runtime = new Runtime();
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command());
+
+        await Assert.That(result.Failure).IsEqualTo(RuntimeProvisionFailure.PersistenceRejected);
+        await Assert.That(runtime.DestroyCalls).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Provision_DestroyCompensationFails_PersistsCleanupReceipt()
+    {
+        var operations = new Operations { CompleteResult = false };
+        var runtime = new Runtime { DestroyThrows = true };
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command());
+
+        await Assert.That(result.Failure).IsEqualTo(RuntimeProvisionFailure.PersistenceRejected);
+        await Assert.That(operations.FailureContext!.CleanupReceipt).IsNotNull();
+        await Assert.That(operations.FailureCancellationToken.CanBeCanceled).IsTrue();
+    }
+
+    [Test]
+    public async Task Provision_PersistenceThrows_PreservesReceiptForRecoveryWithoutImmediateDestroy()
+    {
+        var operations = new Operations { CompleteThrows = true };
+        var runtime = new Runtime();
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command());
+
+        await Assert.That(result.Failure).IsEqualTo(RuntimeProvisionFailure.PersistenceRejected);
+        await Assert.That(runtime.DestroyCalls).IsEqualTo(0);
+        await Assert.That(operations.FailureContext!.CleanupReceipt).IsNotNull();
+    }
+
+    [Test]
+    public async Task Provision_PersistenceResponseLost_ReconcilesCommittedReceipt()
+    {
+        var reconciled = Receipt(Guid.NewGuid());
+        var operations = new Operations { CompleteThrows = true, ReconciledReceipt = reconciled };
+        var runtime = new Runtime();
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command());
+
+        await Assert.That(result.Status).IsEqualTo(RuntimeStatus.Running);
+        await Assert.That(result.Receipt).IsEqualTo(reconciled);
+        await Assert.That(result.AlreadyExists).IsTrue();
+    }
+
     private static ProvisionChallengeRuntimeCommand Command() => new(
         Guid.NewGuid(),
         Guid.NewGuid(),
@@ -86,34 +171,50 @@ public class RuntimeOperationTests
         public bool Completed { get; private set; }
         public bool Failed { get; private set; }
         public DateTimeOffset? ExpiresAt { get; private set; }
+        public bool CompleteResult { get; init; } = true;
+        public bool CompleteThrows { get; init; }
+        public RuntimeOperationFailureContext? FailureContext { get; private set; }
+        public CancellationToken FailureCancellationToken { get; private set; }
+        public ContainerReceipt? ReconciledReceipt { get; init; }
 
-        public Task<RuntimeOperationLease> BeginAsync(
+        public RuntimeOperationBeginFailure? BeginFailure { get; init; }
+
+        public Task<RuntimeOperationBeginResult> BeginAsync(
             Guid competitionId, string operationKey, RuntimeOperationKind kind,
             DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(
-                Lease ?? new(Guid.NewGuid(), competitionId, operationKey, RuntimeStatus.Pending, true));
+                BeginFailure is null
+                    ? new RuntimeOperationBeginResult(
+                        Lease ?? new(Guid.NewGuid(), competitionId, operationKey, Guid.NewGuid(), RuntimeStatus.Pending, true))
+                    : new RuntimeOperationBeginResult(null, BeginFailure));
 
         public Task<bool> CompleteAsync(
             RuntimeOperationLease lease, ContainerReceipt receipt, Guid challengeId,
             Guid? teamId, DateTimeOffset? expiresAt, DateTimeOffset now, CancellationToken cancellationToken)
         {
+            if (CompleteThrows)
+                throw new InvalidOperationException("persistence failure");
             Completed = true;
             ExpiresAt = expiresAt;
-            return Task.FromResult(true);
+            return Task.FromResult(CompleteResult);
         }
 
-        public Task FailAsync(RuntimeOperationLease lease, string errorCode, DateTimeOffset now,
+        public Task<RuntimeOperationFailureResult> FailAsync(RuntimeOperationLease lease, RuntimeOperationFailureContext failure, DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             Failed = true;
-            return Task.CompletedTask;
+            FailureContext = failure;
+            FailureCancellationToken = cancellationToken;
+            return Task.FromResult(new RuntimeOperationFailureResult(ReconciledReceipt));
         }
     }
 
     private sealed class Runtime : IContainerLifecycle
     {
         public bool Throw { get; init; }
+        public bool DestroyThrows { get; init; }
         public TimeSpan? Delay { get; init; }
         public int CreateCalls { get; private set; }
+        public int DestroyCalls { get; private set; }
 
         public Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken)
         {
@@ -137,8 +238,23 @@ public class RuntimeOperationTests
                 null);
         }
 
-        public Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
+        {
+            DestroyCalls++;
+            if (DestroyThrows)
+                throw new InvalidOperationException("destroy failure");
+            return Task.CompletedTask;
+        }
         public Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken) =>
             Task.FromResult<ContainerReceipt?>(null);
     }
+
+    private static ContainerReceipt Receipt(Guid operationId) => new(
+        operationId,
+        RuntimeProvider.Docker,
+        "container-id",
+        RuntimeStatus.Running,
+        new Dictionary<int, int>(),
+        "localhost",
+        null);
 }

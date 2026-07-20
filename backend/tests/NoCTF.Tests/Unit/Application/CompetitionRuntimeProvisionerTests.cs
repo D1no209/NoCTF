@@ -120,7 +120,7 @@ public class CompetitionRuntimeProvisionerTests
     {
         public List<string> OperationKeys { get; } = [];
 
-        public Task<RuntimeOperationLease> BeginAsync(
+        public Task<RuntimeOperationBeginResult> BeginAsync(
             Guid competitionId,
             string operationKey,
             RuntimeOperationKind kind,
@@ -128,8 +128,8 @@ public class CompetitionRuntimeProvisionerTests
             CancellationToken cancellationToken)
         {
             OperationKeys.Add(operationKey);
-            return Task.FromResult(new RuntimeOperationLease(
-                Guid.CreateVersion7(now), competitionId, operationKey, RuntimeStatus.Pending, true));
+            return Task.FromResult(new RuntimeOperationBeginResult(new RuntimeOperationLease(
+                Guid.CreateVersion7(now), competitionId, operationKey, Guid.NewGuid(), RuntimeStatus.Pending, true)));
         }
 
         public Task<bool> CompleteAsync(
@@ -141,11 +141,11 @@ public class CompetitionRuntimeProvisionerTests
             DateTimeOffset now,
             CancellationToken cancellationToken) => Task.FromResult(true);
 
-        public Task FailAsync(
+        public Task<RuntimeOperationFailureResult> FailAsync(
             RuntimeOperationLease lease,
-            string errorCode,
+            RuntimeOperationFailureContext failure,
             DateTimeOffset now,
-            CancellationToken cancellationToken) => Task.CompletedTask;
+            CancellationToken cancellationToken) => Task.FromResult(new RuntimeOperationFailureResult());
     }
 
     private sealed class Runtime : IContainerLifecycle

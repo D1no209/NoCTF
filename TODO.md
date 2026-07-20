@@ -32,8 +32,9 @@
 - [x] 明确 `StartTime < EndTime` 校验。
 - [x] 明确 StartTime/EndTime 边界为服务器 `ReceivedAt` 判断。
 - [x] 规定 Running 后哪些字段不可修改。
-- [ ] 规定 Finished 后只允许查询和审计。
-  - [x] Competition、Team、Challenge、配置、Flag、Fix upload、Submission intake 与计分管理写入使用 lifecycle 行锁并拒绝 Finished。
+- [x] 规定 Finished 后只允许查询和审计。
+  - [x] Competition、Team、Challenge、配置、Flag、Fix upload、Submission intake、runtime provision 与计分管理写入使用 lifecycle 行锁并拒绝 Finished。
+  - [x] Finished 后仅允许审计、cleanup、过期回收和已接受事实处理等维护写入。
   - [ ] 完成其余 mutation path 审计后关闭本项。
 - [x] 为状态转换建立 Application policy，不让 endpoint 自行判断。
 
@@ -306,6 +307,7 @@
 - [x] `CompetitionRuntimeCleaner`。
 - [x] `ChallengeRuntimeHealthChecker`。
 - [x] runtime operation idempotency key。
+- [x] runtime operation 使用单一 `Starting` claim，禁止同 key 并发创建多个外部资源。
 - [x] runtime operation timeout。
 - [x] Docker runtime 接线。
 - [x] Kubernetes runtime 接线。
