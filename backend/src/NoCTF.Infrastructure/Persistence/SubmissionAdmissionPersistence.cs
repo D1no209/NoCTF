@@ -19,13 +19,13 @@ internal static class SubmissionAdmissionPersistence
         CancellationToken ct)
     {
         var scope = await db.Competitions.AsNoTracking()
-            .Join(db.Challenges.AsNoTracking(), competition => competition.Id, challenge => challenge.CompetitionId,
-                (competition, challenge) => new { Competition = competition, Challenge = challenge })
-            .Join(db.ChallengeConfigurations.AsNoTracking(), item => item.Challenge.Id, configuration => configuration.ChallengeId,
-                (item, configuration) => new { item.Competition, item.Challenge, ChallengeConfiguration = configuration })
+            .Join(db.CompetitionChallenges.AsNoTracking(), competition => competition.Id, challenge => challenge.CompetitionId,
+                (competition, challenge) => new { Competition = competition, CompetitionChallenge = challenge })
+            .Join(db.Challenges.AsNoTracking(), item => item.CompetitionChallenge.ChallengeId, challenge => challenge.Id,
+                (item, challenge) => new { item.Competition, item.CompetitionChallenge, Challenge = challenge })
             .Join(db.Teams.AsNoTracking(), item => item.Competition.Id, team => team.CompetitionId,
-                (item, team) => new { item.Competition, item.Challenge, item.ChallengeConfiguration, Team = team })
-            .Where(item => item.Competition.Id == competitionId && item.Challenge.Id == challengeId && item.Team.Id == teamId)
+                (item, team) => new { item.Competition, item.CompetitionChallenge, item.Challenge, Team = team })
+            .Where(item => item.Competition.Id == competitionId && item.CompetitionChallenge.Id == challengeId && item.Team.Id == teamId)
             .SingleOrDefaultAsync(ct);
         if (scope is null)
             return null;
@@ -36,14 +36,14 @@ internal static class SubmissionAdmissionPersistence
         var attempts = await db.Submissions.AsNoTracking()
             .Where(submission => submission.CompetitionId == competitionId
                                  && submission.TeamId == teamId
-                                 && submission.ChallengeId == challengeId)
+                                 && submission.CompetitionChallengeId == challengeId)
             .GroupBy(submission => submission.Kind)
             .Select(group => new { Kind = group.Key, Count = group.Count() })
             .ToDictionaryAsync(item => item.Kind, item => item.Count, ct);
         var challengeInstanceId = scope.Competition.Mode == GameMode.Penetration
             ? await db.ChallengeInstances.AsNoTracking()
                 .Where(instance => instance.CompetitionId == competitionId
-                                   && instance.ChallengeId == challengeId
+                                   && instance.CompetitionChallengeId == challengeId
                                    && instance.TeamId == teamId
                                    && instance.Status == RuntimeStatus.Running
                                    && (instance.ExpiresAt == null || instance.ExpiresAt > now))
@@ -58,9 +58,9 @@ internal static class SubmissionAdmissionPersistence
             challengeId,
             scope.Competition.Mode,
             scope.Competition.ConfigurationRevision,
-            scope.ChallengeConfiguration.Revision,
+            scope.CompetitionChallenge.Revision,
             scope.Competition.ConfigurationJson,
-            scope.ChallengeConfiguration.Json,
+            scope.CompetitionChallenge.ConfigurationJson,
             attempts.GetValueOrDefault(SubmissionKind.Flag),
             attempts.GetValueOrDefault(SubmissionKind.Fix),
             scope.Competition.Status,
@@ -68,7 +68,7 @@ internal static class SubmissionAdmissionPersistence
             scope.Competition.EndTime,
             scope.Competition.Deletion.IsDeleted,
             scope.Challenge.Deletion.IsDeleted,
-            scope.Challenge.IsPublished,
+            scope.CompetitionChallenge.IsPublished,
             scope.Team.Deletion.IsDeleted,
             scope.Team.Ban.IsBanned,
             scope.Team.RegistrationStatus == TeamRegistrationStatus.Approved,
