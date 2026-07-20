@@ -217,7 +217,7 @@
 - [x] verifier failure category 映射。
 - [ ] runner failure 不写入 Flag 或 archive 内容日志。
 - [x] Fix retry 的旧 event soft-delete 和 record 状态重置规则。
-- [ ] 原始 runtime 恢复逻辑。
+- [x] 原始 runtime 恢复逻辑。
 - [x] CleanupPending 扫描和清理。
 
 ## 7. 五种 GameMode evaluator
@@ -308,6 +308,7 @@
 - [x] `ChallengeRuntimeHealthChecker`。
 - [x] runtime operation idempotency key。
 - [x] runtime operation 使用单一 `Starting` claim，禁止同 key 并发创建多个外部资源。
+- [x] stale `Starting` claim 按操作超时与 grace window reclaim，并用 `ClaimToken` fencing 旧 owner。
 - [x] runtime operation timeout。
 - [x] Docker runtime 接线。
 - [x] Kubernetes runtime 接线。

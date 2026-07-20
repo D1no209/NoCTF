@@ -14,6 +14,7 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
         Guid competitionId,
         string operationKey,
         RuntimeOperationKind kind,
+        DateTimeOffset staleBefore,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -25,13 +26,19 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
             ct);
         if (existing is not null)
         {
-            if (existing.Status != RuntimeStatus.Failed)
+            var reclaimable = existing.Status == RuntimeStatus.Failed
+                              || existing.Status == RuntimeStatus.Starting && existing.UpdatedAt <= staleBefore;
+            if (!reclaimable)
                 return new(new(existing.Id, existing.CompetitionId, existing.OperationKey, existing.ClaimToken, existing.Status, false));
             if (competitionStatus != CompetitionStatus.Running)
                 return new(null, RuntimeOperationBeginFailure.CompetitionNotRunning);
             var newClaimToken = Guid.CreateVersion7(now);
             var claimed = await db.RuntimeOperations
-                .Where(operation => operation.Id == existing.Id && operation.Status == RuntimeStatus.Failed)
+                .Where(operation => operation.Id == existing.Id
+                                    && operation.ClaimToken == existing.ClaimToken
+                                    && (operation.Status == RuntimeStatus.Failed
+                                        || operation.Status == RuntimeStatus.Starting
+                                        && operation.UpdatedAt <= staleBefore))
                 .ExecuteUpdateAsync(update => update
                     .SetProperty(operation => operation.Status, RuntimeStatus.Starting)
                     .SetProperty(operation => operation.ClaimToken, newClaimToken)
@@ -178,6 +185,7 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
             RuntimeProvisionFailure.CreateTimeout => "runtime_create_timeout",
             RuntimeProvisionFailure.CreateFailed => "runtime_create_failed",
             RuntimeProvisionFailure.CreateCanceled => "runtime_create_canceled",
+            RuntimeProvisionFailure.ReceiptMismatch => "runtime_receipt_mismatch",
             RuntimeProvisionFailure.CompetitionNotRunning => "competition_not_running",
             RuntimeProvisionFailure.PersistenceRejected => "runtime_persistence_rejected",
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure.Failure, null)

@@ -80,6 +80,32 @@ public class RuntimeOperationTests
     }
 
     [Test]
+    public async Task Provision_ClaimLeaseUsesFixedServerMaximumAndRecoveryGrace()
+    {
+        var operations = new Operations();
+        var runtime = new Runtime();
+
+        _ = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command() with { OperationTimeout = TimeSpan.FromSeconds(10) });
+
+        await Assert.That(operations.ClaimedAt - operations.StaleBefore)
+            .IsEqualTo(TimeSpan.FromMinutes(5.5));
+    }
+
+    [Test]
+    public async Task Provision_ProviderReturnsWrongClaimToken_RejectsAndDestroysResource()
+    {
+        var operations = new Operations();
+        var runtime = new Runtime { ReceiptOperationId = Guid.NewGuid() };
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+            .ExecuteAsync(Command());
+
+        await Assert.That(result.Failure).IsEqualTo(RuntimeProvisionFailure.ReceiptMismatch);
+        await Assert.That(runtime.DestroyCalls).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task Provision_CompetitionNoLongerRunning_DoesNotCreateRuntime()
     {
         var operations = new Operations { BeginFailure = RuntimeOperationBeginFailure.CompetitionNotRunning };
@@ -176,16 +202,23 @@ public class RuntimeOperationTests
         public RuntimeOperationFailureContext? FailureContext { get; private set; }
         public CancellationToken FailureCancellationToken { get; private set; }
         public ContainerReceipt? ReconciledReceipt { get; init; }
+        public DateTimeOffset ClaimedAt { get; private set; }
+        public DateTimeOffset StaleBefore { get; private set; }
 
         public RuntimeOperationBeginFailure? BeginFailure { get; init; }
 
         public Task<RuntimeOperationBeginResult> BeginAsync(
             Guid competitionId, string operationKey, RuntimeOperationKind kind,
-            DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(
+            DateTimeOffset staleBefore, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            ClaimedAt = now;
+            StaleBefore = staleBefore;
+            return Task.FromResult(
                 BeginFailure is null
                     ? new RuntimeOperationBeginResult(
                         Lease ?? new(Guid.NewGuid(), competitionId, operationKey, Guid.NewGuid(), RuntimeStatus.Pending, true))
                     : new RuntimeOperationBeginResult(null, BeginFailure));
+        }
 
         public Task<bool> CompleteAsync(
             RuntimeOperationLease lease, ContainerReceipt receipt, Guid challengeId,
@@ -215,6 +248,7 @@ public class RuntimeOperationTests
         public TimeSpan? Delay { get; init; }
         public int CreateCalls { get; private set; }
         public int DestroyCalls { get; private set; }
+        public Guid? ReceiptOperationId { get; init; }
 
         public Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken)
         {
@@ -229,7 +263,7 @@ public class RuntimeOperationTests
             if (Delay is { } delay)
                 await Task.Delay(delay, cancellationToken);
             return new ContainerReceipt(
-                request.OperationId,
+                ReceiptOperationId ?? request.OperationId,
                 RuntimeProvider.Docker,
                 "container-id",
                 RuntimeStatus.Running,
