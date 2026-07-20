@@ -8,12 +8,18 @@ namespace NoCTF.Infrastructure.BackgroundWork;
 /// <summary>Consumes in-process submission work with bounded concurrency and transient retries.</summary>
 public sealed class SubmissionProcessingHostedService(
     ChannelBackgroundWorkScheduler scheduler,
+    BackgroundWorkShutdownCoordinator shutdown,
     IServiceScopeFactory scopeFactory,
     BackgroundQueueOptions options,
     ILogger<SubmissionProcessingHostedService> logger) : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.WhenAll(
-        Enumerable.Range(0, options.ProcessingConcurrency).Select(_ => ConsumeAsync(stoppingToken)));
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        var completion = Task.WhenAll(
+            Enumerable.Range(0, options.ProcessingConcurrency).Select(_ => ConsumeAsync(shutdown.DrainToken)));
+        shutdown.RegisterStage(BackgroundWorkDrainStage.Processing, completion);
+        return completion;
+    }
 
     private async Task ConsumeAsync(CancellationToken ct)
     {
@@ -24,20 +30,41 @@ public sealed class SubmissionProcessingHostedService(
                 try
                 {
                     await using var scope = scopeFactory.CreateAsyncScope();
-                    var processor = scope.ServiceProvider.GetRequiredService<ISubmissionProcessor>();
-                    await processor.ProcessAsync(item.SubmissionId, ct);
+                    if (item is ProcessSubmissionWorkItem submission)
+                    {
+                        var processor = scope.ServiceProvider.GetRequiredService<ISubmissionProcessor>();
+                        await processor.ProcessAsync(submission.SubmissionId, ct);
+                    }
+                    else if (item is ProcessSystemEventWorkItem systemEvent)
+                    {
+                        var processor = scope.ServiceProvider.GetRequiredService<ISystemScoringEventProcessor>();
+                        await processor.ProcessAsync(systemEvent.ScoringEventId, ct);
+                    }
                     break;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    return;
                 }
                 catch (Exception exception) when (attempt < 3 && !ct.IsCancellationRequested)
                 {
-                    logger.LogWarning(exception, "Submission work {SubmissionId} failed on attempt {Attempt}", item.SubmissionId, attempt + 1);
+                    logger.LogWarning(exception, "Processing work {WorkItemType} {WorkItemId} failed on attempt {Attempt}",
+                        item.GetType().Name, GetId(item), attempt + 1);
                     await Task.Delay(TimeSpan.FromSeconds(attempt switch { 0 => 1, 1 => 5, _ => 15 }), ct);
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "Submission work {SubmissionId} exhausted retries", item.SubmissionId);
+                    logger.LogError(exception, "Processing work {WorkItemType} {WorkItemId} exhausted retries",
+                        item.GetType().Name, GetId(item));
                 }
             }
         }
     }
+
+    private static Guid GetId(ProcessingWorkItem item) => item switch
+    {
+        ProcessSubmissionWorkItem submission => submission.SubmissionId,
+        ProcessSystemEventWorkItem systemEvent => systemEvent.ScoringEventId,
+        _ => Guid.Empty
+    };
 }

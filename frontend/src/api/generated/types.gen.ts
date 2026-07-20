@@ -911,6 +911,7 @@ export type NoCtfapiEndpointsSubmissionsSubmitFixEndpointErrors = {
      */
     403: FastEndpointsErrorResponse;
     409: FastEndpointsErrorResponse;
+    503: FastEndpointsErrorResponse;
 };
 
 export type NoCtfapiEndpointsSubmissionsSubmitFixEndpointError = NoCtfapiEndpointsSubmissionsSubmitFixEndpointErrors[keyof NoCtfapiEndpointsSubmissionsSubmitFixEndpointErrors];
@@ -947,6 +948,7 @@ export type NoCtfapiEndpointsSubmissionsSubmitFlagEndpointErrors = {
      */
     403: FastEndpointsErrorResponse;
     409: FastEndpointsErrorResponse;
+    503: FastEndpointsErrorResponse;
 };
 
 export type NoCtfapiEndpointsSubmissionsSubmitFlagEndpointError = NoCtfapiEndpointsSubmissionsSubmitFlagEndpointErrors[keyof NoCtfapiEndpointsSubmissionsSubmitFlagEndpointErrors];
@@ -1010,6 +1012,10 @@ export type NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointData = {
 
 export type NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointErrors = {
     /**
+     * Bad Request
+     */
+    400: FastEndpointsErrorResponse;
+    /**
      * Unauthorized
      */
     401: unknown;
@@ -1017,7 +1023,10 @@ export type NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointErrors = {
      * Forbidden
      */
     403: unknown;
+    503: FastEndpointsErrorResponse;
 };
+
+export type NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointError = NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointErrors[keyof NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointErrors];
 
 export type NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointResponses = {
     /**

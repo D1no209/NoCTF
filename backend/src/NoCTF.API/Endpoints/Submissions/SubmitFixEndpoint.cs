@@ -29,7 +29,8 @@ public sealed class SubmitFixEndpoint(
         Options(options => options.WithMetadata(new EnableRateLimitingAttribute("submission")));
         Description(builder => builder.ProducesProblemFE(StatusCodes.Status400BadRequest)
             .ProducesProblemFE(StatusCodes.Status403Forbidden)
-            .ProducesProblemFE(StatusCodes.Status409Conflict));
+            .ProducesProblemFE(StatusCodes.Status409Conflict)
+            .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
         Summary(summary => summary.Summary = "Accept a Fix archive reference for asynchronous processing.");
     }
 

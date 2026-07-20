@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.BackgroundWork;
 using NoCTF.Domain.Submissions;
 using Riok.Mapperly.Abstractions;
 
@@ -38,6 +39,9 @@ public sealed class RecordSystemScoringEventEndpoint(RecordSystemScoringEvent re
         Post("/internal/competitions/{competitionId}/scoring-events");
         AuthSchemes("RunnerScoringBearer");
         Policies("ScoringInput");
+        Description(builder => builder.ProducesProblemFE(StatusCodes.Status400BadRequest)
+            .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
+        Summary(summary => summary.Summary = "Record an idempotent score-free system scoring fact.");
     }
 
     public override async Task<Results<Created<SystemScoringEventResponse>, Ok<SystemScoringEventResponse>, ProblemHttpResult>> ExecuteAsync(
@@ -59,6 +63,10 @@ public sealed class RecordSystemScoringEventEndpoint(RecordSystemScoringEvent re
         catch (ArgumentException exception)
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "System event was rejected.", detail: exception.Message);
+        }
+        catch (BackgroundWorkUnavailableException)
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "System event processing is unavailable.");
         }
     }
 }

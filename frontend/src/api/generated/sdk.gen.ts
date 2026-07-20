@@ -165,6 +165,9 @@ export const noCtfapiEndpointsSubmissionsUploadFixArchiveEndpoint = <ThrowOnErro
     }
 });
 
+/**
+ * Record an idempotent score-free system scoring fact.
+ */
 export const noCtfapiEndpointsInternalRecordSystemScoringEventEndpoint = <ThrowOnError extends boolean = false>(options: Options<NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointData, ThrowOnError>) => (options.client ?? client).post<NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointResponses, NoCtfapiEndpointsInternalRecordSystemScoringEventEndpointErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/internal/competitions/{competitionId}/scoring-events',

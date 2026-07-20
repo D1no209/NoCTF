@@ -808,6 +808,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -883,6 +893,16 @@
             }
           },
           "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
             "description": "",
             "content": {
               "application/problem+json": {
@@ -987,6 +1007,7 @@
         "tags": [
           "Internal"
         ],
+        "summary": "Record an idempotent score-free system scoring fact.",
         "operationId": "NoCTFAPIEndpointsInternalRecordSystemScoringEventEndpoint",
         "parameters": [
           {
@@ -1013,16 +1034,6 @@
           "x-position": 1
         },
         "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalSystemScoringEventResponse"
-                }
-              }
-            }
-          },
           "200": {
             "description": "Success",
             "content": {
@@ -1033,11 +1044,41 @@
               }
             }
           },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalSystemScoringEventResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [

@@ -62,12 +62,18 @@ public static class ServiceRegistration
             ?? new BackgroundQueueOptions();
         services.AddSingleton(queueOptions);
         services.AddSingleton<ChannelBackgroundWorkScheduler>();
+        services.AddSingleton<BackgroundWorkShutdownCoordinator>();
         services.AddSingleton<IBackgroundWorkScheduler>(serviceProvider =>
+            serviceProvider.GetRequiredService<ChannelBackgroundWorkScheduler>());
+        services.AddSingleton<IBackgroundWorkAdmissionGate>(serviceProvider =>
             serviceProvider.GetRequiredService<ChannelBackgroundWorkScheduler>());
         services.AddHostedService<SubmissionProcessingHostedService>();
         services.AddHostedService<LeaderboardRefreshHostedService>();
-        services.AddHostedService<CompetitionLifecycleHostedService>();
         services.AddHostedService<CompetitionRebuildHostedService>();
+        // Hosted services stop in reverse registration order: producers first,
+        // then the staged drain coordinator, and consumers last.
+        services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<BackgroundWorkShutdownCoordinator>());
+        services.AddHostedService<CompetitionLifecycleHostedService>();
         services.AddHostedService<FixUploadExpiryHostedService>();
         services.AddHostedService<FixArchiveCleanupHostedService>();
         services.AddHostedService<RuntimeHealthHostedService>();
@@ -95,6 +101,7 @@ public static class ServiceRegistration
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddScoped<ISubmissionRetryStore, EfSubmissionRetryStore>();
         services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();
+        services.AddScoped<ISystemScoringEventProcessor, EfSystemScoringEventProcessor>();
         services.AddScoped<RecordSystemScoringEvent>();
         services.AddScoped<RetrySubmission>();
         services.AddScoped<LogoutUser>();
