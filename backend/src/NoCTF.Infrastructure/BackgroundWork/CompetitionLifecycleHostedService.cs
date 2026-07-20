@@ -59,7 +59,9 @@ public sealed class CompetitionLifecycleHostedService(
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Competition lifecycle sweep failed");
+                logger.LogError(
+                    "Competition lifecycle sweep failed with {ExceptionType}",
+                    exception.GetType().Name);
             }
         }
     }
