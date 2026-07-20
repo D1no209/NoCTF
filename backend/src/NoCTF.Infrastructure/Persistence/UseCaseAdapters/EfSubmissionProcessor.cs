@@ -38,14 +38,15 @@ public sealed class EfSubmissionProcessor(
         var submission = await db.Submissions.Include(x => x.ScoringEvent)
             .SingleOrDefaultAsync(x => x.Id == submissionId, ct);
         if (submission is null || submission.ScoringEvent is not null) return;
-        if (submission.TeamId is not Guid teamId || submission.ChallengeId is not Guid challengeId) return;
+        if (submission.TeamId is not Guid teamId || submission.CompetitionChallengeId is not Guid competitionChallengeId) return;
 
         var result = await EvaluateAsync(submission, ct);
         var now = DateTimeOffset.UtcNow;
         var scoringEvent = new ScoringEvent
         {
             Id = Guid.CreateVersion7(now), CompetitionId = submission.CompetitionId, TeamId = teamId,
-            ChallengeId = challengeId, SubmissionId = submission.Id, Kind = ScoringEventKind.SubmissionEvaluation,
+            ChallengeId = competitionChallengeId, CompetitionChallengeId = competitionChallengeId,
+            SubmissionId = submission.Id, Kind = ScoringEventKind.SubmissionEvaluation,
             Result = result.Result, FailureCode = result.FailureCode, OccurredAt = result.OccurredAt,
             ProcessedAt = now, ProcessedWorkerId = Environment.MachineName, EvaluatorVersion = result.EvaluatorVersion, CreatedAt = now
         };
@@ -63,15 +64,15 @@ public sealed class EfSubmissionProcessor(
     {
         var configuration = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == submission.CompetitionId)
-            .Join(db.ChallengeConfigurations.AsNoTracking(),
-                competition => submission.ChallengeId,
-                challengeConfiguration => challengeConfiguration.ChallengeId,
-                (competition, challengeConfiguration) => new
+            .Join(db.CompetitionChallenges.AsNoTracking(),
+                competition => submission.CompetitionChallengeId,
+                challenge => challenge.Id,
+                (competition, challenge) => new
                 {
                     competition.Mode,
                     competition.StartTime,
                     CompetitionJson = competition.ConfigurationJson,
-                    ChallengeJson = challengeConfiguration.Json
+                    ChallengeJson = challenge.ConfigurationJson
                 })
             .SingleAsync(ct);
         var rules = admissionModePolicy.GetRules(
@@ -86,7 +87,7 @@ public sealed class EfSubmissionProcessor(
             var acceptedIds = await db.Submissions.AsNoTracking()
                 .Where(candidate => candidate.CompetitionId == submission.CompetitionId
                                     && candidate.TeamId == submission.TeamId
-                                    && candidate.ChallengeId == submission.ChallengeId
+                                    && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
                                     && candidate.Kind == submission.Kind)
                 .OrderBy(candidate => candidate.ReceivedAt)
                 .ThenBy(candidate => candidate.Id)
@@ -110,7 +111,7 @@ public sealed class EfSubmissionProcessor(
             ? submission.SubjectTeamId ?? submission.VictimTeamId
             : submission.TeamId;
         var flags = await db.ChallengeFlags.Where(x => x.CompetitionId == submission.CompetitionId
-            && x.ChallengeId == submission.ChallengeId
+            && x.CompetitionChallengeId == submission.CompetitionChallengeId
             && (x.TeamId == null || x.TeamId == flagTeamId)).ToListAsync(ct);
         var fix = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id, ct);
         return evaluatorCatalog.Get(configuration.Mode).Evaluate(new(
