@@ -96,6 +96,11 @@ public sealed class ReviewTeamRegistration(ITeamRegistrationStore store)
 {
     public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid teamId, bool approve, CancellationToken ct = default)
     {
+        var policy = await store.GetPolicyAsync(competitionId, ct);
+        if (policy is null || policy.CompetitionDeleted)
+            return OperationResult.Failure("competition_not_found", "Competition was not found.");
+        if (policy.Status == CompetitionStatus.Finished)
+            return OperationResult.Failure("competition_finished", "Finished competitions are read-only.");
         var changed = await store.SetStatusAsync(competitionId, teamId,
             approve ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Rejected, ct);
         return changed switch
