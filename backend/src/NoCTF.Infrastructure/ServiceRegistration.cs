@@ -204,6 +204,7 @@ public static class ServiceRegistration
         services.AddScoped<DeleteCompetition>();
         services.AddScoped<ICompetitionConfigurationStore, EfCompetitionConfigurationStore>();
         services.AddSingleton<ICompetitionConfigurationValidator, GameModeCompetitionConfigurationValidator>();
+        services.AddSingleton<ICompetitionConfigurationChangePolicy, GameModeCompetitionConfigurationChangePolicy>();
         services.AddScoped<GetCompetitionConfiguration>();
         services.AddScoped<UpdateCompetitionConfiguration>();
         services.AddScoped<ICompetitionCollaboratorStore, EfCompetitionCollaboratorStore>();
