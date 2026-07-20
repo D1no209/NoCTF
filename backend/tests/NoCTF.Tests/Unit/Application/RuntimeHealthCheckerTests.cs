@@ -19,6 +19,7 @@ public class RuntimeHealthCheckerTests
 
         await Assert.That(changed).IsEqualTo(1);
         await Assert.That(store.Statuses[instanceId]).IsEqualTo(RuntimeStatus.Stopped);
+        await Assert.That(runtime.QueriedProvider).IsEqualTo(RuntimeProvider.Docker);
     }
 
     private sealed class Store(IReadOnlyList<RuntimeHealthTarget> targets) : IRuntimeHealthStore
@@ -37,8 +38,13 @@ public class RuntimeHealthCheckerTests
 
     private sealed class Runtime(ContainerReceipt current) : IContainerLifecycle
     {
+        public RuntimeProvider? QueriedProvider { get; private set; }
         public Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ContainerReceipt?> GetAsync(string resourceId, CancellationToken cancellationToken) => Task.FromResult<ContainerReceipt?>(current);
+        public Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)
+        {
+            QueriedProvider = provider;
+            return Task.FromResult<ContainerReceipt?>(current);
+        }
     }
 }

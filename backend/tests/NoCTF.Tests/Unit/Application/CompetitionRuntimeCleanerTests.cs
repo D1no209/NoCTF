@@ -69,6 +69,6 @@ public class CompetitionRuntimeCleanerTests
             return Task.CompletedTask;
         }
 
-        public Task<ContainerReceipt?> GetAsync(string resourceId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

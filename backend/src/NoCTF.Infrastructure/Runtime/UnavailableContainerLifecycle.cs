@@ -16,6 +16,9 @@ public sealed class UnavailableContainerLifecycle : IContainerLifecycle
     public Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken) =>
         Task.FromException(new InvalidOperationException("Container operations must be executed by the Runner service."));
 
-    public Task<ContainerReceipt?> GetAsync(string resourceId, CancellationToken cancellationToken) =>
+    public Task<ContainerReceipt?> GetAsync(
+        NoCTF.Domain.Runtime.RuntimeProvider provider,
+        string resourceId,
+        CancellationToken cancellationToken) =>
         Task.FromException<ContainerReceipt?>(new InvalidOperationException("Container operations must be executed by the Runner service."));
 }

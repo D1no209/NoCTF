@@ -20,7 +20,7 @@ public sealed class ChallengeRuntimeHealthChecker(
         var changed = 0;
         foreach (var target in await store.ListActiveAsync(cancellationToken))
         {
-            var current = await runtime.GetAsync(target.ResourceId, cancellationToken);
+            var current = await runtime.GetAsync(target.Receipt.Provider, target.ResourceId, cancellationToken);
             if (current is null || current.Status == target.Receipt.Status)
                 continue;
             await store.UpdateStatusAsync(target.InstanceId, current.Status, DateTimeOffset.UtcNow, cancellationToken);

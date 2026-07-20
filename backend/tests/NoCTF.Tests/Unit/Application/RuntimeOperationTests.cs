@@ -69,6 +69,7 @@ public class RuntimeOperationTests
         "challenge:1",
         new(
             Guid.Empty,
+            RuntimeProvider.Docker,
             "image:latest",
             [],
             new Dictionary<string, string>(),
@@ -134,7 +135,7 @@ public class RuntimeOperationTests
         }
 
         public Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<ContainerReceipt?> GetAsync(string resourceId, CancellationToken cancellationToken) =>
+        public Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken) =>
             Task.FromResult<ContainerReceipt?>(null);
     }
 }

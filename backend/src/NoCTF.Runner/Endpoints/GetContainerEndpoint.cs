@@ -23,7 +23,10 @@ public sealed class GetContainerEndpoint(RuntimeProviderCatalog providers)
     {
         try
         {
-            var receipt = await providers.Containers(request.Provider).GetAsync(request.ResourceId, cancellationToken);
+            var receipt = await providers.Containers(request.Provider).GetAsync(
+                request.Provider,
+                request.ResourceId,
+                cancellationToken);
             return receipt is null ? TypedResults.NotFound() : TypedResults.Ok(receipt);
         }
         catch (UnsupportedRuntimeProviderException exception)
