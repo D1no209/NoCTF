@@ -12,7 +12,13 @@ public interface IOneShotRuntimeProviderCatalog
     IOneShotJobRunner OneShot(RuntimeProvider provider);
 }
 
-public sealed class RuntimeProviderCatalog(IServiceProvider services) : IOneShotRuntimeProviderCatalog
+public interface IContainerRuntimeProviderCatalog
+{
+    IContainerLifecycle Containers(RuntimeProvider provider);
+}
+
+public sealed class RuntimeProviderCatalog(IServiceProvider services)
+    : IOneShotRuntimeProviderCatalog, IContainerRuntimeProviderCatalog
 {
     public IContainerLifecycle Containers(RuntimeProvider provider) => provider switch
     {

@@ -10,7 +10,8 @@ internal sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submiss
     {
         builder.ToTable("submissions");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.Flag).HasColumnType("text");
+        builder.Property(x => x.FlagHash).HasMaxLength(64);
+        builder.Property(x => x.LegacyFlag).HasColumnName("Flag");
         builder.Property(x => x.IdempotencyKey).HasMaxLength(128);
         builder.Property(x => x.ProcessingVersion).IsConcurrencyToken();
         builder.HasIndex(x => new { x.CompetitionId, x.IdempotencyKey }).IsUnique();

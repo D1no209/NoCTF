@@ -14,7 +14,8 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 public sealed class EfSubmissionIntakeStore(
     NoCtfDbContext db,
     IBackgroundWorkScheduler scheduler,
-    IBackgroundWorkAdmissionGate admissionGate)
+    IBackgroundWorkAdmissionGate admissionGate,
+    TimeProvider? configuredTimeProvider = null)
     : ISubmissionIntakeStore
 {
     public async Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
@@ -25,6 +26,9 @@ public sealed class EfSubmissionIntakeStore(
         Guid userId,
         DomainSubmissionKind kind,
         AwdAttackTarget? attackTarget,
+        Guid? stageId,
+        Guid? challengeInstanceId,
+        FlagFingerprint? flagFingerprint,
         CancellationToken ct)
     {
         if (!admissionGate.IsAccepting)
@@ -36,7 +40,7 @@ public sealed class EfSubmissionIntakeStore(
             ct);
         if (existing is null)
             return null;
-        if (!Matches(existing, teamId, challengeId, userId, kind, attackTarget))
+        if (!Matches(existing, teamId, challengeId, userId, kind, attackTarget, stageId, challengeInstanceId, flagFingerprint))
             return new(SubmissionAcceptanceState.IdempotencyConflict);
 
         if (existing.ScoringEventId is null)
@@ -69,7 +73,8 @@ public sealed class EfSubmissionIntakeStore(
         Guid userId,
         CancellationToken ct)
         => await SubmissionAdmissionPersistence.LoadAsync(
-            db, competitionId, teamId, challengeId, userId, ct);
+            db, competitionId, teamId, challengeId, userId,
+            (configuredTimeProvider ?? TimeProvider.System).GetUtcNow(), ct);
 
     public async Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
         FlagSubmissionReceived received,
@@ -88,7 +93,8 @@ public sealed class EfSubmissionIntakeStore(
 
         var existing = await FindAcceptedAsync(
             received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
-            received.UserId, DomainSubmissionKind.Flag, received.AttackTarget, ct);
+            received.UserId, DomainSubmissionKind.Flag, received.AttackTarget, received.StageId,
+            received.ChallengeInstanceId, received.FlagFingerprint, ct);
         if (existing is not null)
             return existing;
 
@@ -107,10 +113,13 @@ public sealed class EfSubmissionIntakeStore(
             ChallengeId = received.ChallengeId,
             UserId = received.UserId,
             Kind = DomainSubmissionKind.Flag,
-            Flag = received.Flag,
+            FlagHash = received.FlagFingerprint.Sha256,
+            FlagLength = received.FlagFingerprint.Length,
             SubjectTeamId = received.AttackTarget?.TeamId,
             VictimTeamId = received.AttackTarget?.TeamId,
             ServiceId = received.AttackTarget?.ServiceId,
+            StageId = received.StageId,
+            ChallengeInstanceId = received.ChallengeInstanceId,
             IdempotencyKey = received.IdempotencyKey,
             ReceivedAt = received.ReceivedAt,
             CreatedAt = received.ReceivedAt,
@@ -149,7 +158,7 @@ public sealed class EfSubmissionIntakeStore(
 
         var existing = await FindAcceptedAsync(
             received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
-            received.UserId, DomainSubmissionKind.Fix, null, ct);
+            received.UserId, DomainSubmissionKind.Fix, null, null, null, null, ct);
         if (existing is not null)
             return existing;
 
@@ -227,7 +236,13 @@ public sealed class EfSubmissionIntakeStore(
                 ? new AwdAttackTarget(target, service)
                 : null;
             return await FindAcceptedAsync(
-                    entity.CompetitionId, idempotencyKey, teamId, challengeId, userId, kind, attackTarget, ct)
+                    entity.CompetitionId, idempotencyKey, teamId, challengeId, userId, kind, attackTarget,
+                    entity.StageId,
+                    entity.ChallengeInstanceId,
+                    entity.FlagHash is not null && entity.FlagLength is { } length
+                        ? new FlagFingerprint(entity.FlagHash, length)
+                        : null,
+                    ct)
                 ?? new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged);
         }
     }
@@ -238,13 +253,24 @@ public sealed class EfSubmissionIntakeStore(
         Guid challengeId,
         Guid userId,
         DomainSubmissionKind kind,
-        AwdAttackTarget? attackTarget) =>
+        AwdAttackTarget? attackTarget,
+        Guid? stageId,
+        Guid? challengeInstanceId,
+        FlagFingerprint? flagFingerprint) =>
         submission.TeamId == teamId
         && submission.ChallengeId == challengeId
         && submission.UserId == userId
         && submission.Kind == kind
         && submission.SubjectTeamId == attackTarget?.TeamId
         && submission.VictimTeamId == attackTarget?.TeamId
-        && submission.ServiceId == attackTarget?.ServiceId;
+        && submission.ServiceId == attackTarget?.ServiceId
+        && submission.StageId == stageId
+        && submission.ChallengeInstanceId == challengeInstanceId
+        && (flagFingerprint is null
+            ? submission.FlagHash is null && submission.LegacyFlag is null
+            : submission.FlagHash == flagFingerprint.Value.Sha256
+              && submission.FlagLength == flagFingerprint.Value.Length
+              || submission.LegacyFlag is { } legacyFlag
+              && flagFingerprint.Value.Matches(legacyFlag));
 
 }

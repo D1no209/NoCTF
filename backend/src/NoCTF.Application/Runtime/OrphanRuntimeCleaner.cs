@@ -28,7 +28,8 @@ public sealed class OrphanRuntimeCleaner(
         {
             try
             {
-                await runtime.DestroyAsync(target.Receipt, cancellationToken);
+                if (target.Receipt is not null)
+                    await runtime.DestroyAsync(target.Receipt, cancellationToken);
                 stopped.Add(target.InstanceId);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

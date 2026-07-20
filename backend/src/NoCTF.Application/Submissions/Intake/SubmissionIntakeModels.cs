@@ -23,7 +23,8 @@ public sealed record SubmissionAdmissionSnapshot(
     bool TeamDeleted,
     bool TeamBanned,
     bool TeamApproved,
-    bool UserBelongsToTeam);
+    bool UserBelongsToTeam,
+    Guid? ChallengeInstanceId = null);
 
 public sealed record SubmissionAdmissionRules(
     bool AllowsFlag,
@@ -68,7 +69,8 @@ public sealed record FlagSubmissionCommand(
     string IdempotencyKey,
     string IpAddress,
     DateTimeOffset ReceivedAt,
-    AwdAttackTarget? AttackTarget = null);
+    AwdAttackTarget? AttackTarget = null,
+    Guid? StageId = null);
 
 public sealed record FixSubmissionCommand(
     Guid CompetitionId,

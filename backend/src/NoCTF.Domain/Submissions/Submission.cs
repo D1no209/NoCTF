@@ -10,12 +10,16 @@ public sealed class Submission
     public Guid? UserId { get; set; }
     public SubmissionKind Kind { get; set; }
     public DateTimeOffset ReceivedAt { get; set; }
-    public string? Flag { get; set; }
+    public string? FlagHash { get; set; }
+    public int? FlagLength { get; set; }
+    /// <summary>Upgrade-only payload for submissions accepted before fingerprint storage was introduced.</summary>
+    public string? LegacyFlag { get; set; }
     public string? IdempotencyKey { get; set; }
     public Guid? SubjectTeamId { get; set; }
     public Guid? VictimTeamId { get; set; }
     public Guid? ServiceId { get; set; }
     public Guid? StageId { get; set; }
+    public Guid? ChallengeInstanceId { get; set; }
     public long? ControlIntervalSeconds { get; set; }
     public bool CheckerPlatformError { get; set; }
     public Guid? ScoringEventId { get; set; }

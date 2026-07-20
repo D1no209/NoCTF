@@ -12,7 +12,9 @@ public sealed record CreateChallengeFlagCommand(
     string Flag,
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidEnd,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    Guid? StageId = null,
+    Guid? ChallengeInstanceId = null)
 {
     public override string ToString() =>
         $"{nameof(CreateChallengeFlagCommand)} {{ CompetitionId = {CompetitionId}, ChallengeId = {ChallengeId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
@@ -27,7 +29,9 @@ public sealed record UpdateChallengeFlagCommand(
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidEnd,
     long ExpectedRowVersion,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    Guid? StageId = null,
+    Guid? ChallengeInstanceId = null)
 {
     public override string ToString() =>
         $"{nameof(UpdateChallengeFlagCommand)} {{ CompetitionId = {CompetitionId}, ChallengeId = {ChallengeId}, FlagId = {FlagId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
@@ -43,13 +47,20 @@ public sealed record ChallengeFlagView(
     DateTimeOffset? ValidEnd,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    long RowVersion)
+    long RowVersion,
+    Guid? StageId = null,
+    Guid? ChallengeInstanceId = null)
 {
     public override string ToString() =>
         $"{nameof(ChallengeFlagView)} {{ Id = {Id}, CompetitionId = {CompetitionId}, ChallengeId = {ChallengeId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
 }
 
-public sealed record ChallengeFlagScope(CompetitionStatus CompetitionStatus, bool TeamExists);
+public sealed record ChallengeFlagScope(
+    CompetitionStatus CompetitionStatus,
+    bool TeamExists,
+    GameMode Mode = GameMode.Ctf,
+    bool StageExists = true,
+    bool ChallengeInstanceExists = true);
 public enum ChallengeFlagMutationFailure
 {
     CompetitionNotFound,
@@ -58,7 +69,8 @@ public enum ChallengeFlagMutationFailure
     TeamNotFound,
     FlagWindowConflict,
     FlagNotFound,
-    FlagConflict
+    FlagConflict,
+    InvalidScope
 }
 public sealed record ChallengeFlagMutationResult(ChallengeFlagView? Flag, ChallengeFlagMutationFailure? Failure = null);
 
@@ -68,6 +80,8 @@ public interface IChallengeFlagStore
         Guid competitionId,
         Guid challengeId,
         Guid? teamId,
+        Guid? stageId,
+        Guid? challengeInstanceId,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<ChallengeFlagView>> ListAsync(
@@ -108,6 +122,7 @@ internal static class ChallengeFlagMutationFailureProtocol
         ChallengeFlagMutationFailure.FlagWindowConflict => "flag_window_conflict",
         ChallengeFlagMutationFailure.FlagNotFound => "flag_not_found",
         ChallengeFlagMutationFailure.FlagConflict => "flag_conflict",
+        ChallengeFlagMutationFailure.InvalidScope => "invalid_flag_scope",
         _ => "flag_conflict"
     };
 }
@@ -148,8 +163,10 @@ public sealed class CreateChallengeFlag(
         if (validation is not null)
             return OperationResult<ChallengeFlagView>.Failure(validation.Value.Code, validation.Value.Message);
 
-        var scope = await store.LoadScopeAsync(command.CompetitionId, command.ChallengeId, command.TeamId, ct);
-        var scopeError = ChallengeFlagPolicy.ValidateScope(scope, command.TeamId);
+        var scope = await store.LoadScopeAsync(command.CompetitionId, command.ChallengeId, command.TeamId,
+            command.StageId, command.ChallengeInstanceId, ct);
+        var scopeError = ChallengeFlagPolicy.ValidateScope(
+            scope, command.TeamId, command.StageId, command.ChallengeInstanceId);
         if (scopeError is not null)
             return OperationResult<ChallengeFlagView>.Failure(scopeError.Value.Code, scopeError.Value.Message);
 
@@ -181,8 +198,10 @@ public sealed class UpdateChallengeFlag(
         if (validation is not null)
             return OperationResult<ChallengeFlagView>.Failure(validation.Value.Code, validation.Value.Message);
 
-        var scope = await store.LoadScopeAsync(command.CompetitionId, command.ChallengeId, command.TeamId, ct);
-        var scopeError = ChallengeFlagPolicy.ValidateScope(scope, command.TeamId);
+        var scope = await store.LoadScopeAsync(command.CompetitionId, command.ChallengeId, command.TeamId,
+            command.StageId, command.ChallengeInstanceId, ct);
+        var scopeError = ChallengeFlagPolicy.ValidateScope(
+            scope, command.TeamId, command.StageId, command.ChallengeInstanceId);
         if (scopeError is not null)
             return OperationResult<ChallengeFlagView>.Failure(scopeError.Value.Code, scopeError.Value.Message);
 
@@ -212,8 +231,10 @@ public sealed class DeleteChallengeFlag(
         if (expectedRowVersion < 0)
             return OperationResult.Failure("invalid_row_version", "Expected RowVersion cannot be negative.");
 
-        var scope = await store.LoadScopeAsync(competitionId, challengeId, teamId: null, ct);
-        var scopeError = ChallengeFlagPolicy.ValidateScope(scope, teamId: null);
+        var scope = await store.LoadScopeAsync(
+            competitionId, challengeId, teamId: null, stageId: null, challengeInstanceId: null, ct);
+        var scopeError = ChallengeFlagPolicy.ValidateScope(
+            scope, teamId: null, stageId: null, challengeInstanceId: null, validateDimensions: false);
         if (scopeError is not null)
             return OperationResult.Failure(scopeError.Value.Code, scopeError.Value.Message);
 
@@ -243,7 +264,12 @@ internal static class ChallengeFlagPolicy
         return null;
     }
 
-    public static (string Code, string Message)? ValidateScope(ChallengeFlagScope? scope, Guid? teamId)
+    public static (string Code, string Message)? ValidateScope(
+        ChallengeFlagScope? scope,
+        Guid? teamId,
+        Guid? stageId,
+        Guid? challengeInstanceId,
+        bool validateDimensions = true)
     {
         if (scope is null)
             return ("challenge_not_found", "Challenge was not found.");
@@ -251,6 +277,18 @@ internal static class ChallengeFlagPolicy
             return ("flag_locked", "Finished competition Flags are read-only.");
         if (teamId is not null && !scope.TeamExists)
             return ("team_not_found", "The Team-specific Flag scope was not found.");
+        if (!validateDimensions) return null;
+        if (scope.Mode == GameMode.Penetration
+            && (teamId is null || stageId is null))
+            return ("penetration_flag_scope_required",
+                "Penetration Flags require Team and Stage scope; Challenge instance scope is optional.");
+        if (scope.Mode != GameMode.Penetration && (stageId is not null || challengeInstanceId is not null))
+            return ("penetration_flag_scope_not_allowed",
+                "Stage and Challenge instance scope are allowed only for Penetration Flags.");
+        if (!scope.StageExists)
+            return ("stage_not_found", "The Penetration Stage was not found.");
+        if (challengeInstanceId is not null && !scope.ChallengeInstanceExists)
+            return ("challenge_instance_not_found", "The Penetration Challenge instance was not found.");
         return null;
     }
 }

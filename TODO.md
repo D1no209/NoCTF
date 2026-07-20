@@ -274,7 +274,7 @@
 ### 7.5 Penetration
 
 - [x] Stage dependency evaluator。
-- [ ] Stage flag 生成和窗口。
+- [x] Stage flag 生成和窗口。
 - [x] Stage submission evaluator。
 - [x] stage completion。
 - [ ] runtime stage lifecycle。
@@ -315,7 +315,7 @@
 - [ ] AWD game box provision。
 - [ ] AWDP patch/recreate/check 流程。
 - [ ] KoH agent provision/poll。
-- [ ] Penetration stage instance provision。
+- [x] Penetration stage instance provision。
 - [x] orphan runtime cleanup。
 - [x] competition finish cleanup。
 - [x] runtime failure → ScoringEvent/PlatformFailed。

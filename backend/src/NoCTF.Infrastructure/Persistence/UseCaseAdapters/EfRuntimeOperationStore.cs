@@ -32,6 +32,21 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
                 return new(new(existing.Id, existing.CompetitionId, existing.OperationKey, existing.ClaimToken, existing.Status, false));
             if (competitionStatus != CompetitionStatus.Running)
                 return new(null, RuntimeOperationBeginFailure.CompetitionNotRunning);
+            if (existing.ChallengeInstanceId is { } staleInstanceId)
+            {
+                await db.ChallengeInstances
+                    .Where(instance => instance.Id == staleInstanceId)
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(instance => instance.Status, RuntimeStatus.Failed)
+                        .SetProperty(instance => instance.UpdatedAt, now), ct);
+                await db.ChallengeFlags
+                    .Where(flag => flag.ChallengeInstanceId == staleInstanceId
+                                   && (flag.ValidEnd == null || flag.ValidEnd > now))
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(flag => flag.ValidEnd, now)
+                        .SetProperty(flag => flag.UpdatedAt, now)
+                        .SetProperty(flag => flag.RowVersion, flag => flag.RowVersion + 1), ct);
+            }
             var newClaimToken = Guid.CreateVersion7(now);
             var claimed = await db.RuntimeOperations
                 .Where(operation => operation.Id == existing.Id
@@ -42,6 +57,7 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
                 .ExecuteUpdateAsync(update => update
                     .SetProperty(operation => operation.Status, RuntimeStatus.Starting)
                     .SetProperty(operation => operation.ClaimToken, newClaimToken)
+                    .SetProperty(operation => operation.ChallengeInstanceId, (Guid?)null)
                     .SetProperty(operation => operation.ErrorCode, (string?)null)
                     .SetProperty(operation => operation.UpdatedAt, now), ct);
             if (claimed != 1)
@@ -92,6 +108,7 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
         ContainerReceipt receipt,
         Guid challengeId,
         Guid? teamId,
+        Guid challengeInstanceId,
         DateTimeOffset? expiresAt,
         DateTimeOffset now,
         CancellationToken ct)
@@ -108,21 +125,31 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
         if (operation is null || operation.Status is RuntimeStatus.Running or RuntimeStatus.Stopped)
             return false;
 
-        var instance = new ChallengeInstance
+        var instance = await db.ChallengeInstances.SingleOrDefaultAsync(
+            item => item.Id == challengeInstanceId, ct);
+        if (instance is null)
         {
-            Id = Guid.CreateVersion7(now),
-            CompetitionId = lease.CompetitionId,
-            ChallengeId = challengeId,
-            TeamId = teamId,
-            Provider = receipt.Provider,
-            Receipt = JsonSerializer.Serialize(receipt),
-            Status = receipt.Status,
-            EntryUrl = receipt.PublicHost,
-            CreatedAt = now,
-            UpdatedAt = now,
-            ExpiresAt = expiresAt
-        };
-        db.ChallengeInstances.Add(instance);
+            instance = new ChallengeInstance
+            {
+                Id = challengeInstanceId,
+                CompetitionId = lease.CompetitionId,
+                ChallengeId = challengeId,
+                TeamId = teamId,
+                CreatedAt = now
+            };
+            db.ChallengeInstances.Add(instance);
+        }
+        else if (instance.CompetitionId != lease.CompetitionId
+                 || instance.ChallengeId != challengeId || instance.TeamId != teamId)
+        {
+            return false;
+        }
+        instance.Provider = receipt.Provider;
+        instance.Receipt = JsonSerializer.Serialize(receipt);
+        instance.Status = receipt.Status;
+        instance.EntryUrl = receipt.PublicHost;
+        instance.UpdatedAt = now;
+        instance.ExpiresAt = expiresAt;
         operation.ChallengeInstanceId = instance.Id;
         operation.Status = receipt.Status;
         operation.UpdatedAt = now;
@@ -162,34 +189,38 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
         }
         if (operation.ChallengeInstanceId is not null)
         {
-            var reconciledReceiptJson = await db.ChallengeInstances.AsNoTracking()
+            var reconciledInstance = await db.ChallengeInstances
                 .Where(instance => instance.Id == operation.ChallengeInstanceId)
-                .Select(instance => instance.Receipt)
                 .SingleOrDefaultAsync(ct);
-            var reconciledReceipt = reconciledReceiptJson is null
+            var reconciledReceipt = string.IsNullOrWhiteSpace(reconciledInstance?.Receipt)
                 ? null
-                : JsonSerializer.Deserialize<ContainerReceipt>(reconciledReceiptJson)
+                : JsonSerializer.Deserialize<ContainerReceipt>(reconciledInstance.Receipt)
                   ?? throw new InvalidOperationException("Persisted runtime receipt is invalid.");
+            if (reconciledInstance is not null && reconciledReceipt is null)
+            {
+                reconciledInstance.Status = RuntimeStatus.Failed;
+                reconciledInstance.UpdatedAt = now;
+                operation.Status = RuntimeStatus.Failed;
+                operation.ErrorCode = FailureCode(failure.Failure);
+                operation.UpdatedAt = now;
+                if (failure.CleanupReceipt is { } preparedCleanupReceipt)
+                {
+                    reconciledInstance.Provider = preparedCleanupReceipt.Provider;
+                    reconciledInstance.Receipt = JsonSerializer.Serialize(preparedCleanupReceipt);
+                }
+            }
             if (failure.CleanupReceipt is { } cleanupReceipt
-                && (reconciledReceipt is null
-                    || reconciledReceipt.Provider != cleanupReceipt.Provider
-                    || reconciledReceipt.ResourceId != cleanupReceipt.ResourceId))
+                && (reconciledInstance is null
+                    || reconciledReceipt is not null
+                    && (reconciledReceipt.Provider != cleanupReceipt.Provider
+                        || reconciledReceipt.ResourceId != cleanupReceipt.ResourceId)))
                 db.ChallengeInstances.Add(CreateCleanupInstance(lease, failure, cleanupReceipt, now));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return new(reconciledReceipt);
         }
         operation.Status = RuntimeStatus.Failed;
-        operation.ErrorCode = failure.Failure switch
-        {
-            RuntimeProvisionFailure.CreateTimeout => "runtime_create_timeout",
-            RuntimeProvisionFailure.CreateFailed => "runtime_create_failed",
-            RuntimeProvisionFailure.CreateCanceled => "runtime_create_canceled",
-            RuntimeProvisionFailure.ReceiptMismatch => "runtime_receipt_mismatch",
-            RuntimeProvisionFailure.CompetitionNotRunning => "competition_not_running",
-            RuntimeProvisionFailure.PersistenceRejected => "runtime_persistence_rejected",
-            _ => throw new ArgumentOutOfRangeException(nameof(failure), failure.Failure, null)
-        };
+        operation.ErrorCode = FailureCode(failure.Failure);
         operation.UpdatedAt = now;
         if (failure.CleanupReceipt is { } receipt && operation.ChallengeInstanceId is null)
         {
@@ -201,6 +232,17 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
         await transaction.CommitAsync(ct);
         return new();
     }
+
+    private static string FailureCode(RuntimeProvisionFailure failure) => failure switch
+        {
+            RuntimeProvisionFailure.CreateTimeout => "runtime_create_timeout",
+            RuntimeProvisionFailure.CreateFailed => "runtime_create_failed",
+            RuntimeProvisionFailure.CreateCanceled => "runtime_create_canceled",
+            RuntimeProvisionFailure.ReceiptMismatch => "runtime_receipt_mismatch",
+            RuntimeProvisionFailure.CompetitionNotRunning => "competition_not_running",
+            RuntimeProvisionFailure.PersistenceRejected => "runtime_persistence_rejected",
+            _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
+        };
 
     private static ChallengeInstance CreateCleanupInstance(
         RuntimeOperationLease lease,

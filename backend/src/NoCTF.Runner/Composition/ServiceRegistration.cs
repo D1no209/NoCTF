@@ -34,6 +34,8 @@ public static class ServiceRegistration
         services.AddSingleton<RuntimeProviderCatalog>();
         services.AddSingleton<IOneShotRuntimeProviderCatalog>(provider =>
             provider.GetRequiredService<RuntimeProviderCatalog>());
+        services.AddSingleton<IContainerRuntimeProviderCatalog>(provider =>
+            provider.GetRequiredService<RuntimeProviderCatalog>());
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddFastEndpoints(discovery =>
         {

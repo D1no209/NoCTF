@@ -1,6 +1,7 @@
 using System.Text.Json;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Runtime;
 
@@ -55,6 +56,7 @@ public interface IRuntimeOperationStore
         ContainerReceipt receipt,
         Guid challengeId,
         Guid? teamId,
+        Guid challengeInstanceId,
         DateTimeOffset? expiresAt,
         DateTimeOffset now,
         CancellationToken cancellationToken);
@@ -72,14 +74,34 @@ public sealed record ProvisionChallengeRuntimeCommand(
     Guid? TeamId,
     string OperationKey,
     ContainerRequest Container,
-    TimeSpan? OperationTimeout = null);
+    TimeSpan? OperationTimeout = null,
+    GameMode Mode = GameMode.Ctf,
+    string ChallengeConfigurationJson = "{}",
+    int? ChallengeConfigurationRevision = null);
 
 public sealed record ProvisionChallengeRuntimeResult(
     Guid? OperationId,
     RuntimeStatus Status,
     ContainerReceipt? Receipt,
     bool AlreadyExists,
-    RuntimeProvisionFailure? Failure = null);
+    RuntimeProvisionFailure? Failure = null,
+    Guid? ChallengeInstanceId = null);
+
+public interface IRuntimeFlagPreparation
+{
+    Task<ContainerRequest> PrepareAsync(
+        ProvisionChallengeRuntimeCommand command,
+        Guid challengeInstanceId,
+        DateTimeOffset validStart,
+        DateTimeOffset? validEnd,
+        ContainerRequest request,
+        CancellationToken cancellationToken);
+
+    Task DeactivateAsync(
+        Guid challengeInstanceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+}
 
 public sealed record RuntimeOperationPolicyOptions(
     TimeSpan DefaultOperationTimeout,
@@ -111,7 +133,8 @@ public sealed record RuntimeOperationPolicyOptions(
 public sealed class ChallengeRuntimeProvisioner(
     IRuntimeOperationStore operations,
     IContainerLifecycle runtime,
-    RuntimeOperationPolicyOptions? configuredOptions = null)
+    RuntimeOperationPolicyOptions? configuredOptions = null,
+    IRuntimeFlagPreparation? flagPreparation = null)
 {
     public async Task<ProvisionChallengeRuntimeResult> ExecuteAsync(
         ProvisionChallengeRuntimeCommand command,
@@ -146,6 +169,26 @@ public sealed class ChallengeRuntimeProvisioner(
 
         var request = command.Container with { OperationId = lease.ClaimToken };
         DateTimeOffset? expiresAt = request.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null;
+        var challengeInstanceId = Guid.CreateVersion7(now);
+        try
+        {
+            if (flagPreparation is not null)
+                request = await flagPreparation.PrepareAsync(
+                    command, challengeInstanceId, now, expiresAt, request, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            _ = await RecordFailureAsync(
+                lease, command, expiresAt, RuntimeProvisionFailure.CreateCanceled, null);
+            throw;
+        }
+        catch
+        {
+            _ = await RecordFailureAsync(
+                lease, command, expiresAt, RuntimeProvisionFailure.PersistenceRejected, null);
+            return new(lease.OperationId, RuntimeStatus.Failed, null, false,
+                RuntimeProvisionFailure.PersistenceRejected);
+        }
         using var operationTimeout = new CancellationTokenSource(effectiveOperationTimeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, operationTimeout.Token);
         var operationToken = linked.Token;
@@ -188,10 +231,11 @@ public sealed class ChallengeRuntimeProvisioner(
                     receipt,
                     command.ChallengeId,
                     command.TeamId,
+                    challengeInstanceId,
                     expiresAt,
                     DateTimeOffset.UtcNow,
                     ct))
-                return new(lease.OperationId, receipt.Status, receipt, false);
+                return new(lease.OperationId, receipt.Status, receipt, false, null, challengeInstanceId);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -222,18 +266,40 @@ public sealed class ChallengeRuntimeProvisioner(
             RuntimeProvisionFailure failure,
             ContainerReceipt? cleanupReceipt)
         {
-            using var compensation = new CancellationTokenSource(
-                options.CompensationTimeout);
-            return await operations.FailAsync(
-                operationLease,
-                new(
-                    failure,
-                    provisionCommand.ChallengeId,
-                    provisionCommand.TeamId,
-                    operationExpiresAt,
-                cleanupReceipt),
-                DateTimeOffset.UtcNow,
-                compensation.Token);
+            var result = new RuntimeOperationFailureResult();
+            try
+            {
+                using var bookkeeping = new CancellationTokenSource(options.CompensationTimeout);
+                result = await operations.FailAsync(
+                    operationLease,
+                    new(
+                        failure,
+                        provisionCommand.ChallengeId,
+                        provisionCommand.TeamId,
+                        operationExpiresAt,
+                        cleanupReceipt),
+                    DateTimeOffset.UtcNow,
+                    bookkeeping.Token);
+            }
+            catch
+            {
+                // Failure bookkeeping must not suppress the original provisioning outcome.
+            }
+
+            if (flagPreparation is not null && result.ReconciledReceipt is null)
+            {
+                try
+                {
+                    using var flagCompensation = new CancellationTokenSource(options.CompensationTimeout);
+                    await flagPreparation.DeactivateAsync(
+                        challengeInstanceId, DateTimeOffset.UtcNow, flagCompensation.Token);
+                }
+                catch
+                {
+                    // Durable orphan cleanup is the fallback for interrupted compensation.
+                }
+            }
+            return result;
         }
 
         async Task<ContainerReceipt?> TryDestroyAsync(ContainerReceipt createdReceipt)

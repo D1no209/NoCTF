@@ -18,6 +18,39 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class RunOneShotEndpointSecurityTests
 {
     [Test]
+    public async Task Container_provider_failure_does_not_expose_sensitive_exception_in_response_or_logs()
+    {
+        const string sensitive = "FLAG{container-secret} environment-secret";
+        var logs = new CapturingLoggerProvider();
+        await using var factory = new WebApplicationFactory<RunnerProgramMarker>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                    new Dictionary<string, string?> { ["Runtime:Runner:ApiKey"] = "test-runner-key" }));
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<IContainerRuntimeProviderCatalog>();
+                    services.AddSingleton<IContainerRuntimeProviderCatalog>(new ThrowingContainerCatalog(sensitive));
+                    services.AddSingleton<ILoggerProvider>(logs);
+                });
+            });
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Runner-Key", "test-runner-key");
+
+        var response = await client.PostAsJsonAsync("/containers", new CreateContainerRequest
+        {
+            Provider = RuntimeProvider.Docker,
+            Image = "challenge-image",
+            Environment = new() { ["NOCTF_STAGE_1_FLAG"] = "redacted-at-boundary" }
+        });
+        var body = await response.Content.ReadAsStringAsync();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadGateway);
+        await Assert.That(body).DoesNotContain(sensitive);
+        await Assert.That(string.Join(Environment.NewLine, logs.Entries)).DoesNotContain(sensitive);
+    }
+
+    [Test]
     public async Task Provider_failure_does_not_expose_sensitive_exception_in_response_or_logs()
     {
         const string sensitive = "FLAG{runner-secret} archive-content-secret";
@@ -54,6 +87,20 @@ public sealed class RunOneShotEndpointSecurityTests
     private sealed class ThrowingCatalog(string message) : IOneShotRuntimeProviderCatalog
     {
         public IOneShotJobRunner OneShot(RuntimeProvider provider) => new ThrowingRunner(message);
+    }
+
+    private sealed class ThrowingContainerCatalog(string message) : IContainerRuntimeProviderCatalog
+    {
+        public IContainerLifecycle Containers(RuntimeProvider provider) => new ThrowingContainer(message);
+    }
+
+    private sealed class ThrowingContainer(string message) : IContainerLifecycle
+    {
+        public Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException(message);
+        public Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken) =>
+            Task.FromResult<ContainerReceipt?>(null);
     }
 
     private sealed class ThrowingRunner(string message) : IOneShotJobRunner

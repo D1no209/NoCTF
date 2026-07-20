@@ -17,13 +17,7 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
         if (string.IsNullOrWhiteSpace(command.IdempotencyKey) || command.IdempotencyKey.Length > 128)
             return OperationResult<SubmissionAccepted>.Failure("idempotency_key_invalid", "IdempotencyKey is required and cannot exceed 128 characters.");
 
-        var existing = await store.FindAcceptedAsync(
-            command.CompetitionId, command.IdempotencyKey, command.TeamId, command.ChallengeId,
-            command.UserId, NoCTF.Domain.Submissions.SubmissionKind.Flag, command.AttackTarget, cancellationToken);
-        var existingResult = MapAcceptance(existing);
-        if (existingResult is not null)
-            return existingResult;
-
+        var fingerprint = NoCTF.Domain.Submissions.FlagFingerprint.Create(command.Flag);
         for (var attempt = 0; attempt < MaxConcurrencyRetries; attempt++)
         {
             var snapshot = await store.LoadAdmissionAsync(
@@ -43,6 +37,24 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
             if (snapshot.Mode != NoCTF.Domain.Competitions.GameMode.Awd && command.AttackTarget is not null)
                 return OperationResult<SubmissionAccepted>.Failure(
                     "awd_attack_target_not_allowed", "Attack target dimensions are allowed only for AWD submissions.");
+            if (snapshot.Mode == NoCTF.Domain.Competitions.GameMode.Penetration && command.StageId is null)
+                return OperationResult<SubmissionAccepted>.Failure(
+                    "penetration_stage_required", "Penetration submissions require a stage identifier.");
+            if (snapshot.Mode == NoCTF.Domain.Competitions.GameMode.Penetration
+                && snapshot.ChallengeInstanceId is null)
+                return OperationResult<SubmissionAccepted>.Failure(
+                    "penetration_instance_required", "A running Penetration challenge instance is required.");
+            if (snapshot.Mode != NoCTF.Domain.Competitions.GameMode.Penetration && command.StageId is not null)
+                return OperationResult<SubmissionAccepted>.Failure(
+                    "penetration_stage_not_allowed", "Stage identifiers are allowed only for Penetration submissions.");
+
+            var existing = await store.FindAcceptedAsync(
+                command.CompetitionId, command.IdempotencyKey, command.TeamId, command.ChallengeId,
+                command.UserId, NoCTF.Domain.Submissions.SubmissionKind.Flag, command.AttackTarget,
+                command.StageId, snapshot.ChallengeInstanceId, fingerprint, cancellationToken);
+            var existingResult = MapAcceptance(existing);
+            if (existingResult is not null)
+                return existingResult;
 
             var rules = modePolicy.GetRules(
                 snapshot.Mode,
@@ -64,11 +76,13 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
                 TeamId = command.TeamId,
                 ChallengeId = command.ChallengeId,
                 UserId = command.UserId,
-                Flag = command.Flag,
+                FlagFingerprint = fingerprint,
                 IdempotencyKey = command.IdempotencyKey,
                 IpAddress = command.IpAddress,
                 ReceivedAt = command.ReceivedAt,
-                AttackTarget = command.AttackTarget
+                AttackTarget = command.AttackTarget,
+                StageId = command.StageId,
+                ChallengeInstanceId = snapshot.ChallengeInstanceId
             };
 
             var accepted = await store.TryAcceptFlagAsync(received, snapshot, rules.MaxFlagAttempts, cancellationToken);

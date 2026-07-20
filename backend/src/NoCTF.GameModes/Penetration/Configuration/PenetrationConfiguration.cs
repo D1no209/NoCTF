@@ -16,7 +16,8 @@ public sealed record PenetrationStage(
     int Number,
     string Name,
     IReadOnlyList<Guid> PrerequisiteIds,
-    CtfPointConfiguration? Points);
+    CtfPointConfiguration? Points,
+    string? InjectionKey = null);
 
 public sealed record PenetrationChallengeConfiguration(
     int SchemaVersion,

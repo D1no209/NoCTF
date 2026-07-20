@@ -58,7 +58,7 @@ public sealed class CompetitionRuntimeProvisioner(
             {
                 attempted++;
                 var result = await challengeProvisioner.ExecuteAsync(
-                    BuildCommand(snapshot.CompetitionId, challenge, teamId, template),
+                    BuildCommand(snapshot.CompetitionId, snapshot.Mode, challenge, teamId, template),
                     cancellationToken);
                 if (result.Status is NoCTF.Domain.Runtime.RuntimeStatus.Running
                     or NoCTF.Domain.Runtime.RuntimeStatus.Starting
@@ -74,6 +74,7 @@ public sealed class CompetitionRuntimeProvisioner(
 
     private static ProvisionChallengeRuntimeCommand BuildCommand(
         Guid competitionId,
+        GameMode mode,
         RuntimeChallengeDefinition challenge,
         Guid? teamId,
         ChallengeRuntimeTemplate template)
@@ -110,6 +111,9 @@ public sealed class CompetitionRuntimeProvisioner(
             teamId,
             operationKey,
             container,
-            template.OperationTimeoutSeconds is int timeout ? TimeSpan.FromSeconds(timeout) : null);
+            template.OperationTimeoutSeconds is int timeout ? TimeSpan.FromSeconds(timeout) : null,
+            mode,
+            challenge.ConfigurationJson,
+            challenge.ConfigurationRevision);
     }
 }

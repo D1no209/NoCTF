@@ -186,7 +186,8 @@ public class GameModeSubmissionEvaluatorTests
         VictimTeamId = target,
         ServiceId = service ?? Guid.NewGuid(),
         Kind = SubmissionKind.Flag,
-        Flag = "FLAG{round-1}",
+        FlagHash = FlagFingerprint.Create("FLAG{round-1}").Sha256,
+        FlagLength = "FLAG{round-1}".Length,
         ReceivedAt = receivedAt
     };
 
@@ -291,12 +292,89 @@ public class GameModeSubmissionEvaluatorTests
         var submission = new Submission
         {
             TeamId = team, ChallengeId = challenge, StageId = secondStage, Kind = SubmissionKind.Flag,
-            Flag = "flag", ReceivedAt = DateTimeOffset.UtcNow
+            FlagHash = FlagFingerprint.Create("flag").Sha256,
+            FlagLength = "flag".Length,
+            ChallengeInstanceId = Guid.NewGuid(), ReceivedAt = DateTimeOffset.UtcNow
         };
-        var flag = new NoCTF.Domain.Challenges.ChallengeFlag { TeamId = team, ChallengeId = challenge, Flag = "flag" };
+        var flag = new NoCTF.Domain.Challenges.ChallengeFlag
+        {
+            TeamId = team, ChallengeId = challenge, StageId = secondStage,
+            ChallengeInstanceId = submission.ChallengeInstanceId, Flag = "flag"
+        };
 
         var result = new PenetrationSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
-            .Evaluate(new(submission, [new ScoringEvent { SubmissionId = prior.Id, Result = ScoringResult.Correct }], [flag], null, "{}", configuration, [prior]));
+            .Evaluate(new(submission, [new ScoringEvent
+            {
+                SubmissionId = prior.Id,
+                TeamId = team,
+                ChallengeId = challenge,
+                Result = ScoringResult.Correct
+            }], [flag], null, "{}", configuration, [prior]));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Correct);
+    }
+
+    [Test]
+    public async Task PenetrationEvaluator_DoesNotAcceptAnotherStagesFlag()
+    {
+        var requestedStage = Guid.NewGuid();
+        var otherStage = Guid.NewGuid();
+        var team = Guid.NewGuid();
+        var challenge = Guid.NewGuid();
+        var configuration = JsonSerializer.Serialize(new PenetrationChallengeConfiguration(
+            1, [new(requestedStage, 1, "entry", [], null), new(otherStage, 2, "root", [], null)]),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var submission = new Submission
+        {
+            TeamId = team, ChallengeId = challenge, StageId = requestedStage,
+            Kind = SubmissionKind.Flag,
+            FlagHash = FlagFingerprint.Create("same-value").Sha256,
+            FlagLength = "same-value".Length,
+            ChallengeInstanceId = Guid.NewGuid(), ReceivedAt = DateTimeOffset.UtcNow
+        };
+        var flag = new NoCTF.Domain.Challenges.ChallengeFlag
+        {
+            TeamId = team, ChallengeId = challenge, StageId = otherStage,
+            ChallengeInstanceId = submission.ChallengeInstanceId, Flag = "same-value"
+        };
+
+        var result = new PenetrationSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+            .Evaluate(new(submission, [], [flag], null, "{}", configuration));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Wrong);
+    }
+
+    [Test]
+    public async Task PenetrationEvaluator_AcceptsStaticStageFlagAcrossInstances()
+    {
+        var stage = Guid.NewGuid();
+        var team = Guid.NewGuid();
+        var configuration = JsonSerializer.Serialize(new PenetrationChallengeConfiguration(
+            1, [new(stage, 1, "entry", [], null)]),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var fingerprint = FlagFingerprint.Create("static-stage-flag");
+        var submission = new Submission
+        {
+            TeamId = team,
+            ChallengeId = Guid.NewGuid(),
+            StageId = stage,
+            ChallengeInstanceId = Guid.NewGuid(),
+            Kind = SubmissionKind.Flag,
+            FlagHash = fingerprint.Sha256,
+            FlagLength = fingerprint.Length,
+            ReceivedAt = DateTimeOffset.UtcNow
+        };
+        var flag = new NoCTF.Domain.Challenges.ChallengeFlag
+        {
+            TeamId = team,
+            ChallengeId = submission.ChallengeId!.Value,
+            StageId = stage,
+            ChallengeInstanceId = null,
+            Flag = "static-stage-flag"
+        };
+
+        var result = new PenetrationSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+            .Evaluate(new(submission, [], [flag], null, "{}", configuration));
 
         await Assert.That(result.Result).IsEqualTo(ScoringResult.Correct);
     }

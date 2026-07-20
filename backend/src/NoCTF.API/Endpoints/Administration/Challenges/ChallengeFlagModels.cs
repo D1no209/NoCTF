@@ -5,6 +5,8 @@ public sealed class CreateChallengeFlagRequest
     public Guid CompetitionId { get; set; }
     public Guid ChallengeId { get; set; }
     public Guid? TeamId { get; set; }
+    public Guid? StageId { get; set; }
+    public Guid? ChallengeInstanceId { get; set; }
     public string Flag { get; set; } = string.Empty;
     public DateTimeOffset? ValidStart { get; set; }
     public DateTimeOffset? ValidEnd { get; set; }
@@ -16,6 +18,8 @@ public sealed class UpdateChallengeFlagRequest
     public Guid ChallengeId { get; set; }
     public Guid FlagId { get; set; }
     public Guid? TeamId { get; set; }
+    public Guid? StageId { get; set; }
+    public Guid? ChallengeInstanceId { get; set; }
     public string Flag { get; set; } = string.Empty;
     public DateTimeOffset? ValidStart { get; set; }
     public DateTimeOffset? ValidEnd { get; set; }
@@ -47,7 +51,9 @@ public sealed record ChallengeFlagSecretResponse(
     DateTimeOffset? ValidEnd,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    long RowVersion)
+    long RowVersion,
+    Guid? StageId = null,
+    Guid? ChallengeInstanceId = null)
 {
     public override string ToString() =>
         $"{nameof(ChallengeFlagSecretResponse)} {{ Id = {Id}, CompetitionId = {CompetitionId}, ChallengeId = {ChallengeId}, TeamId = {TeamId}, Flag = [REDACTED] }}";

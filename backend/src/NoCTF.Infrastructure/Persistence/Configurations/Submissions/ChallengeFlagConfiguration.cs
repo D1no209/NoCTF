@@ -12,6 +12,10 @@ internal sealed class ChallengeFlagConfiguration : IEntityTypeConfiguration<Chal
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Flag).HasColumnType("text");
         builder.Property(x => x.RowVersion).IsConcurrencyToken();
-        builder.HasIndex(x => new { x.CompetitionId, x.ChallengeId, x.TeamId, x.ValidStart, x.ValidEnd });
+        builder.HasIndex(x => new
+        {
+            x.CompetitionId, x.ChallengeId, x.TeamId, x.StageId, x.ChallengeInstanceId,
+            x.ValidStart, x.ValidEnd
+        });
     }
 }

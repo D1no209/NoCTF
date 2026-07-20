@@ -37,4 +37,28 @@ public class PenetrationConfigurationValidatorTests
 
         await Assert.That(PenetrationConfigurationValidator.Validate(configuration)).IsEmpty();
     }
+
+    [Test]
+    public async Task Valid_injection_key_is_accepted()
+    {
+        var configuration = new PenetrationChallengeConfiguration(
+            1,
+            [new(Guid.NewGuid(), 1, "Root", [], null, "STAGE_1_FLAG")]);
+
+        await Assert.That(PenetrationConfigurationValidator.Validate(configuration)).IsEmpty();
+    }
+
+    [Arguments("1_STAGE_FLAG")]
+    [Arguments("STAGE-FLAG")]
+    [Arguments("")]
+    [Test]
+    public async Task Invalid_injection_key_is_rejected(string injectionKey)
+    {
+        var configuration = new PenetrationChallengeConfiguration(
+            1,
+            [new(Guid.NewGuid(), 1, "Root", [], null, injectionKey)]);
+
+        await Assert.That(PenetrationConfigurationValidator.Validate(configuration))
+            .Contains(item => item.Contains("InjectionKey", StringComparison.Ordinal));
+    }
 }

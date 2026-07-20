@@ -11,7 +11,9 @@ public sealed class EfRuntimeHealthStore(NoCtfDbContext db) : IRuntimeHealthStor
     public async Task<IReadOnlyList<RuntimeHealthTarget>> ListActiveAsync(CancellationToken cancellationToken)
     {
         var records = await db.ChallengeInstances.AsNoTracking()
-            .Where(instance => instance.Status != RuntimeStatus.Stopped && instance.Status != RuntimeStatus.Failed)
+            .Where(instance => instance.Status != RuntimeStatus.Stopped
+                               && instance.Status != RuntimeStatus.Failed
+                               && instance.Receipt != string.Empty)
             .OrderBy(instance => instance.CreatedAt)
             .Select(instance => new { instance.Id, instance.Receipt })
             .ToListAsync(cancellationToken);
