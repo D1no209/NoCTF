@@ -111,6 +111,7 @@ public sealed class EfSubmissionIntakeStore(
             CompetitionId = received.CompetitionId,
             TeamId = received.TeamId,
             ChallengeId = received.ChallengeId,
+            CompetitionChallengeId = received.ChallengeId,
             UserId = received.UserId,
             Kind = DomainSubmissionKind.Flag,
             FlagHash = received.FlagFingerprint.Sha256,
@@ -184,6 +185,7 @@ public sealed class EfSubmissionIntakeStore(
             CompetitionId = received.CompetitionId,
             TeamId = received.TeamId,
             ChallengeId = received.ChallengeId,
+            CompetitionChallengeId = received.ChallengeId,
             UserId = received.UserId,
             Kind = DomainSubmissionKind.Fix,
             IdempotencyKey = received.IdempotencyKey,
@@ -258,7 +260,7 @@ public sealed class EfSubmissionIntakeStore(
         Guid? challengeInstanceId,
         FlagFingerprint? flagFingerprint) =>
         submission.TeamId == teamId
-        && submission.ChallengeId == challengeId
+        && submission.CompetitionChallengeId == challengeId
         && submission.UserId == userId
         && submission.Kind == kind
         && submission.SubjectTeamId == attackTarget?.TeamId
