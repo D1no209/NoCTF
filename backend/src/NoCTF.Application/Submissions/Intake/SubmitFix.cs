@@ -18,7 +18,7 @@ public sealed class SubmitFix(
 
         var existing = await store.FindAcceptedAsync(
             command.CompetitionId, command.IdempotencyKey, command.TeamId, command.ChallengeId,
-            command.UserId, NoCTF.Domain.Submissions.SubmissionKind.Fix, cancellationToken);
+            command.UserId, NoCTF.Domain.Submissions.SubmissionKind.Fix, null, cancellationToken);
         if (existing is not null)
             return MapAcceptance(existing);
 

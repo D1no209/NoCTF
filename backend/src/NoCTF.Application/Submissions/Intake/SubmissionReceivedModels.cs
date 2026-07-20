@@ -12,6 +12,7 @@ public sealed record FlagSubmissionReceived
     public required string IdempotencyKey { get; init; }
     public required string IpAddress { get; init; }
     public required DateTimeOffset ReceivedAt { get; init; }
+    public AwdAttackTarget? AttackTarget { get; init; }
     public string? ExpectedFlagAtReceipt { get; init; }
 
     public override string ToString() =>

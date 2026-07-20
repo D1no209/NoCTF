@@ -238,8 +238,8 @@
 - [x] victim/subject/service/stage 维度。
 - [x] self-attack rejection。
 - [x] duplicate attack rejection。
-- [ ] round flag expiry。
-- [ ] current round 校验。
+- [x] round flag expiry。
+- [x] current round 校验。
 - [x] attack points。
 - [x] service online/down 规则。
 - [x] been-attacked penalty。

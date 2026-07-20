@@ -84,6 +84,36 @@ public class SubmissionIntakeTests
     }
 
     [Test]
+    public async Task SubmitFlag_AwdAttackTarget_IsRequiredAndPassedToAtomicStore()
+    {
+        var target = new AwdAttackTarget(Guid.NewGuid(), Guid.NewGuid());
+        var store = new Store { Snapshot = Snapshot() with { Mode = GameMode.Awd } };
+
+        var missing = await new SubmitFlag(store, new Policy()).ExecuteAsync(FlagCommand());
+        var accepted = await new SubmitFlag(store, new Policy())
+            .ExecuteAsync(FlagCommand() with { IdempotencyKey = "awd-target", AttackTarget = target });
+
+        await Assert.That(missing.ErrorCode).IsEqualTo("awd_attack_target_required");
+        await Assert.That(accepted.Succeeded).IsTrue();
+        await Assert.That(store.LastFlag!.AttackTarget).IsEqualTo(target);
+    }
+
+    [Test]
+    public async Task SubmitFlag_NonAwdAttackTarget_IsRejected()
+    {
+        var store = new Store();
+        var command = FlagCommand() with
+        {
+            AttackTarget = new(Guid.NewGuid(), Guid.NewGuid())
+        };
+
+        var result = await new SubmitFlag(store, new Policy()).ExecuteAsync(command);
+
+        await Assert.That(result.ErrorCode).IsEqualTo("awd_attack_target_not_allowed");
+        await Assert.That(store.AcceptCalls).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task SubmitFix_ReusedKey_ReturnsOriginalBeforeReadingUploadMetadata()
     {
         var originalId = Guid.NewGuid();
@@ -132,7 +162,8 @@ public class SubmissionIntakeTests
 
         public Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
             Guid competitionId, string idempotencyKey, Guid teamId, Guid challengeId, Guid userId,
-            DomainSubmissionKind kind, CancellationToken cancellationToken) => Task.FromResult(Existing);
+            DomainSubmissionKind kind, AwdAttackTarget? attackTarget,
+            CancellationToken cancellationToken) => Task.FromResult(Existing);
 
         public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
             Guid competitionId, Guid teamId, Guid challengeId, Guid userId,
