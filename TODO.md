@@ -400,7 +400,7 @@
 - [x] Runner scoring JWT issuer。
 - [x] Runner scoring scheme、issuer、audience、scope 校验。
 - [x] 用户 token_version 即时吊销 policy。
-- [ ] Refresh Origin/Referer 与部署域名配置统一。
+- [x] Refresh Origin/Referer 与部署域名配置统一。
 - [x] SignalR Bearer token provider。
 - [x] 仅 Hub path 允许 access_token query。
 - [x] query token 不进入日志和代理访问日志。
