@@ -21,12 +21,37 @@ public class CompetitionCollaboratorTests
             CompetitionCollaboratorRole.Manager, CompetitionCollaboratorRole.Judge, CompetitionCollaboratorRole.Observer]);
     }
 
+    [Test]
+    public async Task FinishedCompetition_RejectsCollaboratorMutationsBeforeStoreWrite()
+    {
+        var store = new Store { Status = CompetitionStatus.Finished };
+
+        var add = await new AddCompetitionCollaborator(store).ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), CompetitionCollaboratorRole.Manager, DateTimeOffset.UtcNow));
+        var remove = await new RemoveCompetitionCollaborator(store).ExecuteAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        await Assert.That(add.ErrorCode).IsEqualTo("competition_finished");
+        await Assert.That(remove.ErrorCode).IsEqualTo("competition_finished");
+        await Assert.That(store.WriteCount).IsEqualTo(0);
+    }
+
     private sealed class Store : ICompetitionCollaboratorStore
     {
         public string? Error { get; set; }
+        public CompetitionStatus? Status { get; set; } = CompetitionStatus.Draft;
+        public int WriteCount { get; private set; }
         public Task<bool> CanManageAsync(Guid actorId, Guid competitionId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult(Status);
         public Task<IReadOnlyList<CompetitionCollaboratorView>> ListAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CompetitionCollaboratorView>>([]);
-        public Task<string?> AddOrUpdateAsync(AddCompetitionCollaboratorCommand command, CancellationToken cancellationToken) => Task.FromResult(Error);
-        public Task<bool> RemoveAsync(Guid competitionId, Guid userId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<string?> AddOrUpdateAsync(AddCompetitionCollaboratorCommand command, CancellationToken cancellationToken)
+        {
+            WriteCount++;
+            return Task.FromResult(Error);
+        }
+        public Task<string?> RemoveAsync(Guid competitionId, Guid userId, CancellationToken cancellationToken)
+        {
+            WriteCount++;
+            return Task.FromResult(Error);
+        }
     }
 }

@@ -56,7 +56,9 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
         var exists = await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId && x.CompetitionId == competitionId && !x.Deletion.IsDeleted, ct);
         if (!exists) return null;
         var changed = await db.Teams.Where(x => x.Id == teamId && x.CompetitionId == competitionId
-                && x.RegistrationStatus == TeamRegistrationStatus.Pending)
+                && x.RegistrationStatus == TeamRegistrationStatus.Pending
+                && db.Competitions.Any(competition => competition.Id == competitionId
+                    && competition.Status != CompetitionStatus.Finished))
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
         return changed == 1;
     }
@@ -103,6 +105,7 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
         if (entity is null) return "team_not_found";
         var status = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId).Select(x => (CompetitionStatus?)x.Status).SingleOrDefaultAsync(ct);
         if (status is CompetitionStatus.Running or CompetitionStatus.Paused) return "competition_active";
+        if (status == CompetitionStatus.Finished) return "competition_finished";
         entity.Deletion.IsDeleted = true;
         entity.Deletion.DeletedAt = deletedAt;
         entity.Deletion.DeletedById = actorId;
