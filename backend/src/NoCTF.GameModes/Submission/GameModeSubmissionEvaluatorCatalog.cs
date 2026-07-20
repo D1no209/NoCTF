@@ -4,6 +4,7 @@ using NoCTF.Domain.Submissions;
 using SubmissionEntity = NoCTF.Domain.Submissions.Submission;
 using System.Text.Json;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Penetration.Configuration;
 
 namespace NoCTF.GameModes.Submission;
@@ -14,7 +15,7 @@ public sealed class GameModeSubmissionEvaluatorCatalog : ISubmissionEvaluatorCat
         new Dictionary<GameMode, ISubmissionEvaluator>
         {
             [GameMode.Ctf] = new CtfSubmissionEvaluator(new DefaultEfSubmissionEvaluator()),
-            [GameMode.Awd] = new AwdSubmissionEvaluator(new DefaultEfSubmissionEvaluator()),
+            [GameMode.Awd] = new AwdSubmissionEvaluator(),
             [GameMode.Awdp] = new AwdpSubmissionEvaluator(new DefaultEfSubmissionEvaluator()),
             [GameMode.Koh] = new KohSubmissionEvaluator(),
             [GameMode.Penetration] = new PenetrationSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
@@ -42,7 +43,7 @@ public sealed class CtfSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmis
             : inner.Evaluate(context);
 }
 
-public sealed class AwdSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmissionEvaluator
+public sealed class AwdSubmissionEvaluator : ISubmissionEvaluator
 {
     public ScoringEventDecision Evaluate(SubmissionProcessingContext context)
     {
@@ -51,21 +52,67 @@ public sealed class AwdSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmis
         if (context.Submission.SubjectTeamId is { } subject && subject == context.Submission.TeamId
             || context.Submission.VictimTeamId is { } victim && victim == context.Submission.TeamId)
             return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.SelfAttackRejected);
+        var configuration = AwdConfigurationUpgrader.ParseCompetition(context.CompetitionConfigurationJson);
+        var start = context.CompetitionStartTime ?? context.Submission.ReceivedAt;
+        var currentRound = SubmissionRoundCalculator.Calculate(
+            context.Submission.ReceivedAt, start, configuration.RoundDurationSeconds);
+        if (context.Submission.ReceivedAt < start || currentRound > configuration.TotalRounds)
+            return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.RoundOutOfRange);
+
         var duplicate = context.PriorSubmissions?.Any(previous =>
             previous.Kind == SubmissionKind.Flag
             && previous.TeamId == context.Submission.TeamId
             && previous.SubjectTeamId == context.Submission.SubjectTeamId
             && previous.VictimTeamId == context.Submission.VictimTeamId
             && previous.ServiceId == context.Submission.ServiceId
+            && SubmissionRoundCalculator.Calculate(
+                previous.ReceivedAt, start, configuration.RoundDurationSeconds) == currentRound
             && context.PriorEvents.Any(@event => @event.SubmissionId == previous.Id && @event.Result == ScoringResult.Correct)) == true;
-        return duplicate
-            ? new ScoringEventDecision(
+        if (duplicate)
+            return new ScoringEventDecision(
                 ScoringEventKind.SubmissionEvaluation,
                 ScoringResult.Duplicate,
                 ScoringFailureCode.DuplicateAttack,
                 context.Submission.ReceivedAt,
-                "awd-evaluator-v1")
-            : inner.Evaluate(context);
+                "awd-evaluator-v2");
+
+        var targetTeamId = context.Submission.SubjectTeamId ?? context.Submission.VictimTeamId;
+        IReadOnlyList<NoCTF.Domain.Challenges.ChallengeFlag> matchingFlags = context.Submission.Flag is null
+            ? []
+            : context.ApplicableFlags.Where(flag =>
+                flag.Flag == context.Submission.Flag
+                && (flag.TeamId is null || flag.TeamId == targetTeamId)).ToList();
+        if (matchingFlags.Count == 0)
+            return Decision(ScoringResult.Wrong);
+
+        if (matchingFlags.Any(IsValid))
+            return Decision(ScoringResult.Correct);
+        if (matchingFlags.All(IsExpired))
+            return Decision(ScoringResult.Wrong, ScoringFailureCode.FlagExpired);
+        return Decision(ScoringResult.Wrong);
+
+        ScoringEventDecision Decision(ScoringResult result, ScoringFailureCode? failure = null) =>
+            new(ScoringEventKind.SubmissionEvaluation, result, failure,
+                context.Submission.ReceivedAt, "awd-evaluator-v2");
+
+        bool IsValid(NoCTF.Domain.Challenges.ChallengeFlag flag) =>
+            !IsFuture(flag) && !IsExpired(flag);
+
+        bool IsFuture(NoCTF.Domain.Challenges.ChallengeFlag flag)
+        {
+            var flagRound = SubmissionRoundCalculator.Calculate(
+                flag.ValidStart ?? start, start, configuration.RoundDurationSeconds);
+            return currentRound < flagRound
+                   || flag.ValidStart is { } validStart && validStart > context.Submission.ReceivedAt;
+        }
+
+        bool IsExpired(NoCTF.Domain.Challenges.ChallengeFlag flag)
+        {
+            var flagRound = SubmissionRoundCalculator.Calculate(
+                flag.ValidStart ?? start, start, configuration.RoundDurationSeconds);
+            return currentRound >= flagRound + configuration.FlagValidityRounds
+                   || flag.ValidEnd is { } validEnd && validEnd < context.Submission.ReceivedAt;
+        }
     }
 }
 

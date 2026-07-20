@@ -26,7 +26,11 @@ public sealed class DefaultEfSubmissionEvaluator : ISubmissionEvaluator
                 submission.ReceivedAt, "ef-v1");
         }
         var duplicate = context.PriorEvents.Any(x => x.TeamId == submission.TeamId && x.ChallengeId == submission.ChallengeId && x.Result == ScoringResult.Correct);
-        var correct = submission.Flag is not null && context.ApplicableFlags.Any(x => x.Flag == submission.Flag && (x.TeamId is null || x.TeamId == submission.TeamId));
+        var correct = submission.Flag is not null && context.ApplicableFlags.Any(x =>
+            x.Flag == submission.Flag
+            && (x.TeamId is null || x.TeamId == submission.TeamId)
+            && (x.ValidStart is null || x.ValidStart <= submission.ReceivedAt)
+            && (x.ValidEnd is null || x.ValidEnd >= submission.ReceivedAt));
         return new(ScoringEventKind.SubmissionEvaluation, duplicate ? ScoringResult.Duplicate : correct ? ScoringResult.Correct : ScoringResult.Wrong,
             null, submission.ReceivedAt, "ef-v1");
     }

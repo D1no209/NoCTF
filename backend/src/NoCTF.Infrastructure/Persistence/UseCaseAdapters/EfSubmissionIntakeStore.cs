@@ -24,6 +24,7 @@ public sealed class EfSubmissionIntakeStore(
         Guid challengeId,
         Guid userId,
         DomainSubmissionKind kind,
+        AwdAttackTarget? attackTarget,
         CancellationToken ct)
     {
         if (!admissionGate.IsAccepting)
@@ -35,7 +36,7 @@ public sealed class EfSubmissionIntakeStore(
             ct);
         if (existing is null)
             return null;
-        if (!Matches(existing, teamId, challengeId, userId, kind))
+        if (!Matches(existing, teamId, challengeId, userId, kind, attackTarget))
             return new(SubmissionAcceptanceState.IdempotencyConflict);
 
         if (existing.ScoringEventId is null)
@@ -87,7 +88,7 @@ public sealed class EfSubmissionIntakeStore(
 
         var existing = await FindAcceptedAsync(
             received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
-            received.UserId, DomainSubmissionKind.Flag, ct);
+            received.UserId, DomainSubmissionKind.Flag, received.AttackTarget, ct);
         if (existing is not null)
             return existing;
 
@@ -107,6 +108,9 @@ public sealed class EfSubmissionIntakeStore(
             UserId = received.UserId,
             Kind = DomainSubmissionKind.Flag,
             Flag = received.Flag,
+            SubjectTeamId = received.AttackTarget?.TeamId,
+            VictimTeamId = received.AttackTarget?.TeamId,
+            ServiceId = received.AttackTarget?.ServiceId,
             IdempotencyKey = received.IdempotencyKey,
             ReceivedAt = received.ReceivedAt,
             CreatedAt = received.ReceivedAt,
@@ -145,7 +149,7 @@ public sealed class EfSubmissionIntakeStore(
 
         var existing = await FindAcceptedAsync(
             received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
-            received.UserId, DomainSubmissionKind.Fix, ct);
+            received.UserId, DomainSubmissionKind.Fix, null, ct);
         if (existing is not null)
             return existing;
 
@@ -219,7 +223,11 @@ public sealed class EfSubmissionIntakeStore(
         {
             await transaction.RollbackAsync(ct);
             db.ChangeTracker.Clear();
-            return await FindAcceptedAsync(entity.CompetitionId, idempotencyKey, teamId, challengeId, userId, kind, ct)
+            var attackTarget = entity.SubjectTeamId is { } target && entity.ServiceId is { } service
+                ? new AwdAttackTarget(target, service)
+                : null;
+            return await FindAcceptedAsync(
+                    entity.CompetitionId, idempotencyKey, teamId, challengeId, userId, kind, attackTarget, ct)
                 ?? new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged);
         }
     }
@@ -229,10 +237,14 @@ public sealed class EfSubmissionIntakeStore(
         Guid teamId,
         Guid challengeId,
         Guid userId,
-        DomainSubmissionKind kind) =>
+        DomainSubmissionKind kind,
+        AwdAttackTarget? attackTarget) =>
         submission.TeamId == teamId
         && submission.ChallengeId == challengeId
         && submission.UserId == userId
-        && submission.Kind == kind;
+        && submission.Kind == kind
+        && submission.SubjectTeamId == attackTarget?.TeamId
+        && submission.VictimTeamId == attackTarget?.TeamId
+        && submission.ServiceId == attackTarget?.ServiceId;
 
 }

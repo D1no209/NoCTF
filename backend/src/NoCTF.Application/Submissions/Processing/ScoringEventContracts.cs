@@ -18,7 +18,8 @@ public sealed record SubmissionProcessingContext(
     FixSubmissionRecord? FixRecord,
     string CompetitionConfigurationJson,
     string ChallengeConfigurationJson,
-    IReadOnlyList<Submission>? PriorSubmissions = null);
+    IReadOnlyList<Submission>? PriorSubmissions = null,
+    DateTimeOffset? CompetitionStartTime = null);
 
 public interface ISubmissionEvaluator
 {

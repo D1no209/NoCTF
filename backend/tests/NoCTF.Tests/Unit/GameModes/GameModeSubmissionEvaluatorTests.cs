@@ -1,6 +1,7 @@
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Challenges;
 using NoCTF.GameModes.Submission;
 using NoCTF.GameModes.Penetration.Configuration;
 using System.Text.Json;
@@ -9,6 +10,8 @@ namespace NoCTF.Tests.Unit.GameModes;
 
 public class GameModeSubmissionEvaluatorTests
 {
+    private const string AwdJson = """{"schemaVersion":1,"roundDurationSeconds":60,"totalRounds":3,"flagValidityRounds":2,"attackPoints":100,"serviceOnlinePoints":10,"serviceDownPenalty":10,"victimPenalty":50}""";
+
     [Test]
     public async Task Catalog_ProvidesEvaluatorForEveryMode()
     {
@@ -56,8 +59,8 @@ public class GameModeSubmissionEvaluatorTests
             ReceivedAt = DateTimeOffset.UtcNow
         };
 
-        var result = new AwdSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
-            .Evaluate(new(submission, [], [], null, "{}", "{}"));
+        var result = new AwdSubmissionEvaluator()
+            .Evaluate(new(submission, [], [], null, AwdJson, "{}", CompetitionStartTime: submission.ReceivedAt));
 
         await Assert.That(result.Result).IsEqualTo(ScoringResult.Rejected);
         await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.SelfAttackRejected);
@@ -87,11 +90,122 @@ public class GameModeSubmissionEvaluatorTests
             ReceivedAt = DateTimeOffset.UtcNow
         };
 
-        var result = new AwdSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
-            .Evaluate(new(submission, [priorEvent], [], null, "{}", "{}", [prior]));
+        var result = new AwdSubmissionEvaluator()
+            .Evaluate(new(submission, [priorEvent], [], null, AwdJson, "{}", [prior], submission.ReceivedAt));
 
         await Assert.That(result.Result).IsEqualTo(ScoringResult.Duplicate);
         await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.DuplicateAttack);
+    }
+
+    [Test]
+    public async Task AwdEvaluator_AcceptsTargetFlagWithinConfiguredRoundWindow()
+    {
+        var start = DateTimeOffset.UtcNow;
+        var target = Guid.NewGuid();
+        var submission = Attack(target, start.AddSeconds(119));
+        var flag = RoundFlag(target, start, "FLAG{round-1}");
+
+        var result = new AwdSubmissionEvaluator().Evaluate(new(
+            submission, [], [flag], null, AwdJson, "{}", [], start));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Correct);
+    }
+
+    [Test]
+    public async Task AwdEvaluator_RejectsExpiredRoundFlag()
+    {
+        var start = DateTimeOffset.UtcNow;
+        var target = Guid.NewGuid();
+        var submission = Attack(target, start.AddSeconds(120));
+        var flag = RoundFlag(target, start, "FLAG{round-1}");
+
+        var result = new AwdSubmissionEvaluator().Evaluate(new(
+            submission, [], [flag], null, AwdJson, "{}", [], start));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Wrong);
+        await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.FlagExpired);
+    }
+
+    [Test]
+    public async Task AwdEvaluator_UsesAnyValidMatchingFlagRegardlessOfCandidateOrder()
+    {
+        var start = DateTimeOffset.UtcNow;
+        var target = Guid.NewGuid();
+        var submission = Attack(target, start.AddSeconds(70));
+        var expiredGlobal = RoundFlag(Guid.Empty, start.AddSeconds(-120), "FLAG{round-1}");
+        expiredGlobal.TeamId = null;
+        var validTarget = RoundFlag(target, start.AddSeconds(60), "FLAG{round-1}");
+
+        var result = new AwdSubmissionEvaluator().Evaluate(new(
+            submission, [], [expiredGlobal, validTarget], null, AwdJson, "{}", [], start));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Correct);
+    }
+
+    [Test]
+    public async Task AwdEvaluator_RejectsSubmissionOutsideConfiguredRounds()
+    {
+        var start = DateTimeOffset.UtcNow;
+        var target = Guid.NewGuid();
+        var submission = Attack(target, start.AddSeconds(180));
+
+        var result = new AwdSubmissionEvaluator().Evaluate(new(
+            submission, [], [], null, AwdJson, "{}", [], start));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Rejected);
+        await Assert.That(result.FailureCode).IsEqualTo(ScoringFailureCode.RoundOutOfRange);
+    }
+
+    [Test]
+    public async Task AwdEvaluator_AllowsSameAttackDimensionsInNextRound()
+    {
+        var start = DateTimeOffset.UtcNow;
+        var attacker = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        var service = Guid.NewGuid();
+        var prior = Attack(target, start.AddSeconds(30), attacker, service);
+        prior.Id = Guid.NewGuid();
+        var current = Attack(target, start.AddSeconds(70), attacker, service);
+        var priorEvent = new ScoringEvent { SubmissionId = prior.Id, Result = ScoringResult.Correct };
+        var flag = RoundFlag(target, start.AddSeconds(60), "FLAG{round-1}");
+
+        var result = new AwdSubmissionEvaluator().Evaluate(new(
+            current, [priorEvent], [flag], null, AwdJson, "{}", [prior], start));
+
+        await Assert.That(result.Result).IsEqualTo(ScoringResult.Correct);
+    }
+
+    private static Submission Attack(
+        Guid target,
+        DateTimeOffset receivedAt,
+        Guid? attacker = null,
+        Guid? service = null) => new()
+    {
+        TeamId = attacker ?? Guid.NewGuid(),
+        SubjectTeamId = target,
+        VictimTeamId = target,
+        ServiceId = service ?? Guid.NewGuid(),
+        Kind = SubmissionKind.Flag,
+        Flag = "FLAG{round-1}",
+        ReceivedAt = receivedAt
+    };
+
+    private static ChallengeFlag RoundFlag(Guid target, DateTimeOffset validStart, string flag) => new()
+    {
+        TeamId = target,
+        Flag = flag,
+        ValidStart = validStart
+    };
+
+    [Test]
+    public async Task SubmissionRoundCalculator_UsesLongIntegerBoundariesWithoutOverflow()
+    {
+        var start = DateTimeOffset.MinValue;
+
+        await Assert.That(SubmissionRoundCalculator.Calculate(start.AddSeconds(59), start, 60)).IsEqualTo(1L);
+        await Assert.That(SubmissionRoundCalculator.Calculate(start.AddSeconds(60), start, 60)).IsEqualTo(2L);
+        await Assert.That(SubmissionRoundCalculator.Calculate(DateTimeOffset.MaxValue, start, 1))
+            .IsGreaterThan((long)int.MaxValue);
     }
 
     [Test]

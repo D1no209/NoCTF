@@ -12,6 +12,7 @@ public interface ISubmissionIntakeStore
         Guid challengeId,
         Guid userId,
         NoCTF.Domain.Submissions.SubmissionKind kind,
+        AwdAttackTarget? attackTarget,
         CancellationToken cancellationToken);
 
     Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(

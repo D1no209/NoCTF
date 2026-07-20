@@ -24,5 +24,7 @@ public enum ScoringFailureCode
     UnknownTeamIdentifier,
     InvalidObservation,
     ProducerTimeout,
-    ProducerUnavailable
+    ProducerUnavailable,
+    FlagExpired,
+    RoundOutOfRange
 }

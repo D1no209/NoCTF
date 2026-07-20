@@ -3,6 +3,7 @@ using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Competitions;
 using Microsoft.Extensions.Logging;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
@@ -70,6 +71,7 @@ public sealed class EfSubmissionProcessor(
             select new
             {
                 competition.Mode,
+                competition.StartTime,
                 CompetitionJson = competitionConfiguration.Json,
                 ChallengeJson = challengeConfiguration.Json
             }).SingleAsync(ct);
@@ -105,10 +107,12 @@ public sealed class EfSubmissionProcessor(
         var priorSubmissions = await db.Submissions.AsNoTracking()
             .Where(x => x.CompetitionId == submission.CompetitionId && x.Id != submission.Id)
             .ToListAsync(ct);
+        var flagTeamId = configuration.Mode == GameMode.Awd
+            ? submission.SubjectTeamId ?? submission.VictimTeamId
+            : submission.TeamId;
         var flags = await db.ChallengeFlags.Where(x => x.CompetitionId == submission.CompetitionId
-            && x.ChallengeId == submission.ChallengeId && (x.TeamId == null || x.TeamId == submission.TeamId)
-            && (x.ValidStart == null || x.ValidStart <= submission.ReceivedAt)
-            && (x.ValidEnd == null || x.ValidEnd >= submission.ReceivedAt)).ToListAsync(ct);
+            && x.ChallengeId == submission.ChallengeId
+            && (x.TeamId == null || x.TeamId == flagTeamId)).ToListAsync(ct);
         var fix = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id, ct);
         return evaluatorCatalog.Get(configuration.Mode).Evaluate(new(
             submission,
@@ -117,6 +121,7 @@ public sealed class EfSubmissionProcessor(
             fix,
             configuration.CompetitionJson,
             configuration.ChallengeJson,
-            priorSubmissions));
+            priorSubmissions,
+            configuration.StartTime));
     }
 }

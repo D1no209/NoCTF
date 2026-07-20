@@ -57,6 +57,8 @@ public sealed record SubmissionAcceptanceResult(
 
 public sealed record SubmissionAccepted(Guid SubmissionId, DateTimeOffset ReceivedAt);
 
+public sealed record AwdAttackTarget(Guid TeamId, Guid ServiceId);
+
 public sealed record FlagSubmissionCommand(
     Guid CompetitionId,
     Guid TeamId,
@@ -65,7 +67,8 @@ public sealed record FlagSubmissionCommand(
     string Flag,
     string IdempotencyKey,
     string IpAddress,
-    DateTimeOffset ReceivedAt);
+    DateTimeOffset ReceivedAt,
+    AwdAttackTarget? AttackTarget = null);
 
 public sealed record FixSubmissionCommand(
     Guid CompetitionId,

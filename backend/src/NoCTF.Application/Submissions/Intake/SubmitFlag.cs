@@ -19,7 +19,7 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
 
         var existing = await store.FindAcceptedAsync(
             command.CompetitionId, command.IdempotencyKey, command.TeamId, command.ChallengeId,
-            command.UserId, NoCTF.Domain.Submissions.SubmissionKind.Flag, cancellationToken);
+            command.UserId, NoCTF.Domain.Submissions.SubmissionKind.Flag, command.AttackTarget, cancellationToken);
         var existingResult = MapAcceptance(existing);
         if (existingResult is not null)
             return existingResult;
@@ -34,6 +34,15 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
                 cancellationToken);
             if (snapshot is null)
                 return OperationResult<SubmissionAccepted>.Failure("submission_scope_not_found", "Submission scope was not found.");
+            if (snapshot.Mode == NoCTF.Domain.Competitions.GameMode.Awd
+                && (command.AttackTarget is null
+                    || command.AttackTarget.TeamId == Guid.Empty
+                    || command.AttackTarget.ServiceId == Guid.Empty))
+                return OperationResult<SubmissionAccepted>.Failure(
+                    "awd_attack_target_required", "AWD submissions require a target team and service.");
+            if (snapshot.Mode != NoCTF.Domain.Competitions.GameMode.Awd && command.AttackTarget is not null)
+                return OperationResult<SubmissionAccepted>.Failure(
+                    "awd_attack_target_not_allowed", "Attack target dimensions are allowed only for AWD submissions.");
 
             var rules = modePolicy.GetRules(
                 snapshot.Mode,
@@ -58,7 +67,8 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
                 Flag = command.Flag,
                 IdempotencyKey = command.IdempotencyKey,
                 IpAddress = command.IpAddress,
-                ReceivedAt = command.ReceivedAt
+                ReceivedAt = command.ReceivedAt,
+                AttackTarget = command.AttackTarget
             };
 
             var accepted = await store.TryAcceptFlagAsync(received, snapshot, rules.MaxFlagAttempts, cancellationToken);
