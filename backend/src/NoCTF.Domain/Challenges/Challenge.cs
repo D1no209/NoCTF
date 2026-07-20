@@ -15,4 +15,5 @@ public sealed class Challenge
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public SoftDeleteState Deletion { get; set; } = new();
+    public List<ChallengeAttachment> Attachments { get; set; } = [];
 }
