@@ -63,7 +63,7 @@ public sealed class CompetitionRuntimeProvisioner(
                 if (result.Status is NoCTF.Domain.Runtime.RuntimeStatus.Running
                     or NoCTF.Domain.Runtime.RuntimeStatus.Starting
                     or NoCTF.Domain.Runtime.RuntimeStatus.Pending
-                    || result.AlreadyCompleted)
+                    || result.AlreadyExists)
                     provisioned++;
                 else
                     failed++;
