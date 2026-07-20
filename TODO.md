@@ -334,7 +334,7 @@
 
 ## 11. Leaderboard 完整投影
 
-- [ ] 删除 Correct count 临时 projector。
+- [x] 删除 Correct count 临时 projector。
 - [x] CTF projector。
 - [x] AWD projector。
 - [x] AWDP projector。

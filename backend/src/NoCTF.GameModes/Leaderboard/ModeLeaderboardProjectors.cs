@@ -122,8 +122,6 @@ internal static class AwdLeaderboardProjection
 
     public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
     {
-        if (string.IsNullOrWhiteSpace(input.CompetitionConfigurationJson))
-            return ModeLeaderboardProjection.Project(input, submission => submission.Kind == SubmissionKind.Flag, includeSystemFacts: true);
         var configuration = TryParse(input.CompetitionConfigurationJson)
             ?? new AwdConfiguration(1, 300, 10, 2, 50, 100, 50, 50);
         var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
@@ -177,6 +175,7 @@ internal static class AwdLeaderboardProjection
 
     private static AwdConfiguration? TryParse(string? json)
     {
+        if (string.IsNullOrWhiteSpace(json)) return null;
         try { return JsonSerializer.Deserialize<AwdConfiguration>(json!, JsonOptions); }
         catch (JsonException) { return null; }
     }
@@ -196,8 +195,6 @@ internal static class AwdpLeaderboardProjection
 
     public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
     {
-        if (string.IsNullOrWhiteSpace(input.CompetitionConfigurationJson))
-            return ModeLeaderboardProjection.Project(input, submission => submission.Kind is SubmissionKind.Flag or SubmissionKind.Fix, includeSystemFacts: true);
         var competition = ParseCompetition(input.CompetitionConfigurationJson);
         var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
@@ -279,8 +276,6 @@ internal static class KohLeaderboardProjection
 
     public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
     {
-        if (string.IsNullOrWhiteSpace(input.CompetitionConfigurationJson))
-            return ModeLeaderboardProjection.Project(input, _ => false, includeSystemFacts: true);
         var configuration = Parse(input.CompetitionConfigurationJson);
         var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
         var observations = input.SystemEvents
@@ -311,8 +306,9 @@ internal static class KohLeaderboardProjection
             .ToList();
     }
 
-    private static KohConfiguration Parse(string json)
+    private static KohConfiguration Parse(string? json)
     {
+        if (string.IsNullOrWhiteSpace(json)) return new(1, 5, 10);
         try
         {
             return JsonSerializer.Deserialize<KohConfiguration>(json, JsonOptions)
@@ -339,8 +335,6 @@ internal static class PenetrationLeaderboardProjection
 
     public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
     {
-        if (string.IsNullOrWhiteSpace(input.CompetitionConfigurationJson))
-            return ModeLeaderboardProjection.Project(input, submission => submission.Kind == SubmissionKind.Flag, includeSystemFacts: true);
         var competition = ParseCompetition(input.CompetitionConfigurationJson);
         var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
@@ -415,78 +409,5 @@ internal static class PenetrationLeaderboardProjection
         if (string.IsNullOrWhiteSpace(json)) return null;
         try { return JsonSerializer.Deserialize<T>(json, JsonOptions); }
         catch (JsonException) { return null; }
-    }
-}
-
-internal static class ModeLeaderboardProjection
-{
-    public static IReadOnlyList<LeaderboardEntry> Project(
-        LeaderboardProjectionInput input,
-        Func<LeaderboardSubmissionFact, bool> includeSubmission,
-        bool includeSystemFacts)
-    {
-        var validTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted)
-            .ToDictionary(team => team.Id);
-        var challenges = (input.Challenges ?? [])
-            .Where(challenge => !challenge.IsDeleted)
-            .ToDictionary(challenge => challenge.Id);
-        var submissions = input.Submissions
-            .Where(fact => validTeams.ContainsKey(fact.TeamId)
-                          && includeSubmission(fact)
-                          && (challenges.Count == 0
-                              || fact.ChallengeId is null
-                              || challenges.ContainsKey(fact.ChallengeId.Value))
-                          && !fact.Event.IsDeleted
-                          && fact.Event.Result == ScoringResult.Correct)
-            .OrderBy(fact => fact.ReceivedAt)
-            .ThenBy(fact => fact.SubmissionId)
-            .ToList();
-        var system = includeSystemFacts
-            ? input.SystemEvents
-                .Where(fact => !fact.Event.IsDeleted
-                               && fact.Event.Result == ScoringResult.Correct
-                               && fact.Event.TeamId is not null
-                               && validTeams.ContainsKey(fact.Event.TeamId.Value))
-                .OrderBy(fact => fact.Event.OccurredAt)
-                .ThenBy(fact => fact.Event.Id)
-                .ToList()
-            : [];
-
-        var rows = validTeams.Values.Select(team =>
-        {
-            var ownSubmissions = submissions.Where(fact => fact.TeamId == team.Id).ToList();
-            var ownSystem = system.Where(fact => fact.Event.TeamId == team.Id).ToList();
-            var challengeSummaries = ownSubmissions
-                .Where(fact => fact.ChallengeId.HasValue)
-                .GroupBy(fact => fact.ChallengeId!.Value)
-                .Select(group => new LeaderboardChallengeSummary(
-                    group.Key,
-                    challenges.TryGetValue(group.Key, out var challenge) ? challenge.Direction : string.Empty,
-                    group.Count()))
-                .OrderBy(summary => summary.ChallengeId)
-                .ToList();
-            var score = ownSubmissions.Count + ownSystem.Count;
-            var last = ownSubmissions.Select(fact => fact.Event.OccurredAt)
-                .Concat(ownSystem.Select(fact => fact.Event.OccurredAt))
-                .OrderByDescending(value => value)
-                .FirstOrDefault();
-            return new LeaderboardEntry(
-                0,
-                team.Id,
-                team.Name,
-                score,
-                ownSubmissions.Count,
-                last == default ? null : last,
-                challengeSummaries);
-        });
-
-        return rows
-            .OrderByDescending(row => row.Score)
-            .ThenByDescending(row => row.SolveCount)
-            .ThenBy(row => row.LastScoreAt ?? DateTimeOffset.MaxValue)
-            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
-            .Select((row, index) => row with { Rank = index + 1 })
-            .ToList();
     }
 }

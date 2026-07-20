@@ -38,13 +38,20 @@ public class LeaderboardProjectorTests
     public async Task Project_IncludesSystemFactsWithoutSubmission()
     {
         var team = Guid.NewGuid();
-        var system = new ScoringEvent { Id = Guid.NewGuid(), TeamId = team, Result = ScoringResult.Correct, OccurredAt = DateTimeOffset.UtcNow };
+        var system = new ScoringEvent
+        {
+            Id = Guid.NewGuid(),
+            TeamId = team,
+            Kind = ScoringEventKind.AwdServiceCheck,
+            Result = ScoringResult.Correct,
+            OccurredAt = DateTimeOffset.UtcNow
+        };
         var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Awd,
             [new(team, "alpha", false, false)], [], [new(system)]);
 
         var result = new AwdLeaderboardProjector().Project(input);
 
-        await Assert.That(result[0].Score).IsEqualTo(1L);
+        await Assert.That(result[0].Score).IsEqualTo(100L);
         await Assert.That(result[0].SolveCount).IsEqualTo(0);
     }
 
@@ -56,6 +63,7 @@ public class LeaderboardProjectorTests
         {
             Id = Guid.NewGuid(),
             TeamId = team,
+            Kind = ScoringEventKind.KohObservation,
             Result = ScoringResult.Correct,
             OccurredAt = DateTimeOffset.UtcNow
         };
@@ -78,6 +86,7 @@ public class LeaderboardProjectorTests
         {
             Id = Guid.NewGuid(),
             TeamId = team,
+            Kind = ScoringEventKind.KohObservation,
             Result = ScoringResult.Correct,
             OccurredAt = DateTimeOffset.UtcNow
         };
@@ -89,7 +98,7 @@ public class LeaderboardProjectorTests
             [Fact(team, 1, ScoringResult.Correct)],
             [new(system)]));
 
-        await Assert.That(result[0].Score).IsEqualTo(1L);
+        await Assert.That(result[0].Score).IsEqualTo(10L);
         await Assert.That(result[0].SolveCount).IsEqualTo(0);
     }
 
