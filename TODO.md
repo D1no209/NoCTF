@@ -161,15 +161,15 @@
 - [x] 调整 Challenge Order。
 - [x] Publish/Unpublish Challenge。
 - [ ] Challenge 改为可复用全局题库模板，移除 `CompetitionId`、比赛 Order、发布状态和比赛配置字段。
-- [ ] Challenge 模板附件作为 owned 子集合，内容与比赛无关。
+- [x] Challenge 模板附件作为 owned 子集合，内容与比赛无关。
 - [ ] 模板内容修改实时影响引用它的比赛；不复制比赛题快照。
 
 ### 4.2 CompetitionChallenge 比赛题实例
 
 - [ ] 删除 `ChallengeConfiguration`/`challenge_configurations`，创建有独立 Id 的 `CompetitionChallenge`。
-- [ ] `CompetitionChallenge` 同时关联 Competition 和 Challenge 模板。
-- [ ] 保存 BaseScore、Order、Published、Revision、mode-specific ConfigurationJson。
-- [ ] Hints 作为比赛题 owned 子集合，保存 Content、Cost、PublishedAt。
+- [x] `CompetitionChallenge` 同时关联 Competition 和 Challenge 模板。
+- [x] 保存 BaseScore、Order、Published、Revision、mode-specific ConfigurationJson。
+- [x] Hints 作为比赛题 owned 子集合，保存 Content、Cost、PublishedAt。
 - [ ] 按 Competition.Mode 选择 configuration parser、校验 schemaVersion 和 revision concurrency。
 - [ ] 配置修改后 enqueue rebuild 并只刷新受影响 Competition。
 - [ ] CompetitionChallengeId 贯穿 Flag、Submission、ScoringEvent、ChallengeInstance 和 runtime。
