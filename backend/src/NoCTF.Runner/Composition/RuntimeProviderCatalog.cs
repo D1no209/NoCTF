@@ -7,7 +7,12 @@ using NoCTF.Runtime.Kubernetes.Containers;
 
 namespace NoCTF.Runner.Composition;
 
-public sealed class RuntimeProviderCatalog(IServiceProvider services)
+public interface IOneShotRuntimeProviderCatalog
+{
+    IOneShotJobRunner OneShot(RuntimeProvider provider);
+}
+
+public sealed class RuntimeProviderCatalog(IServiceProvider services) : IOneShotRuntimeProviderCatalog
 {
     public IContainerLifecycle Containers(RuntimeProvider provider) => provider switch
     {

@@ -23,7 +23,11 @@ public sealed class CreateContainerRequest
 public sealed class CreateContainerEndpoint(RuntimeProviderCatalog providers)
     : Endpoint<CreateContainerRequest, Results<Created<ContainerReceipt>, ProblemHttpResult>>
 {
-    public override void Configure() => Post("/containers");
+    public override void Configure()
+    {
+        Post("/containers");
+        AllowAnonymous(); // Authentication is enforced by RunnerSecurity's API-key middleware.
+    }
 
     public override async Task<Results<Created<ContainerReceipt>, ProblemHttpResult>> ExecuteAsync(
         CreateContainerRequest request,

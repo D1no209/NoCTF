@@ -19,7 +19,11 @@ public sealed class ComposeUpRequest
 public sealed class ComposeUpEndpoint(RuntimeProviderCatalog providers)
     : Endpoint<ComposeUpRequest, Results<Created<ComposeReceipt>, ProblemHttpResult>>
 {
-    public override void Configure() => Post("/compose/up");
+    public override void Configure()
+    {
+        Post("/compose/up");
+        AllowAnonymous(); // Authentication is enforced by RunnerSecurity's API-key middleware.
+    }
 
     public override async Task<Results<Created<ComposeReceipt>, ProblemHttpResult>> ExecuteAsync(
         ComposeUpRequest request,
