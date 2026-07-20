@@ -35,7 +35,6 @@ using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.BackgroundWork;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Retry;
-using NoCTF.Application.Authentication.Logout;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Runtime;
@@ -83,6 +82,7 @@ public static class ServiceRegistration
         services.AddHostedService<RuntimeHealthHostedService>();
         services.AddHostedService<OrphanRuntimeCleanupHostedService>();
         services.AddHostedService<KohPollingHostedService>();
+        services.AddHostedService<PenetrationStageMonitorHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (string.IsNullOrWhiteSpace(redis))
@@ -117,8 +117,11 @@ public static class ServiceRegistration
         services.AddSingleton<IKohProducerConfigurationCatalog, KohProducerConfigurationCatalog>();
         services.AddHttpClient<IKohAgentClient, HttpKohAgentClient>();
         services.AddScoped<ProduceKohObservations>();
+        services.AddScoped<IPenetrationStageMonitorTargetStore, EfPenetrationStageMonitorTargetStore>();
+        services.AddSingleton<IPenetrationStageConfigurationCatalog,
+            NoCTF.GameModes.Penetration.PenetrationStageConfigurationCatalog>();
+        services.AddScoped<MonitorPenetrationStages>();
         services.AddScoped<RetrySubmission>();
-        services.AddScoped<LogoutUser>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
         services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();

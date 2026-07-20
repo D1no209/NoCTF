@@ -34,8 +34,8 @@ public sealed class LoginEndpoint(LoginUser login, IConfiguration configuration)
             HttpOnly = true,
             Secure = configuration.GetValue("Authentication:RefreshCookieSecure", true),
             SameSite = SameSiteMode.Strict,
-            Path = "/auth/refresh",
-            MaxAge = TimeSpan.FromDays(7)
+            Path = "/auth",
+            MaxAge = TimeSpan.FromDays(30)
         });
         return TypedResults.Ok(new LoginResponse(
             result.Value!.UserId,

@@ -1,8 +1,6 @@
-using System.Security.Cryptography;
-using System.Text;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
-using NoCTF.Application.Authentication.RefreshSession;
+using NoCTF.Application.Authentication.RefreshJwt;
 using Microsoft.Extensions.Configuration;
 
 namespace NoCTF.API.Endpoints.Authentication;
@@ -27,11 +25,10 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
             return TypedResults.Unauthorized();
         }
 
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)));
-        var result = await refresh.ExecuteAsync(hash, DateTimeOffset.UtcNow, cancellationToken);
+        var result = await refresh.ExecuteAsync(refreshToken, cancellationToken);
         if (!result.Succeeded)
         {
-            HttpContext.Response.Cookies.Delete("noctf_refresh");
+            HttpContext.Response.Cookies.Delete("noctf_refresh", new CookieOptions { Path = "/auth" });
             return TypedResults.Unauthorized();
         }
 
@@ -40,8 +37,8 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
             HttpOnly = true,
             Secure = configuration.GetValue("Authentication:RefreshCookieSecure", true),
             SameSite = SameSiteMode.Strict,
-            Path = "/auth/refresh",
-            MaxAge = TimeSpan.FromDays(7)
+            Path = "/auth",
+            MaxAge = TimeSpan.FromDays(30)
         });
         return TypedResults.Ok(new LoginResponse(
             result.Value.UserId,
