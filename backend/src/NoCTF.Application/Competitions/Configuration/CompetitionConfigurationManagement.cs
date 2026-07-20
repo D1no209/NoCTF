@@ -21,8 +21,18 @@ public interface ICompetitionConfigurationValidator
 public interface ICompetitionConfigurationStore
 {
     Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken cancellationToken);
-    Task<CompetitionConfigurationView?> TryUpdateAsync(Guid competitionId, int expectedRevision, string json, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(Guid competitionId, int expectedRevision, string json, DateTimeOffset now, CancellationToken cancellationToken);
 }
+
+public enum CompetitionConfigurationUpdateFailure
+{
+    CompetitionNotFound,
+    ConfigurationLocked,
+    RevisionConflict
+}
+public sealed record CompetitionConfigurationUpdateResult(
+    CompetitionConfigurationView? Configuration,
+    CompetitionConfigurationUpdateFailure? Failure = null);
 
 public sealed class GetCompetitionConfiguration(ICompetitionConfigurationStore store)
 {
@@ -45,11 +55,24 @@ public sealed class UpdateCompetitionConfiguration(
         var errors = validator.Validate(current.Mode, json);
         if (errors.Count > 0)
             return OperationResult<CompetitionConfigurationView>.Failure("invalid_configuration", string.Join(" ", errors));
-        var updated = await store.TryUpdateAsync(competitionId, expectedRevision, json, now, ct);
-        if (updated is null)
-            return OperationResult<CompetitionConfigurationView>.Failure("configuration_conflict", "Configuration revision changed concurrently.");
+        var result = await store.TryUpdateAsync(competitionId, expectedRevision, json, now, ct);
+        if (result.Configuration is null)
+        {
+            var failure = result.Failure ?? CompetitionConfigurationUpdateFailure.RevisionConflict;
+            return OperationResult<CompetitionConfigurationView>.Failure(failure switch
+            {
+                CompetitionConfigurationUpdateFailure.CompetitionNotFound => "competition_not_found",
+                CompetitionConfigurationUpdateFailure.ConfigurationLocked => "configuration_locked",
+                _ => "configuration_conflict"
+            }, failure switch
+            {
+                CompetitionConfigurationUpdateFailure.CompetitionNotFound => "Competition was not found.",
+                CompetitionConfigurationUpdateFailure.ConfigurationLocked => "Active or finished competition configuration is read-only.",
+                _ => "Configuration revision changed concurrently."
+            });
+        }
         await cache.InvalidateAsync(competitionId, ct);
         await scheduler.EnqueueCompetitionRebuildAsync(competitionId, ct);
-        return OperationResult<CompetitionConfigurationView>.Success(updated);
+        return OperationResult<CompetitionConfigurationView>.Success(result.Configuration);
     }
 }

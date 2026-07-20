@@ -116,7 +116,7 @@ public class ChallengeConfigurationTests
             Guid challengeId,
             CancellationToken cancellationToken) => Task.FromResult(Current);
 
-        public Task<ChallengeConfigurationView?> TryUpdateAsync(
+        public Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
             Guid competitionId,
             Guid challengeId,
             int expectedRevision,
@@ -126,8 +126,8 @@ public class ChallengeConfigurationTests
         {
             UpdateCalls++;
             return Task.FromResult(Conflict || Current is null
-                ? null
-                : Current with { Json = json, Revision = expectedRevision + 1, UpdatedAt = updatedAt });
+                ? new ChallengeConfigurationUpdateResult(null, ChallengeConfigurationUpdateFailure.RevisionConflict)
+                : new ChallengeConfigurationUpdateResult(Current with { Json = json, Revision = expectedRevision + 1, UpdatedAt = updatedAt }));
         }
     }
 

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using Npgsql;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
@@ -67,6 +68,9 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        if (status is null) return new(null, ChallengeFlagMutationFailure.CompetitionNotFound);
+        if (status == CompetitionStatus.Finished) return new(null, ChallengeFlagMutationFailure.FlagLocked);
         var scopeError = await ValidateMutableScopeAsync(
             command.CompetitionId,
             command.ChallengeId,
@@ -82,7 +86,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
                 command.ValidEnd,
                 excludedFlagId: null,
                 ct))
-            return new(null, "flag_window_conflict");
+            return new(null, ChallengeFlagMutationFailure.FlagWindowConflict);
 
         var entity = new ChallengeFlag
         {
@@ -98,9 +102,16 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
             RowVersion = 0
         };
         db.ChallengeFlags.Add(entity);
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        return new(Map(entity), null);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return new(Map(entity));
+        }
+        catch (Exception exception) when (IsSerializationFailure(exception))
+        {
+            return new(null, ChallengeFlagMutationFailure.FlagWindowConflict);
+        }
     }
 
     public async Task<ChallengeFlagMutationResult> UpdateAsync(
@@ -108,15 +119,18 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        if (status is null) return new(null, ChallengeFlagMutationFailure.CompetitionNotFound);
+        if (status == CompetitionStatus.Finished) return new(null, ChallengeFlagMutationFailure.FlagLocked);
         var entity = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.Id == command.FlagId
                     && flag.CompetitionId == command.CompetitionId
                     && flag.ChallengeId == command.ChallengeId,
             ct);
         if (entity is null)
-            return new(null, "flag_not_found");
+            return new(null, ChallengeFlagMutationFailure.FlagNotFound);
         if (entity.RowVersion != command.ExpectedRowVersion)
-            return new(null, "flag_conflict");
+            return new(null, ChallengeFlagMutationFailure.FlagConflict);
 
         var scopeError = await ValidateMutableScopeAsync(
             command.CompetitionId,
@@ -133,7 +147,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
                 command.ValidEnd,
                 command.FlagId,
                 ct))
-            return new(null, "flag_window_conflict");
+            return new(null, ChallengeFlagMutationFailure.FlagWindowConflict);
 
         entity.TeamId = command.TeamId;
         entity.Flag = command.Flag;
@@ -145,15 +159,19 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         {
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            return new(Map(entity), null);
+            return new(Map(entity));
         }
         catch (DbUpdateConcurrencyException)
         {
-            return new(null, "flag_conflict");
+            return new(null, ChallengeFlagMutationFailure.FlagConflict);
+        }
+        catch (Exception exception) when (IsSerializationFailure(exception))
+        {
+            return new(null, ChallengeFlagMutationFailure.FlagWindowConflict);
         }
     }
 
-    public async Task<string?> DeleteAsync(
+    public async Task<ChallengeFlagMutationFailure?> DeleteAsync(
         Guid competitionId,
         Guid challengeId,
         Guid flagId,
@@ -161,15 +179,18 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        if (status is null) return ChallengeFlagMutationFailure.CompetitionNotFound;
+        if (status == CompetitionStatus.Finished) return ChallengeFlagMutationFailure.FlagLocked;
         var entity = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.Id == flagId
                     && flag.CompetitionId == competitionId
                     && flag.ChallengeId == challengeId,
             ct);
         if (entity is null)
-            return "flag_not_found";
+            return ChallengeFlagMutationFailure.FlagNotFound;
         if (entity.RowVersion != expectedRowVersion)
-            return "flag_conflict";
+            return ChallengeFlagMutationFailure.FlagConflict;
 
         var scopeError = await ValidateMutableScopeAsync(competitionId, challengeId, entity.TeamId, ct);
         if (scopeError is not null)
@@ -184,11 +205,15 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         }
         catch (DbUpdateConcurrencyException)
         {
-            return "flag_conflict";
+            return ChallengeFlagMutationFailure.FlagConflict;
+        }
+        catch (Exception exception) when (IsSerializationFailure(exception))
+        {
+            return ChallengeFlagMutationFailure.FlagConflict;
         }
     }
 
-    private async Task<string?> ValidateMutableScopeAsync(
+    private async Task<ChallengeFlagMutationFailure?> ValidateMutableScopeAsync(
         Guid competitionId,
         Guid challengeId,
         Guid? teamId,
@@ -196,11 +221,11 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
     {
         var scope = await LoadScopeAsync(competitionId, challengeId, teamId, ct);
         if (scope is null)
-            return "challenge_not_found";
+            return ChallengeFlagMutationFailure.ChallengeNotFound;
         if (scope.CompetitionStatus == CompetitionStatus.Finished)
-            return "flag_locked";
+            return ChallengeFlagMutationFailure.FlagLocked;
         if (teamId is not null && !scope.TeamExists)
-            return "team_not_found";
+            return ChallengeFlagMutationFailure.TeamNotFound;
         return null;
     }
 
@@ -239,4 +264,8 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         flag.CreatedAt,
         flag.UpdatedAt,
         flag.RowVersion);
+
+    private static bool IsSerializationFailure(Exception exception) =>
+        exception is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure }
+        || exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure };
 }

@@ -46,7 +46,7 @@ public class ChallengeManagementTests
     {
         var store = new Store
         {
-            CreateResult = new ChallengeMutationResult(null, "challenge_order_conflict")
+            CreateResult = new ChallengeMutationResult(null, ChallengeMutationFailure.ChallengeOrderConflict)
         };
 
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
@@ -209,7 +209,7 @@ public class ChallengeManagementTests
             return Task.FromResult(new ChallengeMutationResult(challenge, null));
         }
 
-        public Task<string?> SetPublishedAsync(
+        public Task<ChallengeMutationFailure?> SetPublishedAsync(
             Guid competitionId,
             Guid challengeId,
             bool published,
@@ -217,10 +217,10 @@ public class ChallengeManagementTests
             CancellationToken cancellationToken)
         {
             MutationCalls++;
-            return Task.FromResult<string?>(null);
+            return Task.FromResult<ChallengeMutationFailure?>(null);
         }
 
-        public Task<string?> SoftDeleteAsync(
+        public Task<ChallengeMutationFailure?> SoftDeleteAsync(
             Guid competitionId,
             Guid challengeId,
             Guid actorId,
@@ -228,7 +228,7 @@ public class ChallengeManagementTests
             CancellationToken cancellationToken)
         {
             MutationCalls++;
-            return Task.FromResult<string?>(null);
+            return Task.FromResult<ChallengeMutationFailure?>(null);
         }
     }
 
