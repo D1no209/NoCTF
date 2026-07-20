@@ -13,6 +13,9 @@ public sealed class KubernetesContainerLifecycle(
 {
     public async Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken)
     {
+        if (request.Provider != RuntimeProvider.Kubernetes)
+            throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Kubernetes runtime cannot create another provider.");
+
         var name = $"noctf-{request.OperationId:N}";
         var pod = new V1Pod
         {
@@ -49,8 +52,10 @@ public sealed class KubernetesContainerLifecycle(
             body: new V1DeleteOptions { PropagationPolicy = "Foreground" },
             cancellationToken: cancellationToken);
 
-    public async Task<ContainerReceipt?> GetAsync(string resourceId, CancellationToken cancellationToken)
+    public async Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)
     {
+        if (provider != RuntimeProvider.Kubernetes)
+            throw new ArgumentOutOfRangeException(nameof(provider), provider, "Kubernetes runtime cannot query another provider.");
         try
         {
             var pod = await client.CoreV1.ReadNamespacedPodAsync(resourceId, options.Namespace, cancellationToken: cancellationToken);

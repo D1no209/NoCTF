@@ -42,6 +42,7 @@ public sealed class CreateContainerEndpoint(RuntimeProviderCatalog providers)
 
     private static ContainerRequest Create(CreateContainerRequest request) => new(
         request.OperationId == Guid.Empty ? Guid.NewGuid() : request.OperationId,
+        request.Provider,
         request.Image,
         request.Command,
         request.Environment,

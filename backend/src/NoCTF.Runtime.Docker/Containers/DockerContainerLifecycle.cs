@@ -19,6 +19,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public async Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken)
     {
+        if (request.Provider != RuntimeProvider.Docker)
+            throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Docker runtime cannot create another provider.");
+
         var exposedPorts = request.PortMappings.Keys.ToDictionary(port => $"{port}/tcp", _ => new EmptyStruct());
         var bindings = request.PortMappings.ToDictionary(
             pair => $"{pair.Key}/tcp",
@@ -53,8 +56,10 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         await client.Containers.RemoveContainerAsync(receipt.ResourceId, new ContainerRemoveParameters { Force = true }, cancellationToken);
     }
 
-    public async Task<ContainerReceipt?> GetAsync(string resourceId, CancellationToken cancellationToken)
+    public async Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)
     {
+        if (provider != RuntimeProvider.Docker)
+            throw new ArgumentOutOfRangeException(nameof(provider), provider, "Docker runtime cannot query another provider.");
         try
         {
             var container = await client.Containers.InspectContainerAsync(resourceId, cancellationToken);

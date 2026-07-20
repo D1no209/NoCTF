@@ -18,6 +18,7 @@ public sealed class RunOneShotEndpoint(RuntimeProviderCatalog providers)
         {
             var result = await providers.OneShot(request.Provider).RunAsync(new(
                 request.OperationId == Guid.Empty ? Guid.NewGuid() : request.OperationId,
+                request.Provider,
                 request.Image,
                 request.Command,
                 request.Environment,

@@ -18,6 +18,7 @@ public sealed class RunnerContainerLifecycle(
         {
             Content = JsonContent.Create(new RunnerCreateContainerRequest(
                 request.OperationId,
+                request.Provider,
                 request.Image,
                 request.Command,
                 request.Environment,
@@ -45,9 +46,14 @@ public sealed class RunnerContainerLifecycle(
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<ContainerReceipt?> GetAsync(string resourceId, CancellationToken cancellationToken)
+    public async Task<ContainerReceipt?> GetAsync(
+        NoCTF.Domain.Runtime.RuntimeProvider provider,
+        string resourceId,
+        CancellationToken cancellationToken)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Get, $"containers/{Uri.EscapeDataString(resourceId)}");
+        using var message = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"containers/{Uri.EscapeDataString(resourceId)}?Provider={Uri.EscapeDataString(provider.ToString())}");
         message.Headers.Add("X-Runner-Key", apiKey);
         using var response = await client.SendAsync(message, cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -58,6 +64,7 @@ public sealed class RunnerContainerLifecycle(
 
     private sealed record RunnerCreateContainerRequest(
         Guid OperationId,
+        NoCTF.Domain.Runtime.RuntimeProvider Provider,
         string Image,
         IReadOnlyList<string> Command,
         IReadOnlyDictionary<string, string> Environment,
