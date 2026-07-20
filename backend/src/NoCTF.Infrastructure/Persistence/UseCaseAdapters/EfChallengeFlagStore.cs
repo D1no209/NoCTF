@@ -19,16 +19,17 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         Guid? challengeInstanceId,
         CancellationToken ct)
     {
-        var scope = await db.Challenges.AsNoTracking()
+        var scope = await db.CompetitionChallenges.AsNoTracking()
             .Join(db.Competitions.AsNoTracking(), challenge => challenge.CompetitionId, competition => competition.Id,
-                (challenge, competition) => new { Challenge = challenge, Competition = competition })
-            .Join(db.ChallengeConfigurations.AsNoTracking(), item => item.Challenge.Id, configuration => configuration.ChallengeId,
-                (item, configuration) => new { item.Challenge, item.Competition, Configuration = configuration })
-            .Where(item => item.Challenge.Id == challengeId
-                           && item.Challenge.CompetitionId == competitionId
+                (challenge, competition) => new { CompetitionChallenge = challenge, Competition = competition })
+            .Join(db.Challenges.AsNoTracking(), item => item.CompetitionChallenge.ChallengeId, challenge => challenge.Id,
+                (item, challenge) => new { item.CompetitionChallenge, item.Competition, Challenge = challenge })
+            .Where(item => item.CompetitionChallenge.Id == challengeId
+                           && item.CompetitionChallenge.CompetitionId == competitionId
+                           && !item.CompetitionChallenge.Deletion.IsDeleted
                            && !item.Challenge.Deletion.IsDeleted
                            && !item.Competition.Deletion.IsDeleted)
-            .Select(item => new { item.Competition.Status, item.Competition.Mode, item.Configuration.Json })
+            .Select(item => new { item.Competition.Status, item.Competition.Mode, Json = item.CompetitionChallenge.ConfigurationJson })
             .SingleOrDefaultAsync(ct);
         if (scope is null)
             return null;
@@ -43,7 +44,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         var instanceExists = challengeInstanceId is null || await db.ChallengeInstances.AsNoTracking().AnyAsync(
             instance => instance.Id == challengeInstanceId
                         && instance.CompetitionId == competitionId
-                        && instance.ChallengeId == challengeId
+                        && instance.CompetitionChallengeId == challengeId
                         && instance.TeamId == teamId
                         && instance.Status == RuntimeStatus.Running,
             ct);
@@ -56,7 +57,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         CancellationToken ct)
     {
         var flags = await Query()
-            .Where(flag => flag.CompetitionId == competitionId && flag.ChallengeId == challengeId)
+            .Where(flag => flag.CompetitionId == competitionId && flag.CompetitionChallengeId == challengeId)
             .OrderBy(flag => flag.TeamId)
             .ThenBy(flag => flag.ValidStart)
             .ThenBy(flag => flag.Id)
@@ -73,7 +74,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         var flag = await Query()
             .Where(flag => flag.Id == flagId
                            && flag.CompetitionId == competitionId
-                           && flag.ChallengeId == challengeId)
+                           && flag.CompetitionChallengeId == challengeId)
             .SingleOrDefaultAsync(ct);
         return flag is null ? null : Map(flag);
     }
@@ -112,6 +113,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
             Id = Guid.CreateVersion7(command.CreatedAt),
             CompetitionId = command.CompetitionId,
             ChallengeId = command.ChallengeId,
+            CompetitionChallengeId = command.ChallengeId,
             TeamId = command.TeamId,
             StageId = command.StageId,
             ChallengeInstanceId = command.ChallengeInstanceId,
@@ -146,7 +148,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         var entity = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.Id == command.FlagId
                     && flag.CompetitionId == command.CompetitionId
-                    && flag.ChallengeId == command.ChallengeId,
+                    && flag.CompetitionChallengeId == command.ChallengeId,
             ct);
         if (entity is null)
             return new(null, ChallengeFlagMutationFailure.FlagNotFound);
@@ -212,7 +214,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         var entity = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.Id == flagId
                     && flag.CompetitionId == competitionId
-                    && flag.ChallengeId == challengeId,
+                    && flag.CompetitionChallengeId == challengeId,
             ct);
         if (entity is null)
             return ChallengeFlagMutationFailure.FlagNotFound;
@@ -278,7 +280,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         CancellationToken ct) =>
         db.ChallengeFlags.AsNoTracking().AnyAsync(
             flag => flag.CompetitionId == competitionId
-                    && flag.ChallengeId == challengeId
+                    && flag.CompetitionChallengeId == challengeId
                     && flag.TeamId == teamId
                     && flag.StageId == stageId
                     && flag.ChallengeInstanceId == challengeInstanceId
@@ -288,17 +290,20 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
             ct);
 
     private IQueryable<ChallengeFlag> Query() => db.ChallengeFlags.AsNoTracking()
-        .Join(db.Challenges.AsNoTracking(), flag => flag.ChallengeId, challenge => challenge.Id,
-            (flag, challenge) => new { Flag = flag, Challenge = challenge })
+        .Join(db.CompetitionChallenges.AsNoTracking(), flag => flag.CompetitionChallengeId, challenge => challenge.Id,
+            (flag, challenge) => new { Flag = flag, CompetitionChallenge = challenge })
+        .Join(db.Challenges.AsNoTracking(), item => item.CompetitionChallenge.ChallengeId, challenge => challenge.Id,
+            (item, challenge) => new { item.Flag, item.CompetitionChallenge, Challenge = challenge })
         .Join(db.Competitions.AsNoTracking(), item => item.Flag.CompetitionId, competition => competition.Id,
-            (item, competition) => new { item.Flag, item.Challenge, Competition = competition })
-        .Where(item => !item.Challenge.Deletion.IsDeleted && !item.Competition.Deletion.IsDeleted)
+            (item, competition) => new { item.Flag, item.CompetitionChallenge, item.Challenge, Competition = competition })
+        .Where(item => !item.CompetitionChallenge.Deletion.IsDeleted
+                       && !item.Challenge.Deletion.IsDeleted && !item.Competition.Deletion.IsDeleted)
         .Select(item => item.Flag);
 
     private static ChallengeFlagView Map(ChallengeFlag flag) => new(
         flag.Id,
         flag.CompetitionId,
-        flag.ChallengeId,
+        flag.CompetitionChallengeId,
         flag.TeamId,
         flag.Flag,
         flag.ValidStart,
