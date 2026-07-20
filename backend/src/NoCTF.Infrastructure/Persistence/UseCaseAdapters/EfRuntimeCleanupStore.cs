@@ -21,8 +21,10 @@ public sealed class EfRuntimeCleanupStore(NoCtfDbContext db) : IRuntimeCleanupSt
             .ToListAsync(cancellationToken);
         return instances.Select(instance => new RuntimeCleanupTarget(
             instance.Id,
-            JsonSerializer.Deserialize<ContainerReceipt>(instance.Receipt)
-            ?? throw new InvalidOperationException($"Runtime receipt for instance {instance.Id} is invalid.")))
+            string.IsNullOrWhiteSpace(instance.Receipt)
+                ? null
+                : JsonSerializer.Deserialize<ContainerReceipt>(instance.Receipt)
+                  ?? throw new InvalidOperationException($"Runtime receipt for instance {instance.Id} is invalid.")))
             .ToArray();
     }
 
@@ -31,10 +33,20 @@ public sealed class EfRuntimeCleanupStore(NoCtfDbContext db) : IRuntimeCleanupSt
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.ChallengeInstances
             .Where(instance => instanceIds.Contains(instance.Id))
             .ExecuteUpdateAsync(update => update
                 .SetProperty(instance => instance.Status, RuntimeStatus.Stopped)
                 .SetProperty(instance => instance.UpdatedAt, now), cancellationToken);
+        await db.ChallengeFlags
+            .Where(flag => flag.ChallengeInstanceId != null
+                           && instanceIds.Contains(flag.ChallengeInstanceId.Value)
+                           && (flag.ValidEnd == null || flag.ValidEnd > now))
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(flag => flag.ValidEnd, now)
+                .SetProperty(flag => flag.UpdatedAt, now)
+                .SetProperty(flag => flag.RowVersion, flag => flag.RowVersion + 1), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 }

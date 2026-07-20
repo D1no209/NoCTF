@@ -48,6 +48,7 @@ public sealed class RuntimeOperationClaimStoreTests
         }
 
         RuntimeOperationLease originalLease;
+        var preparedInstanceId = Guid.NewGuid();
         await using (var firstContext = new NoCtfDbContext(options))
         {
             var first = await new EfRuntimeOperationStore(firstContext).BeginAsync(
@@ -62,8 +63,37 @@ public sealed class RuntimeOperationClaimStoreTests
 
         await using (var ageContext = new NoCtfDbContext(options))
         {
+            ageContext.ChallengeInstances.Add(new ChallengeInstance
+            {
+                Id = preparedInstanceId,
+                CompetitionId = competitionId,
+                ChallengeId = Guid.NewGuid(),
+                TeamId = Guid.NewGuid(),
+                Provider = RuntimeProvider.Docker,
+                Receipt = string.Empty,
+                Status = RuntimeStatus.Starting,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            ageContext.ChallengeFlags.Add(new NoCTF.Domain.Challenges.ChallengeFlag
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                ChallengeId = Guid.NewGuid(),
+                TeamId = Guid.NewGuid(),
+                StageId = Guid.NewGuid(),
+                ChallengeInstanceId = preparedInstanceId,
+                Flag = "NOCTF{prepared-orphan}",
+                ValidStart = now,
+                ValidEnd = now.AddHours(1),
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            await ageContext.SaveChangesAsync(cancellationToken);
             await ageContext.RuntimeOperations.ExecuteUpdateAsync(
-                update => update.SetProperty(operation => operation.UpdatedAt, now.AddMinutes(-10)),
+                update => update
+                    .SetProperty(operation => operation.ChallengeInstanceId, preparedInstanceId)
+                    .SetProperty(operation => operation.UpdatedAt, now.AddMinutes(-10)),
                 cancellationToken);
         }
 
@@ -78,7 +108,7 @@ public sealed class RuntimeOperationClaimStoreTests
         await using (var staleContext = new NoCtfDbContext(options))
         {
             var completed = await new EfRuntimeOperationStore(staleContext).CompleteAsync(
-                originalLease, oldReceipt, Guid.NewGuid(), null, null, now, cancellationToken);
+                originalLease, oldReceipt, Guid.NewGuid(), null, Guid.NewGuid(), null, now, cancellationToken);
             await Assert.That(completed).IsFalse();
         }
 
@@ -86,7 +116,7 @@ public sealed class RuntimeOperationClaimStoreTests
         await using (var winnerContext = new NoCtfDbContext(options))
         {
             var completed = await new EfRuntimeOperationStore(winnerContext).CompleteAsync(
-                winningLease, winnerReceipt, Guid.NewGuid(), null, null, now, cancellationToken);
+                winningLease, winnerReceipt, Guid.NewGuid(), null, Guid.NewGuid(), null, now, cancellationToken);
             await Assert.That(completed).IsTrue();
         }
 
@@ -104,8 +134,14 @@ public sealed class RuntimeOperationClaimStoreTests
         await Assert.That(operation.Status).IsEqualTo(RuntimeStatus.Running);
         await Assert.That(operation.ClaimToken).IsEqualTo(winningLease.ClaimToken);
         var instances = await verify.ChallengeInstances.AsNoTracking().ToListAsync(cancellationToken);
-        await Assert.That(instances.Count).IsEqualTo(2);
-        await Assert.That(instances.Count(instance => instance.Status == RuntimeStatus.Failed)).IsEqualTo(1);
+        await Assert.That(instances.Count).IsEqualTo(3);
+        await Assert.That(instances.Count(instance => instance.Status == RuntimeStatus.Failed)).IsEqualTo(2);
+        var prepared = instances.Single(instance => instance.Id == preparedInstanceId);
+        await Assert.That(prepared.Status).IsEqualTo(RuntimeStatus.Failed);
+        var preparedFlag = await verify.ChallengeFlags.AsNoTracking()
+            .SingleAsync(flag => flag.ChallengeInstanceId == preparedInstanceId, cancellationToken);
+        await Assert.That(preparedFlag.ValidEnd).IsNotNull();
+        await Assert.That(preparedFlag.ValidEnd!.Value).IsLessThanOrEqualTo(now.AddMinutes(1));
     }
 
     private static async Task<RuntimeOperationBeginResult> ClaimAsync(

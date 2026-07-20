@@ -100,6 +100,51 @@ public class ChallengeFlagManagementTests
         await Assert.That(view.ToString()).DoesNotContain(secret);
     }
 
+    [Test]
+    public async Task GeneratePenetrationStageFlag_CreatesTeamStageScopedWindow()
+    {
+        var store = new Store
+        {
+            Scope = new(CompetitionStatus.Running, true, GameMode.Penetration, true, true)
+        };
+        var start = DateTimeOffset.UtcNow;
+        var command = new GeneratePenetrationStageFlagCommand(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            start, start.AddHours(1));
+        var useCase = new GeneratePenetrationStageFlag(
+            new Secret("NOCTF{generated}"), CreateUseCase(store));
+
+        var result = await useCase.ExecuteAsync(command);
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.LastCreate!.TeamId).IsEqualTo(command.TeamId);
+        await Assert.That(store.LastCreate.StageId).IsEqualTo(command.StageId);
+        await Assert.That(store.LastCreate.ChallengeInstanceId).IsEqualTo(command.ChallengeInstanceId);
+        await Assert.That(store.LastCreate.ValidStart).IsEqualTo(command.ValidStart);
+        await Assert.That(store.LastCreate.ValidEnd).IsEqualTo(command.ValidEnd);
+        await Assert.That(store.LastCreate.Flag).IsEqualTo("NOCTF{generated}");
+    }
+
+    [Test]
+    public async Task CreateChallengeFlag_PenetrationStaticStageScope_IsAccepted()
+    {
+        var store = new Store
+        {
+            Scope = new(CompetitionStatus.Running, true, GameMode.Penetration, true, true)
+        };
+        var command = CreateCommand() with
+        {
+            TeamId = Guid.NewGuid(),
+            StageId = Guid.NewGuid(),
+            ChallengeInstanceId = null
+        };
+
+        var result = await CreateUseCase(store).ExecuteAsync(command);
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.LastCreate!.ChallengeInstanceId).IsNull();
+    }
+
     public enum FlagMutation
     {
         Create,
@@ -130,7 +175,9 @@ public class ChallengeFlagManagementTests
         0,
         DateTimeOffset.UtcNow);
 
-    private static ChallengeFlagView View(Guid competitionId, Guid challengeId, Guid? teamId, string flag) => new(
+    private static ChallengeFlagView View(
+        Guid competitionId, Guid challengeId, Guid? teamId, string flag,
+        Guid? stageId = null, Guid? challengeInstanceId = null) => new(
         Guid.NewGuid(),
         competitionId,
         challengeId,
@@ -140,18 +187,23 @@ public class ChallengeFlagManagementTests
         DateTimeOffset.UtcNow.AddHours(1),
         DateTimeOffset.UtcNow,
         DateTimeOffset.UtcNow,
-        0);
+        0,
+        stageId,
+        challengeInstanceId);
 
     private sealed class Store : IChallengeFlagStore
     {
         public ChallengeFlagScope? Scope { get; init; } = new(CompetitionStatus.Running, TeamExists: true);
         public ChallengeFlagMutationFailure? MutationFailure { get; init; }
         public int CreateCalls { get; private set; }
+        public CreateChallengeFlagCommand? LastCreate { get; private set; }
 
         public Task<ChallengeFlagScope?> LoadScopeAsync(
             Guid competitionId,
             Guid challengeId,
             Guid? teamId,
+            Guid? stageId,
+            Guid? challengeInstanceId,
             CancellationToken cancellationToken) => Task.FromResult(Scope);
 
         public Task<IReadOnlyList<ChallengeFlagView>> ListAsync(
@@ -170,9 +222,11 @@ public class ChallengeFlagManagementTests
             CancellationToken cancellationToken)
         {
             CreateCalls++;
+            LastCreate = command;
             return Task.FromResult(MutationFailure is null
                 ? new ChallengeFlagMutationResult(
-                    View(command.CompetitionId, command.ChallengeId, command.TeamId, command.Flag),
+                    View(command.CompetitionId, command.ChallengeId, command.TeamId, command.Flag,
+                        command.StageId, command.ChallengeInstanceId),
                     null)
                 : new ChallengeFlagMutationResult(null, MutationFailure));
         }
@@ -181,7 +235,8 @@ public class ChallengeFlagManagementTests
             UpdateChallengeFlagCommand command,
             CancellationToken cancellationToken) => Task.FromResult(MutationFailure is null
                 ? new ChallengeFlagMutationResult(
-                    View(command.CompetitionId, command.ChallengeId, command.TeamId, command.Flag),
+                    View(command.CompetitionId, command.ChallengeId, command.TeamId, command.Flag,
+                        command.StageId, command.ChallengeInstanceId),
                     null)
                 : new ChallengeFlagMutationResult(null, MutationFailure));
 
@@ -191,6 +246,11 @@ public class ChallengeFlagManagementTests
             Guid flagId,
             long expectedRowVersion,
             CancellationToken cancellationToken) => Task.FromResult(MutationFailure);
+    }
+
+    private sealed class Secret(string value) : IPenetrationStageFlagSecretGenerator
+    {
+        public string Generate() => value;
     }
 
     private sealed class Cache : ILeaderboardCache

@@ -23,6 +23,10 @@ public static class PenetrationConfigurationValidator
                 errors.Add($"Stage number {stage.Number} must be positive.");
             if (string.IsNullOrWhiteSpace(stage.Name))
                 errors.Add($"Stage {stage.Number} name is required.");
+            if (stage.InjectionKey is { } injectionKey
+                && (string.IsNullOrWhiteSpace(injectionKey)
+                    || !IsEnvironmentKey(injectionKey)))
+                errors.Add($"Stage {stage.Number} InjectionKey must be a valid environment variable name.");
             if (stage.Points is not null)
                 errors.AddRange(Ctf.Configuration.CtfConfigurationValidator.ValidatePoints(stage.Points));
             foreach (var prerequisite in stage.PrerequisiteIds.Where(id => !ids.Contains(id)))
@@ -34,6 +38,11 @@ public static class PenetrationConfigurationValidator
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         return errors;
     }
+
+    private static bool IsEnvironmentKey(string value) =>
+        value.Length <= 128
+        && (char.IsAsciiLetter(value[0]) || value[0] == '_')
+        && value.Skip(1).All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
 
     private static bool HasCycle(IReadOnlyList<PenetrationStage> stages)
     {

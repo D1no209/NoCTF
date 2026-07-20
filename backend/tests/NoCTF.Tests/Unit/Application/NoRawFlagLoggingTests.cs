@@ -1,4 +1,5 @@
 using NoCTF.Application.Submissions.Intake;
+using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -14,7 +15,7 @@ public class NoRawFlagLoggingTests
             TeamId = Guid.NewGuid(),
             ChallengeId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
-            Flag = "flag{do-not-leak}",
+            FlagFingerprint = FlagFingerprint.Create("flag{do-not-leak}"),
             IdempotencyKey = "test-1",
             IpAddress = "127.0.0.1",
             ReceivedAt = DateTimeOffset.UtcNow

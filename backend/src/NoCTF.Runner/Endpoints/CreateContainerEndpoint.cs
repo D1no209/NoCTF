@@ -20,7 +20,7 @@ public sealed class CreateContainerRequest
     public TimeSpan? Ttl { get; set; }
 }
 
-public sealed class CreateContainerEndpoint(RuntimeProviderCatalog providers)
+public sealed class CreateContainerEndpoint(IContainerRuntimeProviderCatalog providers)
     : Endpoint<CreateContainerRequest, Results<Created<ContainerReceipt>, ProblemHttpResult>>
 {
     public override void Configure()
@@ -41,6 +41,16 @@ public sealed class CreateContainerEndpoint(RuntimeProviderCatalog providers)
         catch (UnsupportedRuntimeProviderException exception)
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, detail: exception.Message);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status502BadGateway,
+                title: "Runner container creation failed.");
         }
     }
 

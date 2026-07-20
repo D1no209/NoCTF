@@ -8,7 +8,9 @@ using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
-public sealed class EfOrphanRuntimeStore(NoCtfDbContext db) : IOrphanRuntimeStore
+public sealed class EfOrphanRuntimeStore(
+    NoCtfDbContext db,
+    RuntimeOperationPolicyOptions policyOptions) : IOrphanRuntimeStore
 {
     public async Task<IReadOnlyList<RuntimeCleanupTarget>> ListOrphansAsync(
         DateTimeOffset now,
@@ -46,30 +48,53 @@ public sealed class EfOrphanRuntimeStore(NoCtfDbContext db) : IOrphanRuntimeStor
                                || latest.GetValueOrDefault((instance.CompetitionId, instance.ChallengeId, instance.TeamId)) != instance.Id)
             .Select(instance => new RuntimeCleanupTarget(
                 instance.Id,
-                JsonSerializer.Deserialize<ContainerReceipt>(instance.Receipt)
-                ?? throw new InvalidOperationException($"Runtime receipt for instance {instance.Id} is invalid.")))
+                string.IsNullOrWhiteSpace(instance.Receipt)
+                    ? null
+                    : JsonSerializer.Deserialize<ContainerReceipt>(instance.Receipt)
+                      ?? throw new InvalidOperationException($"Runtime receipt for instance {instance.Id} is invalid.")))
             .ToList();
     }
 
-    public Task MarkStoppedAsync(
+    public async Task MarkStoppedAsync(
         IReadOnlyCollection<Guid> instanceIds,
         DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        db.ChallengeInstances.Where(instance => instanceIds.Contains(instance.Id))
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await db.ChallengeInstances.Where(instance => instanceIds.Contains(instance.Id))
             .ExecuteUpdateAsync(update => update
                 .SetProperty(instance => instance.Status, RuntimeStatus.Stopped)
                 .SetProperty(instance => instance.UpdatedAt, now), cancellationToken);
+        await db.ChallengeFlags
+            .Where(flag => flag.ChallengeInstanceId != null
+                           && instanceIds.Contains(flag.ChallengeInstanceId.Value)
+                           && (flag.ValidEnd == null || flag.ValidEnd > now))
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(flag => flag.ValidEnd, now)
+                .SetProperty(flag => flag.UpdatedAt, now)
+                .SetProperty(flag => flag.RowVersion, flag => flag.RowVersion + 1), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
 
-    private static bool IsValid(
+    private bool IsValid(
         ChallengeInstance instance,
         IReadOnlySet<Guid> validCompetitions,
         IReadOnlyDictionary<Guid, Guid> validChallenges,
         IReadOnlyDictionary<Guid, Guid> validTeams,
         DateTimeOffset now) =>
         validCompetitions.Contains(instance.CompetitionId)
+        && IsPreparedPlaceholderWithinLease(instance, now, policyOptions.ClaimLeaseGrace)
         && instance.Status != RuntimeStatus.Failed
         && validChallenges.GetValueOrDefault(instance.ChallengeId) == instance.CompetitionId
         && (instance.TeamId is null
             || validTeams.GetValueOrDefault(instance.TeamId.Value) == instance.CompetitionId)
         && (instance.ExpiresAt is null || instance.ExpiresAt > now);
+
+    public static bool IsPreparedPlaceholderWithinLease(
+        ChallengeInstance instance,
+        DateTimeOffset now,
+        TimeSpan claimLeaseGrace) =>
+        !string.IsNullOrWhiteSpace(instance.Receipt)
+        || instance.UpdatedAt > now.Subtract(
+            RuntimeOperationPolicyOptions.MaximumOperationTimeout + claimLeaseGrace);
 }

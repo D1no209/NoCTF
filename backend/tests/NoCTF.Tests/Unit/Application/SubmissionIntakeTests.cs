@@ -39,6 +39,42 @@ public class SubmissionIntakeTests
     }
 
     [Test]
+    public async Task SubmitFlag_ReusedKeyForDifferentFlag_ReturnsConflict()
+    {
+        var store = new Store
+        {
+            Existing = new(SubmissionAcceptanceState.Existing, Guid.NewGuid(), Now),
+            BoundFingerprint = NoCTF.Domain.Submissions.FlagFingerprint.Create("original")
+        };
+
+        var result = await new SubmitFlag(store, new Policy()).ExecuteAsync(
+            FlagCommand() with { Flag = "different" });
+
+        await Assert.That(result.ErrorCode).IsEqualTo("idempotency_conflict");
+    }
+
+    [Test]
+    public async Task SubmitFlag_ReusedKeyForDifferentPenetrationInstance_ReturnsConflict()
+    {
+        var currentInstance = Guid.NewGuid();
+        var store = new Store
+        {
+            Existing = new(SubmissionAcceptanceState.Existing, Guid.NewGuid(), Now),
+            BoundInstanceId = Guid.NewGuid(),
+            Snapshot = Snapshot() with
+            {
+                Mode = GameMode.Penetration,
+                ChallengeInstanceId = currentInstance
+            }
+        };
+
+        var result = await new SubmitFlag(store, new Policy()).ExecuteAsync(
+            FlagCommand() with { StageId = Guid.NewGuid() });
+
+        await Assert.That(result.ErrorCode).IsEqualTo("idempotency_conflict");
+    }
+
+    [Test]
     public async Task SubmitFlag_MaxAttemptsReached_IsRejectedBeforeWrite()
     {
         var store = new Store { Snapshot = Snapshot() with { AcceptedFlagAttempts = 2 } };
@@ -114,6 +150,44 @@ public class SubmissionIntakeTests
     }
 
     [Test]
+    public async Task SubmitFlag_PenetrationStage_IsRequiredAndPersisted()
+    {
+        var stageId = Guid.NewGuid();
+        var store = new Store
+        {
+            Snapshot = Snapshot() with
+            {
+                Mode = GameMode.Penetration,
+                ChallengeInstanceId = Guid.NewGuid()
+            }
+        };
+        var useCase = new SubmitFlag(store, new Policy());
+
+        var missing = await useCase.ExecuteAsync(FlagCommand());
+        var accepted = await useCase.ExecuteAsync(FlagCommand() with
+        {
+            IdempotencyKey = "penetration-stage",
+            StageId = stageId
+        });
+
+        await Assert.That(missing.ErrorCode).IsEqualTo("penetration_stage_required");
+        await Assert.That(accepted.Succeeded).IsTrue();
+        await Assert.That(store.LastFlag!.StageId).IsEqualTo(stageId);
+    }
+
+    [Test]
+    public async Task SubmitFlag_NonPenetrationStage_IsRejected()
+    {
+        var store = new Store();
+
+        var result = await new SubmitFlag(store, new Policy()).ExecuteAsync(
+            FlagCommand() with { StageId = Guid.NewGuid() });
+
+        await Assert.That(result.ErrorCode).IsEqualTo("penetration_stage_not_allowed");
+        await Assert.That(store.AcceptCalls).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task SubmitFix_ReusedKey_ReturnsOriginalBeforeReadingUploadMetadata()
     {
         var originalId = Guid.NewGuid();
@@ -154,6 +228,8 @@ public class SubmissionIntakeTests
     private sealed class Store : ISubmissionIntakeStore
     {
         public SubmissionAcceptanceResult? Existing { get; init; }
+        public NoCTF.Domain.Submissions.FlagFingerprint? BoundFingerprint { get; init; }
+        public Guid? BoundInstanceId { get; init; }
         public SubmissionAdmissionSnapshot Snapshot { get; init; } = SubmissionIntakeTests.Snapshot();
         public int AcceptCalls { get; private set; }
         public int? LastMaxAttempts { get; private set; }
@@ -163,7 +239,15 @@ public class SubmissionIntakeTests
         public Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
             Guid competitionId, string idempotencyKey, Guid teamId, Guid challengeId, Guid userId,
             DomainSubmissionKind kind, AwdAttackTarget? attackTarget,
-            CancellationToken cancellationToken) => Task.FromResult(Existing);
+            Guid? stageId,
+            Guid? challengeInstanceId,
+            NoCTF.Domain.Submissions.FlagFingerprint? flagFingerprint,
+            CancellationToken cancellationToken) => Task.FromResult(
+                Existing is not null
+                && (BoundFingerprint is { } bound && bound != flagFingerprint
+                    || BoundInstanceId is { } boundInstance && boundInstance != challengeInstanceId)
+                    ? new SubmissionAcceptanceResult(SubmissionAcceptanceState.IdempotencyConflict)
+                    : Existing);
 
         public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
             Guid competitionId, Guid teamId, Guid challengeId, Guid userId,

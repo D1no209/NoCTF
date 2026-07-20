@@ -77,11 +77,15 @@ public sealed class AwdSubmissionEvaluator : ISubmissionEvaluator
                 "awd-evaluator-v2");
 
         var targetTeamId = context.Submission.SubjectTeamId ?? context.Submission.VictimTeamId;
-        IReadOnlyList<NoCTF.Domain.Challenges.ChallengeFlag> matchingFlags = context.Submission.Flag is null
-            ? []
-            : context.ApplicableFlags.Where(flag =>
-                flag.Flag == context.Submission.Flag
-                && (flag.TeamId is null || flag.TeamId == targetTeamId)).ToList();
+        var fingerprint = context.Submission.FlagHash is not null
+                          && context.Submission.FlagLength is { } flagLength
+            ? new FlagFingerprint(context.Submission.FlagHash, flagLength)
+            : (FlagFingerprint?)null;
+        IReadOnlyList<NoCTF.Domain.Challenges.ChallengeFlag> matchingFlags = context.ApplicableFlags
+            .Where(flag => (fingerprint?.Matches(flag.Flag) == true
+                           || context.Submission.LegacyFlag == flag.Flag)
+                           && (flag.TeamId is null || flag.TeamId == targetTeamId))
+            .ToList();
         if (matchingFlags.Count == 0)
             return Decision(ScoringResult.Wrong);
 
@@ -197,7 +201,23 @@ public sealed class PenetrationSubmissionEvaluator(ISubmissionEvaluator inner) :
                 ScoringFailureCode.AchievementAlreadyCompleted, context.Submission.ReceivedAt, "penetration-evaluator-v1");
         if (stage.PrerequisiteIds.Any(required => !completedStages.Contains(required)))
             return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.StagePrerequisiteIncomplete);
-        return inner.Evaluate(context);
+        var currentStageSubmissionIds = context.PriorSubmissions?
+            .Where(previous => previous.TeamId == context.Submission.TeamId
+                               && previous.ChallengeId == context.Submission.ChallengeId
+                               && previous.StageId == stageId)
+            .Select(previous => previous.Id)
+            .ToHashSet() ?? [];
+        return inner.Evaluate(context with
+        {
+            PriorEvents = context.PriorEvents
+                .Where(@event => @event.SubmissionId is { } id && currentStageSubmissionIds.Contains(id))
+                .ToList(),
+            ApplicableFlags = context.ApplicableFlags
+                .Where(flag => flag.StageId == stageId
+                               && (flag.ChallengeInstanceId is null
+                                   || flag.ChallengeInstanceId == context.Submission.ChallengeInstanceId))
+                .ToList()
+        });
     }
 
     private static PenetrationChallengeConfiguration Parse(string json)

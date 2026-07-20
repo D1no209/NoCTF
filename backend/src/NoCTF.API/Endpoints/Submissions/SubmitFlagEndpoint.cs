@@ -16,6 +16,7 @@ public sealed class SubmitFlagRequest
     public string IdempotencyKey { get; set; } = string.Empty;
     public Guid? TargetTeamId { get; set; }
     public Guid? ServiceId { get; set; }
+    public Guid? StageId { get; set; }
 }
 
 public sealed class SubmitFlagEndpoint(
@@ -47,7 +48,8 @@ public sealed class SubmitFlagEndpoint(
             DateTimeOffset.UtcNow,
             request.TargetTeamId is null && request.ServiceId is null
                 ? null
-                : new(request.TargetTeamId ?? Guid.Empty, request.ServiceId ?? Guid.Empty)), cancellationToken);
+                : new(request.TargetTeamId ?? Guid.Empty, request.ServiceId ?? Guid.Empty),
+            request.StageId), cancellationToken);
         if (!result.Succeeded)
         {
             return SubmissionProblemDetails.Create(SubmissionProblemDetails.StatusFor(result.ErrorCode), result.ErrorCode, result.ErrorMessage);

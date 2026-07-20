@@ -2,7 +2,7 @@ using NoCTF.Application.Runtime.Ports;
 
 namespace NoCTF.Application.Runtime;
 
-public sealed record RuntimeCleanupTarget(Guid InstanceId, ContainerReceipt Receipt);
+public sealed record RuntimeCleanupTarget(Guid InstanceId, ContainerReceipt? Receipt);
 
 public interface IRuntimeCleanupStore
 {
@@ -27,7 +27,8 @@ public sealed class CompetitionRuntimeCleaner(
         {
             try
             {
-                await runtime.DestroyAsync(target.Receipt, cancellationToken);
+                if (target.Receipt is not null)
+                    await runtime.DestroyAsync(target.Receipt, cancellationToken);
                 stopped.Add(target.InstanceId);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

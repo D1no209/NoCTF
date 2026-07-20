@@ -19,7 +19,8 @@ public sealed class EfFixUploadSessionStore(NoCtfDbContext db, IObjectStorage st
         if (status != CompetitionStatus.Running)
             return FixUploadCreationResult.Rejected(FixUploadCreationFailure.AdmissionChanged);
         var currentAdmission = await SubmissionAdmissionPersistence.LoadAsync(
-            db, command.CompetitionId, command.TeamId, command.ChallengeId, command.UserId, ct);
+            db, command.CompetitionId, command.TeamId, command.ChallengeId, command.UserId,
+            command.RequestedAt, ct);
         if (!SubmissionAdmissionPersistence.Matches(expectedAdmission, currentAdmission))
             return FixUploadCreationResult.Rejected(FixUploadCreationFailure.AdmissionChanged);
 

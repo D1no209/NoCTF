@@ -86,6 +86,9 @@ public class CreateFixUploadTests
         public Task<SubmissionAcceptanceResult?> FindAcceptedAsync(Guid competitionId, string idempotencyKey,
             Guid teamId, Guid challengeId, Guid userId, NoCTF.Domain.Submissions.SubmissionKind kind,
             AwdAttackTarget? attackTarget,
+            Guid? stageId,
+            Guid? challengeInstanceId,
+            NoCTF.Domain.Submissions.FlagFingerprint? flagFingerprint,
             CancellationToken cancellationToken) => Task.FromResult<SubmissionAcceptanceResult?>(null);
         public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(Guid competitionId, Guid teamId, Guid challengeId,
             Guid userId, CancellationToken cancellationToken) => Task.FromResult<SubmissionAdmissionSnapshot?>(snapshot);

@@ -54,6 +54,63 @@ public class RuntimeOperationTests
     }
 
     [Test]
+    public async Task Provision_FlagPreparation_InjectsSecretsAndBindsInstance()
+    {
+        var operations = new Operations();
+        var runtime = new Runtime();
+        var preparation = new FlagPreparation();
+
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime, null, preparation)
+            .ExecuteAsync(Command());
+
+        await Assert.That(preparation.PreparedInstanceId).IsEqualTo(result.ChallengeInstanceId);
+        await Assert.That(operations.CompletedInstanceId).IsEqualTo(result.ChallengeInstanceId);
+        await Assert.That(runtime.LastRequest!.Environment["NOCTF_STAGE_1_FLAG"])
+            .IsEqualTo("NOCTF{stage}");
+    }
+
+    [Test]
+    public async Task Provision_RuntimeFailure_DeactivatesPreparedFlags()
+    {
+        var preparation = new FlagPreparation();
+
+        _ = await new ChallengeRuntimeProvisioner(
+                new Operations(), new Runtime { Throw = true }, null, preparation)
+            .ExecuteAsync(Command());
+
+        await Assert.That(preparation.DeactivatedInstanceId).IsEqualTo(preparation.PreparedInstanceId);
+    }
+
+    [Test]
+    public async Task Provision_FailureBookkeepingThrows_StillDeactivatesPreparedFlags()
+    {
+        var preparation = new FlagPreparation();
+        var result = await new ChallengeRuntimeProvisioner(
+                new Operations { FailThrows = true }, new Runtime { Throw = true }, null, preparation)
+            .ExecuteAsync(Command());
+
+        await Assert.That(result.Failure).IsEqualTo(RuntimeProvisionFailure.CreateFailed);
+        await Assert.That(preparation.DeactivatedInstanceId).IsEqualTo(preparation.PreparedInstanceId);
+    }
+
+    [Test]
+    public async Task Provision_PreparationCanceled_DeactivatesPreparedFlagsAndMarksOperationFailed()
+    {
+        var operations = new Operations();
+        var preparation = new FlagPreparation { CancelPreparation = true };
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        _ = await Assert.That(async () => await new ChallengeRuntimeProvisioner(
+                    operations, new Runtime(), null, preparation)
+                .ExecuteAsync(Command(), cancellation.Token))
+            .Throws<OperationCanceledException>();
+
+        await Assert.That(operations.Failed).IsTrue();
+        await Assert.That(preparation.DeactivatedInstanceId).IsEqualTo(preparation.PreparedInstanceId);
+    }
+
+    [Test]
     public async Task Provision_RuntimeFailure_MarksOperationFailed()
     {
         var operations = new Operations();
@@ -165,13 +222,15 @@ public class RuntimeOperationTests
         var reconciled = Receipt(Guid.NewGuid());
         var operations = new Operations { CompleteThrows = true, ReconciledReceipt = reconciled };
         var runtime = new Runtime();
+        var preparation = new FlagPreparation();
 
-        var result = await new ChallengeRuntimeProvisioner(operations, runtime)
+        var result = await new ChallengeRuntimeProvisioner(operations, runtime, null, preparation)
             .ExecuteAsync(Command());
 
         await Assert.That(result.Status).IsEqualTo(RuntimeStatus.Running);
         await Assert.That(result.Receipt).IsEqualTo(reconciled);
         await Assert.That(result.AlreadyExists).IsTrue();
+        await Assert.That(preparation.DeactivatedInstanceId).IsNull();
     }
 
     private static ProvisionChallengeRuntimeCommand Command() => new(
@@ -202,8 +261,10 @@ public class RuntimeOperationTests
         public RuntimeOperationFailureContext? FailureContext { get; private set; }
         public CancellationToken FailureCancellationToken { get; private set; }
         public ContainerReceipt? ReconciledReceipt { get; init; }
+        public bool FailThrows { get; init; }
         public DateTimeOffset ClaimedAt { get; private set; }
         public DateTimeOffset StaleBefore { get; private set; }
+        public Guid? CompletedInstanceId { get; private set; }
 
         public RuntimeOperationBeginFailure? BeginFailure { get; init; }
 
@@ -222,11 +283,13 @@ public class RuntimeOperationTests
 
         public Task<bool> CompleteAsync(
             RuntimeOperationLease lease, ContainerReceipt receipt, Guid challengeId,
-            Guid? teamId, DateTimeOffset? expiresAt, DateTimeOffset now, CancellationToken cancellationToken)
+            Guid? teamId, Guid challengeInstanceId, DateTimeOffset? expiresAt, DateTimeOffset now,
+            CancellationToken cancellationToken)
         {
             if (CompleteThrows)
                 throw new InvalidOperationException("persistence failure");
             Completed = true;
+            CompletedInstanceId = challengeInstanceId;
             ExpiresAt = expiresAt;
             return Task.FromResult(CompleteResult);
         }
@@ -234,6 +297,8 @@ public class RuntimeOperationTests
         public Task<RuntimeOperationFailureResult> FailAsync(RuntimeOperationLease lease, RuntimeOperationFailureContext failure, DateTimeOffset now,
             CancellationToken cancellationToken)
         {
+            if (FailThrows)
+                throw new InvalidOperationException("failure bookkeeping failed");
             Failed = true;
             FailureContext = failure;
             FailureCancellationToken = cancellationToken;
@@ -249,10 +314,12 @@ public class RuntimeOperationTests
         public int CreateCalls { get; private set; }
         public int DestroyCalls { get; private set; }
         public Guid? ReceiptOperationId { get; init; }
+        public ContainerRequest? LastRequest { get; private set; }
 
         public Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken)
         {
             CreateCalls++;
+            LastRequest = request;
             if (Throw)
                 throw new InvalidOperationException("runtime failure");
             return CreateAsyncCore(request, cancellationToken);
@@ -281,6 +348,40 @@ public class RuntimeOperationTests
         }
         public Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken) =>
             Task.FromResult<ContainerReceipt?>(null);
+    }
+
+    private sealed class FlagPreparation : IRuntimeFlagPreparation
+    {
+        public bool CancelPreparation { get; init; }
+        public Guid? PreparedInstanceId { get; private set; }
+        public Guid? DeactivatedInstanceId { get; private set; }
+
+        public Task<ContainerRequest> PrepareAsync(
+            ProvisionChallengeRuntimeCommand command,
+            Guid challengeInstanceId,
+            DateTimeOffset validStart,
+            DateTimeOffset? validEnd,
+            ContainerRequest request,
+            CancellationToken cancellationToken)
+        {
+            PreparedInstanceId = challengeInstanceId;
+            if (CancelPreparation)
+                throw new OperationCanceledException(cancellationToken);
+            var environment = new Dictionary<string, string>(request.Environment)
+            {
+                ["NOCTF_STAGE_1_FLAG"] = "NOCTF{stage}"
+            };
+            return Task.FromResult(request with { Environment = environment });
+        }
+
+        public Task DeactivateAsync(
+            Guid challengeInstanceId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            DeactivatedInstanceId = challengeInstanceId;
+            return Task.CompletedTask;
+        }
     }
 
     private static ContainerReceipt Receipt(Guid operationId) => new(

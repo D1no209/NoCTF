@@ -13,6 +13,9 @@ public interface ISubmissionIntakeStore
         Guid userId,
         NoCTF.Domain.Submissions.SubmissionKind kind,
         AwdAttackTarget? attackTarget,
+        Guid? stageId,
+        Guid? challengeInstanceId,
+        NoCTF.Domain.Submissions.FlagFingerprint? flagFingerprint,
         CancellationToken cancellationToken);
 
     Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(

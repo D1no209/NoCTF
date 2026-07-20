@@ -183,6 +183,11 @@ public static class ServiceRegistration
         services.AddScoped<ListChallengeFlags>();
         services.AddScoped<GetChallengeFlag>();
         services.AddScoped<CreateChallengeFlag>();
+        services.AddScoped<GeneratePenetrationStageFlag>();
+        services.AddSingleton<Security.PenetrationStageFlagSecretGenerator>();
+        services.AddSingleton<IPenetrationStageFlagSecretGenerator>(provider =>
+            provider.GetRequiredService<Security.PenetrationStageFlagSecretGenerator>());
+        services.AddScoped<IRuntimeFlagPreparation, EfPenetrationRuntimeFlagPreparation>();
         services.AddScoped<UpdateChallengeFlag>();
         services.AddScoped<DeleteChallengeFlag>();
         if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
