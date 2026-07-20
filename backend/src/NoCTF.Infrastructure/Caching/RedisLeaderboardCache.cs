@@ -12,7 +12,7 @@ namespace NoCTF.Infrastructure.Caching;
 
 public sealed class RedisLeaderboardCache(
     NoCtfDbContext db,
-    ILeaderboardProjectorCatalog projectors,
+    ILeaderboardProjectionEngine projectionEngine,
     IConfiguration configuration,
     ILeaderboardRefreshPublisher publisher,
     IConnectionMultiplexer? redis = null) : ILeaderboardCache
@@ -55,9 +55,13 @@ public sealed class RedisLeaderboardCache(
                 s.SubjectTeamId, s.VictimTeamId, s.ServiceId, s.ControlIntervalSeconds, s.StageId)).ToListAsync(ct);
         var system = await db.ScoringEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.SubmissionId == null)
             .Select(x => new LeaderboardSystemFact(x)).ToListAsync(ct);
-        var entries = projectors.Get(competition.Mode).Project(
+        var projection = projectionEngine.Project(
             new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration, competition.StartTime));
-        var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, entries);
+        var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, projection.Entries)
+        {
+            Subjects = projection.Subjects,
+            FirstBloods = projection.FirstBloods
+        };
         await redis.GetDatabase().StringSetAsync(Key(competitionId), JsonSerializer.Serialize(response, JsonOptions), ttl);
         await publisher.PublishAsync(competitionId, response.GeneratedAt, ct);
     }

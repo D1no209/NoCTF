@@ -41,3 +41,13 @@ public interface ILeaderboardProjectorCatalog
 {
     IGameModeLeaderboardProjector Get(GameMode mode);
 }
+
+public sealed record LeaderboardProjectionResult(
+    IReadOnlyList<LeaderboardEntry> Entries,
+    IReadOnlyList<LeaderboardSubjectSummary> Subjects,
+    IReadOnlyList<LeaderboardFirstBloodSummary> FirstBloods);
+
+public interface ILeaderboardProjectionEngine
+{
+    LeaderboardProjectionResult Project(LeaderboardProjectionInput input);
+}

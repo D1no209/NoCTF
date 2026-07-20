@@ -3579,6 +3579,18 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardEntry"
             }
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSubjectSummary"
+            }
+          },
+          "firstBloods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardFirstBloodSummary"
+            }
           }
         }
       },
@@ -3632,6 +3644,105 @@
           "solveCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationScoringLeaderboardLeaderboardSubjectSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "successCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSlotSummary"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationScoringLeaderboardLeaderboardSlotSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slotKey": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSlotKind"
+          },
+          "label": {
+            "type": "string"
+          },
+          "successCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastOccurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "firstBloodAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationScoringLeaderboardLeaderboardSlotKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Challenge",
+          "Service",
+          "Break",
+          "Fix",
+          "Control",
+          "Stage"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "NoCTFApplicationScoringLeaderboardLeaderboardFirstBloodSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slotKey": {
+            "type": "string"
+          },
+          "slotKind": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSlotKind"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

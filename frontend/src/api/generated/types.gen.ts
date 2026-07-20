@@ -195,6 +195,8 @@ export type NoCtfApplicationScoringLeaderboardLeaderboardResponse = {
     competitionId?: string;
     generatedAt?: string;
     entries?: Array<NoCtfApplicationScoringLeaderboardLeaderboardEntry>;
+    subjects?: Array<NoCtfApplicationScoringLeaderboardLeaderboardSubjectSummary>;
+    firstBloods?: Array<NoCtfApplicationScoringLeaderboardLeaderboardFirstBloodSummary>;
 };
 
 export type NoCtfApplicationScoringLeaderboardLeaderboardEntry = {
@@ -211,6 +213,33 @@ export type NoCtfApplicationScoringLeaderboardLeaderboardChallengeSummary = {
     challengeId?: string;
     direction?: string;
     solveCount?: number;
+};
+
+export type NoCtfApplicationScoringLeaderboardLeaderboardSubjectSummary = {
+    subjectId?: string;
+    subjectName?: string;
+    score?: number;
+    successCount?: number;
+    slots?: Array<NoCtfApplicationScoringLeaderboardLeaderboardSlotSummary>;
+};
+
+export type NoCtfApplicationScoringLeaderboardLeaderboardSlotSummary = {
+    slotKey?: string;
+    kind?: NoCtfApplicationScoringLeaderboardLeaderboardSlotKind;
+    label?: string;
+    successCount?: number;
+    lastOccurredAt?: string | null;
+    firstBloodAt?: string | null;
+};
+
+export type NoCtfApplicationScoringLeaderboardLeaderboardSlotKind = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type NoCtfApplicationScoringLeaderboardLeaderboardFirstBloodSummary = {
+    slotKey?: string;
+    slotKind?: NoCtfApplicationScoringLeaderboardLeaderboardSlotKind;
+    teamId?: string;
+    teamName?: string;
+    occurredAt?: string;
 };
 
 export type NoCtfApplicationScoringLeaderboardLeaderboardProcessingResponse = {

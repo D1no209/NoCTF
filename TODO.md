@@ -345,9 +345,9 @@
 - [x] Challenge soft-delete 过滤。
 - [x] system event `OccurredAt + Id` 排序。
 - [x] Submission `ReceivedAt + Id` 排序。
-- [ ] First Blood summary。
-- [ ] Subject/slot summary。
-- [ ] Slot kind。
+- [x] First Blood summary。
+- [x] Subject/slot summary。
+- [x] Slot kind。
 - [x] score/rank 只在内存 DTO 和 Redis。
 - [x] Redis TTL 配置化。
 - [ ] Redis miss → 202 → refresh → hit。

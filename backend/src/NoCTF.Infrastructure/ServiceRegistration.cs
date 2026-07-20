@@ -99,6 +99,7 @@ public static class ServiceRegistration
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
         services.AddSingleton<ISubmissionAdmissionModePolicy, GameModeSubmissionAdmissionPolicy>();
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
+        services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
         services.AddScoped<ISubmissionRetryStore, EfSubmissionRetryStore>();
         services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();
         services.AddScoped<ISystemScoringEventProcessor, EfSystemScoringEventProcessor>();
