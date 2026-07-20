@@ -137,6 +137,7 @@ public class CompetitionRuntimeProvisionerTests
             ContainerReceipt receipt,
             Guid challengeId,
             Guid? teamId,
+            DateTimeOffset? expiresAt,
             DateTimeOffset now,
             CancellationToken cancellationToken) => Task.FromResult(true);
 

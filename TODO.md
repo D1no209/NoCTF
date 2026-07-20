@@ -311,8 +311,8 @@
 - [ ] AWDP patch/recreate/check 流程。
 - [ ] KoH agent provision/poll。
 - [ ] Penetration stage instance provision。
-- [ ] orphan runtime cleanup。
-- [ ] competition finish cleanup。
+- [x] orphan runtime cleanup。
+- [x] competition finish cleanup。
 - [x] runtime failure → ScoringEvent/PlatformFailed。
 
 ## 10. Maintenance、rebuild 和 lifecycle Channel

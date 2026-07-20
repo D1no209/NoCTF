@@ -54,6 +54,7 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
         ContainerReceipt receipt,
         Guid challengeId,
         Guid? teamId,
+        DateTimeOffset? expiresAt,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -74,7 +75,8 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
             Status = receipt.Status,
             EntryUrl = receipt.PublicHost,
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            ExpiresAt = expiresAt
         };
         db.ChallengeInstances.Add(instance);
         operation.ChallengeInstanceId = instance.Id;

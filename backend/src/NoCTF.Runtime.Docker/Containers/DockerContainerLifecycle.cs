@@ -52,8 +52,15 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
-        await client.Containers.StopContainerAsync(receipt.ResourceId, new ContainerStopParameters(), cancellationToken);
-        await client.Containers.RemoveContainerAsync(receipt.ResourceId, new ContainerRemoveParameters { Force = true }, cancellationToken);
+        try
+        {
+            await client.Containers.StopContainerAsync(receipt.ResourceId, new ContainerStopParameters(), cancellationToken);
+            await client.Containers.RemoveContainerAsync(receipt.ResourceId, new ContainerRemoveParameters { Force = true }, cancellationToken);
+        }
+        catch (DockerContainerNotFoundException)
+        {
+            // Destroy is idempotent: an externally removed runtime is already stopped.
+        }
     }
 
     public async Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)

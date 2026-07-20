@@ -33,6 +33,7 @@ public class RuntimeOperationTests
 
         await Assert.That(result.Status).IsEqualTo(RuntimeStatus.Running);
         await Assert.That(operations.Completed).IsTrue();
+        await Assert.That(operations.ExpiresAt).IsNotNull();
         await Assert.That(runtime.CreateCalls).IsEqualTo(1);
     }
 
@@ -84,6 +85,7 @@ public class RuntimeOperationTests
         public RuntimeOperationLease? Lease { get; init; }
         public bool Completed { get; private set; }
         public bool Failed { get; private set; }
+        public DateTimeOffset? ExpiresAt { get; private set; }
 
         public Task<RuntimeOperationLease> BeginAsync(
             Guid competitionId, string operationKey, RuntimeOperationKind kind,
@@ -92,9 +94,10 @@ public class RuntimeOperationTests
 
         public Task<bool> CompleteAsync(
             RuntimeOperationLease lease, ContainerReceipt receipt, Guid challengeId,
-            Guid? teamId, DateTimeOffset now, CancellationToken cancellationToken)
+            Guid? teamId, DateTimeOffset? expiresAt, DateTimeOffset now, CancellationToken cancellationToken)
         {
             Completed = true;
+            ExpiresAt = expiresAt;
             return Task.FromResult(true);
         }
 

@@ -45,12 +45,22 @@ public sealed class KubernetesContainerLifecycle(
         return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending, request.PortMappings, options.PublicHost, $"{name}.{options.Namespace}.svc");
     }
 
-    public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken) =>
-        await client.CoreV1.DeleteNamespacedPodAsync(
-            receipt.ResourceId,
-            options.Namespace,
-            body: new V1DeleteOptions { PropagationPolicy = "Foreground" },
-            cancellationToken: cancellationToken);
+    public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await client.CoreV1.DeleteNamespacedPodAsync(
+                receipt.ResourceId,
+                options.Namespace,
+                body: new V1DeleteOptions { PropagationPolicy = "Foreground" },
+                cancellationToken: cancellationToken);
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // Destroy is idempotent: an externally removed runtime is already stopped.
+        }
+    }
 
     public async Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)
     {

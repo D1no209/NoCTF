@@ -25,6 +25,7 @@ public interface IRuntimeOperationStore
         ContainerReceipt receipt,
         Guid challengeId,
         Guid? teamId,
+        DateTimeOffset? expiresAt,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
@@ -86,6 +87,7 @@ public sealed class ChallengeRuntimeProvisioner(
                     receipt,
                     command.ChallengeId,
                     command.TeamId,
+                    request.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
                     DateTimeOffset.UtcNow,
                     ct))
             {
