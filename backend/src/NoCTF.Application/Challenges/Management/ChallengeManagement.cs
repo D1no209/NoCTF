@@ -9,7 +9,14 @@ namespace NoCTF.Application.Challenges.Management;
 public sealed record CreateChallengeCommand(Guid CompetitionId, string Title, string? Description, string Direction, int Order, DateTimeOffset CreatedAt);
 public sealed record UpdateChallengeCommand(Guid CompetitionId, Guid ChallengeId, string Title, string? Description, string Direction, int Order, DateTimeOffset UpdatedAt);
 public sealed record ChallengeView(Guid Id, Guid CompetitionId, string Title, string? Description, string Direction, int Order, bool IsPublished, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
-public sealed record ChallengeMutationResult(ChallengeView? Challenge, string? ErrorCode);
+public enum ChallengeMutationFailure
+{
+    CompetitionNotFound,
+    ChallengeLocked,
+    ChallengeNotFound,
+    ChallengeOrderConflict
+}
+public sealed record ChallengeMutationResult(ChallengeView? Challenge, ChallengeMutationFailure? Failure = null);
 public sealed record ChallengeCompetitionContext(GameMode Mode, CompetitionStatus Status);
 
 public interface IChallengeManagementStore
@@ -22,8 +29,20 @@ public interface IChallengeManagementStore
     Task<ChallengeView?> FindAsync(Guid competitionId, Guid challengeId, bool includeUnpublished, CancellationToken cancellationToken);
     Task<IReadOnlyList<ChallengeView>> ListAsync(Guid competitionId, bool includeUnpublished, CancellationToken cancellationToken);
     Task<ChallengeMutationResult> UpdateAsync(UpdateChallengeCommand command, CancellationToken cancellationToken);
-    Task<string?> SetPublishedAsync(Guid competitionId, Guid challengeId, bool published, DateTimeOffset now, CancellationToken cancellationToken);
-    Task<string?> SoftDeleteAsync(Guid competitionId, Guid challengeId, Guid actorId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<ChallengeMutationFailure?> SetPublishedAsync(Guid competitionId, Guid challengeId, bool published, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<ChallengeMutationFailure?> SoftDeleteAsync(Guid competitionId, Guid challengeId, Guid actorId, DateTimeOffset now, CancellationToken cancellationToken);
+}
+
+internal static class ChallengeMutationFailureProtocol
+{
+    public static string Code(ChallengeMutationFailure failure) => failure switch
+    {
+        ChallengeMutationFailure.CompetitionNotFound => "competition_not_found",
+        ChallengeMutationFailure.ChallengeLocked => "challenge_locked",
+        ChallengeMutationFailure.ChallengeNotFound => "challenge_not_found",
+        ChallengeMutationFailure.ChallengeOrderConflict => "challenge_order_conflict",
+        _ => "challenge_conflict"
+    };
 }
 
 public sealed class CreateChallenge(IChallengeManagementStore store, IChallengeConfigurationCatalog configurationCatalog)
@@ -42,7 +61,7 @@ public sealed class CreateChallenge(IChallengeManagementStore store, IChallengeC
             configurationJson,
             ct);
         return result.Challenge is not null ? OperationResult<ChallengeView>.Success(result.Challenge)
-            : OperationResult<ChallengeView>.Failure(result.ErrorCode ?? "challenge_conflict", "Challenge was not created.");
+            : OperationResult<ChallengeView>.Failure(ChallengeMutationFailureProtocol.Code(result.Failure ?? ChallengeMutationFailure.ChallengeOrderConflict), "Challenge was not created.");
     }
 
     internal static (string Code, string Message)? Validate(string title, string direction, int order)
@@ -77,7 +96,7 @@ public sealed class UpdateChallenge(IChallengeManagementStore store, ILeaderboar
             return OperationResult<ChallengeView>.Failure("challenge_locked", "Challenge definitions are locked for this competition.");
 
         var result = await store.UpdateAsync(command with { Title = command.Title.Trim(), Direction = command.Direction.Trim() }, ct);
-        if (result.Challenge is null) return OperationResult<ChallengeView>.Failure(result.ErrorCode ?? "challenge_conflict", "Challenge was not updated.");
+        if (result.Challenge is null) return OperationResult<ChallengeView>.Failure(ChallengeMutationFailureProtocol.Code(result.Failure ?? ChallengeMutationFailure.ChallengeOrderConflict), "Challenge was not updated.");
         await cache.InvalidateAsync(command.CompetitionId, ct);
         await scheduler.EnqueueCompetitionRebuildAsync(command.CompetitionId, ct);
         return OperationResult<ChallengeView>.Success(result.Challenge);
@@ -94,8 +113,8 @@ public sealed class SetChallengePublished(IChallengeManagementStore store, ILead
         if (ChallengeMutationPolicy.IsLocked(competition.Status))
             return OperationResult.Failure("challenge_locked", "Challenge definitions are locked for this competition.");
 
-        var error = await store.SetPublishedAsync(competitionId, challengeId, published, now, ct);
-        if (error is not null) return OperationResult.Failure(error, "Challenge publication was rejected.");
+        var failure = await store.SetPublishedAsync(competitionId, challengeId, published, now, ct);
+        if (failure is not null) return OperationResult.Failure(ChallengeMutationFailureProtocol.Code(failure.Value), "Challenge publication was rejected.");
         await cache.InvalidateAsync(competitionId, ct);
         await scheduler.EnqueueCompetitionRebuildAsync(competitionId, ct);
         return OperationResult.Success();
@@ -112,15 +131,15 @@ public sealed class DeleteChallenge(IChallengeManagementStore store, ILeaderboar
         if (ChallengeMutationPolicy.IsLocked(competition.Status))
             return OperationResult.Failure("challenge_locked", "Challenge definitions are locked for this competition.");
 
-        var error = await store.SoftDeleteAsync(competitionId, challengeId, actorId, now, ct);
-        if (error is not null) return OperationResult.Failure(error, "Challenge was not deleted.");
+        var failure = await store.SoftDeleteAsync(competitionId, challengeId, actorId, now, ct);
+        if (failure is not null) return OperationResult.Failure(ChallengeMutationFailureProtocol.Code(failure.Value), "Challenge was not deleted.");
         await cache.InvalidateAsync(competitionId, ct);
         await scheduler.EnqueueCompetitionRebuildAsync(competitionId, ct);
         return OperationResult.Success();
     }
 }
 
-internal static class ChallengeMutationPolicy
+public static class ChallengeMutationPolicy
 {
     public static bool IsLocked(CompetitionStatus status) =>
         status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished;

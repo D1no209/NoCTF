@@ -45,7 +45,7 @@ public class ChallengeFlagManagementTests
     [Test]
     public async Task CreateChallengeFlag_OverlappingWindow_PropagatesConflict()
     {
-        var store = new Store { MutationError = "flag_window_conflict" };
+        var store = new Store { MutationFailure = ChallengeFlagMutationFailure.FlagWindowConflict };
 
         var result = await CreateUseCase(store).ExecuteAsync(CreateCommand());
 
@@ -55,7 +55,7 @@ public class ChallengeFlagManagementTests
     [Test]
     public async Task UpdateChallengeFlag_StaleRowVersion_PropagatesConflict()
     {
-        var store = new Store { MutationError = "flag_conflict" };
+        var store = new Store { MutationFailure = ChallengeFlagMutationFailure.FlagConflict };
         var useCase = new UpdateChallengeFlag(store, new Cache(), new Scheduler());
 
         var result = await useCase.ExecuteAsync(UpdateCommand());
@@ -145,7 +145,7 @@ public class ChallengeFlagManagementTests
     private sealed class Store : IChallengeFlagStore
     {
         public ChallengeFlagScope? Scope { get; init; } = new(CompetitionStatus.Running, TeamExists: true);
-        public string? MutationError { get; init; }
+        public ChallengeFlagMutationFailure? MutationFailure { get; init; }
         public int CreateCalls { get; private set; }
 
         public Task<ChallengeFlagScope?> LoadScopeAsync(
@@ -170,27 +170,27 @@ public class ChallengeFlagManagementTests
             CancellationToken cancellationToken)
         {
             CreateCalls++;
-            return Task.FromResult(MutationError is null
+            return Task.FromResult(MutationFailure is null
                 ? new ChallengeFlagMutationResult(
                     View(command.CompetitionId, command.ChallengeId, command.TeamId, command.Flag),
                     null)
-                : new ChallengeFlagMutationResult(null, MutationError));
+                : new ChallengeFlagMutationResult(null, MutationFailure));
         }
 
         public Task<ChallengeFlagMutationResult> UpdateAsync(
             UpdateChallengeFlagCommand command,
-            CancellationToken cancellationToken) => Task.FromResult(MutationError is null
+            CancellationToken cancellationToken) => Task.FromResult(MutationFailure is null
                 ? new ChallengeFlagMutationResult(
                     View(command.CompetitionId, command.ChallengeId, command.TeamId, command.Flag),
                     null)
-                : new ChallengeFlagMutationResult(null, MutationError));
+                : new ChallengeFlagMutationResult(null, MutationFailure));
 
-        public Task<string?> DeleteAsync(
+        public Task<ChallengeFlagMutationFailure?> DeleteAsync(
             Guid competitionId,
             Guid challengeId,
             Guid flagId,
             long expectedRowVersion,
-            CancellationToken cancellationToken) => Task.FromResult(MutationError);
+            CancellationToken cancellationToken) => Task.FromResult(MutationFailure);
     }
 
     private sealed class Cache : ILeaderboardCache

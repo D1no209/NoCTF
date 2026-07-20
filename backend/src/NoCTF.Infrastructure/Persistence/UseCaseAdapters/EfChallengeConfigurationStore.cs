@@ -27,7 +27,7 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
              configuration.UpdatedAt))
         .SingleOrDefaultAsync(ct);
 
-    public async Task<ChallengeConfigurationView?> TryUpdateAsync(
+    public async Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
         Guid challengeId,
         int expectedRevision,
@@ -35,6 +35,14 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
         DateTimeOffset updatedAt,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        if (status is null) return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
+        if (status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+            return new(null, ChallengeConfigurationUpdateFailure.ConfigurationLocked);
+        if (!await db.Challenges.AsNoTracking().AnyAsync(challenge => challenge.Id == challengeId
+            && challenge.CompetitionId == competitionId && !challenge.Deletion.IsDeleted, ct))
+            return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
         var changed = await db.ChallengeConfigurations
             .Where(configuration =>
                 configuration.ChallengeId == challengeId
@@ -43,18 +51,14 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
                     challenge.Id == configuration.ChallengeId
                     && challenge.CompetitionId == competitionId
                     && !challenge.Deletion.IsDeleted)
-                && db.Competitions.Any(competition =>
-                    competition.Id == competitionId
-                    && !competition.Deletion.IsDeleted
-                    && (competition.Status == CompetitionStatus.Draft
-                        || competition.Status == CompetitionStatus.Published)))
+                )
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(configuration => configuration.Json, json)
                 .SetProperty(configuration => configuration.Revision, expectedRevision + 1)
                 .SetProperty(configuration => configuration.UpdatedAt, updatedAt), ct);
 
-        return changed == 1
-            ? await FindAsync(competitionId, challengeId, ct)
-            : null;
+        if (changed != 1) return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
+        await transaction.CommitAsync(ct);
+        return new(await FindAsync(competitionId, challengeId, ct));
     }
 }

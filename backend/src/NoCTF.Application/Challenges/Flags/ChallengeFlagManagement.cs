@@ -50,7 +50,17 @@ public sealed record ChallengeFlagView(
 }
 
 public sealed record ChallengeFlagScope(CompetitionStatus CompetitionStatus, bool TeamExists);
-public sealed record ChallengeFlagMutationResult(ChallengeFlagView? Flag, string? ErrorCode);
+public enum ChallengeFlagMutationFailure
+{
+    CompetitionNotFound,
+    ChallengeNotFound,
+    FlagLocked,
+    TeamNotFound,
+    FlagWindowConflict,
+    FlagNotFound,
+    FlagConflict
+}
+public sealed record ChallengeFlagMutationResult(ChallengeFlagView? Flag, ChallengeFlagMutationFailure? Failure = null);
 
 public interface IChallengeFlagStore
 {
@@ -79,12 +89,27 @@ public interface IChallengeFlagStore
         UpdateChallengeFlagCommand command,
         CancellationToken cancellationToken);
 
-    Task<string?> DeleteAsync(
+    Task<ChallengeFlagMutationFailure?> DeleteAsync(
         Guid competitionId,
         Guid challengeId,
         Guid flagId,
         long expectedRowVersion,
         CancellationToken cancellationToken);
+}
+
+internal static class ChallengeFlagMutationFailureProtocol
+{
+    public static string Code(ChallengeFlagMutationFailure failure) => failure switch
+    {
+        ChallengeFlagMutationFailure.CompetitionNotFound => "competition_not_found",
+        ChallengeFlagMutationFailure.ChallengeNotFound => "challenge_not_found",
+        ChallengeFlagMutationFailure.FlagLocked => "flag_locked",
+        ChallengeFlagMutationFailure.TeamNotFound => "team_not_found",
+        ChallengeFlagMutationFailure.FlagWindowConflict => "flag_window_conflict",
+        ChallengeFlagMutationFailure.FlagNotFound => "flag_not_found",
+        ChallengeFlagMutationFailure.FlagConflict => "flag_conflict",
+        _ => "flag_conflict"
+    };
 }
 
 public sealed class ListChallengeFlags(IChallengeFlagStore store)
@@ -131,7 +156,7 @@ public sealed class CreateChallengeFlag(
         var result = await store.CreateAsync(command, ct);
         if (result.Flag is null)
             return OperationResult<ChallengeFlagView>.Failure(
-                result.ErrorCode ?? "flag_conflict",
+                ChallengeFlagMutationFailureProtocol.Code(result.Failure ?? ChallengeFlagMutationFailure.FlagConflict),
                 "Challenge Flag was not created.");
 
         await ChallengeFlagRebuild.ExecuteAsync(command.CompetitionId, cache, scheduler, ct);
@@ -164,7 +189,7 @@ public sealed class UpdateChallengeFlag(
         var result = await store.UpdateAsync(command, ct);
         if (result.Flag is null)
             return OperationResult<ChallengeFlagView>.Failure(
-                result.ErrorCode ?? "flag_conflict",
+                ChallengeFlagMutationFailureProtocol.Code(result.Failure ?? ChallengeFlagMutationFailure.FlagConflict),
                 "Challenge Flag was not updated.");
 
         await ChallengeFlagRebuild.ExecuteAsync(command.CompetitionId, cache, scheduler, ct);
@@ -192,9 +217,9 @@ public sealed class DeleteChallengeFlag(
         if (scopeError is not null)
             return OperationResult.Failure(scopeError.Value.Code, scopeError.Value.Message);
 
-        var error = await store.DeleteAsync(competitionId, challengeId, flagId, expectedRowVersion, ct);
-        if (error is not null)
-            return OperationResult.Failure(error, "Challenge Flag was not deleted.");
+        var failure = await store.DeleteAsync(competitionId, challengeId, flagId, expectedRowVersion, ct);
+        if (failure is not null)
+            return OperationResult.Failure(ChallengeFlagMutationFailureProtocol.Code(failure.Value), "Challenge Flag was not deleted.");
 
         await ChallengeFlagRebuild.ExecuteAsync(competitionId, cache, scheduler, ct);
         return OperationResult.Success();
