@@ -121,7 +121,7 @@
 - [x] `ApproveTeam`。
 - [x] `RejectTeam`。
 - [x] Team owned ordered members：删除独立 `team_members` 聚合/DbSet，使用 `MemberOrder`。
-- [ ] 固定 32 字符 `InvitationToken`、持码直接加入和 token 轮换；删除指定用户邀请、接受、拒绝流程。
+- [x] 固定 32 字符 `InvitationToken`、持码直接加入和 token 轮换；删除指定用户邀请、接受、拒绝流程。
 - [x] `RemoveTeamMember`。
 - [x] `LeaveTeam`。
 - [x] `TransferTeamCaptain`。
