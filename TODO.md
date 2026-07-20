@@ -267,7 +267,7 @@
 - [x] Team identifier 映射。
 - [x] unknown/invalid identifier 处理。
 - [x] polling timeout。
-- [ ] control transition。
+- [x] control transition。
 - [x] control interval score。
 - [x] banned/deleted Team 过滤。
 
