@@ -120,7 +120,7 @@
 - [x] `RegisterTeamToCompetition`。
 - [x] `ApproveTeam`。
 - [x] `RejectTeam`。
-- [ ] Team owned ordered members：删除独立 `team_members` 聚合/DbSet，使用 `MemberOrder`。
+- [x] Team owned ordered members：删除独立 `team_members` 聚合/DbSet，使用 `MemberOrder`。
 - [ ] 固定 32 字符 `InvitationToken`、持码直接加入和 token 轮换；删除指定用户邀请、接受、拒绝流程。
 - [x] `RemoveTeamMember`。
 - [x] `LeaveTeam`。
@@ -129,7 +129,7 @@
 ### 3.2 Team 规则
 
 - [x] 同一 Competition 内 Team name unique。
-- [ ] 创建者进入 Members 的 `MemberOrder = 0`，首位成员即 Captain；不再维护 `CaptainId`/Role 双重来源。
+- [x] 创建者进入 Members 的 `MemberOrder = 0`，首位成员即 Captain；不再维护 `CaptainId`/Role 双重来源。
 - [x] MaxTeamMembers 强制执行。
 - [x] 自动批准和人工批准两条路径都可用。
 - [x] Running 后默认禁止新报名。

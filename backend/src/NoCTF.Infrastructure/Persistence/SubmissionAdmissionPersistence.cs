@@ -37,11 +37,9 @@ internal static class SubmissionAdmissionPersistence
         if (scope is null)
             return null;
 
-        var belongs = await db.TeamMembers.AsNoTracking().AnyAsync(
-            member => member.CompetitionId == competitionId
-                      && member.TeamId == teamId
-                      && member.UserId == userId,
-            ct);
+        var belongs = await db.Teams.AsNoTracking().AnyAsync(
+            team => team.Id == teamId && team.CompetitionId == competitionId
+                && team.Members.Any(member => member.UserId == userId), ct);
         var attempts = await db.Submissions.AsNoTracking()
             .Where(submission => submission.CompetitionId == competitionId
                                  && submission.TeamId == teamId

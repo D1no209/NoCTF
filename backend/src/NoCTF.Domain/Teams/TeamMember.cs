@@ -4,9 +4,7 @@ namespace NoCTF.Domain.Teams;
 public sealed class TeamMember
 {
     public Guid Id { get; set; }
-    public Guid CompetitionId { get; set; }
-    public Guid TeamId { get; set; }
     public Guid UserId { get; set; }
-    public TeamMemberRole Role { get; set; }
+    public int MemberOrder { get; set; }
     public DateTimeOffset JoinedAt { get; set; }
 }

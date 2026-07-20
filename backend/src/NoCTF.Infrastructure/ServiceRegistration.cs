@@ -136,8 +136,8 @@ public static class ServiceRegistration
         services.AddScoped<UpdateTeam>();
         services.AddScoped<DeleteTeam>();
         services.AddScoped<ITeamMembershipStore, EfTeamMembershipStore>();
-        services.AddScoped<InviteTeamMember>();
-        services.AddScoped<RespondToTeamInvitation>();
+        services.AddScoped<JoinTeamByInvitation>();
+        services.AddScoped<RotateTeamInvitation>();
         services.AddScoped<RemoveTeamMember>();
         services.AddScoped<LeaveTeam>();
         services.AddScoped<TransferTeamCaptain>();
