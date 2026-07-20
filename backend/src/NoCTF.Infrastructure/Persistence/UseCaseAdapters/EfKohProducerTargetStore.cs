@@ -9,8 +9,6 @@ public sealed class EfKohProducerTargetStore(NoCtfDbContext db) : IKohProducerTa
     public async Task<IReadOnlyList<KohProducerTarget>> ListRunningAsync(CancellationToken cancellationToken) =>
         await (
                 from competition in db.Competitions.AsNoTracking()
-                join competitionConfiguration in db.CompetitionConfigurations.AsNoTracking()
-                    on competition.Id equals competitionConfiguration.CompetitionId
                 join challenge in db.Challenges.AsNoTracking()
                     on competition.Id equals challenge.CompetitionId
                 join challengeConfiguration in db.ChallengeConfigurations.AsNoTracking()
@@ -23,7 +21,7 @@ public sealed class EfKohProducerTargetStore(NoCtfDbContext db) : IKohProducerTa
                     competition.Id,
                     challenge.Id,
                     competition.StartTime,
-                    competitionConfiguration.Json,
+                    competition.ConfigurationJson,
                     challengeConfiguration.Json))
             .ToListAsync(cancellationToken);
 }

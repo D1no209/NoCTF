@@ -11,7 +11,6 @@ public enum CompetitionCollaboratorRole
 public sealed class CompetitionCollaborator
 {
     public Guid Id { get; set; }
-    public Guid CompetitionId { get; set; }
     public Guid UserId { get; set; }
     public CompetitionCollaboratorRole Role { get; set; }
     public DateTimeOffset AddedAt { get; set; }

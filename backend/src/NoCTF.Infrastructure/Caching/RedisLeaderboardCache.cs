@@ -45,10 +45,7 @@ public sealed class RedisLeaderboardCache(
                 x.challenge.Deletion.IsDeleted,
                 x.configuration))
             .ToListAsync(ct);
-        var competitionConfiguration = await db.CompetitionConfigurations.AsNoTracking()
-            .Where(x => x.CompetitionId == competitionId)
-            .Select(x => x.Json)
-            .SingleOrDefaultAsync(ct);
+        var competitionConfiguration = competition.ConfigurationJson;
         var submissions = await db.Submissions.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.ScoringEventId != null)
             .Join(db.ScoringEvents.AsNoTracking(), s => s.ScoringEventId, e => e.Id, (s, e) => new LeaderboardSubmissionFact(
                 s.Id, s.TeamId!.Value, s.ChallengeId, s.Kind, s.ReceivedAt, e,

@@ -90,8 +90,9 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
             && !x.Deletion.IsDeleted && x.CaptainId == actorId, ct)
         || await db.Users.AsNoTracking().AnyAsync(x => x.Id == actorId && x.Role == UserRole.Administrator, ct)
         || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId && x.OwnerId == actorId && !x.Deletion.IsDeleted, ct)
-        || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId
-            && x.UserId == actorId && x.Role == CompetitionCollaboratorRole.Manager, ct);
+        || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId
+            && x.Collaborators.Any(collaborator => collaborator.UserId == actorId
+                && collaborator.Role == CompetitionCollaboratorRole.Manager), ct);
 
     public async Task<TeamUpdateStoreResult> UpdateAsync(UpdateTeamCommand command, CancellationToken ct)
     {

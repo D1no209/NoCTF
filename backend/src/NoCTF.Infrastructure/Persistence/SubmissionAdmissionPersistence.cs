@@ -20,8 +20,6 @@ internal static class SubmissionAdmissionPersistence
     {
         var scope = await (
             from competition in db.Competitions.AsNoTracking()
-            join competitionConfiguration in db.CompetitionConfigurations.AsNoTracking()
-                on competition.Id equals competitionConfiguration.CompetitionId
             join challenge in db.Challenges.AsNoTracking()
                 on competition.Id equals challenge.CompetitionId
             join challengeConfiguration in db.ChallengeConfigurations.AsNoTracking()
@@ -32,7 +30,6 @@ internal static class SubmissionAdmissionPersistence
             select new
             {
                 Competition = competition,
-                CompetitionConfiguration = competitionConfiguration,
                 Challenge = challenge,
                 ChallengeConfiguration = challengeConfiguration,
                 Team = team
@@ -69,9 +66,9 @@ internal static class SubmissionAdmissionPersistence
             teamId,
             challengeId,
             scope.Competition.Mode,
-            scope.CompetitionConfiguration.Revision,
+            scope.Competition.ConfigurationRevision,
             scope.ChallengeConfiguration.Revision,
-            scope.CompetitionConfiguration.Json,
+            scope.Competition.ConfigurationJson,
             scope.ChallengeConfiguration.Json,
             attempts.GetValueOrDefault(SubmissionKind.Flag),
             attempts.GetValueOrDefault(SubmissionKind.Fix),

@@ -4,7 +4,6 @@ namespace NoCTF.Domain.Competitions;
 public sealed class CompetitionLifecycleAudit
 {
     public Guid Id { get; set; }
-    public Guid CompetitionId { get; set; }
     public CompetitionStatus From { get; set; }
     public CompetitionStatus To { get; set; }
     public Guid? ActorId { get; set; }
