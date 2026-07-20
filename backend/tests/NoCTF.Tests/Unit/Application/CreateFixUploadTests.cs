@@ -59,6 +59,20 @@ public class CreateFixUploadTests
         await Assert.That(store.CreateCalls).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task ExecuteAsync_AdmissionChangesBeforeReservation_ReturnsConcurrencyFailure()
+    {
+        var useCase = new CreateFixUpload(
+            new AdmissionStore(AllowedAdmission()),
+            new ChangedUploadStore(),
+            new Policy(),
+            () => Now);
+
+        var result = await useCase.ExecuteAsync(Command());
+
+        await Assert.That(result.ErrorCode).IsEqualTo("upload_admission_changed");
+    }
+
     private static CreateFixUploadCommand Command() => new(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "fix.zip",
         "application/zip", 128, new string('a', 64), Now);
@@ -91,13 +105,34 @@ public class CreateFixUploadTests
     private sealed class UploadStore(FixUploadGrant grant) : IFixUploadSessionStore
     {
         public int CreateCalls { get; private set; }
-        public Task<FixUploadGrant?> CreateAsync(CreateFixUploadCommand command, CancellationToken cancellationToken)
+        public Task<FixUploadCreationResult> CreateAsync(
+            CreateFixUploadCommand command,
+            SubmissionAdmissionSnapshot expectedAdmission,
+            CancellationToken cancellationToken)
         {
             CreateCalls++;
-            return Task.FromResult<FixUploadGrant?>(grant);
+            return Task.FromResult(FixUploadCreationResult.Created(grant));
         }
         public Task<FixUploadMetadata?> GetAuthorizedMetadataAsync(Guid uploadId, Guid competitionId, Guid teamId,
             Guid challengeId, Guid userId, DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class ChangedUploadStore : IFixUploadSessionStore
+    {
+        public Task<FixUploadCreationResult> CreateAsync(
+            CreateFixUploadCommand command,
+            SubmissionAdmissionSnapshot expectedAdmission,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(FixUploadCreationResult.Rejected(FixUploadCreationFailure.AdmissionChanged));
+
+        public Task<FixUploadMetadata?> GetAuthorizedMetadataAsync(
+            Guid uploadId,
+            Guid competitionId,
+            Guid teamId,
+            Guid challengeId,
+            Guid userId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

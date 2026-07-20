@@ -55,13 +55,20 @@ public sealed class CreateFixUpload(
         if (!decision.Succeeded)
             return OperationResult<FixUploadCreated>.Failure(decision.ErrorCode!, decision.ErrorMessage!);
 
-        var grant = await sessions.CreateAsync(command with
+        var creation = await sessions.CreateAsync(command with
         {
             RequestedAt = now
-        }, cancellationToken);
-        return grant is null
-            ? OperationResult<FixUploadCreated>.Failure("upload_scope_not_found", "The upload scope was not found.")
-            : OperationResult<FixUploadCreated>.Success(new(grant));
+        }, admission, cancellationToken);
+        if (creation.Grant is not null)
+            return OperationResult<FixUploadCreated>.Success(new(creation.Grant));
+        return creation.Failure switch
+        {
+            FixUploadCreationFailure.AdmissionChanged =>
+                OperationResult<FixUploadCreated>.Failure(
+                    "upload_admission_changed",
+                    "Upload admission changed concurrently."),
+            _ => throw new InvalidOperationException("Fix upload creation returned an invalid result.")
+        };
     }
 
     private static bool IsSha256(string value)

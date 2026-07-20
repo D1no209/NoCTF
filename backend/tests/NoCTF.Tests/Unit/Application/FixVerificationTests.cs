@@ -25,6 +25,8 @@ public class FixVerificationTests
     public async Task StateMachine_AllowsOnlyExpectedTransitions()
     {
         await Assert.That(FixVerificationStateMachine.CanTransition(
+            DomainFixVerificationStatus.AuthorizationPending, DomainFixVerificationStatus.Created)).IsTrue();
+        await Assert.That(FixVerificationStateMachine.CanTransition(
             DomainFixVerificationStatus.Claimed, DomainFixVerificationStatus.Verifying)).IsTrue();
         await Assert.That(FixVerificationStateMachine.CanTransition(
             DomainFixVerificationStatus.Verifying, DomainFixVerificationStatus.Valid)).IsTrue();

@@ -1,3 +1,5 @@
+using NoCTF.Application.Submissions.Intake;
+
 namespace NoCTF.Application.Storage;
 
 public sealed record CreateFixUploadCommand(
@@ -24,9 +26,36 @@ public sealed record FixUploadMetadata(
     long Length,
     string Sha256);
 
+public enum FixUploadCreationFailure
+{
+    AdmissionChanged
+}
+
+public sealed class FixUploadCreationResult
+{
+    private FixUploadCreationResult(FixUploadGrant? grant, FixUploadCreationFailure? failure)
+    {
+        Grant = grant;
+        Failure = failure;
+    }
+
+    public FixUploadGrant? Grant { get; }
+    public FixUploadCreationFailure? Failure { get; }
+
+    public static FixUploadCreationResult Created(FixUploadGrant grant)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+        return new(grant, null);
+    }
+    public static FixUploadCreationResult Rejected(FixUploadCreationFailure failure) => new(null, failure);
+}
+
 public interface IFixUploadSessionStore
 {
-    Task<FixUploadGrant?> CreateAsync(CreateFixUploadCommand command, CancellationToken cancellationToken);
+    Task<FixUploadCreationResult> CreateAsync(
+        CreateFixUploadCommand command,
+        SubmissionAdmissionSnapshot expectedAdmission,
+        CancellationToken cancellationToken);
     Task<FixUploadMetadata?> GetAuthorizedMetadataAsync(
         Guid uploadId,
         Guid competitionId,

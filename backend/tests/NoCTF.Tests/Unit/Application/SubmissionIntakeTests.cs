@@ -156,7 +156,10 @@ public class SubmissionIntakeTests
 
     private sealed class ThrowingUploadStore : IFixUploadSessionStore
     {
-        public Task<FixUploadGrant?> CreateAsync(CreateFixUploadCommand command, CancellationToken cancellationToken) =>
+        public Task<FixUploadCreationResult> CreateAsync(
+            CreateFixUploadCommand command,
+            SubmissionAdmissionSnapshot expectedAdmission,
+            CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task<FixUploadMetadata?> GetAuthorizedMetadataAsync(
