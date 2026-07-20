@@ -56,7 +56,7 @@
 - [x] Published/Running/Paused 到 EndTime 自动转 Finished。
 - [x] 加入 shutdown cancellation 和有限 drain。
 - [x] 记录 structured log：CompetitionId、from、to、耗时、结果。
-- [ ] 不记录 Flag、SourceKey、archive metadata。
+- [x] 不记录 Flag、SourceKey、archive metadata。
 
 ### 1.4 Lifecycle API
 
