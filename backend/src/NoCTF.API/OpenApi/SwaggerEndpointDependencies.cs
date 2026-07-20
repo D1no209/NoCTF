@@ -50,10 +50,6 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
     public Task<AuthenticatedUser?> FindByLoginAsync(string login, CancellationToken cancellationToken) => Task.FromResult<AuthenticatedUser?>(null);
     public Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) => Task.FromResult<AuthenticatedUser?>(null);
     public Task<bool> VerifyPasswordAsync(Guid userId, string password, CancellationToken cancellationToken) => Task.FromResult(false);
-    public Task<string> CreateRefreshTokenAsync(Guid userId, string? ipAddress, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(string.Empty);
-    public Task<RefreshRotation?> RotateRefreshAsync(string tokenHash, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult<RefreshRotation?>(null);
-    public Task RevokeRefreshFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task RevokeRefreshTokenAsync(string tokenHash, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReader
@@ -66,6 +62,11 @@ internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
 {
     public IssuedAccessToken Issue(AuthenticatedUser user) =>
         new("swagger-export-token", DateTimeOffset.UtcNow.AddMinutes(15));
+
+    public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
+        new("swagger-export-refresh-token", DateTimeOffset.UtcNow.AddDays(30));
+
+    public RefreshTokenPrincipal? ValidateRefresh(string token) => null;
 }
 
 internal sealed class SwaggerModerationStore : ITeamModerationStore

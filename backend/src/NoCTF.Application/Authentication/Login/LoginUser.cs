@@ -24,12 +24,8 @@ public sealed class LoginUser(IUserAuthenticationStore store, IAccessTokenIssuer
             return OperationResult<LoginResult>.Failure("invalid_credentials", "Invalid credentials.");
 
         var token = issuer.Issue(user);
-        var refreshToken = await store.CreateRefreshTokenAsync(
-            user.Id,
-            null,
-            DateTimeOffset.UtcNow,
-            cancellationToken);
+        var refreshToken = issuer.IssueRefresh(user);
         return OperationResult<LoginResult>.Success(new(
-            user.Id, user.UserName, user.Role, token.Token, token.ExpiresAt, refreshToken));
+            user.Id, user.UserName, user.Role, token.Token, token.ExpiresAt, refreshToken.Token));
     }
 }

@@ -14,7 +14,6 @@ namespace NoCTF.Infrastructure.Persistence;
 public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
-    public DbSet<RefreshSession> RefreshSessions => Set<RefreshSession>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionConfiguration> CompetitionConfigurations => Set<CompetitionConfiguration>();
     public DbSet<CompetitionCollaborator> CompetitionCollaborators => Set<CompetitionCollaborator>();

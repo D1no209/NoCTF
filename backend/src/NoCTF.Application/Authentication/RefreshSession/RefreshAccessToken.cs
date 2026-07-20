@@ -1,7 +1,7 @@
 using NoCTF.Application.Authentication.Ports;
 using NoCTF.Application.Common;
 
-namespace NoCTF.Application.Authentication.RefreshSession;
+namespace NoCTF.Application.Authentication.RefreshJwt;
 
 public sealed record RefreshAccessTokenResult(
     Guid UserId,
@@ -14,24 +14,21 @@ public sealed record RefreshAccessTokenResult(
 public sealed class RefreshAccessToken(IUserAuthenticationStore store, IAccessTokenIssuer issuer)
 {
     public async Task<OperationResult<RefreshAccessTokenResult>> ExecuteAsync(
-        string refreshTokenHash,
-        DateTimeOffset now,
+        string refreshToken,
         CancellationToken cancellationToken = default)
     {
-        var rotation = await store.RotateRefreshAsync(refreshTokenHash, now, cancellationToken);
-        if (rotation is null)
-            return OperationResult<RefreshAccessTokenResult>.Failure("refresh_invalid", "Refresh session is invalid.");
-        if (rotation.ReplayDetected)
-        {
-            await store.RevokeRefreshFamilyAsync(rotation.FamilyId, now, cancellationToken);
-            return OperationResult<RefreshAccessTokenResult>.Failure("refresh_replay", "Refresh token replay detected.");
-        }
+        var principal = issuer.ValidateRefresh(refreshToken);
+        if (principal is null)
+            return OperationResult<RefreshAccessTokenResult>.Failure("refresh_invalid", "Refresh token is invalid.");
 
-        var user = await store.FindByIdAsync(rotation.UserId, cancellationToken);
+        var user = await store.FindByIdAsync(principal.UserId, cancellationToken);
         if (user is null)
             return OperationResult<RefreshAccessTokenResult>.Failure("user_not_found", "User no longer exists.");
+        if (user.TokenVersion != principal.TokenVersion)
+            return OperationResult<RefreshAccessTokenResult>.Failure("refresh_invalid", "Refresh token is no longer valid.");
         var access = issuer.Issue(user);
+        var replacement = issuer.IssueRefresh(user);
         return OperationResult<RefreshAccessTokenResult>.Success(
-            new(user.Id, user.UserName, user.Role, access.Token, access.ExpiresAt, rotation.RefreshToken));
+            new(user.Id, user.UserName, user.Role, access.Token, access.ExpiresAt, replacement.Token));
     }
 }

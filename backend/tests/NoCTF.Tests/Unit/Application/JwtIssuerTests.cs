@@ -41,6 +41,42 @@ public class JwtIssuerTests
         await Assert.That(() => new JwtIssuer(config)).Throws<InvalidOperationException>();
     }
 
+    [Test]
+    public async Task IssueRefresh_UsesDistinctAudienceAndThirtyDayLifetime()
+    {
+        var config = Configuration(new Dictionary<string, string?>
+        {
+            ["Authentication:SigningKey"] = "test-signing-key-with-at-least-32-bytes!",
+            ["Authentication:Issuer"] = "NoCTF.Test",
+            ["Authentication:Audience"] = "NoCTF.Api.Test",
+            ["Authentication:RefreshAudience"] = "NoCTF.Refresh.Test"
+        });
+        var user = new AuthenticatedUser(Guid.NewGuid(), "alice", "Admin", 7);
+        var issuer = new JwtIssuer(config);
+        var issued = issuer.IssueRefresh(user);
+        var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
+
+        await Assert.That(token.Audiences.Single()).IsEqualTo("NoCTF.Refresh.Test");
+        await Assert.That(token.Claims.Single(x => x.Type == "token_type").Value).IsEqualTo("refresh");
+        await Assert.That(token.Claims.Single(x => x.Type == "token_version").Value).IsEqualTo("7");
+        await Assert.That(token.Claims.Single(x => x.Type == JwtRegisteredClaimNames.Iat).Value).IsNotNull();
+        await Assert.That(issued.ExpiresAt - DateTimeOffset.UtcNow).IsGreaterThan(TimeSpan.FromDays(29));
+        await Assert.That(issuer.ValidateRefresh(issued.Token)).IsEqualTo(new RefreshTokenPrincipal(user.Id, 7));
+    }
+
+    [Test]
+    public async Task ValidateRefresh_RejectsAccessToken()
+    {
+        var config = Configuration(new Dictionary<string, string?>
+        {
+            ["Authentication:SigningKey"] = "test-signing-key-with-at-least-32-bytes!"
+        });
+        var issuer = new JwtIssuer(config);
+        var access = issuer.Issue(new AuthenticatedUser(Guid.NewGuid(), "alice", "Admin", 7));
+
+        await Assert.That(issuer.ValidateRefresh(access.Token)).IsNull();
+    }
+
     private static IConfiguration Configuration(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 }
