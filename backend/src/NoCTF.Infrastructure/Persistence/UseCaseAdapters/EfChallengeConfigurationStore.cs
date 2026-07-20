@@ -10,22 +10,24 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
         Guid competitionId,
         Guid challengeId,
         CancellationToken ct) =>
-        (from configuration in db.ChallengeConfigurations.AsNoTracking()
-         join challenge in db.Challenges.AsNoTracking() on configuration.ChallengeId equals challenge.Id
-         join competition in db.Competitions.AsNoTracking() on challenge.CompetitionId equals competition.Id
-         where challenge.Id == challengeId
-               && challenge.CompetitionId == competitionId
-               && !challenge.Deletion.IsDeleted
-               && !competition.Deletion.IsDeleted
-         select new ChallengeConfigurationView(
-             competition.Id,
-             challenge.Id,
-             competition.Mode,
-             configuration.Json,
-             configuration.Revision,
-             competition.Status,
-             configuration.UpdatedAt))
-        .SingleOrDefaultAsync(ct);
+        db.ChallengeConfigurations.AsNoTracking()
+            .Join(db.Challenges.AsNoTracking(), configuration => configuration.ChallengeId, challenge => challenge.Id,
+                (configuration, challenge) => new { Configuration = configuration, Challenge = challenge })
+            .Join(db.Competitions.AsNoTracking(), item => item.Challenge.CompetitionId, competition => competition.Id,
+                (item, competition) => new { item.Configuration, item.Challenge, Competition = competition })
+            .Where(item => item.Challenge.Id == challengeId
+                           && item.Challenge.CompetitionId == competitionId
+                           && !item.Challenge.Deletion.IsDeleted
+                           && !item.Competition.Deletion.IsDeleted)
+            .Select(item => new ChallengeConfigurationView(
+                item.Competition.Id,
+                item.Challenge.Id,
+                item.Competition.Mode,
+                item.Configuration.Json,
+                item.Configuration.Revision,
+                item.Competition.Status,
+                item.Configuration.UpdatedAt))
+            .SingleOrDefaultAsync(ct);
 
     public async Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
