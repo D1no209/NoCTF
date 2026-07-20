@@ -10,20 +10,20 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
         Guid competitionId,
         Guid challengeId,
         CancellationToken ct) =>
-        db.ChallengeConfigurations.AsNoTracking()
+        db.CompetitionChallenges.AsNoTracking()
             .Join(db.Challenges.AsNoTracking(), configuration => configuration.ChallengeId, challenge => challenge.Id,
                 (configuration, challenge) => new { Configuration = configuration, Challenge = challenge })
-            .Join(db.Competitions.AsNoTracking(), item => item.Challenge.CompetitionId, competition => competition.Id,
+            .Join(db.Competitions.AsNoTracking(), item => item.Configuration.CompetitionId, competition => competition.Id,
                 (item, competition) => new { item.Configuration, item.Challenge, Competition = competition })
-            .Where(item => item.Challenge.Id == challengeId
-                           && item.Challenge.CompetitionId == competitionId
+            .Where(item => item.Configuration.Id == challengeId
+                           && item.Configuration.CompetitionId == competitionId
                            && !item.Challenge.Deletion.IsDeleted
                            && !item.Competition.Deletion.IsDeleted)
             .Select(item => new ChallengeConfigurationView(
                 item.Competition.Id,
-                item.Challenge.Id,
+                item.Configuration.Id,
                 item.Competition.Mode,
-                item.Configuration.Json,
+                item.Configuration.ConfigurationJson,
                 item.Configuration.Revision,
                 item.Competition.Status,
                 item.Configuration.UpdatedAt))
@@ -42,20 +42,18 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
         if (status is null) return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
         if (status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
             return new(null, ChallengeConfigurationUpdateFailure.ConfigurationLocked);
-        if (!await db.Challenges.AsNoTracking().AnyAsync(challenge => challenge.Id == challengeId
+        if (!await db.CompetitionChallenges.AsNoTracking().AnyAsync(challenge => challenge.Id == challengeId
             && challenge.CompetitionId == competitionId && !challenge.Deletion.IsDeleted, ct))
             return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
-        var changed = await db.ChallengeConfigurations
+        var changed = await db.CompetitionChallenges
             .Where(configuration =>
-                configuration.ChallengeId == challengeId
+                configuration.Id == challengeId
                 && configuration.Revision == expectedRevision
-                && db.Challenges.Any(challenge =>
-                    challenge.Id == configuration.ChallengeId
-                    && challenge.CompetitionId == competitionId
-                    && !challenge.Deletion.IsDeleted)
+                && configuration.CompetitionId == competitionId
+                && !configuration.Deletion.IsDeleted
                 )
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(configuration => configuration.Json, json)
+                .SetProperty(configuration => configuration.ConfigurationJson, json)
                 .SetProperty(configuration => configuration.Revision, expectedRevision + 1)
                 .SetProperty(configuration => configuration.UpdatedAt, updatedAt), ct);
 
