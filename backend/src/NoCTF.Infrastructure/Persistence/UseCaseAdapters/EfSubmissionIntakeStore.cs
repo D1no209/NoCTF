@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.Infrastructure.BackgroundWork;
 using DomainSubmissionKind = NoCTF.Domain.Submissions.SubmissionKind;
@@ -142,6 +143,10 @@ public sealed class EfSubmissionIntakeStore(
         if (existing is not null)
             return existing;
 
+        var status = await CompetitionWriteLock.AcquireAsync(db, received.CompetitionId, ct);
+        if (status != CompetitionStatus.Running)
+            return new(SubmissionAcceptanceState.SnapshotChanged);
+
         var current = await LoadAdmissionAsync(
             received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
         if (!MatchesSnapshot(snapshot, current))
@@ -195,6 +200,10 @@ public sealed class EfSubmissionIntakeStore(
             received.UserId, DomainSubmissionKind.Fix, ct);
         if (existing is not null)
             return existing;
+
+        var status = await CompetitionWriteLock.AcquireAsync(db, received.CompetitionId, ct);
+        if (status != CompetitionStatus.Running)
+            return new(SubmissionAcceptanceState.SnapshotChanged);
 
         var current = await LoadAdmissionAsync(
             received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
