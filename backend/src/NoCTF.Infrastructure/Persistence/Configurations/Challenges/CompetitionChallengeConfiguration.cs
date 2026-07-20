@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Infrastructure.Persistence.Configurations.Challenges;
 
@@ -13,6 +14,14 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
         builder.Property(item => item.ConfigurationJson).HasColumnType("jsonb");
         builder.OwnsOne(item => item.Deletion);
         builder.HasQueryFilter(item => !item.Deletion.IsDeleted);
+        builder.HasOne<Competition>()
+            .WithMany()
+            .HasForeignKey(item => item.CompetitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Challenge>()
+            .WithMany()
+            .HasForeignKey(item => item.ChallengeId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(item => new { item.CompetitionId, item.Order }).IsUnique();
         builder.HasIndex(item => new { item.CompetitionId, item.ChallengeId }).IsUnique();
         builder.OwnsMany(item => item.Hints, hints =>
