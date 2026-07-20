@@ -82,6 +82,8 @@ public sealed class SubmitFix(
             OperationResult<SubmissionAccepted>.Failure("attempts_exhausted", "The maximum number of accepted attempts has been reached."),
         SubmissionAcceptanceState.UploadUnavailable =>
             OperationResult<SubmissionAccepted>.Failure("upload_not_found", "The upload was not found or has expired."),
+        SubmissionAcceptanceState.BackgroundWorkUnavailable =>
+            OperationResult<SubmissionAccepted>.Failure("background_work_unavailable", "Submission processing is temporarily unavailable."),
         _ => OperationResult<SubmissionAccepted>.Failure("submission_concurrency", "The submission could not be accepted.")
     };
 }

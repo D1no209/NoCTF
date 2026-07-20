@@ -74,6 +74,17 @@ public class SubmissionIntakeTests
     }
 
     [Test]
+    public async Task SubmitFlag_BackgroundWorkUnavailable_ReturnsRetryableFailure()
+    {
+        var store = new Store { AcceptanceState = SubmissionAcceptanceState.BackgroundWorkUnavailable };
+
+        var result = await new SubmitFlag(store, new Policy()).ExecuteAsync(FlagCommand());
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.ErrorCode).IsEqualTo("background_work_unavailable");
+    }
+
+    [Test]
     public async Task SubmitFix_ReusedKey_ReturnsOriginalBeforeReadingUploadMetadata()
     {
         var originalId = Guid.NewGuid();
@@ -118,6 +129,7 @@ public class SubmissionIntakeTests
         public int AcceptCalls { get; private set; }
         public int? LastMaxAttempts { get; private set; }
         public FlagSubmissionReceived? LastFlag { get; private set; }
+        public SubmissionAcceptanceState AcceptanceState { get; init; } = SubmissionAcceptanceState.Created;
 
         public Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
             Guid competitionId, string idempotencyKey, Guid teamId, Guid challengeId, Guid userId,
@@ -135,7 +147,7 @@ public class SubmissionIntakeTests
             LastFlag = received;
             LastMaxAttempts = maxAttempts;
             return Task.FromResult(new SubmissionAcceptanceResult(
-                SubmissionAcceptanceState.Created, received.SubmissionId, received.ReceivedAt));
+                AcceptanceState, received.SubmissionId, received.ReceivedAt));
         }
 
         public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(

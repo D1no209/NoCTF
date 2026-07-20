@@ -10,18 +10,28 @@ namespace NoCTF.Infrastructure.BackgroundWork;
 /// <summary>Consumes deduplicated competition rebuild work from the maintenance Channel.</summary>
 public sealed class CompetitionRebuildHostedService(
     ChannelBackgroundWorkScheduler scheduler,
+    BackgroundWorkShutdownCoordinator shutdown,
     IServiceScopeFactory scopeFactory,
+    BackgroundQueueOptions options,
     ILogger<CompetitionRebuildHostedService> logger) : BackgroundService
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var item in scheduler.MaintenanceReader.ReadAllAsync(stoppingToken))
+        var completion = Task.WhenAll(
+            Enumerable.Range(0, options.MaintenanceConcurrency).Select(_ => ConsumeAsync(shutdown.DrainToken)));
+        shutdown.RegisterStage(BackgroundWorkDrainStage.Maintenance, completion);
+        return completion;
+    }
+
+    private async Task ConsumeAsync(CancellationToken cancellationToken)
+    {
+        await foreach (var item in scheduler.MaintenanceReader.ReadAllAsync(cancellationToken))
         {
             try
             {
-                await ExecuteWithRetryAsync(item, stoppingToken);
+                await ExecuteWithRetryAsync(item, cancellationToken);
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 break;
             }
@@ -61,6 +71,10 @@ public sealed class CompetitionRebuildHostedService(
                 }
                 logger.LogInformation("Maintenance item {WorkItemType} completed for {CompetitionId}", item.GetType().Name, item.CompetitionId);
                 return;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception) when (attempt < 3 && !ct.IsCancellationRequested)
             {

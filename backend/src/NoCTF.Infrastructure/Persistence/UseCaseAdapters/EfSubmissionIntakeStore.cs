@@ -5,12 +5,16 @@ using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Domain.Submissions;
+using NoCTF.Infrastructure.BackgroundWork;
 using DomainSubmissionKind = NoCTF.Domain.Submissions.SubmissionKind;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 /// <summary>Accepts Submission facts atomically with idempotency and attempt-limit checks.</summary>
-public sealed class EfSubmissionIntakeStore(NoCtfDbContext db, IBackgroundWorkScheduler scheduler)
+public sealed class EfSubmissionIntakeStore(
+    NoCtfDbContext db,
+    IBackgroundWorkScheduler scheduler,
+    IBackgroundWorkAdmissionGate admissionGate)
     : ISubmissionIntakeStore
 {
     public async Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
@@ -22,15 +26,39 @@ public sealed class EfSubmissionIntakeStore(NoCtfDbContext db, IBackgroundWorkSc
         DomainSubmissionKind kind,
         CancellationToken ct)
     {
+        if (!admissionGate.IsAccepting)
+            return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+
         var existing = await db.Submissions.AsNoTracking().SingleOrDefaultAsync(
             submission => submission.CompetitionId == competitionId
                           && submission.IdempotencyKey == idempotencyKey,
             ct);
         if (existing is null)
             return null;
-        return Matches(existing, teamId, challengeId, userId, kind)
-            ? new(SubmissionAcceptanceState.Existing, existing.Id, existing.ReceivedAt)
-            : new(SubmissionAcceptanceState.IdempotencyConflict);
+        if (!Matches(existing, teamId, challengeId, userId, kind))
+            return new(SubmissionAcceptanceState.IdempotencyConflict);
+
+        if (existing.ScoringEventId is null)
+        {
+            using var admission = admissionGate.TryEnter();
+            if (admission is null)
+                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+            using var enqueueCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, admission.DrainCancellation);
+            try
+            {
+                await scheduler.EnqueueSubmissionAsync(existing.Id, enqueueCancellation.Token);
+            }
+            catch (BackgroundWorkUnavailableException)
+            {
+                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+            }
+            catch (OperationCanceledException) when (admission.DrainCancellation.IsCancellationRequested)
+            {
+                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+            }
+        }
+
+        return new(SubmissionAcceptanceState.Existing, existing.Id, existing.ReceivedAt);
     }
 
     public async Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
@@ -104,6 +132,10 @@ public sealed class EfSubmissionIntakeStore(NoCtfDbContext db, IBackgroundWorkSc
         int? maxAttempts,
         CancellationToken ct)
     {
+        using var admission = admissionGate.TryEnter();
+        if (admission is null)
+            return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var existing = await FindAcceptedAsync(
             received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
@@ -136,7 +168,15 @@ public sealed class EfSubmissionIntakeStore(NoCtfDbContext db, IBackgroundWorkSc
         var result = await SaveAsync(entity, transaction, received.IdempotencyKey, received.TeamId,
             received.ChallengeId, received.UserId, DomainSubmissionKind.Flag, ct);
         if (result.State == SubmissionAcceptanceState.Created)
-            await scheduler.EnqueueSubmissionAsync(entity.Id, ct);
+        {
+            using var enqueueCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, admission.DrainCancellation);
+            try { await scheduler.EnqueueSubmissionAsync(entity.Id, enqueueCancellation.Token); }
+            catch (BackgroundWorkUnavailableException) { return new(SubmissionAcceptanceState.BackgroundWorkUnavailable); }
+            catch (OperationCanceledException) when (admission.DrainCancellation.IsCancellationRequested)
+            {
+                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+            }
+        }
         return result;
     }
 
@@ -146,6 +186,10 @@ public sealed class EfSubmissionIntakeStore(NoCtfDbContext db, IBackgroundWorkSc
         int? maxAttempts,
         CancellationToken ct)
     {
+        using var admission = admissionGate.TryEnter();
+        if (admission is null)
+            return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var existing = await FindAcceptedAsync(
             received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
@@ -190,7 +234,15 @@ public sealed class EfSubmissionIntakeStore(NoCtfDbContext db, IBackgroundWorkSc
         var result = await SaveAsync(entity, transaction, received.IdempotencyKey, received.TeamId,
             received.ChallengeId, received.UserId, DomainSubmissionKind.Fix, ct);
         if (result.State == SubmissionAcceptanceState.Created)
-            await scheduler.EnqueueSubmissionAsync(entity.Id, ct);
+        {
+            using var enqueueCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, admission.DrainCancellation);
+            try { await scheduler.EnqueueSubmissionAsync(entity.Id, enqueueCancellation.Token); }
+            catch (BackgroundWorkUnavailableException) { return new(SubmissionAcceptanceState.BackgroundWorkUnavailable); }
+            catch (OperationCanceledException) when (admission.DrainCancellation.IsCancellationRequested)
+            {
+                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+            }
+        }
         return result;
     }
 

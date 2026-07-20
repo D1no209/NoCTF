@@ -1,5 +1,4 @@
 using NoCTF.Application.BackgroundWork;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Application.Submissions.Processing;
@@ -22,10 +21,15 @@ public interface ISystemScoringEventStore
     Task<RecordSystemScoringEventResult> RecordAsync(RecordSystemScoringEventCommand command, CancellationToken cancellationToken);
 }
 
+public interface ISystemScoringEventProcessor
+{
+    Task ProcessAsync(Guid scoringEventId, CancellationToken cancellationToken);
+}
+
 public sealed class RecordSystemScoringEvent(
     ISystemScoringEventStore store,
-    ILeaderboardCache cache,
-    IBackgroundWorkScheduler scheduler)
+    IBackgroundWorkScheduler scheduler,
+    IBackgroundWorkAdmissionGate admissionGate)
 {
     public async Task<RecordSystemScoringEventResult> ExecuteAsync(
         RecordSystemScoringEventCommand command,
@@ -36,11 +40,21 @@ public sealed class RecordSystemScoringEvent(
         if (command.Kind == ScoringEventKind.SubmissionEvaluation)
             throw new ArgumentException("System events cannot use the submission evaluation kind.", nameof(command));
 
+        using var admission = admissionGate.TryEnter();
+        if (admission is null)
+            throw new BackgroundWorkUnavailableException();
+
         var result = await store.RecordAsync(command, cancellationToken);
         if (!result.Created) return result;
 
-        await cache.InvalidateAsync(command.CompetitionId, cancellationToken);
-        await scheduler.EnqueueLeaderboardRefreshAsync(command.CompetitionId, cancellationToken);
+        try
+        {
+            await scheduler.EnqueueSystemEventAsync(result.ScoringEventId, admission.DrainCancellation);
+        }
+        catch (OperationCanceledException) when (admission.DrainCancellation.IsCancellationRequested)
+        {
+            throw new BackgroundWorkUnavailableException();
+        }
         return result;
     }
 }

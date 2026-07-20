@@ -74,6 +74,7 @@ NoCTF includes a full set of K8s manifests under `deploy/k8s/`. These manifests 
 - `kubectl` configured for your cluster
 - NGINX Ingress Controller installed
 - A single backend replica is required because background Channels are process-local and non-durable.
+- Graceful shutdown stops new scoring admissions and drains Maintenance, Processing, then Projection for `BackgroundQueue__ShutdownDrainSeconds` (20 seconds by default). Forced termination can lose an accepted in-memory work item, and committed-but-not-enqueued Submissions are not recovered automatically.
 
 ### Creating Secrets
 

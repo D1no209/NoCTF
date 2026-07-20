@@ -51,7 +51,7 @@
 - [x] 配置扫描间隔，默认 5 秒。
 - [x] Published 到 StartTime 自动转 Running。
 - [x] Published/Running/Paused 到 EndTime 自动转 Finished。
-- [ ] 加入 shutdown cancellation 和有限 drain。
+- [x] 加入 shutdown cancellation 和有限 drain。
 - [x] 记录 structured log：CompetitionId、from、to、耗时、结果。
 - [ ] 不记录 Flag、SourceKey、archive metadata。
 
@@ -329,8 +329,8 @@
 - [x] runtime cleanup work item 接入 Maintenance channel。
 - [x] Processing/Projection/Maintenance 统一 1/5/15 秒 retry。
 - [x] consumer scope、耗时和结果 structured logging。
-- [ ] shutdown drain。
-- [ ] 记录已知限制：Channel 不跨进程、不持久化、不恢复崩溃窗口。
+- [x] shutdown drain。
+- [x] 记录已知限制：Channel 不跨进程、不持久化、不恢复崩溃窗口。
 
 ## 11. Leaderboard 完整投影
 
@@ -496,7 +496,7 @@
 - [x] OpenAPI 增加 Login/Refresh/Logout/Runner scoring security scheme。
 - [x] 重新生成 frontend API client。
 - [x] 更新 architecture、deployment、game-modes、handoff 文档。
-- [ ] 文档明确 Channel 丢失窗口和单副本限制。
+- [x] 文档明确 Channel 丢失窗口和单副本限制。
 
 ## 17. 最终验收
 

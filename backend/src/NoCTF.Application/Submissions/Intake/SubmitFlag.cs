@@ -80,6 +80,8 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
             OperationResult<SubmissionAccepted>.Failure("idempotency_conflict", "IdempotencyKey is already bound to another submission scope."),
         SubmissionAcceptanceState.AttemptsExhausted =>
             OperationResult<SubmissionAccepted>.Failure("attempts_exhausted", "The maximum number of accepted attempts has been reached."),
+        SubmissionAcceptanceState.BackgroundWorkUnavailable =>
+            OperationResult<SubmissionAccepted>.Failure("background_work_unavailable", "Submission processing is temporarily unavailable."),
         _ => OperationResult<SubmissionAccepted>.Failure("submission_concurrency", "The submission could not be accepted.")
     };
 }

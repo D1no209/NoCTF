@@ -46,7 +46,8 @@ public enum SubmissionAcceptanceState
     IdempotencyConflict,
     AttemptsExhausted,
     SnapshotChanged,
-    UploadUnavailable
+    UploadUnavailable,
+    BackgroundWorkUnavailable
 }
 
 public sealed record SubmissionAcceptanceResult(
