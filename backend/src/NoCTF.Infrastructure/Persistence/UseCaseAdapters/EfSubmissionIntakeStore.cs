@@ -80,16 +80,16 @@ public sealed class EfSubmissionIntakeStore(
         if (admission is null)
             return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
 
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, received.CompetitionId, ct);
+        if (status != CompetitionStatus.Running)
+            return new(SubmissionAcceptanceState.SnapshotChanged);
+
         var existing = await FindAcceptedAsync(
             received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
             received.UserId, DomainSubmissionKind.Flag, ct);
         if (existing is not null)
             return existing;
-
-        var status = await CompetitionWriteLock.AcquireAsync(db, received.CompetitionId, ct);
-        if (status != CompetitionStatus.Running)
-            return new(SubmissionAcceptanceState.SnapshotChanged);
 
         var current = await LoadAdmissionAsync(
             received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
@@ -138,16 +138,16 @@ public sealed class EfSubmissionIntakeStore(
         if (admission is null)
             return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
 
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, received.CompetitionId, ct);
+        if (status != CompetitionStatus.Running)
+            return new(SubmissionAcceptanceState.SnapshotChanged);
+
         var existing = await FindAcceptedAsync(
             received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
             received.UserId, DomainSubmissionKind.Fix, ct);
         if (existing is not null)
             return existing;
-
-        var status = await CompetitionWriteLock.AcquireAsync(db, received.CompetitionId, ct);
-        if (status != CompetitionStatus.Running)
-            return new(SubmissionAcceptanceState.SnapshotChanged);
 
         var current = await LoadAdmissionAsync(
             received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);

@@ -204,7 +204,7 @@
 - [x] Flag/Fix attempt 是否消耗由 GameMode policy 决定。
 - [x] 正确结果普通 retry 拒绝。
 - [x] `AttemptsExhausted` 生成 score-free ScoringEvent。
-- [ ] 并发提交测试保证不超过 MaxAttempt。
+- [x] 并发提交测试保证不超过 MaxAttempt。
 
 ## 6. Fix submission 完整状态机
 
