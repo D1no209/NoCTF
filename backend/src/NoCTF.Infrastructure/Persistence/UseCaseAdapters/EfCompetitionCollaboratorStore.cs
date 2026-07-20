@@ -19,31 +19,36 @@ public sealed class EfCompetitionCollaboratorStore(NoCtfDbContext db) : ICompeti
         db.Competitions.AsNoTracking().Where(x => x.Id == competitionId && !x.Deletion.IsDeleted)
             .Select(x => (CompetitionStatus?)x.Status).SingleOrDefaultAsync(ct);
 
-    public async Task<string?> AddOrUpdateAsync(AddCompetitionCollaboratorCommand command, CancellationToken ct)
+    public async Task<CompetitionCollaboratorFailure?> AddOrUpdateAsync(AddCompetitionCollaboratorCommand command, CancellationToken ct)
     {
-        var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.CompetitionId && !x.Deletion.IsDeleted, ct);
-        if (competition is null) return "competition_not_found";
-        if (competition.Status == CompetitionStatus.Finished) return "competition_finished";
-        if (competition.OwnerId == command.UserId) return "owner_is_not_collaborator";
-        if (!await db.Users.AsNoTracking().AnyAsync(x => x.Id == command.UserId, ct)) return "user_not_found";
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        if (status is null) return CompetitionCollaboratorFailure.CompetitionNotFound;
+        if (status == CompetitionStatus.Finished) return CompetitionCollaboratorFailure.CompetitionFinished;
+        var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == command.CompetitionId, ct);
+        if (competition.OwnerId == command.UserId) return CompetitionCollaboratorFailure.OwnerIsNotCollaborator;
+        if (!await db.Users.AsNoTracking().AnyAsync(x => x.Id == command.UserId, ct)) return CompetitionCollaboratorFailure.UserNotFound;
         var existing = await db.CompetitionCollaborators.SingleOrDefaultAsync(x => x.CompetitionId == command.CompetitionId && x.UserId == command.UserId, ct);
         if (existing is null)
             db.CompetitionCollaborators.Add(new CompetitionCollaborator { Id = Guid.CreateVersion7(command.AddedAt), CompetitionId = command.CompetitionId, UserId = command.UserId, Role = command.Role, AddedAt = command.AddedAt });
         else
             existing.Role = command.Role;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return null;
     }
 
-    public async Task<string?> RemoveAsync(Guid competitionId, Guid userId, CancellationToken ct)
+    public async Task<CompetitionCollaboratorFailure?> RemoveAsync(Guid competitionId, Guid userId, CancellationToken ct)
     {
-        var status = await GetCompetitionStatusAsync(competitionId, ct);
-        if (status is null) return "competition_not_found";
-        if (status == CompetitionStatus.Finished) return "competition_finished";
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        if (status is null) return CompetitionCollaboratorFailure.CompetitionNotFound;
+        if (status == CompetitionStatus.Finished) return CompetitionCollaboratorFailure.CompetitionFinished;
         var entity = await db.CompetitionCollaborators.SingleOrDefaultAsync(x => x.CompetitionId == competitionId && x.UserId == userId, ct);
-        if (entity is null) return "collaborator_not_found";
+        if (entity is null) return CompetitionCollaboratorFailure.CollaboratorNotFound;
         db.CompetitionCollaborators.Remove(entity);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return null;
     }
 }

@@ -16,8 +16,12 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        if (competitionStatus is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
+        if (competitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+            return new(null, TeamRegistrationFailure.RegistrationClosed);
         if (await db.TeamMembers.AnyAsync(x => x.CompetitionId == command.CompetitionId && x.UserId == command.UserId, ct))
-            return new(null, "user_already_registered");
+            return new(null, TeamRegistrationFailure.UserAlreadyRegistered);
         var id = Guid.CreateVersion7(command.RegisteredAt);
         var team = new Team
         {
@@ -39,7 +43,7 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
         catch (DbUpdateException)
         {
             await transaction.RollbackAsync(ct);
-            return new(null, "team_name_or_membership_conflict");
+            return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
         }
     }
 
@@ -51,16 +55,19 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
             .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId,
                 x.RegistrationStatus, x.IsLocked, x.RegisteredAt)).ToListAsync(ct);
 
-    public async Task<bool?> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
+    public async Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        if (competitionStatus is null) return new(false, TeamRegistrationFailure.CompetitionNotFound);
+        if (competitionStatus == CompetitionStatus.Finished) return new(false, TeamRegistrationFailure.CompetitionFinished);
         var exists = await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId && x.CompetitionId == competitionId && !x.Deletion.IsDeleted, ct);
-        if (!exists) return null;
+        if (!exists) return new(false, TeamRegistrationFailure.TeamNotFound);
         var changed = await db.Teams.Where(x => x.Id == teamId && x.CompetitionId == competitionId
-                && x.RegistrationStatus == TeamRegistrationStatus.Pending
-                && db.Competitions.Any(competition => competition.Id == competitionId
-                    && competition.Status != CompetitionStatus.Finished))
+                && x.RegistrationStatus == TeamRegistrationStatus.Pending)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
-        return changed == 1;
+        await transaction.CommitAsync(ct);
+        return changed == 1 ? new(true) : new(false, TeamRegistrationFailure.TeamReviewConflict);
     }
 
     public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken ct) =>
@@ -86,30 +93,36 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
         || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId
             && x.UserId == actorId && x.Role == CompetitionCollaboratorRole.Manager, ct);
 
-    public async Task<TeamView?> UpdateAsync(UpdateTeamCommand command, CancellationToken ct)
+    public async Task<TeamUpdateStoreResult> UpdateAsync(UpdateTeamCommand command, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        if (status is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
+        if (status == CompetitionStatus.Finished) return new(null, TeamRegistrationFailure.CompetitionFinished);
         var entity = await db.Teams.SingleOrDefaultAsync(x => x.Id == command.TeamId && x.CompetitionId == command.CompetitionId && !x.Deletion.IsDeleted, ct);
-        if (entity is null || entity.IsLocked) return null;
-        var finished = await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == command.CompetitionId && x.Status == CompetitionStatus.Finished, ct);
-        if (finished) return null;
+        if (entity is null) return new(null, TeamRegistrationFailure.TeamNotFound);
+        if (entity.IsLocked) return new(null, TeamRegistrationFailure.TeamLocked);
         entity.Name = command.Name;
         entity.AvatarUrl = command.AvatarUrl;
-        try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { return null; }
-        return Map(entity);
+        try { await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); }
+        catch (DbUpdateException) { return new(null, TeamRegistrationFailure.TeamConflict); }
+        return new(Map(entity));
     }
 
-    public async Task<string?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken ct)
+    public async Task<TeamRegistrationFailure?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        if (status is null) return TeamRegistrationFailure.CompetitionNotFound;
+        if (status is CompetitionStatus.Running or CompetitionStatus.Paused) return TeamRegistrationFailure.CompetitionActive;
+        if (status == CompetitionStatus.Finished) return TeamRegistrationFailure.CompetitionFinished;
         var entity = await db.Teams.SingleOrDefaultAsync(x => x.Id == teamId && x.CompetitionId == competitionId && !x.Deletion.IsDeleted, ct);
-        if (entity is null) return "team_not_found";
-        var status = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId).Select(x => (CompetitionStatus?)x.Status).SingleOrDefaultAsync(ct);
-        if (status is CompetitionStatus.Running or CompetitionStatus.Paused) return "competition_active";
-        if (status == CompetitionStatus.Finished) return "competition_finished";
+        if (entity is null) return TeamRegistrationFailure.TeamNotFound;
         entity.Deletion.IsDeleted = true;
         entity.Deletion.DeletedAt = deletedAt;
         entity.Deletion.DeletedById = actorId;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return null;
     }
 

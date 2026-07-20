@@ -7,20 +7,22 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 public sealed class EfTeamMembershipStore(NoCtfDbContext db) : ITeamMembershipStore
 {
-    public async Task<(TeamInvitationView? Invitation, string? Error)> InviteAsync(InviteTeamMemberCommand command, CancellationToken ct)
+    public async Task<InviteTeamMemberStoreResult> InviteAsync(InviteTeamMemberCommand command, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        if (competitionStatus is null) return new(null, TeamMembershipFailure.CompetitionNotFound);
+        if (TeamMembershipPolicy.IsMembershipChangeLocked(competitionStatus.Value)) return new(null, TeamMembershipFailure.MembershipLocked);
         var team = await db.Teams.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.TeamId && x.CompetitionId == command.CompetitionId && !x.Deletion.IsDeleted, ct);
-        if (team is null) return (null, "team_not_found");
+        if (team is null) return new(null, TeamMembershipFailure.TeamNotFound);
         var canInvite = team.CaptainId == command.ActorId || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(x =>
             x.CompetitionId == command.CompetitionId && x.UserId == command.ActorId && x.Role == CompetitionCollaboratorRole.Manager, ct)
             || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == command.CompetitionId && x.OwnerId == command.ActorId, ct);
-        if (!canInvite) return (null, "team_forbidden");
+        if (!canInvite) return new(null, TeamMembershipFailure.TeamForbidden);
         var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == command.CompetitionId, ct);
-        if (competition.Status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished) return (null, "membership_locked");
-        if (!await db.Users.AsNoTracking().AnyAsync(x => x.Id == command.InvitedUserId, ct)) return (null, "user_not_found");
-        if (await db.TeamMembers.AsNoTracking().AnyAsync(x => x.CompetitionId == command.CompetitionId && x.UserId == command.InvitedUserId, ct)) return (null, "user_already_registered");
-        if (await db.TeamMembers.AsNoTracking().CountAsync(x => x.TeamId == command.TeamId, ct) >= competition.MaxTeamMembers) return (null, "team_full");
+        if (!await db.Users.AsNoTracking().AnyAsync(x => x.Id == command.InvitedUserId, ct)) return new(null, TeamMembershipFailure.UserNotFound);
+        if (await db.TeamMembers.AsNoTracking().AnyAsync(x => x.CompetitionId == command.CompetitionId && x.UserId == command.InvitedUserId, ct)) return new(null, TeamMembershipFailure.UserAlreadyRegistered);
+        if (await db.TeamMembers.AsNoTracking().CountAsync(x => x.TeamId == command.TeamId, ct) >= competition.MaxTeamMembers) return new(null, TeamMembershipFailure.TeamFull);
         var invitation = new TeamInvitation
         {
             Id = Guid.CreateVersion7(command.Now), CompetitionId = command.CompetitionId, TeamId = command.TeamId,
@@ -29,73 +31,83 @@ public sealed class EfTeamMembershipStore(NoCtfDbContext db) : ITeamMembershipSt
         };
         db.TeamInvitations.Add(invitation);
         try { await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); }
-        catch (DbUpdateException) { await transaction.RollbackAsync(ct); return (null, "invitation_conflict"); }
-        return (new(invitation.Id, invitation.CompetitionId, invitation.TeamId, invitation.InvitedUserId, invitation.ExpiresAt, invitation.CreatedAt), null);
+        catch (DbUpdateException) { await transaction.RollbackAsync(ct); return new(null, TeamMembershipFailure.InvitationConflict); }
+        return new(new(invitation.Id, invitation.CompetitionId, invitation.TeamId, invitation.InvitedUserId, invitation.ExpiresAt, invitation.CreatedAt));
     }
 
-    public async Task<string?> RespondAsync(Guid invitationId, Guid userId, bool accept, DateTimeOffset now, CancellationToken ct)
+    public async Task<TeamMembershipFailure?> RespondAsync(Guid invitationId, Guid userId, bool accept, DateTimeOffset now, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        var competitionId = await db.TeamInvitations.AsNoTracking().Where(x => x.Id == invitationId && x.InvitedUserId == userId)
+            .Select(x => (Guid?)x.CompetitionId).SingleOrDefaultAsync(ct);
+        if (competitionId is null) return TeamMembershipFailure.InvitationNotFound;
+        var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, competitionId.Value, ct);
+        if (competitionStatus is null) return TeamMembershipFailure.CompetitionNotFound;
+        if (TeamMembershipPolicy.IsInvitationResponseLocked(competitionStatus.Value, accept))
+            return TeamMembershipFailure.MembershipLocked;
         var invitation = await db.TeamInvitations.SingleOrDefaultAsync(x => x.Id == invitationId && x.InvitedUserId == userId, ct);
-        if (invitation is null) return "invitation_not_found";
-        if (invitation.Status != TeamInvitationStatus.Pending) return "invitation_already_answered";
-        if (invitation.ExpiresAt <= now) return "invitation_expired";
+        if (invitation is null) return TeamMembershipFailure.InvitationNotFound;
+        if (invitation.Status != TeamInvitationStatus.Pending) return TeamMembershipFailure.InvitationAlreadyAnswered;
+        if (invitation.ExpiresAt <= now) return TeamMembershipFailure.InvitationExpired;
         if (!accept)
         {
             invitation.Status = TeamInvitationStatus.Rejected; invitation.RespondedAt = now;
             await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); return null;
         }
         var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == invitation.CompetitionId, ct);
-        if (competition.Status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished) return "membership_locked";
-        if (await db.TeamMembers.AnyAsync(x => x.CompetitionId == invitation.CompetitionId && x.UserId == userId, ct)) return "user_already_registered";
-        if (await db.TeamMembers.CountAsync(x => x.TeamId == invitation.TeamId, ct) >= competition.MaxTeamMembers) return "team_full";
+        if (await db.TeamMembers.AnyAsync(x => x.CompetitionId == invitation.CompetitionId && x.UserId == userId, ct)) return TeamMembershipFailure.UserAlreadyRegistered;
+        if (await db.TeamMembers.CountAsync(x => x.TeamId == invitation.TeamId, ct) >= competition.MaxTeamMembers) return TeamMembershipFailure.TeamFull;
         db.TeamMembers.Add(new TeamMember { Id = Guid.CreateVersion7(now), CompetitionId = invitation.CompetitionId,
             TeamId = invitation.TeamId, UserId = userId, Role = TeamMemberRole.Member, JoinedAt = now });
         invitation.Status = TeamInvitationStatus.Accepted; invitation.RespondedAt = now;
         try { await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); }
-        catch (DbUpdateException) { await transaction.RollbackAsync(ct); return "membership_conflict"; }
+        catch (DbUpdateException) { await transaction.RollbackAsync(ct); return TeamMembershipFailure.MembershipConflict; }
         return null;
     }
 
-    public async Task<string?> RemoveMemberAsync(Guid competitionId, Guid teamId, Guid targetUserId, Guid actorId, CancellationToken ct)
+    public async Task<TeamMembershipFailure?> RemoveMemberAsync(Guid competitionId, Guid teamId, Guid targetUserId, Guid actorId, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        if (status is null) return TeamMembershipFailure.CompetitionNotFound;
+        if (TeamMembershipPolicy.IsMembershipChangeLocked(status.Value)) return TeamMembershipFailure.MembershipLocked;
         var team = await db.Teams.AsNoTracking().SingleOrDefaultAsync(x => x.Id == teamId && x.CompetitionId == competitionId && !x.Deletion.IsDeleted, ct);
-        if (team is null) return "team_not_found";
-        if (team.CaptainId == targetUserId) return "captain_cannot_be_removed";
+        if (team is null) return TeamMembershipFailure.TeamNotFound;
+        if (team.CaptainId == targetUserId) return TeamMembershipFailure.CaptainCannotBeRemoved;
         var canManage = team.CaptainId == actorId || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId && x.OwnerId == actorId, ct)
             || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId && x.UserId == actorId && x.Role == CompetitionCollaboratorRole.Manager, ct);
-        if (!canManage) return "team_forbidden";
-        if (await IsMembershipLocked(competitionId, ct)) return "membership_locked";
+        if (!canManage) return TeamMembershipFailure.TeamForbidden;
         var member = await db.TeamMembers.SingleOrDefaultAsync(x => x.TeamId == teamId && x.UserId == targetUserId, ct);
-        if (member is null) return "member_not_found";
-        db.TeamMembers.Remove(member); await db.SaveChangesAsync(ct); return null;
+        if (member is null) return TeamMembershipFailure.MemberNotFound;
+        db.TeamMembers.Remove(member); await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); return null;
     }
 
-    public async Task<string?> LeaveAsync(Guid competitionId, Guid userId, CancellationToken ct)
+    public async Task<TeamMembershipFailure?> LeaveAsync(Guid competitionId, Guid userId, CancellationToken ct)
     {
-        if (await IsMembershipLocked(competitionId, ct)) return "membership_locked";
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        if (status is null) return TeamMembershipFailure.CompetitionNotFound;
+        if (TeamMembershipPolicy.IsMembershipChangeLocked(status.Value)) return TeamMembershipFailure.MembershipLocked;
         var member = await db.TeamMembers.SingleOrDefaultAsync(x => x.CompetitionId == competitionId && x.UserId == userId, ct);
-        if (member is null) return "membership_not_found";
-        if (member.Role == TeamMemberRole.Captain) return "captain_must_transfer";
-        db.TeamMembers.Remove(member); await db.SaveChangesAsync(ct); return null;
+        if (member is null) return TeamMembershipFailure.MembershipNotFound;
+        if (member.Role == TeamMemberRole.Captain) return TeamMembershipFailure.CaptainMustTransfer;
+        db.TeamMembers.Remove(member); await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); return null;
     }
 
-    public async Task<string?> TransferCaptainAsync(Guid competitionId, Guid teamId, Guid actorId, Guid newCaptainId, CancellationToken ct)
+    public async Task<TeamMembershipFailure?> TransferCaptainAsync(Guid competitionId, Guid teamId, Guid actorId, Guid newCaptainId, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        if (status is null) return TeamMembershipFailure.CompetitionNotFound;
+        if (TeamMembershipPolicy.IsMembershipChangeLocked(status.Value)) return TeamMembershipFailure.MembershipLocked;
         var team = await db.Teams.SingleOrDefaultAsync(x => x.Id == teamId && x.CompetitionId == competitionId && !x.Deletion.IsDeleted, ct);
-        if (team is null) return "team_not_found";
-        if (team.CaptainId != actorId) return "captain_only";
-        if (await IsMembershipLocked(competitionId, ct)) return "membership_locked";
+        if (team is null) return TeamMembershipFailure.TeamNotFound;
+        if (team.CaptainId != actorId) return TeamMembershipFailure.CaptainOnly;
         var oldCaptain = await db.TeamMembers.SingleAsync(x => x.TeamId == teamId && x.UserId == actorId, ct);
         var newCaptain = await db.TeamMembers.SingleOrDefaultAsync(x => x.TeamId == teamId && x.UserId == newCaptainId, ct);
-        if (newCaptain is null) return "member_not_found";
+        if (newCaptain is null) return TeamMembershipFailure.MemberNotFound;
         oldCaptain.Role = TeamMemberRole.Member; newCaptain.Role = TeamMemberRole.Captain; team.CaptainId = newCaptainId;
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); return null;
     }
 
-    private Task<bool> IsMembershipLocked(Guid competitionId, CancellationToken ct) =>
-        db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId
-            && (x.Status == CompetitionStatus.Running || x.Status == CompetitionStatus.Paused
-                || x.Status == CompetitionStatus.Finished), ct);
 }
