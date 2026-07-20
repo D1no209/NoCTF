@@ -1,4 +1,3 @@
-using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 
 namespace NoCTF.Application.Submissions.Ports;

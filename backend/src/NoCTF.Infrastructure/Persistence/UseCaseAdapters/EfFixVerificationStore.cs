@@ -1,7 +1,7 @@
 using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Application.Submissions.Events;
+using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
 using ApplicationFixVerificationStatus = NoCTF.Application.Submissions.Processing.FixVerificationDecision;

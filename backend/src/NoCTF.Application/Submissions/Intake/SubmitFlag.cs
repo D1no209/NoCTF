@@ -1,10 +1,9 @@
 using NoCTF.Application.Common;
-using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Ports;
 
 namespace NoCTF.Application.Submissions.Intake;
 
-/// <summary>Accepts a Flag into the permanent stream and schedules asynchronous processing.</summary>
+/// <summary>Accepts a Flag input fact and schedules asynchronous processing.</summary>
 public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissionModePolicy modePolicy)
 {
     private const int MaxConcurrencyRetries = 3;

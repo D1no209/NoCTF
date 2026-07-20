@@ -1,5 +1,4 @@
 using NoCTF.Application.Storage;
-using NoCTF.Application.Submissions.Events;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Domain.Competitions;
