@@ -1,3 +1,5 @@
+using NoCTF.Application.Runtime.Ports;
+
 namespace NoCTF.GameModes.Awdp.Configuration;
 
 public enum AchievementSettlement
@@ -23,7 +25,8 @@ public sealed record AwdpChallengeConfiguration(
     AwdpAchievementConfiguration? Fix,
     bool RequireBreakBeforeFix,
     int MaxBreakAttempts,
-    int MaxFixAttempts)
+    int MaxFixAttempts,
+    ChallengeRuntimeTemplate? Runtime = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

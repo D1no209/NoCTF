@@ -8,6 +8,7 @@ public interface IBackgroundWorkScheduler
     ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken);
     ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken);
     ValueTask EnqueueRuntimeCleanupAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    ValueTask EnqueueRuntimeProvisionAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 /// <summary>Guards the transaction-to-enqueue boundary while the host enters graceful shutdown.</summary>

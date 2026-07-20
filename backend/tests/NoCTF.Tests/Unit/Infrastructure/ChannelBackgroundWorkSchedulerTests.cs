@@ -149,4 +149,19 @@ public class ChannelBackgroundWorkSchedulerTests
         await Assert.That(new[] { first.GetType(), second.GetType() })
             .IsEquivalentTo(new[] { typeof(ProcessSubmissionWorkItem), typeof(ProcessSystemEventWorkItem) });
     }
+
+    [Test]
+    public async Task EnqueueRuntimeProvisionAsync_CoalescesCompetitionWork()
+    {
+        var scheduler = new ChannelBackgroundWorkScheduler(new BackgroundQueueOptions { MaintenanceCapacity = 2 });
+        var competitionId = Guid.NewGuid();
+
+        await scheduler.EnqueueRuntimeProvisionAsync(competitionId, CancellationToken.None);
+        await scheduler.EnqueueRuntimeProvisionAsync(competitionId, CancellationToken.None);
+
+        var item = await scheduler.MaintenanceReader.ReadAsync();
+        await Assert.That(item).IsTypeOf<ProvisionCompetitionRuntimeWorkItem>();
+        await Assert.That(item.CompetitionId).IsEqualTo(competitionId);
+        await Assert.That(scheduler.MaintenanceReader.TryRead(out _)).IsFalse();
+    }
 }

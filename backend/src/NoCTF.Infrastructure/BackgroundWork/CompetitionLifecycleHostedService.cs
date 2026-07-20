@@ -40,6 +40,8 @@ public sealed class CompetitionLifecycleHostedService(
                 {
                     await cache.InvalidateAsync(transition.CompetitionId, ct);
                     await scheduler.EnqueueLeaderboardRefreshAsync(transition.CompetitionId, ct);
+                    if (transition.To == CompetitionStatus.Running)
+                        await scheduler.EnqueueRuntimeProvisionAsync(transition.CompetitionId, ct);
                     if (transition.To == CompetitionStatus.Finished)
                         await scheduler.EnqueueRuntimeCleanupAsync(transition.CompetitionId, ct);
                     if (notifications is not null)

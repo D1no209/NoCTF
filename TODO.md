@@ -299,7 +299,7 @@
 
 ## 9. Runner 和 runtime lifecycle
 
-- [ ] `CompetitionRuntimeProvisioner`。
+- [x] `CompetitionRuntimeProvisioner`。
 - [x] `ChallengeRuntimeProvisioner`。
 - [x] `CompetitionRuntimeCleaner`。
 - [x] `ChallengeRuntimeHealthChecker`。
@@ -325,7 +325,7 @@
 - [x] replacement event rebind。
 - [x] rebuild success/failure/cancel 释放去重标记。
 - [x] rebuild 最后只触发一次 leaderboard refresh。
-- [ ] lifecycle work item 接入 Maintenance/专用 channel。
+- [x] lifecycle work item 接入 Maintenance/专用 channel。
 - [x] runtime cleanup work item 接入 Maintenance channel。
 - [x] Processing/Projection/Maintenance 统一 1/5/15 秒 retry。
 - [x] consumer scope、耗时和结果 structured logging。

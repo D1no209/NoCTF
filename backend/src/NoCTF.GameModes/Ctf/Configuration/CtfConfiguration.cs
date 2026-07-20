@@ -1,3 +1,5 @@
+using NoCTF.Application.Runtime.Ports;
+
 namespace NoCTF.GameModes.Ctf.Configuration;
 
 public enum BloodRewardPolicy
@@ -22,7 +24,8 @@ public sealed record CtfChallengeConfiguration(
     int SchemaVersion,
     CtfPointConfiguration? Points,
     IReadOnlyList<BloodReward>? BloodRewards,
-    int? MaxFlagAttempts = null)
+    int? MaxFlagAttempts = null,
+    ChallengeRuntimeTemplate? Runtime = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

@@ -1,3 +1,5 @@
+using NoCTF.Application.Runtime.Ports;
+
 namespace NoCTF.GameModes.Koh.Configuration;
 
 public sealed record KohConfiguration(int SchemaVersion, int PollIntervalSeconds, long ControlPointsPerInterval)
@@ -5,7 +7,10 @@ public sealed record KohConfiguration(int SchemaVersion, int PollIntervalSeconds
     public const int CurrentSchemaVersion = 1;
 }
 
-public sealed record KohChallengeConfiguration(int SchemaVersion, string AgentUrl)
+public sealed record KohChallengeConfiguration(
+    int SchemaVersion,
+    string AgentUrl,
+    ChallengeRuntimeTemplate? Runtime = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

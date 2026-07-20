@@ -25,6 +25,7 @@ public static class CtfConfigurationValidator
         if (configuration.BloodRewards is null)
         {
             ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
+            errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
             return errors;
         }
         if (configuration.BloodRewards.Count > 3)
@@ -37,6 +38,7 @@ public static class CtfConfigurationValidator
                 errors.Add("Blood reward percentages cannot exceed 100.");
         }
         ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
+        errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         return errors;
     }
 

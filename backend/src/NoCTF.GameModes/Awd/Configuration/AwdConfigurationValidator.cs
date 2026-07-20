@@ -16,12 +16,11 @@ public static class AwdConfigurationValidator
 
     public static IReadOnlyList<string> Validate(AwdChallengeConfiguration configuration)
     {
-        if (string.IsNullOrWhiteSpace(configuration.FlagFormat))
-            return ["FlagFormat is required."];
-        if (configuration.FlagFormat.Length > 256)
-            return ["FlagFormat cannot exceed 256 characters."];
-        if (configuration.MaxFlagAttempts is <= 0)
-            return ["MaxFlagAttempts must be positive when configured."];
-        return [];
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(configuration.FlagFormat)) errors.Add("FlagFormat is required.");
+        else if (configuration.FlagFormat.Length > 256) errors.Add("FlagFormat cannot exceed 256 characters.");
+        if (configuration.MaxFlagAttempts is <= 0) errors.Add("MaxFlagAttempts must be positive when configured.");
+        errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
+        return errors;
     }
 }
