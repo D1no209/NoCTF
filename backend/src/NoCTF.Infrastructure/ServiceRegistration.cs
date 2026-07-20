@@ -97,6 +97,7 @@ public static class ServiceRegistration
         services.AddScoped<CleanupFixArchives>();
         services.AddSingleton<ISubmissionEvaluatorCatalog, GameModeSubmissionEvaluatorCatalog>();
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
+        services.AddSingleton<IChallengeRuntimeTemplateCatalog, ChallengeRuntimeTemplateCatalog>();
         services.AddSingleton<ISubmissionAdmissionModePolicy, GameModeSubmissionAdmissionPolicy>();
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
@@ -140,6 +141,8 @@ public static class ServiceRegistration
         services.AddScoped<IRuntimeOperationStore, EfRuntimeOperationStore>();
         services.AddScoped<IRuntimeCleanupStore, EfRuntimeCleanupStore>();
         services.AddScoped<ChallengeRuntimeProvisioner>();
+        services.AddScoped<ICompetitionRuntimeProvisioningStore, EfCompetitionRuntimeProvisioningStore>();
+        services.AddScoped<CompetitionRuntimeProvisioner>();
         services.AddScoped<CompetitionRuntimeCleaner>();
         services.AddScoped<IRuntimeHealthStore, EfRuntimeHealthStore>();
         services.AddScoped<ChallengeRuntimeHealthChecker>();

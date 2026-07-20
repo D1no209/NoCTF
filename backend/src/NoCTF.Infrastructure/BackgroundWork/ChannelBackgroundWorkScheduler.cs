@@ -11,6 +11,7 @@ public sealed record RefreshLeaderboardWorkItem(Guid CompetitionId);
 public abstract record MaintenanceWorkItem(Guid CompetitionId);
 public sealed record RebuildCompetitionWorkItem(Guid CompetitionId) : MaintenanceWorkItem(CompetitionId);
 public sealed record CleanupCompetitionRuntimeWorkItem(Guid CompetitionId) : MaintenanceWorkItem(CompetitionId);
+public sealed record ProvisionCompetitionRuntimeWorkItem(Guid CompetitionId) : MaintenanceWorkItem(CompetitionId);
 
 /// <summary>Bounded, single-host Channels used by the API background services.</summary>
 public sealed class ChannelBackgroundWorkScheduler : IBackgroundWorkScheduler, IBackgroundWorkAdmissionGate, IDisposable
@@ -21,6 +22,7 @@ public sealed class ChannelBackgroundWorkScheduler : IBackgroundWorkScheduler, I
     private readonly ConcurrentDictionary<Guid, byte> pendingRefreshes = new();
     private readonly ConcurrentDictionary<Guid, byte> pendingRebuilds = new();
     private readonly ConcurrentDictionary<Guid, byte> pendingRuntimeCleanups = new();
+    private readonly ConcurrentDictionary<Guid, byte> pendingRuntimeProvisions = new();
     private readonly CancellationTokenSource drainCancellation = new();
     private readonly TaskCompletionSource admissionDrained = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int activeAdmissions;
@@ -66,9 +68,17 @@ public sealed class ChannelBackgroundWorkScheduler : IBackgroundWorkScheduler, I
         catch { pendingRuntimeCleanups.TryRemove(competitionId, out _); throw; }
     }
 
+    public async ValueTask EnqueueRuntimeProvisionAsync(Guid competitionId, CancellationToken cancellationToken)
+    {
+        if (!pendingRuntimeProvisions.TryAdd(competitionId, 0)) return;
+        try { await WriteAsync(maintenance.Writer, new ProvisionCompetitionRuntimeWorkItem(competitionId), cancellationToken); }
+        catch { pendingRuntimeProvisions.TryRemove(competitionId, out _); throw; }
+    }
+
     public void CompleteRefresh(Guid competitionId) => pendingRefreshes.TryRemove(competitionId, out _);
     public void CompleteRebuild(Guid competitionId) => pendingRebuilds.TryRemove(competitionId, out _);
     public void CompleteRuntimeCleanup(Guid competitionId) => pendingRuntimeCleanups.TryRemove(competitionId, out _);
+    public void CompleteRuntimeProvision(Guid competitionId) => pendingRuntimeProvisions.TryRemove(competitionId, out _);
 
     public IBackgroundWorkAdmissionLease? TryEnter()
     {

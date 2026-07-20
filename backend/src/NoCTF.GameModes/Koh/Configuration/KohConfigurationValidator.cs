@@ -12,9 +12,11 @@ public static class KohConfigurationValidator
 
     public static IReadOnlyList<string> Validate(KohChallengeConfiguration configuration)
     {
+        var errors = new List<string>();
         if (!Uri.TryCreate(configuration.AgentUrl, UriKind.Absolute, out var uri)
             || uri.Scheme is not ("http" or "https"))
-            return ["AgentUrl must be an absolute HTTP or HTTPS URL."];
-        return [];
+            errors.Add("AgentUrl must be an absolute HTTP or HTTPS URL.");
+        errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
+        return errors;
     }
 }

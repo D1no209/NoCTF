@@ -1,5 +1,8 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Tests.Unit.GameModes;
@@ -52,5 +55,63 @@ public class ChallengeConfigurationCatalogTests
             """{"schemaVersion":99,"points":null,"bloodRewards":null}""");
 
         await Assert.That(errors).IsNotEmpty();
+    }
+
+    [Test]
+    public async Task RuntimeTemplate_ParsesForEveryGameMode()
+    {
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        var runtimes = new ChallengeRuntimeTemplateCatalog();
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Kubernetes,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            ["/app/challenge"],
+            new Dictionary<string, string> { ["MODE"] = "competition" },
+            new Dictionary<string, string> { ["purpose"] = "challenge" },
+            new Dictionary<int, int> { [8080] = 0 },
+            new(268_435_456, 500_000_000, 128),
+            new(true, true, true, ["ALL"], []),
+            3600);
+
+        foreach (var mode in Enum.GetValues<GameMode>())
+        {
+            var json = WithRuntime(configurations.GetDefaultJson(mode), template);
+            var parsed = runtimes.Get(mode, json);
+
+            await Assert.That(parsed).IsNotNull();
+            await Assert.That(parsed!.Provider).IsEqualTo(RuntimeProvider.Kubernetes);
+            await Assert.That(parsed.Allocation).IsEqualTo(RuntimeAllocation.PerTeam);
+            await Assert.That(parsed.Image).IsEqualTo(template.Image);
+            await Assert.That(configurations.Validate(mode, json)).IsEmpty();
+        }
+    }
+
+    [Test]
+    public async Task RuntimeTemplate_InvalidSecurityAndLimits_FailsEveryModeValidator()
+    {
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        var invalid = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.Shared,
+            string.Empty,
+            Limits: new(0, 0, 0),
+            Security: new(false, false, false, [], []),
+            TtlSeconds: -1);
+
+        foreach (var mode in Enum.GetValues<GameMode>())
+        {
+            var errors = configurations.Validate(mode, WithRuntime(configurations.GetDefaultJson(mode), invalid));
+
+            await Assert.That(errors).IsNotEmpty();
+            await Assert.That(errors).Contains("Runtime image is required.");
+        }
+    }
+
+    private static string WithRuntime(string json, ChallengeRuntimeTemplate runtime)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        root["runtime"] = JsonSerializer.SerializeToNode(runtime, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return root.ToJsonString();
     }
 }

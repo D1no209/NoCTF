@@ -37,10 +37,9 @@ public sealed class CompetitionRebuildHostedService(
             }
             finally
             {
-                if (item is RebuildCompetitionWorkItem)
-                    scheduler.CompleteRebuild(item.CompetitionId);
-                else
-                    scheduler.CompleteRuntimeCleanup(item.CompetitionId);
+                if (item is RebuildCompetitionWorkItem) scheduler.CompleteRebuild(item.CompetitionId);
+                else if (item is CleanupCompetitionRuntimeWorkItem) scheduler.CompleteRuntimeCleanup(item.CompetitionId);
+                else scheduler.CompleteRuntimeProvision(item.CompetitionId);
             }
         }
     }
@@ -63,11 +62,19 @@ public sealed class CompetitionRebuildHostedService(
                         .GetRequiredService<IBackgroundWorkScheduler>()
                         .EnqueueLeaderboardRefreshAsync(item.CompetitionId, ct);
                 }
-                else
+                else if (item is CleanupCompetitionRuntimeWorkItem)
                 {
                     await scope.ServiceProvider
                         .GetRequiredService<CompetitionRuntimeCleaner>()
                         .ExecuteAsync(item.CompetitionId, ct);
+                }
+                else
+                {
+                    var result = await scope.ServiceProvider
+                        .GetRequiredService<CompetitionRuntimeProvisioner>()
+                        .ExecuteAsync(item.CompetitionId, ct);
+                    if (result.FailedCount > 0)
+                        throw new InvalidOperationException($"{result.FailedCount} competition runtimes failed to provision.");
                 }
                 logger.LogInformation("Maintenance item {WorkItemType} completed for {CompetitionId}", item.GetType().Name, item.CompetitionId);
                 return;

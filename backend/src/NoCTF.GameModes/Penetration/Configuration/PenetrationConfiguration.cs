@@ -1,4 +1,5 @@
 using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.Application.Runtime.Ports;
 
 namespace NoCTF.GameModes.Penetration.Configuration;
 
@@ -20,7 +21,8 @@ public sealed record PenetrationStage(
 public sealed record PenetrationChallengeConfiguration(
     int SchemaVersion,
     IReadOnlyList<PenetrationStage> Stages,
-    int? MaxFlagAttempts = null)
+    int? MaxFlagAttempts = null,
+    ChallengeRuntimeTemplate? Runtime = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

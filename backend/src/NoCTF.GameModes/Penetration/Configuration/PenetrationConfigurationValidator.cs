@@ -31,6 +31,7 @@ public static class PenetrationConfigurationValidator
 
         if (HasCycle(configuration.Stages))
             errors.Add("Stage prerequisites contain a cycle.");
+        errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         return errors;
     }
 

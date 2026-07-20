@@ -20,6 +20,7 @@ public static class AwdpConfigurationValidator
             errors.Add("Achievement points cannot be negative.");
         if (configuration.MaxBreakAttempts < 1) errors.Add("MaxBreakAttempts must be at least one.");
         if (configuration.MaxFixAttempts < 1) errors.Add("MaxFixAttempts must be at least one.");
+        errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         return errors;
     }
 }

@@ -76,6 +76,10 @@ public sealed class TransitionCompetitionLifecycle(
             return OperationResult.Failure("lifecycle_conflict", "Competition status changed concurrently.");
         await cache.InvalidateAsync(competitionId, cancellationToken);
         await scheduler.EnqueueLeaderboardRefreshAsync(competitionId, cancellationToken);
+        if (target == CompetitionStatus.Running)
+            await scheduler.EnqueueRuntimeProvisionAsync(competitionId, cancellationToken);
+        if (target == CompetitionStatus.Finished)
+            await scheduler.EnqueueRuntimeCleanupAsync(competitionId, cancellationToken);
         if (notifications is not null)
             await notifications.PublishAsync(competitionId, current.Value, target, DateTimeOffset.UtcNow, cancellationToken);
         return OperationResult.Success();

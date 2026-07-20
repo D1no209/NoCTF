@@ -10,6 +10,30 @@ public sealed record ContainerSecurityPolicy(
     IReadOnlyList<string> CapDrop,
     IReadOnlyList<string> CapAdd);
 
+public enum RuntimeAllocation
+{
+    Shared,
+    PerTeam
+}
+
+public sealed record ChallengeRuntimeTemplate(
+    RuntimeProvider Provider,
+    RuntimeAllocation Allocation,
+    string Image,
+    IReadOnlyList<string>? Command = null,
+    IReadOnlyDictionary<string, string>? Environment = null,
+    IReadOnlyDictionary<string, string>? Labels = null,
+    IReadOnlyDictionary<int, int>? PortMappings = null,
+    ContainerResourceLimits? Limits = null,
+    ContainerSecurityPolicy? Security = null,
+    int? TtlSeconds = null,
+    int? OperationTimeoutSeconds = null);
+
+public interface IChallengeRuntimeTemplateCatalog
+{
+    ChallengeRuntimeTemplate? Get(NoCTF.Domain.Competitions.GameMode mode, string challengeConfigurationJson);
+}
+
 public sealed record ContainerRequest(
     Guid OperationId,
     RuntimeProvider Provider,
