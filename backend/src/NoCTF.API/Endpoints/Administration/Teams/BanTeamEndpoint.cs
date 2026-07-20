@@ -23,6 +23,8 @@ public sealed class BanTeamEndpoint(
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/ban");
         AuthSchemes("Bearer");
+        Description(builder => builder.ProducesProblemFE(StatusCodes.Status404NotFound)
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
     }
 
     public override async Task<Results<NoContent, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
@@ -42,7 +44,12 @@ public sealed class BanTeamEndpoint(
             DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
         {
-            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest,
+            var statusCode = result.ErrorCode == "competition_finished"
+                ? StatusCodes.Status409Conflict
+                : result.ErrorCode is "competition_not_found" or "team_not_found"
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(statusCode: statusCode,
                 title: "Team ban was rejected.", detail: result.ErrorMessage);
         }
         return TypedResults.NoContent();

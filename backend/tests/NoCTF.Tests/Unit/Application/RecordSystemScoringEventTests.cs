@@ -1,6 +1,7 @@
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -46,13 +47,29 @@ public class RecordSystemScoringEventTests
         await Assert.That(store.RecordCalls).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task ExecuteAsync_FinishedCompetition_DoesNotPersistOrEnterAdmission()
+    {
+        var store = new Store(new(Guid.NewGuid(), true)) { Status = CompetitionStatus.Finished };
+        var scheduler = new Scheduler();
+
+        var result = await new RecordSystemScoringEvent(store, scheduler, scheduler)
+            .ExecuteAsync(Command(Guid.NewGuid()));
+
+        await Assert.That(result.Failure).IsEqualTo(SystemScoringEventRecordFailure.CompetitionFinished);
+        await Assert.That(store.RecordCalls).IsEqualTo(0);
+        await Assert.That(scheduler.AdmissionCalls).IsEqualTo(0);
+    }
+
     private static RecordSystemScoringEventCommand Command(Guid competition) => new(
         competition, Guid.NewGuid(), Guid.NewGuid(), ScoringEventKind.AwdServiceCheck,
         ScoringResult.Correct, null, DateTimeOffset.UtcNow, "test-v1", "source-1");
 
     private sealed class Store(RecordSystemScoringEventResult result) : ISystemScoringEventStore
     {
+        public CompetitionStatus? Status { get; init; } = CompetitionStatus.Running;
         public int RecordCalls { get; private set; }
+        public Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult(Status);
         public Task<RecordSystemScoringEventResult> RecordAsync(RecordSystemScoringEventCommand command, CancellationToken cancellationToken)
         {
             RecordCalls++;
@@ -63,9 +80,14 @@ public class RecordSystemScoringEventTests
     private sealed class Scheduler : IBackgroundWorkScheduler, IBackgroundWorkAdmissionGate
     {
         public Guid? SystemEvent { get; private set; }
+        public int AdmissionCalls { get; private set; }
         public bool Accepting { get; init; } = true;
         public bool IsAccepting => Accepting;
-        public IBackgroundWorkAdmissionLease? TryEnter() => Accepting ? new Lease() : null;
+        public IBackgroundWorkAdmissionLease? TryEnter()
+        {
+            AdmissionCalls++;
+            return Accepting ? new Lease() : null;
+        }
         public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
         public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) { SystemEvent = scoringEventId; return ValueTask.CompletedTask; }
         public ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;

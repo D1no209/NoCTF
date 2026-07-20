@@ -66,8 +66,11 @@ internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
 
 internal sealed class SwaggerModerationStore : ITeamModerationStore
 {
-    public Task<OperationResult> ApplyAsync(TeamModerationCommand command, CancellationToken cancellationToken) =>
-        Task.FromResult(OperationResult.Success());
+    public Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken) =>
+        Task.FromResult<CompetitionStatus?>(CompetitionStatus.Draft);
+
+    public Task<TeamModerationStoreResult> ApplyAsync(TeamModerationCommand command, CancellationToken cancellationToken) =>
+        Task.FromResult(new TeamModerationStoreResult());
 }
 
 internal sealed class SwaggerModerationAuthorizer : ICompetitionModerationAuthorizer
