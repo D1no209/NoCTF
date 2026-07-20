@@ -23,6 +23,7 @@ using NoCTF.Application.Runtime.Ports;
 using NoCTF.GameModes.Submission;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Registration;
+using NoCTF.GameModes.Awdp.Scoring;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 using NoCTF.Infrastructure.Authentication;
@@ -110,6 +111,8 @@ public static class ServiceRegistration
         services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();
         services.AddScoped<ISystemScoringEventProcessor, EfSystemScoringEventProcessor>();
         services.AddScoped<RecordSystemScoringEvent>();
+        services.AddSingleton<IAwdpCheckExitCodeMapper, AwdpCheckExitCodeMapper>();
+        services.AddScoped<RecordAwdpCheckResult>();
         services.AddScoped<IKohProducerTargetStore, EfKohProducerTargetStore>();
         services.AddSingleton<IKohProducerConfigurationCatalog, KohProducerConfigurationCatalog>();
         services.AddHttpClient<IKohAgentClient, HttpKohAgentClient>();

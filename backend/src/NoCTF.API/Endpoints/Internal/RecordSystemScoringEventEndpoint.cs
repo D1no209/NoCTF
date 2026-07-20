@@ -52,6 +52,9 @@ public sealed class RecordSystemScoringEventEndpoint(RecordSystemScoringEvent re
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
+        if (request.Kind == ScoringEventKind.AwdpFixCheck)
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest,
+                title: "AWDP check facts must use the dedicated checker-result endpoint.");
         if (string.IsNullOrWhiteSpace(request.SourceKey) || request.SourceKey.Length > 256)
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid source key.");
 
@@ -62,6 +65,8 @@ public sealed class RecordSystemScoringEventEndpoint(RecordSystemScoringEvent re
                 return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "Competition was not found.");
             if (result.Failure == SystemScoringEventRecordFailure.CompetitionFinished)
                 return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Finished competitions are read-only.");
+            if (result.Failure == SystemScoringEventRecordFailure.SourceConflict)
+                return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Source key belongs to a different system fact.");
             var response = SystemScoringEventMapper.ToResponse(result);
             return result.Created
                 ? TypedResults.Created($"/internal/competitions/{request.CompetitionId}/scoring-events/{result.ScoringEventId}", response)

@@ -115,7 +115,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
             GameMode.Awd when scoringEvent.Kind == ScoringEventKind.AwdServiceCheck =>
                 Slot(teamId, $"service:{challengeId}", LeaderboardSlotKind.Service, label, scoringEvent.OccurredAt,
                     scoringEvent.Id, scoringEvent.Result == ScoringResult.Correct, false),
-            GameMode.Awdp when scoringEvent.Kind == ScoringEventKind.AwdServiceCheck =>
+            GameMode.Awdp when scoringEvent.Kind == ScoringEventKind.AwdpFixCheck =>
                 Slot(teamId, $"service:{challengeId}", LeaderboardSlotKind.Service, label, scoringEvent.OccurredAt,
                     scoringEvent.Id, scoringEvent.Result == ScoringResult.Correct, false),
             GameMode.Koh when scoringEvent.Kind == ScoringEventKind.KohObservation =>
