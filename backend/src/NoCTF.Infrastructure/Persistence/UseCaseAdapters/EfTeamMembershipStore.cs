@@ -15,8 +15,8 @@ public sealed class EfTeamMembershipStore(NoCtfDbContext db) : ITeamMembershipSt
         if (TeamMembershipPolicy.IsMembershipChangeLocked(competitionStatus.Value)) return new(null, TeamMembershipFailure.MembershipLocked);
         var team = await db.Teams.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.TeamId && x.CompetitionId == command.CompetitionId && !x.Deletion.IsDeleted, ct);
         if (team is null) return new(null, TeamMembershipFailure.TeamNotFound);
-        var canInvite = team.CaptainId == command.ActorId || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(x =>
-            x.CompetitionId == command.CompetitionId && x.UserId == command.ActorId && x.Role == CompetitionCollaboratorRole.Manager, ct)
+        var canInvite = team.CaptainId == command.ActorId || await db.Competitions.AsNoTracking().AnyAsync(x =>
+            x.Id == command.CompetitionId && x.Collaborators.Any(collaborator => collaborator.UserId == command.ActorId && collaborator.Role == CompetitionCollaboratorRole.Manager), ct)
             || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == command.CompetitionId && x.OwnerId == command.ActorId, ct);
         if (!canInvite) return new(null, TeamMembershipFailure.TeamForbidden);
         var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == command.CompetitionId, ct);
@@ -75,7 +75,8 @@ public sealed class EfTeamMembershipStore(NoCtfDbContext db) : ITeamMembershipSt
         if (team is null) return TeamMembershipFailure.TeamNotFound;
         if (team.CaptainId == targetUserId) return TeamMembershipFailure.CaptainCannotBeRemoved;
         var canManage = team.CaptainId == actorId || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId && x.OwnerId == actorId, ct)
-            || await db.CompetitionCollaborators.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId && x.UserId == actorId && x.Role == CompetitionCollaboratorRole.Manager, ct);
+            || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId
+                && x.Collaborators.Any(collaborator => collaborator.UserId == actorId && collaborator.Role == CompetitionCollaboratorRole.Manager), ct);
         if (!canManage) return TeamMembershipFailure.TeamForbidden;
         var member = await db.TeamMembers.SingleOrDefaultAsync(x => x.TeamId == teamId && x.UserId == targetUserId, ct);
         if (member is null) return TeamMembershipFailure.MemberNotFound;

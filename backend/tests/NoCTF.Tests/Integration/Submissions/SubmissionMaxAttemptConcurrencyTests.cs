@@ -93,18 +93,13 @@ public sealed class SubmissionMaxAttemptConcurrencyTests
             Title = "Max attempt race",
             OwnerId = userId,
             Mode = GameMode.Ctf,
+            ConfigurationJson = """{"schemaVersion":1}""",
+            ConfigurationRevision = 1,
+            ConfigurationUpdatedAt = now,
             Status = CompetitionStatus.Running,
             StartTime = now.AddHours(-1),
             EndTime = now.AddHours(1),
             CreatedAt = now,
-            UpdatedAt = now
-        });
-        db.CompetitionConfigurations.Add(new CompetitionConfiguration
-        {
-            CompetitionId = competitionId,
-            Mode = GameMode.Ctf,
-            Json = """{"schemaVersion":1}""",
-            Revision = 1,
             UpdatedAt = now
         });
         db.Teams.Add(new Team

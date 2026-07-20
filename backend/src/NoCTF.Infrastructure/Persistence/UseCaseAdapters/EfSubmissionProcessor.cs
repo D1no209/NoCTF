@@ -61,20 +61,19 @@ public sealed class EfSubmissionProcessor(
 
     private async Task<ScoringEventDecision> EvaluateAsync(Submission submission, CancellationToken ct)
     {
-        var configuration = await (
-            from competition in db.Competitions.AsNoTracking()
-            join competitionConfiguration in db.CompetitionConfigurations.AsNoTracking()
-                on competition.Id equals competitionConfiguration.CompetitionId
-            join challengeConfiguration in db.ChallengeConfigurations.AsNoTracking()
-                on submission.ChallengeId equals challengeConfiguration.ChallengeId
-            where competition.Id == submission.CompetitionId
-            select new
-            {
-                competition.Mode,
-                competition.StartTime,
-                CompetitionJson = competitionConfiguration.Json,
-                ChallengeJson = challengeConfiguration.Json
-            }).SingleAsync(ct);
+        var configuration = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == submission.CompetitionId)
+            .Join(db.ChallengeConfigurations.AsNoTracking(),
+                competition => submission.ChallengeId,
+                challengeConfiguration => challengeConfiguration.ChallengeId,
+                (competition, challengeConfiguration) => new
+                {
+                    competition.Mode,
+                    competition.StartTime,
+                    CompetitionJson = competition.ConfigurationJson,
+                    ChallengeJson = challengeConfiguration.Json
+                })
+            .SingleAsync(ct);
         var rules = admissionModePolicy.GetRules(
             configuration.Mode,
             configuration.CompetitionJson,

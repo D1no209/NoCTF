@@ -7,11 +7,16 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompetitionConfigurationStore
 {
     public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken ct) =>
-        (from config in db.CompetitionConfigurations.AsNoTracking()
-         join competition in db.Competitions.AsNoTracking() on config.CompetitionId equals competition.Id
-         where config.CompetitionId == competitionId && !competition.Deletion.IsDeleted
-         select new CompetitionConfigurationView(config.CompetitionId, config.Mode, config.Json, config.Revision,
-             competition.Status, config.UpdatedAt)).SingleOrDefaultAsync(ct);
+        db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == competitionId && !competition.Deletion.IsDeleted)
+            .Select(competition => new CompetitionConfigurationView(
+                competition.Id,
+                competition.Mode,
+                competition.ConfigurationJson,
+                competition.ConfigurationRevision,
+                competition.Status,
+                competition.ConfigurationUpdatedAt))
+            .SingleOrDefaultAsync(ct);
 
     public async Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
@@ -27,12 +32,12 @@ public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompet
         if (status is CompetitionStatus.Paused or CompetitionStatus.Finished
             || status == CompetitionStatus.Running && !allowWhileRunning)
             return new(null, CompetitionConfigurationUpdateFailure.ConfigurationLocked);
-        var changed = await db.CompetitionConfigurations
-            .Where(x => x.CompetitionId == competitionId && x.Revision == expectedRevision)
+        var changed = await db.Competitions
+            .Where(x => x.Id == competitionId && x.ConfigurationRevision == expectedRevision)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.Json, json)
-                .SetProperty(x => x.Revision, expectedRevision + 1)
-                .SetProperty(x => x.UpdatedAt, now), ct);
+                .SetProperty(x => x.ConfigurationJson, json)
+                .SetProperty(x => x.ConfigurationRevision, expectedRevision + 1)
+                .SetProperty(x => x.ConfigurationUpdatedAt, now), ct);
         if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.RevisionConflict);
         await transaction.CommitAsync(ct);
         return new(await FindAsync(competitionId, ct));

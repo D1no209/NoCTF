@@ -15,15 +15,11 @@ public sealed class EfCompetitionManagementStore(NoCtfDbContext db) : ICompetiti
             Id = id, Title = command.Title.Trim(), Description = command.Description?.Trim(), OwnerId = command.OwnerId,
             Mode = command.Mode, StartTime = command.StartTime, EndTime = command.EndTime,
             Status = CompetitionStatus.Draft, TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove,
-            MaxTeamMembers = command.MaxTeamMembers, CreatedAt = command.CreatedAt, UpdatedAt = command.CreatedAt
+            MaxTeamMembers = command.MaxTeamMembers, CreatedAt = command.CreatedAt, UpdatedAt = command.CreatedAt,
+            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
+            ConfigurationRevision = 0, ConfigurationUpdatedAt = command.CreatedAt
         };
         db.Competitions.Add(competition);
-        db.CompetitionConfigurations.Add(new CompetitionConfiguration
-        {
-            CompetitionId = id, Mode = command.Mode,
-            Json = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
-            Revision = 0, UpdatedAt = command.CreatedAt
-        });
         await db.SaveChangesAsync(ct);
         return Map(competition);
     }

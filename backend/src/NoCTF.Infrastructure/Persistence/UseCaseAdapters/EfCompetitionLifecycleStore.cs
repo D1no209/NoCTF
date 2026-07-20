@@ -57,10 +57,12 @@ public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitio
                 .SetProperty(item => item.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken);
         if (changed != 1)
             return false;
-        db.CompetitionLifecycleAudits.Add(new CompetitionLifecycleAudit
+        var competition = await db.Competitions
+            .Include(item => item.LifecycleAudits)
+            .SingleAsync(item => item.Id == competitionId, cancellationToken);
+        competition.LifecycleAudits.Add(new CompetitionLifecycleAudit
         {
             Id = Guid.CreateVersion7(DateTimeOffset.UtcNow),
-            CompetitionId = competitionId,
             From = from,
             To = to,
             ActorId = actorId,
