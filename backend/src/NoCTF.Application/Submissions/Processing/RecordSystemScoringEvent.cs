@@ -1,5 +1,6 @@
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Submissions.Processing;
 
@@ -14,10 +15,20 @@ public sealed record RecordSystemScoringEventCommand(
     string EvaluatorVersion,
     string SourceKey);
 
-public sealed record RecordSystemScoringEventResult(Guid ScoringEventId, bool Created);
+public enum SystemScoringEventRecordFailure
+{
+    CompetitionNotFound,
+    CompetitionFinished
+}
+
+public sealed record RecordSystemScoringEventResult(
+    Guid ScoringEventId,
+    bool Created,
+    SystemScoringEventRecordFailure? Failure = null);
 
 public interface ISystemScoringEventStore
 {
+    Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<RecordSystemScoringEventResult> RecordAsync(RecordSystemScoringEventCommand command, CancellationToken cancellationToken);
 }
 
@@ -39,6 +50,12 @@ public sealed class RecordSystemScoringEvent(
         ArgumentException.ThrowIfNullOrWhiteSpace(command.EvaluatorVersion);
         if (command.Kind == ScoringEventKind.SubmissionEvaluation)
             throw new ArgumentException("System events cannot use the submission evaluation kind.", nameof(command));
+
+        var status = await store.GetCompetitionStatusAsync(command.CompetitionId, cancellationToken);
+        if (status is null)
+            return new(Guid.Empty, false, SystemScoringEventRecordFailure.CompetitionNotFound);
+        if (status == CompetitionStatus.Finished)
+            return new(Guid.Empty, false, SystemScoringEventRecordFailure.CompetitionFinished);
 
         using var admission = admissionGate.TryEnter();
         if (admission is null)

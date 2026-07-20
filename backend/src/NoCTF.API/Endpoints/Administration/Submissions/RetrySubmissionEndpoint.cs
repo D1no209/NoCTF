@@ -35,7 +35,7 @@ public sealed class RetrySubmissionEndpoint(
         if (!await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken))
             return TypedResults.Forbid();
         var result = await retry.ExecuteAsync(request.CompetitionId, request.SubmissionId, user.UserId, false, cancellationToken);
-        if (result.ErrorCode == "submission_not_found") return TypedResults.NotFound();
+        if (result.ErrorCode is "submission_not_found" or "competition_not_found") return TypedResults.NotFound();
         return result.Succeeded
             ? TypedResults.NoContent()
             : TypedResults.Problem(statusCode: StatusCodes.Status409Conflict,

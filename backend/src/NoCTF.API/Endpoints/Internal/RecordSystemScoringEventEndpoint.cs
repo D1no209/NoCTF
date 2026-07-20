@@ -27,6 +27,7 @@ public sealed record SystemScoringEventResponse(Guid ScoringEventId, bool Create
 internal static partial class SystemScoringEventMapper
 {
     public static partial RecordSystemScoringEventCommand ToCommand(RecordSystemScoringEventRequest request);
+    [MapperIgnoreSource(nameof(RecordSystemScoringEventResult.Failure))]
     public static partial SystemScoringEventResponse ToResponse(RecordSystemScoringEventResult result);
 }
 
@@ -40,6 +41,8 @@ public sealed class RecordSystemScoringEventEndpoint(RecordSystemScoringEvent re
         AuthSchemes("RunnerScoringBearer");
         Policies("ScoringInput");
         Description(builder => builder.ProducesProblemFE(StatusCodes.Status400BadRequest)
+            .ProducesProblemFE(StatusCodes.Status404NotFound)
+            .ProducesProblemFE(StatusCodes.Status409Conflict)
             .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
         Summary(summary => summary.Summary = "Record an idempotent score-free system scoring fact.");
     }
@@ -55,6 +58,10 @@ public sealed class RecordSystemScoringEventEndpoint(RecordSystemScoringEvent re
         try
         {
             var result = await record.ExecuteAsync(SystemScoringEventMapper.ToCommand(request), cancellationToken);
+            if (result.Failure == SystemScoringEventRecordFailure.CompetitionNotFound)
+                return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "Competition was not found.");
+            if (result.Failure == SystemScoringEventRecordFailure.CompetitionFinished)
+                return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Finished competitions are read-only.");
             var response = SystemScoringEventMapper.ToResponse(result);
             return result.Created
                 ? TypedResults.Created($"/internal/competitions/{request.CompetitionId}/scoring-events/{result.ScoringEventId}", response)

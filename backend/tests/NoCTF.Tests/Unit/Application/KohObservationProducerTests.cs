@@ -2,6 +2,7 @@ using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.SystemProducers;
 using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -175,6 +176,8 @@ public class KohObservationProducerTests
     {
         private readonly Dictionary<string, Guid> ids = [];
         public List<RecordSystemScoringEventCommand> Commands { get; } = [];
+        public Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken) =>
+            Task.FromResult<CompetitionStatus?>(CompetitionStatus.Running);
 
         public Task<RecordSystemScoringEventResult> RecordAsync(
             RecordSystemScoringEventCommand command,

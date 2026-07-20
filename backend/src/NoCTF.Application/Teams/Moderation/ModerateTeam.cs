@@ -1,6 +1,7 @@
 using NoCTF.Application.Common;
 using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Teams.Moderation;
 
@@ -12,9 +13,22 @@ public sealed record TeamModerationCommand(
     string? Reason,
     DateTimeOffset OccurredAt);
 
+public enum TeamModerationFailure
+{
+    CompetitionNotFound,
+    CompetitionFinished,
+    TeamNotFound
+}
+
+public sealed record TeamModerationStoreResult(TeamModerationFailure? Failure = null)
+{
+    public bool Succeeded => Failure is null;
+}
+
 public interface ITeamModerationStore
 {
-    Task<OperationResult> ApplyAsync(TeamModerationCommand command, CancellationToken cancellationToken);
+    Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken);
+    Task<TeamModerationStoreResult> ApplyAsync(TeamModerationCommand command, CancellationToken cancellationToken);
 }
 
 public interface ICompetitionModerationAuthorizer
@@ -35,10 +49,20 @@ public sealed class ModerateTeam(ITeamModerationStore store, ILeaderboardCache c
     {
         if (command.Ban && string.IsNullOrWhiteSpace(command.Reason))
             return OperationResult.Failure("ban_reason_required", "A ban reason is required.");
+        var status = await store.GetCompetitionStatusAsync(command.CompetitionId, cancellationToken);
+        if (status is null)
+            return OperationResult.Failure("competition_not_found", "Competition was not found.");
+        if (status == CompetitionStatus.Finished)
+            return OperationResult.Failure("competition_finished", "Finished competitions are read-only.");
 
         var result = await store.ApplyAsync(command, cancellationToken);
-        if (!result.Succeeded)
-            return result;
+        if (!result.Succeeded) return result.Failure switch
+        {
+            TeamModerationFailure.CompetitionNotFound => OperationResult.Failure("competition_not_found", "Competition was not found."),
+            TeamModerationFailure.CompetitionFinished => OperationResult.Failure("competition_finished", "Finished competitions are read-only."),
+            TeamModerationFailure.TeamNotFound => OperationResult.Failure("team_not_found", "Team was not found."),
+            _ => OperationResult.Failure("team_moderation_failed", "Team moderation failed.")
+        };
 
         await cache.InvalidateAsync(command.CompetitionId, cancellationToken);
         await scheduler.EnqueueCompetitionRebuildAsync(command.CompetitionId, cancellationToken);
