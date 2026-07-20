@@ -31,7 +31,7 @@
 - [x] 只有 Running 接受普通 Flag/Fix Submission。
 - [x] 明确 `StartTime < EndTime` 校验。
 - [x] 明确 StartTime/EndTime 边界为服务器 `ReceivedAt` 判断。
-- [ ] 规定 Running 后哪些字段不可修改。
+- [x] 规定 Running 后哪些字段不可修改。
 - [ ] 规定 Finished 后只允许查询和审计。
 - [x] 为状态转换建立 Application policy，不让 endpoint 自行判断。
 
