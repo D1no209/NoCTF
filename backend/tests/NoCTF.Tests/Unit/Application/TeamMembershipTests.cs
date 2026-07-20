@@ -40,6 +40,8 @@ public class TeamMembershipTests
 
     private sealed class Store : ITeamMembershipStore
     {
+        public Task<TeamMembershipFailure?> JoinByInvitationAsync(Guid competitionId, string invitationToken, Guid userId, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult<TeamMembershipFailure?>(null);
+        public Task<(string? Token, TeamMembershipFailure? Failure)> RotateInvitationAsync(Guid competitionId, Guid teamId, Guid actorId, string token, CancellationToken cancellationToken) => Task.FromResult<(string?, TeamMembershipFailure?)>((token, null));
         public TeamMembershipFailure? ResponseFailure { get; set; }
         public Task<InviteTeamMemberStoreResult> InviteAsync(InviteTeamMemberCommand command, CancellationToken cancellationToken) =>
             Task.FromResult(new InviteTeamMemberStoreResult(new(Guid.NewGuid(), command.CompetitionId, command.TeamId, command.InvitedUserId, command.ExpiresAt, command.Now)));

@@ -20,20 +20,16 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
         if (competitionStatus is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
         if (competitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
             return new(null, TeamRegistrationFailure.RegistrationClosed);
-        if (await db.TeamMembers.AnyAsync(x => x.CompetitionId == command.CompetitionId && x.UserId == command.UserId, ct))
+        if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId && x.Members.Any(member => member.UserId == command.UserId), ct))
             return new(null, TeamRegistrationFailure.UserAlreadyRegistered);
         var id = Guid.CreateVersion7(command.RegisteredAt);
         var team = new Team
         {
             Id = id, CompetitionId = command.CompetitionId, Name = command.Name, AvatarUrl = command.AvatarUrl,
-            CaptainId = command.UserId, RegistrationStatus = status, RegisteredAt = command.RegisteredAt
+            InvitationToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)), RegistrationStatus = status, RegisteredAt = command.RegisteredAt
         };
+        team.Members.Add(new TeamMember { Id = Guid.CreateVersion7(command.RegisteredAt), UserId = command.UserId, MemberOrder = 0, JoinedAt = command.RegisteredAt });
         db.Teams.Add(team);
-        db.TeamMembers.Add(new TeamMember
-        {
-            Id = Guid.CreateVersion7(command.RegisteredAt), CompetitionId = command.CompetitionId,
-            TeamId = id, UserId = command.UserId, Role = TeamMemberRole.Captain, JoinedAt = command.RegisteredAt
-        });
         try
         {
             await db.SaveChangesAsync(ct);
@@ -52,7 +48,7 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
             .Where(x => x.CompetitionId == competitionId && !x.Deletion.IsDeleted
                 && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
             .OrderBy(x => x.Name)
-            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId,
+            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.Members.OrderBy(member => member.MemberOrder).Select(member => member.UserId).FirstOrDefault(),
                 x.RegistrationStatus, x.IsLocked, x.RegisteredAt)).ToListAsync(ct);
 
     public async Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
@@ -73,21 +69,17 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
     public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken ct) =>
         db.Teams.AsNoTracking().Where(x => x.Id == teamId && x.CompetitionId == competitionId && !x.Deletion.IsDeleted
                 && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
-            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId,
+            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.Members.OrderBy(member => member.MemberOrder).Select(member => member.UserId).FirstOrDefault(),
                 x.RegistrationStatus, x.IsLocked, x.RegisteredAt)).SingleOrDefaultAsync(ct);
 
     public Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct) =>
-        (from team in db.Teams.AsNoTracking()
-         join member in db.TeamMembers.AsNoTracking() on team.Id equals member.TeamId
-         where team.CompetitionId == competitionId && member.UserId == userId
-               && !team.Deletion.IsDeleted
-               && (includePending || team.RegistrationStatus == TeamRegistrationStatus.Approved)
-         select new TeamView(team.Id, team.CompetitionId, team.Name, team.AvatarUrl, team.CaptainId,
-             team.RegistrationStatus, team.IsLocked, team.RegisteredAt)).SingleOrDefaultAsync(ct);
+        db.Teams.AsNoTracking().Where(team => team.CompetitionId == competitionId && team.Members.Any(member => member.UserId == userId)
+               && !team.Deletion.IsDeleted && (includePending || team.RegistrationStatus == TeamRegistrationStatus.Approved))
+            .Select(team => new TeamView(team.Id, team.CompetitionId, team.Name, team.AvatarUrl, team.Members.OrderBy(member => member.MemberOrder).Select(member => member.UserId).FirstOrDefault(), team.RegistrationStatus, team.IsLocked, team.RegisteredAt)).SingleOrDefaultAsync(ct);
 
     public async Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken ct) =>
         await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId && x.CompetitionId == competitionId
-            && !x.Deletion.IsDeleted && x.CaptainId == actorId, ct)
+            && !x.Deletion.IsDeleted && x.Members.Any(member => member.MemberOrder == 0 && member.UserId == actorId), ct)
         || await db.Users.AsNoTracking().AnyAsync(x => x.Id == actorId && x.Role == UserRole.Administrator, ct)
         || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId && x.OwnerId == actorId && !x.Deletion.IsDeleted, ct)
         || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId
@@ -127,6 +119,6 @@ public sealed class EfTeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrati
         return null;
     }
 
-    private static TeamView Map(Team x) => new(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId,
+    private static TeamView Map(Team x) => new(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.Members.OrderBy(member => member.MemberOrder).FirstOrDefault()?.UserId ?? Guid.Empty,
         x.RegistrationStatus, x.IsLocked, x.RegisteredAt);
 }

@@ -6,9 +6,3 @@ public enum TeamRegistrationStatus
     Approved,
     Rejected
 }
-
-public enum TeamMemberRole
-{
-    Captain,
-    Member
-}

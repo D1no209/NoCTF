@@ -107,17 +107,15 @@ public sealed class SubmissionMaxAttemptConcurrencyTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = "Race team",
-            CaptainId = userId,
+            InvitationToken = "0123456789ABCDEF0123456789ABCDEF",
             RegistrationStatus = TeamRegistrationStatus.Approved,
             RegisteredAt = now
         });
-        db.TeamMembers.Add(new TeamMember
+        db.Teams.Local.Single(item => item.Id == teamId).Members.Add(new TeamMember
         {
             Id = Guid.CreateVersion7(now.AddTicks(4)),
-            CompetitionId = competitionId,
-            TeamId = teamId,
             UserId = userId,
-            Role = TeamMemberRole.Captain,
+            MemberOrder = 0,
             JoinedAt = now
         });
         db.Challenges.Add(new Challenge

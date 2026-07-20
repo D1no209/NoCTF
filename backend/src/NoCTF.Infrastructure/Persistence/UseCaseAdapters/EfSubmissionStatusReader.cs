@@ -9,7 +9,7 @@ public sealed class EfSubmissionStatusReader(NoCtfDbContext db) : ISubmissionSta
     public async Task<SubmissionStatusView?> FindAsync(Guid competitionId, Guid submissionId, Guid userId, CancellationToken ct)
     {
         var canRead = await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId && x.Collaborators.Any(collaborator => collaborator.UserId == userId), ct)
-            || await db.TeamMembers.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId && x.UserId == userId, ct);
+            || await db.Teams.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId && x.Members.Any(member => member.UserId == userId), ct);
         if (!canRead) return null;
         var item = await db.Submissions.AsNoTracking().Include(x => x.ScoringEvent)
             .SingleOrDefaultAsync(x => x.Id == submissionId && x.CompetitionId == competitionId, ct);
