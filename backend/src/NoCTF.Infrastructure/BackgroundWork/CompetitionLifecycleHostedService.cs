@@ -15,8 +15,7 @@ public sealed class CompetitionLifecycleHostedService(
     IServiceScopeFactory scopeFactory,
     IHostApplicationLifetime lifetime,
     IConfiguration configuration,
-    ILogger<CompetitionLifecycleHostedService> logger,
-    ICompetitionLifecycleNotificationPublisher? notifications = null) : BackgroundService
+    ILogger<CompetitionLifecycleHostedService> logger) : BackgroundService
 {
     private readonly TimeSpan interval = TimeSpan.FromSeconds(
         Math.Max(1, configuration.GetValue("CompetitionLifecycle:IntervalSeconds", 5)));
@@ -32,6 +31,7 @@ public sealed class CompetitionLifecycleHostedService(
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var lifecycle = scope.ServiceProvider.GetRequiredService<AdvanceCompetitionLifecycle>();
+                var notifications = scope.ServiceProvider.GetService<ICompetitionLifecycleNotificationPublisher>();
                 var stopwatch = Stopwatch.StartNew();
                 var transitions = await lifecycle.ExecuteAsync(DateTimeOffset.UtcNow, ct);
                 var scheduler = scope.ServiceProvider.GetRequiredService<IBackgroundWorkScheduler>();

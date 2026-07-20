@@ -23,6 +23,7 @@ public sealed class RetrySubmissionEndpoint(
     {
         Post("/admin/competitions/{competitionId}/submissions/{submissionId}/retry");
         AuthSchemes("Bearer");
+        Summary(s => s.Summary = "Retry a non-correct submission.");
     }
 
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(

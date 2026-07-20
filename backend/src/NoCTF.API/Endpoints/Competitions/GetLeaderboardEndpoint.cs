@@ -22,6 +22,7 @@ public sealed class GetLeaderboardEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard");
         AllowAnonymous();
+        Summary(s => s.Summary = "Get the cached leaderboard or queue an asynchronous refresh.");
     }
 
     public override async Task<Results<Ok<LeaderboardResponse>, Accepted<LeaderboardProcessingResponse>, NotFound>> ExecuteAsync(

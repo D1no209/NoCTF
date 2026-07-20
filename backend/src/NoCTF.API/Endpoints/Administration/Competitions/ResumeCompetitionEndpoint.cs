@@ -11,7 +11,7 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 public sealed class ResumeCompetitionEndpoint(TransitionCompetitionLifecycle transition, ICompetitionModerationAuthorizer authorizer, IUserContext user)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
-    public override void Configure() { Post("/admin/competitions/{competitionId}/resume"); AuthSchemes("Bearer"); }
+    public override void Configure() { Post("/admin/competitions/{competitionId}/resume"); AuthSchemes("Bearer"); Summary(s => s.Summary = "Resume a paused competition."); }
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var id = Route<Guid>("competitionId");
