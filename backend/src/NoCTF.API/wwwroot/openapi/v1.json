@@ -3274,7 +3274,11 @@
           "AchievementAlreadyCompleted",
           "StageRequired",
           "StageNotFound",
-          "StagePrerequisiteIncomplete"
+          "StagePrerequisiteIncomplete",
+          "UnknownTeamIdentifier",
+          "InvalidObservation",
+          "ProducerTimeout",
+          "ProducerUnavailable"
         ],
         "enum": [
           0,
@@ -3295,7 +3299,11 @@
           15,
           16,
           17,
-          18
+          18,
+          19,
+          20,
+          21,
+          22
         ]
       },
       "NoCTFAPIEndpointsSubmissionsGetSubmissionStatusRequest": {

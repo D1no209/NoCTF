@@ -20,5 +20,9 @@ public enum ScoringFailureCode
     AchievementAlreadyCompleted,
     StageRequired,
     StageNotFound,
-    StagePrerequisiteIncomplete
+    StagePrerequisiteIncomplete,
+    UnknownTeamIdentifier,
+    InvalidObservation,
+    ProducerTimeout,
+    ProducerUnavailable
 }

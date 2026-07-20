@@ -38,6 +38,9 @@ using NoCTF.Application.Authentication.Logout;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Runtime;
+using NoCTF.Application.SystemProducers;
+using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.Infrastructure.SystemProducers;
 
 namespace NoCTF.Infrastructure;
 
@@ -78,6 +81,7 @@ public static class ServiceRegistration
         services.AddHostedService<FixArchiveCleanupHostedService>();
         services.AddHostedService<RuntimeHealthHostedService>();
         services.AddHostedService<OrphanRuntimeCleanupHostedService>();
+        services.AddHostedService<KohPollingHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (string.IsNullOrWhiteSpace(redis))
@@ -106,6 +110,10 @@ public static class ServiceRegistration
         services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();
         services.AddScoped<ISystemScoringEventProcessor, EfSystemScoringEventProcessor>();
         services.AddScoped<RecordSystemScoringEvent>();
+        services.AddScoped<IKohProducerTargetStore, EfKohProducerTargetStore>();
+        services.AddSingleton<IKohProducerConfigurationCatalog, KohProducerConfigurationCatalog>();
+        services.AddHttpClient<IKohAgentClient, HttpKohAgentClient>();
+        services.AddScoped<ProduceKohObservations>();
         services.AddScoped<RetrySubmission>();
         services.AddScoped<LogoutUser>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
