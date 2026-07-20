@@ -26,6 +26,10 @@ export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
     avatarUrl?: string | null;
 };
 
+export type NoCtfapiEndpointsTeamsGetMyTeamRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsTeamsGetTeamRequest = {
     [key: string]: never;
 };
@@ -611,6 +615,39 @@ export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponse = NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses];
+
+export type NoCtfapiEndpointsTeamsGetMyTeamEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/competitions/{competitionId}/teams/me';
+};
+
+export type NoCtfapiEndpointsTeamsGetMyTeamEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type NoCtfapiEndpointsTeamsGetMyTeamEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsTeamResponse;
+};
+
+export type NoCtfapiEndpointsTeamsGetMyTeamEndpointResponse = NoCtfapiEndpointsTeamsGetMyTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsGetMyTeamEndpointResponses];
 
 export type NoCtfapiEndpointsTeamsInviteTeamMemberEndpointData = {
     body: NoCtfapiEndpointsTeamsInviteTeamMemberRequest;

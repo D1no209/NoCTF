@@ -301,6 +301,51 @@
         ]
       }
     },
+    "/competitions/{competitionId}/teams/me": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "operationId": "NoCTFAPIEndpointsTeamsGetMyTeamEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/competitions/{competitionId}/teams/{teamId}/invitations": {
       "post": {
         "tags": [
@@ -1041,6 +1086,7 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Get the cached leaderboard or queue an asynchronous refresh.",
         "operationId": "NoCTFAPIEndpointsCompetitionsGetLeaderboardEndpoint",
         "parameters": [
           {
@@ -1438,6 +1484,7 @@
         "tags": [
           "Admin"
         ],
+        "summary": "Read the current administrative submission status.",
         "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsGetAdminSubmissionStatusEndpoint",
         "parameters": [
           {
@@ -1492,6 +1539,7 @@
         "tags": [
           "Admin"
         ],
+        "summary": "Queue a deterministic competition rebuild.",
         "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsRebuildCompetitionEndpoint",
         "parameters": [
           {
@@ -1534,6 +1582,7 @@
         "tags": [
           "Admin"
         ],
+        "summary": "Retry a non-correct submission.",
         "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsRetrySubmissionEndpoint",
         "parameters": [
           {
@@ -1808,6 +1857,7 @@
         "tags": [
           "Admin"
         ],
+        "summary": "Finish a competition and schedule runtime cleanup.",
         "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsFinishCompetitionEndpoint",
         "parameters": [
           {
@@ -1945,6 +1995,7 @@
         "tags": [
           "Admin"
         ],
+        "summary": "Pause a running competition.",
         "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsPauseCompetitionEndpoint",
         "parameters": [
           {
@@ -1982,6 +2033,7 @@
         "tags": [
           "Admin"
         ],
+        "summary": "Publish a competition.",
         "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsPublishCompetitionEndpoint",
         "parameters": [
           {
@@ -2064,6 +2116,7 @@
         "tags": [
           "Admin"
         ],
+        "summary": "Resume a paused competition.",
         "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsResumeCompetitionEndpoint",
         "parameters": [
           {
@@ -2927,6 +2980,10 @@
             "nullable": true
           }
         }
+      },
+      "NoCTFAPIEndpointsTeamsGetMyTeamRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsTeamsGetTeamRequest": {
         "type": "object",

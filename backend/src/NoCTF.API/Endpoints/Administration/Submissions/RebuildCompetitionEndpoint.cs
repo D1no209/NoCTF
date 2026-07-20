@@ -18,6 +18,7 @@ public sealed class RebuildCompetitionEndpoint(
     {
         Post("/admin/competitions/{competitionId}/rebuild");
         AuthSchemes("Bearer");
+        Summary(s => s.Summary = "Queue a deterministic competition rebuild.");
     }
 
     public override async Task<Results<Accepted<RebuildCompetitionResponse>, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(

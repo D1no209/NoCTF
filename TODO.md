@@ -64,7 +64,7 @@
 - [x] 全部 endpoint 使用 typed FastEndpoints `ExecuteAsync`。
 - [x] 全部 endpoint 使用 Bearer JWT + collaborator policy。
 - [x] 状态冲突返回 typed `409 Problem`。
-- [ ] 补 OpenAPI summary、authorization 和 response schema。
+- [x] 补 OpenAPI summary、authorization 和 response schema。
 
 ## 2. Competition CRUD 和配置
 
