@@ -17,6 +17,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
+    public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();
     public DbSet<ChallengeConfiguration> ChallengeConfigurations => Set<ChallengeConfiguration>();
     public DbSet<ChallengeHint> ChallengeHints => Set<ChallengeHint>();
     public DbSet<ChallengeAttachment> ChallengeAttachments => Set<ChallengeAttachment>();
