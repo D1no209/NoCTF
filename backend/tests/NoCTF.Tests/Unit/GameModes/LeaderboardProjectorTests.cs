@@ -241,7 +241,7 @@ public class LeaderboardProjectorTests
     }
 
     [Test]
-    public async Task KohProjector_AwardsEachStableControlObservation()
+    public async Task KohProjector_AwardsEachIntervalAcrossControlTransitions()
     {
         var controller = Guid.NewGuid();
         var other = Guid.NewGuid();
@@ -249,9 +249,9 @@ public class LeaderboardProjectorTests
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var observations = new[]
         {
-            Observation(controller, 2),
             Observation(controller, 1),
-            Observation(other, 3)
+            Observation(other, 2),
+            Observation(controller, 3)
         };
 
         var result = new KohLeaderboardProjector().Project(new LeaderboardProjectionInput(
@@ -261,6 +261,10 @@ public class LeaderboardProjectorTests
 
         await Assert.That(result.Single(item => item.TeamId == controller).Score).IsEqualTo(50L);
         await Assert.That(result.Single(item => item.TeamId == other).Score).IsEqualTo(25L);
+        await Assert.That(result.Single(item => item.TeamId == controller).LastScoreAt)
+            .IsEqualTo(DateTimeOffset.UnixEpoch.AddSeconds(3));
+        await Assert.That(result.Single(item => item.TeamId == other).LastScoreAt)
+            .IsEqualTo(DateTimeOffset.UnixEpoch.AddSeconds(2));
     }
 
     [Test]

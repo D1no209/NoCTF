@@ -99,6 +99,34 @@ public class KohObservationProducerTests
     }
 
     [Test]
+    public async Task ExecuteAsync_ControllerTransition_RecordsNewControllerInNextInterval()
+    {
+        var firstTeam = Guid.NewGuid();
+        var secondTeam = Guid.NewGuid();
+        var store = new Store();
+        var scheduler = new Scheduler();
+        var producer = new ProduceKohObservations(
+            new Targets(),
+            new Configurations(new Dictionary<string, Guid>
+            {
+                ["first"] = firstTeam,
+                ["second"] = secondTeam
+            }),
+            new SequencedAgent([new("first", true), new("second", true)]),
+            new RecordSystemScoringEvent(store, scheduler, scheduler));
+
+        await producer.ExecuteAsync(Start.AddSeconds(5));
+        await producer.ExecuteAsync(Start.AddSeconds(10));
+
+        await Assert.That(store.Commands[0].TeamId).IsEqualTo(firstTeam);
+        await Assert.That(store.Commands[0].SourceKey).EndsWith("interval:1");
+        await Assert.That(store.Commands[0].OccurredAt).IsEqualTo(Start.AddSeconds(5));
+        await Assert.That(store.Commands[1].TeamId).IsEqualTo(secondTeam);
+        await Assert.That(store.Commands[1].SourceKey).EndsWith("interval:2");
+        await Assert.That(store.Commands[1].OccurredAt).IsEqualTo(Start.AddSeconds(10));
+    }
+
+    [Test]
     [Arguments(0, 0L)]
     [Arguments(4, 0L)]
     [Arguments(5, 1L)]
@@ -170,6 +198,16 @@ public class KohObservationProducerTests
             timeout
                 ? Task.FromException<KohAgentObservation>(new TimeoutException())
                 : Task.FromResult(observation);
+    }
+
+    private sealed class SequencedAgent(IEnumerable<KohAgentObservation> observations) : IKohAgentClient
+    {
+        private readonly Queue<KohAgentObservation> remaining = new(observations);
+
+        public Task<KohAgentObservation> ObserveAsync(
+            Uri agentUri,
+            TimeSpan timeout,
+            CancellationToken cancellationToken) => Task.FromResult(remaining.Dequeue());
     }
 
     private sealed class Store : ISystemScoringEventStore
