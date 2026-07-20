@@ -12,6 +12,10 @@ public sealed class EfSystemScoringEventStore(NoCtfDbContext db) : ISystemScorin
         db.Competitions.AsNoTracking().Where(item => item.Id == competitionId && !item.Deletion.IsDeleted)
             .Select(item => (CompetitionStatus?)item.Status).SingleOrDefaultAsync(ct);
 
+    public Task<GameMode?> GetCompetitionModeAsync(Guid competitionId, CancellationToken ct) =>
+        db.Competitions.AsNoTracking().Where(item => item.Id == competitionId && !item.Deletion.IsDeleted)
+            .Select(item => (GameMode?)item.Mode).SingleOrDefaultAsync(ct);
+
     public async Task<RecordSystemScoringEventResult> RecordAsync(RecordSystemScoringEventCommand command, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -25,7 +29,9 @@ public sealed class EfSystemScoringEventStore(NoCtfDbContext db) : ISystemScorin
         if (existing is not null)
         {
             await transaction.CommitAsync(ct);
-            return new(existing.Id, false);
+            return SameFact(existing, command)
+                ? new(existing.Id, false)
+                : new(Guid.Empty, false, SystemScoringEventRecordFailure.SourceConflict);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -62,7 +68,17 @@ public sealed class EfSystemScoringEventStore(NoCtfDbContext db) : ISystemScorin
             db.Entry(entity).State = EntityState.Detached;
             existing = await db.ScoringEvents.AsNoTracking().SingleAsync(
                 x => x.CompetitionId == command.CompetitionId && x.Kind == command.Kind && x.SourceKey == command.SourceKey, ct);
-            return new(existing.Id, false);
+            return SameFact(existing, command)
+                ? new(existing.Id, false)
+                : new(Guid.Empty, false, SystemScoringEventRecordFailure.SourceConflict);
         }
     }
+
+    private static bool SameFact(ScoringEvent existing, RecordSystemScoringEventCommand command) =>
+        existing.TeamId == command.TeamId
+        && existing.ChallengeId == command.ChallengeId
+        && existing.Result == command.Result
+        && existing.FailureCode == command.FailureCode
+        && existing.OccurredAt == command.OccurredAt
+        && existing.EvaluatorVersion == command.EvaluatorVersion;
 }

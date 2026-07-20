@@ -215,6 +215,32 @@ public class LeaderboardProjectorTests
     }
 
     [Test]
+    public async Task AwdpProjector_AppliesViolationAndServicePenaltiesButIgnoresPlatformFailures()
+    {
+        var team = Guid.NewGuid();
+        var configuration = JsonSerializer.Serialize(new AwdpConfiguration(
+            2, 60,
+            new(AchievementSettlement.Milestone, 100),
+            new(AchievementSettlement.Milestone, 50),
+            30,
+            20), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var systemFacts = new[]
+        {
+            AwdpCheck(team, ScoringResult.Rejected, ScoringFailureCode.AwdpViolation),
+            AwdpCheck(team, ScoringResult.Wrong, ScoringFailureCode.AwdpServiceDown),
+            AwdpCheck(team, ScoringResult.PlatformFailed, ScoringFailureCode.CheckerPlatformError),
+            AwdpCheck(team, ScoringResult.Correct, ScoringFailureCode.AwdpViolation),
+            AwdpCheck(team, ScoringResult.Rejected, ScoringFailureCode.AwdpServiceDown)
+        };
+
+        var result = new AwdpLeaderboardProjector().Project(new LeaderboardProjectionInput(
+            Guid.NewGuid(), GameMode.Awdp, [new(team, "team", false, false)], [], systemFacts,
+            [], configuration, DateTimeOffset.UnixEpoch));
+
+        await Assert.That(result[0].Score).IsEqualTo(-50L);
+    }
+
+    [Test]
     public async Task KohProjector_AwardsEachStableControlObservation()
     {
         var controller = Guid.NewGuid();
@@ -296,6 +322,19 @@ public class LeaderboardProjectorTests
         Kind = ScoringEventKind.KohObservation,
         Result = ScoringResult.Correct,
         OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds)
+    });
+
+    private static LeaderboardSystemFact AwdpCheck(
+        Guid team,
+        ScoringResult result,
+        ScoringFailureCode failureCode) => new(new ScoringEvent
+    {
+        Id = Guid.NewGuid(),
+        TeamId = team,
+        Kind = ScoringEventKind.AwdpFixCheck,
+        Result = result,
+        FailureCode = failureCode,
+        OccurredAt = DateTimeOffset.UnixEpoch
     });
 
     private static LeaderboardSubmissionFact Stage(Guid team, Guid challenge, Guid stage, int seconds) =>

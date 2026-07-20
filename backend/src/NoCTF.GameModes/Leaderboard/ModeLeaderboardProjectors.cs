@@ -225,11 +225,29 @@ internal static class AwdpLeaderboardProjection
                 awarded[fact.TeamId] = teamFacts = [];
             teamFacts.Add((fact, achievement.Points));
         }
+        var penalties = input.SystemEvents
+            .Where(fact => !fact.Event.IsDeleted
+                           && fact.Event.Kind == ScoringEventKind.AwdpFixCheck
+                           && fact.Event.TeamId is not null)
+            .GroupBy(fact => fact.Event.TeamId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Aggregate(0L, (total, fact) => SaturatingAdd(total,
+                    fact.Event switch
+                    {
+                        { Result: ScoringResult.Rejected, FailureCode: ScoringFailureCode.AwdpViolation }
+                            => competition.ViolationPenalty,
+                        { Result: ScoringResult.Wrong, FailureCode: ScoringFailureCode.AwdpServiceDown }
+                            => competition.ServiceDownPenalty,
+                        _ => 0L
+                    })));
         var rows = teams.Values.Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
             var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
-            return new LeaderboardEntry(0, team.Id, team.Name, own.Sum(item => item.Points), own.Count,
+            var awardedScore = own.Aggregate(0L, (total, item) => SaturatingAdd(total, item.Points));
+            return new LeaderboardEntry(0, team.Id, team.Name,
+                SaturatingSubtract(awardedScore, penalties.GetValueOrDefault(team.Id)), own.Count,
                 last == default ? null : last, []);
         });
         return rows.OrderByDescending(row => row.Score)
@@ -238,6 +256,12 @@ internal static class AwdpLeaderboardProjection
             .Select((row, index) => row with { Rank = index + 1 })
             .ToList();
     }
+
+    private static long SaturatingAdd(long total, long value) =>
+        value > 0 && total > long.MaxValue - value ? long.MaxValue : total + value;
+
+    private static long SaturatingSubtract(long total, long value) =>
+        value > 0 && total < long.MinValue + value ? long.MinValue : total - value;
 
     private static int Round(DateTimeOffset occurredAt, DateTimeOffset? start, int durationSeconds)
     {
@@ -248,7 +272,8 @@ internal static class AwdpLeaderboardProjection
 
     private static AwdpConfiguration ParseCompetition(string? json) =>
         TryParse<AwdpConfiguration>(json)
-        ?? new(1, 300, new(AchievementSettlement.PerRound, 50), new(AchievementSettlement.PerRound, 50));
+        ?? new(2, 300, new(AchievementSettlement.PerRound, 50),
+            new(AchievementSettlement.PerRound, 50), 0, 0);
 
     private static AwdpChallengeConfiguration ParseChallenge(string? json) =>
         TryParse<AwdpChallengeConfiguration>(json)

@@ -18,7 +18,9 @@ public sealed record RecordSystemScoringEventCommand(
 public enum SystemScoringEventRecordFailure
 {
     CompetitionNotFound,
-    CompetitionFinished
+    CompetitionFinished,
+    CompetitionModeMismatch,
+    SourceConflict
 }
 
 public sealed record RecordSystemScoringEventResult(
@@ -29,6 +31,7 @@ public sealed record RecordSystemScoringEventResult(
 public interface ISystemScoringEventStore
 {
     Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken);
+    Task<GameMode?> GetCompetitionModeAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<RecordSystemScoringEventResult> RecordAsync(RecordSystemScoringEventCommand command, CancellationToken cancellationToken);
 }
 
@@ -46,10 +49,32 @@ public sealed class RecordSystemScoringEvent(
         RecordSystemScoringEventCommand command,
         CancellationToken cancellationToken = default)
     {
+        if (command.Kind == ScoringEventKind.AwdpFixCheck)
+            throw new ArgumentException("AWDP fix checks require the dedicated checker-result use case.", nameof(command));
+        return await ExecuteCoreAsync(command, cancellationToken);
+    }
+
+    public async Task<RecordSystemScoringEventResult> ExecuteAwdpCheckAsync(
+        RecordSystemScoringEventCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsValidAwdpCheck(command))
+            throw new ArgumentException("Invalid AWDP service-check fact.", nameof(command));
+        return await ExecuteCoreAsync(command, cancellationToken);
+    }
+
+    private async Task<RecordSystemScoringEventResult> ExecuteCoreAsync(
+        RecordSystemScoringEventCommand command,
+        CancellationToken cancellationToken)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(command.SourceKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(command.EvaluatorVersion);
         if (command.Kind == ScoringEventKind.SubmissionEvaluation)
             throw new ArgumentException("System events cannot use the submission evaluation kind.", nameof(command));
+        if (command.Kind != ScoringEventKind.AwdpFixCheck
+            && command.FailureCode is ScoringFailureCode.AwdpFixFailed
+                or ScoringFailureCode.AwdpServiceDown or ScoringFailureCode.AwdpViolation)
+            throw new ArgumentException("AWDP check failure codes require an AWDP service-check event.", nameof(command));
 
         var status = await store.GetCompetitionStatusAsync(command.CompetitionId, cancellationToken);
         if (status is null)
@@ -74,4 +99,13 @@ public sealed class RecordSystemScoringEvent(
         }
         return result;
     }
+
+    private static bool IsValidAwdpCheck(RecordSystemScoringEventCommand command) => command is
+        { Kind: ScoringEventKind.AwdpFixCheck, Result: ScoringResult.Correct, FailureCode: null }
+        or { Kind: ScoringEventKind.AwdpFixCheck, Result: ScoringResult.Wrong,
+            FailureCode: ScoringFailureCode.AwdpFixFailed or ScoringFailureCode.AwdpServiceDown }
+        or { Kind: ScoringEventKind.AwdpFixCheck, Result: ScoringResult.Rejected,
+            FailureCode: ScoringFailureCode.AwdpViolation }
+        or { Kind: ScoringEventKind.AwdpFixCheck, Result: ScoringResult.PlatformFailed,
+            FailureCode: ScoringFailureCode.CheckerPlatformError };
 }

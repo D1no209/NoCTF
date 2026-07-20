@@ -8,6 +8,8 @@ public static class AwdpConfigurationValidator
         if (configuration.RoundDurationSeconds <= 0) errors.Add("RoundDurationSeconds must be positive.");
         if (configuration.Break.Points < 0 || configuration.Fix.Points < 0)
             errors.Add("Achievement points cannot be negative.");
+        if (configuration.ViolationPenalty < 0 || configuration.ServiceDownPenalty < 0)
+            errors.Add("Penalty values cannot be negative.");
         return errors;
     }
 

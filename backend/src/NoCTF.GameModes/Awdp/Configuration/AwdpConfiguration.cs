@@ -14,9 +14,11 @@ public sealed record AwdpConfiguration(
     int SchemaVersion,
     int RoundDurationSeconds,
     AwdpAchievementConfiguration Break,
-    AwdpAchievementConfiguration Fix)
+    AwdpAchievementConfiguration Fix,
+    long ViolationPenalty = 0,
+    long ServiceDownPenalty = 0)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 }
 
 public sealed record AwdpChallengeConfiguration(

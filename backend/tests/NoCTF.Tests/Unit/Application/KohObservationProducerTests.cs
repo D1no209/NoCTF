@@ -174,6 +174,8 @@ public class KohObservationProducerTests
 
     private sealed class Store : ISystemScoringEventStore
     {
+        public Task<GameMode?> GetCompetitionModeAsync(Guid competitionId, CancellationToken cancellationToken) =>
+            Task.FromResult<GameMode?>(GameMode.Koh);
         private readonly Dictionary<string, Guid> ids = [];
         public List<RecordSystemScoringEventCommand> Commands { get; } = [];
         public Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken) =>

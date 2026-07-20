@@ -253,9 +253,9 @@
 - [x] BreakSuccess 后禁止普通 Break。
 - [x] FixSuccess 后禁止普通 Fix。
 - [x] Fix archive verification mapping。
-- [ ] Check exit code mapping。
+- [x] Check exit code mapping。
 - [x] round settlement。
-- [ ] attack/defense/violation/service penalty 配置。
+- [x] attack/defense/violation/service penalty 配置。
 - [x] Break 只来自 Correct Flag event。
 - [x] Fix 只来自 Correct Fix event。
 - [x] Checkdown 只使用独立 system event。

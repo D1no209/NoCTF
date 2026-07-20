@@ -80,7 +80,42 @@ public class LeaderboardProjectionEngineTests
         await Assert.That(result.Subjects[0].Slots[0].Kind).IsEqualTo(expectedKind);
     }
 
+    [Test]
+    public async Task AwdpSummary_UsesOnlyAwdpFixChecksForServiceSlots()
+    {
+        var team = Guid.NewGuid();
+        var challenge = Guid.NewGuid();
+        var systemFacts = new[]
+        {
+            SystemFact(team, challenge, ScoringEventKind.AwdServiceCheck, 3),
+            SystemFact(team, challenge, ScoringEventKind.AwdpFixCheck, 2)
+        };
+        var input = new LeaderboardProjectionInput(
+            Guid.NewGuid(), GameMode.Awdp, [new(team, "team", false, false)], [], systemFacts,
+            [new(challenge, "pwn", false)]);
+
+        var result = Engine().Project(input);
+
+        await Assert.That(result.Subjects[0].Slots).HasSingleItem();
+        await Assert.That(result.Subjects[0].Slots[0].LastOccurredAt)
+            .IsEqualTo(DateTimeOffset.UnixEpoch.AddSeconds(2));
+    }
+
     private static LeaderboardProjectionEngine Engine() => new(new LeaderboardProjectorCatalog());
+
+    private static LeaderboardSystemFact SystemFact(
+        Guid teamId,
+        Guid challengeId,
+        ScoringEventKind kind,
+        int seconds) => new(new ScoringEvent
+        {
+            Id = Guid.CreateVersion7(DateTimeOffset.UnixEpoch.AddSeconds(seconds)),
+            TeamId = teamId,
+            ChallengeId = challengeId,
+            Kind = kind,
+            Result = ScoringResult.Correct,
+            OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds)
+        });
 
     private static LeaderboardSubmissionFact Fact(
         Guid teamId,

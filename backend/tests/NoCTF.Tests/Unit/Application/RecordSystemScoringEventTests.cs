@@ -2,6 +2,7 @@ using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Competitions;
+using NoCTF.GameModes.Awdp.Scoring;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -61,18 +62,124 @@ public class RecordSystemScoringEventTests
         await Assert.That(scheduler.AdmissionCalls).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task ExecuteAsync_RejectsAwdpFailureCodeOnAnotherEventKind()
+    {
+        var store = new Store(new(Guid.NewGuid(), true));
+        var scheduler = new Scheduler();
+        var useCase = new RecordSystemScoringEvent(store, scheduler, scheduler);
+        var command = Command(Guid.NewGuid()) with
+        {
+            Kind = ScoringEventKind.KohObservation,
+            Result = ScoringResult.Rejected,
+            FailureCode = ScoringFailureCode.AwdpViolation
+        };
+
+        var execute = async () => await useCase.ExecuteAsync(command);
+
+        await Assert.That(execute).Throws<ArgumentException>();
+        await Assert.That(store.RecordCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ExecuteAsync_AllowsAwdServiceCheckForAwdMode()
+    {
+        var store = new Store(new(Guid.NewGuid(), true)) { Mode = GameMode.Awd };
+        var scheduler = new Scheduler();
+        var useCase = new RecordSystemScoringEvent(store, scheduler, scheduler);
+        var command = Command(Guid.NewGuid()) with
+        {
+            Kind = ScoringEventKind.AwdServiceCheck,
+            Result = ScoringResult.Wrong
+        };
+
+        var result = await useCase.ExecuteAsync(command);
+
+        await Assert.That(result.Created).IsTrue();
+        await Assert.That(store.LastCommand!.Kind).IsEqualTo(ScoringEventKind.AwdServiceCheck);
+    }
+
+    [Test]
+    public async Task ExecuteAsync_RejectsAwdpFixCheckOutsideDedicatedUseCase()
+    {
+        var store = new Store(new(Guid.NewGuid(), true));
+        var scheduler = new Scheduler();
+        var useCase = new RecordSystemScoringEvent(store, scheduler, scheduler);
+        var command = Command(Guid.NewGuid()) with { Kind = ScoringEventKind.AwdpFixCheck };
+
+        var execute = async () => await useCase.ExecuteAsync(command);
+
+        await Assert.That(execute).Throws<ArgumentException>();
+        await Assert.That(store.RecordCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task RecordAwdpCheckResult_MapsExitCodeBeforeRecordingFact()
+    {
+        var store = new Store(new(Guid.NewGuid(), true));
+        var scheduler = new Scheduler();
+        var record = new RecordSystemScoringEvent(store, scheduler, scheduler);
+        var useCase = new RecordAwdpCheckResult(new AwdpCheckExitCodeMapper(), store, record);
+
+        var result = await useCase.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 2, false,
+            DateTimeOffset.UtcNow, "awdp-check:1"));
+
+        await Assert.That(result.Created).IsTrue();
+        await Assert.That(store.LastCommand!.Kind).IsEqualTo(ScoringEventKind.AwdpFixCheck);
+        await Assert.That(store.LastCommand.Result).IsEqualTo(ScoringResult.Rejected);
+        await Assert.That(store.LastCommand.FailureCode).IsEqualTo(ScoringFailureCode.AwdpViolation);
+    }
+
+    [Test]
+    public async Task RecordAwdpCheckResult_RejectsNonAwdpCompetition()
+    {
+        var store = new Store(new(Guid.NewGuid(), true)) { Mode = GameMode.Ctf };
+        var scheduler = new Scheduler();
+        var record = new RecordSystemScoringEvent(store, scheduler, scheduler);
+        var useCase = new RecordAwdpCheckResult(new AwdpCheckExitCodeMapper(), store, record);
+
+        var result = await useCase.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 0, false,
+            DateTimeOffset.UtcNow, "awdp-check:wrong-mode"));
+
+        await Assert.That(result.Failure).IsEqualTo(SystemScoringEventRecordFailure.CompetitionModeMismatch);
+        await Assert.That(store.RecordCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task RecordAwdpCheckResult_ReturnsNotFoundForMissingCompetition()
+    {
+        var store = new Store(new(Guid.NewGuid(), true)) { Mode = null };
+        var scheduler = new Scheduler();
+        var record = new RecordSystemScoringEvent(store, scheduler, scheduler);
+        var useCase = new RecordAwdpCheckResult(new AwdpCheckExitCodeMapper(), store, record);
+
+        var result = await useCase.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 0, false,
+            DateTimeOffset.UtcNow, "awdp-check:missing"));
+
+        await Assert.That(result.Failure).IsEqualTo(SystemScoringEventRecordFailure.CompetitionNotFound);
+        await Assert.That(store.RecordCalls).IsEqualTo(0);
+    }
+
     private static RecordSystemScoringEventCommand Command(Guid competition) => new(
-        competition, Guid.NewGuid(), Guid.NewGuid(), ScoringEventKind.AwdServiceCheck,
+        competition, Guid.NewGuid(), Guid.NewGuid(), ScoringEventKind.SystemInput,
         ScoringResult.Correct, null, DateTimeOffset.UtcNow, "test-v1", "source-1");
 
     private sealed class Store(RecordSystemScoringEventResult result) : ISystemScoringEventStore
     {
+        public GameMode? Mode { get; init; } = GameMode.Awdp;
+        public RecordSystemScoringEventCommand? LastCommand { get; private set; }
+        public Task<GameMode?> GetCompetitionModeAsync(Guid competitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(Mode);
         public CompetitionStatus? Status { get; init; } = CompetitionStatus.Running;
         public int RecordCalls { get; private set; }
         public Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult(Status);
         public Task<RecordSystemScoringEventResult> RecordAsync(RecordSystemScoringEventCommand command, CancellationToken cancellationToken)
         {
             RecordCalls++;
+            LastCommand = command;
             return Task.FromResult(result);
         }
     }
