@@ -1,11 +1,15 @@
 using NoCTF.Application.Storage;
+using NoCTF.Application.Submissions.Intake;
 
 namespace NoCTF.API.OpenApi;
 
 internal sealed class SwaggerFixUploadStore : IFixUploadSessionStore
 {
-    public Task<FixUploadGrant?> CreateAsync(CreateFixUploadCommand command, CancellationToken cancellationToken) =>
-        Task.FromResult<FixUploadGrant?>(null);
+    public Task<FixUploadCreationResult> CreateAsync(
+        CreateFixUploadCommand command,
+        SubmissionAdmissionSnapshot expectedAdmission,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(FixUploadCreationResult.Rejected(FixUploadCreationFailure.AdmissionChanged));
 
     public Task<FixUploadMetadata?> GetAuthorizedMetadataAsync(
         Guid uploadId,

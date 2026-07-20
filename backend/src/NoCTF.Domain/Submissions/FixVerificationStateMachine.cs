@@ -10,6 +10,9 @@ public static class FixVerificationStateMachine
     public static bool CanTransition(FixVerificationStatus from, FixVerificationStatus to) =>
         (from, to) switch
         {
+            (FixVerificationStatus.AuthorizationPending, FixVerificationStatus.Created) => true,
+            (FixVerificationStatus.AuthorizationPending, FixVerificationStatus.Expired) => true,
+            (FixVerificationStatus.AuthorizationPending, FixVerificationStatus.CleanupPending) => true,
             (FixVerificationStatus.Created, FixVerificationStatus.Claimed) => true,
             (FixVerificationStatus.Claimed, FixVerificationStatus.Verifying) => true,
             (FixVerificationStatus.Verifying, FixVerificationStatus.Valid) => true,

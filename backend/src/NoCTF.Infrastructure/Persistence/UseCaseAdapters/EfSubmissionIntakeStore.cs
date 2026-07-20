@@ -67,64 +67,8 @@ public sealed class EfSubmissionIntakeStore(
         Guid challengeId,
         Guid userId,
         CancellationToken ct)
-    {
-        var scope = await (
-            from competition in db.Competitions.AsNoTracking()
-            join competitionConfiguration in db.CompetitionConfigurations.AsNoTracking()
-                on competition.Id equals competitionConfiguration.CompetitionId
-            join challenge in db.Challenges.AsNoTracking()
-                on competition.Id equals challenge.CompetitionId
-            join challengeConfiguration in db.ChallengeConfigurations.AsNoTracking()
-                on challenge.Id equals challengeConfiguration.ChallengeId
-            join team in db.Teams.AsNoTracking()
-                on competition.Id equals team.CompetitionId
-            where competition.Id == competitionId && challenge.Id == challengeId && team.Id == teamId
-            select new
-            {
-                Competition = competition,
-                CompetitionConfiguration = competitionConfiguration,
-                Challenge = challenge,
-                ChallengeConfiguration = challengeConfiguration,
-                Team = team
-            }).SingleOrDefaultAsync(ct);
-        if (scope is null)
-            return null;
-
-        var belongs = await db.TeamMembers.AsNoTracking().AnyAsync(
-            member => member.CompetitionId == competitionId
-                      && member.TeamId == teamId
-                      && member.UserId == userId,
-            ct);
-        var attempts = await db.Submissions.AsNoTracking()
-            .Where(submission => submission.CompetitionId == competitionId
-                                 && submission.TeamId == teamId
-                                 && submission.ChallengeId == challengeId)
-            .GroupBy(submission => submission.Kind)
-            .Select(group => new { Kind = group.Key, Count = group.Count() })
-            .ToDictionaryAsync(item => item.Kind, item => item.Count, ct);
-
-        return new(
-            competitionId,
-            teamId,
-            challengeId,
-            scope.Competition.Mode,
-            scope.CompetitionConfiguration.Revision,
-            scope.ChallengeConfiguration.Revision,
-            scope.CompetitionConfiguration.Json,
-            scope.ChallengeConfiguration.Json,
-            attempts.GetValueOrDefault(DomainSubmissionKind.Flag),
-            attempts.GetValueOrDefault(DomainSubmissionKind.Fix),
-            scope.Competition.Status,
-            scope.Competition.StartTime,
-            scope.Competition.EndTime,
-            scope.Competition.Deletion.IsDeleted,
-            scope.Challenge.Deletion.IsDeleted,
-            scope.Challenge.IsPublished,
-            scope.Team.Deletion.IsDeleted,
-            scope.Team.Ban.IsBanned,
-            scope.Team.RegistrationStatus == NoCTF.Domain.Teams.TeamRegistrationStatus.Approved,
-            belongs);
-    }
+        => await SubmissionAdmissionPersistence.LoadAsync(
+            db, competitionId, teamId, challengeId, userId, ct);
 
     public async Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
         FlagSubmissionReceived received,
@@ -149,7 +93,7 @@ public sealed class EfSubmissionIntakeStore(
 
         var current = await LoadAdmissionAsync(
             received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
-        if (!MatchesSnapshot(snapshot, current))
+        if (!SubmissionAdmissionPersistence.Matches(snapshot, current))
             return new(SubmissionAcceptanceState.SnapshotChanged);
         if (maxAttempts is > 0 && current!.AcceptedFlagAttempts >= maxAttempts)
             return new(SubmissionAcceptanceState.AttemptsExhausted);
@@ -207,13 +151,14 @@ public sealed class EfSubmissionIntakeStore(
 
         var current = await LoadAdmissionAsync(
             received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
-        if (!MatchesSnapshot(snapshot, current))
+        if (!SubmissionAdmissionPersistence.Matches(snapshot, current))
             return new(SubmissionAcceptanceState.SnapshotChanged);
         if (maxAttempts is > 0 && current!.AcceptedFixAttempts >= maxAttempts)
             return new(SubmissionAcceptanceState.AttemptsExhausted);
 
         var record = await db.FixSubmissionRecords.SingleOrDefaultAsync(
-            item => item.UploadId == received.UploadId,
+            item => item.UploadId == received.UploadId
+                    && item.VerificationStatus == FixVerificationStatus.Created,
             ct);
         if (record is null || record.SubmissionId is not null || record.ExpiresAt <= received.ReceivedAt
             || record.CompetitionId != received.CompetitionId || record.TeamId != received.TeamId
@@ -290,19 +235,4 @@ public sealed class EfSubmissionIntakeStore(
         && submission.UserId == userId
         && submission.Kind == kind;
 
-    private static bool MatchesSnapshot(
-        SubmissionAdmissionSnapshot expected,
-        SubmissionAdmissionSnapshot? current) =>
-        current is not null
-        && current.Mode == expected.Mode
-        && current.CompetitionConfigurationRevision == expected.CompetitionConfigurationRevision
-        && current.ChallengeConfigurationRevision == expected.ChallengeConfigurationRevision
-        && current.CompetitionStatus == expected.CompetitionStatus
-        && current.CompetitionDeleted == expected.CompetitionDeleted
-        && current.ChallengeDeleted == expected.ChallengeDeleted
-        && current.ChallengePublished == expected.ChallengePublished
-        && current.TeamDeleted == expected.TeamDeleted
-        && current.TeamBanned == expected.TeamBanned
-        && current.TeamApproved == expected.TeamApproved
-        && current.UserBelongsToTeam == expected.UserBelongsToTeam;
 }

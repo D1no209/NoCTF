@@ -96,7 +96,8 @@ public sealed class EfFixVerificationStore(NoCtfDbContext db) : IFixVerification
     {
         var records = await db.FixSubmissionRecords
             .Where(item => item.ExpiresAt <= now
-            && (item.VerificationStatus == DomainFixVerificationStatus.Created
+            && (item.VerificationStatus == DomainFixVerificationStatus.AuthorizationPending
+                || item.VerificationStatus == DomainFixVerificationStatus.Created
                 || item.VerificationStatus == DomainFixVerificationStatus.Claimed))
             .ToListAsync(ct);
         foreach (var record in records)

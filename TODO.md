@@ -33,7 +33,7 @@
 - [x] 明确 StartTime/EndTime 边界为服务器 `ReceivedAt` 判断。
 - [x] 规定 Running 后哪些字段不可修改。
 - [ ] 规定 Finished 后只允许查询和审计。
-  - [x] Competition、Team、Challenge、配置、Flag、Submission intake 与计分管理写入使用 lifecycle 行锁并拒绝 Finished。
+  - [x] Competition、Team、Challenge、配置、Flag、Fix upload、Submission intake 与计分管理写入使用 lifecycle 行锁并拒绝 Finished。
   - [ ] 完成其余 mutation path 审计后关闭本项。
 - [x] 为状态转换建立 Application policy，不让 endpoint 自行判断。
 
@@ -207,7 +207,7 @@
 
 ## 6. Fix submission 完整状态机
 
-- [x] `Created -> Claimed -> Verifying -> Valid/TeamFailure/PlatformFailed` 状态机。
+- [x] `AuthorizationPending -> Created -> Claimed -> Verifying -> Valid/TeamFailure/PlatformFailed` 状态机。
 - [x] Upload expiry 检查。
 - [x] Upload claim transaction。
 - [x] archive path 安全校验。
