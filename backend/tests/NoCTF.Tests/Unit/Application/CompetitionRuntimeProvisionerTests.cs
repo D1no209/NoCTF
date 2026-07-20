@@ -124,6 +124,7 @@ public class CompetitionRuntimeProvisionerTests
             Guid competitionId,
             string operationKey,
             RuntimeOperationKind kind,
+            DateTimeOffset staleBefore,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {

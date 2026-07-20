@@ -27,7 +27,8 @@ public enum RuntimeProvisionFailure
     PersistenceRejected,
     CreateCanceled,
     CreateTimeout,
-    CreateFailed
+    CreateFailed,
+    ReceiptMismatch
 }
 
 public sealed record RuntimeOperationFailureContext(
@@ -45,6 +46,7 @@ public interface IRuntimeOperationStore
         Guid competitionId,
         string operationKey,
         RuntimeOperationKind kind,
+        DateTimeOffset staleBefore,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
@@ -79,12 +81,38 @@ public sealed record ProvisionChallengeRuntimeResult(
     bool AlreadyExists,
     RuntimeProvisionFailure? Failure = null);
 
+public sealed record RuntimeOperationPolicyOptions(
+    TimeSpan DefaultOperationTimeout,
+    TimeSpan CompensationTimeout,
+    TimeSpan ClaimLeaseGrace)
+{
+    public static TimeSpan MaximumOperationTimeout { get; } = TimeSpan.FromMinutes(5);
+
+    public static RuntimeOperationPolicyOptions Default { get; } = new(
+        TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+
+    public void Validate()
+    {
+        ValidateDuration(DefaultOperationTimeout, nameof(DefaultOperationTimeout));
+        ValidateDuration(CompensationTimeout, nameof(CompensationTimeout));
+        ValidateDuration(ClaimLeaseGrace, nameof(ClaimLeaseGrace));
+    }
+
+    public static void ValidateOperationTimeout(TimeSpan timeout) =>
+        ValidateDuration(timeout, "OperationTimeout");
+
+    private static void ValidateDuration(TimeSpan value, string name)
+    {
+        if (value <= TimeSpan.Zero || value > MaximumOperationTimeout)
+            throw new ArgumentOutOfRangeException(name, value, "Runtime durations must be between 1 tick and 5 minutes.");
+    }
+}
+
 public sealed class ChallengeRuntimeProvisioner(
     IRuntimeOperationStore operations,
-    IContainerLifecycle runtime)
+    IContainerLifecycle runtime,
+    RuntimeOperationPolicyOptions? configuredOptions = null)
 {
-    private static readonly TimeSpan DefaultCompensationTimeout = TimeSpan.FromSeconds(30);
-
     public async Task<ProvisionChallengeRuntimeResult> ExecuteAsync(
         ProvisionChallengeRuntimeCommand command,
         CancellationToken ct = default)
@@ -92,11 +120,17 @@ public sealed class ChallengeRuntimeProvisioner(
         if (string.IsNullOrWhiteSpace(command.OperationKey) || command.OperationKey.Length > 256)
             throw new ArgumentException("Runtime operation key is required and cannot exceed 256 characters.", nameof(command));
 
+        var options = configuredOptions ?? RuntimeOperationPolicyOptions.Default;
+        options.Validate();
+        var effectiveOperationTimeout = command.OperationTimeout ?? options.DefaultOperationTimeout;
+        RuntimeOperationPolicyOptions.ValidateOperationTimeout(effectiveOperationTimeout);
         var now = DateTimeOffset.UtcNow;
+        var claimLeaseDuration = RuntimeOperationPolicyOptions.MaximumOperationTimeout + options.ClaimLeaseGrace;
         var begin = await operations.BeginAsync(
             command.CompetitionId,
             command.OperationKey,
             RuntimeOperationKind.CreateContainer,
+            now.Subtract(claimLeaseDuration),
             now,
             ct);
         if (begin.Lease is null)
@@ -110,15 +144,11 @@ public sealed class ChallengeRuntimeProvisioner(
         if (!lease.IsNew)
             return new(lease.OperationId, lease.Status, null, true);
 
-        var request = command.Container with { OperationId = lease.OperationId };
+        var request = command.Container with { OperationId = lease.ClaimToken };
         DateTimeOffset? expiresAt = request.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null;
-        using var operationTimeout = command.OperationTimeout is { } timeout
-            ? new CancellationTokenSource(timeout)
-            : null;
-        using var linked = operationTimeout is null
-            ? null
-            : CancellationTokenSource.CreateLinkedTokenSource(ct, operationTimeout.Token);
-        var operationToken = linked?.Token ?? ct;
+        using var operationTimeout = new CancellationTokenSource(effectiveOperationTimeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, operationTimeout.Token);
+        var operationToken = linked.Token;
         ContainerReceipt receipt;
         try
         {
@@ -141,6 +171,14 @@ public sealed class ChallengeRuntimeProvisioner(
             _ = await RecordFailureAsync(
                 lease, command, expiresAt, RuntimeProvisionFailure.CreateFailed, null);
             return new(lease.OperationId, RuntimeStatus.Failed, null, false, RuntimeProvisionFailure.CreateFailed);
+        }
+
+        if (receipt.OperationId != lease.ClaimToken)
+        {
+            var cleanupReceipt = await TryDestroyAsync(receipt);
+            _ = await RecordFailureAsync(
+                lease, command, expiresAt, RuntimeProvisionFailure.ReceiptMismatch, cleanupReceipt);
+            return new(lease.OperationId, RuntimeStatus.Failed, null, false, RuntimeProvisionFailure.ReceiptMismatch);
         }
 
         try
@@ -185,7 +223,7 @@ public sealed class ChallengeRuntimeProvisioner(
             ContainerReceipt? cleanupReceipt)
         {
             using var compensation = new CancellationTokenSource(
-                provisionCommand.OperationTimeout ?? DefaultCompensationTimeout);
+                options.CompensationTimeout);
             return await operations.FailAsync(
                 operationLease,
                 new(
@@ -201,7 +239,7 @@ public sealed class ChallengeRuntimeProvisioner(
         async Task<ContainerReceipt?> TryDestroyAsync(ContainerReceipt createdReceipt)
         {
             using var compensation = new CancellationTokenSource(
-                command.OperationTimeout ?? DefaultCompensationTimeout);
+                options.CompensationTimeout);
             try
             {
                 await runtime.DestroyAsync(createdReceipt, compensation.Token);

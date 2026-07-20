@@ -147,6 +147,12 @@ public static class ServiceRegistration
         services.AddScoped<UpdateChallengeConfiguration>();
         services.AddScoped<IChallengeFlagStore, EfChallengeFlagStore>();
         services.AddScoped<ICompetitionRebuildProcessor, EfCompetitionRebuildProcessor>();
+        var runtimePolicyOptions = new RuntimeOperationPolicyOptions(
+            TimeSpan.FromSeconds(configuration.GetValue("Runtime:Operation:DefaultTimeoutSeconds", 300)),
+            TimeSpan.FromSeconds(configuration.GetValue("Runtime:Operation:CompensationTimeoutSeconds", 30)),
+            TimeSpan.FromSeconds(configuration.GetValue("Runtime:Operation:ClaimLeaseGraceSeconds", 30)));
+        runtimePolicyOptions.Validate();
+        services.AddSingleton(runtimePolicyOptions);
         services.AddScoped<IRuntimeOperationStore, EfRuntimeOperationStore>();
         services.AddScoped<IRuntimeCleanupStore, EfRuntimeCleanupStore>();
         services.AddScoped<ChallengeRuntimeProvisioner>();
