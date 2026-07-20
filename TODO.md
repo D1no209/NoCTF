@@ -260,10 +260,10 @@
 ### 7.4 KoH
 
 - [x] 不接受普通 Flag Submission。
-- [ ] Agent observation parser。
-- [ ] Team identifier 映射。
-- [ ] unknown/invalid identifier 处理。
-- [ ] polling timeout。
+- [x] Agent observation parser。
+- [x] Team identifier 映射。
+- [x] unknown/invalid identifier 处理。
+- [x] polling timeout。
 - [ ] control transition。
 - [x] control interval score。
 - [x] banned/deleted Team 过滤。
@@ -287,15 +287,15 @@
 - [ ] `AwdRoundSettlementHostedService`。
 - [ ] `AwdpRoundHostedService`。
 - [ ] `AwdpSettlementHostedService`。
-- [ ] `KohPollingHostedService`。
+- [x] `KohPollingHostedService`。
 - [ ] Penetration stage monitor。
 - [ ] producer 使用 Runner scoring JWT。
-- [ ] producer 使用 stable SourceKey。
+- [x] producer 使用 stable SourceKey。
 - [ ] producer timeout/retry。
-- [ ] producer 不记录 Flag、archive URL 或 secret。
-- [ ] Competition Paused 时暂停 producer。
-- [ ] Competition Finished 时停止 producer。
-- [ ] 失败 producer 生成 PlatformFailed 或明确延迟策略。
+- [x] producer 不记录 Flag、archive URL 或 secret。
+- [x] Competition Paused 时暂停 producer。
+- [x] Competition Finished 时停止 producer。
+- [x] 失败 producer 生成 PlatformFailed 或明确延迟策略。
 
 ## 9. Runner 和 runtime lifecycle
 

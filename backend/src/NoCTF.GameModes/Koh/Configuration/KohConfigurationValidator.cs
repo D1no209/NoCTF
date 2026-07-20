@@ -17,6 +17,15 @@ public static class KohConfigurationValidator
             || uri.Scheme is not ("http" or "https"))
             errors.Add("AgentUrl must be an absolute HTTP or HTTPS URL.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
+        if (configuration.TeamIdentifiers is { } identifiers)
+        {
+            if (identifiers.Keys.Any(string.IsNullOrWhiteSpace))
+                errors.Add("KoH team identifiers cannot be empty.");
+            if (identifiers.Values.Any(teamId => teamId == Guid.Empty))
+                errors.Add("KoH team identifiers must map to non-empty Team IDs.");
+            if (identifiers.Values.Distinct().Count() != identifiers.Count)
+                errors.Add("Each KoH Team ID can have only one external identifier.");
+        }
         return errors;
     }
 }
