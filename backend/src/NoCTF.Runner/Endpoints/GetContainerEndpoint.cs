@@ -15,7 +15,11 @@ public sealed class GetContainerRequest
 public sealed class GetContainerEndpoint(RuntimeProviderCatalog providers)
     : Endpoint<GetContainerRequest, Results<Ok<ContainerReceipt>, NotFound, ProblemHttpResult>>
 {
-    public override void Configure() => Get("/containers/{resourceId}");
+    public override void Configure()
+    {
+        Get("/containers/{resourceId}");
+        AllowAnonymous(); // Authentication is enforced by RunnerSecurity's API-key middleware.
+    }
 
     public override async Task<Results<Ok<ContainerReceipt>, NotFound, ProblemHttpResult>> ExecuteAsync(
         GetContainerRequest request,

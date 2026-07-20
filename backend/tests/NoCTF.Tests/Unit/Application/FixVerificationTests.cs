@@ -96,15 +96,18 @@ public class FixVerificationTests
     }
 
     [Test]
-    public async Task VerifyFixSubmission_VerifierException_IsMappedToPlatformFailure()
+    public async Task VerifyFixSubmission_SensitiveRunnerFailure_IsReducedToBoundedFailure()
     {
+        const string sensitiveFailure = "FLAG{must-not-log} archive-content-must-not-log";
         var store = new Store();
-        var result = await new VerifyFixSubmission(store, new ThrowingVerifier())
+        var result = await new VerifyFixSubmission(store, new ThrowingVerifier(sensitiveFailure))
             .ExecuteAsync(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.Result!.Status).IsEqualTo(ApplicationFixVerificationStatus.PlatformFailed);
         await Assert.That(store.Result.ErrorCode).IsEqualTo(ScoringFailureCode.StorageUnavailable);
+        await Assert.That(store.Result.ToString()).DoesNotContain(sensitiveFailure);
+        await Assert.That(store.Version).DoesNotContain(sensitiveFailure);
     }
 
     [Test]
@@ -203,10 +206,10 @@ public class FixVerificationTests
         public Task<Stream> OpenReadAsync(string objectKey, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class ThrowingVerifier : IFixSubmissionVerifier
+    private sealed class ThrowingVerifier(string failureMessage) : IFixSubmissionVerifier
     {
         public Task<FixVerificationResult> VerifyAsync(
             FixSubmissionReceived submission,
-            CancellationToken cancellationToken) => throw new InvalidOperationException("verifier failed");
+            CancellationToken cancellationToken) => throw new InvalidOperationException(failureMessage);
     }
 }

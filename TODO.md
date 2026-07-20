@@ -215,7 +215,7 @@
 - [x] archive metadata 读取和 hash 校验。
 - [x] verifier timeout。
 - [x] verifier failure category 映射。
-- [ ] runner failure 不写入 Flag 或 archive 内容日志。
+- [x] runner failure 不写入 Flag 或 archive 内容日志。
 - [x] Fix retry 的旧 event soft-delete 和 record 状态重置规则。
 - [x] 原始 runtime 恢复逻辑。
 - [x] CleanupPending 扫描和清理。

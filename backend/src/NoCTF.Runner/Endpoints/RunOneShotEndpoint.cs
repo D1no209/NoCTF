@@ -5,10 +5,14 @@ using NoCTF.Application.Runtime.Ports;
 
 namespace NoCTF.Runner.Endpoints;
 
-public sealed class RunOneShotEndpoint(RuntimeProviderCatalog providers)
+public sealed class RunOneShotEndpoint(IOneShotRuntimeProviderCatalog providers)
     : Endpoint<CreateContainerRequest, Results<Ok<OneShotResult>, ProblemHttpResult>>
 {
-    public override void Configure() => Post("/jobs/one-shot");
+    public override void Configure()
+    {
+        Post("/jobs/one-shot");
+        AllowAnonymous(); // Authentication is enforced by RunnerSecurity's API-key middleware.
+    }
 
     public override async Task<Results<Ok<OneShotResult>, ProblemHttpResult>> ExecuteAsync(
         CreateContainerRequest request,
@@ -32,6 +36,16 @@ public sealed class RunOneShotEndpoint(RuntimeProviderCatalog providers)
         catch (UnsupportedRuntimeProviderException exception)
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, detail: exception.Message);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status502BadGateway,
+                title: "Runner job failed.");
         }
     }
 }

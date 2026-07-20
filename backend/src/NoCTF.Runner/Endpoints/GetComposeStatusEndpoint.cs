@@ -17,7 +17,11 @@ public sealed class GetComposeStatusRequest
 public sealed class GetComposeStatusEndpoint(RuntimeProviderCatalog providers)
     : Endpoint<GetComposeStatusRequest, Results<Ok<ComposeStatus>, NotFound, ProblemHttpResult>>
 {
-    public override void Configure() => Post("/compose/status");
+    public override void Configure()
+    {
+        Post("/compose/status");
+        AllowAnonymous(); // Authentication is enforced by RunnerSecurity's API-key middleware.
+    }
 
     public override async Task<Results<Ok<ComposeStatus>, NotFound, ProblemHttpResult>> ExecuteAsync(
         GetComposeStatusRequest request,

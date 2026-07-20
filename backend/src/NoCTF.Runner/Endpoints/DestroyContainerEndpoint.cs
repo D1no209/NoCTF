@@ -15,7 +15,11 @@ public sealed class DestroyContainerRequest
 public sealed class DestroyContainerEndpoint(RuntimeProviderCatalog providers)
     : Endpoint<DestroyContainerRequest, Results<NoContent, ProblemHttpResult>>
 {
-    public override void Configure() => Post("/containers/destroy");
+    public override void Configure()
+    {
+        Post("/containers/destroy");
+        AllowAnonymous(); // Authentication is enforced by RunnerSecurity's API-key middleware.
+    }
 
     public override async Task<Results<NoContent, ProblemHttpResult>> ExecuteAsync(
         DestroyContainerRequest request,

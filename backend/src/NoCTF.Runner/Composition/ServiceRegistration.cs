@@ -6,9 +6,12 @@ using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Runtime.Kubernetes.Compose;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Containers;
+using NoCTF.Runner.Endpoints;
 using k8s;
 
 namespace NoCTF.Runner.Composition;
+
+public sealed class RunnerProgramMarker;
 
 public static class ServiceRegistration
 {
@@ -29,8 +32,14 @@ public static class ServiceRegistration
         services.AddSingleton<KubernetesContainerLifecycle>();
         services.AddSingleton<KubernetesComposeRuntime>();
         services.AddSingleton<RuntimeProviderCatalog>();
+        services.AddSingleton<IOneShotRuntimeProviderCatalog>(provider =>
+            provider.GetRequiredService<RuntimeProviderCatalog>());
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
-        services.AddFastEndpoints();
+        services.AddFastEndpoints(discovery =>
+        {
+            discovery.Assemblies = [typeof(RunOneShotEndpoint).Assembly];
+            discovery.DisableAutoDiscovery = true;
+        });
         return services;
     }
 }

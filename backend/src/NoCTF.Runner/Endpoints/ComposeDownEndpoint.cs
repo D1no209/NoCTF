@@ -17,7 +17,11 @@ public sealed class ComposeDownRequest
 public sealed class ComposeDownEndpoint(RuntimeProviderCatalog providers)
     : Endpoint<ComposeDownRequest, Results<NoContent, ProblemHttpResult>>
 {
-    public override void Configure() => Post("/compose/down");
+    public override void Configure()
+    {
+        Post("/compose/down");
+        AllowAnonymous(); // Authentication is enforced by RunnerSecurity's API-key middleware.
+    }
 
     public override async Task<Results<NoContent, ProblemHttpResult>> ExecuteAsync(
         ComposeDownRequest request,
