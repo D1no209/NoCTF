@@ -17,7 +17,7 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
     public override async Task<Results<Ok<LoginResponse>, UnauthorizedHttpResult>> ExecuteAsync(
         CancellationToken cancellationToken)
     {
-        if (!RefreshRequestGuard.IsSameOrigin(HttpContext.Request))
+        if (!RefreshRequestGuard.IsAllowed(HttpContext.Request, configuration))
             return TypedResults.Unauthorized();
         if (!HttpContext.Request.Cookies.TryGetValue("noctf_refresh", out var refreshToken)
             || string.IsNullOrWhiteSpace(refreshToken))
