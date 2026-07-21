@@ -1,5 +1,6 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { ApiError, competitionApi } from '@/api/noctf'
+import { useScoreStore } from '@/stores/score'
 import { normalizeDirection } from '@/lib/challengeDirections'
 import type {
   AwdpChallengeStateDto,
@@ -82,6 +83,7 @@ function readOption(read: (() => boolean | undefined) | undefined) {
 // driving cooldown/expiry math, and outcome objects instead of user-facing
 // copy so each theme renders its own feedback.
 export function useChallengeConsole(options: UseChallengeConsoleOptions) {
+  const scoreStore = useScoreStore()
   const flagInput = ref('')
   const submitting = ref(false)
   const submitResult = ref<'correct' | 'incorrect' | null>(null)
@@ -103,7 +105,7 @@ export function useChallengeConsole(options: UseChallengeConsoleOptions) {
     const dt = options.challenge()?.deploymentType
     if (dt === 2) return true
     if (typeof dt === 'string' && dt.toLowerCase() === 'dynamiccontainer') return true
-    const dir = normalizeDirection(options.challenge()?.typeId)
+    const dir = normalizeDirection(options.challenge()?.direction)
     if (dir === 'WEB' || dir === 'PWN') return true
     return false
   })
@@ -301,6 +303,7 @@ export function useChallengeConsole(options: UseChallengeConsoleOptions) {
     try {
       const data = await competitionApi.submitFlag<ChallengeConsoleFlagResponseDto>(
         options.competitionId(),
+        scoreStore.teamId ?? '',
         challenge.id,
         flagInput.value.trim(),
       )
@@ -345,7 +348,7 @@ export function useChallengeConsole(options: UseChallengeConsoleOptions) {
     patchUploading.value = true
 
     try {
-      await competitionApi.submitPatch(options.competitionId(), challenge.id, patchFile.value)
+      await competitionApi.submitPatch(options.competitionId(), scoreStore.teamId ?? '', challenge.id, patchFile.value)
       patchFile.value = null
       return { kind: 'ok' }
     }

@@ -23,12 +23,12 @@ POST /api/auth/login
 Content-Type: application/json
 
 {
-  "username": "your_username",
+  "email": "your_email_or_username",
   "password": "your_password"
 }
 ```
 
-The response contains an `accessToken` string.
+The backward-compatible `email` field accepts either an email address or a username. Both are matched case-insensitively after surrounding whitespace is removed. The response contains an `accessToken` string.
 
 When email verification is enabled, registration returns `requiresEmailVerification: true` and login returns `403 email_not_verified` until the address is verified. Verification tokens are submitted in the request body rather than in an API URL:
 
@@ -81,7 +81,7 @@ For WebSocket connections, pass the JWT token via the `access_token` query param
 
 Clients receive:
 
-- `LeaderboardSnapshot` — full leaderboard payload (rank, team name, total score, solve count)
+- `LeaderboardResponse` — Redis-backed leaderboard payload (rank, team name, total score, solve count)
 - `LeaderboardDelta` — incremental updates when a single score changes
 
 ### GameHub
@@ -111,6 +111,15 @@ Clients receive:
 - `LogEntry` — real-time log stream from the backend
 
 ## Common Endpoints
+
+### Challenge type and direction
+
+Challenge template, competition challenge, and public challenge payloads expose two separate fields:
+
+- `typeId` selects the runtime challenge behavior, such as `Ctf`, `Awd`, `Awdp`, or a plugin-owned type such as `Penetration`.
+- `direction` is the subject direction shown to participants and reports, such as `WEB`, `PWN`, `MISC`, or `AI`.
+
+Clients must not use `direction` for runtime dispatch and must not display `typeId` as the challenge direction. Legacy rows whose direction could not be proven are returned as `Uncategorized`.
 
 ### User Notifications
 

@@ -36,7 +36,7 @@ export function useAdminCompetitionOperationsPage() {
   const competitionId = computed(() => String(route.params.id))
   const selectedChallengeId = ref('')
   const topologyJson = ref('{}')
-  const instanceChallengeFilter = ref('')
+  const instanceChallengeFilter = ref('__all__')
   const selectedInstanceId = ref('')
 
   const challengesQuery = useQuery({
@@ -68,7 +68,7 @@ export function useAdminCompetitionOperationsPage() {
   const instancesQuery = useQuery({
     queryKey: computed(() => [...instancesKey.value, instanceChallengeFilter.value]),
     queryFn: () => penetrationAdminApi.instances(competitionId.value, {
-      challengeId: instanceChallengeFilter.value || undefined,
+      challengeId: instanceChallengeFilter.value === '__all__' ? undefined : instanceChallengeFilter.value,
     } as never) as unknown as Promise<PenetrationInstanceDto[] | { items?: PenetrationInstanceDto[] }>,
     refetchInterval: 15_000,
   })

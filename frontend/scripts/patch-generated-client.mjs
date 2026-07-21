@@ -15,7 +15,7 @@ if (!clientSource.includes("import { createClientConfig } from '../client-config
 }
 
 clientSource = clientSource.replace(
-  /export const client = createClient\(createConfig<ClientOptions2>\(\{ baseUrl: '[^']*' \}\)\);/,
+  /export const client = createClient\(createConfig<ClientOptions2>\([^;]*\)\);/,
   'export const client = createClient(createConfig<ClientOptions2>(createClientConfig()));',
 )
 await writeFile(clientFile, clientSource)

@@ -10,5 +10,5 @@ if (!response.ok) {
 }
 
 await mkdir(dirname(output), { recursive: true })
-await writeFile(output, await response.text())
+await writeFile(output, `${(await response.text()).trimEnd()}\n`)
 console.log(`Wrote ${output}`)

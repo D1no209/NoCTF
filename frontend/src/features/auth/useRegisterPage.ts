@@ -12,7 +12,10 @@ export function useRegisterPage() {
   async function register(userName: string, email: string, password: string): Promise<RegisterOutcome> {
     loading.value = true
     try {
-      const result = await auth.register(userName, email, password)
+      const result = await auth.register(userName, email, password) as {
+        requiresEmailVerification?: boolean
+        verificationEmailSent?: boolean
+      }
       if (result.requiresEmailVerification) {
         await router.push({
           name: 'verify-email',

@@ -160,9 +160,10 @@ export function useScoreboard(options: UseScoreboardOptions) {
   }
 
   const { connection, isConnected, start } = useSignalR({
-    hubUrl: `/hubs/leaderboard?competitionId=${options.competitionId()}`,
+    hubUrl: '/hubs/competition',
     accessToken: () => auth.accessToken,
     onConnected: () => {
+      connection.value?.invoke('JoinCompetition', options.competitionId()).catch(() => undefined)
       stopPolling()
     },
     onDisconnected: () => {
@@ -177,13 +178,14 @@ export function useScoreboard(options: UseScoreboardOptions) {
   watch(connection, (conn) => {
     if (!conn)
       return
-    conn.on('ReceiveLeaderboardSnapshot', (data: ScoreboardEntryDto[]) => {
-      applyLeaderboard(data ?? [])
-      competitionApi.leaderboardTrend<ScoreboardTrendResponseDto>(options.competitionId())
-        .then((nextTrend) => {
-          trend.value = nextTrend?.series ?? []
-        })
-        .catch(() => undefined)
+    conn.on('leaderboardRefreshed', (notification: { competitionId?: string }) => {
+      if (notification?.competitionId && notification.competitionId !== options.competitionId())
+        return
+      void fetchLeaderboard()
+    })
+    conn.on('competitionLifecycleChanged', (notification: { competitionId?: string }) => {
+      if (notification?.competitionId === options.competitionId())
+        void fetchLeaderboard()
     })
     conn.on('ReceiveScoreUpdate', () => {
       void fetchLeaderboard()

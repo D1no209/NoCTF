@@ -1,4 +1,5 @@
 import { computed, ref, watch } from 'vue'
+import { challengeDirectionsForType, normalizeDirection } from '@/lib/challengeDirections'
 import { optionalPositiveNumber } from '../shared/number'
 
 export interface CheckerConfigDto {
@@ -19,6 +20,7 @@ export interface ChallengeTemplateInputDto {
   title?: string
   description?: string
   typeId?: string
+  direction?: string
   containerImage?: string
   containerMode?: 'SingleImage' | 'DockerCompose' | number
   composeYaml?: string
@@ -81,6 +83,7 @@ export interface ChallengeTemplateFormState {
   title: string
   description: string
   typeId: string
+  direction: string
   attachmentUrl: string
   patchTemplateUrl: string
   deploymentType: string
@@ -103,6 +106,7 @@ export function defaultChallengeTemplateForm(): ChallengeTemplateFormState {
     title: '',
     description: '',
     typeId: 'Ctf',
+    direction: 'WEB',
     attachmentUrl: '',
     patchTemplateUrl: '',
     deploymentType: 'StaticAttachment',
@@ -129,6 +133,7 @@ export function useChallengeTemplateForm(template: () => ChallengeTemplateInputD
   const form = ref<ChallengeTemplateFormState>(defaultChallengeTemplateForm())
 
   const selectedChallengeType = computed(() => normalizeChallengeType(form.value.typeId))
+  const directionOptions = computed(() => challengeDirectionsForType(selectedChallengeType.value))
   const deploymentOptionKeys = computed(() => selectedChallengeType.value === 'Ctf'
     ? ctfDeploymentTypes
     : containerDeploymentTypes)
@@ -153,6 +158,7 @@ export function useChallengeTemplateForm(template: () => ChallengeTemplateInputD
       title: value.title ?? '',
       description: value.description ?? '',
       typeId: normalizeChallengeType(value.typeId),
+      direction: normalizeDirection(value.direction),
       attachmentUrl: value.attachmentUrl ?? '',
       patchTemplateUrl: value.patchTemplateUrl ?? '',
       deploymentType: formDeploymentTypeKey(value.deploymentType),
@@ -178,6 +184,9 @@ export function useChallengeTemplateForm(template: () => ChallengeTemplateInputD
       form.value.deploymentType = 'DynamicContainer'
     if (mode === 'Ctf' && !ctfDeploymentTypes.includes(form.value.deploymentType as typeof ctfDeploymentTypes[number]))
       form.value.deploymentType = 'StaticAttachment'
+    const availableDirections = challengeDirectionsForType(mode)
+    if (!availableDirections.includes(normalizeDirection(form.value.direction)))
+      form.value.direction = availableDirections[0]
   })
 
   function buildPayload(): Record<string, unknown> {
@@ -200,6 +209,7 @@ export function useChallengeTemplateForm(template: () => ChallengeTemplateInputD
       title: form.value.title.trim(),
       description: form.value.description.trim() || undefined,
       typeId: normalizeChallengeType(form.value.typeId),
+      direction: normalizeDirection(form.value.direction),
       attachmentUrl: form.value.attachmentUrl.trim() || undefined,
       patchTemplateUrl: usesPatchTemplate.value ? form.value.patchTemplateUrl.trim() || undefined : undefined,
       deploymentType: deploymentTypeValue(effectiveDeploymentType),
@@ -227,6 +237,7 @@ export function useChallengeTemplateForm(template: () => ChallengeTemplateInputD
     attachmentFile,
     patchTemplateFile,
     selectedChallengeType,
+    directionOptions,
     deploymentOptionKeys,
     isContainerDeployment,
     usesRuntimeContainer,

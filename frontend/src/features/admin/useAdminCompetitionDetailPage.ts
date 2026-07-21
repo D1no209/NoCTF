@@ -52,13 +52,6 @@ export interface AdminCompetitionDto {
   awdpFixTimeoutSeconds?: number | null
 }
 
-export interface AdminCompetitionTemplateDto {
-  id: string
-  title: string
-  description?: string
-  typeId: string
-}
-
 export interface ChallengeHintDto {
   id?: string
   content: string
@@ -72,6 +65,7 @@ export interface CompetitionChallengeDto {
   description?: string
   descriptionFormat: string
   typeId: string
+  direction: string
   deploymentType?: string | number
   exposedPort?: number | null
   flagPrefix?: string
@@ -168,43 +162,6 @@ export interface AdminCompetitionDetailForm {
   awdpFixTimeoutSeconds: string
 }
 
-export interface AdminCompetitionChallengeBindForm {
-  templateId: string
-  description: string
-  initialPoints: string
-  minimumPoints: string
-  decayFactor: string
-  decayFunction: string
-  difficultyCoefficient: string
-  enableBloodBonus: boolean
-  flagPrefix: string
-  awdpAttackScorePerRound: string
-  awdpDefenseScorePerRound: string
-  awdpMaxAttackAttempts: string
-  awdpMaxDefenseAttempts: string
-  awdpFixEntry: string
-  awdpFixTimeoutSeconds: string
-  hints: string[]
-}
-
-export interface AdminCompetitionChallengeEdit {
-  description: string
-  initialPoints: string
-  minimumPoints: string
-  decayFactor: string
-  decayFunction: string
-  difficultyCoefficient: string
-  enableBloodBonus: boolean
-  flagPrefix: string
-  awdpAttackScorePerRound: string
-  awdpDefenseScorePerRound: string
-  awdpMaxAttackAttempts: string
-  awdpMaxDefenseAttempts: string
-  awdpFixEntry: string
-  awdpFixTimeoutSeconds: string
-  hints: string[]
-}
-
 export const adminCompetitionDetailSections = ['settings', 'challenges', 'teams', 'cheats', 'logs'] as const
 export type AdminCompetitionDetailSection = typeof adminCompetitionDetailSections[number]
 
@@ -222,25 +179,11 @@ function optionalString(value: number | string | undefined | null) {
   return value === undefined || value === null ? '' : String(value)
 }
 
-// V1's `??` inheritance chain: only null/undefined fall through, '' is kept.
-function inheritNumberString(...candidates: (number | string | undefined | null)[]) {
-  for (const candidate of candidates) {
-    if (candidate !== undefined && candidate !== null)
-      return String(candidate)
-  }
-  return ''
-}
-
-function cleanHints(hints: string[]) {
-  return hints.map(hint => hint.trim()).filter(Boolean)
-}
-
 export function useAdminCompetitionDetailPage() {
   const route = useRoute()
   const router = useRouter()
   const queryClient = useQueryClient()
   const competitionId = computed(() => String(route.params.id))
-  const selectedChallengeId = ref<string | null>(null)
 
   const competitionForm = ref<AdminCompetitionDetailForm>({
     title: '',
@@ -284,51 +227,9 @@ export function useAdminCompetitionDetailPage() {
     awdpFixTimeoutSeconds: '',
   })
 
-  const bindForm = ref<AdminCompetitionChallengeBindForm>({
-    templateId: '',
-    description: '',
-    initialPoints: '500',
-    minimumPoints: '100',
-    decayFactor: '450',
-    decayFunction: 'sigmoid',
-    difficultyCoefficient: '1',
-    enableBloodBonus: false,
-    flagPrefix: 'flag',
-    awdpAttackScorePerRound: '50',
-    awdpDefenseScorePerRound: '100',
-    awdpMaxAttackAttempts: '5',
-    awdpMaxDefenseAttempts: '3',
-    awdpFixEntry: 'fix.sh',
-    awdpFixTimeoutSeconds: '60',
-    hints: [''],
-  })
-
-  const selectedEdit = ref<AdminCompetitionChallengeEdit>({
-    description: '',
-    initialPoints: '500',
-    minimumPoints: '100',
-    decayFactor: '450',
-    decayFunction: 'sigmoid',
-    difficultyCoefficient: '1',
-    enableBloodBonus: false,
-    flagPrefix: 'flag',
-    awdpAttackScorePerRound: '50',
-    awdpDefenseScorePerRound: '100',
-    awdpMaxAttackAttempts: '5',
-    awdpMaxDefenseAttempts: '3',
-    awdpFixEntry: 'fix.sh',
-    awdpFixTimeoutSeconds: '60',
-    hints: [''],
-  })
-
   const competitionQuery = useQuery({
     queryKey: computed(() => queryKeys.adminCompetition(competitionId.value)),
     queryFn: () => adminApi.competition<AdminCompetitionDto>(competitionId.value),
-  })
-
-  const templatesQuery = useQuery({
-    queryKey: queryKeys.adminChallenges,
-    queryFn: () => adminApi.challenges<AdminCompetitionTemplateDto[]>(),
   })
 
   const challengesQuery = useQuery({
@@ -395,51 +296,6 @@ export function useAdminCompetitionDetailPage() {
       awdpFixEntry: value.awdpFixEntry ?? 'fix.sh',
       awdpFixTimeoutSeconds: optionalString(value.awdpFixTimeoutSeconds),
     }
-    bindForm.value = {
-      ...bindForm.value,
-      initialPoints: competitionForm.value.initialPoints,
-      minimumPoints: competitionForm.value.minimumPoints,
-      decayFactor: competitionForm.value.decayFactor,
-      decayFunction: competitionForm.value.decayFunction,
-      difficultyCoefficient: competitionForm.value.difficultyCoefficient,
-      flagPrefix: 'flag',
-      awdpAttackScorePerRound: String(value.awdpAttackScorePerRound ?? 50),
-      awdpDefenseScorePerRound: String(value.awdpDefenseScorePerRound ?? 100),
-      awdpMaxAttackAttempts: String(value.awdpMaxAttackAttempts ?? 5),
-      awdpMaxDefenseAttempts: String(value.awdpMaxDefenseAttempts ?? 3),
-      awdpFixEntry: value.awdpFixEntry ?? 'fix.sh',
-      awdpFixTimeoutSeconds: String(value.awdpFixTimeoutSeconds ?? 60),
-    }
-  }, { immediate: true })
-
-  watch(templatesQuery.data, (items) => {
-    if (!bindForm.value.templateId && items?.length)
-      bindForm.value = { ...bindForm.value, templateId: items[0].id }
-  }, { immediate: true })
-
-  const selectedChallenge = computed(() =>
-    challengesQuery.data.value?.find(challenge => challenge.id === selectedChallengeId.value) ?? null)
-
-  watch(selectedChallenge, (challenge) => {
-    if (!challenge)
-      return
-    selectedEdit.value = {
-      description: challenge.description ?? '',
-      initialPoints: String(challenge.pointsConfig?.initialPoints ?? 500),
-      minimumPoints: String(challenge.pointsConfig?.minimumPoints ?? 100),
-      decayFactor: String(challenge.pointsConfig?.decayFactor ?? 450),
-      decayFunction: challenge.pointsConfig?.decayFunction ?? 'sigmoid',
-      difficultyCoefficient: String(challenge.difficultyCoefficient ?? 1),
-      enableBloodBonus: challenge.enableBloodBonus ?? false,
-      flagPrefix: challenge.flagPrefix ?? 'flag',
-      awdpAttackScorePerRound: inheritNumberString(challenge.awdpAttackScorePerRound, competitionForm.value.awdpAttackScorePerRound, 50),
-      awdpDefenseScorePerRound: inheritNumberString(challenge.awdpDefenseScorePerRound, competitionForm.value.awdpDefenseScorePerRound, 100),
-      awdpMaxAttackAttempts: inheritNumberString(challenge.awdpMaxAttackAttempts, competitionForm.value.awdpMaxAttackAttempts, 5),
-      awdpMaxDefenseAttempts: inheritNumberString(challenge.awdpMaxDefenseAttempts, competitionForm.value.awdpMaxDefenseAttempts, 3),
-      awdpFixEntry: challenge.awdpFixEntry ?? competitionForm.value.awdpFixEntry ?? 'fix.sh',
-      awdpFixTimeoutSeconds: inheritNumberString(challenge.awdpFixTimeoutSeconds, competitionForm.value.awdpFixTimeoutSeconds, 60),
-      hints: challenge.hints?.length ? challenge.hints.map(hint => hint.content) : [''],
-    }
   }, { immediate: true })
 
   function competitionPayload() {
@@ -489,29 +345,6 @@ export function useAdminCompetitionDetailPage() {
     }
   }
 
-  function challengeEditorPayload(editor: AdminCompetitionChallengeEdit) {
-    return {
-      description: editor.description.trim() || undefined,
-      descriptionFormat: 'markdown',
-      pointsConfig: {
-        initialPoints: numberOrDefault(editor.initialPoints, 500),
-        minimumPoints: numberOrDefault(editor.minimumPoints, 100),
-        decayFactor: numberOrDefault(editor.decayFactor, 450),
-        decayFunction: editor.decayFunction || 'sigmoid',
-      },
-      difficultyCoefficient: numberOrDefault(editor.difficultyCoefficient, 1),
-      enableBloodBonus: editor.enableBloodBonus,
-      flagPrefix: editor.flagPrefix.trim() || 'flag',
-      awdpAttackScorePerRound: optionalNumber(editor.awdpAttackScorePerRound),
-      awdpDefenseScorePerRound: optionalNumber(editor.awdpDefenseScorePerRound),
-      awdpMaxAttackAttempts: optionalNumber(editor.awdpMaxAttackAttempts),
-      awdpMaxDefenseAttempts: optionalNumber(editor.awdpMaxDefenseAttempts),
-      awdpFixEntry: editor.awdpFixEntry.trim() || undefined,
-      awdpFixTimeoutSeconds: optionalNumber(editor.awdpFixTimeoutSeconds),
-      hints: cleanHints(editor.hints),
-    }
-  }
-
   const saveCompetitionMutation = useMutation({
     mutationFn: () => adminApi.updateCompetition(competitionId.value, competitionPayload()),
     onSuccess: () => {
@@ -520,33 +353,10 @@ export function useAdminCompetitionDetailPage() {
     },
   })
 
-  const bindMutation = useMutation({
-    mutationFn: () => adminApi.bindCompetitionChallenge(competitionId.value, {
-      templateId: bindForm.value.templateId,
-      ...challengeEditorPayload(bindForm.value),
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.adminCompetitionChallenges(competitionId.value) })
-      bindForm.value = { ...bindForm.value, description: '', hints: [''] }
-    },
-  })
-
-  const updateChallengeMutation = useMutation({
-    mutationFn: () => adminApi.updateCompetitionChallenge(
-      competitionId.value,
-      selectedChallenge.value!.id,
-      challengeEditorPayload(selectedEdit.value),
-    ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.adminCompetitionChallenges(competitionId.value) })
-    },
-  })
-
   const deleteChallengeMutation = useMutation({
     mutationFn: (challengeId: string) => adminApi.deleteCompetitionChallenge(competitionId.value, challengeId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminCompetitionChallenges(competitionId.value) })
-      selectedChallengeId.value = null
     },
   })
 
@@ -617,22 +427,6 @@ export function useAdminCompetitionDetailPage() {
     })
   }
 
-  function isStaticContainer(challenge: CompetitionChallengeDto) {
-    return challenge.deploymentType === 'StaticContainer' || challenge.deploymentType === 3
-  }
-
-  function selectChallenge(challenge: CompetitionChallengeDto) {
-    selectedChallengeId.value = challenge.id
-  }
-
-  function addBindHint() {
-    bindForm.value = { ...bindForm.value, hints: [...bindForm.value.hints, ''] }
-  }
-
-  function addEditHint() {
-    selectedEdit.value = { ...selectedEdit.value, hints: [...selectedEdit.value.hints, ''] }
-  }
-
   function goAdminCompetitions() {
     void router.push({ name: 'admin-competitions' })
   }
@@ -645,15 +439,19 @@ export function useAdminCompetitionDetailPage() {
     void router.push({ name: 'awdp-screen', params: { gameId: competitionId.value } })
   }
 
+  function goCreateChallenge() {
+    void router.push({ name: 'admin-competition-challenge-create', params: { id: competitionId.value } })
+  }
+
+  function goEditChallenge(challengeId: string) {
+    void router.push({ name: 'admin-competition-challenge-edit', params: { id: competitionId.value, challengeId } })
+  }
+
   return {
     competitionId,
-    selectedChallengeId,
     competitionForm,
-    bindForm,
-    selectedEdit,
     competition: competitionQuery.data,
     loadingCompetition: competitionQuery.isLoading,
-    templates: templatesQuery.data,
     competitionChallenges: challengesQuery.data,
     loadingChallenges: challengesQuery.isLoading,
     competitionTeams: teamsQuery.data,
@@ -662,10 +460,7 @@ export function useAdminCompetitionDetailPage() {
     loadingLogs: logsQuery.isLoading,
     cheatIncidents: cheatsQuery.data,
     loadingCheatIncidents: cheatsQuery.isLoading,
-    selectedChallenge,
     saveCompetitionMutation,
-    bindMutation,
-    updateChallengeMutation,
     deleteChallengeMutation,
     approveTeamMutation,
     rejectTeamMutation,
@@ -677,12 +472,10 @@ export function useAdminCompetitionDetailPage() {
     activeSection,
     switchSection,
     canOpenAwdpScreen,
-    isStaticContainer,
-    selectChallenge,
-    addBindHint,
-    addEditHint,
     goAdminCompetitions,
     goOperations,
     goAwdpScreen,
+    goCreateChallenge,
+    goEditChallenge,
   }
 }

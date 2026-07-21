@@ -23,7 +23,8 @@ export function useLoginPage() {
     }
     catch (error) {
       if (error instanceof ApiError && error.status === 403) {
-        await router.push({ name: 'verify-email', query: { email } })
+        const query = email.includes('@') ? { email } : undefined
+        await router.push({ name: 'verify-email', query })
         return 'unverified'
       }
       return 'failed'

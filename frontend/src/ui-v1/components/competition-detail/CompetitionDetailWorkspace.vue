@@ -99,7 +99,7 @@ async function recalcConnectionLines() {
   const containerRect = container.getBoundingClientRect()
   const groups = new Map<string, CompetitionChallengeDto[]>()
   for (const challenge of filteredChallenges.value) {
-    const dir = normalizeDirection(challenge.typeId)
+    const dir = normalizeDirection(challenge.direction)
     if (!groups.has(dir))
       groups.set(dir, [])
     groups.get(dir)!.push(challenge)
@@ -455,7 +455,7 @@ function bloodStampClass(rank: number) {
                 <!-- Pin -->
                 <div
                   class="absolute -top-1.5 left-1/2 z-20 size-3 -translate-x-1/2 rounded-full border-2 border-background shadow-sm"
-                  :class="challengeTypeLabel(challenge.typeId).pinClassName"
+                  :class="challengeTypeLabel(challenge.direction).pinClassName"
                 />
 
                 <!-- Photo area -->
@@ -477,7 +477,7 @@ function bloodStampClass(rank: number) {
                     <span
                       class="pointer-events-none absolute bottom-1 right-2 select-none text-2xl font-black uppercase tracking-[0.15em] text-foreground/30 rotate-[-12deg]"
                     >
-                      {{ normalizeDirection(challenge.typeId) }}
+                      {{ normalizeDirection(challenge.direction) }}
                     </span>
                   </Panel>
                 </CardContent>

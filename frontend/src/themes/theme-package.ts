@@ -220,6 +220,7 @@ const themeTokenGroupDefinitions = [
       '--awdp-node-stroke',
       '--awdp-category-web',
       '--awdp-category-pwn',
+      '--awdp-category-ai',
       '--awdp-category-crypto',
       '--awdp-category-reverse',
       '--awdp-category-misc',

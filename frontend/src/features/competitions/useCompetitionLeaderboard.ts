@@ -1,11 +1,14 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import type { NoCtfapiEndpointsCompetitionsGetLeaderboardResponse } from '@/api/generated/types.gen'
+import type { NoCtfApplicationScoringLeaderboardLeaderboardResponse } from '@/api/generated/types.gen'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 
-export type CompetitionLeaderboardDto = NoCtfapiEndpointsCompetitionsGetLeaderboardResponse
+// The endpoint union also covers a 202 "processing" payload; consumers render
+// entry tables, so the DTO narrows to the 200 snapshot shape (a processing
+// response simply has no entries at runtime).
+export type CompetitionLeaderboardDto = NoCtfApplicationScoringLeaderboardLeaderboardResponse
 
 // Standalone public leaderboard query. V1 fetches leaderboard data inside its
 // own child components, so this feature exists for theme packages (V2) that

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
   ArrowLeft,
   Check,
+  Edit3,
   Lock,
   Plus,
   RefreshCw,
@@ -22,7 +23,7 @@ import CommandPanel from '../primitives/CommandPanel.vue'
 import CommandSelect from '../primitives/CommandSelect.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
 import CommandTextarea from '../primitives/CommandTextarea.vue'
-import CommandDecayCurve, { type CommandDecayCurveConfig } from './CommandDecayCurve.vue'
+import { normalizeDirection } from '@/lib/challengeDirections'
 
 export interface CommandAdminCompetitionForm {
   title: string
@@ -66,27 +67,6 @@ export interface CommandAdminCompetitionForm {
   awdpFixTimeoutSeconds: string
 }
 
-export interface CommandAdminCompetitionBindForm {
-  templateId: string
-  description: string
-  initialPoints: string
-  minimumPoints: string
-  decayFactor: string
-  decayFunction: string
-  difficultyCoefficient: string
-  enableBloodBonus: boolean
-  flagPrefix: string
-  awdpAttackScorePerRound: string
-  awdpDefenseScorePerRound: string
-  awdpMaxAttackAttempts: string
-  awdpMaxDefenseAttempts: string
-  awdpFixEntry: string
-  awdpFixTimeoutSeconds: string
-  hints: string[]
-}
-
-export interface CommandAdminCompetitionSelectedEdit extends Omit<CommandAdminCompetitionBindForm, 'templateId'> {}
-
 export interface CommandAdminCompetitionChallenge {
   id: string
   templateId?: string
@@ -94,6 +74,7 @@ export interface CommandAdminCompetitionChallenge {
   description?: string
   descriptionFormat: string
   typeId: string
+  direction: string
   deploymentType?: string | number
   exposedPort?: number | null
   flagPrefix?: string
@@ -159,13 +140,8 @@ const props = defineProps<{
   canOpenAwdpScreen: boolean
   activeSection: string
   competitionForm: CommandAdminCompetitionForm
-  bindForm: CommandAdminCompetitionBindForm
-  selectedEdit: CommandAdminCompetitionSelectedEdit
-  templates: { id: string, title: string }[]
   challenges: CommandAdminCompetitionChallenge[]
   loadingChallenges: boolean
-  selectedChallengeId: string | null
-  selectedChallenge: CommandAdminCompetitionChallenge | null
   teams: CommandAdminCompetitionTeam[]
   loadingTeams: boolean
   logs: CommandAdminCompetitionLog[]
@@ -173,8 +149,6 @@ const props = defineProps<{
   cheats: CommandAdminCompetitionCheatIncident[]
   loadingCheats: boolean
   saving: boolean
-  deploying: boolean
-  updatingChallenge: boolean
   teamActionPending: boolean
   restartPending: boolean
   rebuildPending: boolean
@@ -185,8 +159,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   switchSection: [section: string]
   save: []
-  deploy: []
-  updateChallenge: []
+  createChallenge: []
+  editChallenge: [challengeId: string]
   deleteChallenge: [challengeId: string]
   restartContainer: [challengeId: string]
   approve: [teamId: string]
@@ -198,12 +172,7 @@ const emit = defineEmits<{
   back: []
   openOperations: []
   openAwdpScreen: []
-  addBindHint: []
-  addEditHint: []
   'update:competitionForm': [value: CommandAdminCompetitionForm]
-  'update:bindForm': [value: CommandAdminCompetitionBindForm]
-  'update:selectedEdit': [value: CommandAdminCompetitionSelectedEdit]
-  'update:selectedChallengeId': [value: string | null]
 }>()
 
 const sections = [
@@ -229,18 +198,6 @@ const gameModeOptions = [
   { value: 'Koh', label: 'KoH' },
 ]
 
-const decayFunctionOptions = [
-  { value: 'sigmoid', label: 'Sigmoid' },
-  { value: 'quadratic', label: 'Quadratic' },
-  { value: 'logarithmic', label: 'Logarithmic' },
-  { value: 'linear', label: 'Linear' },
-]
-
-const templateOptions = computed(() => props.templates.map(template => ({
-  value: template.id,
-  label: template.title,
-})))
-
 const isAwdp = computed(() => props.competitionForm.gameModeType === 'Awdp')
 const isAwd = computed(() => props.competitionForm.gameModeType === 'Awd')
 const isCtf = computed(() => props.competitionForm.gameModeType === 'Ctf')
@@ -249,21 +206,20 @@ function patchCompetitionForm(patch: Partial<CommandAdminCompetitionForm>) {
   emit('update:competitionForm', { ...props.competitionForm, ...patch })
 }
 
-function patchBindForm(patch: Partial<CommandAdminCompetitionBindForm>) {
-  emit('update:bindForm', { ...props.bindForm, ...patch })
-}
+const allDirectionsValue = '__all__'
+const directionFilter = ref(allDirectionsValue)
 
-function patchSelectedEdit(patch: Partial<CommandAdminCompetitionSelectedEdit>) {
-  emit('update:selectedEdit', { ...props.selectedEdit, ...patch })
-}
+const availableDirections = computed(() =>
+  [...new Set(props.challenges.map(challenge => normalizeDirection(challenge.direction)))].sort())
 
-function setBindHint(index: number, value: string) {
-  patchBindForm({ hints: props.bindForm.hints.map((hint, position) => (position === index ? value : hint)) })
-}
+const directionOptions = computed(() => [
+  { value: allDirectionsValue, label: 'All directions' },
+  ...availableDirections.value.map(direction => ({ value: direction, label: direction })),
+])
 
-function setEditHint(index: number, value: string) {
-  patchSelectedEdit({ hints: props.selectedEdit.hints.map((hint, position) => (position === index ? value : hint)) })
-}
+const filteredChallenges = computed(() => directionFilter.value === allDirectionsValue
+  ? props.challenges
+  : props.challenges.filter(challenge => normalizeDirection(challenge.direction) === directionFilter.value))
 
 function isStaticContainer(challenge: CommandAdminCompetitionChallenge) {
   return challenge.deploymentType === 'StaticContainer' || challenge.deploymentType === 3
@@ -290,10 +246,6 @@ function formatDateTime(value: string) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString()
 }
-
-const bindCurveConfig = computed<CommandDecayCurveConfig>(() => props.bindForm)
-const editCurveConfig = computed<CommandDecayCurveConfig>(() => props.selectedEdit)
-const competitionCurveConfig = computed<CommandDecayCurveConfig>(() => props.competitionForm)
 </script>
 
 <template>
@@ -345,7 +297,7 @@ const competitionCurveConfig = computed<CommandDecayCurveConfig>(() => props.com
         </button>
       </nav>
 
-      <div class="admin-detail__layout" :class="{ 'admin-detail__layout--aside': props.activeSection === 'challenges' }">
+      <div class="admin-detail__layout">
         <div class="admin-detail__main">
           <!-- Settings -->
           <CommandPanel v-if="props.activeSection === 'settings'" class="admin-detail__panel">
@@ -376,15 +328,6 @@ const competitionCurveConfig = computed<CommandDecayCurveConfig>(() => props.com
               <CommandInput :model-value="props.competitionForm.startTime" type="datetime-local" label="Start time" @update:model-value="patchCompetitionForm({ startTime: $event })" />
               <CommandInput :model-value="props.competitionForm.endTime" type="datetime-local" label="End time" @update:model-value="patchCompetitionForm({ endTime: $event })" />
             </div>
-
-            <CommandPanel v-if="!isAwdp" class="admin-detail__subpanel">
-              <div class="admin-detail__grid admin-detail__grid--four">
-                <CommandInput :model-value="props.competitionForm.initialPoints" type="number" label="Initial points" @update:model-value="patchCompetitionForm({ initialPoints: $event })" />
-                <CommandInput :model-value="props.competitionForm.minimumPoints" type="number" label="Minimum points" @update:model-value="patchCompetitionForm({ minimumPoints: $event })" />
-                <CommandInput :model-value="props.competitionForm.decayFactor" type="number" label="Decay factor" @update:model-value="patchCompetitionForm({ decayFactor: $event })" />
-                <CommandSelect :model-value="props.competitionForm.decayFunction" label="Decay function" :options="decayFunctionOptions" @update:model-value="patchCompetitionForm({ decayFunction: $event })" />
-              </div>
-            </CommandPanel>
 
             <CommandPanel v-if="isCtf" class="admin-detail__subpanel">
               <div class="admin-detail__grid admin-detail__grid--three">
@@ -431,72 +374,54 @@ const competitionCurveConfig = computed<CommandDecayCurveConfig>(() => props.com
                 <CommandCheckbox :checked="props.competitionForm.awdpViolationPenaltyEnabled" label="Enable violation penalty" @update:checked="patchCompetitionForm({ awdpViolationPenaltyEnabled: $event })" />
               </div>
             </CommandPanel>
-
-            <CommandDecayCurve v-if="!isAwdp" :config="competitionCurveConfig" />
           </CommandPanel>
 
-          <!-- Challenges: binder -->
+          <!-- Challenges -->
           <CommandPanel v-if="props.activeSection === 'challenges'" class="admin-detail__panel">
-            <div class="admin-detail__panel-title">
-              <h2>Deploy a challenge</h2>
-              <p>Bind a challenge template to this competition with custom scoring.</p>
+            <div class="admin-detail__panel-head">
+              <div class="admin-detail__panel-title">
+                <h2>Deployed challenges</h2>
+                <p>Manage the challenges bound to this competition.</p>
+              </div>
+              <CommandButton label="Deploy challenge" @click="emit('createChallenge')">
+                <template #icon><Plus class="size-4" /></template>
+              </CommandButton>
             </div>
 
-            <div class="admin-detail__grid">
-              <CommandSelect :model-value="props.bindForm.templateId" label="Challenge template" placeholder="Select a template" :options="templateOptions" @update:model-value="patchBindForm({ templateId: $event })" />
-              <CommandInput :model-value="props.bindForm.difficultyCoefficient" type="number" label="Difficulty coefficient" :min="0.1" :step="0.1" @update:model-value="patchBindForm({ difficultyCoefficient: $event })" />
-              <CommandInput :model-value="props.bindForm.flagPrefix" label="Flag prefix" placeholder="flag" @update:model-value="patchBindForm({ flagPrefix: $event })" />
-              <CommandCheckbox v-if="isCtf" :checked="props.bindForm.enableBloodBonus" label="Enable blood bonus" @update:checked="patchBindForm({ enableBloodBonus: $event })" />
-              <div class="admin-detail__span">
-                <CommandTextarea :model-value="props.bindForm.description" label="Description (markdown)" :rows="5" mono placeholder="Markdown description shown to players" @update:model-value="patchBindForm({ description: $event })" />
-              </div>
+            <div class="admin-detail__challenges-toolbar">
+              <CommandSelect v-model="directionFilter" label="Direction" :options="directionOptions" />
+              <p v-if="!props.loadingChallenges" class="admin-detail__challenge-count">
+                {{ filteredChallenges.length }} challenge(s)
+              </p>
             </div>
 
-            <CommandPanel class="admin-detail__subpanel">
-              <div class="admin-detail__grid admin-detail__grid--four">
-                <CommandInput :model-value="props.bindForm.initialPoints" type="number" label="Initial" @update:model-value="patchBindForm({ initialPoints: $event })" />
-                <CommandInput :model-value="props.bindForm.minimumPoints" type="number" label="Minimum" @update:model-value="patchBindForm({ minimumPoints: $event })" />
-                <CommandInput :model-value="props.bindForm.decayFactor" type="number" label="Decay factor" @update:model-value="patchBindForm({ decayFactor: $event })" />
-                <CommandSelect :model-value="props.bindForm.decayFunction" label="Decay function" :options="decayFunctionOptions" @update:model-value="patchBindForm({ decayFunction: $event })" />
-              </div>
-            </CommandPanel>
-
-            <CommandPanel v-if="isAwdp" class="admin-detail__subpanel">
-              <div class="admin-detail__grid admin-detail__grid--three">
-                <CommandInput :model-value="props.bindForm.awdpAttackScorePerRound" type="number" label="Attack score" :min="0" @update:model-value="patchBindForm({ awdpAttackScorePerRound: $event })" />
-                <CommandInput :model-value="props.bindForm.awdpDefenseScorePerRound" type="number" label="Defense score" :min="0" @update:model-value="patchBindForm({ awdpDefenseScorePerRound: $event })" />
-                <CommandInput :model-value="props.bindForm.awdpFixTimeoutSeconds" type="number" label="Fix timeout" :min="1" @update:model-value="patchBindForm({ awdpFixTimeoutSeconds: $event })" />
-                <CommandInput :model-value="props.bindForm.awdpMaxAttackAttempts" type="number" label="Max attack attempts" :min="1" @update:model-value="patchBindForm({ awdpMaxAttackAttempts: $event })" />
-                <CommandInput :model-value="props.bindForm.awdpMaxDefenseAttempts" type="number" label="Max defense attempts" :min="1" @update:model-value="patchBindForm({ awdpMaxDefenseAttempts: $event })" />
-                <CommandInput :model-value="props.bindForm.awdpFixEntry" label="Fix entry" placeholder="fix.sh" @update:model-value="patchBindForm({ awdpFixEntry: $event })" />
-              </div>
-            </CommandPanel>
-
-            <CommandDecayCurve :config="bindCurveConfig" />
-
-            <div class="admin-detail__hints">
-              <div class="admin-detail__hints-head">
-                <span class="admin-detail__label">Hints</span>
-                <CommandButton label="Add hint" tone="outline" @click="emit('addBindHint')">
-                  <template #icon><Plus class="size-4" /></template>
-                </CommandButton>
-              </div>
-              <CommandInput
-                v-for="(hint, index) in props.bindForm.hints"
-                :key="index"
-                :model-value="hint"
-                :label="`Hint ${index + 1}`"
-                :placeholder="`Hint ${index + 1}`"
-                @update:model-value="setBindHint(index, $event)"
-              />
+            <div v-if="props.loadingChallenges" class="admin-detail__inline-state" aria-busy="true">
+              <CommandSignal label="Synchronizing" tone="info" />
+              <span>Loading challenges.</span>
             </div>
-
-            <div class="admin-detail__footer">
-              <CommandButton
-                :label="props.deploying ? 'Deploying' : 'Deploy challenge'"
-                :disabled="props.deploying || !props.bindForm.templateId"
-                @click="emit('deploy')"
-              />
+            <p v-else-if="filteredChallenges.length === 0" class="admin-detail__empty">No challenges deployed.</p>
+            <div v-else class="admin-detail__deployed">
+              <div
+                v-for="challenge in filteredChallenges"
+                :key="challenge.id"
+                class="admin-detail__deployed-row"
+              >
+                <div class="admin-detail__deployed-identity">
+                  <strong>{{ challenge.title }}</strong>
+                  <span>{{ normalizeDirection(challenge.direction) }} · {{ challenge.typeId }} · {{ challenge.pointsConfig.minimumPoints }} → {{ challenge.pointsConfig.initialPoints }}</span>
+                </div>
+                <div class="admin-detail__row-actions">
+                  <CommandButton v-if="isStaticContainer(challenge)" label="Restart" tone="ghost" :disabled="props.restartPending" @click="emit('restartContainer', challenge.id)">
+                    <template #icon><RotateCw class="size-4" :class="{ 'animate-spin': props.restartPending }" /></template>
+                  </CommandButton>
+                  <CommandButton label="Edit" tone="ghost" @click="emit('editChallenge', challenge.id)">
+                    <template #icon><Edit3 class="size-4" /></template>
+                  </CommandButton>
+                  <CommandButton label="Remove" tone="ghost" class="admin-detail__danger-action" @click="emit('deleteChallenge', challenge.id)">
+                    <template #icon><Trash2 class="size-4" /></template>
+                  </CommandButton>
+                </div>
+              </div>
             </div>
           </CommandPanel>
 
@@ -608,95 +533,6 @@ const competitionCurveConfig = computed<CommandDecayCurveConfig>(() => props.com
             </div>
           </CommandPanel>
         </div>
-
-        <!-- Challenges aside -->
-        <aside v-if="props.activeSection === 'challenges'" class="admin-detail__aside">
-          <CommandPanel class="admin-detail__panel">
-            <div class="admin-detail__panel-title">
-              <h2>Deployed challenges</h2>
-              <p>Select a deployed challenge to edit its scoring.</p>
-            </div>
-            <div v-if="props.loadingChallenges" class="admin-detail__inline-state" aria-busy="true">
-              <CommandSignal label="Synchronizing" tone="info" />
-              <span>Loading challenges.</span>
-            </div>
-            <p v-else-if="props.challenges.length === 0" class="admin-detail__empty">No challenges deployed.</p>
-            <div v-else class="admin-detail__deployed">
-              <div
-                v-for="challenge in props.challenges"
-                :key="challenge.id"
-                class="admin-detail__deployed-row"
-                :class="{ 'admin-detail__deployed-row--active': props.selectedChallengeId === challenge.id }"
-                role="button"
-                tabindex="0"
-                @click="emit('update:selectedChallengeId', challenge.id)"
-                @keydown.enter="emit('update:selectedChallengeId', challenge.id)"
-              >
-                <div class="admin-detail__deployed-identity">
-                  <strong>{{ challenge.title }}</strong>
-                  <span>{{ challenge.typeId }} · {{ challenge.pointsConfig.minimumPoints }} → {{ challenge.pointsConfig.initialPoints }}</span>
-                </div>
-                <div class="admin-detail__row-actions">
-                  <CommandButton v-if="isStaticContainer(challenge)" label="Restart" tone="ghost" :disabled="props.restartPending" @click.stop="emit('restartContainer', challenge.id)">
-                    <template #icon><RotateCw class="size-4" :class="{ 'animate-spin': props.restartPending }" /></template>
-                  </CommandButton>
-                  <CommandButton label="Remove" tone="ghost" class="admin-detail__danger-action" @click.stop="emit('deleteChallenge', challenge.id)">
-                    <template #icon><Trash2 class="size-4" /></template>
-                  </CommandButton>
-                </div>
-              </div>
-            </div>
-          </CommandPanel>
-
-          <CommandPanel v-if="props.selectedChallenge" class="admin-detail__panel">
-            <div class="admin-detail__panel-title">
-              <h2>{{ props.selectedChallenge.title }}</h2>
-              <p>Edit the deployed challenge configuration.</p>
-            </div>
-            <CommandTextarea :model-value="props.selectedEdit.description" label="Description (markdown)" :rows="7" mono @update:model-value="patchSelectedEdit({ description: $event })" />
-            <div class="admin-detail__grid">
-              <CommandInput :model-value="props.selectedEdit.initialPoints" type="number" label="Initial" @update:model-value="patchSelectedEdit({ initialPoints: $event })" />
-              <CommandInput :model-value="props.selectedEdit.minimumPoints" type="number" label="Minimum" @update:model-value="patchSelectedEdit({ minimumPoints: $event })" />
-              <CommandInput :model-value="props.selectedEdit.decayFactor" type="number" label="Decay factor" @update:model-value="patchSelectedEdit({ decayFactor: $event })" />
-              <CommandInput :model-value="props.selectedEdit.difficultyCoefficient" type="number" label="Difficulty" :min="0.1" :step="0.1" @update:model-value="patchSelectedEdit({ difficultyCoefficient: $event })" />
-            </div>
-            <CommandSelect :model-value="props.selectedEdit.decayFunction" label="Decay function" :options="decayFunctionOptions" @update:model-value="patchSelectedEdit({ decayFunction: $event })" />
-            <CommandCheckbox v-if="isCtf" :checked="props.selectedEdit.enableBloodBonus" label="Enable blood bonus" @update:checked="patchSelectedEdit({ enableBloodBonus: $event })" />
-            <CommandDecayCurve :config="editCurveConfig" />
-            <CommandInput :model-value="props.selectedEdit.flagPrefix" label="Flag prefix" placeholder="flag" @update:model-value="patchSelectedEdit({ flagPrefix: $event })" />
-            <CommandPanel v-if="isAwdp" class="admin-detail__subpanel">
-              <div class="admin-detail__grid">
-                <CommandInput :model-value="props.selectedEdit.awdpAttackScorePerRound" type="number" label="Attack score" :min="0" @update:model-value="patchSelectedEdit({ awdpAttackScorePerRound: $event })" />
-                <CommandInput :model-value="props.selectedEdit.awdpDefenseScorePerRound" type="number" label="Defense score" :min="0" @update:model-value="patchSelectedEdit({ awdpDefenseScorePerRound: $event })" />
-                <CommandInput :model-value="props.selectedEdit.awdpMaxAttackAttempts" type="number" label="Max attack attempts" :min="1" @update:model-value="patchSelectedEdit({ awdpMaxAttackAttempts: $event })" />
-                <CommandInput :model-value="props.selectedEdit.awdpMaxDefenseAttempts" type="number" label="Max defense attempts" :min="1" @update:model-value="patchSelectedEdit({ awdpMaxDefenseAttempts: $event })" />
-                <CommandInput :model-value="props.selectedEdit.awdpFixEntry" label="Fix entry" placeholder="fix.sh" @update:model-value="patchSelectedEdit({ awdpFixEntry: $event })" />
-                <CommandInput :model-value="props.selectedEdit.awdpFixTimeoutSeconds" type="number" label="Fix timeout" :min="1" @update:model-value="patchSelectedEdit({ awdpFixTimeoutSeconds: $event })" />
-              </div>
-            </CommandPanel>
-            <div class="admin-detail__hints">
-              <div class="admin-detail__hints-head">
-                <span class="admin-detail__label">Hints</span>
-                <CommandButton label="Add hint" tone="outline" @click="emit('addEditHint')">
-                  <template #icon><Plus class="size-4" /></template>
-                </CommandButton>
-              </div>
-              <CommandInput
-                v-for="(hint, index) in props.selectedEdit.hints"
-                :key="index"
-                :model-value="hint"
-                :label="`Hint ${index + 1}`"
-                :placeholder="`Hint ${index + 1}`"
-                @update:model-value="setEditHint(index, $event)"
-              />
-            </div>
-            <CommandButton
-              :label="props.updatingChallenge ? 'Saving' : 'Save deployed challenge'"
-              :disabled="props.updatingChallenge"
-              @click="emit('updateChallenge')"
-            />
-          </CommandPanel>
-        </aside>
       </div>
     </template>
   </section>
@@ -717,12 +553,7 @@ const competitionCurveConfig = computed<CommandDecayCurveConfig>(() => props.com
 .admin-detail__tab { border: 0; border-radius: 10px; padding: 8px 14px; color: var(--v2-text-muted); background: transparent; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; }
 .admin-detail__tab--active { color: var(--v2-primary); background: var(--v2-canvas); box-shadow: var(--v2-raised-sm); }
 .admin-detail__layout { display: grid; align-items: start; gap: 16px; }
-.admin-detail__layout--aside { grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); }
-@media (max-width: 1100px) {
-  .admin-detail__layout--aside { grid-template-columns: minmax(0, 1fr); }
-}
 .admin-detail__main { display: grid; align-content: start; gap: 16px; min-width: 0; }
-.admin-detail__aside { display: grid; align-content: start; gap: 16px; min-width: 0; }
 .admin-detail__panel { display: grid; align-content: start; gap: 16px; padding: 18px; }
 .admin-detail__panel-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .admin-detail__panel-title { display: grid; gap: 4px; }
@@ -733,10 +564,8 @@ const competitionCurveConfig = computed<CommandDecayCurveConfig>(() => props.com
 .admin-detail__grid--four { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .admin-detail__span { grid-column: 1 / -1; }
 .admin-detail__subpanel { padding: 14px; }
-.admin-detail__label { color: var(--v2-text-faint); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; }
-.admin-detail__hints { display: grid; gap: 10px; }
-.admin-detail__hints-head { display: flex; align-items: center; justify-content: space-between; }
-.admin-detail__footer { display: flex; justify-content: flex-end; }
+.admin-detail__challenges-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.admin-detail__challenge-count { margin: 0; color: var(--v2-text-faint); font-size: 12px; }
 .admin-detail__inline-state { display: flex; align-items: center; gap: 10px; border-radius: 12px; padding: 18px 14px; color: var(--v2-text-muted); background: var(--v2-surface); box-shadow: var(--v2-inset); font-size: 13px; }
 .admin-detail__empty { margin: 0; border-radius: 12px; padding: 20px 14px; color: var(--v2-text-muted); background: var(--v2-surface); box-shadow: var(--v2-inset); font-size: 13px; text-align: center; }
 .admin-detail__table-wrap { overflow-x: auto; }
@@ -764,8 +593,7 @@ const competitionCurveConfig = computed<CommandDecayCurveConfig>(() => props.com
 .admin-detail__log-message { margin: 0; color: var(--v2-text); font-size: 13px; }
 .admin-detail__log-meta { margin: 0; color: var(--v2-text-faint); font-size: 11px; }
 .admin-detail__deployed { display: grid; gap: 8px; }
-.admin-detail__deployed-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 12px; padding: 10px 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); cursor: pointer; }
-.admin-detail__deployed-row--active { box-shadow: var(--v2-inset-strong); }
+.admin-detail__deployed-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 12px; padding: 10px 12px; background: var(--v2-surface); box-shadow: var(--v2-inset); }
 .admin-detail__deployed-identity { display: grid; min-width: 0; gap: 3px; }
 .admin-detail__deployed-identity strong { overflow: hidden; color: var(--v2-text); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .admin-detail__deployed-identity span { color: var(--v2-text-faint); font-size: 11px; }

@@ -98,7 +98,7 @@ Static flags are also supported:
   "name": "Privilege Escalation",
   "score": 200,
   "isDynamic": false,
-  "nodeName": "worker",
+  "nodeName": "API-hosted Channel consumer",
   "valueSecret": "rooted",
   "visible": true
 }

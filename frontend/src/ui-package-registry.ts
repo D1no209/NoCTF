@@ -29,6 +29,8 @@ const v1RouteNames: ReadonlySet<string> = new Set([
   'admin-teams',
   'admin-competitions',
   'admin-competition-detail',
+  'admin-competition-challenge-create',
+  'admin-competition-challenge-edit',
   'admin-competition-operations',
   'admin-collaborators',
   'admin-challenges',

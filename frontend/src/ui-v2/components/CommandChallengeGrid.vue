@@ -9,6 +9,7 @@ export interface CommandChallenge {
   title: string
   description?: string | null
   typeId: string
+  direction: string
   points: number
   solveCount: number
 }
@@ -60,7 +61,7 @@ function challengeTone(typeId: string) {
     <div v-else-if="props.challenges.length" class="challenge-grid__cards">
       <article v-for="challenge in props.challenges" :key="challenge.id" class="challenge-grid__card">
         <div class="challenge-grid__title">
-          <CommandSignal :label="challenge.typeId" :tone="challengeTone(challenge.typeId)" />
+          <CommandSignal :label="challenge.direction" :tone="challengeTone(challenge.direction)" />
           <h3>{{ challenge.title }}</h3>
         </div>
         <p>{{ challenge.description || 'No challenge brief published.' }}</p>

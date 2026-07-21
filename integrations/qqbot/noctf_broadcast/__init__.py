@@ -241,7 +241,7 @@ class BroadcastAgent:
         )
 
     async def _sync_groups(self, bot: Any) -> None:
-        raw = _plain(await bot.call_api("get_group_list"))
+        raw = _plain(await bot.get_group_list(no_cache=False))
         items = raw if isinstance(raw, list) else raw.get("groups", []) if isinstance(raw, dict) else []
         groups: list[dict[str, Any]] = []
         for item in items:

@@ -18,6 +18,8 @@ function categoryClass(category: AwdpChallengeCategory) {
     return 'text-[var(--awdp-category-web)] bg-[var(--semantic-info-soft)] border-[var(--semantic-info-border)]'
   if (category === 'pwn')
     return 'text-[var(--awdp-category-pwn)] bg-[var(--semantic-danger-soft)] border-[var(--semantic-danger-border)]'
+  if (category === 'ai')
+    return 'text-[var(--awdp-category-ai)] bg-[var(--semantic-neutral-soft)] border-[var(--awdp-border)]'
   if (category === 'crypto')
     return 'text-[var(--awdp-category-crypto)] bg-[var(--semantic-neutral-soft)] border-[var(--awdp-border)]'
   if (category === 'reverse')

@@ -1,76 +1,19 @@
 using FastEndpoints;
-using Microsoft.EntityFrameworkCore;
-using NoCTF.Core;
-using NoCTF.Infrastructure;
+using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.Application.Competitions.Management;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
-public class GetCompetitionRequest
-{
-    public Guid Id { get; set; }
-}
+public sealed class GetCompetitionRequest { public Guid CompetitionId { get; set; } }
 
-public class CompetitionDetailDto
+public sealed class GetCompetitionEndpoint(GetCompetition get)
+    : Endpoint<GetCompetitionRequest, Results<Ok<CompetitionResponse>, NotFound>>
 {
-    public Guid Id { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public DateTime StartTime { get; set; }
-    public DateTime EndTime { get; set; }
-    public string GameModeType { get; set; } = string.Empty;
-    public bool TeamRegistrationAutoApprove { get; set; }
-    public int MaxTeamMembers { get; set; }
-    public bool TracksEnabled { get; set; }
-    public List<string> TrackNames { get; set; } = [];
-}
+    public override void Configure() { Get("/competitions/{competitionId}"); AllowAnonymous(); }
 
-/// <summary>
-/// GET /api/competitions/{id} — returns a single competition's details.
-/// </summary>
-public class GetCompetitionEndpoint(ApplicationDbContext dbContext) : Endpoint<GetCompetitionRequest, CompetitionDetailDto>
-{
-    public override void Configure()
+    public override async Task<Results<Ok<CompetitionResponse>, NotFound>> ExecuteAsync(GetCompetitionRequest request, CancellationToken ct)
     {
-        Get("/api/competitions/{id}");
-        AllowAnonymous();
-        Options(builder => builder.RequireRateLimiting("public-read"));
+        var view = await get.ExecuteAsync(Route<Guid>("competitionId"), false, ct);
+        return view is null ? TypedResults.NotFound() : TypedResults.Ok(CompetitionMapper.ToResponse(view));
     }
-
-    public override async Task HandleAsync(GetCompetitionRequest req, CancellationToken ct)
-    {
-        var competition = await dbContext.Competitions
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(c => c.Id == req.Id)
-            .FirstOrDefaultAsync(ct);
-
-        if (competition is null)
-        {
-            await SendNotFoundAsync(ct);
-            return;
-        }
-
-        if (!PublicCompetitionGuard.IsPublic(competition.Status))
-        {
-            await SendNotFoundAsync(ct);
-            return;
-        }
-
-        await SendAsync(new CompetitionDetailDto
-        {
-            Id = competition.Id,
-            Title = competition.Title,
-            Description = competition.Description,
-            Status = competition.Status.ToString().ToLowerInvariant(),
-            StartTime = competition.StartTime,
-            EndTime = competition.EndTime,
-            GameModeType = competition.GameModeType.ToString().ToLowerInvariant(),
-            TeamRegistrationAutoApprove = competition.TeamRegistrationAutoApprove,
-            MaxTeamMembers = competition.MaxTeamMembers,
-            TracksEnabled = competition.TracksEnabled,
-            TrackNames = Admin.GetCompetitionAdminEndpoint.ParseTracks(competition.TrackNamesJson),
-        }, cancellation: ct);
-    }
-
 }

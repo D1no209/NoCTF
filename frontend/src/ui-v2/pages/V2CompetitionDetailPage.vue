@@ -72,6 +72,7 @@ const challenges = computed<CommandChallenge[]>(() => effectiveChallenges.value
     title: challenge.title?.trim() || 'Untitled challenge',
     description: challenge.description ?? null,
     typeId: challenge.typeId?.trim() || 'misc',
+    direction: challenge.direction?.trim() || 'misc',
     points: challenge.points ?? 0,
     solveCount: challenge.solveCount ?? 0,
   })))

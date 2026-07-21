@@ -107,6 +107,18 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
+          path: 'competitions/:id/challenges/new',
+          name: 'admin-competition-challenge-create',
+          component: () => import('@/ui-v1/views/admin/AdminCompetitionChallengeEditorView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
+        },
+        {
+          path: 'competitions/:id/challenges/:challengeId/edit',
+          name: 'admin-competition-challenge-edit',
+          component: () => import('@/ui-v1/views/admin/AdminCompetitionChallengeEditorView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
+        },
+        {
           path: 'competitions/:id',
           name: 'admin-competition-detail',
           component: () => import('@/ui-v1/views/admin/AdminCompetitionDetailView.vue'),

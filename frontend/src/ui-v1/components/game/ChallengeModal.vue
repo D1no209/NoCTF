@@ -137,7 +137,7 @@ const renderedDescription = computed(() => {
   if (!props.challenge?.description) return ''
   return renderMarkdown(props.challenge.description)
 })
-const challengeType = computed(() => challengeTypeLabel(props.challenge?.typeId))
+const challengeType = computed(() => challengeTypeLabel(props.challenge?.direction))
 
 const visibleHints = computed(() => props.challenge?.hints?.filter(Boolean) ?? [])
 const patchStatuses = computed(() => props.patchSubmissions ?? [])

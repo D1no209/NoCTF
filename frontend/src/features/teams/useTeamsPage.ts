@@ -1,17 +1,41 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import type {
-  NoCtfapiEndpointsCompetitionsCompetitionDetailDto,
-  NoCtfapiEndpointsCompetitionsCompetitionListItemDto,
-  NoCtfapiEndpointsTeamsMyTeamDto,
-} from '@/api/generated/types.gen'
 import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 
-export type MyTeamDto = NoCtfapiEndpointsTeamsMyTeamDto
-export type TeamCompetitionDto = NoCtfapiEndpointsCompetitionsCompetitionListItemDto
-export type TeamCompetitionDetailDto = NoCtfapiEndpointsCompetitionsCompetitionDetailDto
+// Player-facing payloads, matching V1's TeamsPageWorkspace contract (plain
+// arrays with string status/mode, not the generated SDK shapes).
+export interface MyTeamDto {
+  id: string
+  competitionId: string
+  name: string
+  inviteToken: string
+  registrationStatus: string
+  competitionTitle: string
+  competitionStatus: string
+  gameModeType: string
+  memberCount: number
+  maxTeamMembers: number
+  isCaptain: boolean
+  isLocked: boolean
+  isBanned: boolean
+  trackName?: string | null
+}
+
+export interface TeamCompetitionDto {
+  id: string
+  title: string
+  status: string
+  gameModeType: string
+}
+
+export interface TeamCompetitionDetailDto {
+  id: string
+  title: string
+  tracksEnabled: boolean
+  trackNames: string[]
+}
 
 export function useTeamsPage() {
   const router = useRouter()
@@ -64,7 +88,7 @@ export function useTeamsPage() {
       newTeamName.value = ''
       selectedTrackName.value = ''
       queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
-      queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(team?.competitionId ?? selectedCompetitionId.value) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(team.competitionId) })
     },
   })
 

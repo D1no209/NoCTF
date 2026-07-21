@@ -33,7 +33,6 @@ const competitionsToWatch = computed<CommandCompetition[]>(() => watchedCompetit
     gameModeType: competition.gameModeType?.trim() || 'CTF',
     startTime: competition.startTime ?? '',
     endTime: competition.endTime ?? '',
-    registeredTeamCount: competition.registeredTeamCount ?? null,
   })))
 
 const recentTeams = computed<CommandHomeTeam[]>(() => myRecentTeams.value

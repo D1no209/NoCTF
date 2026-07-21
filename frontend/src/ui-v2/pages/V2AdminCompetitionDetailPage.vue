@@ -12,13 +12,9 @@ const operationMessage = ref('')
 const operationTone = ref<'success' | 'danger'>('success')
 
 const {
-  selectedChallengeId,
   competitionForm,
-  bindForm,
-  selectedEdit,
   competition,
   loadingCompetition,
-  templates: rawTemplates,
   competitionChallenges,
   loadingChallenges,
   competitionTeams,
@@ -27,10 +23,7 @@ const {
   loadingLogs,
   cheatIncidents,
   loadingCheatIncidents,
-  selectedChallenge,
   saveCompetitionMutation,
-  bindMutation,
-  updateChallengeMutation,
   deleteChallengeMutation,
   approveTeamMutation,
   rejectTeamMutation,
@@ -42,16 +35,12 @@ const {
   activeSection,
   switchSection,
   canOpenAwdpScreen,
-  addBindHint,
-  addEditHint,
   goAdminCompetitions,
   goOperations,
   goAwdpScreen,
+  goCreateChallenge,
+  goEditChallenge,
 } = useAdminCompetitionDetailPage()
-
-const templates = computed(() => (rawTemplates.value ?? [])
-  .filter(template => Boolean(template.id))
-  .map(template => ({ id: template.id, title: template.title?.trim() || 'Untitled template' })))
 
 const challenges = computed<CommandAdminCompetitionChallenge[]>(() => (competitionChallenges.value ?? [])
   .filter(challenge => Boolean(challenge.id)))
@@ -86,20 +75,6 @@ function save() {
   saveCompetitionMutation.mutate(undefined, {
     onSuccess: () => reportSuccess('Competition settings saved.'),
     onError: error => reportError(error, 'Unable to save the competition settings.'),
-  })
-}
-
-function deploy() {
-  bindMutation.mutate(undefined, {
-    onSuccess: () => reportSuccess('Challenge deployed to the competition.'),
-    onError: error => reportError(error, 'Unable to deploy the challenge.'),
-  })
-}
-
-function updateChallenge() {
-  updateChallengeMutation.mutate(undefined, {
-    onSuccess: () => reportSuccess('Deployed challenge updated.'),
-    onError: error => reportError(error, 'Unable to update the deployed challenge.'),
   })
 }
 
@@ -170,18 +145,13 @@ function rebuild() {
 <template>
   <CommandAdminCompetitionDetailWorkspace
     v-model:competition-form="competitionForm"
-    v-model:bind-form="bindForm"
-    v-model:selected-edit="selectedEdit"
-    v-model:selected-challenge-id="selectedChallengeId"
     :loading="loadingCompetition"
     :competition-title="competition?.title ?? ''"
     :competition-status="competition?.status ?? ''"
     :can-open-awdp-screen="canOpenAwdpScreen"
     :active-section="activeSection"
-    :templates="templates"
     :challenges="challenges"
     :loading-challenges="loadingChallenges"
-    :selected-challenge="selectedChallenge"
     :teams="teams"
     :loading-teams="loadingTeams"
     :logs="logs"
@@ -189,8 +159,6 @@ function rebuild() {
     :cheats="cheats"
     :loading-cheats="loadingCheatIncidents"
     :saving="saveCompetitionMutation.isPending.value"
-    :deploying="bindMutation.isPending.value"
-    :updating-challenge="updateChallengeMutation.isPending.value"
     :team-action-pending="teamActionPending"
     :restart-pending="restartContainerMutation.isPending.value"
     :rebuild-pending="rebuildScoreboardMutation.isPending.value"
@@ -198,8 +166,8 @@ function rebuild() {
     :operation-tone="operationTone"
     @switch-section="switchSection"
     @save="save"
-    @deploy="deploy"
-    @update-challenge="updateChallenge"
+    @create-challenge="goCreateChallenge"
+    @edit-challenge="goEditChallenge"
     @delete-challenge="deleteChallenge"
     @restart-container="restartContainer"
     @approve="approve"
@@ -211,7 +179,5 @@ function rebuild() {
     @back="goAdminCompetitions"
     @open-operations="goOperations"
     @open-awdp-screen="goAwdpScreen"
-    @add-bind-hint="addBindHint"
-    @add-edit-hint="addEditHint"
   />
 </template>

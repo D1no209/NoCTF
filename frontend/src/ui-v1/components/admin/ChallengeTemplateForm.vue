@@ -45,6 +45,7 @@ const {
   attachmentFile,
   patchTemplateFile,
   selectedChallengeType,
+  directionOptions,
   deploymentOptionKeys: deploymentOptions,
   usesRuntimeContainer,
   usesExpConfig,
@@ -89,6 +90,17 @@ function submit() {
           <SelectContent>
             <SelectItem v-for="option in challengeTypeOptions" :key="option.value" :value="option.value">
               {{ option.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div class="grid gap-2">
+        <Label>{{ t('admin.challenges.direction') }}</Label>
+        <Select v-model="form.direction">
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="direction in directionOptions" :key="direction" :value="direction">
+              {{ direction }}
             </SelectItem>
           </SelectContent>
         </Select>

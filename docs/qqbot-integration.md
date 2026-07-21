@@ -77,7 +77,7 @@ Before sending, the agent records `sending` in SQLite. A successful Milky respon
 
 ## Platform deployment
 
-Apply the EF Core migration and deploy both API and Worker with the QQBot plugin assembly present:
+Apply the EF Core migration and deploy both API and API-hosted Channel consumer with the QQBot plugin assembly present:
 
 ```bash
 dotnet ef database update --project backend/src/NoCTF.Infrastructure --startup-project backend/src/NoCTF.API
@@ -95,7 +95,7 @@ Both sides must authorize a group:
 2. After group synchronization, authorize the group globally in NoCTF.
 3. Bind it to the intended competition and events.
 
-For the approved test environment, restrict both allowlists to `1095173403`. Start with a test notification from the competition page. Do not use another group without explicit approval.
+For a test environment, restrict both allowlists to a single operator-approved test group supplied outside version control. Start with a test notification from the competition page. Do not use another group without explicit approval.
 
 ## Operations and rollback
 

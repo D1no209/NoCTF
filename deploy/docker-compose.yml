@@ -60,19 +60,23 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: >-
+      ConnectionStrings__PostgreSql: >-
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
-      JwtSettings__Secret: ${JWT_SECRET}
-      JwtSettings__Issuer: ${JWT_ISSUER:-NoCTF}
-      JwtSettings__Audience: ${JWT_AUDIENCE:-NoCTF}
+      Authentication__SigningKey: ${JWT_SECRET:?set JWT_SECRET}
+      Authentication__Issuer: ${JWT_ISSUER:-NoCTF}
+      Authentication__Audience: ${JWT_AUDIENCE:-NoCTF.Api}
+      RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET}}
+      RunnerScoring__Issuer: ${RUNNER_SCORING_ISSUER:-NoCTF.Runner}
+      RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}
+      Authentication__RefreshCookieSecure: ${AUTH_REFRESH_COOKIE_SECURE:-false}
       Database__AutoMigrate: "false"
       SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
       SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
-      StorageProvider__Local__BasePath: /app/uploads
-      StorageProvider__Local__UrlSigningKey: ${LOCAL_STORAGE_URL_SIGNING_KEY:?set LOCAL_STORAGE_URL_SIGNING_KEY}
-      StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
+      Storage__Provider: Local
+      Storage__LocalRoot: /app/uploads
+      Storage__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
       Runner__BaseUrl: http://runner:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
       Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
@@ -114,54 +118,6 @@ services:
     ports:
       - "80:8080"
 
-  worker:
-    build:
-      context: ..
-      dockerfile: backend/Dockerfile
-      target: worker
-      args:
-        HTTP_PROXY: ${HTTP_PROXY:-}
-        HTTPS_PROXY: ${HTTPS_PROXY:-}
-        ALL_PROXY: ${ALL_PROXY:-}
-    restart: unless-stopped
-    environment:
-      ConnectionStrings__DefaultConnection: >-
-        Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
-      ConnectionStrings__Redis: redis:6379
-      StorageProvider__Local__BasePath: /app/uploads
-      StorageProvider__Local__UrlSigningKey: ${LOCAL_STORAGE_URL_SIGNING_KEY:?set LOCAL_STORAGE_URL_SIGNING_KEY}
-      StorageProvider__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
-      Runner__BaseUrl: http://runner:8080
-      Runner__Provider: ${RUNNER_PROVIDER:-Docker}
-      Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
-      Runner__UtilityNetwork: ${RUNNER_UTILITY_NETWORK:-deploy_default}
-      InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
-      QqBot__PublicBaseUrl: ${NOCTF_QQBOT_PUBLIC_BASE_URL:-}
-      Worker__Concurrency: ${WORKER_CONCURRENCY:-4}
-      Worker__LongRunningConcurrency: ${WORKER_LONG_RUNNING_CONCURRENCY:-1}
-      Awd__MaxConcurrentContainerRefreshes: ${AWD_CONTAINER_REFRESH_CONCURRENCY:-4}
-      Koh__MaxConcurrentPolls: ${KOH_POLL_CONCURRENCY:-8}
-    volumes:
-      - backend_uploads:/app/uploads
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
-    tmpfs:
-      - /tmp:size=128m,mode=1777
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      runner:
-        condition: service_started
-      migration:
-        condition: service_completed_successfully
-
   migration:
     build:
       context: ..
@@ -174,15 +130,16 @@ services:
     command: ["--migrate-only"]
     restart: "no"
     environment:
-      ConnectionStrings__DefaultConnection: >-
+      ConnectionStrings__PostgreSql: >-
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
-      JwtSettings__Secret: ${JWT_SECRET:?set JWT_SECRET}
+      Authentication__SigningKey: ${JWT_SECRET:?set JWT_SECRET}
+      RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET:?set JWT_SECRET}}
       SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
       SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
-      StorageProvider__Local__BasePath: /app/uploads
-      StorageProvider__Local__UrlSigningKey: ${LOCAL_STORAGE_URL_SIGNING_KEY:?set LOCAL_STORAGE_URL_SIGNING_KEY}
+      Storage__Provider: Local
+      Storage__LocalRoot: /app/uploads
       Runner__BaseUrl: http://runner:8080
       Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
     security_opt:

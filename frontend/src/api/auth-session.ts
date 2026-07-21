@@ -11,6 +11,9 @@ const TRAILING_SLASH_RE = /\/$/
 type SessionListener = (session: AuthSession | null) => void
 
 const listeners = new Set<SessionListener>()
+// Access tokens are deliberately process-memory only. The refresh token remains
+// in the server-managed HttpOnly cookie and is never readable by JavaScript.
+let memorySession: AuthSession | null = null
 let refreshFetch: typeof fetch = globalThis.fetch
 let refreshBaseUrl = ''
 let refreshTimeoutMs = DEFAULT_REFRESH_TIMEOUT_MS
@@ -51,33 +54,16 @@ export function millisecondsUntilTokenRefresh(token: string | null, now = Date.n
 }
 
 export function readAuthSession(): AuthSession | null {
-  const accessToken = localStorage.getItem('accessToken')
-  const storedUser = localStorage.getItem('authUser')
-  if (!accessToken || !storedUser)
-    return null
-
-  try {
-    const user = JSON.parse(storedUser) as Partial<Pick<AuthSession, 'userName' | 'role'>>
-    if (typeof user.userName === 'string' && typeof user.role === 'string')
-      return { accessToken, userName: user.userName, role: user.role }
-  }
-  catch {
-    // Invalid persisted data is cleared below.
-  }
-
-  clearAuthSession()
-  return null
+  return memorySession
 }
 
 export function saveAuthSession(session: AuthSession) {
-  localStorage.setItem('accessToken', session.accessToken)
-  localStorage.setItem('authUser', JSON.stringify({ userName: session.userName, role: session.role }))
+  memorySession = session
   notifySessionChanged(session)
 }
 
 export function clearAuthSession() {
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('authUser')
+  memorySession = null
   notifySessionChanged(null)
 }
 
@@ -117,17 +103,17 @@ async function refreshAuthSession(session: AuthSession): Promise<AuthSession | n
   const timeout = globalThis.setTimeout(() => controller.abort(), refreshTimeoutMs)
 
   try {
-    const response = await refreshFetch(`${refreshBaseUrl}/api/auth/refresh`, {
+    const response = await refreshFetch(`${refreshBaseUrl}/auth/refresh`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${session.accessToken}`,
       },
+      credentials: 'include',
       signal: controller.signal,
     })
 
     if (response.status === 401 || response.status === 403) {
-      if (localStorage.getItem('accessToken') === session.accessToken)
+      if (memorySession?.accessToken === session.accessToken)
         clearAuthSession()
       return null
     }
@@ -150,7 +136,7 @@ async function refreshAuthSession(session: AuthSession): Promise<AuthSession | n
       role: data.role,
     }
 
-    if (localStorage.getItem('accessToken') === session.accessToken)
+    if (memorySession?.accessToken === session.accessToken)
       saveAuthSession(refreshed)
 
     return readAuthSession()

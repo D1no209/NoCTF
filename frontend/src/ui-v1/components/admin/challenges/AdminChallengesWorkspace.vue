@@ -49,6 +49,7 @@ import {
 } from '@/ui-v1/components/ui/table'
 import { Edit, Key, Loader2, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-vue-next'
 import { Card } from '@/ui-v1/components/ui/card'
+import { hasContainerDeployment } from '@/lib/challengeDeployment'
 import {
   challengeTypeOptions,
   deploymentTypeKey,
@@ -62,6 +63,7 @@ import { useAdminChallengesPage } from '@/features/admin/useAdminChallengesPage'
 const { t } = useI18n()
 const globalFilter = ref('')
 const challengeTypeFilter = ref('all')
+const directionFilter = ref('all')
 const attachmentFilter = ref('all')
 const deploymentTypeFilter = ref('all')
 const sorting = ref<SortingState>([])
@@ -99,7 +101,7 @@ const deleteMutation = useToastMutation<string>(removeChallenge, {
 })
 
 const revealMutation = useToastMutation<string>(reveal, {
-  error: 'admin.challenges.revealError',
+  error: 'admin.challenges.revealFlagError',
 })
 
 function challengeTypeLabel(value?: string | null) {
@@ -124,7 +126,9 @@ function openDelete(template: ChallengeTemplateDto) {
 function openReveal(template: ChallengeTemplateDto) {
   selectedTemplate.value = template
   revealedSecret.value = ''
+  revealMutation.reset()
   revealDialog.value = true
+  revealMutation.mutate(template.id)
 }
 
 const columnHelper = createColumnHelper<ChallengeTemplateDto>()
@@ -134,7 +138,13 @@ const columns = [
     header: () => t('admin.challenges.challengeMode'),
     enableSorting: true,
     filterFn: (row, columnId, filterValue) => normalizeChallengeType(row.getValue<string>(columnId)) === filterValue,
-    cell: (info) => h(Badge, { variant: 'secondary', class: 'font-bold text-[10px]' }, () => challengeTypeLabel(info.getValue())),
+    cell: (info) => h(Badge, { variant: 'secondary', class: 'text-sm font-bold' }, () => challengeTypeLabel(info.getValue())),
+  }),
+  columnHelper.accessor('direction', {
+    header: () => t('admin.challenges.direction'),
+    enableSorting: true,
+    filterFn: (row, columnId, filterValue) => String(row.getValue<string>(columnId) ?? '').toLowerCase() === String(filterValue).toLowerCase(),
+    cell: (info) => h(Badge, { variant: 'outline', class: 'text-sm font-bold uppercase' }, () => info.getValue() || 'Uncategorized'),
   }),
   columnHelper.accessor('attachmentUrl', {
     header: () => t('admin.challenges.attachment'),
@@ -150,7 +160,9 @@ const columns = [
   }),
   columnHelper.accessor('containerMode', {
     header: () => t('admin.challenges.containerMode'),
-    cell: (info) => h(Badge, { variant: 'outline' }, () => (info.getValue() === 1 || info.getValue() === 'DockerCompose') ? t('admin.challenges.dockerCompose') : t('admin.challenges.singleImage')),
+    cell: (info) => hasContainerDeployment(info.row.original.deploymentType)
+      ? h(Badge, { variant: 'outline' }, () => (info.getValue() === 1 || info.getValue() === 'DockerCompose') ? t('admin.challenges.dockerCompose') : t('admin.challenges.singleImage'))
+      : h('span', { class: 'text-muted-foreground' }, '-'),
   }),
   columnHelper.accessor('containerImage', {
     header: () => t('admin.challenges.containerImage'),
@@ -180,6 +192,10 @@ watch(challengeTypeFilter, (value) => {
   table.getColumn('typeId')?.setFilterValue(value === 'all' ? undefined : value)
   table.setPageIndex(0)
 })
+watch(directionFilter, (value) => {
+  table.getColumn('direction')?.setFilterValue(value === 'all' ? undefined : value)
+  table.setPageIndex(0)
+})
 watch(attachmentFilter, (value) => {
   table.getColumn('attachmentUrl')?.setFilterValue(value === 'all' ? undefined : value)
   table.setPageIndex(0)
@@ -190,6 +206,7 @@ watch(deploymentTypeFilter, (value) => {
 })
 
 const filteredTemplateCount = computed(() => table.getFilteredRowModel().rows.length)
+const availableDirections = computed(() => Array.from(new Set((templates.value ?? []).map(template => template.direction || 'Uncategorized'))).sort())
 const pageCount = computed(() => Math.max(1, table.getPageCount()))
 </script>
 
@@ -206,7 +223,7 @@ const pageCount = computed(() => Math.max(1, table.getPageCount()))
       </Button>
     </div>
 
-    <Card class="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_repeat(3,minmax(8rem,0.55fr))]">
+    <Card class="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_repeat(4,minmax(8rem,0.55fr))]">
       <div class="relative w-full">
         <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input v-model="globalFilter" :placeholder="t('admin.challenges.searchPlaceholder')" class="pl-10" />
@@ -221,6 +238,17 @@ const pageCount = computed(() => Math.max(1, table.getPageCount()))
           </SelectItem>
           <SelectItem v-for="option in challengeTypeOptions" :key="option.value" :value="option.value">
             {{ option.label }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="directionFilter">
+        <SelectTrigger :aria-label="t('admin.challenges.filterDirection')">
+          <SelectValue :placeholder="t('admin.challenges.allDirections')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{{ t('admin.challenges.allDirections') }}</SelectItem>
+          <SelectItem v-for="direction in availableDirections" :key="direction" :value="direction">
+            {{ direction }}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -308,7 +336,7 @@ const pageCount = computed(() => Math.max(1, table.getPageCount()))
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="openReveal(row.original)">
                     <Key class="mr-2 size-4" />
-                    {{ t('admin.challenges.revealSecret') }}
+                    {{ t('admin.challenges.revealFlag') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem class="text-destructive focus:text-destructive" @click="openDelete(row.original)">
@@ -375,15 +403,25 @@ const pageCount = computed(() => Math.max(1, table.getPageCount()))
     <Dialog v-model:open="revealDialog">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ t('admin.challenges.revealSecret') }}</DialogTitle>
-          <DialogDescription>{{ t('admin.challenges.revealSecretAuditHint') }}</DialogDescription>
+          <DialogTitle>{{ t('admin.challenges.revealFlag') }}</DialogTitle>
+          <DialogDescription>{{ t('admin.challenges.revealFlagAuditHint') }}</DialogDescription>
         </DialogHeader>
-        <pre v-if="revealedSecret" class="rounded-lg border bg-muted p-4 text-sm whitespace-pre-wrap break-all">{{ revealedSecret }}</pre>
+        <div v-if="revealMutation.isPending.value" class="flex min-h-24 items-center justify-center border bg-muted/40 text-sm text-muted-foreground">
+          <Loader2 class="mr-2 size-4 animate-spin" />
+          {{ t('admin.challenges.loadingFlag') }}
+        </div>
+        <pre v-else-if="revealedSecret" class="border bg-muted p-4 text-sm whitespace-pre-wrap break-all">{{ revealedSecret }}</pre>
+        <p v-else-if="revealMutation.isError.value" class="border border-destructive p-4 text-sm text-destructive">
+          {{ t('admin.challenges.revealFlagError') }}
+        </p>
+        <p v-else class="border bg-muted/40 p-4 text-sm text-muted-foreground">
+          {{ t('admin.challenges.flagNotConfigured') }}
+        </p>
         <DialogFooter>
           <Button variant="outline" @click="revealDialog = false">{{ t('common.close') }}</Button>
-          <Button variant="destructive" :disabled="revealMutation.isPending.value" @click="revealMutation.mutate(selectedTemplate!.id)">
+          <Button v-if="revealMutation.isError.value" variant="destructive" :disabled="revealMutation.isPending.value" @click="revealMutation.mutate(selectedTemplate!.id)">
             <Loader2 v-if="revealMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-            {{ t('admin.challenges.revealSecret') }}
+            {{ t('common.retry') }}
           </Button>
         </DialogFooter>
       </DialogContent>

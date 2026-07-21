@@ -1,3 +1,4 @@
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { MutationAction } from '@/features/shared/feedback'
@@ -13,8 +14,11 @@ export function useToastMutation<TVars = void>(
   hooks?: { onSuccess?: () => void, onError?: () => void },
 ) {
   const { t } = useI18n()
+  const fallbackIsError = computed(() => false)
   return {
     isPending: mutation.isPending,
+    isError: mutation.isError ?? fallbackIsError,
+    reset: mutation.reset?.bind(mutation) ?? (() => undefined),
     mutate: (variables: TVars) => mutation.mutate(variables, {
       onSuccess: (data) => {
         hooks?.onSuccess?.()

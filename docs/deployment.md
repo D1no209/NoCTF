@@ -14,7 +14,6 @@ The fastest way to get NoCTF running is with the provided `deploy/docker-compose
 | `redis` | `redis:7` | SignalR backplane and leaderboard cache |
 | `minio` | `minio/minio:latest` | S3-compatible object storage |
 | `backend` | Built from `backend/Dockerfile` | NoCTF API and Vue SPA static files |
-| `worker` | Built from `backend/Dockerfile` | Durable background task processor |
 | `runner` | Built from `backend/Dockerfile` | Isolated Docker/K8s execution boundary |
 
 ### Steps
@@ -58,7 +57,7 @@ curl http://localhost/api/health
 
 ### Notes
 
-- The backend does not mount `/var/run/docker.sock`. Container access is isolated in the `runner` service; the worker calls runner over the internal Compose network.
+- The backend does not mount `/var/run/docker.sock`. Container access is isolated in the `runner` service; API-hosted Channel consumers call runner over the internal Compose network.
 - The Docker Compose API image builds the Vue SPA with Bun and serves the built `dist` from ASP.NET Core `wwwroot`, so no separate Nginx frontend container is required.
 - Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
 - Penetration Challenge ranges can run through the Docker Runner or the Kubernetes Runner. Set `NOCTF_PUBLIC_HOST` / `InstanceAccess:PublicHost` for Docker NodePort-style entry URLs, or `K8s:PublicEntry` / `K8s:IngressBaseDomain` for Kubernetes entries.
@@ -74,7 +73,8 @@ NoCTF includes a full set of K8s manifests under `deploy/k8s/`. These manifests 
 - Kubernetes cluster (v1.25+)
 - `kubectl` configured for your cluster
 - NGINX Ingress Controller installed
-- Metrics Server installed (required for HPA)
+- A single backend replica is required because background Channels are process-local and non-durable.
+- Graceful shutdown stops new scoring admissions and drains Maintenance, Processing, then Projection for `BackgroundQueue__ShutdownDrainSeconds` (20 seconds by default). Forced termination can lose an accepted in-memory work item, and committed-but-not-enqueued Submissions are not recovered automatically.
 
 ### Creating Secrets
 
@@ -89,13 +89,14 @@ kubectl create secret generic noctf-secrets \
   --from-literal=db-password='your-db-password' \
   --from-literal=seed-admin-password='your-initial-admin-password' \
   --from-literal=runner-api-key='your-runner-internal-api-key' \
+  --from-literal=runner-scoring-key='your-runner-scoring-jwt-key-at-least-32-chars' \
   --from-literal=minio-access-key='your-minio-access-key' \
   --from-literal=minio-secret-key='your-minio-secret-key' \
   --from-literal=smtp-username='your-smtp-user' \
   --from-literal=smtp-password='your-smtp-password'
 ```
 
-The SMTP secret keys are optional while `EmailVerification__Enabled` is `false`. They may be supplied as bootstrap defaults before the first start, or configured later through **Admin → Email verification**. Administrator-saved SMTP passwords are AES-GCM protected in PostgreSQL with a purpose-specific key derived from the deployment JWT secret. Rotating `JwtSettings__Secret` therefore requires re-entering the SMTP password in the admin page; the password is never returned by the API or written to the audit log.
+The SMTP secret keys are optional while `EmailVerification__Enabled` is `false`. They may be supplied as bootstrap defaults before the first start, or configured later through **Admin → Email verification**. Administrator-saved SMTP passwords are AES-GCM protected in PostgreSQL with a purpose-specific key derived from the deployment JWT secret. Rotating `Authentication__SigningKey` therefore requires re-entering the SMTP password in the admin page; the password is never returned by the API or written to the audit log.
 
 ### Build and Load Images
 
@@ -103,7 +104,6 @@ From the repo root:
 
 ```bash
 docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
-docker build -f backend/Dockerfile --target worker -t noctf-worker:latest .
 docker build -f backend/Dockerfile --target runner -t noctf-runner:latest .
 ```
 
@@ -112,12 +112,10 @@ For local clusters, load the images:
 ```bash
 # kind
 kind load docker-image noctf-backend:latest
-kind load docker-image noctf-worker:latest
 kind load docker-image noctf-runner:latest
 
 # minikube
 minikube image load noctf-backend:latest
-minikube image load noctf-worker:latest
 minikube image load noctf-runner:latest
 ```
 
@@ -144,8 +142,6 @@ kubectl apply -f deploy/k8s/runner-deployment.yaml
 kubectl apply -f deploy/k8s/runner-service.yaml
 kubectl apply -f deploy/k8s/backend-deployment.yaml
 kubectl apply -f deploy/k8s/backend-service.yaml
-kubectl apply -f deploy/k8s/worker-deployment.yaml
-kubectl apply -f deploy/k8s/backend-hpa.yaml
 kubectl apply -f deploy/k8s/ingress.yaml
 kubectl apply -f deploy/k8s/networkpolicy.yaml
 ```
@@ -170,7 +166,6 @@ Verify:
 ```bash
 kubectl get ingress -n noctf
 kubectl get all -n noctf
-kubectl get hpa -n noctf
 ```
 
 ### Kubernetes Runner
@@ -215,7 +210,7 @@ volumes:
       type: Socket
 ```
 
-Use a dedicated node pool with taints/tolerations for Runner workloads so privileged container access is isolated from API, Worker, and database pods.
+Use a dedicated node pool with taints/tolerations for Runner workloads so privileged container access is isolated from API and database pods.
 
 ### Network Policy Notes
 

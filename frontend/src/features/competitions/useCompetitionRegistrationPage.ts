@@ -1,15 +1,38 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import type {
-  NoCtfapiEndpointsCompetitionsCompetitionDetailDto,
-  NoCtfapiEndpointsCompetitionsMyCompetitionTeamDto,
-} from '@/api/generated/types.gen'
 import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 
-export type RegistrationCompetitionDto = NoCtfapiEndpointsCompetitionsCompetitionDetailDto
-export type RegistrationTeamDto = NoCtfapiEndpointsCompetitionsMyCompetitionTeamDto
+// Player-facing payloads, matching V1's CompetitionRegistrationWorkspace
+// contract (string status/mode, not the generated SDK shapes).
+export interface RegistrationCompetitionDto {
+  id: string
+  title: string
+  description?: string | null
+  status: string
+  startTime: string
+  endTime: string
+  gameModeType: string
+  maxTeamMembers: number
+  teamRegistrationAutoApprove: boolean
+  tracksEnabled: boolean
+  trackNames: string[]
+}
+
+export interface RegistrationTeamDto {
+  id: string
+  competitionId: string
+  name: string
+  inviteToken: string
+  memberCount: number
+  isLocked: boolean
+  isBanned: boolean
+  bannedReason?: string | null
+  trackName?: string | null
+  registrationStatus: string
+  isCaptain: boolean
+}
 
 // Canonical behavior follows V1's CompetitionRegistrationWorkspace: the teams
 // query is gated only on the route id, and joining another competition's team
@@ -62,8 +85,7 @@ export function useCompetitionRegistrationPage() {
     onSuccess: (team) => {
       joinToken.value = ''
       queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(competitionId.value) })
-      if (team?.competitionId)
-        queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(team.competitionId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(team.competitionId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
     },
   })

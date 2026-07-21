@@ -120,7 +120,7 @@ module.ConfigureServices(services)
 
 - 用受限注册 API 替代裸 `IServiceCollection`
 - 增加 Plugin Manifest
-- 不可信任务迁移到独立 Worker / Runner
+- 不可信任务迁移到独立 API-hosted Channel consumer / Runner
 
 ---
 
@@ -357,7 +357,7 @@ http://localhost:5000/swagger/v1/swagger.json
 
 ## 3. 推荐架构优化方向
 
-### 3.1 拆出 API / Worker / Runner 三个边界
+### 3.1 拆出 API / API-hosted Channel consumer / Runner 三个边界
 
 当前 API 承担太多职责：
 
@@ -374,7 +374,7 @@ http://localhost:5000/swagger/v1/swagger.json
 NoCTF.API
   认证、授权、管理、查询、提交入口
 
-NoCTF.Worker / GameOrchestrator
+API-hosted Channel consumers / GameOrchestrator
   AWD round
   KoH polling
   AWDP patch validation
@@ -584,7 +584,7 @@ Redis Cache / SignalR Push
 
 - 不要记录 flag、JWT、password、patch URL
 - Admin reveal flag、role change、container destroy、competition delete 必须审计
-- 后台 Worker 操作也要审计
+- 后台 API-hosted Channel consumer 操作也要审计
 - 日志流不要向 Organizer 泄露其他比赛或系统 secret
 
 ---
@@ -643,11 +643,11 @@ Redis Cache / SignalR Push
 
 ---
 
-### 阶段 B：Worker / Runner 架构
+### 阶段 B：API-hosted Channel consumer / Runner 架构
 
 目标：把比赛运行逻辑从 API 生命周期中解耦。
 
-- 新增 Worker
+- 新增 API-hosted Channel consumer
 - 新增 Runner
 - API 不直接访问 Docker socket
 - 后台任务可恢复、可重试

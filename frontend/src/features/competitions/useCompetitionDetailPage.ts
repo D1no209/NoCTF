@@ -31,6 +31,7 @@ export interface CompetitionChallengeDto {
   id: string
   title: string
   typeId: string
+  direction: string
   points: number
   solveCount: number
   deploymentType?: string | number | null
@@ -251,7 +252,7 @@ export function useCompetitionDetailPage() {
   const filteredChallenges = computed(() => {
     return effectiveChallenges.value.filter((challenge) => {
       const solved = solvedIds.value.has(challenge.id)
-      const matchesDirection = activeDirection.value === 'ALL' || normalizeDirection(challenge.typeId) === activeDirection.value
+      const matchesDirection = activeDirection.value === 'ALL' || normalizeDirection(challenge.direction) === activeDirection.value
       const matchesSolved = !hideSolved.value || !solved
       return matchesDirection && matchesSolved
     })
@@ -263,7 +264,7 @@ export function useCompetitionDetailPage() {
       counts.set(dir, { total: 0, unsolved: 0 })
 
     for (const challenge of effectiveChallenges.value) {
-      const direction = normalizeDirection(challenge.typeId)
+      const direction = normalizeDirection(challenge.direction)
       const current = counts.get(direction) ?? { total: 0, unsolved: 0 }
       current.total += 1
       if (!solvedIds.value.has(challenge.id))

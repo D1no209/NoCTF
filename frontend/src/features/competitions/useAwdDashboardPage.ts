@@ -181,6 +181,7 @@ export function useAwdDashboardPage(gameModeType: () => string) {
     try {
       const data = await competitionApi.submitPatch<{ submissionId?: string }>(
         competitionId.value,
+        scoreStore.teamId ?? '',
         patchChallenge.value,
         patchFile.value,
       )
@@ -208,6 +209,7 @@ export function useAwdDashboardPage(gameModeType: () => string) {
     try {
       const data = await competitionApi.submitFlag<{ correct?: boolean, message?: string }>(
         competitionId.value,
+        scoreStore.teamId ?? '',
         selectedChallenge.value,
         flagInput.value.trim(),
       )

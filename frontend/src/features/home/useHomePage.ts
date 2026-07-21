@@ -1,16 +1,34 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import type {
-  NoCtfapiEndpointsCompetitionsCompetitionListItemDto,
-  NoCtfapiEndpointsTeamsMyTeamDto,
-} from '@/api/generated/types.gen'
 import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { useAuthStore } from '@/stores/auth'
 
-export type HomeCompetitionDto = NoCtfapiEndpointsCompetitionsCompetitionListItemDto
-export type HomeTeamDto = NoCtfapiEndpointsTeamsMyTeamDto
+// Player-facing payloads, matching V1's HomeWorkspace contract (plain arrays
+// with string status/mode, not the generated SDK shapes).
+export interface HomeCompetitionDto {
+  id: string
+  title: string
+  description?: string | null
+  status: string
+  gameModeType?: string | null
+  startTime: string
+  endTime: string
+}
+
+export interface HomeTeamDto {
+  id: string
+  competitionId: string
+  name: string
+  competitionTitle: string
+  registrationStatus: string
+  memberCount: number
+  maxTeamMembers: number
+  isLocked: boolean
+  isBanned: boolean
+  gameModeType: string
+}
 
 const statusPriority = new Map([
   ['running', 0],
@@ -38,11 +56,11 @@ export function useHomePage() {
 
   const activeCompetitions = computed(() => [...(competitionsQuery.data.value ?? [])]
     .sort((a, b) => {
-      const statusA = statusPriority.get((a.status ?? '').toLowerCase()) ?? 5
-      const statusB = statusPriority.get((b.status ?? '').toLowerCase()) ?? 5
+      const statusA = statusPriority.get(a.status.toLowerCase()) ?? 5
+      const statusB = statusPriority.get(b.status.toLowerCase()) ?? 5
       if (statusA !== statusB)
         return statusA - statusB
-      return Date.parse(a.startTime ?? '') - Date.parse(b.startTime ?? '')
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     })
     .slice(0, 3))
 

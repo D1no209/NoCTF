@@ -25,12 +25,13 @@ cd deploy && docker compose up -d postgres redis minio runner
 2. Ensure your local environment is configured. The backend reads from `appsettings.Development.json` and environment variables. At minimum you need a connection string and JWT secret. Example:
 
 ```bash
-export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=change_me_strong_password"
+export ConnectionStrings__PostgreSql="Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=change_me_strong_password"
 export ConnectionStrings__Redis="localhost:6379"
-export JwtSettings__Secret="change_me_at_least_32_chars_long_secret_key"
+export Authentication__SigningKey="change_me_at_least_32_chars_long_secret_key"
+export RunnerScoring__SigningKey="change_me_at_least_32_chars_long_runner_key"
 ```
 
-> On Windows PowerShell use `$env:ConnectionStrings__DefaultConnection = "..."`
+> On Windows PowerShell use `$env:ConnectionStrings__PostgreSql = "..."`
 
 3. Run the API:
 
@@ -136,7 +137,7 @@ backend/src/
   NoCTF.Container.Docker/  # Docker orchestration
   NoCTF.Runner.Client/ # HTTP client and contracts for runner calls
   NoCTF.Runner/        # Runtime boundary that owns Docker access
-  NoCTF.Worker/        # Background task processor
+  NoCTF.API/            # HTTP API and in-process Channel consumers
   NoCTF.Plugins.CTF/   # CTF plugin
   NoCTF.Plugins.AWD/   # AWD plugin
   NoCTF.Plugins.AWDP/  # AWDP plugin

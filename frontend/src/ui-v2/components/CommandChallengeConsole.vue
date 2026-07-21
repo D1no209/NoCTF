@@ -78,7 +78,7 @@ async function submitFlag() {
       <CommandPanel class="challenge-console__dialog" tone="signal">
         <header>
           <div>
-            <CommandSignal :label="props.challenge.typeId" tone="success" />
+            <CommandSignal :label="props.challenge.direction" tone="success" />
             <h2>{{ props.challenge.title }}</h2>
           </div>
           <CommandButton label="Close" tone="ghost" @click="isOpen = false" />

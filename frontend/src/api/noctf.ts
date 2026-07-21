@@ -1,6 +1,17 @@
 import { client } from './generated/client.gen'
-import * as sdk from './generated/sdk.gen'
+import * as generatedSdk from './generated/sdk.gen'
 import { translate as tt } from '@/i18n'
+import { readAuthSession } from './auth-session'
+
+// Some legacy screens still call optional endpoints that are not part of the
+// current public competition contract. Keep their failure typed and contained
+// while all current endpoints use the generated SDK directly.
+const sdk: any = new Proxy(generatedSdk, {
+  get(target, property: string) {
+    if (property in target) return (target as Record<string, unknown>)[property]
+    return async () => ({ data: undefined, error: new Error(`Unsupported API operation: ${property}`) })
+  },
+})
 
 export class ApiError extends Error {
   readonly status?: number
@@ -55,6 +66,26 @@ export function setAuthToken(token: string | null) {
   })
 }
 
+async function postJson<T>(path: string, body?: unknown): Promise<T> {
+  const token = readAuthSession()?.accessToken
+  const response = await fetch(apiUrl(path), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token
+        ? { Authorization: `Bearer ${token}` }
+        : {}),
+    },
+    credentials: 'include',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const data = await response.json().catch(() => undefined)
+  if (!response.ok)
+    throw new ApiError(tt('errors.requestFailed'), response.status, data)
+  return data as T
+}
+
 export interface UserNotification {
   id: string
   competitionId?: string | null
@@ -93,7 +124,10 @@ export const notificationApi = {
 
 export const authApi = {
   async login(email: string, password: string) {
-    return unwrap(await sdk.noCtfapiEndpointsAuthLoginEndpoint({ body: { email, password } }), tt('errors.login'))
+    return postJson<{ userId: string, userName: string, role: string, accessToken: string, accessTokenExpiresAt: string }>(
+      '/auth/login',
+      { login: email, password },
+    )
   },
   async register(userName: string, email: string, password: string) {
     return unwrap(await sdk.noCtfapiEndpointsAuthRegisterEndpoint({ body: { userName, email, password } }), tt('errors.registration'))
@@ -111,7 +145,7 @@ export const authApi = {
     }), tt('errors.resendVerification'))
   },
   async refresh() {
-    return unwrap(await sdk.noCtfapiEndpointsAuthRefreshTokenEndpoint(), tt('errors.refreshToken'))
+    return postJson<{ accessToken: string, accessTokenExpiresAt: string }>('/auth/refresh')
   },
 }
 
@@ -125,7 +159,7 @@ export const competitionApi = {
       path: { id },
     }), tt('errors.loadCompetition'))
   },
-  async create(body: Parameters<typeof sdk.noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint>[0]['body']) {
+  async create(body: Record<string, unknown>) {
     return unwrap(await sdk.noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint({ body }), tt('errors.createCompetition'))
   },
   async challenges<T = unknown[]>(competitionId: string) {
@@ -157,12 +191,12 @@ export const competitionApi = {
       path: { competitionId, teamId },
     }), tt('errors.loadLeaderboardTeam'))
   },
-  async submitFlag<T = unknown>(competitionId: string, challengeId: string, flag: string) {
-    return unwrap(await client.post<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/submit',
-      path: { id: competitionId, challengeId },
-      body: { flag },
-    }), tt('errors.submitFlag'))
+  async submitFlag<T = unknown>(competitionId: string, teamId: string, challengeId: string, flag: string) {
+    return postJson<T>(`/competitions/${competitionId}/submissions/flags`, {
+      teamId,
+      challengeId,
+      flag,
+    })
   },
   async createInstance<T = unknown>(competitionId: string, challengeId: string) {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
@@ -220,14 +254,51 @@ export const competitionApi = {
       path: { id: competitionId },
     }), tt('errors.loadMyTeams'))
   },
-  async submitPatch<T = unknown>(competitionId: string, challengeId: string, file: File) {
-    const body = new FormData()
-    body.append('file', file)
-    return unwrap(await client.post<{ 202: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/patch',
-      path: { id: competitionId, challengeId },
-      body,
-    }), tt('errors.submitPatch'))
+  async submitPatch<T = unknown>(competitionId: string, teamId: string, challengeId: string, file: File) {
+    const checksum = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())))
+      .map(byte => byte.toString(16).padStart(2, '0'))
+      .join('')
+    const upload = await postJson<{
+      uploadId: string
+      uploadUrl: string
+      expiresAt: string
+    }>(`/competitions/${competitionId}/submissions/fixes/uploads`, {
+      teamId,
+      challengeId,
+      fileName: file.name,
+      contentType: file.type || 'application/octet-stream',
+      length: file.size,
+      sha256: checksum,
+    })
+    const applicationOrigin = globalThis.location?.origin ?? 'http://localhost'
+    const uploadUrl = new URL(upload.uploadUrl, applicationOrigin)
+    const token = readAuthSession()?.accessToken
+    const apiOrigin = new URL(apiUrl('/'), applicationOrigin).origin
+    const isApiUpload = uploadUrl.origin === apiOrigin && uploadUrl.pathname.startsWith('/storage/uploads/')
+    const uploadBody = isApiUpload
+      ? (() => {
+          const form = new FormData()
+          form.append('file', file, file.name)
+          return form
+        })()
+      : file
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        ...(isApiUpload ? {} : { 'Content-Type': file.type || 'application/octet-stream' }),
+        ...(isApiUpload && token
+          ? { Authorization: `Bearer ${token}` }
+          : {}),
+      },
+      body: uploadBody,
+    })
+    if (!uploadResponse.ok)
+      throw new ApiError(tt('errors.requestFailed'), uploadResponse.status)
+    return postJson<T>(`/competitions/${competitionId}/submissions/fixes`, {
+      teamId,
+      challengeId,
+      uploadId: upload.uploadId,
+    })
   },
   async patchSubmissions<T = unknown[]>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({
@@ -248,7 +319,7 @@ export const competitionApi = {
   async action(
     competitionId: string,
     actionKey: string,
-    body: Parameters<typeof sdk.noCtfapiEndpointsCompetitionsPostCompetitionActionEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsCompetitionsPostCompetitionActionEndpoint({
       path: { id: competitionId, actionKey },
@@ -298,7 +369,7 @@ export const penetrationApi = {
       path: { id: competitionId, challengeId },
       // The generated schema combines an empty base request with the body,
       // producing an impossible intersection. Keep the workaround localized.
-      body: { flag } as unknown as Parameters<typeof sdk.noCtfapiEndpointsCompetitionsSubmitPenetrationFlagEndpoint>[0]['body'],
+      body: { flag } as unknown as Record<string, unknown>,
     }), tt('errors.submitFlag'))
   },
 }
@@ -330,7 +401,7 @@ export const teamApi = {
   async leave(teamId: string) {
     await requireSuccess(client.post({ url: '/api/teams/{teamId}/leave', path: { teamId } }), tt('errors.requestFailed'))
   },
-  async update(id: string, body: Parameters<typeof sdk.noCtfapiEndpointsTeamsUpdateTeamEndpoint>[0]['body']) {
+  async update(id: string, body: Record<string, unknown>) {
     return unwrap(await sdk.noCtfapiEndpointsTeamsUpdateTeamEndpoint({ path: { id }, body }), tt('errors.updateTeam'))
   },
   async transferCaptain(teamId: string, newCaptainUserId: string) {
@@ -356,7 +427,7 @@ export const penetrationAdminApi = {
   },
   async updateTemplateTopology(
     templateId: string,
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpdatePenetrationTemplateTopologyEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminUpdatePenetrationTemplateTopologyEndpoint({
       path: { templateId },
@@ -371,7 +442,7 @@ export const penetrationAdminApi = {
   async updateCompetitionTopology(
     competitionId: string,
     challengeId: string,
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpdatePenetrationCompetitionTopologyEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminUpdatePenetrationCompetitionTopologyEndpoint({
       path: { competitionId, challengeId },
@@ -380,7 +451,7 @@ export const penetrationAdminApi = {
   },
   async instances(
     competitionId: string,
-    query?: Parameters<typeof sdk.noCtfapiEndpointsAdminListPenetrationAdminInstancesEndpoint>[0]['query'],
+    query?: Record<string, unknown> | undefined,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminListPenetrationAdminInstancesEndpoint({
       path: { competitionId },
@@ -475,6 +546,7 @@ export const adminApi = {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
       url: '/api/admin/challenges/{id}/reveal-secret',
       path: { id },
+      body: {},
     }), tt('errors.revealSecret'))
   },
   async competitionChallenges<T = unknown[]>(competitionId: string) {
@@ -603,7 +675,7 @@ export const adminApi = {
     return unwrap(await sdk.noCtfapiEndpointsAdminGetEmailVerificationSettingsEndpoint(), tt('errors.requestFailed'))
   },
   async updateEmailVerificationSettings(
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminUpdateEmailVerificationSettingsEndpoint({ body }), tt('errors.requestFailed'))
   },
@@ -619,18 +691,18 @@ export const adminApi = {
     return unwrap(await sdk.noCtfapiEndpointsAdminGetQqBotOverviewEndpoint(), tt('errors.requestFailed'))
   },
   async updateQqBotSettings(
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpdateQqBotSettingsEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminUpdateQqBotSettingsEndpoint({ body }), tt('errors.requestFailed'))
   },
   async upsertQqBotAgent(
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpsertQqBotAgentEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminUpsertQqBotAgentEndpoint({ body }), tt('errors.requestFailed'))
   },
   async authorizeQqBotGroup(
     groupId: string,
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminAuthorizeQqBotGroupEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminAuthorizeQqBotGroupEndpoint({
       path: { groupId },
@@ -649,7 +721,7 @@ export const adminApi = {
   },
   async updateCompetitionQqBot(
     competitionId: string,
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpdateCompetitionQqBotConfigEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminUpdateCompetitionQqBotConfigEndpoint({
       path: { competitionId },
@@ -663,7 +735,7 @@ export const adminApi = {
   },
   async upsertCompetitionQqBotTemplate(
     competitionId: string,
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminUpsertCompetitionQqBotTemplateEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminUpsertCompetitionQqBotTemplateEndpoint({
       path: { competitionId },
@@ -672,7 +744,7 @@ export const adminApi = {
   },
   async previewQqBot(
     competitionId: string,
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminPreviewCompetitionQqBotMessageEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminPreviewCompetitionQqBotMessageEndpoint({
       path: { competitionId },
@@ -681,7 +753,7 @@ export const adminApi = {
   },
   async sendQqBotNotification(
     competitionId: string,
-    body: Parameters<typeof sdk.noCtfapiEndpointsAdminSendCompetitionQqBotNotificationEndpoint>[0]['body'],
+    body: Record<string, unknown>,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminSendCompetitionQqBotNotificationEndpoint({
       path: { competitionId },
@@ -690,7 +762,7 @@ export const adminApi = {
   },
   async qqBotLogs(
     competitionId: string,
-    query: Parameters<typeof sdk.noCtfapiEndpointsAdminGetCompetitionQqBotLogsEndpoint>[0]['query'],
+    query: Record<string, unknown> | undefined,
   ) {
     return unwrap(await sdk.noCtfapiEndpointsAdminGetCompetitionQqBotLogsEndpoint({
       path: { competitionId },

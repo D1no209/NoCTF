@@ -27,7 +27,7 @@ const loginError = ref('')
 const { loading, login } = useLoginPage()
 
 const formSchema = toTypedSchema(z.object({
-  email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
+  email: z.string().trim().min(1, t('validation.loginIdentifierRequired')),
   password: z.string().min(8, t('validation.passwordMin')),
 }))
 
@@ -64,14 +64,14 @@ const onSubmit = form.handleSubmit(async (values) => {
 
           <FormField v-slot="{ componentField }" name="email">
             <FormItem>
-              <FormLabel>{{ t('auth.email') }}</FormLabel>
+              <FormLabel>{{ t('auth.loginIdentifier') }}</FormLabel>
               <FormControl>
                 <Input
-                  type="email"
-                  placeholder="name@example.com"
+                  type="text"
+                  :placeholder="t('auth.loginIdentifierPlaceholder')"
                   v-bind="componentField"
                   :disabled="loading"
-                  autocomplete="email"
+                  autocomplete="username"
                 />
               </FormControl>
               <FormMessage />

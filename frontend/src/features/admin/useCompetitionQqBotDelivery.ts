@@ -11,6 +11,7 @@ export interface QqRule {
 }
 
 export interface QqBinding {
+  id?: string | null
   agentId: string
   groupId: string
   qqGroupId: number
@@ -84,7 +85,7 @@ export interface QqAnnouncementForm {
 
 export function useCompetitionQqBotDelivery(competitionId: () => string) {
   const queryClient = useQueryClient()
-  const selectedTemplateId = ref('')
+  const selectedTemplateId = ref('__none__')
   const preview = ref<QqPreview | null>(null)
   const selectedGroupIds = ref<string[]>([])
   const templateForm = ref<QqTemplateForm>({ id: null, eventType: 0, name: '', content: '', isDefault: false })
@@ -146,6 +147,7 @@ export function useCompetitionQqBotDelivery(competitionId: () => string) {
       : []
   }))
   const deliveryItems = computed(() => deliveryQuery.data.value?.items ?? [])
+  const selectableTemplates = computed(() => (templatesQuery.data.value ?? []).filter(template => Boolean(template.id)))
 
   watch(configQuery.data, (value) => {
     if (!value)
@@ -170,8 +172,8 @@ export function useCompetitionQqBotDelivery(competitionId: () => string) {
   }, { immediate: true })
 
   watch(templatesQuery.data, (items) => {
-    if (!selectedTemplateId.value)
-      selectedTemplateId.value = items?.[0]?.id ?? ''
+    if (selectedTemplateId.value === '__none__')
+      selectedTemplateId.value = items?.find(template => template.id)?.id ?? '__none__'
   }, { immediate: true })
 
   function toggleGroup(groupId: string) {
@@ -188,7 +190,7 @@ export function useCompetitionQqBotDelivery(competitionId: () => string) {
       content: template.content ?? '',
       isDefault: template.isDefault ?? false,
     }
-    selectedTemplateId.value = template.id ?? ''
+    selectedTemplateId.value = template.id ?? '__none__'
   }
 
   function resetTemplate() {
@@ -196,7 +198,24 @@ export function useCompetitionQqBotDelivery(competitionId: () => string) {
   }
 
   const saveConfigMutation = useMutation({
-    mutationFn: () => adminApi.updateCompetitionQqBot(competitionId(), { ...form.value, groupBindings: bindings.value }),
+    mutationFn: () => adminApi.updateCompetitionQqBot(competitionId(), {
+      enabled: form.value.enabled,
+      allowMessages: form.value.allowMessages,
+      allowManualNotifications: form.value.allowManualNotifications,
+      stopNormalEventsAfterFinished: form.value.stopNormalEventsAfterFinished,
+      mentionAll: form.value.mentionAll,
+      showTeamName: form.value.showTeamName,
+      showUserName: form.value.showUserName,
+      showChallengeCategory: form.value.showChallengeCategory,
+      includeCompetitionLink: form.value.includeCompetitionLink,
+      includeChallengeLink: form.value.includeChallengeLink,
+      hidePenaltyDetails: form.value.hidePenaltyDetails,
+      eventRules: form.value.eventRules.map(rule => ({ ...rule })),
+      groupBindings: bindings.value.map(binding => ({
+        ...binding,
+        eventTypes: binding.eventTypes ?? [],
+      })),
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['competition-qqbot', competitionId()] })
     },
@@ -231,7 +250,7 @@ export function useCompetitionQqBotDelivery(competitionId: () => string) {
     mutationFn: () => adminApi.sendQqBotNotification(competitionId(), {
       title: announcementForm.value.title.trim(),
       content: announcementForm.value.content.trim(),
-      templateId: selectedTemplateId.value || null,
+      templateId: selectedTemplateId.value === '__none__' ? null : selectedTemplateId.value,
       groupIds: bindings.value.map(binding => binding.groupId),
       isTest: announcementForm.value.isTest,
     }),
@@ -261,6 +280,7 @@ export function useCompetitionQqBotDelivery(competitionId: () => string) {
     error: configQuery.error,
     refetch: configQuery.refetch,
     templates: templatesQuery.data,
+    selectableTemplates,
     loadingTemplates: templatesQuery.isLoading,
     availableGroups: groupsQuery.data,
     deliveryItems,

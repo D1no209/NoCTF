@@ -1,0 +1,112 @@
+using FastEndpoints;
+using FastEndpoints.Swagger;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using NoCTF.Application.Authentication.Login;
+using NoCTF.Application.Authentication.RefreshJwt;
+using NoCTF.Application.Submissions.Intake;
+using NoCTF.Infrastructure;
+using NoCTF.API.OpenApi;
+using NoCTF.Application.Authentication.Ports;
+using NoCTF.Application.Submissions.Ports;
+using NoCTF.Application.Teams.Moderation;
+using NoCTF.Application.Storage;
+using NoCTF.Application.Notifications;
+using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.API.SignalR.Publishing;
+using NSwag;
+
+namespace NoCTF.API.Composition;
+
+public static class ServiceRegistration
+{
+    public static IServiceCollection AddNoCtfApi(this IServiceCollection services, IConfiguration configuration)
+        => AddNoCtfApi(services, configuration, true);
+
+    public static IServiceCollection AddNoCtfApi(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool includeInfrastructure)
+    {
+        services.AddProblemDetails();
+        services.AddFastEndpoints();
+        services.SwaggerDocument(options =>
+        {
+            options.EnableJWTBearerAuth = false;
+            options.DocumentSettings = settings =>
+            {
+                settings.AddAuth("Bearer", new OpenApiSecurityScheme
+                {
+                    Type = OpenApiSecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    Description = "Short-lived NoCTF user access token."
+                }, []);
+                settings.AddAuth("RunnerScoringBearer", new OpenApiSecurityScheme
+                {
+                    Type = OpenApiSecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    Description = "Short-lived Runner token restricted to scoring.write."
+                }, []);
+            };
+        });
+        if (includeInfrastructure)
+        {
+            services.AddNoCtfInfrastructure(configuration);
+            services.AddScoped<SubmitFlag>();
+            services.AddScoped<SubmitFix>();
+            services.AddScoped<LoginUser>();
+            services.AddScoped<RefreshAccessToken>();
+            services.AddScoped<ModerateTeam>();
+            services.AddScoped<CreateFixUpload>();
+        }
+        else
+        {
+            services.AddScoped<ISubmissionIntakeStore, SwaggerSubmissionStore>();
+            services.AddScoped<ISubmissionStatusReader, SwaggerStatusReader>();
+            services.AddScoped<IUserAuthenticationStore, SwaggerAuthenticationStore>();
+            services.AddScoped<IAccessTokenVersionReader, SwaggerAccessTokenVersionReader>();
+            services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();
+            services.AddScoped<SubmitFlag>();
+            services.AddScoped<SubmitFix>();
+            services.AddSingleton<ISubmissionAdmissionModePolicy, SwaggerSubmissionAdmissionModePolicy>();
+            services.AddScoped<LoginUser>();
+            services.AddScoped<RefreshAccessToken>();
+            services.AddScoped<ModerateTeam>();
+            services.AddScoped<CreateFixUpload>();
+            services.AddScoped<ITeamModerationStore, SwaggerModerationStore>();
+            services.AddScoped<ICompetitionModerationAuthorizer, SwaggerModerationAuthorizer>();
+            services.AddSingleton<IBackgroundWorkScheduler, SwaggerBackgroundWorkScheduler>();
+            services.AddScoped<ILeaderboardCache, SwaggerLeaderboardCache>();
+            services.AddScoped<IFixUploadSessionStore, SwaggerFixUploadStore>();
+            services.AddSingleton<IObjectStorage, SwaggerObjectStorage>();
+        }
+        var redis = configuration.GetConnectionString("Redis");
+        var signalR = services.AddSignalR();
+        services.AddScoped<ISubmissionResultPublisher, SignalRSubmissionResultPublisher>();
+        services.AddScoped<ILeaderboardRefreshPublisher, SignalRLeaderboardRefreshPublisher>();
+        services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
+        if (includeInfrastructure
+            && !configuration.GetValue<bool>("OpenApi:Exporting")
+            && !string.IsNullOrWhiteSpace(redis))
+        {
+            signalR.AddStackExchangeRedis(redis);
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisSubmissionResultRelay>();
+        }
+        services.AddRateLimiter(options =>
+        {
+            options.AddPolicy("submission", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    $"{context.User.FindFirst("sub")?.Value ?? "anonymous"}:{context.Connection.RemoteIpAddress}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+        });
+        return services;
+    }
+}

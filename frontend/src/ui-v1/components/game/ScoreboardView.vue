@@ -174,6 +174,7 @@ function rowTiltClass(index: number) {
   ]
   return tilts[index % tilts.length]
 }
+
 </script>
 
 
