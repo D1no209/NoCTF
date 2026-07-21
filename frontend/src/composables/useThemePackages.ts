@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { builtInThemePackages, defaultThemeId } from '@/themes/presets'
+import { readThemeArchiveEntries } from '@/themes/theme-archive'
 import {
   ACTIVE_THEME_STORAGE_KEY,
   isThemeTokenName,
@@ -352,6 +353,38 @@ function exportTheme(theme: ThemePackage): ThemePackageExport {
   }
 }
 
+export interface ThemeArchiveImportResult {
+  imported: ThemePackage[]
+  skipped: Array<{ name: string, reason: string }>
+}
+
+// Zip import: every `.json` entry is imported independently; failures skip the
+// single entry and are reported by name instead of aborting the batch.
+// Archive-level problems (not a zip, no JSON entries, over the caps) throw.
+async function importThemeArchive(data: ArrayBuffer): Promise<ThemeArchiveImportResult> {
+  const entries = await readThemeArchiveEntries(data)
+  if (!entries.length)
+    throw new Error('The archive does not contain any theme package files.')
+
+  const result: ThemeArchiveImportResult = { imported: [], skipped: [] }
+  for (const entry of entries) {
+    let payload: unknown
+    try {
+      payload = JSON.parse(entry.text)
+    }
+    catch {
+      result.skipped.push({ name: entry.name, reason: 'Invalid JSON.' })
+      continue
+    }
+    const imported = importTheme(payload)
+    if (imported)
+      result.imported.push(imported)
+    else
+      result.skipped.push({ name: entry.name, reason: 'Not a compatible theme package.' })
+  }
+  return result
+}
+
 if (!findTheme(activeThemeId.value)) {
   activeThemeId.value = defaultThemeId
   persistActiveTheme(defaultThemeId)
@@ -381,6 +414,7 @@ export function useThemePackages() {
     updateTheme,
     removeTheme,
     importTheme,
+    importThemeArchive,
     exportTheme,
   }
 }

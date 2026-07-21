@@ -23,6 +23,7 @@ const {
   updateTheme,
   removeTheme,
   importTheme,
+  importThemeArchive,
   exportTheme,
 } = useThemePackages()
 
@@ -126,6 +127,10 @@ function exportActiveTheme() {
   URL.revokeObjectURL(link.href)
 }
 
+function isZipArchive(file: File) {
+  return file.name.toLowerCase().endsWith('.zip') || file.type.includes('zip')
+}
+
 async function handleImport(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -133,10 +138,24 @@ async function handleImport(event: Event) {
     return
 
   try {
-    const imported = importTheme(JSON.parse(await file.text()) as unknown)
-    if (!imported)
-      throw new Error('This file is not a compatible theme package.')
-    toast.success(`${imported.name} imported`)
+    if (isZipArchive(file)) {
+      const result = await importThemeArchive(await file.arrayBuffer())
+      if (!result.imported.length) {
+        const firstSkip = result.skipped[0]
+        throw new Error(firstSkip
+          ? `${firstSkip.name}: ${firstSkip.reason}`
+          : 'The archive does not contain a compatible theme package.')
+      }
+      toast.success(`Imported ${result.imported.length} theme package${result.imported.length === 1 ? '' : 's'}`)
+      if (result.skipped.length)
+        toast.warning(`${result.skipped.length} file${result.skipped.length === 1 ? '' : 's'} skipped (${result.skipped[0]?.name})`)
+    }
+    else {
+      const imported = importTheme(JSON.parse(await file.text()) as unknown)
+      if (!imported)
+        throw new Error('This file is not a compatible theme package.')
+      toast.success(`${imported.name} imported`)
+    }
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : 'Unable to import theme package.')
@@ -160,7 +179,7 @@ async function handleImport(event: Event) {
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <input ref="importInput" class="sr-only" type="file" accept="application/json,.json,.theme.json" @change="handleImport" />
+        <input ref="importInput" class="sr-only" type="file" accept="application/json,.json,.theme.json,application/zip,.zip,application/x-zip-compressed" @change="handleImport" />
         <Button variant="outline" size="icon" title="Import theme package" aria-label="Import theme package" @click="importInput?.click()">
           <Upload class="size-4" />
         </Button>

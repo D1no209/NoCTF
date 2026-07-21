@@ -22,7 +22,8 @@ frontend/src/
   features/             Page feature modules (view models). One module per route.
     shared/             Cross-page domain helpers (number coercion, etc.).
     <domain>/           auth, home, competitions, teams, dashboards, screen, admin.
-  themes/               Token packs: manifest, presets, storage, import/export.
+  themes/               Token packs: manifest, presets, storage, import/export
+                        (single JSON files and zip archives — see below).
   ui-v1/                UI package "v1" (default package; shadcn-vue style; i18n).
     V1Application.vue   Chrome: RouterView + PixelBlast + TargetCursor + Toaster.
     views/              Thin route wrappers (3-line files).
@@ -64,6 +65,30 @@ Additional component-level rules inside a theme package:
 - A theme package must never reach into another theme package, not even for
   types. If two packages need the same type, it belongs in `features/` (domain
   types) or in the platform layer.
+
+### Token pack archives (zip import)
+
+The admin theme-packs page imports token packs from two containers:
+
+- **JSON file** (`*.json`, `*.theme.json`): a single `ThemePackageExport`
+  payload (or a bare theme object).
+- **Zip archive** (`*.zip`): one or more JSON entries, each holding a
+  `ThemePackageExport` payload. Entries are matched by `.json` extension at
+  any depth; `__MACOSX`, dot-underscored, and directory entries are ignored.
+  Every entry is imported independently: valid entries become local packages,
+  invalid ones are skipped and reported by name — a bad entry never aborts
+  the batch.
+
+Limits enforced by `themes/theme-archive.ts`: at most 32 archive entries,
+1 MiB uncompressed per entry, 4 MiB total. Compression methods 0 (store) and
+8 (deflate) are supported through the platform `DecompressionStream`;
+multi-disk and Zip64 archives are rejected with an explicit error.
+
+Archive parsing lives in the platform layer (`themes/theme-archive.ts`,
+exposed as `useThemePackages.importThemeArchive`). Theme packages only wire a
+file input to the service and render the returned
+`{ imported, skipped }` summary in their own copy — they never parse archives
+or JSON payloads themselves.
 
 ## 2. Feature module contract
 
@@ -284,7 +309,7 @@ Code-review questions that must always be answered "no":
 | admin-audit-logs | `features/admin/useAdminAuditLogsPage.ts` | `admin/audit-logs/AdminAuditLogsWorkspace.vue` | `pages/V2AdminAuditLogsPage.vue` |
 | admin-health | `features/admin/useAdminHealthPage.ts` | `admin/health/AdminHealthWorkspace.vue` | `pages/V2AdminHealthPage.vue` |
 | admin-logs | `features/admin/useAdminLogsPage.ts` | `admin/logs/AdminLogsWorkspace.vue` | `pages/V2AdminLogsPage.vue` |
-| admin-theme-packs | platform service `useThemePackages` | `views/admin/AdminThemePacksView.vue` | `pages/V2ThemePackagesPage.vue` |
+| admin-theme-packs | platform service `useThemePackages` (+ `themes/theme-archive.ts` for zip import) | `views/admin/AdminThemePacksView.vue` | `pages/V2ThemePackagesPage.vue` |
 | not-found | — (static) | `views/NotFoundView.vue` | `pages/V2NotFoundPage.vue` |
 
 Shared challenge-template editing (used by admin-challenges and
