@@ -2,9 +2,11 @@
 const props = withDefaults(defineProps<{
   label: string
   tone?: 'primary' | 'outline' | 'ghost'
+  type?: 'button' | 'submit'
   disabled?: boolean
 }>(), {
   tone: 'primary',
+  type: 'button',
   disabled: false,
 })
 
@@ -15,7 +17,7 @@ defineEmits<{
 
 <template>
   <button
-    type="button"
+    :type="props.type"
     class="command-button"
     :class="`command-button--${props.tone}`"
     :disabled="props.disabled"

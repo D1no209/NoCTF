@@ -1,22 +1,17 @@
 <script setup lang="ts">
 import { CircleAlert, KeyRound, LogIn, UserPlus } from 'lucide-vue-next'
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { ApiError } from '@/api/noctf'
-import { useAuthStore } from '@/stores/auth'
 import CommandButton from '../primitives/CommandButton.vue'
 import CommandInput from '../primitives/CommandInput.vue'
 import CommandPanel from '../primitives/CommandPanel.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
+import { useLoginPage } from '@/features/auth/useLoginPage'
 
-const auth = useAuthStore()
-const router = useRouter()
-const route = useRoute()
 const email = ref('')
 const password = ref('')
-const loading = ref(false)
 const loginError = ref('')
+const { loading, login, goRegister } = useLoginPage()
 
 async function submit() {
   if (loading.value)
@@ -27,25 +22,13 @@ async function submit() {
     return
   }
 
-  loading.value = true
-  try {
-    await auth.login(email.value.trim(), password.value)
+  const outcome = await login(email.value.trim(), password.value)
+  if (outcome === 'success') {
     toast.success('Signed in successfully.')
-    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
-      ? route.query.redirect
-      : '/'
-    await router.push(redirect)
   }
-  catch (error) {
-    if (error instanceof ApiError && error.status === 403) {
-      await router.push({ name: 'verify-email', query: { email: email.value.trim() } })
-      return
-    }
+  else if (outcome === 'failed') {
     loginError.value = 'The service rejected these credentials.'
     toast.error(loginError.value)
-  }
-  finally {
-    loading.value = false
   }
 }
 </script>
@@ -97,7 +80,7 @@ async function submit() {
         <template #icon><LogIn class="size-4" /></template>
       </CommandButton>
 
-      <CommandButton label="Create an account" tone="outline" :disabled="loading" @click="router.push('/register')">
+      <CommandButton label="Create an account" tone="outline" :disabled="loading" @click="goRegister">
         <template #icon><UserPlus class="size-4" /></template>
       </CommandButton>
 

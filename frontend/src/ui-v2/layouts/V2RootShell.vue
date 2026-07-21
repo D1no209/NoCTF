@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Bell, Blocks, Command, LayoutDashboard, Palette, Search, UsersRound } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
+import CommandAdminNav from '../components/CommandAdminNav.vue'
 import CommandIconButton from '../primitives/CommandIconButton.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
 
@@ -16,6 +17,8 @@ const systemNavigation = [
   { label: 'Theme packages', icon: Palette, to: '/admin/theme-packs' },
 ]
 
+const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
+
 const activeItem = computed(() => {
   const all = [...workspaceNavigation, ...systemNavigation]
   if (route.name === 'competitions' || route.name === 'competition-detail' || route.name === 'competition-register'
@@ -25,16 +28,18 @@ const activeItem = computed(() => {
     return workspaceNavigation[2]!
   return all.find(item => item.to === route.path) ?? workspaceNavigation[0]!
 })
-const sectionTitle = computed(() => activeItem.value.label.toUpperCase())
+const sectionTitle = computed(() => isAdminRoute.value ? 'ADMIN' : activeItem.value.label.toUpperCase())
 const contextSignal = computed(() => {
   if (route.name === 'competitions' || route.name === 'competition-detail' || route.name === 'competition-register'
     || route.name === 'awd-dashboard' || route.name === 'koh-dashboard' || route.name === 'penetration-dashboard')
     return { label: 'Competition API / contract data', tone: 'success' as const }
   if (route.name === 'teams')
     return { label: 'Team API / account data', tone: 'success' as const }
-  if (route.name === 'admin-theme-packs')
-    return { label: 'Local package registry', tone: 'info' as const }
-  return { label: 'Development mock / AWDP snapshot', tone: 'warning' as const }
+  if (isAdminRoute.value)
+    return { label: 'Admin API / operator channel', tone: 'warning' as const }
+  if (route.name === 'home')
+    return { label: 'Competition API / account overview', tone: 'success' as const }
+  return { label: 'Neon Command package', tone: 'info' as const }
 })
 
 function navigate(to: string) {
@@ -87,6 +92,7 @@ function navigate(to: string) {
           <Command class="size-3.5 text-[var(--v2-primary)]" />
           <span>{{ sectionTitle }}</span>
         </div>
+        <CommandAdminNav v-if="isAdminRoute" class="v2-context__admin" />
         <div class="v2-context__meta">
           <CommandSignal :label="contextSignal.label" :tone="contextSignal.tone" />
           <span class="v2-context__version">Neon Command v0.2.0</span>
@@ -178,9 +184,10 @@ function navigate(to: string) {
   position: sticky;
   z-index: 5;
   top: 64px;
-  background: rgb(224 229 236 / 0.86);
+  /* opaque: backdrop-filter blur forces a full backdrop repaint on every
+     scroll frame — the main source of scroll jank in this package */
+  background: var(--v2-canvas);
   box-shadow: 0 1px 0 var(--v2-shadow-light), 0 6px 12px rgb(184 188 194 / 0.24);
-  backdrop-filter: blur(14px);
 }
 
 .v2-context__inner {

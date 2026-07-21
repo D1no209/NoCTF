@@ -706,6 +706,597 @@
       "path": "/api/competitions/:id/challenges/:challengeId/penetration/flags/submit",
       "status": 200,
       "body": { "correct": true, "alreadySolved": false, "result": "accepted" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "body": {
+        "status": "Healthy",
+        "checks": [
+          { "name": "database", "status": "Healthy", "description": "PostgreSQL 16 primary" },
+          { "name": "redis", "status": "Healthy", "description": "Cache and scoreboard bus" },
+          { "name": "rabbitmq", "status": "Degraded", "description": "One queue is above the warning threshold" },
+          { "name": "runner", "status": "Healthy" }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions",
+      "status": 200,
+      "body": [
+        { "id": "comp-2026-awdp", "title": "NoCTF 2026 AWDP Invitational", "description": "Development mock competition for the AWDP workspace and command screen.", "status": "Running", "gameModeType": "Awdp", "startTime": "2026-07-05T09:00:00Z", "endTime": "2026-07-05T17:00:00Z", "ownerId": "mock-admin" },
+        { "id": "comp-2026-koh", "title": "NoCTF 2026 King of the Hill", "description": "Mock KoH competition for dashboard and registration flow checks.", "status": "Published", "gameModeType": "Koh", "startTime": "2026-07-06T09:00:00Z", "endTime": "2026-07-06T15:00:00Z", "ownerId": "mock-admin" },
+        { "id": "comp-2026-ctf", "title": "NoCTF 2026 Classic Qualifier", "description": "Mock classic jeopardy event for list and card rendering.", "status": "Draft", "gameModeType": "Ctf", "startTime": "2026-07-12T09:00:00Z", "endTime": "2026-07-12T18:00:00Z", "ownerId": "mock-admin" },
+        { "id": "comp-2026-pen", "title": "NoCTF 2026 Penetration Range", "description": "Mock penetration competition for topology, instance, and staged flag flows.", "status": "Running", "gameModeType": "Ctf", "startTime": "2026-07-08T09:00:00Z", "endTime": "2026-07-08T18:00:00Z", "ownerId": "mock-admin" }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions",
+      "status": 201,
+      "body": { "id": "comp-new-mock" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id",
+      "status": 200,
+      "body": {
+        "id": "comp-2026-awdp",
+        "title": "NoCTF 2026 AWDP Invitational",
+        "description": "Development mock competition for the AWDP workspace and command screen.",
+        "gameModeType": "Awdp",
+        "status": "Running",
+        "startTime": "2026-07-05T09:00:00Z",
+        "endTime": "2026-07-05T17:00:00Z",
+        "defaultPointsConfig": { "initialPoints": 500, "minimumPoints": 100, "decayFactor": 450, "decayFunction": "sigmoid" },
+        "difficultyCoefficient": 1,
+        "firstBloodBonusPercent": 10,
+        "secondBloodBonusPercent": 6,
+        "thirdBloodBonusPercent": 4,
+        "teamRegistrationAutoApprove": true,
+        "maxTeamMembers": 5,
+        "tracksEnabled": false,
+        "trackNames": [],
+        "roundDurationSeconds": 300,
+        "totalRounds": 10,
+        "awdpAttackScorePerRound": 50,
+        "awdpDefenseScorePerRound": 100,
+        "awdpMaxAttackAttempts": 5,
+        "awdpMaxDefenseAttempts": 3,
+        "awdpAllowAttackAfterBreakSuccess": false,
+        "awdpAllowDefenseAfterFixSuccess": true,
+        "awdpServicePenaltyEnabled": true,
+        "awdpServicePenaltyPerRound": 25,
+        "awdpViolationPenaltyEnabled": false,
+        "awdpViolationPenalty": 200,
+        "awdpFixEntry": "fix.sh",
+        "awdpFixTimeoutSeconds": 60
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/competitions/:id",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/competitions/:id",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/challenges",
+      "status": 200,
+      "body": [
+        { "id": "awdp-web-1", "templateId": "tpl-web-upload", "title": "WEB-upload", "description": "Patch the upload pipeline and keep the service online.", "descriptionFormat": "markdown", "typeId": "Awdp", "deploymentType": "DynamicContainer", "exposedPort": 8080, "flagPrefix": "flag", "flagEnvironmentVariable": "NOCTF_FLAG_UUID", "pointsConfig": { "initialPoints": 500, "minimumPoints": 100, "decayFactor": 450, "decayFunction": "sigmoid" }, "difficultyCoefficient": 1, "enableBloodBonus": false, "awdpAttackScorePerRound": 50, "awdpDefenseScorePerRound": 100, "awdpMaxAttackAttempts": 5, "awdpMaxDefenseAttempts": 3, "awdpFixEntry": "fix.sh", "awdpFixTimeoutSeconds": 60, "hints": [ { "id": "hint-1", "content": "Look at file extension handling.", "displayOrder": 0 } ] },
+        { "id": "awdp-pwn-1", "templateId": "tpl-pwn-baby", "title": "PWN-baby", "description": "Harden the binary service and preserve availability.", "descriptionFormat": "markdown", "typeId": "Awdp", "deploymentType": "StaticContainer", "exposedPort": 31337, "flagPrefix": "flag", "pointsConfig": { "initialPoints": 460, "minimumPoints": 100, "decayFactor": 450, "decayFunction": "sigmoid" }, "difficultyCoefficient": 1, "enableBloodBonus": false, "awdpAttackScorePerRound": 50, "awdpDefenseScorePerRound": 100, "hints": [] }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/challenges",
+      "status": 201,
+      "body": { "id": "deployed-new-mock" }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/competitions/:id/challenges/:challengeId",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/competitions/:id/challenges/:challengeId",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/challenges/:challengeId/container/restart",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/teams",
+      "status": 200,
+      "body": [
+        { "id": "team-alpha", "name": "Alpha Squad", "captainName": "mock-admin", "memberCount": 4, "inviteToken": "ALPHA-2026", "isLocked": false, "isBanned": false, "trackName": null, "registrationStatus": "approved", "registeredAt": "2026-06-20T10:00:00Z", "approvedAt": "2026-06-20T12:00:00Z" },
+        { "id": "team-bravo", "name": "Bravo Bytes", "captainName": "bravo-lead", "memberCount": 3, "inviteToken": "BRAVO-2026", "isLocked": false, "isBanned": false, "trackName": null, "registrationStatus": "pending", "registeredAt": "2026-06-25T09:30:00Z", "approvedAt": null },
+        { "id": "team-charlie", "name": "Charlie Root", "captainName": "charlie", "memberCount": 5, "inviteToken": "CHARLIE-2026", "isLocked": true, "isBanned": true, "bannedReason": "suspected_cheat", "trackName": null, "registrationStatus": "approved", "registeredAt": "2026-06-18T08:00:00Z", "approvedAt": "2026-06-18T09:00:00Z" }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/teams/:teamId/approve",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/teams/:teamId/reject",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/competitions/:id/teams/:teamId/lock",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/teams/:teamId/ban",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/teams/:teamId/unban",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/logs",
+      "status": 200,
+      "body": [
+        { "id": "log-1", "level": "Information", "eventType": "competitionStart", "message": "Competition round 1 started.", "teamName": null, "challengeTitle": null, "createdAt": "2026-07-05T09:00:05Z" },
+        { "id": "log-2", "level": "Warning", "eventType": "serviceDown", "message": "Service WEB-upload is unreachable for Alpha Squad.", "teamName": "Alpha Squad", "challengeTitle": "WEB-upload", "createdAt": "2026-07-05T09:12:41Z" },
+        { "id": "log-3", "level": "Error", "eventType": "cheatDetected", "message": "Flag replay detected from Charlie Root.", "teamName": "Charlie Root", "challengeTitle": "PWN-baby", "createdAt": "2026-07-05T09:31:02Z" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/cheat-incidents",
+      "status": 200,
+      "body": [
+        { "id": "cheat-1", "suspectTeamId": "team-charlie", "suspectTeamName": "Charlie Root", "victimTeamName": "Alpha Squad", "challengeTitle": "PWN-baby", "userName": "charlie", "reason": "Flag replay from another team.", "resolved": false, "createdAt": "2026-07-05T09:31:02Z" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/collaborators",
+      "status": 200,
+      "body": [
+        { "userId": "user-2", "userName": "ops-lead", "role": "Manager" },
+        { "userId": "user-3", "userName": "spectator", "role": "Observer" }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/collaborators",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/competitions/:id/collaborators/:userId",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/scoreboard/rebuild",
+      "status": 200,
+      "body": { "rows": 12 }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/users",
+      "status": 200,
+      "body": [
+        { "id": "user-1", "userName": "mock-admin", "email": "admin@noctf.local", "role": "admin" },
+        { "id": "user-2", "userName": "ops-lead", "email": "ops@noctf.local", "role": "organizer" },
+        { "id": "user-3", "userName": "spectator", "email": "spectator@noctf.local", "role": "user" },
+        { "id": "user-4", "userName": "bravo-lead", "email": "bravo@noctf.local", "role": "user" }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/users/:id/role",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/users/:id/reset-password",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/teams",
+      "status": 200,
+      "body": [
+        { "id": "team-alpha", "competitionId": "comp-2026-awdp", "name": "Alpha Squad", "captainName": "mock-admin", "memberCount": 4, "competitionTitle": "NoCTF 2026 AWDP Invitational", "inviteToken": "ALPHA-2026", "isLocked": false, "registrationStatus": "approved" },
+        { "id": "team-bravo", "competitionId": "comp-2026-awdp", "name": "Bravo Bytes", "captainName": "bravo-lead", "memberCount": 3, "competitionTitle": "NoCTF 2026 AWDP Invitational", "inviteToken": "BRAVO-2026", "isLocked": false, "registrationStatus": "pending" },
+        { "id": "team-charlie", "competitionId": "comp-2026-koh", "name": "Charlie Root", "captainName": "charlie", "memberCount": 5, "competitionTitle": "NoCTF 2026 King of the Hill", "inviteToken": "CHARLIE-2026", "isLocked": true, "registrationStatus": "rejected" }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/teams/:id",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/teams/:teamId/members",
+      "status": 200,
+      "body": [
+        { "userId": "user-1", "userName": "mock-admin", "role": "captain" },
+        { "userId": "user-3", "userName": "spectator", "role": "member" },
+        { "userId": "user-4", "userName": "bravo-lead", "role": "member" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/challenges",
+      "status": 200,
+      "body": [
+        { "id": "tpl-web-upload", "title": "WEB-upload template", "description": "Upload pipeline with an extension filter flaw.", "typeId": "Awdp", "containerImage": "noctf/web-upload:latest", "containerMode": "SingleImage", "attachmentUrl": "/mock/web-upload.zip", "patchTemplateUrl": "/mock/web-upload-patch.zip", "flagEnvironmentVariable": "NOCTF_FLAG_UUID", "deploymentType": "DynamicContainer", "exposedPort": 8080, "checkerConfig": { "image": "noctf/checker:latest", "command": "/check.sh", "timeoutSeconds": 30 } },
+        { "id": "tpl-pwn-baby", "title": "PWN-baby template", "description": "Stack echo service with a saved-pointer overwrite.", "typeId": "Awdp", "containerImage": "noctf/pwn-baby:latest", "containerMode": "SingleImage", "deploymentType": "StaticContainer", "exposedPort": 31337 },
+        { "id": "tpl-pen-range", "title": "Penetration range template", "description": "Three-node penetration range with staged flags.", "typeId": "Penetration", "containerImage": "noctf/pen-range:latest", "containerMode": "DockerCompose", "composeProjectName": "pen-range", "composeYaml": "services:\n  entry:\n    image: noctf/pen-entry:latest", "deploymentType": "DynamicContainer", "exposedPort": 22 }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/challenges",
+      "status": 201,
+      "body": { "id": "tpl-new-mock" }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/challenges/:id",
+      "status": 200,
+      "body": { "id": "tpl-web-upload" }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/challenges/:id",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/challenges/:id/attachment",
+      "status": 200,
+      "body": { "attachmentUrl": "/mock/uploaded-attachment.zip" }
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/challenges/:id/patch-template",
+      "status": 200,
+      "body": { "patchTemplateUrl": "/mock/uploaded-patch.zip" }
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/challenges/:id/reveal-secret",
+      "status": 200,
+      "body": { "flagSecret": "flag{mock-static-secret}" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/containers",
+      "status": 200,
+      "body": [
+        { "containerId": "c0ffee1234567890abcd", "competitionId": "comp-2026-awdp", "teamId": "team-alpha", "challengeId": "awdp-web-1", "status": "running" },
+        { "containerId": "badegg9876543210dcba", "competitionId": "comp-2026-awdp", "teamId": "team-bravo", "challengeId": "awdp-pwn-1", "status": "running" },
+        { "containerId": "deadbeef00001111cccc", "competitionId": "comp-2026-pen", "teamId": "team-alpha", "challengeId": "pen-range-1", "status": "exited" }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/containers/:containerId",
+      "status": 204,
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/plugins",
+      "status": 200,
+      "body": [
+        { "name": "Classic Jeopardy", "type": "GameMode", "version": "1.4.0" },
+        { "name": "Attack Defense with Patches", "type": "GameMode", "version": "2.1.0" },
+        { "name": "King of the Hill", "type": "GameMode", "version": "1.2.0" },
+        { "name": "Standard Challenge", "type": "ChallengeType", "version": "1.0.0" },
+        { "name": "Penetration Range", "type": "ChallengeType", "version": "0.9.0" },
+        { "name": "Docker Runner", "type": "ContainerProvider", "version": "3.2.1" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/logs",
+      "status": 200,
+      "body": [
+        { "level": "Information", "message": "NoCTF host started on port 8080.", "source": "Host", "timestamp": "2026-07-18T09:00:01.120Z" },
+        { "level": "Information", "message": "Scoreboard projection warmed for 2 competitions.", "source": "Scoreboard", "timestamp": "2026-07-18T09:00:03.450Z" },
+        { "level": "Warning", "message": "Runner heartbeat delayed by 4s.", "source": "Runner", "timestamp": "2026-07-18T09:02:11.005Z" },
+        { "level": "Error", "message": "Failed to deliver QQ notification: timeout.", "source": "QqBot", "timestamp": "2026-07-18T09:04:47.990Z" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/audit-logs",
+      "status": 200,
+      "body": {
+        "items": [
+          { "id": "audit-1", "userId": "user-1", "userName": "mock-admin", "ipAddress": "10.0.0.8", "action": "competition.update", "entityType": "Competition", "endpointPath": "/api/admin/competitions/comp-2026-awdp", "httpMethod": "PUT", "newValues": "{\"status\":\"Running\"}", "oldValues": "{\"status\":\"Published\"}", "diff": "{\"status\":[\"Published\",\"Running\"]}", "timestamp": "2026-07-17T14:22:10Z", "exception": null },
+          { "id": "audit-2", "userId": "user-2", "userName": "ops-lead", "ipAddress": "10.0.0.9", "action": "team.ban", "entityType": "Team", "endpointPath": "/api/admin/competitions/comp-2026-awdp/teams/team-charlie/ban", "httpMethod": "POST", "timestamp": "2026-07-17T15:02:44Z", "exception": null },
+          { "id": "audit-3", "userName": "mock-admin", "ipAddress": "10.0.0.8", "action": "challenge.reveal-secret", "entityType": "Challenge", "endpointPath": "/api/admin/challenges/tpl-web-upload/reveal-secret", "httpMethod": "POST", "timestamp": "2026-07-17T16:40:03Z", "exception": "System.InvalidOperationException: Secret already revealed" }
+        ],
+        "total": 3,
+        "page": 1,
+        "pageSize": 50
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/infrastructure",
+      "status": 200,
+      "body": {
+        "runnerProvider": "docker",
+        "runnerBaseUrl": "tcp://runner:2375",
+        "runnerReachable": true,
+        "runnerInfo": { "serverVersion": "26.1.4", "operatingSystem": "Ubuntu 24.04", "containersRunning": 12, "imagesCached": 34 },
+        "kubernetes": { "namespace": "noctf-system", "storageClass": "longhorn", "ingressClass": "nginx" }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/email-verification",
+      "status": 200,
+      "body": {
+        "enabled": true,
+        "publicBaseUrl": "https://ctf.example.com",
+        "tokenLifetimeMinutes": 1440,
+        "resendCooldownSeconds": 60,
+        "smtpHost": "smtp.example.com",
+        "smtpPort": 587,
+        "smtpEnableSsl": true,
+        "smtpUserName": "noctf-smtp",
+        "smtpPasswordConfigured": true,
+        "smtpFromAddress": "no-reply@example.com",
+        "smtpFromName": "NoCTF",
+        "smtpTimeoutSeconds": 10,
+        "persisted": true,
+        "updatedAt": "2026-07-15T08:30:00Z"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/email-verification",
+      "status": 200,
+      "body": {
+        "enabled": true,
+        "publicBaseUrl": "https://ctf.example.com",
+        "tokenLifetimeMinutes": 1440,
+        "resendCooldownSeconds": 60,
+        "smtpHost": "smtp.example.com",
+        "smtpPort": 587,
+        "smtpEnableSsl": true,
+        "smtpUserName": "noctf-smtp",
+        "smtpPasswordConfigured": true,
+        "smtpFromAddress": "no-reply@example.com",
+        "smtpFromName": "NoCTF",
+        "smtpTimeoutSeconds": 10,
+        "persisted": true,
+        "updatedAt": "2026-07-18T09:00:00Z"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/email-verification/test",
+      "status": 202,
+      "body": { "status": "queued" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/qqbot",
+      "status": 200,
+      "body": {
+        "pluginAvailable": true,
+        "connectionType": "HTTP polling",
+        "settings": { "enabled": true, "longPollSeconds": 25, "deliveryLeaseSeconds": 45, "maxDeliveryAttempts": 5, "maxMessageLength": 1000, "maxPendingDeliveries": 500, "groupCooldownMilliseconds": 1000, "competitionCooldownMilliseconds": 1000, "manualNotificationCooldownSeconds": 30 },
+        "agents": [
+          { "id": "agent-1", "name": "primary-bot", "enabled": true, "apiReachable": true, "qqOnline": true, "botNickname": "NoCTF Bot", "pendingDeliveries": 2, "recentFailed": 0, "lastErrorSummary": null },
+          { "id": "agent-2", "name": "backup-bot", "enabled": true, "apiReachable": false, "qqOnline": false, "botNickname": null, "pendingDeliveries": 0, "recentFailed": 3, "lastErrorSummary": "HTTP 503 from go-cqhttp" }
+        ],
+        "groups": [
+          { "id": "binding-1", "groupName": "NoCTF Announcements", "groupId": 10001, "isPresent": true, "isAuthorized": true },
+          { "id": "binding-2", "groupName": "AWDP Live", "groupId": 10002, "isPresent": true, "isAuthorized": false }
+        ]
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/qqbot/settings",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/qqbot/agents",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/qqbot/groups/:groupId/authorization",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/qqbot",
+      "status": 200,
+      "body": {
+        "enabled": true,
+        "allowMessages": true,
+        "allowManualNotifications": true,
+        "stopNormalEventsAfterFinished": true,
+        "mentionAll": false,
+        "showTeamName": true,
+        "showUserName": false,
+        "showChallengeCategory": true,
+        "includeCompetitionLink": false,
+        "includeChallengeLink": false,
+        "hidePenaltyDetails": true,
+        "eventRules": [
+          { "eventType": 0, "enabled": true, "templateId": "tpl-start" },
+          { "eventType": 2, "enabled": true, "templateId": null },
+          { "eventType": 3, "enabled": false, "templateId": null }
+        ],
+        "groupBindings": [
+          { "agentId": "agent-1", "groupId": "binding-1", "qqGroupId": 10001, "groupName": "NoCTF Announcements", "isDefault": true, "eventTypes": [] }
+        ],
+        "warnings": [ "backup-bot is offline; deliveries may queue." ]
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/competitions/:id/qqbot",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/qqbot/templates",
+      "status": 200,
+      "body": [
+        { "id": "tpl-start", "eventType": 0, "name": "Competition kickoff", "content": "{competition} has started. Good luck!", "isDefault": true },
+        { "id": "tpl-solve", "eventType": 2, "name": "Solve notice", "content": "{team} solved {challenge}.", "isDefault": false }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/competitions/:id/qqbot/templates",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/qqbot/groups/available",
+      "status": 200,
+      "body": [
+        { "id": "binding-1", "agentId": "agent-1", "groupId": 10001, "groupName": "NoCTF Announcements" },
+        { "id": "binding-2", "agentId": "agent-1", "groupId": 10002, "groupName": "AWDP Live" }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/qqbot/preview",
+      "status": 200,
+      "body": { "renderedText": "[NoCTF 2026 AWDP Invitational] Alpha Squad solved WEB-upload (+500)", "characterCount": 64, "warnings": [ "Message exceeds the recommended length for one bubble." ] }
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/qqbot/notifications",
+      "status": 202,
+      "body": { "queued": 1 }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/qqbot/logs",
+      "status": 200,
+      "body": {
+        "items": [
+          { "id": "delivery-1", "eventType": 0, "groupName": "NoCTF Announcements", "status": 2, "attemptCount": 1, "maxAttempts": 5, "messageSummary": "Competition kickoff announcement", "lastErrorSummary": null },
+          { "id": "delivery-2", "eventType": 6, "groupName": "AWDP Live", "status": 3, "attemptCount": 3, "maxAttempts": 5, "messageSummary": "Round 4 service alert digest", "lastErrorSummary": "Group message rate limited" }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/qqbot/deliveries/:deliveryId/retry",
+      "status": 202,
+      "body": { "status": "retrying" }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/challenges/:challengeId/penetration/topology",
+      "status": 200,
+      "body": {
+        "nodes": [
+          { "id": "entry", "name": "entry-gateway", "role": "entry", "image": "noctf/pen-entry:latest", "ports": [ { "host": 2222, "container": 22 } ], "flagHints": [ "stage-1" ] },
+          { "id": "app", "name": "internal-app", "role": "internal", "image": "noctf/pen-app:latest", "flagHints": [ "stage-2" ] },
+          { "id": "db", "name": "internal-db", "role": "internal", "image": "noctf/pen-db:latest", "flagHints": [ "stage-3" ] }
+        ],
+        "networks": [ { "name": "range", "subnet": "10.13.0.0/24" } ]
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/competitions/:id/challenges/:challengeId/penetration/topology",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/penetration/instances",
+      "status": 200,
+      "body": [
+        { "id": "inst-1", "teamId": "team-alpha", "teamName": "Alpha Squad", "challengeId": "pen-range-1", "challengeTitle": "Penetration range", "status": "running", "entryUrl": "ssh://range-1.noctf.local:2222", "expiresAt": "2026-07-08T18:00:00Z", "resetCount": 1, "lastError": null },
+        { "id": "inst-2", "teamId": "team-bravo", "teamName": "Bravo Bytes", "challengeId": "pen-range-1", "challengeTitle": "Penetration range", "status": "failed", "entryUrl": null, "expiresAt": null, "resetCount": 0, "lastError": "Compose project failed to converge" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/competitions/:id/penetration/instances/:instanceId",
+      "status": 200,
+      "body": {
+        "id": "inst-1",
+        "teamId": "team-alpha",
+        "teamName": "Alpha Squad",
+        "challengeId": "pen-range-1",
+        "challengeTitle": "Penetration range",
+        "status": "running",
+        "entryUrl": "ssh://range-1.noctf.local:2222",
+        "entryHost": "range-1.noctf.local",
+        "entryPort": 2222,
+        "expiresAt": "2026-07-08T18:00:00Z",
+        "resetCount": 1,
+        "lastError": null,
+        "containerIdsJson": "[\"c0ffee1234567890abcd\"]",
+        "portMappingsJson": "[{\"host\":2222,\"container\":22}]"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/competitions/:id/penetration/instances/:instanceId/reset",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/competitions/:id/penetration/instances/:instanceId",
+      "status": 204,
+      "body": null
     }
   ]
 }

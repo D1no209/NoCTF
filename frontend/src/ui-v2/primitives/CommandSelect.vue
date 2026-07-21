@@ -8,6 +8,7 @@ const props = defineProps<{
   modelValue: string
   label: string
   options: CommandSelectOption[]
+  placeholder?: string
 }>()
 
 defineEmits<{
@@ -22,6 +23,9 @@ defineEmits<{
     :aria-label="props.label"
     @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
   >
+    <option v-if="props.placeholder" value="" :disabled="Boolean(props.modelValue)">
+      {{ props.placeholder }}
+    </option>
     <option v-for="option in props.options" :key="option.value" :value="option.value">
       {{ option.label }}
     </option>

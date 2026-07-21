@@ -93,6 +93,9 @@ function formatDateRange(startTime: string, endTime: string) {
   min-height: 286px;
   grid-template-rows: auto 1fr auto auto;
   gap: 4px;
+  /* skip layout/paint for off-screen cards in long registries */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 286px;
 }
 
 .competition-card__header {

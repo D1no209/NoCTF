@@ -1,21 +1,18 @@
 <script setup lang="ts">
 import { CircleAlert, LogIn, UserPlus } from 'lucide-vue-next'
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { useAuthStore } from '@/stores/auth'
 import CommandButton from '../primitives/CommandButton.vue'
 import CommandInput from '../primitives/CommandInput.vue'
 import CommandPanel from '../primitives/CommandPanel.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
+import { useRegisterPage } from '@/features/auth/useRegisterPage'
 
-const auth = useAuthStore()
-const router = useRouter()
 const userName = ref('')
 const email = ref('')
 const password = ref('')
-const loading = ref(false)
 const registerError = ref('')
+const { loading, register, goLogin } = useRegisterPage()
 
 async function submit() {
   if (loading.value)
@@ -34,29 +31,13 @@ async function submit() {
     return
   }
 
-  loading.value = true
-  try {
-    const result = await auth.register(userName.value.trim(), email.value.trim(), password.value)
-    toast.success(`Account created for ${userName.value.trim()}.`)
-    if (result.requiresEmailVerification) {
-      await router.push({
-        name: 'verify-email',
-        query: {
-          email: email.value.trim(),
-          delivery: result.verificationEmailSent ? 'sent' : 'failed',
-        },
-      })
-    }
-    else {
-      await router.push('/login')
-    }
-  }
-  catch {
+  const outcome = await register(userName.value.trim(), email.value.trim(), password.value)
+  if (outcome === 'failed') {
     registerError.value = 'The service could not create this account.'
     toast.error(registerError.value)
   }
-  finally {
-    loading.value = false
+  else {
+    toast.success(`Account created for ${userName.value.trim()}.`)
   }
 }
 </script>
@@ -120,7 +101,7 @@ async function submit() {
         <template #icon><UserPlus class="size-4" /></template>
       </CommandButton>
 
-      <CommandButton label="Sign in instead" tone="ghost" :disabled="loading" @click="router.push('/login')">
+      <CommandButton label="Sign in instead" tone="ghost" :disabled="loading" @click="goLogin">
         <template #icon><LogIn class="size-4" /></template>
       </CommandButton>
     </form>

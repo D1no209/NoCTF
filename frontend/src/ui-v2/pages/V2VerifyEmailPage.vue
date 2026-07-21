@@ -1,24 +1,22 @@
 <script setup lang="ts">
 import { CircleCheck, Loader2, LogIn, MailCheck, MailWarning, RefreshCw } from 'lucide-vue-next'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
 import { toast } from 'vue-sonner'
-import { authApi } from '@/api/noctf'
 import CommandButton from '../primitives/CommandButton.vue'
 import CommandInput from '../primitives/CommandInput.vue'
 import CommandPanel from '../primitives/CommandPanel.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
+import { useVerifyEmailPage } from '@/features/auth/useVerifyEmailPage'
 
-type VerificationState = 'waiting' | 'verifying' | 'verified' | 'invalid'
-
-const route = useRoute()
-const router = useRouter()
-const state = ref<VerificationState>('waiting')
-const email = ref(typeof route.query.email === 'string' ? route.query.email : '')
-const resending = ref(false)
-const retrySeconds = ref(0)
-const deliveryFailed = computed(() => route.query.delivery === 'failed')
-let retryTimer: number | null = null
+const {
+  state,
+  email,
+  resending,
+  retrySeconds,
+  deliveryFailed,
+  resend: resendVerification,
+  goLogin,
+} = useVerifyEmailPage()
 
 const stateIcon = computed(() => {
   if (state.value === 'verifying')
@@ -39,59 +37,13 @@ const stateSignal = computed(() => {
   return { label: 'Verification pending', tone: 'warning' as const }
 })
 
-function startRetryCountdown() {
-  retrySeconds.value = 60
-  if (retryTimer !== null)
-    window.clearInterval(retryTimer)
-  retryTimer = window.setInterval(() => {
-    retrySeconds.value = Math.max(0, retrySeconds.value - 1)
-    if (retrySeconds.value === 0 && retryTimer !== null) {
-      window.clearInterval(retryTimer)
-      retryTimer = null
-    }
-  }, 1000)
-}
-
-async function verify(token: string) {
-  state.value = 'verifying'
-  await router.replace({ name: 'verify-email', query: email.value ? { email: email.value } : {} })
-  try {
-    await authApi.verifyEmail(token)
-    state.value = 'verified'
-  }
-  catch {
-    state.value = 'invalid'
-  }
-}
-
 async function resend() {
-  if (!email.value.trim() || resending.value || retrySeconds.value > 0)
-    return
-
-  resending.value = true
-  try {
-    await authApi.resendEmailVerification(email.value.trim())
+  const outcome = await resendVerification()
+  if (outcome === 'sent')
     toast.success('Verification email sent again.')
-    startRetryCountdown()
-  }
-  catch {
+  else if (outcome === 'failed')
     toast.error('Unable to resend the verification email.')
-  }
-  finally {
-    resending.value = false
-  }
 }
-
-onMounted(() => {
-  const token = typeof route.query.token === 'string' ? route.query.token : ''
-  if (token)
-    void verify(token)
-})
-
-onBeforeUnmount(() => {
-  if (retryTimer !== null)
-    window.clearInterval(retryTimer)
-})
 </script>
 
 <template>
@@ -116,7 +68,7 @@ onBeforeUnmount(() => {
         The platform could not deliver the first verification email. Use resend after checking the address.
       </p>
 
-      <CommandButton v-if="state === 'verified'" label="Continue to sign in" @click="router.push('/login')">
+      <CommandButton v-if="state === 'verified'" label="Continue to sign in" @click="goLogin">
         <template #icon><LogIn class="size-4" /></template>
       </CommandButton>
 
@@ -141,7 +93,7 @@ onBeforeUnmount(() => {
         >
           <template #icon><RefreshCw class="size-4" /></template>
         </CommandButton>
-        <CommandButton label="Back to sign in" tone="ghost" @click="router.push('/login')">
+        <CommandButton label="Back to sign in" tone="ghost" @click="goLogin">
           <template #icon><LogIn class="size-4" /></template>
         </CommandButton>
       </template>

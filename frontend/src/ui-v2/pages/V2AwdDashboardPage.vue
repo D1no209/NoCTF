@@ -1,47 +1,34 @@
 <script setup lang="ts">
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import type {
-  NoCtfapiEndpointsCompetitionsAwdDashboardDto,
-  NoCtfapiEndpointsCompetitionsChallengeDto,
-} from '@/api/generated/types.gen'
-import { competitionApi } from '@/api/noctf'
-import { queryKeys } from '@/api/queryKeys'
-import { useSignalR, type AttackLogDto } from '@/composables/useSignalR'
-import { useAuthStore } from '@/stores/auth'
+import { computed, ref } from 'vue'
+import type { AttackLogDto } from '@/composables/useSignalR'
 import type { CommandAwdAttack, CommandAwdChallenge, CommandAwdService } from '../components/awd-contract'
 import CommandAwdDashboardWorkspace from '../components/CommandAwdDashboardWorkspace.vue'
+import { useAwdDashboardPage } from '@/features/competitions/useAwdDashboardPage'
 
-const route = useRoute()
-const queryClient = useQueryClient()
-const auth = useAuthStore()
-const selectedChallengeId = ref('')
-const flag = ref('')
+const {
+  hasValidCompetitionId,
+  round,
+  remainingSeconds,
+  totalSeconds,
+  services: rawServices,
+  challenges: rawChallenges,
+  loadingDashboard,
+  dashboardError,
+  dashboardQueryError,
+  refetchDashboard,
+  refetchChallenges,
+  attackLogs,
+  signalR,
+  selectedChallenge: selectedChallengeId,
+  flagInput: flag,
+  flagLoading,
+  submitFlag: submitFlagAction,
+} = useAwdDashboardPage(() => 'awd')
+
 const operationMessage = ref('')
 const operationTone = ref<'success' | 'danger'>('success')
-const attacks = ref<CommandAwdAttack[]>([])
 
-const competitionId = computed(() => typeof route.params.id === 'string' ? route.params.id.trim() : '')
-const hasValidCompetitionId = computed(() => competitionId.value.length > 0)
-
-const dashboardQuery = useQuery({
-  queryKey: computed(() => queryKeys.awdDashboard(competitionId.value)),
-  queryFn: () => competitionApi.awdDashboard<NoCtfapiEndpointsCompetitionsAwdDashboardDto>(competitionId.value),
-  enabled: hasValidCompetitionId,
-  refetchInterval: 10_000,
-})
-
-const challengesQuery = useQuery({
-  queryKey: computed(() => queryKeys.challenges(competitionId.value)),
-  queryFn: () => competitionApi.challenges<NoCtfapiEndpointsCompetitionsChallengeDto[]>(competitionId.value),
-  enabled: hasValidCompetitionId,
-})
-
-const services = computed<CommandAwdService[]>(() => (dashboardQuery.data.value?.services ?? [])
-  .filter((service): service is Required<NoCtfapiEndpointsCompetitionsAwdDashboardDto>['services'][number] & { teamId: string, challengeId: string } =>
-    Boolean(service.teamId && service.challengeId),
-  )
+const services = computed<CommandAwdService[]>(() => rawServices.value
   .map(service => ({
     teamId: service.teamId,
     teamName: service.teamName?.trim() || 'Unknown team',
@@ -50,71 +37,56 @@ const services = computed<CommandAwdService[]>(() => (dashboardQuery.data.value?
     status: normalizeServiceStatus(service.status),
   })))
 
-const challenges = computed<CommandAwdChallenge[]>(() => (challengesQuery.data.value ?? [])
-  .filter((challenge): challenge is NoCtfapiEndpointsCompetitionsChallengeDto & { id: string } => Boolean(challenge.id))
+const challenges = computed<CommandAwdChallenge[]>(() => (rawChallenges.value ?? [])
+  .filter((challenge): challenge is typeof challenge & { id: string } => Boolean(challenge.id))
   .map(challenge => ({ id: challenge.id, title: challenge.title?.trim() || 'Untitled challenge' })))
 
-const signalR = useSignalR({
-  hubUrl: `/hubs/game?competitionId=${competitionId.value}`,
-  accessToken: () => auth.accessToken,
-})
-
-signalR.onRoundStarted(() => {
-  void dashboardQuery.refetch()
-})
-signalR.onAttackLog((log) => {
-  attacks.value = [mapAttack(log), ...attacks.value].slice(0, 100)
-})
-
-const submitMutation = useMutation({
-  mutationFn: async () => {
-    const challengeId = selectedChallengeId.value.trim()
-    const submittedFlag = flag.value.trim()
-    if (!challengeId || !submittedFlag)
-      throw new Error('A challenge and flag value are required.')
-    return competitionApi.submitFlag<{ correct?: boolean, message?: string }>(competitionId.value, challengeId, submittedFlag)
-  },
-  onSuccess: async (result) => {
-    if (result?.correct) {
-      flag.value = ''
-      operationTone.value = 'success'
-      operationMessage.value = result.message || 'Flag accepted. Competition data has been refreshed.'
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.awdDashboard(competitionId.value) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard(competitionId.value) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.submissions(competitionId.value) }),
-      ])
-      return
-    }
-    operationTone.value = 'danger'
-    operationMessage.value = result?.message || 'The server rejected this flag.'
-  },
-  onError: (error) => {
-    operationTone.value = 'danger'
-    operationMessage.value = error instanceof Error ? error.message : 'Flag submission failed.'
-  },
-})
+const attacks = computed<CommandAwdAttack[]>(() => attackLogs.value.map(log => mapAttack(log)))
 
 const workspaceState = computed<'invalid' | 'loading' | 'error' | 'ready'>(() => {
   if (!hasValidCompetitionId.value)
     return 'invalid'
-  if (dashboardQuery.isLoading.value)
+  if (loadingDashboard.value)
     return 'loading'
-  if (dashboardQuery.isError.value)
+  if (dashboardError.value)
     return 'error'
   return 'ready'
 })
+
 const errorMessage = computed(() => {
-  const error = dashboardQuery.error.value
+  const error = dashboardQueryError.value
   return error instanceof Error ? error.message : undefined
 })
-const round = computed(() => dashboardQuery.data.value?.currentRound ?? 0)
-const remainingSeconds = computed(() => dashboardQuery.data.value?.remainingSeconds ?? 0)
-const totalSeconds = computed(() => dashboardQuery.data.value?.roundDurationSeconds ?? 300)
+
+function reportSuccess(message: string) {
+  operationTone.value = 'success'
+  operationMessage.value = message
+}
+
+function reportError(error: unknown, fallback: string) {
+  operationTone.value = 'danger'
+  operationMessage.value = error instanceof Error ? error.message : fallback
+}
+
+async function submit() {
+  const outcome = await submitFlagAction()
+  if (outcome.kind === 'correct') {
+    reportSuccess('Flag accepted. Competition data has been refreshed.')
+  }
+  else if (outcome.kind === 'incorrect') {
+    reportError(null, outcome.message || 'The server rejected this flag.')
+  }
+  else if (outcome.kind === 'failed') {
+    reportError(null, 'Flag submission failed.')
+  }
+  else {
+    reportError(null, 'A challenge and flag value are required.')
+  }
+}
 
 function retry() {
-  void dashboardQuery.refetch()
-  void challengesQuery.refetch()
+  void refetchDashboard()
+  void refetchChallenges()
 }
 
 function normalizeServiceStatus(value?: string): CommandAwdService['status'] {
@@ -137,15 +109,6 @@ function mapAttack(log: AttackLogDto): CommandAwdAttack {
     timestamp,
   }
 }
-
-onMounted(() => {
-  if (hasValidCompetitionId.value)
-    void signalR.start()
-})
-
-onUnmounted(() => {
-  void signalR.stop()
-})
 </script>
 
 <template>
@@ -160,11 +123,11 @@ onUnmounted(() => {
     :services="services"
     :attacks="attacks"
     :challenges="challenges"
-    :submit-pending="submitMutation.isPending.value"
+    :submit-pending="flagLoading"
     :operation-message="operationMessage"
     :operation-tone="operationTone"
     :signal-connected="signalR.isConnected.value"
     @retry="retry"
-    @submit="submitMutation.mutate()"
+    @submit="submit"
   />
 </template>

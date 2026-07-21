@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAwdpScreenData } from '@/composables/useAwdpScreenData'
+import { useAwdpScreenData } from '@/features/screen/useAwdpScreenData'
 import CommandAwdpScreenWorkspace from '../components/CommandAwdpScreenWorkspace.vue'
 
 const route = useRoute()

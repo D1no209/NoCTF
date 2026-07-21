@@ -53,13 +53,15 @@ export interface CommandPreviewModel {
 }
 
 export async function loadSharedThemePreviewMock(): Promise<CommandPreviewModel | null> {
-  // Match the first package's dev-only AWDP mock source. Keeping this import
-  // runtime-gated prevents preview data from being emitted into production.
-  const mockModulePath = import.meta.env.DEV ? '@/mocks/awdpScreenMock' : null
-  if (!mockModulePath)
+  // Match the first package's dev-only AWDP mock source. The specifier must be
+  // a literal so Vite resolves the `@` alias in dev — a variable specifier with
+  // `@vite-ignore` reaches the browser untransformed and fails to resolve. In
+  // production builds `import.meta.env.DEV` is `false`, so Rollup tree-shakes
+  // this branch and never emits the mock chunk.
+  if (!import.meta.env.DEV)
     return null
 
-  const { createMockAwdpScreenSnapshot } = await import(/* @vite-ignore */ mockModulePath)
+  const { createMockAwdpScreenSnapshot } = await import('@/mocks/awdpScreenMock')
   return createCommandPreviewModel(createMockAwdpScreenSnapshot('comp-2026-awdp'))
 }
 

@@ -3,14 +3,20 @@ const props = withDefaults(defineProps<{
   modelValue: string
   placeholder?: string
   label: string
-  type?: 'search' | 'text' | 'email' | 'password'
+  type?: 'search' | 'text' | 'email' | 'password' | 'number' | 'url' | 'datetime-local'
   disabled?: boolean
   autocomplete?: string
+  min?: number | string
+  max?: number | string
+  step?: number | string
 }>(), {
   placeholder: '',
   type: 'search',
   disabled: false,
   autocomplete: undefined,
+  min: undefined,
+  max: undefined,
+  step: undefined,
 })
 
 defineEmits<{
@@ -28,6 +34,9 @@ defineEmits<{
     :placeholder="props.placeholder"
     :disabled="props.disabled"
     :autocomplete="props.autocomplete"
+    :min="props.min"
+    :max="props.max"
+    :step="props.step"
     @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     @keyup.enter="$emit('enter')"
   >

@@ -295,6 +295,14 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /*
+   * The pixel grid page backdrop is v1 package chrome. It must stay scoped to
+   * the v1 shell — painting it on the global body leaks the pattern into v2
+   * pages (v2 theme tokens intentionally leave --page-* untouched).
+   */
+  .app-pixel-shell:not(.app-pixel-shell--v2) {
     background:
       linear-gradient(90deg, var(--page-grid-color) 1px, transparent 1px),
       linear-gradient(180deg, var(--page-grid-color) 1px, transparent 1px),

@@ -95,7 +95,7 @@ function challengeTone(typeId: string) {
 .challenge-grid__header h2 { margin: 7px 0 0; color: var(--v2-text); font-size: 17px; font-weight: 600; }
 .challenge-grid__header > span { color: var(--v2-text-muted); font-family: var(--v2-font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
 .challenge-grid__cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 6px 18px 18px; }
-.challenge-grid__card { display: grid; min-width: 0; grid-template-rows: auto minmax(42px, 1fr) auto auto; gap: 12px; border-radius: 14px; padding: 16px; background: var(--v2-surface); box-shadow: var(--v2-raised-sm); }
+.challenge-grid__card { display: grid; min-width: 0; grid-template-rows: auto minmax(42px, 1fr) auto auto; gap: 12px; border-radius: 14px; padding: 16px; background: var(--v2-surface); box-shadow: var(--v2-raised-sm); content-visibility: auto; contain-intrinsic-size: auto 205px; }
 .challenge-grid__title h3 { overflow: hidden; margin: 8px 0 0; color: var(--v2-text); font-family: var(--v2-font-mono); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .challenge-grid__card > p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--v2-text-muted); font-size: 12px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .challenge-grid__card dl { display: flex; gap: 18px; margin: 0; }

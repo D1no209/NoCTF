@@ -1,19 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { CheckCircle2, XCircle } from 'lucide-vue-next'
-import { competitionApi } from '@/api/noctf'
 import CommandButton from '../primitives/CommandButton.vue'
 import CommandInput from '../primitives/CommandInput.vue'
 import CommandPanel from '../primitives/CommandPanel.vue'
 import CommandSignal from '../primitives/CommandSignal.vue'
 import type { CommandChallenge } from './CommandChallengeGrid.vue'
-
-interface SubmitResponse {
-  correct?: boolean
-  alreadySolved?: boolean
-  message?: string | null
-  result?: string | null
-}
+import { useChallengeConsole } from '@/features/game/useChallengeConsole'
 
 const props = defineProps<{
   open: boolean
@@ -28,8 +21,19 @@ const emit = defineEmits<{
   submitted: []
 }>()
 
-const flag = ref('')
-const submitting = ref(false)
+const {
+  flagInput: flag,
+  submitting,
+  resetConsole,
+  submitFlag: submitFlagAction,
+} = useChallengeConsole({
+  competitionId: () => props.competitionId,
+  challenge: () => props.challenge,
+  open: () => props.open,
+  canCreateInstance: () => false,
+  canSubmitFlag: () => props.canSubmit,
+})
+
 const result = ref<'correct' | 'incorrect' | 'error' | null>(null)
 const resultMessage = ref('')
 
@@ -39,46 +43,37 @@ const isOpen = computed({
 })
 
 watch(() => [props.open, props.challenge?.id], () => {
-  flag.value = ''
+  resetConsole()
   result.value = null
   resultMessage.value = ''
 })
 
 async function submitFlag() {
-  if (!props.challenge || !props.canSubmit || !flag.value.trim() || submitting.value)
+  if (submitting.value)
     return
 
-  submitting.value = true
-  result.value = null
-  resultMessage.value = ''
-  try {
-    const response = await competitionApi.submitFlag<SubmitResponse>(
-      props.competitionId,
-      props.challenge.id,
-      flag.value.trim(),
-    )
-    if (response?.correct) {
-      result.value = 'correct'
-      resultMessage.value = response.alreadySolved ? 'This challenge was already solved by your team.' : 'Flag accepted.'
-      emit('submitted')
-      return
-    }
+  const outcome = await submitFlagAction()
+  if (outcome.kind === 'correct') {
+    result.value = 'correct'
+    resultMessage.value = outcome.alreadySolved ? 'This challenge was already solved by your team.' : 'Flag accepted.'
+    emit('submitted')
+    return
+  }
+  if (outcome.kind === 'incorrect') {
     result.value = 'incorrect'
-    resultMessage.value = response?.message || response?.result || 'Flag was not accepted.'
+    resultMessage.value = outcome.message || outcome.reason || 'Flag was not accepted.'
+    return
   }
-  catch (error) {
+  if (outcome.kind === 'failed') {
     result.value = 'error'
-    resultMessage.value = error instanceof Error ? error.message : 'Flag submission failed.'
-  }
-  finally {
-    submitting.value = false
+    resultMessage.value = outcome.message || 'Flag submission failed.'
   }
 }
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="isOpen && props.challenge" class="challenge-console" role="dialog" aria-modal="true" :aria-label="`${props.challenge.title} challenge console`">
+    <div v-if="isOpen && props.challenge" class="challenge-console ui-v2" role="dialog" aria-modal="true" :aria-label="`${props.challenge.title} challenge console`">
       <button class="challenge-console__backdrop" aria-label="Close challenge console" @click="isOpen = false" />
       <CommandPanel class="challenge-console__dialog" tone="signal">
         <header>
@@ -115,7 +110,10 @@ async function submitFlag() {
 </template>
 
 <style scoped>
-.challenge-console { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 18px; }
+/* teleported to <body>: re-declares .ui-v2 for token scope, so the layout
+   side-effects of the root class (canvas background, 100dvh min-height,
+   overflow clipping) must be neutralized to keep the scrim visible */
+.challenge-console { position: fixed; z-index: 50; inset: 0; display: grid; min-height: 0; place-items: center; overflow: visible; padding: 18px; background: transparent; }
 .challenge-console__backdrop { position: absolute; inset: 0; border: 0; background: rgb(31 41 55 / 0.38); cursor: default; }
 .challenge-console__dialog { position: relative; z-index: 1; width: min(620px, 100%); max-height: min(720px, calc(100dvh - 36px)); overflow-y: auto; }
 .challenge-console__dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 18px 4px; }

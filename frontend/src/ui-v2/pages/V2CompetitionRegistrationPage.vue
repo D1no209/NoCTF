@@ -1,44 +1,37 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { useRoute, useRouter } from 'vue-router'
-import type {
-  NoCtfapiEndpointsCompetitionsCompetitionDetailDto,
-  NoCtfapiEndpointsCompetitionsMyCompetitionTeamDto,
-} from '@/api/generated/types.gen'
-import { competitionApi, teamApi } from '@/api/noctf'
-import { queryKeys } from '@/api/queryKeys'
 import CommandCompetitionRegistrationWorkspace, {
   type CommandRegistrationCompetition,
   type CommandRegistrationTeam,
 } from '../components/CommandCompetitionRegistrationWorkspace.vue'
+import { useCompetitionRegistrationPage } from '@/features/competitions/useCompetitionRegistrationPage'
 
-const route = useRoute()
-const router = useRouter()
-const queryClient = useQueryClient()
-const newTeamName = ref('')
-const selectedTrackName = ref('')
-const joinToken = ref('')
+const {
+  newTeamName,
+  selectedTrackName,
+  joinToken,
+  hasValidCompetitionId,
+  competition: competitionRaw,
+  loadingCompetition,
+  competitionError,
+  competitionQueryError,
+  refetchCompetition,
+  myTeams,
+  loadingTeams,
+  teamsError,
+  refetchTeams,
+  createTeamMutation,
+  joinByTokenMutation,
+  copyToken,
+  goCompetitions,
+  goCompetitionDetail,
+} = useCompetitionRegistrationPage()
+
 const operationMessage = ref('')
 const operationTone = ref<'success' | 'danger'>('success')
 
-const competitionId = computed(() => typeof route.params.id === 'string' ? route.params.id.trim() : '')
-const hasValidCompetitionId = computed(() => competitionId.value.length > 0)
-
-const competitionQuery = useQuery({
-  queryKey: computed(() => queryKeys.competition(competitionId.value)),
-  queryFn: () => competitionApi.get<NoCtfapiEndpointsCompetitionsCompetitionDetailDto>(competitionId.value),
-  enabled: hasValidCompetitionId,
-})
-
-const teamsQuery = useQuery({
-  queryKey: computed(() => queryKeys.myCompetitionTeams(competitionId.value)),
-  queryFn: () => competitionApi.myTeams<NoCtfapiEndpointsCompetitionsMyCompetitionTeamDto[]>(competitionId.value),
-  enabled: computed(() => hasValidCompetitionId.value && Boolean(competitionQuery.data.value?.id)),
-})
-
 const competition = computed<CommandRegistrationCompetition | undefined>(() => {
-  const source = competitionQuery.data.value
+  const source = competitionRaw.value
   if (!source?.id)
     return undefined
 
@@ -56,8 +49,8 @@ const competition = computed<CommandRegistrationCompetition | undefined>(() => {
   }
 })
 
-const teams = computed<CommandRegistrationTeam[]>(() => (teamsQuery.data.value ?? [])
-  .filter((team): team is NoCtfapiEndpointsCompetitionsMyCompetitionTeamDto & { id: string, competitionId: string } => Boolean(team.id && team.competitionId))
+const teams = computed<CommandRegistrationTeam[]>(() => (myTeams.value ?? [])
+  .filter((team): team is typeof team & { id: string, competitionId: string } => Boolean(team.id && team.competitionId))
   .map(team => ({
     id: team.id,
     competitionId: team.competitionId,
@@ -75,86 +68,52 @@ const teams = computed<CommandRegistrationTeam[]>(() => (teamsQuery.data.value ?
 const workspaceState = computed<'invalid' | 'loading' | 'error' | 'ready'>(() => {
   if (!hasValidCompetitionId.value)
     return 'invalid'
-  if (competitionQuery.isLoading.value)
+  if (loadingCompetition.value)
     return 'loading'
-  if (competitionQuery.isError.value || !competition.value)
+  if (competitionError.value || !competition.value)
     return 'error'
   return 'ready'
 })
 
 const errorMessage = computed(() => {
-  const error = competitionQuery.error.value
+  const error = competitionQueryError.value
   return error instanceof Error ? error.message : undefined
 })
 
-const createTeamMutation = useMutation({
-  mutationFn: () => teamApi.create<NoCtfapiEndpointsCompetitionsMyCompetitionTeamDto>({
-    competitionId: competitionId.value,
-    name: newTeamName.value.trim(),
-    trackName: competition.value?.tracksEnabled ? selectedTrackName.value : undefined,
-  }),
-  onSuccess: async () => {
-    newTeamName.value = ''
-    selectedTrackName.value = ''
-    operationTone.value = 'success'
-    operationMessage.value = 'Team created. Registration status has been synchronized.'
-    await refreshTeamData()
-  },
-  onError: (error) => {
-    operationTone.value = 'danger'
-    operationMessage.value = error instanceof Error ? error.message : 'Team creation failed.'
-  },
-})
-
-const joinByTokenMutation = useMutation({
-  mutationFn: () => teamApi.joinByToken<NoCtfapiEndpointsCompetitionsMyCompetitionTeamDto>(joinToken.value.trim()),
-  onSuccess: async (team) => {
-    joinToken.value = ''
-    operationTone.value = 'success'
-    operationMessage.value = 'Team joined. Registration status has been synchronized.'
-    await refreshTeamData(team.competitionId)
-    if (team.competitionId && team.competitionId !== competitionId.value)
-      router.push({ name: 'competition-register', params: { id: team.competitionId } })
-  },
-  onError: (error) => {
-    operationTone.value = 'danger'
-    operationMessage.value = error instanceof Error ? error.message : 'Unable to join the team with this token.'
-  },
-})
-
-function refreshTeamData(relatedCompetitionId?: string) {
-  const keys = [
-    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(competitionId.value) }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.myTeams }),
-  ]
-  if (relatedCompetitionId && relatedCompetitionId !== competitionId.value)
-    keys.push(queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(relatedCompetitionId) }))
-  return Promise.all(keys)
+function reportSuccess(message: string) {
+  operationTone.value = 'success'
+  operationMessage.value = message
 }
 
-function backToRegistry() {
-  router.push({ name: 'competitions' })
+function reportError(error: unknown, fallback: string) {
+  operationTone.value = 'danger'
+  operationMessage.value = error instanceof Error ? error.message : fallback
 }
 
-function enterCompetition() {
-  router.push({ name: 'competition-detail', params: { id: competitionId.value } })
+function createTeam() {
+  createTeamMutation.mutate(undefined, {
+    onSuccess: () => reportSuccess('Team created. Registration status has been synchronized.'),
+    onError: error => reportError(error, 'Team creation failed.'),
+  })
+}
+
+function joinByToken() {
+  joinByTokenMutation.mutate(undefined, {
+    onSuccess: () => reportSuccess('Team joined. Registration status has been synchronized.'),
+    onError: error => reportError(error, 'Unable to join the team with this token.'),
+  })
 }
 
 function retry() {
-  competitionQuery.refetch()
-  teamsQuery.refetch()
+  refetchCompetition()
+  refetchTeams()
 }
 
 async function copyInviteToken(token: string) {
-  try {
-    await navigator.clipboard.writeText(token)
-    operationTone.value = 'success'
-    operationMessage.value = 'Invitation token copied to the clipboard.'
-  }
-  catch {
-    operationTone.value = 'danger'
-    operationMessage.value = 'Unable to copy the invitation token in this browser.'
-  }
+  if (await copyToken(token))
+    reportSuccess('Invitation token copied to the clipboard.')
+  else
+    reportError(null, 'Unable to copy the invitation token in this browser.')
 }
 </script>
 
@@ -167,17 +126,17 @@ async function copyInviteToken(token: string) {
     :error-message="errorMessage"
     :competition="competition"
     :teams="teams"
-    :loading-teams="teamsQuery.isLoading.value"
-    :teams-error="teamsQuery.isError.value"
+    :loading-teams="loadingTeams"
+    :teams-error="teamsError"
     :create-pending="createTeamMutation.isPending.value"
     :join-pending="joinByTokenMutation.isPending.value"
     :operation-message="operationMessage"
     :operation-tone="operationTone"
-    @back="backToRegistry"
+    @back="goCompetitions"
     @retry="retry"
-    @enter="enterCompetition"
-    @create="createTeamMutation.mutate()"
-    @join="joinByTokenMutation.mutate()"
+    @enter="goCompetitionDetail"
+    @create="createTeam"
+    @join="joinByToken"
     @copy="copyInviteToken"
   />
 </template>
