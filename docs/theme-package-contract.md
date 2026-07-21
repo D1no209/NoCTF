@@ -52,8 +52,12 @@ Additional component-level rules inside a theme package:
   is a pure presentational component.
 - **Pure presentational components** receive props and emit events. They may
   hold presentational state (search text, sort key, page index, hover, open
-  dialogs) but must not import `@/features`, `@/api`, `vue-query`, or
-  `vue-router`, and must not touch stores.
+  dialogs) but must not import `@/features`, `@/api`, `vue-query`, or stores,
+  and must not issue programmatic navigation (`useRouter`, `router.push`,
+  `router.replace`). Declarative `<RouterLink>` links inside V1 templates are
+  presentation — they mirror the upstream markup that hard rule 1 protects.
+  What the feature owns is navigation *intent* after domain actions (post-save
+  redirects, section switching), never the rendering of a plain link.
 - **Layouts and navigation chrome** (nav bars, admin nav, screen headers) may
   read the current route and render links, and may call `auth` store actions
   such as logout. They may not issue domain queries or mutations.
@@ -208,7 +212,7 @@ like are package-internal decisions — the platform does not impose a look.
 `vue-i18n` keys; V2 uses hardcoded English. Feature modules never supply copy.
 
 **Route coverage.** A package lists the route names it renders. Routes it does
-not list fall back to the default package (`v1`). Full coverage of the 30
+not list fall back to the default package (`v1`). Full coverage of the 32
 registered routes is the definition of "aligned with V1".
 
 ## 4. Registering a new UI package
@@ -240,8 +244,8 @@ Code-review questions that must always be answered "no":
 
 - Does any file under `ui-v1/` or `ui-v2/` import `@/api/*` at runtime,
   `@tanstack/vue-query`, or the other theme package?
-- Does any presentational component import `@/features`, `vue-router`, or a
-  store?
+- Does any presentational component import `@/features`, a store, or call
+  `useRouter`/`router.push` (programmatic navigation)?
 - Does any feature module import a `.vue` file or contain user-facing copy?
 - Did any payload, query key, invalidation set, enum, or fallback chain
   diverge from V1?
@@ -266,6 +270,8 @@ Code-review questions that must always be answered "no":
 | admin-teams | `features/admin/useAdminTeamsPage.ts` | `admin/teams/AdminTeamsWorkspace.vue` | `pages/V2AdminTeamsPage.vue` |
 | admin-competitions | `features/admin/useAdminCompetitionsPage.ts` | `admin/competitions/AdminCompetitionsWorkspace.vue` | `pages/V2AdminCompetitionsPage.vue` |
 | admin-competition-detail | `features/admin/useAdminCompetitionDetailPage.ts` | `admin/competition-detail/AdminCompetitionDetailWorkspace.vue` | `pages/V2AdminCompetitionDetailPage.vue` |
+| admin-competition-challenge-create | `features/admin/useAdminCompetitionChallengeEditorPage.ts` | `admin/competition-detail/AdminCompetitionChallengeEditorWorkspace.vue` | — (falls back to v1) |
+| admin-competition-challenge-edit | `features/admin/useAdminCompetitionChallengeEditorPage.ts` | `admin/competition-detail/AdminCompetitionChallengeEditorWorkspace.vue` | — (falls back to v1) |
 | admin-competition-operations | `features/admin/useAdminCompetitionOperationsPage.ts` | `admin/competition-operations/AdminCompetitionOperationsWorkspace.vue` | `pages/V2AdminCompetitionOperationsPage.vue` |
 | admin-collaborators | `features/admin/useAdminCollaboratorsPage.ts` | `admin/collaborators/AdminCollaboratorsWorkspace.vue` | `pages/V2AdminCollaboratorsPage.vue` |
 | admin-challenges | `features/admin/useAdminChallengesPage.ts` | `admin/challenges/AdminChallengesWorkspace.vue` | `pages/V2AdminChallengesPage.vue` |
@@ -281,11 +287,13 @@ Code-review questions that must always be answered "no":
 | admin-theme-packs | platform service `useThemePackages` | `views/admin/AdminThemePacksView.vue` | `pages/V2ThemePackagesPage.vue` |
 | not-found | — (static) | `views/NotFoundView.vue` | `pages/V2NotFoundPage.vue` |
 
-Shared challenge-template editing (used by admin-challenges,
-admin-challenge-create and admin-competition-detail) lives in
+Shared challenge-template editing (used by admin-challenges and
+admin-challenge-create) lives in
 `features/admin/challengeTemplate.ts`; each theme renders it with its
 own form component (V1 `ChallengeTemplateForm.vue`, V2
-`CommandChallengeTemplateForm.vue`).
+`CommandChallengeTemplateForm.vue`). Competition challenge deploy/edit
+uses the dedicated editor feature
+`features/admin/useAdminCompetitionChallengeEditorPage.ts`.
 
 Cross-page interactive components have their own parameterized features:
 `features/game/useChallengeConsole.ts` (V1 `ChallengeModal.vue`, V2

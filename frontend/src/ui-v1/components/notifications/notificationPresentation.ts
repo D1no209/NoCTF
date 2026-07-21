@@ -1,4 +1,4 @@
-import type { UserNotification } from '@/api/noctf'
+import type { UserNotification } from '@/features/notifications/useNotificationCenter'
 
 export interface NotificationCopy {
   titleKey: string
