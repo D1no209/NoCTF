@@ -89,7 +89,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         if (status == CompetitionStatus.Finished) return new(null, ChallengeFlagMutationFailure.FlagLocked);
         var scopeError = await ValidateMutableScopeAsync(
             command.CompetitionId,
-            command.ChallengeId,
+            command.CompetitionChallengeId,
             command.TeamId,
             command.StageId,
             command.ChallengeInstanceId,
@@ -98,7 +98,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
             return new(null, scopeError);
         if (await OverlapsAsync(
                 command.CompetitionId,
-                command.ChallengeId,
+                command.CompetitionChallengeId,
                 command.TeamId,
                 command.StageId,
                 command.ChallengeInstanceId,
@@ -112,8 +112,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         {
             Id = Guid.CreateVersion7(command.CreatedAt),
             CompetitionId = command.CompetitionId,
-            ChallengeId = command.ChallengeId,
-            CompetitionChallengeId = command.ChallengeId,
+            CompetitionChallengeId = command.CompetitionChallengeId,
             TeamId = command.TeamId,
             StageId = command.StageId,
             ChallengeInstanceId = command.ChallengeInstanceId,
@@ -148,7 +147,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
         var entity = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.Id == command.FlagId
                     && flag.CompetitionId == command.CompetitionId
-                    && flag.CompetitionChallengeId == command.ChallengeId,
+                    && flag.CompetitionChallengeId == command.CompetitionChallengeId,
             ct);
         if (entity is null)
             return new(null, ChallengeFlagMutationFailure.FlagNotFound);
@@ -157,7 +156,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
 
         var scopeError = await ValidateMutableScopeAsync(
             command.CompetitionId,
-            command.ChallengeId,
+            command.CompetitionChallengeId,
             command.TeamId,
             command.StageId,
             command.ChallengeInstanceId,
@@ -166,7 +165,7 @@ public sealed class EfChallengeFlagStore(NoCtfDbContext db) : IChallengeFlagStor
             return new(null, scopeError);
         if (await OverlapsAsync(
                 command.CompetitionId,
-                command.ChallengeId,
+                command.CompetitionChallengeId,
                 command.TeamId,
                 command.StageId,
                 command.ChallengeInstanceId,

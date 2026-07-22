@@ -46,6 +46,8 @@ public interface IFixVerificationStore
         DateTimeOffset completedAt,
         CancellationToken cancellationToken);
 
+    Task<FixVerificationResult?> GetCompletedAsync(Guid submissionId, CancellationToken cancellationToken);
+
     Task<int> ExpireAsync(DateTimeOffset now, CancellationToken cancellationToken);
 }
 
@@ -56,6 +58,8 @@ public interface IFixSubmissionVerifier
         FixSubmissionReceived submission,
         CancellationToken cancellationToken);
 }
+
+public interface IRunnerFixSubmissionVerifier : IFixSubmissionVerifier;
 
 public sealed class VerifyFixSubmission(
     IFixVerificationStore store,
@@ -91,7 +95,9 @@ public sealed class VerifyFixSubmission(
             "fix-verifier-v1",
             now,
             ct);
-        return completed
+        if (completed) return FixVerificationOperationResult.Success();
+        var callbackResult = await store.GetCompletedAsync(submissionId, ct);
+        return callbackResult == result
             ? FixVerificationOperationResult.Success()
             : FixVerificationOperationResult.Failure(FixVerificationError.Concurrency);
     }

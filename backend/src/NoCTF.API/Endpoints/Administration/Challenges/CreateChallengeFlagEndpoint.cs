@@ -16,7 +16,7 @@ public sealed class CreateChallengeFlagEndpoint(
 {
     public override void Configure()
     {
-        Post("/admin/competitions/{competitionId}/challenges/{challengeId}/flags");
+        Post("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags");
         AuthSchemes("Bearer");
         Summary(summary => summary.Summary = "Creates a global or Team-specific Challenge Flag.");
     }
@@ -25,7 +25,7 @@ public sealed class CreateChallengeFlagEndpoint(
         ExecuteAsync(CreateChallengeFlagRequest request, CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        request.ChallengeId = Route<Guid>("challengeId");
+        request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
         if (!await authorizer.CanModerateAsync(user.UserId, request.CompetitionId, ct))
             return TypedResults.Forbid();
 
@@ -44,7 +44,7 @@ public sealed class CreateChallengeFlagEndpoint(
 
         var response = ChallengeFlagMapper.ToResponse(result.Value!);
         return TypedResults.Created(
-            $"/admin/competitions/{request.CompetitionId}/challenges/{request.ChallengeId}/flags/{response.Id}",
+            $"/admin/competitions/{request.CompetitionId}/challenges/{request.CompetitionChallengeId}/flags/{response.Id}",
             response);
     }
 }

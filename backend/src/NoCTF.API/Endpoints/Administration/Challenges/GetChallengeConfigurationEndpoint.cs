@@ -14,7 +14,7 @@ public sealed class GetChallengeConfigurationEndpoint(
 {
     public override void Configure()
     {
-        Get("/admin/competitions/{competitionId}/challenges/{challengeId}/configuration");
+        Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration");
         AuthSchemes("Bearer");
         Summary(summary => summary.Summary = "Gets a challenge's versioned game-mode configuration.");
     }
@@ -26,7 +26,7 @@ public sealed class GetChallengeConfigurationEndpoint(
         if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
 
-        var view = await get.ExecuteAsync(competitionId, Route<Guid>("challengeId"), ct);
+        var view = await get.ExecuteAsync(competitionId, Route<Guid>("competitionChallengeId"), ct);
         return view is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(ChallengeConfigurationMapper.ToResponse(view));

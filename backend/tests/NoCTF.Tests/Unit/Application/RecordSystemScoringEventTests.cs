@@ -114,6 +114,47 @@ public class RecordSystemScoringEventTests
     }
 
     [Test]
+    public async Task ExecutePenetrationStageAsync_RequiresStageAndInstanceDimensions()
+    {
+        var store = new Store(new(Guid.NewGuid(), true));
+        var scheduler = new Scheduler();
+        var useCase = new RecordSystemScoringEvent(store, scheduler, scheduler);
+        var command = Command(Guid.NewGuid()) with
+        {
+            Kind = ScoringEventKind.PenetrationStage,
+            Result = ScoringResult.PlatformFailed,
+            FailureCode = ScoringFailureCode.ProducerUnavailable
+        };
+
+        var execute = async () => await useCase.ExecutePenetrationStageAsync(command);
+
+        await Assert.That(execute).Throws<ArgumentException>();
+        await Assert.That(store.RecordCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ExecutePenetrationStageAsync_AcceptsFullyScopedPlatformFailure()
+    {
+        var store = new Store(new(Guid.NewGuid(), true));
+        var scheduler = new Scheduler();
+        var useCase = new RecordSystemScoringEvent(store, scheduler, scheduler);
+        var command = Command(Guid.NewGuid()) with
+        {
+            Kind = ScoringEventKind.PenetrationStage,
+            Result = ScoringResult.PlatformFailed,
+            FailureCode = ScoringFailureCode.ProducerUnavailable,
+            StageId = Guid.NewGuid(),
+            ChallengeInstanceId = Guid.NewGuid()
+        };
+
+        var result = await useCase.ExecutePenetrationStageAsync(command);
+
+        await Assert.That(result.Created).IsTrue();
+        await Assert.That(store.LastCommand!.StageId).IsEqualTo(command.StageId);
+        await Assert.That(store.LastCommand.ChallengeInstanceId).IsEqualTo(command.ChallengeInstanceId);
+    }
+
+    [Test]
     public async Task RecordAwdpCheckResult_MapsExitCodeBeforeRecordingFact()
     {
         var store = new Store(new(Guid.NewGuid(), true));
@@ -122,7 +163,7 @@ public class RecordSystemScoringEventTests
         var useCase = new RecordAwdpCheckResult(new AwdpCheckExitCodeMapper(), store, record);
 
         var result = await useCase.ExecuteAsync(new(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 2, false,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), AwdpVerificationPhase.Checker, 2, false,
             DateTimeOffset.UtcNow, "awdp-check:1"));
 
         await Assert.That(result.Created).IsTrue();
@@ -140,7 +181,7 @@ public class RecordSystemScoringEventTests
         var useCase = new RecordAwdpCheckResult(new AwdpCheckExitCodeMapper(), store, record);
 
         var result = await useCase.ExecuteAsync(new(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 0, false,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), AwdpVerificationPhase.Checker, 0, false,
             DateTimeOffset.UtcNow, "awdp-check:wrong-mode"));
 
         await Assert.That(result.Failure).IsEqualTo(SystemScoringEventRecordFailure.CompetitionModeMismatch);
@@ -156,11 +197,26 @@ public class RecordSystemScoringEventTests
         var useCase = new RecordAwdpCheckResult(new AwdpCheckExitCodeMapper(), store, record);
 
         var result = await useCase.ExecuteAsync(new(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 0, false,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), AwdpVerificationPhase.Checker, 0, false,
             DateTimeOffset.UtcNow, "awdp-check:missing"));
 
         await Assert.That(result.Failure).IsEqualTo(SystemScoringEventRecordFailure.CompetitionNotFound);
         await Assert.That(store.RecordCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task RecordAwdpCheckResult_MapsPatchTimeoutToTypedViolationFact()
+    {
+        var store = new Store(new(Guid.NewGuid(), true));
+        var scheduler = new Scheduler();
+        var useCase = new RecordAwdpCheckResult(new AwdpCheckExitCodeMapper(), store,
+            new RecordSystemScoringEvent(store, scheduler, scheduler));
+
+        await useCase.ExecuteAsync(new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            AwdpVerificationPhase.Patch, -1, true, DateTimeOffset.UtcNow, "awdp-patch:timeout"));
+
+        await Assert.That(store.LastCommand!.Result).IsEqualTo(ScoringResult.Rejected);
+        await Assert.That(store.LastCommand.FailureCode).IsEqualTo(ScoringFailureCode.AwdpPatchTimeout);
     }
 
     private static RecordSystemScoringEventCommand Command(Guid competition) => new(

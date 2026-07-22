@@ -68,9 +68,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -82,12 +79,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasMaxLength(96)
                         .HasColumnType("character varying(96)");
 
-                    b.Property<bool>("IsPublished")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -98,67 +89,7 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CompetitionId", "Order")
-                        .IsUnique();
-
                     b.ToTable("challenges", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeAttachment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long>("Length")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("ObjectKey")
-                        .IsRequired()
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
-                    b.Property<string>("Sha256")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ObjectKey")
-                        .IsUnique();
-
-                    b.ToTable("challenge_attachments", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeConfiguration", b =>
-                {
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Json")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<int>("Revision")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("ChallengeId");
-
-                    b.ToTable("challenge_configurations", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeFlag", b =>
@@ -167,10 +98,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ChallengeId")
+                    b.Property<Guid?>("ChallengeInstanceId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ChallengeInstanceId")
+                    b.Property<Guid>("CompetitionChallengeId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("CompetitionId")
@@ -183,12 +114,21 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("InjectionClaimToken")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("InjectionClaimedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<long>("RowVersion")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
                     b.Property<Guid?>("StageId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("TeamId")
                         .HasColumnType("uuid");
@@ -204,35 +144,60 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CompetitionId", "ChallengeId", "TeamId", "StageId", "ChallengeInstanceId", "ValidStart", "ValidEnd");
+                    b.HasIndex("CompetitionChallengeId");
+
+                    b.HasIndex("CompetitionId", "CompetitionChallengeId", "TeamId", "ValidStart")
+                        .IsUnique()
+                        .HasFilter("\"TeamId\" IS NOT NULL AND \"StageId\" IS NULL");
+
+                    b.HasIndex("CompetitionId", "CompetitionChallengeId", "TeamId", "StageId", "ChallengeInstanceId", "ValidStart", "ValidEnd")
+                        .HasDatabaseName("IX_challenge_flags_CompetitionId_CompetitionChallengeId_TeamI~1");
 
                     b.ToTable("challenge_flags", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeHint", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallenge", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("BaseScore")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("ChallengeId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid");
 
-                    b.Property<int>("Cost")
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Order")
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("PublishedAt")
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ChallengeId");
 
-                    b.ToTable("challenge_hints", (string)null);
+                    b.HasIndex("CompetitionId", "ChallengeId")
+                        .IsUnique();
+
+                    b.HasIndex("CompetitionId", "Order")
+                        .IsUnique();
+
+                    b.ToTable("competition_challenges", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
@@ -240,6 +205,16 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("ConfigurationRevision")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ConfigurationUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -281,135 +256,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("Status", "StartTime");
 
                     b.ToTable("competitions", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Competitions.CompetitionCollaborator", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("AddedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Role")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("competition_collaborators", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Competitions.CompetitionConfiguration", b =>
-                {
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Json")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<int>("Mode")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Revision")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("CompetitionId");
-
-                    b.ToTable("competition_configurations", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Competitions.CompetitionLifecycleAudit", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ActorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("Automatic")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("From")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<int>("To")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId", "OccurredAt");
-
-                    b.ToTable("competition_lifecycle_audits", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Identity.RefreshSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("ConsumedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedByIp")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("FamilyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ReplacedBySessionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique();
-
-                    b.HasIndex("UserId", "FamilyId");
-
-                    b.ToTable("refresh_sessions", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Identity.User", b =>
@@ -510,7 +356,7 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ChallengeId")
+                    b.Property<Guid>("CompetitionChallengeId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("CompetitionId")
@@ -543,7 +389,9 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId");
+                    b.HasIndex("CompetitionChallengeId");
+
+                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId");
 
                     b.ToTable("challenge_instances", (string)null);
                 });
@@ -599,11 +447,11 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset?>("ClaimedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid");
@@ -653,7 +501,7 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("SubmissionId")
                         .IsUnique();
 
-                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId", "ExpiresAt");
+                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "ExpiresAt");
 
                     b.ToTable("fix_submission_records", (string)null);
                 });
@@ -664,7 +512,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ChallengeId")
+                    b.Property<Guid?>("ChallengeInstanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CompetitionChallengeId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("CompetitionId")
@@ -714,6 +565,9 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<Guid?>("StageId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("SubmissionId")
                         .HasColumnType("uuid");
 
@@ -721,6 +575,8 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CompetitionChallengeId");
 
                     b.HasIndex("SubmissionId")
                         .IsUnique();
@@ -731,7 +587,7 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasIndex("CompetitionId", "OccurredAt", "Id");
 
-                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId", "Kind", "OccurredAt");
+                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "OccurredAt");
 
                     b.ToTable("scoring_events", (string)null);
                 });
@@ -742,14 +598,14 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ChallengeId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid?>("ChallengeInstanceId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("CheckerPlatformError")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid?>("CompetitionChallengeId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid");
@@ -773,10 +629,6 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.Property<int>("Kind")
                         .HasColumnType("integer");
-
-                    b.Property<string>("LegacyFlag")
-                        .HasColumnType("text")
-                        .HasColumnName("Flag");
 
                     b.Property<long>("ProcessingVersion")
                         .IsConcurrencyToken()
@@ -811,13 +663,15 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompetitionChallengeId");
+
                     b.HasIndex("ScoringEventId")
                         .IsUnique();
 
                     b.HasIndex("CompetitionId", "IdempotencyKey")
                         .IsUnique();
 
-                    b.HasIndex("CompetitionId", "TeamId", "ChallengeId", "Kind", "ReceivedAt", "Id");
+                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "ReceivedAt", "Id");
 
                     b.ToTable("submissions", (string)null);
                 });
@@ -831,11 +685,13 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("CaptainId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("InvitationToken")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<bool>("IsLocked")
                         .HasColumnType("boolean");
@@ -853,85 +709,15 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("InvitationToken")
+                        .IsUnique();
+
                     b.HasIndex("CompetitionId", "Name")
                         .IsUnique();
 
                     b.HasIndex("CompetitionId", "RegistrationStatus");
 
                     b.ToTable("teams", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Teams.TeamInvitation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("InvitedById")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("InvitedUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("RespondedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId", "InvitedUserId")
-                        .IsUnique()
-                        .HasFilter("\"Status\" = 0");
-
-                    b.HasIndex("TeamId", "Status", "ExpiresAt");
-
-                    b.ToTable("team_invitations", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Teams.TeamMember", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("JoinedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Role")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId", "UserId")
-                        .IsUnique();
-
-                    b.HasIndex("TeamId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("team_members", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>
@@ -958,17 +744,132 @@ namespace NoCTF.Infrastructure.Migrations
                                 .HasForeignKey("ChallengeId");
                         });
 
+                    b.OwnsMany("NoCTF.Domain.Challenges.ChallengeAttachment", "Attachments", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("ChallengeId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("ContentType")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<string>("FileName")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<long>("Length")
+                                .HasColumnType("bigint");
+
+                            b1.Property<string>("ObjectKey")
+                                .IsRequired()
+                                .HasMaxLength(1024)
+                                .HasColumnType("character varying(1024)");
+
+                            b1.Property<string>("Sha256")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("ChallengeId");
+
+                            b1.HasIndex("ObjectKey")
+                                .IsUnique();
+
+                            b1.ToTable("challenge_attachments", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChallengeId");
+                        });
+
+                    b.Navigation("Attachments");
+
                     b.Navigation("Deletion")
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeConfiguration", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeFlag", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallenge", b =>
                 {
                     b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
-                        .WithOne()
-                        .HasForeignKey("NoCTF.Domain.Challenges.ChallengeConfiguration", "ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsOne("NoCTF.Domain.Shared.SoftDeleteState", "Deletion", b1 =>
+                        {
+                            b1.Property<Guid>("CompetitionChallengeId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTimeOffset?>("DeletedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<Guid?>("DeletedById")
+                                .HasColumnType("uuid");
+
+                            b1.Property<bool>("IsDeleted")
+                                .HasColumnType("boolean");
+
+                            b1.HasKey("CompetitionChallengeId");
+
+                            b1.ToTable("competition_challenges");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompetitionChallengeId");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Challenges.CompetitionChallengeHint", "Hints", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("CompetitionChallengeId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Content")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<int>("Cost")
+                                .HasColumnType("integer");
+
+                            b1.Property<DateTimeOffset?>("PublishedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("CompetitionChallengeId");
+
+                            b1.ToTable("competition_challenge_hints", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompetitionChallengeId");
+                        });
+
+                    b.Navigation("Deletion")
+                        .IsRequired();
+
+                    b.Navigation("Hints");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
@@ -995,24 +896,86 @@ namespace NoCTF.Infrastructure.Migrations
                                 .HasForeignKey("CompetitionId");
                         });
 
+                    b.OwnsMany("NoCTF.Domain.Competitions.CompetitionCollaborator", "Collaborators", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTimeOffset>("AddedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<Guid>("CompetitionId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("Role")
+                                .HasColumnType("integer");
+
+                            b1.Property<Guid>("UserId")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("CompetitionId", "UserId")
+                                .IsUnique();
+
+                            b1.ToTable("competition_collaborators", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompetitionId");
+                        });
+
+                    b.OwnsMany("NoCTF.Domain.Competitions.CompetitionLifecycleAudit", "LifecycleAudits", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid?>("ActorId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<bool>("Automatic")
+                                .HasColumnType("boolean");
+
+                            b1.Property<Guid>("CompetitionId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("From")
+                                .HasColumnType("integer");
+
+                            b1.Property<DateTimeOffset>("OccurredAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("Reason")
+                                .HasMaxLength(256)
+                                .HasColumnType("character varying(256)");
+
+                            b1.Property<int>("To")
+                                .HasColumnType("integer");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("CompetitionId", "OccurredAt");
+
+                            b1.ToTable("competition_lifecycle_audits", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompetitionId");
+                        });
+
+                    b.Navigation("Collaborators");
+
                     b.Navigation("Deletion")
                         .IsRequired();
+
+                    b.Navigation("LifecycleAudits");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Competitions.CompetitionConfiguration", b =>
+            modelBuilder.Entity("NoCTF.Domain.Runtime.ChallengeInstance", b =>
                 {
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
-                        .WithOne()
-                        .HasForeignKey("NoCTF.Domain.Competitions.CompetitionConfiguration", "CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Competitions.CompetitionLifecycleAudit", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
                         .WithMany()
-                        .HasForeignKey("CompetitionId")
+                        .HasForeignKey("CompetitionChallengeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1029,6 +992,11 @@ namespace NoCTF.Infrastructure.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.Submissions.ScoringEvent", b =>
                 {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("NoCTF.Domain.Submissions.Submission", "Submission")
                         .WithMany()
                         .HasForeignKey("SubmissionId")
@@ -1039,6 +1007,11 @@ namespace NoCTF.Infrastructure.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.Submissions.Submission", b =>
                 {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("NoCTF.Domain.Submissions.ScoringEvent", "ScoringEvent")
                         .WithMany()
                         .HasForeignKey("ScoringEventId")
@@ -1096,20 +1069,45 @@ namespace NoCTF.Infrastructure.Migrations
                                 .HasForeignKey("TeamId");
                         });
 
+                    b.OwnsMany("NoCTF.Domain.Teams.TeamMember", "Members", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTimeOffset>("JoinedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<int>("MemberOrder")
+                                .HasColumnType("integer");
+
+                            b1.Property<Guid>("TeamId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("UserId")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("TeamId", "MemberOrder")
+                                .IsUnique();
+
+                            b1.HasIndex("TeamId", "UserId")
+                                .IsUnique();
+
+                            b1.ToTable("team_members", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("TeamId");
+                        });
+
                     b.Navigation("Ban")
                         .IsRequired();
 
                     b.Navigation("Deletion")
                         .IsRequired();
-                });
 
-            modelBuilder.Entity("NoCTF.Domain.Teams.TeamInvitation", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Teams.Team", null)
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Navigation("Members");
                 });
 #pragma warning restore 612, 618
         }

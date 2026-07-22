@@ -44,7 +44,16 @@ public sealed record ContainerRequest(
     IReadOnlyDictionary<int, int> PortMappings,
     ContainerResourceLimits Limits,
     ContainerSecurityPolicy Security,
-    TimeSpan? Ttl);
+    TimeSpan? Ttl,
+    RunnerScoringCallback? ScoringCallback = null,
+    string? NetworkName = null,
+    TimeSpan? OperationTimeout = null);
+
+/// <summary>Restricted metadata for a Runner-authenticated system-result callback.</summary>
+public sealed record RunnerScoringCallback(
+    Uri Url,
+    string RunnerId,
+    IReadOnlyDictionary<string, string> Context);
 
 public sealed record ContainerReceipt(
     Guid OperationId,
@@ -73,4 +82,30 @@ public interface IContainerLifecycle
 public interface IOneShotJobRunner
 {
     Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken);
+}
+
+public sealed record ContainerExecResult(int ExitCode, bool TimedOut);
+
+public interface IContainerSandboxLifecycle
+{
+    Task<string> CreateIsolatedNetworkAsync(
+        Guid operationId, DateTimeOffset expiresAt, CancellationToken cancellationToken);
+    Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken);
+    Task CopyArchiveAsync(ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken);
+    Task<ContainerExecResult> ExecAsync(
+        ContainerReceipt receipt, IReadOnlyList<string> command, TimeSpan timeout, CancellationToken cancellationToken);
+    Task<ContainerExecResult> ExecWithInputAsync(
+        ContainerReceipt receipt,
+        IReadOnlyList<string> command,
+        ReadOnlyMemory<byte> standardInput,
+        TimeSpan timeout,
+        CancellationToken cancellationToken);
+}
+
+public sealed record RuntimeResourceReapResult(int RemovedCount, int FailedCount);
+
+public interface IRuntimeResourceReaper
+{
+    Task<RuntimeResourceReapResult> ReapExpiredAsync(
+        DateTimeOffset now, CancellationToken cancellationToken);
 }

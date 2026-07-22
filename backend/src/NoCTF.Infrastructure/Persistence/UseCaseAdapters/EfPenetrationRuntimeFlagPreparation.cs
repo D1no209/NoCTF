@@ -30,27 +30,29 @@ public sealed class EfPenetrationRuntimeFlagPreparation(
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var lockedStatus = await CompetitionWriteLock.AcquireAsync(
             db, command.CompetitionId, cancellationToken);
-        var scope = await (
-            from competition in db.Competitions
-            join challenge in db.Challenges on competition.Id equals challenge.CompetitionId
-            join challengeConfiguration in db.ChallengeConfigurations
-                on challenge.Id equals challengeConfiguration.ChallengeId
-            join team in db.Teams on competition.Id equals team.CompetitionId
-            where competition.Id == command.CompetitionId
-                  && challenge.Id == command.ChallengeId
-                  && team.Id == teamId
-            select new
+        var scope = await db.CompetitionChallenges
+            .Join(db.Competitions, instance => instance.CompetitionId, competition => competition.Id,
+                (instance, competition) => new { Instance = instance, Competition = competition })
+            .Join(db.Challenges, item => item.Instance.ChallengeId, challenge => challenge.Id,
+                (item, challenge) => new { item.Instance, item.Competition, Challenge = challenge })
+            .Join(db.Teams, item => item.Competition.Id, team => team.CompetitionId,
+                (item, team) => new { item.Instance, item.Competition, item.Challenge, Team = team })
+            .Where(item => item.Competition.Id == command.CompetitionId
+                           && item.Instance.Id == command.CompetitionChallengeId
+                           && item.Team.Id == teamId)
+            .Select(item => new
             {
-                competition.Status,
-                competition.Mode,
-                competition.EndTime,
-                CompetitionDeleted = competition.Deletion.IsDeleted,
-                ChallengeDeleted = challenge.Deletion.IsDeleted,
-                TeamDeleted = team.Deletion.IsDeleted,
-                team.RegistrationStatus,
-                ConfigurationJson = challengeConfiguration.Json,
-                ConfigurationRevision = challengeConfiguration.Revision
-            }).SingleOrDefaultAsync(cancellationToken);
+                item.Competition.Status,
+                item.Competition.Mode,
+                item.Competition.EndTime,
+                CompetitionDeleted = item.Competition.Deletion.IsDeleted,
+                ChallengeDeleted = item.Instance.Deletion.IsDeleted || item.Challenge.Deletion.IsDeleted,
+                TeamDeleted = item.Team.Deletion.IsDeleted,
+                item.Team.RegistrationStatus,
+                item.Instance.ConfigurationJson,
+                ConfigurationRevision = item.Instance.Revision
+            })
+            .SingleOrDefaultAsync(cancellationToken);
         if (lockedStatus != CompetitionStatus.Running
             || scope is null || scope.Status != CompetitionStatus.Running
             || scope.Mode != GameMode.Penetration || scope.CompetitionDeleted
@@ -76,7 +78,7 @@ public sealed class EfPenetrationRuntimeFlagPreparation(
         {
             Id = challengeInstanceId,
             CompetitionId = command.CompetitionId,
-            ChallengeId = command.ChallengeId,
+            CompetitionChallengeId = command.CompetitionChallengeId,
             TeamId = teamId,
             Provider = request.Provider,
             Receipt = string.Empty,
@@ -103,7 +105,7 @@ public sealed class EfPenetrationRuntimeFlagPreparation(
             {
                 Id = Guid.CreateVersion7(validStart),
                 CompetitionId = command.CompetitionId,
-                ChallengeId = command.ChallengeId,
+                CompetitionChallengeId = command.CompetitionChallengeId,
                 TeamId = teamId,
                 StageId = stage.Id,
                 ChallengeInstanceId = challengeInstanceId,

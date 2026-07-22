@@ -11,6 +11,12 @@ public enum AwdpCheckOutcome
     PlatformFailure
 }
 
+public enum AwdpVerificationPhase
+{
+    Patch,
+    Checker
+}
+
 public sealed record AwdpCheckDecision(
     AwdpCheckOutcome Outcome,
     ScoringResult Result,
@@ -24,7 +30,9 @@ public interface IAwdpCheckExitCodeMapper
 public sealed record RecordAwdpCheckResultCommand(
     Guid CompetitionId,
     Guid TeamId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
+    Guid SubmissionId,
+    AwdpVerificationPhase Phase,
     int ExitCode,
     bool TimedOut,
     DateTimeOffset OccurredAt,
@@ -51,16 +59,26 @@ public sealed class RecordAwdpCheckResult(
             return new(Guid.Empty, false, SystemScoringEventRecordFailure.CompetitionNotFound);
         if (mode is not NoCTF.Domain.Competitions.GameMode.Awdp)
             return new(Guid.Empty, false, SystemScoringEventRecordFailure.CompetitionModeMismatch);
-        var decision = mapper.Map(command.ExitCode, command.TimedOut);
+        var decision = command.Phase == AwdpVerificationPhase.Patch
+            ? MapPatch(command.ExitCode, command.TimedOut)
+            : mapper.Map(command.ExitCode, command.TimedOut);
         return await record.ExecuteAwdpCheckAsync(new(
             command.CompetitionId,
             command.TeamId,
-            command.ChallengeId,
+            command.CompetitionChallengeId,
             ScoringEventKind.AwdpFixCheck,
             decision.Result,
             decision.FailureCode,
             command.OccurredAt,
             "awdp-check-v1",
-            command.SourceKey), cancellationToken);
+            command.SourceKey,
+            SubmissionId: command.SubmissionId), cancellationToken);
     }
+
+
+    private static AwdpCheckDecision MapPatch(int exitCode, bool timedOut) => timedOut
+        ? new(AwdpCheckOutcome.FixRuleViolation, ScoringResult.Rejected, ScoringFailureCode.AwdpPatchTimeout)
+        : exitCode == 0
+            ? new(AwdpCheckOutcome.FixSuccess, ScoringResult.Correct, null)
+            : new(AwdpCheckOutcome.FixRuleViolation, ScoringResult.Rejected, ScoringFailureCode.AwdpPatchFailed);
 }

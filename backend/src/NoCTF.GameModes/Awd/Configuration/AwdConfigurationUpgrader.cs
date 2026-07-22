@@ -9,8 +9,17 @@ public static class AwdConfigurationUpgrader
         VersionedConfiguration.Parse<AwdConfiguration>(json, AwdConfiguration.CurrentSchemaVersion, Upgrade);
 
     public static AwdChallengeConfiguration ParseChallenge(string json) =>
-        VersionedConfiguration.Parse<AwdChallengeConfiguration>(json, AwdChallengeConfiguration.CurrentSchemaVersion, Upgrade);
+        VersionedConfiguration.Parse<AwdChallengeConfiguration>(json, AwdChallengeConfiguration.CurrentSchemaVersion, UpgradeChallenge);
 
     private static JsonObject Upgrade(JsonObject root, int fromVersion) =>
         throw new GameModeConfigurationException($"AWD schemaVersion {fromVersion} has no registered upgrader.");
+
+    private static JsonObject UpgradeChallenge(JsonObject root, int fromVersion)
+    {
+        if (fromVersion != 1)
+            throw new GameModeConfigurationException($"AWD challenge schemaVersion {fromVersion} has no registered upgrader.");
+        root["checker"] = null;
+        root["schemaVersion"] = 2;
+        return root;
+    }
 }

@@ -58,7 +58,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
                      .OrderBy(fact => fact.ReceivedAt)
                      .ThenBy(fact => fact.SubmissionId))
         {
-            if (fact.ChallengeId is Guid challengeId && challenges.Count > 0 && !challenges.ContainsKey(challengeId))
+            if (fact.CompetitionChallengeId is Guid challengeId && challenges.Count > 0 && !challenges.ContainsKey(challengeId))
                 continue;
             var observation = SubmissionObservation(input.Mode, fact, challenges);
             if (observation is not null) observations.Add(observation);
@@ -80,7 +80,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
         IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges)
     {
         var succeeded = fact.Event.Result == ScoringResult.Correct;
-        var challengeId = fact.ChallengeId;
+        var challengeId = fact.CompetitionChallengeId;
         var challengeLabel = challengeId is Guid id && challenges.TryGetValue(id, out var challenge)
             ? challenge.Direction
             : string.Empty;
@@ -106,7 +106,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
         IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges)
     {
         var teamId = scoringEvent.TeamId!.Value;
-        var challengeId = scoringEvent.ChallengeId;
+        var challengeId = scoringEvent.CompetitionChallengeId;
         var label = challengeId is Guid id && challenges.TryGetValue(id, out var challenge)
             ? challenge.Direction
             : string.Empty;

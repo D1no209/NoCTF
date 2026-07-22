@@ -18,7 +18,7 @@ public sealed record AwdpConfiguration(
     long ViolationPenalty = 0,
     long ServiceDownPenalty = 0)
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 1;
 }
 
 public sealed record AwdpChallengeConfiguration(
@@ -28,7 +28,13 @@ public sealed record AwdpChallengeConfiguration(
     bool RequireBreakBeforeFix,
     int MaxBreakAttempts,
     int MaxFixAttempts,
-    ChallengeRuntimeTemplate? Runtime = null)
+    ChallengeRuntimeTemplate? Runtime = null,
+    string PatchEntrypoint = "fix.sh",
+    IReadOnlyList<string>? PatchCommand = null,
+    int PatchTimeoutSeconds = 60,
+    RunnerJobConfiguration? Checker = null,
+    int TargetPort = 0,
+    int ReadyTimeoutSeconds = 30)
 {
     public const int CurrentSchemaVersion = 1;
 }

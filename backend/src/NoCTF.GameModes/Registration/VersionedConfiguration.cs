@@ -32,6 +32,23 @@ internal static class VersionedConfiguration
                 ?? throw new GameModeConfigurationException("An upgrader did not set schemaVersion.");
         }
 
+        return Deserialize<T>(root);
+    }
+
+    internal static T ParseCurrent<T>(string json, int currentVersion)
+    {
+        var root = JsonNode.Parse(json)?.AsObject()
+            ?? throw new GameModeConfigurationException("Configuration must be a JSON object.");
+        var version = root["schemaVersion"]?.GetValue<int>()
+            ?? throw new GameModeConfigurationException("schemaVersion is required.");
+        if (version != currentVersion)
+            throw new GameModeConfigurationException(
+                $"schemaVersion {version} is unsupported; expected {currentVersion} during V0.");
+        return Deserialize<T>(root);
+    }
+
+    private static T Deserialize<T>(JsonObject root)
+    {
         try
         {
             return root.Deserialize<T>(StrictOptions)

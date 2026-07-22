@@ -6,7 +6,7 @@ using ApplicationFixVerificationStatus = NoCTF.Application.Submissions.Processin
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 /// <summary>Explicitly fails Fix verification until a configured Runner verifier is available.</summary>
-public sealed class UnavailableFixSubmissionVerifier : IFixSubmissionVerifier
+public sealed class UnavailableFixSubmissionVerifier : IRunnerFixSubmissionVerifier
 {
     public Task<FixVerificationResult> VerifyAsync(
         FixSubmissionReceived submission,

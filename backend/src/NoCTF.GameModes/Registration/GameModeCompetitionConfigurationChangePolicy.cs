@@ -44,8 +44,8 @@ public sealed class GameModeCompetitionConfigurationChangePolicy : ICompetitionC
 
     private static bool Awdp(string currentJson, string proposedJson)
     {
-        var current = NoCTF.GameModes.Awdp.Configuration.AwdpConfigurationUpgrader.ParseCompetition(currentJson);
-        var proposed = NoCTF.GameModes.Awdp.Configuration.AwdpConfigurationUpgrader.ParseCompetition(proposedJson);
+        var current = NoCTF.GameModes.Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(currentJson);
+        var proposed = NoCTF.GameModes.Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(proposedJson);
         return current.RoundDurationSeconds == proposed.RoundDurationSeconds
                && current.Break.Settlement == proposed.Break.Settlement
                && current.Fix.Settlement == proposed.Fix.Settlement;

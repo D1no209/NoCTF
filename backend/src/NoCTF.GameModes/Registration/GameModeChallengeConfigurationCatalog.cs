@@ -25,7 +25,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             new AwdpChallengeConfiguration(
                 AwdpChallengeConfiguration.CurrentSchemaVersion,
                 new(AchievementSettlement.PerRound, 50),
-                new(AchievementSettlement.PerRound, 50),
+                null,
                 true,
                 10,
                 10),
@@ -47,7 +47,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             {
                 GameMode.Ctf => CtfConfigurationValidator.Validate(CtfConfigurationUpgrader.ParseChallenge(json)),
                 GameMode.Awd => AwdConfigurationValidator.Validate(AwdConfigurationUpgrader.ParseChallenge(json)),
-                GameMode.Awdp => AwdpConfigurationValidator.Validate(AwdpConfigurationUpgrader.ParseChallenge(json)),
+                GameMode.Awdp => AwdpConfigurationValidator.Validate(AwdpConfigurationParser.ParseChallenge(json)),
                 GameMode.Koh => KohConfigurationValidator.Validate(KohConfigurationUpgrader.ParseChallenge(json)),
                 GameMode.Penetration => PenetrationConfigurationValidator.Validate(
                     PenetrationConfigurationUpgrader.ParseChallenge(json)),

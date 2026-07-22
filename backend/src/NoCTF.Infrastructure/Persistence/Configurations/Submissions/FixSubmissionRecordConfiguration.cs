@@ -15,7 +15,7 @@ internal sealed class FixSubmissionRecordConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.VerifierVersion).HasMaxLength(128);
         builder.Property(x => x.RowVersion).IsConcurrencyToken();
         builder.HasIndex(x => x.SubmissionId).IsUnique();
-        builder.HasIndex(x => new { x.CompetitionId, x.TeamId, x.ChallengeId, x.ExpiresAt });
+        builder.HasIndex(x => new { x.CompetitionId, x.TeamId, x.CompetitionChallengeId, x.ExpiresAt });
         builder.HasOne(x => x.Submission).WithMany().HasForeignKey(x => x.SubmissionId)
             .OnDelete(DeleteBehavior.Restrict);
     }

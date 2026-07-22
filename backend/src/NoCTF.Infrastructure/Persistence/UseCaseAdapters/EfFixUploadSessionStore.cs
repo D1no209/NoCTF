@@ -19,7 +19,7 @@ public sealed class EfFixUploadSessionStore(NoCtfDbContext db, IObjectStorage st
         if (status != CompetitionStatus.Running)
             return FixUploadCreationResult.Rejected(FixUploadCreationFailure.AdmissionChanged);
         var currentAdmission = await SubmissionAdmissionPersistence.LoadAsync(
-            db, command.CompetitionId, command.TeamId, command.ChallengeId, command.UserId,
+            db, command.CompetitionId, command.TeamId, command.CompetitionChallengeId, command.UserId,
             command.RequestedAt, ct);
         if (!SubmissionAdmissionPersistence.Matches(expectedAdmission, currentAdmission))
             return FixUploadCreationResult.Rejected(FixUploadCreationFailure.AdmissionChanged);
@@ -29,7 +29,8 @@ public sealed class EfFixUploadSessionStore(NoCtfDbContext db, IObjectStorage st
         var objectKey = $"fix/{command.CompetitionId:N}/{uploadId:N}";
         db.FixSubmissionRecords.Add(new FixSubmissionRecord
         {
-            UploadId = uploadId, CompetitionId = command.CompetitionId, TeamId = command.TeamId, ChallengeId = command.ChallengeId,
+            UploadId = uploadId, CompetitionId = command.CompetitionId, TeamId = command.TeamId,
+            CompetitionChallengeId = command.CompetitionChallengeId,
             ObjectKey = objectKey, ExpiresAt = expiresAt, VerificationStatus = FixVerificationStatus.AuthorizationPending,
             ObjectMetadata = JsonSerializer.Serialize(new { command.FileName, command.ContentType, command.Length, command.Sha256, command.UserId }),
             CreatedAt = command.RequestedAt, UpdatedAt = command.RequestedAt
@@ -78,7 +79,7 @@ public sealed class EfFixUploadSessionStore(NoCtfDbContext db, IObjectStorage st
     public async Task<FixUploadMetadata?> GetAuthorizedMetadataAsync(Guid uploadId, Guid competitionId, Guid teamId, Guid challengeId, Guid userId, DateTimeOffset now, CancellationToken ct)
     {
         var item = await db.FixSubmissionRecords.AsNoTracking().SingleOrDefaultAsync(x => x.UploadId == uploadId
-            && x.CompetitionId == competitionId && x.TeamId == teamId && x.ChallengeId == challengeId
+            && x.CompetitionId == competitionId && x.TeamId == teamId && x.CompetitionChallengeId == challengeId
             && x.VerificationStatus == FixVerificationStatus.Created
             && x.SubmissionId == null && x.ExpiresAt > now, ct);
         if (item is null || string.IsNullOrWhiteSpace(item.ObjectMetadata)) return null;

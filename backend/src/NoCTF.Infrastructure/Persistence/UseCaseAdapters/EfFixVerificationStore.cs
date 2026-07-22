@@ -110,6 +110,21 @@ public sealed class EfFixVerificationStore(NoCtfDbContext db) : IFixVerification
         return records.Count;
     }
 
+    public async Task<FixVerificationResult?> GetCompletedAsync(Guid submissionId, CancellationToken ct)
+    {
+        var record = await db.FixSubmissionRecords.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.SubmissionId == submissionId, ct);
+        if (record is null) return null;
+        var status = record.VerificationStatus switch
+        {
+            DomainFixVerificationStatus.Valid => ApplicationFixVerificationStatus.Valid,
+            DomainFixVerificationStatus.TeamFailure => ApplicationFixVerificationStatus.TeamFailure,
+            DomainFixVerificationStatus.PlatformFailed => ApplicationFixVerificationStatus.PlatformFailed,
+            _ => (ApplicationFixVerificationStatus?)null
+        };
+        return status is null ? null : new(status.Value, record.FailureCategory);
+    }
+
     private static FixSubmissionReceived ToReceived(FixSubmissionRecord record)
     {
         var submission = record.Submission!;
@@ -126,7 +141,7 @@ public sealed class EfFixVerificationStore(NoCtfDbContext db) : IFixVerification
             submission.Id,
             submission.CompetitionId,
             submission.TeamId!.Value,
-            submission.ChallengeId!.Value,
+            submission.CompetitionChallengeId!.Value,
             submission.UserId!.Value,
             record.UploadId,
             submission.IdempotencyKey ?? string.Empty,

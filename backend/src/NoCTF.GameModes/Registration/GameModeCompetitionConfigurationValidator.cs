@@ -13,7 +13,7 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             {
                 GameMode.Ctf => Ctf.Configuration.CtfConfigurationValidator.Validate(Ctf.Configuration.CtfConfigurationUpgrader.ParseCompetition(json)),
                 GameMode.Awd => Awd.Configuration.AwdConfigurationValidator.Validate(Awd.Configuration.AwdConfigurationUpgrader.ParseCompetition(json)),
-                GameMode.Awdp => Awdp.Configuration.AwdpConfigurationValidator.Validate(Awdp.Configuration.AwdpConfigurationUpgrader.ParseCompetition(json)),
+                GameMode.Awdp => Awdp.Configuration.AwdpConfigurationValidator.Validate(Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(json)),
                 GameMode.Koh => Koh.Configuration.KohConfigurationValidator.Validate(Koh.Configuration.KohConfigurationUpgrader.ParseCompetition(json)),
                 GameMode.Penetration => ValidatePenetration(json),
                 _ => ["Unsupported game mode."]

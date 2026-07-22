@@ -13,7 +13,7 @@ public static partial class SubmissionMapper
     [MapProperty(nameof(SubmissionStatusView.Result), nameof(SubmissionStatusResponse.State))]
     [MapperIgnoreSource(nameof(SubmissionStatusView.CompetitionId))]
     [MapperIgnoreSource(nameof(SubmissionStatusView.TeamId))]
-    [MapperIgnoreSource(nameof(SubmissionStatusView.ChallengeId))]
+    [MapperIgnoreSource(nameof(SubmissionStatusView.CompetitionChallengeId))]
     [MapperIgnoreSource(nameof(SubmissionStatusView.EvaluatorVersion))]
     public static partial SubmissionStatusResponse ToStatusResponse(SubmissionStatusView view);
 

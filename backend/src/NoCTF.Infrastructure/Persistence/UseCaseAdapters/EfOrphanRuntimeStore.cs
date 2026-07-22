@@ -26,8 +26,8 @@ public sealed class EfOrphanRuntimeStore(
                                   || competition.Status == CompetitionStatus.Paused)
             .Select(competition => competition.Id)
             .ToHashSetAsync(cancellationToken);
-        var validChallenges = await db.Challenges.AsNoTracking()
-            .Where(challenge => challenge.IsPublished)
+        var validChallenges = await db.CompetitionChallenges.AsNoTracking()
+            .Where(challenge => challenge.IsPublished && !challenge.Deletion.IsDeleted)
             .Select(challenge => new { challenge.Id, challenge.CompetitionId })
             .ToDictionaryAsync(challenge => challenge.Id, challenge => challenge.CompetitionId, cancellationToken);
         var validTeams = await db.Teams.AsNoTracking()
@@ -37,15 +37,15 @@ public sealed class EfOrphanRuntimeStore(
 
         var latest = instances
             .Where(instance => IsValid(instance, validCompetitions, validChallenges, validTeams, now))
-            .GroupBy(instance => new { instance.CompetitionId, instance.ChallengeId, instance.TeamId })
+            .GroupBy(instance => new { instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId })
             .ToDictionary(
-                group => (group.Key.CompetitionId, group.Key.ChallengeId, group.Key.TeamId),
+                group => (group.Key.CompetitionId, group.Key.CompetitionChallengeId, group.Key.TeamId),
                 group => group.OrderByDescending(instance => instance.CreatedAt)
                     .ThenByDescending(instance => instance.Id)
                     .First().Id);
         return instances
             .Where(instance => !IsValid(instance, validCompetitions, validChallenges, validTeams, now)
-                               || latest.GetValueOrDefault((instance.CompetitionId, instance.ChallengeId, instance.TeamId)) != instance.Id)
+                               || latest.GetValueOrDefault((instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId)) != instance.Id)
             .Select(instance => new RuntimeCleanupTarget(
                 instance.Id,
                 string.IsNullOrWhiteSpace(instance.Receipt)
@@ -85,7 +85,7 @@ public sealed class EfOrphanRuntimeStore(
         validCompetitions.Contains(instance.CompetitionId)
         && IsPreparedPlaceholderWithinLease(instance, now, policyOptions.ClaimLeaseGrace)
         && instance.Status != RuntimeStatus.Failed
-        && validChallenges.GetValueOrDefault(instance.ChallengeId) == instance.CompetitionId
+        && validChallenges.GetValueOrDefault(instance.CompetitionChallengeId) == instance.CompetitionId
         && (instance.TeamId is null
             || validTeams.GetValueOrDefault(instance.TeamId.Value) == instance.CompetitionId)
         && (instance.ExpiresAt is null || instance.ExpiresAt > now);

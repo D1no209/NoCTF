@@ -22,7 +22,7 @@ public sealed record SubmissionStatusResponse(
 public sealed record AdminSubmissionStatusResponse(
     Guid SubmissionId,
     Guid? TeamId,
-    Guid? ChallengeId,
+    Guid? CompetitionChallengeId,
     SubmissionKind Kind,
     ScoringResult? Result,
     ScoringFailureCode? FailureCode,

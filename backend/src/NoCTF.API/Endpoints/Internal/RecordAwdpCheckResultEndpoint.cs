@@ -10,7 +10,9 @@ public sealed class RecordAwdpCheckResultRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
-    public Guid ChallengeId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+    public Guid SubmissionId { get; set; }
+    public AwdpVerificationPhase Phase { get; set; }
     public int ExitCode { get; set; }
     public bool TimedOut { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
@@ -29,14 +31,14 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordAwdpCheckResult record)
 {
     public override void Configure()
     {
-        Post("/internal/competitions/{competitionId}/awdp-check-results");
+        Post("/internal/competitions/{competitionId}/awdp-verification-results");
         AuthSchemes("RunnerScoringBearer");
         Policies("ScoringInput");
         Description(builder => builder.ProducesProblemFE(StatusCodes.Status400BadRequest)
             .ProducesProblemFE(StatusCodes.Status404NotFound)
             .ProducesProblemFE(StatusCodes.Status409Conflict)
             .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
-        Summary(summary => summary.Summary = "Map an AWDP checker exit code to an idempotent score-free fact.");
+        Summary(summary => summary.Summary = "Map an AWDP patch/checker result to an idempotent score-free fact.");
     }
 
     public override async Task<Results<Created<SystemScoringEventResponse>, Ok<SystemScoringEventResponse>, ProblemHttpResult>> ExecuteAsync(
@@ -44,7 +46,7 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordAwdpCheckResult record)
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        if (request.TeamId == Guid.Empty || request.ChallengeId == Guid.Empty
+        if (request.TeamId == Guid.Empty || request.CompetitionChallengeId == Guid.Empty || request.SubmissionId == Guid.Empty
             || string.IsNullOrWhiteSpace(request.SourceKey) || request.SourceKey.Length > 256)
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid AWDP check result.");
         try

@@ -45,7 +45,7 @@ public sealed class EfSubmissionProcessor(
         var scoringEvent = new ScoringEvent
         {
             Id = Guid.CreateVersion7(now), CompetitionId = submission.CompetitionId, TeamId = teamId,
-            ChallengeId = competitionChallengeId, CompetitionChallengeId = competitionChallengeId,
+            CompetitionChallengeId = competitionChallengeId,
             SubmissionId = submission.Id, Kind = ScoringEventKind.SubmissionEvaluation,
             Result = result.Result, FailureCode = result.FailureCode, OccurredAt = result.OccurredAt,
             ProcessedAt = now, ProcessedWorkerId = Environment.MachineName, EvaluatorVersion = result.EvaluatorVersion, CreatedAt = now
@@ -111,6 +111,7 @@ public sealed class EfSubmissionProcessor(
             ? submission.SubjectTeamId ?? submission.VictimTeamId
             : submission.TeamId;
         var flags = await db.ChallengeFlags.Where(x => x.CompetitionId == submission.CompetitionId
+            && x.Status == NoCTF.Domain.Challenges.ChallengeFlagStatus.Active
             && x.CompetitionChallengeId == submission.CompetitionChallengeId
             && (x.TeamId == null || x.TeamId == flagTeamId)).ToListAsync(ct);
         var fix = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id, ct);

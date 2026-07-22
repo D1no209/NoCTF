@@ -128,6 +128,7 @@ public class FixVerificationTests
         public bool Completed { get; private set; }
         public string? Version { get; private set; }
         public FixVerificationResult? Result { get; private set; }
+        public FixVerificationResult? CallbackResult { get; init; }
 
         public Task<FixVerificationContext?> BeginVerifyingAsync(
             Guid submissionId, DateTimeOffset now, CancellationToken cancellationToken) =>
@@ -165,6 +166,9 @@ public class FixVerificationTests
             ExpiredAt = now;
             return Task.FromResult(ExpiredCount);
         }
+
+        public Task<FixVerificationResult?> GetCompletedAsync(Guid submissionId, CancellationToken cancellationToken) =>
+            Task.FromResult(CallbackResult);
     }
 
     private sealed class Verifier(FixVerificationResult result) : IFixSubmissionVerifier

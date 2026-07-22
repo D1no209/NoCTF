@@ -7,7 +7,7 @@ namespace NoCTF.Application.Challenges.Flags;
 
 public sealed record CreateChallengeFlagCommand(
     Guid CompetitionId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid? TeamId,
     string Flag,
     DateTimeOffset? ValidStart,
@@ -17,12 +17,12 @@ public sealed record CreateChallengeFlagCommand(
     Guid? ChallengeInstanceId = null)
 {
     public override string ToString() =>
-        $"{nameof(CreateChallengeFlagCommand)} {{ CompetitionId = {CompetitionId}, ChallengeId = {ChallengeId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
+        $"{nameof(CreateChallengeFlagCommand)} {{ CompetitionId = {CompetitionId}, CompetitionChallengeId = {CompetitionChallengeId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
 }
 
 public sealed record UpdateChallengeFlagCommand(
     Guid CompetitionId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid FlagId,
     Guid? TeamId,
     string Flag,
@@ -34,13 +34,13 @@ public sealed record UpdateChallengeFlagCommand(
     Guid? ChallengeInstanceId = null)
 {
     public override string ToString() =>
-        $"{nameof(UpdateChallengeFlagCommand)} {{ CompetitionId = {CompetitionId}, ChallengeId = {ChallengeId}, FlagId = {FlagId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
+        $"{nameof(UpdateChallengeFlagCommand)} {{ CompetitionId = {CompetitionId}, CompetitionChallengeId = {CompetitionChallengeId}, FlagId = {FlagId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
 }
 
 public sealed record ChallengeFlagView(
     Guid Id,
     Guid CompetitionId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid? TeamId,
     string Flag,
     DateTimeOffset? ValidStart,
@@ -52,7 +52,7 @@ public sealed record ChallengeFlagView(
     Guid? ChallengeInstanceId = null)
 {
     public override string ToString() =>
-        $"{nameof(ChallengeFlagView)} {{ Id = {Id}, CompetitionId = {CompetitionId}, ChallengeId = {ChallengeId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
+        $"{nameof(ChallengeFlagView)} {{ Id = {Id}, CompetitionId = {CompetitionId}, CompetitionChallengeId = {CompetitionChallengeId}, TeamId = {TeamId}, Flag = [REDACTED] }}";
 }
 
 public sealed record ChallengeFlagScope(
@@ -78,7 +78,7 @@ public interface IChallengeFlagStore
 {
     Task<ChallengeFlagScope?> LoadScopeAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         Guid? teamId,
         Guid? stageId,
         Guid? challengeInstanceId,
@@ -86,12 +86,12 @@ public interface IChallengeFlagStore
 
     Task<IReadOnlyList<ChallengeFlagView>> ListAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         CancellationToken cancellationToken);
 
     Task<ChallengeFlagView?> FindAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         Guid flagId,
         CancellationToken cancellationToken);
 
@@ -105,7 +105,7 @@ public interface IChallengeFlagStore
 
     Task<ChallengeFlagMutationFailure?> DeleteAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         Guid flagId,
         long expectedRowVersion,
         CancellationToken cancellationToken);
@@ -131,19 +131,19 @@ public sealed class ListChallengeFlags(IChallengeFlagStore store)
 {
     public Task<IReadOnlyList<ChallengeFlagView>> ExecuteAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         CancellationToken ct = default) =>
-        store.ListAsync(competitionId, challengeId, ct);
+        store.ListAsync(competitionId, competitionChallengeId, ct);
 }
 
 public sealed class GetChallengeFlag(IChallengeFlagStore store)
 {
     public Task<ChallengeFlagView?> ExecuteAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         Guid flagId,
         CancellationToken ct = default) =>
-        store.FindAsync(competitionId, challengeId, flagId, ct);
+        store.FindAsync(competitionId, competitionChallengeId, flagId, ct);
 }
 
 public sealed class CreateChallengeFlag(
@@ -163,7 +163,7 @@ public sealed class CreateChallengeFlag(
         if (validation is not null)
             return OperationResult<ChallengeFlagView>.Failure(validation.Value.Code, validation.Value.Message);
 
-        var scope = await store.LoadScopeAsync(command.CompetitionId, command.ChallengeId, command.TeamId,
+        var scope = await store.LoadScopeAsync(command.CompetitionId, command.CompetitionChallengeId, command.TeamId,
             command.StageId, command.ChallengeInstanceId, ct);
         var scopeError = ChallengeFlagPolicy.ValidateScope(
             scope, command.TeamId, command.StageId, command.ChallengeInstanceId);
@@ -198,7 +198,7 @@ public sealed class UpdateChallengeFlag(
         if (validation is not null)
             return OperationResult<ChallengeFlagView>.Failure(validation.Value.Code, validation.Value.Message);
 
-        var scope = await store.LoadScopeAsync(command.CompetitionId, command.ChallengeId, command.TeamId,
+        var scope = await store.LoadScopeAsync(command.CompetitionId, command.CompetitionChallengeId, command.TeamId,
             command.StageId, command.ChallengeInstanceId, ct);
         var scopeError = ChallengeFlagPolicy.ValidateScope(
             scope, command.TeamId, command.StageId, command.ChallengeInstanceId);
@@ -223,7 +223,7 @@ public sealed class DeleteChallengeFlag(
 {
     public async Task<OperationResult> ExecuteAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         Guid flagId,
         long expectedRowVersion,
         CancellationToken ct = default)
@@ -232,13 +232,13 @@ public sealed class DeleteChallengeFlag(
             return OperationResult.Failure("invalid_row_version", "Expected RowVersion cannot be negative.");
 
         var scope = await store.LoadScopeAsync(
-            competitionId, challengeId, teamId: null, stageId: null, challengeInstanceId: null, ct);
+            competitionId, competitionChallengeId, teamId: null, stageId: null, challengeInstanceId: null, ct);
         var scopeError = ChallengeFlagPolicy.ValidateScope(
             scope, teamId: null, stageId: null, challengeInstanceId: null, validateDimensions: false);
         if (scopeError is not null)
             return OperationResult.Failure(scopeError.Value.Code, scopeError.Value.Message);
 
-        var failure = await store.DeleteAsync(competitionId, challengeId, flagId, expectedRowVersion, ct);
+        var failure = await store.DeleteAsync(competitionId, competitionChallengeId, flagId, expectedRowVersion, ct);
         if (failure is not null)
             return OperationResult.Failure(ChallengeFlagMutationFailureProtocol.Code(failure.Value), "Challenge Flag was not deleted.");
 

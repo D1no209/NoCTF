@@ -1,4 +1,6 @@
 using NoCTF.GameModes.Penetration.Configuration;
+using NoCTF.GameModes.Penetration;
+using System.Text.Json;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -60,5 +62,25 @@ public class PenetrationConfigurationValidatorTests
 
         await Assert.That(PenetrationConfigurationValidator.Validate(configuration))
             .Contains(item => item.Contains("InjectionKey", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task Stage_progress_DetectsAllStagesCompleted()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var json = JsonSerializer.Serialize(new PenetrationChallengeConfiguration(
+            1,
+            [new(first, 1, "First", [], null), new(second, 2, "Second", [first], null)]),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var catalog = new PenetrationStageConfigurationCatalog();
+
+        var partial = catalog.GetProgress(json, new HashSet<Guid> { first });
+        var complete = catalog.GetProgress(json, new HashSet<Guid> { first, second });
+
+        await Assert.That(partial.AllCompleted).IsFalse();
+        await Assert.That(partial.RemainingStageIds).IsEquivalentTo([second]);
+        await Assert.That(complete.AllCompleted).IsTrue();
+        await Assert.That(complete.RemainingStageIds).IsEmpty();
     }
 }

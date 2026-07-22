@@ -34,7 +34,7 @@ public enum RuntimeProvisionFailure
 
 public sealed record RuntimeOperationFailureContext(
     RuntimeProvisionFailure Failure,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid? TeamId,
     DateTimeOffset? ExpiresAt,
     ContainerReceipt? CleanupReceipt = null);
@@ -54,7 +54,7 @@ public interface IRuntimeOperationStore
     Task<bool> CompleteAsync(
         RuntimeOperationLease lease,
         ContainerReceipt receipt,
-        Guid challengeId,
+        Guid competitionChallengeId,
         Guid? teamId,
         Guid challengeInstanceId,
         DateTimeOffset? expiresAt,
@@ -70,7 +70,7 @@ public interface IRuntimeOperationStore
 
 public sealed record ProvisionChallengeRuntimeCommand(
     Guid CompetitionId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid? TeamId,
     string OperationKey,
     ContainerRequest Container,
@@ -229,7 +229,7 @@ public sealed class ChallengeRuntimeProvisioner(
             if (await operations.CompleteAsync(
                     lease,
                     receipt,
-                    command.ChallengeId,
+                    command.CompetitionChallengeId,
                     command.TeamId,
                     challengeInstanceId,
                     expiresAt,
@@ -274,7 +274,7 @@ public sealed class ChallengeRuntimeProvisioner(
                     operationLease,
                     new(
                         failure,
-                        provisionCommand.ChallengeId,
+                        provisionCommand.CompetitionChallengeId,
                         provisionCommand.TeamId,
                         operationExpiresAt,
                         cleanupReceipt),

@@ -16,7 +16,7 @@ public sealed class UpdateChallengeConfigurationEndpoint(
 {
     public override void Configure()
     {
-        Put("/admin/competitions/{competitionId}/challenges/{challengeId}/configuration");
+        Put("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration");
         AuthSchemes("Bearer");
         Summary(summary => summary.Summary = "Updates a challenge configuration using optimistic concurrency.");
     }
@@ -25,13 +25,13 @@ public sealed class UpdateChallengeConfigurationEndpoint(
         ExecuteAsync(UpdateChallengeConfigurationRequest request, CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        request.ChallengeId = Route<Guid>("challengeId");
+        request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
         if (!await authorizer.CanModerateAsync(user.UserId, request.CompetitionId, ct))
             return TypedResults.Forbid();
 
         var result = await update.ExecuteAsync(
             request.CompetitionId,
-            request.ChallengeId,
+            request.CompetitionChallengeId,
             request.ExpectedRevision,
             request.Json,
             DateTimeOffset.UtcNow,

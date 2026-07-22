@@ -25,12 +25,14 @@ public sealed class DefaultEfSubmissionEvaluator : ISubmissionEvaluator
                 },
                 submission.ReceivedAt, "ef-v1");
         }
-        var duplicate = context.PriorEvents.Any(x => x.TeamId == submission.TeamId && x.ChallengeId == submission.ChallengeId && x.Result == ScoringResult.Correct);
+        var duplicate = context.PriorEvents.Any(x => x.TeamId == submission.TeamId
+            && x.CompetitionChallengeId == submission.CompetitionChallengeId
+            && x.Result == ScoringResult.Correct);
         FlagFingerprint? fingerprint = submission.FlagHash is not null && submission.FlagLength is { } length
             ? new FlagFingerprint(submission.FlagHash, length)
             : null;
         var correct = context.ApplicableFlags.Any(x =>
-            (fingerprint?.Matches(x.Flag) == true || submission.LegacyFlag == x.Flag)
+            fingerprint?.Matches(x.Flag) == true
             && (x.TeamId is null || x.TeamId == submission.TeamId)
             && (x.ValidStart is null || x.ValidStart <= submission.ReceivedAt)
             && (x.ValidEnd is null || x.ValidEnd >= submission.ReceivedAt));

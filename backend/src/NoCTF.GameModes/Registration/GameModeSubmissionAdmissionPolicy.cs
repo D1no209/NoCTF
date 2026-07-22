@@ -32,7 +32,7 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
 
     private static SubmissionAdmissionRules AwdpRules(string json)
     {
-        var configuration = Awdp.Configuration.AwdpConfigurationUpgrader.ParseChallenge(json);
+        var configuration = Awdp.Configuration.AwdpConfigurationParser.ParseChallenge(json);
         return new(
             configuration.Break is not null,
             configuration.Fix is not null,

@@ -23,7 +23,7 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
             var snapshot = await store.LoadAdmissionAsync(
                 command.CompetitionId,
                 command.TeamId,
-                command.ChallengeId,
+                command.CompetitionChallengeId,
                 command.UserId,
                 cancellationToken);
             if (snapshot is null)
@@ -49,7 +49,7 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
                     "penetration_stage_not_allowed", "Stage identifiers are allowed only for Penetration submissions.");
 
             var existing = await store.FindAcceptedAsync(
-                command.CompetitionId, command.IdempotencyKey, command.TeamId, command.ChallengeId,
+                command.CompetitionId, command.IdempotencyKey, command.TeamId, command.CompetitionChallengeId,
                 command.UserId, NoCTF.Domain.Submissions.SubmissionKind.Flag, command.AttackTarget,
                 command.StageId, snapshot.ChallengeInstanceId, fingerprint, cancellationToken);
             var existingResult = MapAcceptance(existing);
@@ -74,7 +74,7 @@ public sealed class SubmitFlag(ISubmissionIntakeStore store, ISubmissionAdmissio
                 SubmissionId = submissionId,
                 CompetitionId = command.CompetitionId,
                 TeamId = command.TeamId,
-                ChallengeId = command.ChallengeId,
+                CompetitionChallengeId = command.CompetitionChallengeId,
                 UserId = command.UserId,
                 FlagFingerprint = fingerprint,
                 IdempotencyKey = command.IdempotencyKey,

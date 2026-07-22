@@ -94,7 +94,7 @@ public class ChallengeFlagManagementTests
     {
         const string secret = "flag{must-not-appear}";
         var command = CreateCommand() with { Flag = secret };
-        var view = View(command.CompetitionId, command.ChallengeId, command.TeamId, secret);
+        var view = View(command.CompetitionId, command.CompetitionChallengeId, command.TeamId, secret);
 
         await Assert.That(command.ToString()).DoesNotContain(secret);
         await Assert.That(view.ToString()).DoesNotContain(secret);
@@ -225,7 +225,7 @@ public class ChallengeFlagManagementTests
             LastCreate = command;
             return Task.FromResult(MutationFailure is null
                 ? new ChallengeFlagMutationResult(
-                    View(command.CompetitionId, command.ChallengeId, command.TeamId, command.Flag,
+                    View(command.CompetitionId, command.CompetitionChallengeId, command.TeamId, command.Flag,
                         command.StageId, command.ChallengeInstanceId),
                     null)
                 : new ChallengeFlagMutationResult(null, MutationFailure));
@@ -235,7 +235,7 @@ public class ChallengeFlagManagementTests
             UpdateChallengeFlagCommand command,
             CancellationToken cancellationToken) => Task.FromResult(MutationFailure is null
                 ? new ChallengeFlagMutationResult(
-                    View(command.CompetitionId, command.ChallengeId, command.TeamId, command.Flag,
+                    View(command.CompetitionId, command.CompetitionChallengeId, command.TeamId, command.Flag,
                         command.StageId, command.ChallengeInstanceId),
                     null)
                 : new ChallengeFlagMutationResult(null, MutationFailure));

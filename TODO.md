@@ -46,7 +46,7 @@
 - [x] 实现 Publish、Pause、Resume、Finish use case。
 - [x] 每个状态转换使用 expected-status 条件更新，保证并发幂等。
 - [x] 状态转换记录 actor、时间和原因审计信息。
-- [ ] 删除独立 `competition_lifecycle_audits` 聚合/DbSet，改为 Competition owned audit 子集合。
+  - [x] 删除独立 `competition_lifecycle_audits` 聚合/DbSet，改为 Competition owned audit 子集合。
 - [x] 状态变化统一 invalidate leaderboard 并 enqueue refresh。
 - [x] Finished 状态触发 runtime cleanup work item。
 - [x] 状态变化发布脱敏 SignalR competition notification。
@@ -100,13 +100,13 @@
 
 ### 2.3 Competition 主表配置
 
-- [ ] 删除 `competition_configurations` 实体/表；将 Mode、Revision、ConfigurationJson、UpdatedAt 并入 `competitions`。
-- [ ] 通用配置使用普通列，模式特有配置使用 `jsonb`。
-- [ ] 实现 mode-specific configuration parser、schemaVersion 校验和 upgrader。
-- [ ] 实现 expected revision optimistic concurrency 和 `409` 冲突响应。
-- [ ] Running 只允许非破坏性配置修改，Finished 拒绝修改。
-- [ ] 配置修改后 invalidate + rebuild。
-- [ ] 为 CTF/AWD/AWDP/KoH/Penetration 建立 validator catalog。
+- [x] 删除 `competition_configurations` 实体/表；将 Mode、Revision、ConfigurationJson、UpdatedAt 并入 `competitions`。
+- [x] 通用配置使用普通列，模式特有配置使用 `jsonb`。
+- [x] 实现 mode-specific configuration parser、schemaVersion 校验和 upgrader。
+- [x] 实现 expected revision optimistic concurrency 和 `409` 冲突响应。
+- [x] Running 只允许非破坏性配置修改，Finished 拒绝修改。
+- [x] 配置修改后 invalidate + rebuild。
+- [x] 为 CTF/AWD/AWDP/KoH/Penetration 建立 validator catalog。
 
 ## 3. Team 报名和成员管理
 
@@ -144,8 +144,8 @@
 - [x] `GET /admin/competitions/{id}/collaborators`。
 - [x] `POST /admin/competitions/{id}/collaborators`。
 - [x] `DELETE /admin/competitions/{id}/collaborators/{userId}`。
-- [ ] 删除独立 `competition_collaborators` 聚合/DbSet，改为 Competition owned collaborator 子集合。
-- [ ] 实现 Owner、Manager、Judge、Observer 权限矩阵。
+- [x] 删除独立 `competition_collaborators` 聚合/DbSet，改为 Competition owned collaborator 子集合。
+- [x] 实现 Owner、Manager、Judge、Observer 权限矩阵。
 - [x] Judge 可 retry/rebuild，但不能修改 Competition owner/config secret。
 - [x] Observer 只能读取管理员视图。
 
@@ -160,19 +160,19 @@
 - [x] 删除 Challenge soft-delete。
 - [x] 调整 Challenge Order。
 - [x] Publish/Unpublish Challenge。
-- [ ] Challenge 改为可复用全局题库模板，移除 `CompetitionId`、比赛 Order、发布状态和比赛配置字段。
+- [x] Challenge 改为可复用全局题库模板，移除 `CompetitionId`、比赛 Order、发布状态和比赛配置字段。
 - [x] Challenge 模板附件作为 owned 子集合，内容与比赛无关。
-- [ ] 模板内容修改实时影响引用它的比赛；不复制比赛题快照。
+- [x] 模板内容修改实时影响引用它的比赛；不复制比赛题快照。
 
 ### 4.2 CompetitionChallenge 比赛题实例
 
-- [ ] 删除 `ChallengeConfiguration`/`challenge_configurations`，创建有独立 Id 的 `CompetitionChallenge`。
+- [x] 删除 `ChallengeConfiguration`/`challenge_configurations`，创建有独立 Id 的 `CompetitionChallenge`。
 - [x] `CompetitionChallenge` 同时关联 Competition 和 Challenge 模板。
 - [x] 保存 BaseScore、Order、Published、Revision、mode-specific ConfigurationJson。
 - [x] Hints 作为比赛题 owned 子集合，保存 Content、Cost、PublishedAt。
-- [ ] 按 Competition.Mode 选择 configuration parser、校验 schemaVersion 和 revision concurrency。
-- [ ] 配置修改后 enqueue rebuild 并只刷新受影响 Competition。
-- [ ] CompetitionChallengeId 贯穿 Flag、Submission、ScoringEvent、ChallengeInstance 和 runtime。
+- [x] 按 Competition.Mode 选择 configuration parser、校验 schemaVersion 和 revision concurrency。
+- [x] 配置修改后 enqueue rebuild 并只刷新受影响 Competition。
+- [x] CompetitionChallengeId 贯穿 Flag、Submission、ScoringEvent、ChallengeInstance 和 runtime。
 
 ### 4.3 ChallengeFlag
 
@@ -180,8 +180,8 @@
 - [x] 查询管理员 Flag。
 - [x] 更新 Flag。
 - [x] 删除/失效 Flag。
-- [ ] Flag 关联 `CompetitionChallengeId`，不再只关联模板 `ChallengeId`。
-- [ ] 支持 global Flag 和 Team-specific Flag。
+- [x] Flag 关联 `CompetitionChallengeId`，不再只关联模板 `ChallengeId`。
+- [x] 支持 global Flag 和 Team-specific Flag。
 - [x] 校验 ValidStart/ValidEnd。
 - [x] 阻止同一范围的有效时间窗口冲突。
 - [x] Flag 更新使用 RowVersion。
@@ -218,7 +218,7 @@
 - [x] verifier failure category 映射。
 - [x] runner failure 不写入 Flag 或 archive 内容日志。
 - [x] Fix retry 的旧 event soft-delete 和 record 状态重置规则。
-- [x] 原始 runtime 恢复逻辑。
+- [x] AWDP disposable patch target/check/cleanup；不修改、recreate 或恢复队伍 runtime。
 - [x] CleanupPending 扫描和清理。
 
 ## 7. 五种 GameMode evaluator
@@ -285,17 +285,17 @@
 
 ## 8. Round engine 和 system producer
 
-- [ ] `AwdRoundHostedService`。
-- [ ] `AwdFlagRotationHostedService`。
-- [ ] `AwdCheckerHostedService`。
-- [ ] `AwdRoundSettlementHostedService`。
-- [ ] `AwdpRoundHostedService`。
-- [ ] `AwdpSettlementHostedService`。
+- [x] `AwdRoundHostedService` 当前轮编排。
+- [x] AWD Flag 持久化 claim → stdin inject → activate。
+- [x] AWD checker 持久化 dispatch claim 与 Runner callback。
+- [x] AWD projector settlement；不持久化 round score。
+- [x] `AwdpRoundHostedService` 当前轮 runtime 编排。
+- [x] AWDP projector settlement；不持久化 round score。
 - [x] `KohPollingHostedService`。
 - [x] Penetration stage monitor。
-- [ ] producer 使用 Runner scoring JWT。
+- [x] producer 使用 Runner scoring JWT。
 - [x] producer 使用 stable SourceKey。
-- [ ] producer timeout/retry。
+- [x] producer timeout、archive/callback 1/5/15 秒 retry。
 - [x] producer 不记录 Flag、archive URL 或 secret。
 - [x] Competition Paused 时暂停 producer。
 - [x] Competition Finished 时停止 producer。
@@ -313,8 +313,8 @@
 - [x] runtime operation timeout。
 - [x] Docker runtime 接线。
 - [x] Kubernetes runtime 接线。
-- [ ] AWD game box provision。
-- [ ] AWDP patch/recreate/check 流程。
+- [x] AWD game box provision。
+- [x] AWDP disposable patch target/check/cleanup（Docker 与 Kubernetes）。
 - [ ] KoH agent provision/poll。
 - [x] Penetration stage instance provision。
 - [x] orphan runtime cleanup。
@@ -378,9 +378,9 @@
 - [x] lifecycle publish/pause/resume/finish。
 - [x] Challenge CRUD/publish。
 - [x] Flag CRUD/window update。
-- [ ] Competition 主表 configuration update。
-- [ ] Team owned ordered member management。
-- [ ] Competition owned collaborator management。
+- [x] Competition 主表 configuration update。
+- [x] Team owned ordered member management。
+- [x] Competition owned collaborator management。
 - [x] Admin detailed submission status。
 - [x] Admin retry。
 - [x] Admin rebuild。
@@ -418,12 +418,12 @@
 - [x] Submission idempotency index。
 - [x] Submission stable ordering index。
 - [x] ScoringEvent current/source filtered unique indexes。
-- [ ] 删除 `refresh_sessions` 表和 token hash index；补 Refresh JWT claim/audience 校验。
+- [x] 删除 `refresh_sessions` 表和 token hash index；补 Refresh JWT claim/audience 校验。
 - [x] runtime operation idempotency index。
 - [x] 所有 schema 变更只通过 `dotnet ef migrations add`。
-- [ ] 删除旧 migrations，使用 `dotnet ef migrations` 重新生成唯一 Initial baseline。
+- [x] 删除旧 migrations，使用 `dotnet ef migrations` 重新生成唯一 Initial baseline。
 - [ ] 空 PostgreSQL 执行唯一 baseline；开发/测试数据库直接重建，不做旧数据迁移。
-- [ ] 新模型通过 `dotnet ef migrations has-pending-model-changes`。
+- [x] 新模型通过 `dotnet ef migrations has-pending-model-changes`。
 - [x] 禁止手改 migration/snapshot。
 
 ## 15. 测试
@@ -432,25 +432,25 @@
 
 - [x] Refresh JWT claim、audience、type、30 天 exp 和 token_version 失效。
 - [ ] Team MemberOrder、Captain 转让并发、邀请码生成/唯一性/轮换/直接加入。
-- [ ] CompetitionChallenge 模板复用、配置、BaseScore、Hints 和 schema/revision。
+- [x] CompetitionChallenge 模板复用、配置、BaseScore、Hints 和 schema/revision。
 
-- [ ] lifecycle state machine。
-- [ ] admission status boundary。
-- [ ] MaxAttempt。
-- [ ] Submission idempotency。
-- [ ] Team membership。
-- [ ] collaborator authorization。
-- [ ] Challenge publish/Flag window。
-- [ ] configuration revision。
-- [ ] 五种 evaluator。
-- [ ] 五种 projector。
-- [ ] system SourceKey dedupe。
-- [ ] retry/rebuild ordering。
+- [x] lifecycle state machine。
+- [x] admission status boundary。
+- [x] MaxAttempt。
+- [x] Submission idempotency。
+- [x] Team membership。
+- [x] collaborator authorization。
+- [x] Challenge publish/Flag window。
+- [x] configuration revision。
+- [x] 五种 evaluator。
+- [x] 五种 projector。
+- [x] system SourceKey dedupe。
+- [x] retry/rebuild ordering。
 - [x] runtime failure mapping。
-- [ ] Channel capacity/cancel/retry/dedup。
-- [ ] JWT/Runner JWT policy。
-- [ ] Mapperly mapping。
-- [ ] Flag/archive sensitive data redaction。
+- [x] Channel capacity/cancel/retry/dedup。
+- [x] JWT/Runner JWT policy。
+- [x] Mapperly mapping。
+- [x] Flag/archive sensitive data redaction。
 
 ### 15.2 Testcontainers PostgreSQL
 
@@ -475,7 +475,7 @@
 - [x] Login → 30 天 Refresh JWT → Refresh（issuer/use-case 单元验证）。
 - [x] Logout 清 Cookie；旧 refresh JWT 在 exp/token_version 有效时仍可使用（issuer/use-case 单元验证）。
 - [x] 普通 Access JWT/Runner JWT/Refresh JWT scheme 隔离（issuer 验证覆盖 Access/Refresh，Runner scheme 保持独立）。
-- [ ] 新邀请码直接加入 API；旧指定用户邀请/接受/拒绝 API 删除。
+- [x] 新邀请码直接加入 API；旧指定用户邀请/接受/拒绝 API 删除。
 
 - [ ] leaderboard miss → 202 → refresh → hit。
 - [ ] invalidate/rebuild。
@@ -491,29 +491,35 @@
 
 ### 15.4 Architecture
 
-- [ ] 禁止 Marten/Wolverine/Rebus。
-- [ ] 禁止 stream/checkpoint/snapshot store。
-- [ ] 禁止 Score/ScoreDelta 持久化。
+- [x] 禁止 Marten/Wolverine/Rebus。
+- [x] 禁止 stream/checkpoint/snapshot store。
+- [x] 禁止 Score/ScoreDelta 持久化。
 - [ ] 禁止 Worker/HPA/multi-replica backend。
-- [ ] Application/GameModes 不直接引用 EF/Redis/Channel。
-- [ ] endpoint 不使用 HandleAsync/IResult/object/Request.Body。
+- [x] Application/GameModes 不直接引用 EF/Redis/Channel。
+- [x] endpoint 不使用 HandleAsync/IResult/object/Request.Body。
 - [ ] endpoint 不手写 structural mapping。
-- [ ] 禁止 LINQ 查询语法；所有 LINQ/EF 查询统一使用方法语法。
+- [x] 禁止 LINQ 查询语法；所有 LINQ/EF 查询统一使用方法语法。
 - [ ] 禁止手工 migration/snapshot。
-- [ ] Flag 不进入日志、Redis、SignalR、公开 DTO、Channel payload。
+- [x] Flag 不进入日志、Redis、SignalR、公开 DTO、Channel payload。
+
+### 15.5 Runner sandbox
+
+- [ ] Docker stdin exec、timeout 后容器停止与进程树终止 Testcontainers 验证（测试已加入，等待 Docker Engine）。
+- [ ] Docker AWDP network/archive/one-shot/finally cleanup/reaper 集成验证。
+- [ ] Kubernetes AWDP Pod/Service/NetworkPolicy、exec timeout 和最终清理集成验证。
 
 ## 16. 部署、OpenAPI 和文档
 
-- [ ] 统一配置键：`ConnectionStrings__PostgreSql`。
-- [ ] 统一配置键：`Authentication__*`。
-- [ ] 统一配置键：`RunnerScoring__*`。
-- [ ] 统一配置键：`Storage__*`。
-- [ ] 删除 `DefaultConnection`、`JwtSettings`、`StorageProvider` 残留。
-- [ ] 统一 Refresh JWT audience/type 配置并删除 refresh session 配置。
+- [x] 统一配置键：`ConnectionStrings__PostgreSql`。
+- [x] 统一配置键：`Authentication__*`。
+- [x] 统一配置键：`RunnerScoring__*`。
+- [x] 统一配置键：`Storage__*`。
+- [x] 删除 `DefaultConnection`、`JwtSettings`、`StorageProvider` 残留。
+- [x] 统一 Refresh JWT audience/type 配置并删除 refresh session 配置。
 - [x] 删除 Kubernetes worker/HPA/network policy 残留。
 - [x] backend Deployment 固定 `replicas: 1`。
 - [x] Compose 只运行单 backend。
-- [ ] Runner 镜像保留 Docker CLI/Compose plugin。
+- [x] Runner 镜像保留 Docker CLI/Compose plugin。
 - [x] OpenAPI 删除 LeaderboardSnapshot/旧 outcome schema。
 - [x] OpenAPI 增加 Login/Refresh/Logout/Runner scoring security scheme。
 - [x] 重新生成 frontend API client。
@@ -522,16 +528,16 @@
 
 ## 17. 最终验收
 
-- [ ] `dotnet restore backend/NoCTF.slnx`。
+- [x] `dotnet restore backend/NoCTF.slnx`。
 - [x] `dotnet build backend/NoCTF.slnx --configuration Release --no-restore`。
-- [ ] 完整 TUnit suite 通过。
-- [ ] Testcontainers PostgreSQL/Redis suite 通过。
+- [ ] 完整 TUnit suite 通过（当前 299 个非 Docker 测试通过；共发现 309 个测试，Docker Engine 未启动，10 个集成测试待运行）。
+- [ ] Testcontainers PostgreSQL/Redis suite 通过（当前环境 Docker Engine 未启动；新增 producer 状态迁移与 callback-response-loss 回归测试待执行）。
 - [ ] `dotnet ef database update` 新 Initial baseline 空库通过。
-- [ ] `dotnet ef migrations has-pending-model-changes` 通过。
+- [x] `dotnet ef migrations has-pending-model-changes` 通过。
 - [x] OpenAPI export 通过。
 - [x] frontend `bun run generate-api` 通过。
 - [x] frontend `bun run build` 通过。
-- [ ] `docker compose config` 通过。
+- [x] `docker compose config` 通过。
 - [ ] API/Runner Docker image build 通过。
 - [ ] Kubernetes kubeconform 通过。
 - [ ] 旧架构残留扫描通过。

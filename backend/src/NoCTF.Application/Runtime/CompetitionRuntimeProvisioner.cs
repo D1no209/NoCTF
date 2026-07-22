@@ -4,7 +4,7 @@ using NoCTF.Domain.Competitions;
 namespace NoCTF.Application.Runtime;
 
 public sealed record RuntimeChallengeDefinition(
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     int Order,
     int ConfigurationRevision,
     string ConfigurationJson);
@@ -47,7 +47,7 @@ public sealed class CompetitionRuntimeProvisioner(
         var attempted = 0;
         var provisioned = 0;
         var failed = 0;
-        foreach (var challenge in snapshot.Challenges.OrderBy(item => item.Order).ThenBy(item => item.ChallengeId))
+        foreach (var challenge in snapshot.Challenges.OrderBy(item => item.Order).ThenBy(item => item.CompetitionChallengeId))
         {
             var template = templates.Get(snapshot.Mode, challenge.ConfigurationJson);
             if (template is null) continue;
@@ -82,18 +82,18 @@ public sealed class CompetitionRuntimeProvisioner(
         var environment = new Dictionary<string, string>(template.Environment ?? new Dictionary<string, string>(), StringComparer.Ordinal)
         {
             ["NOCTF_COMPETITION_ID"] = competitionId.ToString("N"),
-            ["NOCTF_CHALLENGE_ID"] = challenge.ChallengeId.ToString("N")
+            ["NOCTF_COMPETITION_CHALLENGE_ID"] = challenge.CompetitionChallengeId.ToString("N")
         };
         if (teamId is Guid id) environment["NOCTF_TEAM_ID"] = id.ToString("N");
         var labels = new Dictionary<string, string>(template.Labels ?? new Dictionary<string, string>(), StringComparer.Ordinal)
         {
             ["noctf.io/competition-id"] = competitionId.ToString("N"),
-            ["noctf.io/challenge-id"] = challenge.ChallengeId.ToString("N")
+            ["noctf.io/competition-challenge-id"] = challenge.CompetitionChallengeId.ToString("N")
         };
         if (teamId is Guid labelTeamId) labels["noctf.io/team-id"] = labelTeamId.ToString("N");
 
         var subject = teamId?.ToString("N") ?? "shared";
-        var operationKey = $"runtime:{challenge.ChallengeId:N}:{subject}:revision:{challenge.ConfigurationRevision}";
+        var operationKey = $"runtime:{challenge.CompetitionChallengeId:N}:{subject}:revision:{challenge.ConfigurationRevision}";
         var container = new ContainerRequest(
             Guid.Empty,
             template.Provider,
@@ -107,7 +107,7 @@ public sealed class CompetitionRuntimeProvisioner(
             template.TtlSeconds is int ttl ? TimeSpan.FromSeconds(ttl) : null);
         return new(
             competitionId,
-            challenge.ChallengeId,
+            challenge.CompetitionChallengeId,
             teamId,
             operationKey,
             container,

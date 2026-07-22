@@ -19,7 +19,7 @@ public sealed record LeaderboardChallengeFact(Guid Id, string Direction, bool Is
 public sealed record LeaderboardSubmissionFact(
     Guid SubmissionId,
     Guid TeamId,
-    Guid? ChallengeId,
+    Guid? CompetitionChallengeId,
     SubmissionKind Kind,
     DateTimeOffset ReceivedAt,
     ScoringEvent Event,

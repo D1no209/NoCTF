@@ -17,7 +17,7 @@ public sealed class SubmitFix(
             return OperationResult<SubmissionAccepted>.Failure("idempotency_key_invalid", "IdempotencyKey is required and cannot exceed 128 characters.");
 
         var existing = await store.FindAcceptedAsync(
-            command.CompetitionId, command.IdempotencyKey, command.TeamId, command.ChallengeId,
+            command.CompetitionId, command.IdempotencyKey, command.TeamId, command.CompetitionChallengeId,
             command.UserId, NoCTF.Domain.Submissions.SubmissionKind.Fix, null, null, null, null, cancellationToken);
         if (existing is not null)
             return MapAcceptance(existing);
@@ -25,7 +25,7 @@ public sealed class SubmitFix(
         var snapshot = await store.LoadAdmissionAsync(
             command.CompetitionId,
             command.TeamId,
-            command.ChallengeId,
+            command.CompetitionChallengeId,
             command.UserId,
             cancellationToken);
         if (snapshot is null)
@@ -48,7 +48,7 @@ public sealed class SubmitFix(
             command.UploadId,
             command.CompetitionId,
             command.TeamId,
-            command.ChallengeId,
+            command.CompetitionChallengeId,
             command.UserId,
             command.ReceivedAt,
             cancellationToken);
@@ -59,7 +59,7 @@ public sealed class SubmitFix(
             submissionId,
             command.CompetitionId,
             command.TeamId,
-            command.ChallengeId,
+            command.CompetitionChallengeId,
             command.UserId,
             command.UploadId,
             command.IdempotencyKey,

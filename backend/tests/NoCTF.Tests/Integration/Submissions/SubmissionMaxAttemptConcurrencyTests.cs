@@ -120,17 +120,20 @@ public sealed class SubmissionMaxAttemptConcurrencyTests
         });
         db.Challenges.Add(new Challenge
         {
-            Id = challengeId,
-            CompetitionId = competitionId,
+            Id = Guid.CreateVersion7(now.AddTicks(5)),
             Title = "Race challenge",
-            IsPublished = true,
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.ChallengeConfigurations.Add(new ChallengeConfiguration
+        db.CompetitionChallenges.Add(new CompetitionChallenge
         {
-            ChallengeId = challengeId,
-            Json = """{"schemaVersion":1}""",
+            Id = challengeId,
+            CompetitionId = competitionId,
+            ChallengeId = db.Challenges.Local.Single().Id,
+            BaseScore = 100,
+            Order = 0,
+            IsPublished = true,
+            ConfigurationJson = """{"schemaVersion":1}""",
             Revision = 1,
             UpdatedAt = now
         });

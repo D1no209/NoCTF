@@ -21,7 +21,7 @@ public sealed class FixSubmissionRecord
     public Submission? Submission { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
-    public Guid ChallengeId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
     public string ObjectKey { get; set; } = string.Empty;
     public DateTimeOffset ExpiresAt { get; set; }
     public DateTimeOffset? ClaimedAt { get; set; }

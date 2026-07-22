@@ -31,8 +31,8 @@ internal static class CtfLeaderboardProjection
             .Where(fact => validTeams.ContainsKey(fact.TeamId)
                           && fact.Kind == SubmissionKind.Flag
                           && fact.Event is { IsDeleted: false, Result: ScoringResult.Correct }
-                          && fact.ChallengeId is not null
-                          && (challenges.Count == 0 || challenges.ContainsKey(fact.ChallengeId.Value)))
+                          && fact.CompetitionChallengeId is not null
+                          && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.ReceivedAt)
             .ThenBy(fact => fact.SubmissionId)
             .ToList();
@@ -41,7 +41,7 @@ internal static class CtfLeaderboardProjection
         var solveNumber = new Dictionary<Guid, int>();
         foreach (var solve in solves)
         {
-            var challengeId = solve.ChallengeId!.Value;
+            var challengeId = solve.CompetitionChallengeId!.Value;
             var configuration = ParseChallenge(challenges.TryGetValue(challengeId, out var challenge)
                 ? challenge.ConfigurationJson
                 : null);
@@ -59,12 +59,12 @@ internal static class CtfLeaderboardProjection
         var rows = validTeams.Values.Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
-            var summaries = own.GroupBy(item => item.Fact.ChallengeId!.Value)
+            var summaries = own.GroupBy(item => item.Fact.CompetitionChallengeId!.Value)
                 .Select(group => new LeaderboardChallengeSummary(
                     group.Key,
                     challenges.TryGetValue(group.Key, out var challenge) ? challenge.Direction : string.Empty,
                     group.Count()))
-                .OrderBy(summary => summary.ChallengeId)
+                .OrderBy(summary => summary.CompetitionChallengeId)
                 .ToList();
             var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
             return new LeaderboardEntry(0, team.Id, team.Name, own.Sum(item => item.Points), own.Count,
@@ -202,8 +202,8 @@ internal static class AwdpLeaderboardProjection
             .Where(fact => teams.ContainsKey(fact.TeamId)
                           && fact.Kind is SubmissionKind.Flag or SubmissionKind.Fix
                           && fact.Event is { IsDeleted: false, Result: ScoringResult.Correct }
-                          && fact.ChallengeId is not null
-                          && (challenges.Count == 0 || challenges.ContainsKey(fact.ChallengeId.Value)))
+                          && fact.CompetitionChallengeId is not null
+                          && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.ReceivedAt)
             .ThenBy(fact => fact.SubmissionId)
             .ToList();
@@ -211,7 +211,7 @@ internal static class AwdpLeaderboardProjection
         var milestones = new HashSet<(Guid TeamId, Guid ChallengeId, SubmissionKind Kind, int Round)>();
         foreach (var fact in facts)
         {
-            var challengeId = fact.ChallengeId!.Value;
+            var challengeId = fact.CompetitionChallengeId!.Value;
             var challenge = ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
             var achievement = fact.Kind == SubmissionKind.Flag
                 ? challenge.Break ?? competition.Break
@@ -235,7 +235,8 @@ internal static class AwdpLeaderboardProjection
                 group => group.Aggregate(0L, (total, fact) => SaturatingAdd(total,
                     fact.Event switch
                     {
-                        { Result: ScoringResult.Rejected, FailureCode: ScoringFailureCode.AwdpViolation }
+                        { Result: ScoringResult.Rejected, FailureCode: ScoringFailureCode.AwdpViolation
+                            or ScoringFailureCode.AwdpPatchFailed or ScoringFailureCode.AwdpPatchTimeout }
                             => competition.ViolationPenalty,
                         { Result: ScoringResult.Wrong, FailureCode: ScoringFailureCode.AwdpServiceDown }
                             => competition.ServiceDownPenalty,
@@ -368,8 +369,8 @@ internal static class PenetrationLeaderboardProjection
                           && fact.Kind == SubmissionKind.Flag
                           && fact.StageId is not null
                           && fact.Event is { IsDeleted: false, Result: ScoringResult.Correct }
-                          && fact.ChallengeId is not null
-                          && (challenges.Count == 0 || challenges.ContainsKey(fact.ChallengeId.Value)))
+                          && fact.CompetitionChallengeId is not null
+                          && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.ReceivedAt)
             .ThenBy(fact => fact.SubmissionId)
             .ToList();
@@ -378,7 +379,7 @@ internal static class PenetrationLeaderboardProjection
         var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points)>>();
         foreach (var fact in facts)
         {
-            var challengeId = fact.ChallengeId!.Value;
+            var challengeId = fact.CompetitionChallengeId!.Value;
             var stageId = fact.StageId!.Value;
             if (!completed.Add((fact.TeamId, challengeId, stageId))) continue;
             var challengeConfiguration = ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
@@ -404,12 +405,12 @@ internal static class PenetrationLeaderboardProjection
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
             var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
-            var summaries = own.GroupBy(item => item.Fact.ChallengeId!.Value)
+            var summaries = own.GroupBy(item => item.Fact.CompetitionChallengeId!.Value)
                 .Select(group => new LeaderboardChallengeSummary(
                     group.Key,
                     challenges.GetValueOrDefault(group.Key)?.Direction ?? string.Empty,
                     group.Count()))
-                .OrderBy(summary => summary.ChallengeId)
+                .OrderBy(summary => summary.CompetitionChallengeId)
                 .ToList();
             return new LeaderboardEntry(0, team.Id, team.Name, own.Sum(item => item.Points), own.Count,
                 last == default ? null : last, summaries);

@@ -28,6 +28,8 @@ public enum ScoringFailureCode
     FlagExpired,
     RoundOutOfRange,
     AwdpFixFailed,
+    AwdpPatchFailed,
+    AwdpPatchTimeout,
     AwdpServiceDown,
     AwdpViolation
 }
