@@ -77,6 +77,8 @@ public class ChallengeConfigurationCatalogTests
         foreach (var mode in Enum.GetValues<GameMode>())
         {
             var json = WithRuntime(configurations.GetDefaultJson(mode), template);
+            if (mode == GameMode.Awd)
+                json = WithAwdFlagInjection(json);
             var parsed = runtimes.Get(mode, json);
 
             await Assert.That(parsed).IsNotNull();
@@ -112,6 +114,17 @@ public class ChallengeConfigurationCatalogTests
     {
         var root = JsonNode.Parse(json)!.AsObject();
         root["runtime"] = JsonSerializer.SerializeToNode(runtime, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return root.ToJsonString();
+    }
+
+    private static string WithAwdFlagInjection(string json)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        root["flagInjection"] = new JsonObject
+        {
+            ["command"] = new JsonArray("/usr/local/bin/set-flag"),
+            ["timeoutSeconds"] = 30
+        };
         return root.ToJsonString();
     }
 }

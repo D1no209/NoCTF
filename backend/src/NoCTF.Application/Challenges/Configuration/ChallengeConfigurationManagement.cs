@@ -7,7 +7,7 @@ namespace NoCTF.Application.Challenges.Configuration;
 
 public sealed record ChallengeConfigurationView(
     Guid CompetitionId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     GameMode Mode,
     string Json,
     int Revision,
@@ -24,12 +24,12 @@ public interface IChallengeConfigurationStore
 {
     Task<ChallengeConfigurationView?> FindAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         CancellationToken cancellationToken);
 
     Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         int expectedRevision,
         string json,
         DateTimeOffset updatedAt,
@@ -51,9 +51,9 @@ public sealed class GetChallengeConfiguration(IChallengeConfigurationStore store
 {
     public Task<ChallengeConfigurationView?> ExecuteAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         CancellationToken ct = default) =>
-        store.FindAsync(competitionId, challengeId, ct);
+        store.FindAsync(competitionId, competitionChallengeId, ct);
 }
 
 public sealed class UpdateChallengeConfiguration(
@@ -64,7 +64,7 @@ public sealed class UpdateChallengeConfiguration(
 {
     public async Task<OperationResult<ChallengeConfigurationView>> ExecuteAsync(
         Guid competitionId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         int expectedRevision,
         string json,
         DateTimeOffset updatedAt,
@@ -79,7 +79,7 @@ public sealed class UpdateChallengeConfiguration(
                 "invalid_configuration",
                 "Challenge configuration is required.");
 
-        var current = await store.FindAsync(competitionId, challengeId, ct);
+        var current = await store.FindAsync(competitionId, competitionChallengeId, ct);
         if (current is null)
             return OperationResult<ChallengeConfigurationView>.Failure(
                 "challenge_not_found",
@@ -97,7 +97,7 @@ public sealed class UpdateChallengeConfiguration(
 
         var result = await store.TryUpdateAsync(
             competitionId,
-            challengeId,
+            competitionChallengeId,
             expectedRevision,
             json,
             updatedAt,

@@ -16,7 +16,7 @@ public sealed class UpdateChallengeFlagEndpoint(
 {
     public override void Configure()
     {
-        Put("/admin/competitions/{competitionId}/challenges/{challengeId}/flags/{flagId}");
+        Put("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
         Summary(summary => summary.Summary = "Updates a Challenge Flag using optimistic concurrency.");
     }
@@ -25,7 +25,7 @@ public sealed class UpdateChallengeFlagEndpoint(
         ExecuteAsync(UpdateChallengeFlagRequest request, CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        request.ChallengeId = Route<Guid>("challengeId");
+        request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
         request.FlagId = Route<Guid>("flagId");
         if (!await authorizer.CanModerateAsync(user.UserId, request.CompetitionId, ct))
             return TypedResults.Forbid();

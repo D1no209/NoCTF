@@ -15,7 +15,7 @@ public sealed class GetChallengeFlagEndpoint(
 {
     public override void Configure()
     {
-        Get("/admin/competitions/{competitionId}/challenges/{challengeId}/flags/{flagId}");
+        Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
         Summary(summary => summary.Summary = "Gets a protected Challenge Flag for administrators.");
     }
@@ -25,14 +25,14 @@ public sealed class GetChallengeFlagEndpoint(
         CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        request.ChallengeId = Route<Guid>("challengeId");
+        request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
         request.FlagId = Route<Guid>("flagId");
         if (!await authorizer.CanModerateAsync(user.UserId, request.CompetitionId, ct))
             return TypedResults.Forbid();
 
         var flag = await get.ExecuteAsync(
             request.CompetitionId,
-            request.ChallengeId,
+            request.CompetitionChallengeId,
             request.FlagId,
             ct);
         return flag is null

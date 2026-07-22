@@ -37,6 +37,7 @@ public sealed class RuntimeProviderCatalog(IServiceProvider services)
     public IOneShotJobRunner OneShot(RuntimeProvider provider) => provider switch
     {
         RuntimeProvider.Docker => services.GetRequiredService<DockerContainerLifecycle>(),
+        RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesContainerLifecycle>(),
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 }

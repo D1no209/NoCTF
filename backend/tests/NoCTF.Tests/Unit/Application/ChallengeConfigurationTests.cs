@@ -23,7 +23,7 @@ public class ChallengeConfigurationTests
 
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
-            store.Current.ChallengeId,
+            store.Current.CompetitionChallengeId,
             0,
             ValidJson,
             DateTimeOffset.UtcNow);
@@ -44,7 +44,7 @@ public class ChallengeConfigurationTests
 
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
-            store.Current.ChallengeId,
+            store.Current.CompetitionChallengeId,
             0,
             "{}",
             DateTimeOffset.UtcNow);
@@ -65,7 +65,7 @@ public class ChallengeConfigurationTests
 
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
-            store.Current.ChallengeId,
+            store.Current.CompetitionChallengeId,
             4,
             ValidJson,
             DateTimeOffset.UtcNow);
@@ -84,7 +84,7 @@ public class ChallengeConfigurationTests
 
         var result = await useCase.ExecuteAsync(
             current.CompetitionId,
-            current.ChallengeId,
+            current.CompetitionChallengeId,
             current.Revision,
             ValidJson,
             DateTimeOffset.UtcNow);

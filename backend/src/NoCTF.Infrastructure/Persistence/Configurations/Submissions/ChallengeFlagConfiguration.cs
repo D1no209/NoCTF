@@ -14,8 +14,15 @@ internal sealed class ChallengeFlagConfiguration : IEntityTypeConfiguration<Chal
         builder.Property(x => x.RowVersion).IsConcurrencyToken();
         builder.HasIndex(x => new
         {
-            x.CompetitionId, x.ChallengeId, x.TeamId, x.StageId, x.ChallengeInstanceId,
+            x.CompetitionId, x.CompetitionChallengeId, x.TeamId, x.StageId, x.ChallengeInstanceId,
             x.ValidStart, x.ValidEnd
         });
+        builder.HasIndex(x => new { x.CompetitionId, x.CompetitionChallengeId, x.TeamId, x.ValidStart })
+            .IsUnique()
+            .HasFilter("\"TeamId\" IS NOT NULL AND \"StageId\" IS NULL");
+        builder.HasOne<CompetitionChallenge>()
+            .WithMany()
+            .HasForeignKey(flag => flag.CompetitionChallengeId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -12,7 +12,7 @@ public sealed class EfAdminSubmissionStatusReader(NoCtfDbContext db) : IAdminSub
         .SelectMany(item => item.currentEvents.DefaultIfEmpty(), (item, scoringEvent) => new { item.submission, scoringEvent })
         .Where(item => item.submission.CompetitionId == competitionId && item.submission.Id == submissionId)
         .Select(item => new AdminSubmissionStatusView(
-             item.submission.Id, item.submission.CompetitionId, item.submission.TeamId, item.submission.ChallengeId,
+             item.submission.Id, item.submission.CompetitionId, item.submission.TeamId, item.submission.CompetitionChallengeId,
              item.submission.Kind, item.scoringEvent == null ? null : item.scoringEvent.Result,
              item.scoringEvent == null ? null : item.scoringEvent.FailureCode, item.submission.ReceivedAt,
              item.scoringEvent == null ? null : item.scoringEvent.ProcessedAt,

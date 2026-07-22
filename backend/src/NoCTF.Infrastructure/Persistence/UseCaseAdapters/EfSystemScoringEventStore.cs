@@ -40,8 +40,10 @@ public sealed class EfSystemScoringEventStore(NoCtfDbContext db) : ISystemScorin
             Id = Guid.CreateVersion7(now),
             CompetitionId = command.CompetitionId,
             TeamId = command.TeamId,
-            ChallengeId = command.ChallengeId,
-            SubmissionId = null,
+            CompetitionChallengeId = command.CompetitionChallengeId,
+            StageId = command.StageId,
+            ChallengeInstanceId = command.ChallengeInstanceId,
+            SubmissionId = command.SubmissionId,
             Kind = command.Kind,
             Result = command.Result,
             FailureCode = command.FailureCode,
@@ -52,6 +54,24 @@ public sealed class EfSystemScoringEventStore(NoCtfDbContext db) : ISystemScorin
             CreatedAt = now
         };
         db.ScoringEvents.Add(entity);
+        if (command.Kind == ScoringEventKind.AwdpFixCheck && command.SubmissionId is Guid submissionId)
+        {
+            var verification = await db.FixSubmissionRecords.SingleOrDefaultAsync(
+                item => item.SubmissionId == submissionId && item.VerificationStatus == FixVerificationStatus.Verifying, ct);
+            if (verification is null)
+                return new(Guid.Empty, false, SystemScoringEventRecordFailure.SourceConflict);
+            verification.VerificationStatus = command.Result switch
+            {
+                ScoringResult.Correct => FixVerificationStatus.Valid,
+                ScoringResult.PlatformFailed => FixVerificationStatus.PlatformFailed,
+                _ => FixVerificationStatus.TeamFailure
+            };
+            verification.FailureCategory = command.FailureCode;
+            verification.VerifiedAt = command.OccurredAt;
+            verification.VerifierVersion = command.EvaluatorVersion;
+            verification.UpdatedAt = now;
+            verification.RowVersion++;
+        }
         try
         {
             await db.SaveChangesAsync(ct);
@@ -76,7 +96,10 @@ public sealed class EfSystemScoringEventStore(NoCtfDbContext db) : ISystemScorin
 
     private static bool SameFact(ScoringEvent existing, RecordSystemScoringEventCommand command) =>
         existing.TeamId == command.TeamId
-        && existing.ChallengeId == command.ChallengeId
+        && existing.CompetitionChallengeId == command.CompetitionChallengeId
+        && existing.SubmissionId == command.SubmissionId
+        && existing.StageId == command.StageId
+        && existing.ChallengeInstanceId == command.ChallengeInstanceId
         && existing.Result == command.Result
         && existing.FailureCode == command.FailureCode
         && existing.OccurredAt == command.OccurredAt

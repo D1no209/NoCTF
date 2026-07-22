@@ -6,7 +6,7 @@ namespace NoCTF.Application.SystemProducers;
 
 public sealed record KohProducerTarget(
     Guid CompetitionId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     DateTimeOffset CompetitionStartTime,
     string CompetitionConfigurationJson,
     string ChallengeConfigurationJson);
@@ -61,7 +61,7 @@ public sealed class ProduceKohObservations(
                     now,
                     settings.PollIntervalSeconds);
                 var occurredAt = target.CompetitionStartTime.AddSeconds((long)interval * settings.PollIntervalSeconds);
-                var sourceKey = $"koh:{target.ChallengeId:N}:interval:{interval}";
+                var sourceKey = $"koh:{target.CompetitionChallengeId:N}:interval:{interval}";
                 RecordSystemScoringEventCommand command;
                 try
                 {
@@ -132,7 +132,7 @@ public sealed class ProduceKohObservations(
         ScoringFailureCode? failureCode,
         DateTimeOffset occurredAt,
         string sourceKey) =>
-        new(target.CompetitionId, teamId, target.ChallengeId, ScoringEventKind.KohObservation,
+        new(target.CompetitionId, teamId, target.CompetitionChallengeId, ScoringEventKind.KohObservation,
             result, failureCode, occurredAt, "koh-agent-v1", sourceKey);
 }
 

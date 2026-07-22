@@ -11,7 +11,7 @@ public sealed class SubmitFlagRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
-    public Guid ChallengeId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
     public string Flag { get; set; } = string.Empty;
     public string IdempotencyKey { get; set; } = string.Empty;
     public Guid? TargetTeamId { get; set; }
@@ -43,7 +43,7 @@ public sealed class SubmitFlagEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var result = await submitFlag.ExecuteAsync(new(
-            request.CompetitionId, request.TeamId, request.ChallengeId, userContext.UserId, request.Flag, request.IdempotencyKey,
+            request.CompetitionId, request.TeamId, request.CompetitionChallengeId, userContext.UserId, request.Flag, request.IdempotencyKey,
             httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             DateTimeOffset.UtcNow,
             request.TargetTeamId is null && request.ServiceId is null

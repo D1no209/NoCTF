@@ -16,11 +16,15 @@ internal sealed class ScoringEventConfiguration : IEntityTypeConfiguration<Scori
         builder.Property(x => x.RowVersion).IsConcurrencyToken();
         builder.HasIndex(x => new { x.CompetitionId, x.OccurredAt, x.Id });
         builder.HasIndex(x => x.SubmissionId);
-        builder.HasIndex(x => new { x.CompetitionId, x.TeamId, x.ChallengeId, x.Kind, x.OccurredAt });
+        builder.HasIndex(x => new { x.CompetitionId, x.TeamId, x.CompetitionChallengeId, x.Kind, x.OccurredAt });
         builder.HasIndex(x => new { x.CompetitionId, x.Kind, x.SourceKey }).IsUnique()
             .HasFilter("\"IsDeleted\" = FALSE AND \"SourceKey\" IS NOT NULL");
         builder.HasQueryFilter(x => !x.IsDeleted);
         builder.HasOne(x => x.Submission).WithMany().HasForeignKey(x => x.SubmissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<NoCTF.Domain.Challenges.CompetitionChallenge>()
+            .WithMany()
+            .HasForeignKey(scoringEvent => scoringEvent.CompetitionChallengeId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

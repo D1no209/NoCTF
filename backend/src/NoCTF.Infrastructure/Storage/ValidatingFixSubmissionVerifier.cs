@@ -4,6 +4,7 @@ using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Runtime;
 
 namespace NoCTF.Infrastructure.Storage;
 
@@ -13,7 +14,7 @@ namespace NoCTF.Infrastructure.Storage;
 /// </summary>
 public sealed class ValidatingFixSubmissionVerifier(
     IObjectStorage storage,
-    UnavailableFixSubmissionVerifier runnerVerifier,
+    IRunnerFixSubmissionVerifier runnerVerifier,
     IConfiguration configuration) : IFixSubmissionVerifier
 {
     private readonly TimeSpan inspectionTimeout = TimeSpan.FromSeconds(Math.Max(

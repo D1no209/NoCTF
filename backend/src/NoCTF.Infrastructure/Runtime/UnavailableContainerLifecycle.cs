@@ -8,7 +8,7 @@ namespace NoCTF.Infrastructure.Runtime;
 /// the application graph valid and fails explicitly if a runtime operation is
 /// accidentally attempted in the API process.
 /// </summary>
-public sealed class UnavailableContainerLifecycle : IContainerLifecycle
+public sealed class UnavailableContainerLifecycle : IContainerLifecycle, IOneShotJobRunner
 {
     public Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken) =>
         Task.FromException<ContainerReceipt>(new InvalidOperationException("Container operations must be executed by the Runner service."));
@@ -21,4 +21,7 @@ public sealed class UnavailableContainerLifecycle : IContainerLifecycle
         string resourceId,
         CancellationToken cancellationToken) =>
         Task.FromException<ContainerReceipt?>(new InvalidOperationException("Container operations must be executed by the Runner service."));
+
+    public Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken) =>
+        Task.FromException<OneShotResult>(new InvalidOperationException("One-shot jobs must be executed by the Runner service."));
 }

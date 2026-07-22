@@ -5,7 +5,7 @@ public sealed class ChallengeInstance
 {
     public Guid Id { get; set; }
     public Guid CompetitionId { get; set; }
-    public Guid ChallengeId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
     public Guid? TeamId { get; set; }
     public RuntimeProvider Provider { get; set; }
     public string Receipt { get; set; } = string.Empty;

@@ -59,7 +59,7 @@ public class LeaderboardProjectionEngineTests
             {
                 Id = Guid.NewGuid(),
                 TeamId = team,
-                ChallengeId = challenge,
+                CompetitionChallengeId = challenge,
                 Kind = ScoringEventKind.KohObservation,
                 Result = ScoringResult.Correct,
                 OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(1)
@@ -111,7 +111,7 @@ public class LeaderboardProjectionEngineTests
         {
             Id = Guid.CreateVersion7(DateTimeOffset.UnixEpoch.AddSeconds(seconds)),
             TeamId = teamId,
-            ChallengeId = challengeId,
+            CompetitionChallengeId = challengeId,
             Kind = kind,
             Result = ScoringResult.Correct,
             OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds)
@@ -132,7 +132,7 @@ public class LeaderboardProjectionEngineTests
             {
                 Id = Guid.CreateVersion7(DateTimeOffset.UnixEpoch.AddSeconds(seconds)),
                 TeamId = teamId,
-                ChallengeId = challengeId,
+                CompetitionChallengeId = challengeId,
                 Result = result,
                 OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds)
             });

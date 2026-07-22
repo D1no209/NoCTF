@@ -21,6 +21,16 @@ public static class AwdConfigurationValidator
         else if (configuration.FlagFormat.Length > 256) errors.Add("FlagFormat cannot exceed 256 characters.");
         if (configuration.MaxFlagAttempts is <= 0) errors.Add("MaxFlagAttempts must be positive when configured.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
+        errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(configuration.Checker, "Checker"));
+        if (configuration.Runtime is not null && configuration.FlagInjection is null)
+            errors.Add("FlagInjection is required when Runtime is configured.");
+        if (configuration.FlagInjection is { } injection)
+        {
+            if (injection.Command.Count == 0 || injection.Command.Any(string.IsNullOrWhiteSpace))
+                errors.Add("FlagInjection.Command must contain non-empty arguments.");
+            if (injection.TimeoutSeconds <= 0)
+                errors.Add("FlagInjection.TimeoutSeconds must be positive.");
+        }
         return errors;
     }
 }

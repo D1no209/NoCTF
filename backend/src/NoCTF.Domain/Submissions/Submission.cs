@@ -6,14 +6,12 @@ public sealed class Submission
     public Guid Id { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid? TeamId { get; set; }
-    public Guid? ChallengeId { get; set; }
+    public Guid? CompetitionChallengeId { get; set; }
     public Guid? UserId { get; set; }
     public SubmissionKind Kind { get; set; }
     public DateTimeOffset ReceivedAt { get; set; }
     public string? FlagHash { get; set; }
     public int? FlagLength { get; set; }
-    /// <summary>Upgrade-only payload for submissions accepted before fingerprint storage was introduced.</summary>
-    public string? LegacyFlag { get; set; }
     public string? IdempotencyKey { get; set; }
     public Guid? SubjectTeamId { get; set; }
     public Guid? VictimTeamId { get; set; }

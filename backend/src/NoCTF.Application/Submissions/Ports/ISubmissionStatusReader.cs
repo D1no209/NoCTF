@@ -6,7 +6,7 @@ public sealed record SubmissionStatusView(
     Guid SubmissionId,
     Guid CompetitionId,
     Guid TeamId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     SubmissionKind Kind,
     ScoringResult? Result,
     DateTimeOffset ReceivedAt,

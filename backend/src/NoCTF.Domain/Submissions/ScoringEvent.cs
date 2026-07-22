@@ -6,7 +6,9 @@ public sealed class ScoringEvent
     public Guid Id { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid? TeamId { get; set; }
-    public Guid? ChallengeId { get; set; }
+    public Guid? CompetitionChallengeId { get; set; }
+    public Guid? StageId { get; set; }
+    public Guid? ChallengeInstanceId { get; set; }
     public Guid? SubmissionId { get; set; }
     public Submission? Submission { get; set; }
     public ScoringEventKind Kind { get; set; }

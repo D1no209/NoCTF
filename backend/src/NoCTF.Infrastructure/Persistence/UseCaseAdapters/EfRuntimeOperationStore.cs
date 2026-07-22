@@ -39,13 +39,8 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
                     .ExecuteUpdateAsync(update => update
                         .SetProperty(instance => instance.Status, RuntimeStatus.Failed)
                         .SetProperty(instance => instance.UpdatedAt, now), ct);
-                await db.ChallengeFlags
-                    .Where(flag => flag.ChallengeInstanceId == staleInstanceId
-                                   && (flag.ValidEnd == null || flag.ValidEnd > now))
-                    .ExecuteUpdateAsync(update => update
-                        .SetProperty(flag => flag.ValidEnd, now)
-                        .SetProperty(flag => flag.UpdatedAt, now)
-                        .SetProperty(flag => flag.RowVersion, flag => flag.RowVersion + 1), ct);
+                await RuntimeFailurePersistence.InvalidateFlagsAsync(
+                    db, staleInstanceId, now, ct);
             }
             var newClaimToken = Guid.CreateVersion7(now);
             var claimed = await db.RuntimeOperations
@@ -133,14 +128,14 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
             {
                 Id = challengeInstanceId,
                 CompetitionId = lease.CompetitionId,
-                ChallengeId = challengeId,
+                CompetitionChallengeId = challengeId,
                 TeamId = teamId,
                 CreatedAt = now
             };
             db.ChallengeInstances.Add(instance);
         }
         else if (instance.CompetitionId != lease.CompetitionId
-                 || instance.ChallengeId != challengeId || instance.TeamId != teamId)
+                 || instance.CompetitionChallengeId != challengeId || instance.TeamId != teamId)
         {
             return false;
         }
@@ -252,7 +247,7 @@ public sealed class EfRuntimeOperationStore(NoCtfDbContext db) : IRuntimeOperati
         {
             Id = Guid.CreateVersion7(now),
             CompetitionId = lease.CompetitionId,
-            ChallengeId = failure.ChallengeId,
+            CompetitionChallengeId = failure.CompetitionChallengeId,
             TeamId = failure.TeamId,
             Provider = receipt.Provider,
             Receipt = JsonSerializer.Serialize(receipt),

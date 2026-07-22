@@ -12,7 +12,7 @@ public sealed class RecordSystemScoringEventRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid? TeamId { get; set; }
-    public Guid? ChallengeId { get; set; }
+    public Guid? CompetitionChallengeId { get; set; }
     public ScoringEventKind Kind { get; set; }
     public ScoringResult Result { get; set; }
     public ScoringFailureCode? FailureCode { get; set; }
@@ -26,6 +26,9 @@ public sealed record SystemScoringEventResponse(Guid ScoringEventId, bool Create
 [Mapper]
 internal static partial class SystemScoringEventMapper
 {
+    [MapperIgnoreTarget(nameof(RecordSystemScoringEventCommand.StageId))]
+    [MapperIgnoreTarget(nameof(RecordSystemScoringEventCommand.ChallengeInstanceId))]
+    [MapperIgnoreTarget(nameof(RecordSystemScoringEventCommand.SubmissionId))]
     public static partial RecordSystemScoringEventCommand ToCommand(RecordSystemScoringEventRequest request);
     [MapperIgnoreSource(nameof(RecordSystemScoringEventResult.Failure))]
     public static partial SystemScoringEventResponse ToResponse(RecordSystemScoringEventResult result);
@@ -55,6 +58,9 @@ public sealed class RecordSystemScoringEventEndpoint(RecordSystemScoringEvent re
         if (request.Kind == ScoringEventKind.AwdpFixCheck)
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest,
                 title: "AWDP check facts must use the dedicated checker-result endpoint.");
+        if (request.Kind == ScoringEventKind.PenetrationStage)
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest,
+                title: "Penetration stage facts are recorded by the runtime monitor.");
         if (string.IsNullOrWhiteSpace(request.SourceKey) || request.SourceKey.Length > 256)
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid source key.");
 

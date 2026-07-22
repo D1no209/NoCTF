@@ -11,7 +11,7 @@ public sealed class CreateFixUploadRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
-    public Guid ChallengeId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
     public string FileName { get; set; } = string.Empty;
     public string ContentType { get; set; } = "application/octet-stream";
     public long Length { get; set; }
@@ -43,7 +43,7 @@ public sealed class CreateFixUploadEndpoint(
         var result = await createUpload.ExecuteAsync(new(
             request.CompetitionId,
             request.TeamId,
-            request.ChallengeId,
+            request.CompetitionChallengeId,
             userContext.UserId,
             request.FileName,
             request.ContentType,

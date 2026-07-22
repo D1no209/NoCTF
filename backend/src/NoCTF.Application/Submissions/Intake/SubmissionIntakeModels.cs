@@ -6,7 +6,7 @@ namespace NoCTF.Application.Submissions.Intake;
 public sealed record SubmissionAdmissionSnapshot(
     Guid CompetitionId,
     Guid TeamId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     GameMode Mode,
     int CompetitionConfigurationRevision,
     int ChallengeConfigurationRevision,
@@ -63,7 +63,7 @@ public sealed record AwdAttackTarget(Guid TeamId, Guid ServiceId);
 public sealed record FlagSubmissionCommand(
     Guid CompetitionId,
     Guid TeamId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid UserId,
     string Flag,
     string IdempotencyKey,
@@ -75,7 +75,7 @@ public sealed record FlagSubmissionCommand(
 public sealed record FixSubmissionCommand(
     Guid CompetitionId,
     Guid TeamId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid UserId,
     Guid UploadId,
     string IdempotencyKey,

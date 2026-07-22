@@ -8,7 +8,7 @@ public sealed record FlagSubmissionReceived
     public required Guid SubmissionId { get; init; }
     public required Guid CompetitionId { get; init; }
     public required Guid TeamId { get; init; }
-    public required Guid ChallengeId { get; init; }
+    public required Guid CompetitionChallengeId { get; init; }
     public required Guid UserId { get; init; }
     public required FlagFingerprint FlagFingerprint { get; init; }
     public required string IdempotencyKey { get; init; }
@@ -33,7 +33,7 @@ public sealed record FixSubmissionReceived(
     Guid SubmissionId,
     Guid CompetitionId,
     Guid TeamId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid UserId,
     Guid UploadId,
     string IdempotencyKey,

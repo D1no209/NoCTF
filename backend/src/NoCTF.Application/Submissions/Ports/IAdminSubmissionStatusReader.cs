@@ -6,7 +6,7 @@ public sealed record AdminSubmissionStatusView(
     Guid SubmissionId,
     Guid CompetitionId,
     Guid? TeamId,
-    Guid? ChallengeId,
+    Guid? CompetitionChallengeId,
     SubmissionKind Kind,
     ScoringResult? Result,
     ScoringFailureCode? FailureCode,

@@ -83,6 +83,8 @@ public static class ServiceRegistration
         services.AddHostedService<OrphanRuntimeCleanupHostedService>();
         services.AddHostedService<KohPollingHostedService>();
         services.AddHostedService<PenetrationStageMonitorHostedService>();
+        services.AddHostedService<AwdRoundHostedService>();
+        services.AddHostedService<AwdpRoundHostedService>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (string.IsNullOrWhiteSpace(redis))
@@ -96,6 +98,15 @@ public static class ServiceRegistration
         services.AddScoped<ISubmissionProcessor, EfSubmissionProcessor>();
         services.AddScoped<IFixVerificationStore, EfFixVerificationStore>();
         services.AddScoped<UnavailableFixSubmissionVerifier>();
+        services.AddScoped<RunnerFixSubmissionVerifier>();
+        services.AddHttpClient(nameof(RunnerFixSubmissionVerifier), client =>
+            client.Timeout = Timeout.InfiniteTimeSpan);
+        if (string.IsNullOrWhiteSpace(configuration["Runtime:Runner:BaseUrl"]))
+            services.AddScoped<IRunnerFixSubmissionVerifier>(provider =>
+                provider.GetRequiredService<UnavailableFixSubmissionVerifier>());
+        else
+            services.AddScoped<IRunnerFixSubmissionVerifier>(provider =>
+                provider.GetRequiredService<RunnerFixSubmissionVerifier>());
         services.AddScoped<IFixSubmissionVerifier, ValidatingFixSubmissionVerifier>();
         services.AddScoped<VerifyFixSubmission>();
         services.AddScoped<ExpireFixUploads>();
@@ -111,12 +122,25 @@ public static class ServiceRegistration
         services.AddScoped<ISystemScoringEventStore, EfSystemScoringEventStore>();
         services.AddScoped<ISystemScoringEventProcessor, EfSystemScoringEventProcessor>();
         services.AddScoped<RecordSystemScoringEvent>();
+        services.AddScoped<RecordAwdCheckResult>();
         services.AddSingleton<IAwdpCheckExitCodeMapper, AwdpCheckExitCodeMapper>();
         services.AddScoped<RecordAwdpCheckResult>();
         services.AddScoped<IKohProducerTargetStore, EfKohProducerTargetStore>();
         services.AddSingleton<IKohProducerConfigurationCatalog, KohProducerConfigurationCatalog>();
         services.AddHttpClient<IKohAgentClient, HttpKohAgentClient>();
         services.AddScoped<ProduceKohObservations>();
+        services.AddScoped<IRunningCompetitionStore, EfRunningCompetitionStore>();
+        services.AddScoped<ProvisionModeRuntimes>();
+        services.AddScoped<IAwdFlagRotationStore, EfAwdFlagRotationStore>();
+        services.AddSingleton<IAwdRoundConfigurationCatalog, NoCTF.GameModes.Awd.Configuration.AwdRoundConfigurationCatalog>();
+        services.AddSingleton<IAwdFlagInjectionConfigurationCatalog,
+            NoCTF.GameModes.Awd.Configuration.AwdFlagInjectionConfigurationCatalog>();
+        services.AddScoped<RotateAwdFlags>();
+        services.AddScoped<IAwdCheckerTargetStore, EfAwdCheckerTargetStore>();
+        services.AddScoped<IProducerDispatchClaimStore, EfProducerDispatchClaimStore>();
+        services.AddSingleton<IAwdCheckerConfigurationCatalog, NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog>();
+        services.AddSingleton<IAwdCheckerCallbackFactory, AwdCheckerCallbackFactory>();
+        services.AddScoped<ProduceAwdChecks>();
         services.AddScoped<IPenetrationStageMonitorTargetStore, EfPenetrationStageMonitorTargetStore>();
         services.AddSingleton<IPenetrationStageConfigurationCatalog,
             NoCTF.GameModes.Penetration.PenetrationStageConfigurationCatalog>();
@@ -124,6 +148,7 @@ public static class ServiceRegistration
         services.AddScoped<RetrySubmission>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
         services.AddScoped<IFixUploadSessionStore, EfFixUploadSessionStore>();
+        services.AddScoped<IFixArchiveDownloadStore, EfFixArchiveDownloadStore>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
         services.AddScoped<ITeamModerationStore, EfTeamModerationStore>();
         services.AddScoped<ICompetitionModerationAuthorizer, EfCompetitionModerationAuthorizer>();
@@ -173,15 +198,19 @@ public static class ServiceRegistration
         if (string.IsNullOrWhiteSpace(runnerBaseUrl))
         {
             services.AddScoped<IContainerLifecycle, UnavailableContainerLifecycle>();
+            services.AddScoped<IOneShotJobRunner, UnavailableContainerLifecycle>();
+            services.AddScoped<IAwdFlagInjector, UnavailableAwdFlagInjector>();
         }
         else
         {
             services.AddHttpClient<RunnerContainerLifecycle>(client =>
             {
                 client.BaseAddress = new Uri(runnerBaseUrl.EndsWith('/') ? runnerBaseUrl : runnerBaseUrl + "/");
-                client.Timeout = TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Runtime:Runner:TimeoutSeconds", 30), 1, 120));
+                client.Timeout = Timeout.InfiniteTimeSpan;
             });
             services.AddScoped<IContainerLifecycle>(provider => provider.GetRequiredService<RunnerContainerLifecycle>());
+            services.AddScoped<IOneShotJobRunner>(provider => provider.GetRequiredService<RunnerContainerLifecycle>());
+            services.AddScoped<IAwdFlagInjector>(provider => provider.GetRequiredService<RunnerContainerLifecycle>());
         }
         services.AddScoped<ListChallengeFlags>();
         services.AddScoped<GetChallengeFlag>();

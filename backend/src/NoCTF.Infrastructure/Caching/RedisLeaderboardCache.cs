@@ -33,22 +33,20 @@ public sealed class RedisLeaderboardCache(
         if (competition is null) return;
         var teams = await db.Teams.AsNoTracking().Where(x => x.CompetitionId == competitionId)
             .Select(x => new LeaderboardTeamFact(x.Id, x.Name, x.Ban.IsBanned, x.Deletion.IsDeleted)).ToListAsync(ct);
-        var challenges = await db.Challenges.AsNoTracking().Where(x => x.CompetitionId == competitionId)
-            .GroupJoin(
-                db.ChallengeConfigurations.AsNoTracking(),
-                challenge => challenge.Id,
-                configuration => configuration.ChallengeId,
-                (challenge, configurations) => new { challenge, configuration = configurations.Select(item => item.Json).FirstOrDefault() })
-            .Select(x => new LeaderboardChallengeFact(
-                x.challenge.Id,
-                x.challenge.Direction,
-                x.challenge.Deletion.IsDeleted,
-                x.configuration))
+        var challenges = await db.CompetitionChallenges.AsNoTracking()
+            .Where(instance => instance.CompetitionId == competitionId)
+            .Join(db.Challenges.AsNoTracking(), instance => instance.ChallengeId, template => template.Id,
+                (instance, template) => new { Instance = instance, Template = template })
+            .Select(item => new LeaderboardChallengeFact(
+                item.Instance.Id,
+                item.Template.Direction,
+                item.Instance.Deletion.IsDeleted || item.Template.Deletion.IsDeleted,
+                item.Instance.ConfigurationJson))
             .ToListAsync(ct);
         var competitionConfiguration = competition.ConfigurationJson;
         var submissions = await db.Submissions.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.ScoringEventId != null)
             .Join(db.ScoringEvents.AsNoTracking(), s => s.ScoringEventId, e => e.Id, (s, e) => new LeaderboardSubmissionFact(
-                s.Id, s.TeamId!.Value, s.ChallengeId, s.Kind, s.ReceivedAt, e,
+                s.Id, s.TeamId!.Value, s.CompetitionChallengeId, s.Kind, s.ReceivedAt, e,
                 s.SubjectTeamId, s.VictimTeamId, s.ServiceId, s.ControlIntervalSeconds, s.StageId)).ToListAsync(ct);
         var system = await db.ScoringEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.SubmissionId == null)
             .Select(x => new LeaderboardSystemFact(x)).ToListAsync(ct);

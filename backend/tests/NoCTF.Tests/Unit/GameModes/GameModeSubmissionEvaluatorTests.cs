@@ -215,7 +215,7 @@ public class GameModeSubmissionEvaluatorTests
         var submission = new Submission
         {
             TeamId = Guid.NewGuid(),
-            ChallengeId = Guid.NewGuid(),
+            CompetitionChallengeId = Guid.NewGuid(),
             Kind = SubmissionKind.Fix,
             ReceivedAt = DateTimeOffset.UtcNow
         };
@@ -231,12 +231,12 @@ public class GameModeSubmissionEvaluatorTests
     {
         var teamId = Guid.NewGuid();
         var challengeId = Guid.NewGuid();
-        var prior = new Submission { Id = Guid.NewGuid(), TeamId = teamId, ChallengeId = challengeId, Kind = SubmissionKind.Fix };
+        var prior = new Submission { Id = Guid.NewGuid(), TeamId = teamId, CompetitionChallengeId = challengeId, Kind = SubmissionKind.Fix };
         var priorEvent = new ScoringEvent { SubmissionId = prior.Id, Result = ScoringResult.Correct };
         var submission = new Submission
         {
             TeamId = teamId,
-            ChallengeId = challengeId,
+            CompetitionChallengeId = challengeId,
             Kind = SubmissionKind.Fix,
             ReceivedAt = DateTimeOffset.UtcNow
         };
@@ -264,7 +264,7 @@ public class GameModeSubmissionEvaluatorTests
         var submission = new Submission
         {
             TeamId = team,
-            ChallengeId = challenge,
+            CompetitionChallengeId = challenge,
             StageId = secondStage,
             Kind = SubmissionKind.Flag,
             ReceivedAt = DateTimeOffset.UtcNow
@@ -284,21 +284,21 @@ public class GameModeSubmissionEvaluatorTests
         var secondStage = Guid.NewGuid();
         var team = Guid.NewGuid();
         var challenge = Guid.NewGuid();
-        var prior = new Submission { Id = Guid.NewGuid(), TeamId = team, ChallengeId = challenge, StageId = firstStage, Kind = SubmissionKind.Flag };
+        var prior = new Submission { Id = Guid.NewGuid(), TeamId = team, CompetitionChallengeId = challenge, StageId = firstStage, Kind = SubmissionKind.Flag };
         var configuration = JsonSerializer.Serialize(new PenetrationChallengeConfiguration(
             1,
             [new(firstStage, 1, "entry", [], null), new(secondStage, 2, "root", [firstStage], null)]),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var submission = new Submission
         {
-            TeamId = team, ChallengeId = challenge, StageId = secondStage, Kind = SubmissionKind.Flag,
+            TeamId = team, CompetitionChallengeId = challenge, StageId = secondStage, Kind = SubmissionKind.Flag,
             FlagHash = FlagFingerprint.Create("flag").Sha256,
             FlagLength = "flag".Length,
             ChallengeInstanceId = Guid.NewGuid(), ReceivedAt = DateTimeOffset.UtcNow
         };
         var flag = new NoCTF.Domain.Challenges.ChallengeFlag
         {
-            TeamId = team, ChallengeId = challenge, StageId = secondStage,
+            TeamId = team, CompetitionChallengeId = challenge, StageId = secondStage,
             ChallengeInstanceId = submission.ChallengeInstanceId, Flag = "flag"
         };
 
@@ -307,7 +307,7 @@ public class GameModeSubmissionEvaluatorTests
             {
                 SubmissionId = prior.Id,
                 TeamId = team,
-                ChallengeId = challenge,
+                CompetitionChallengeId = challenge,
                 Result = ScoringResult.Correct
             }], [flag], null, "{}", configuration, [prior]));
 
@@ -326,7 +326,7 @@ public class GameModeSubmissionEvaluatorTests
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var submission = new Submission
         {
-            TeamId = team, ChallengeId = challenge, StageId = requestedStage,
+            TeamId = team, CompetitionChallengeId = challenge, StageId = requestedStage,
             Kind = SubmissionKind.Flag,
             FlagHash = FlagFingerprint.Create("same-value").Sha256,
             FlagLength = "same-value".Length,
@@ -334,7 +334,7 @@ public class GameModeSubmissionEvaluatorTests
         };
         var flag = new NoCTF.Domain.Challenges.ChallengeFlag
         {
-            TeamId = team, ChallengeId = challenge, StageId = otherStage,
+            TeamId = team, CompetitionChallengeId = challenge, StageId = otherStage,
             ChallengeInstanceId = submission.ChallengeInstanceId, Flag = "same-value"
         };
 
@@ -356,7 +356,7 @@ public class GameModeSubmissionEvaluatorTests
         var submission = new Submission
         {
             TeamId = team,
-            ChallengeId = Guid.NewGuid(),
+            CompetitionChallengeId = Guid.NewGuid(),
             StageId = stage,
             ChallengeInstanceId = Guid.NewGuid(),
             Kind = SubmissionKind.Flag,
@@ -367,7 +367,7 @@ public class GameModeSubmissionEvaluatorTests
         var flag = new NoCTF.Domain.Challenges.ChallengeFlag
         {
             TeamId = team,
-            ChallengeId = submission.ChallengeId!.Value,
+            CompetitionChallengeId = submission.CompetitionChallengeId!.Value,
             StageId = stage,
             ChallengeInstanceId = null,
             Flag = "static-stage-flag"

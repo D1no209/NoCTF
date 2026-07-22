@@ -14,7 +14,7 @@ public sealed class ListChallengeFlagsEndpoint(
 {
     public override void Configure()
     {
-        Get("/admin/competitions/{competitionId}/challenges/{challengeId}/flags");
+        Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags");
         AuthSchemes("Bearer");
         Summary(summary => summary.Summary = "Lists protected Challenge Flags for administrators.");
     }
@@ -26,7 +26,7 @@ public sealed class ListChallengeFlagsEndpoint(
         if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
 
-        var flags = await list.ExecuteAsync(competitionId, Route<Guid>("challengeId"), ct);
+        var flags = await list.ExecuteAsync(competitionId, Route<Guid>("competitionChallengeId"), ct);
         return TypedResults.Ok(ChallengeFlagMapper.ToListResponse(flags));
     }
 }

@@ -92,14 +92,14 @@ public sealed class EfSubmissionIntakeStore(
             return new(SubmissionAcceptanceState.SnapshotChanged);
 
         var existing = await FindAcceptedAsync(
-            received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
+            received.CompetitionId, received.IdempotencyKey, received.TeamId, received.CompetitionChallengeId,
             received.UserId, DomainSubmissionKind.Flag, received.AttackTarget, received.StageId,
             received.ChallengeInstanceId, received.FlagFingerprint, ct);
         if (existing is not null)
             return existing;
 
         var current = await LoadAdmissionAsync(
-            received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
+            received.CompetitionId, received.TeamId, received.CompetitionChallengeId, received.UserId, ct);
         if (!SubmissionAdmissionPersistence.Matches(snapshot, current))
             return new(SubmissionAcceptanceState.SnapshotChanged);
         if (maxAttempts is > 0 && current!.AcceptedFlagAttempts >= maxAttempts)
@@ -110,8 +110,7 @@ public sealed class EfSubmissionIntakeStore(
             Id = received.SubmissionId,
             CompetitionId = received.CompetitionId,
             TeamId = received.TeamId,
-            ChallengeId = received.ChallengeId,
-            CompetitionChallengeId = received.ChallengeId,
+            CompetitionChallengeId = received.CompetitionChallengeId,
             UserId = received.UserId,
             Kind = DomainSubmissionKind.Flag,
             FlagHash = received.FlagFingerprint.Sha256,
@@ -128,7 +127,7 @@ public sealed class EfSubmissionIntakeStore(
         };
         db.Submissions.Add(entity);
         var result = await SaveAsync(entity, transaction, received.IdempotencyKey, received.TeamId,
-            received.ChallengeId, received.UserId, DomainSubmissionKind.Flag, ct);
+            received.CompetitionChallengeId, received.UserId, DomainSubmissionKind.Flag, ct);
         if (result.State == SubmissionAcceptanceState.Created)
         {
             using var enqueueCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, admission.DrainCancellation);
@@ -158,13 +157,13 @@ public sealed class EfSubmissionIntakeStore(
             return new(SubmissionAcceptanceState.SnapshotChanged);
 
         var existing = await FindAcceptedAsync(
-            received.CompetitionId, received.IdempotencyKey, received.TeamId, received.ChallengeId,
+            received.CompetitionId, received.IdempotencyKey, received.TeamId, received.CompetitionChallengeId,
             received.UserId, DomainSubmissionKind.Fix, null, null, null, null, ct);
         if (existing is not null)
             return existing;
 
         var current = await LoadAdmissionAsync(
-            received.CompetitionId, received.TeamId, received.ChallengeId, received.UserId, ct);
+            received.CompetitionId, received.TeamId, received.CompetitionChallengeId, received.UserId, ct);
         if (!SubmissionAdmissionPersistence.Matches(snapshot, current))
             return new(SubmissionAcceptanceState.SnapshotChanged);
         if (maxAttempts is > 0 && current!.AcceptedFixAttempts >= maxAttempts)
@@ -176,7 +175,7 @@ public sealed class EfSubmissionIntakeStore(
             ct);
         if (record is null || record.SubmissionId is not null || record.ExpiresAt <= received.ReceivedAt
             || record.CompetitionId != received.CompetitionId || record.TeamId != received.TeamId
-            || record.ChallengeId != received.ChallengeId)
+            || record.CompetitionChallengeId != received.CompetitionChallengeId)
             return new(SubmissionAcceptanceState.UploadUnavailable);
 
         var entity = new Submission
@@ -184,8 +183,7 @@ public sealed class EfSubmissionIntakeStore(
             Id = received.SubmissionId,
             CompetitionId = received.CompetitionId,
             TeamId = received.TeamId,
-            ChallengeId = received.ChallengeId,
-            CompetitionChallengeId = received.ChallengeId,
+            CompetitionChallengeId = received.CompetitionChallengeId,
             UserId = received.UserId,
             Kind = DomainSubmissionKind.Fix,
             IdempotencyKey = received.IdempotencyKey,
@@ -200,7 +198,7 @@ public sealed class EfSubmissionIntakeStore(
         db.Submissions.Add(entity);
 
         var result = await SaveAsync(entity, transaction, received.IdempotencyKey, received.TeamId,
-            received.ChallengeId, received.UserId, DomainSubmissionKind.Fix, ct);
+            received.CompetitionChallengeId, received.UserId, DomainSubmissionKind.Fix, ct);
         if (result.State == SubmissionAcceptanceState.Created)
         {
             using var enqueueCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, admission.DrainCancellation);
@@ -269,10 +267,8 @@ public sealed class EfSubmissionIntakeStore(
         && submission.StageId == stageId
         && submission.ChallengeInstanceId == challengeInstanceId
         && (flagFingerprint is null
-            ? submission.FlagHash is null && submission.LegacyFlag is null
+            ? submission.FlagHash is null
             : submission.FlagHash == flagFingerprint.Value.Sha256
-              && submission.FlagLength == flagFingerprint.Value.Length
-              || submission.LegacyFlag is { } legacyFlag
-              && flagFingerprint.Value.Matches(legacyFlag));
+              && submission.FlagLength == flagFingerprint.Value.Length);
 
 }

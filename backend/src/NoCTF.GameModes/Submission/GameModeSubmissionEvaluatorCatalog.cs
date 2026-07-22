@@ -82,8 +82,7 @@ public sealed class AwdSubmissionEvaluator : ISubmissionEvaluator
             ? new FlagFingerprint(context.Submission.FlagHash, flagLength)
             : (FlagFingerprint?)null;
         IReadOnlyList<NoCTF.Domain.Challenges.ChallengeFlag> matchingFlags = context.ApplicableFlags
-            .Where(flag => (fingerprint?.Matches(flag.Flag) == true
-                           || context.Submission.LegacyFlag == flag.Flag)
+            .Where(flag => fingerprint?.Matches(flag.Flag) == true
                            && (flag.TeamId is null || flag.TeamId == targetTeamId))
             .ToList();
         if (matchingFlags.Count == 0)
@@ -145,7 +144,7 @@ public sealed class AwdpSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmi
         context.PriorSubmissions?.Any(previous =>
             previous.Kind == kind
             && previous.TeamId == context.Submission.TeamId
-            && previous.ChallengeId == context.Submission.ChallengeId
+            && previous.CompetitionChallengeId == context.Submission.CompetitionChallengeId
             && context.PriorEvents.Any(@event => @event.SubmissionId == previous.Id && @event.Result == ScoringResult.Correct)) == true;
 
     private static AwdpChallengeConfiguration Parse(string json)
@@ -191,7 +190,7 @@ public sealed class PenetrationSubmissionEvaluator(ISubmissionEvaluator inner) :
             return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.StageNotFound);
         var completedStages = context.PriorSubmissions?
             .Where(previous => previous.TeamId == context.Submission.TeamId
-                               && previous.ChallengeId == context.Submission.ChallengeId
+                               && previous.CompetitionChallengeId == context.Submission.CompetitionChallengeId
                                && previous.StageId is not null
                                && context.PriorEvents.Any(@event => @event.SubmissionId == previous.Id && @event.Result == ScoringResult.Correct))
             .Select(previous => previous.StageId!.Value)
@@ -203,7 +202,7 @@ public sealed class PenetrationSubmissionEvaluator(ISubmissionEvaluator inner) :
             return ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.StagePrerequisiteIncomplete);
         var currentStageSubmissionIds = context.PriorSubmissions?
             .Where(previous => previous.TeamId == context.Submission.TeamId
-                               && previous.ChallengeId == context.Submission.ChallengeId
+                               && previous.CompetitionChallengeId == context.Submission.CompetitionChallengeId
                                && previous.StageId == stageId)
             .Select(previous => previous.Id)
             .ToHashSet() ?? [];

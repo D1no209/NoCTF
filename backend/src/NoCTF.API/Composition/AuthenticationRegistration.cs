@@ -72,6 +72,12 @@ public static class AuthenticationRegistration
                 .AddAuthenticationSchemes(RunnerScoringScheme)
                 .RequireAuthenticatedUser()
                 .RequireClaim("scope", "scoring.write"));
+            options.AddPolicy("FixArchiveRead", policy => policy
+                .AddAuthenticationSchemes(RunnerScoringScheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim("scope", "fix-archive.read")
+                .RequireClaim("upload_id")
+                .RequireClaim("submission_id"));
         });
         return services;
     }

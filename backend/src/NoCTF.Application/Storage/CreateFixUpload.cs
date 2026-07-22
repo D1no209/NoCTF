@@ -38,7 +38,7 @@ public sealed class CreateFixUpload(
         var admission = await admissionStore.LoadAdmissionAsync(
             command.CompetitionId,
             command.TeamId,
-            command.ChallengeId,
+            command.CompetitionChallengeId,
             command.UserId,
             cancellationToken);
         if (admission is null)

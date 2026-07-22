@@ -13,7 +13,7 @@ public class NoRawFlagLoggingTests
             SubmissionId = Guid.NewGuid(),
             CompetitionId = Guid.NewGuid(),
             TeamId = Guid.NewGuid(),
-            ChallengeId = Guid.NewGuid(),
+            CompetitionChallengeId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             FlagFingerprint = FlagFingerprint.Create("flag{do-not-leak}"),
             IdempotencyKey = "test-1",

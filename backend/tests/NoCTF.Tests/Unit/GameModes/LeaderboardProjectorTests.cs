@@ -345,7 +345,7 @@ public class LeaderboardProjectorTests
         new(Guid.NewGuid(), team, challenge, SubmissionKind.Flag, DateTimeOffset.UnixEpoch.AddSeconds(seconds),
             new ScoringEvent
             {
-                Id = Guid.NewGuid(), TeamId = team, ChallengeId = challenge, Result = ScoringResult.Correct,
+                Id = Guid.NewGuid(), TeamId = team, CompetitionChallengeId = challenge, Result = ScoringResult.Correct,
                 OccurredAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds)
             }, StageId: stage);
 }

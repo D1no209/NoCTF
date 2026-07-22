@@ -1,0 +1,66 @@
+using FastEndpoints;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Submissions.Processing;
+using Riok.Mapperly.Abstractions;
+
+namespace NoCTF.API.Endpoints.Internal;
+
+public sealed class RecordAwdCheckResultRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+    public int ExitCode { get; set; }
+    public bool TimedOut { get; set; }
+    public DateTimeOffset OccurredAt { get; set; }
+    public string SourceKey { get; set; } = string.Empty;
+}
+
+[Mapper]
+internal static partial class AwdCheckResultMapper
+{
+    public static partial RecordAwdCheckResultCommand ToCommand(RecordAwdCheckResultRequest request);
+}
+
+public sealed class RecordAwdCheckResultEndpoint(RecordAwdCheckResult record)
+    : Endpoint<RecordAwdCheckResultRequest,
+        Results<Created<SystemScoringEventResponse>, Ok<SystemScoringEventResponse>, ProblemHttpResult>>
+{
+    public override void Configure()
+    {
+        Post("/internal/competitions/{competitionId}/awd-check-results");
+        AuthSchemes("RunnerScoringBearer");
+        Policies("ScoringInput");
+        Summary(summary => summary.Summary = "Record an idempotent Runner-authenticated AWD service check.");
+    }
+
+    public override async Task<Results<Created<SystemScoringEventResponse>, Ok<SystemScoringEventResponse>, ProblemHttpResult>> ExecuteAsync(
+        RecordAwdCheckResultRequest request,
+        CancellationToken cancellationToken)
+    {
+        request.CompetitionId = Route<Guid>("competitionId");
+        if (request.TeamId == Guid.Empty || request.CompetitionChallengeId == Guid.Empty
+            || string.IsNullOrWhiteSpace(request.SourceKey) || request.SourceKey.Length > 256)
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid AWD check result.");
+        try
+        {
+            var result = await record.ExecuteAsync(AwdCheckResultMapper.ToCommand(request), cancellationToken);
+            if (result.Failure == SystemScoringEventRecordFailure.CompetitionNotFound)
+                return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "Competition was not found.");
+            if (result.Failure is SystemScoringEventRecordFailure.CompetitionFinished or SystemScoringEventRecordFailure.CompetitionModeMismatch)
+                return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "AWD checker result was rejected.");
+            if (result.Failure == SystemScoringEventRecordFailure.SourceConflict)
+                return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Source key belongs to a different AWD check fact.");
+            var response = new SystemScoringEventResponse(result.ScoringEventId, result.Created);
+            return result.Created
+                ? TypedResults.Created($"/internal/competitions/{request.CompetitionId}/scoring-events/{result.ScoringEventId}", response)
+                : TypedResults.Ok(response);
+        }
+        catch (BackgroundWorkUnavailableException)
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "System event processing is unavailable.");
+        }
+    }
+}

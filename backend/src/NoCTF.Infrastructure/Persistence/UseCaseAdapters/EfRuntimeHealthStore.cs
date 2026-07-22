@@ -15,20 +15,47 @@ public sealed class EfRuntimeHealthStore(NoCtfDbContext db) : IRuntimeHealthStor
                                && instance.Status != RuntimeStatus.Failed
                                && instance.Receipt != string.Empty)
             .OrderBy(instance => instance.CreatedAt)
-            .Select(instance => new { instance.Id, instance.Receipt })
+            .Select(instance => new { instance.Id, instance.Receipt, instance.Status })
             .ToListAsync(cancellationToken);
         return records.Select(record =>
         {
             var receipt = JsonSerializer.Deserialize<ContainerReceipt>(record.Receipt)
                 ?? throw new InvalidOperationException($"Runtime receipt for instance {record.Id} is invalid.");
-            return new RuntimeHealthTarget(record.Id, receipt.ResourceId, receipt);
+            return new RuntimeHealthTarget(record.Id, receipt.ResourceId, receipt, record.Status);
         }).ToArray();
     }
 
-    public Task UpdateStatusAsync(Guid instanceId, RuntimeStatus status, DateTimeOffset now, CancellationToken cancellationToken) =>
-        db.ChallengeInstances
+    public async Task<bool> UpdateStatusAsync(
+        Guid instanceId,
+        RuntimeStatus expectedStatus,
+        RuntimeStatus status,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var competitionId = await db.ChallengeInstances
             .Where(instance => instance.Id == instanceId)
+            .Select(instance => (Guid?)instance.CompetitionId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (competitionId is null) return false;
+        _ = await CompetitionWriteLock.AcquireAsync(db, competitionId.Value, cancellationToken);
+        var instanceUpdated = await db.ChallengeInstances
+            .Where(instance => instance.Id == instanceId
+                               && instance.Status == expectedStatus)
             .ExecuteUpdateAsync(update => update
                 .SetProperty(instance => instance.Status, status)
                 .SetProperty(instance => instance.UpdatedAt, now), cancellationToken);
+        if (instanceUpdated != 1) return false;
+        var operationUpdated = await db.RuntimeOperations
+            .Where(operation => operation.ChallengeInstanceId == instanceId
+                                && operation.Status == expectedStatus)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(operation => operation.Status, status)
+                .SetProperty(operation => operation.UpdatedAt, now), cancellationToken);
+        if (operationUpdated != 1) return false;
+        if (status == RuntimeStatus.Failed)
+            await RuntimeFailurePersistence.InvalidateFlagsAsync(db, instanceId, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
 }

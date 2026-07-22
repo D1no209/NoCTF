@@ -16,7 +16,7 @@ public sealed class DeleteChallengeFlagEndpoint(
 {
     public override void Configure()
     {
-        Delete("/admin/competitions/{competitionId}/challenges/{challengeId}/flags/{flagId}");
+        Delete("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
         Summary(summary => summary.Summary = "Deletes a Challenge Flag using optimistic concurrency.");
     }
@@ -26,14 +26,14 @@ public sealed class DeleteChallengeFlagEndpoint(
         CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        request.ChallengeId = Route<Guid>("challengeId");
+        request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
         request.FlagId = Route<Guid>("flagId");
         if (!await authorizer.CanModerateAsync(user.UserId, request.CompetitionId, ct))
             return TypedResults.Forbid();
 
         var result = await delete.ExecuteAsync(
             request.CompetitionId,
-            request.ChallengeId,
+            request.CompetitionChallengeId,
             request.FlagId,
             request.ExpectedRowVersion,
             ct);

@@ -4,7 +4,7 @@ namespace NoCTF.Application.Challenges.Flags;
 
 public sealed record GeneratePenetrationStageFlagCommand(
     Guid CompetitionId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid TeamId,
     Guid StageId,
     Guid ChallengeInstanceId,
@@ -35,7 +35,7 @@ public sealed class GeneratePenetrationStageFlag(
                 "instance_required", "A Penetration stage Flag requires a Challenge instance."));
         return createFlag.ExecuteAsync(new(
             command.CompetitionId,
-            command.ChallengeId,
+            command.CompetitionChallengeId,
             command.TeamId,
             secrets.Generate(),
             command.ValidStart,

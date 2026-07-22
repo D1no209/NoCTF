@@ -12,8 +12,8 @@ public class DefaultEfSubmissionEvaluatorTests
     {
         var received = DateTimeOffset.UtcNow;
         var fingerprint = FlagFingerprint.Create("flag");
-        var submission = new Submission { Id = Guid.NewGuid(), CompetitionId = Guid.NewGuid(), TeamId = Guid.NewGuid(), ChallengeId = Guid.NewGuid(), Kind = SubmissionKind.Flag, FlagHash = fingerprint.Sha256, FlagLength = fingerprint.Length, ReceivedAt = received };
-        var context = new SubmissionProcessingContext(submission, [], [new ChallengeFlag { Flag = "flag", CompetitionId = submission.CompetitionId, ChallengeId = submission.ChallengeId!.Value }], null, "{}", "{}");
+        var submission = new Submission { Id = Guid.NewGuid(), CompetitionId = Guid.NewGuid(), TeamId = Guid.NewGuid(), CompetitionChallengeId = Guid.NewGuid(), Kind = SubmissionKind.Flag, FlagHash = fingerprint.Sha256, FlagLength = fingerprint.Length, ReceivedAt = received };
+        var context = new SubmissionProcessingContext(submission, [], [new ChallengeFlag { Flag = "flag", CompetitionId = submission.CompetitionId, CompetitionChallengeId = submission.CompetitionChallengeId!.Value }], null, "{}", "{}");
 
         var result = new DefaultEfSubmissionEvaluator().Evaluate(context);
 
@@ -25,8 +25,8 @@ public class DefaultEfSubmissionEvaluatorTests
     public async Task Evaluate_PriorCorrectFact_ReturnsDuplicate()
     {
         var fingerprint = FlagFingerprint.Create("flag");
-        var submission = new Submission { Id = Guid.NewGuid(), CompetitionId = Guid.NewGuid(), TeamId = Guid.NewGuid(), ChallengeId = Guid.NewGuid(), Kind = SubmissionKind.Flag, FlagHash = fingerprint.Sha256, FlagLength = fingerprint.Length, ReceivedAt = DateTimeOffset.UtcNow };
-        var prior = new ScoringEvent { Id = Guid.NewGuid(), TeamId = submission.TeamId, ChallengeId = submission.ChallengeId, Result = ScoringResult.Correct };
+        var submission = new Submission { Id = Guid.NewGuid(), CompetitionId = Guid.NewGuid(), TeamId = Guid.NewGuid(), CompetitionChallengeId = Guid.NewGuid(), Kind = SubmissionKind.Flag, FlagHash = fingerprint.Sha256, FlagLength = fingerprint.Length, ReceivedAt = DateTimeOffset.UtcNow };
+        var prior = new ScoringEvent { Id = Guid.NewGuid(), TeamId = submission.TeamId, CompetitionChallengeId = submission.CompetitionChallengeId, Result = ScoringResult.Correct };
         var context = new SubmissionProcessingContext(submission, [prior], [], null, "{}", "{}");
 
         var result = new DefaultEfSubmissionEvaluator().Evaluate(context);
@@ -37,7 +37,7 @@ public class DefaultEfSubmissionEvaluatorTests
     [Test]
     public async Task Evaluate_ValidFix_ReturnsCorrect()
     {
-        var submission = new Submission { Id = Guid.NewGuid(), CompetitionId = Guid.NewGuid(), TeamId = Guid.NewGuid(), ChallengeId = Guid.NewGuid(), Kind = SubmissionKind.Fix, ReceivedAt = DateTimeOffset.UtcNow };
+        var submission = new Submission { Id = Guid.NewGuid(), CompetitionId = Guid.NewGuid(), TeamId = Guid.NewGuid(), CompetitionChallengeId = Guid.NewGuid(), Kind = SubmissionKind.Fix, ReceivedAt = DateTimeOffset.UtcNow };
         var fix = new FixSubmissionRecord { SubmissionId = submission.Id, VerificationStatus = NoCTF.Domain.Submissions.FixVerificationStatus.Valid };
 
         var result = new DefaultEfSubmissionEvaluator().Evaluate(new(submission, [], [], fix, "{}", "{}"));

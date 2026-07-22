@@ -5,7 +5,7 @@ namespace NoCTF.Application.Storage;
 public sealed record CreateFixUploadCommand(
     Guid CompetitionId,
     Guid TeamId,
-    Guid ChallengeId,
+    Guid CompetitionChallengeId,
     Guid UserId,
     string FileName,
     string ContentType,
@@ -79,6 +79,14 @@ public interface IObjectStorage
     Task<StoredObject> PutAsync(string objectKey, string fileName, string contentType, Stream content, CancellationToken cancellationToken);
     Task<Stream> OpenReadAsync(string objectKey, CancellationToken cancellationToken);
     Task DeleteAsync(string objectKey, CancellationToken cancellationToken);
+}
+
+public sealed record AuthorizedFixArchive(Guid UploadId, Guid SubmissionId, string ObjectKey, string FileName, string ContentType);
+
+public interface IFixArchiveDownloadStore
+{
+    Task<AuthorizedFixArchive?> AuthorizeAsync(
+        Guid uploadId, Guid submissionId, DateTimeOffset now, CancellationToken cancellationToken);
 }
 
 public sealed record StoredObject(

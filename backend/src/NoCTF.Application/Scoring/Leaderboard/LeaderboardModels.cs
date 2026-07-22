@@ -1,6 +1,6 @@
 namespace NoCTF.Application.Scoring.Leaderboard;
 
-public sealed record LeaderboardChallengeSummary(Guid ChallengeId, string Direction, int SolveCount);
+public sealed record LeaderboardChallengeSummary(Guid CompetitionChallengeId, string Direction, int SolveCount);
 
 public enum LeaderboardSlotKind
 {
