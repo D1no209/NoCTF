@@ -1,228 +1,57 @@
-# Deployment Guide
+# 部署边界
 
-This guide covers deploying NoCTF with Docker Compose (recommended for single-node setups) or Kubernetes (recommended for production).
+## 必需组件
 
-## Docker Compose
-
-The fastest way to get NoCTF running is with the provided `deploy/docker-compose.yml`.
-
-### Services
-
-| Service | Image | Purpose |
-|---------|-------|---------|
-| `postgres` | `postgres:16` | Primary database |
-| `redis` | `redis:7` | SignalR backplane and leaderboard cache |
-| `minio` | `minio/minio:latest` | S3-compatible object storage |
-| `backend` | Built from `backend/Dockerfile` | NoCTF API and Vue SPA static files |
-| `runner` | Built from `backend/Dockerfile` | Isolated Docker/K8s execution boundary |
-
-### Steps
-
-1. Copy the example environment file:
-
-```bash
-cp .env.example .env
+```text
+NoCTF.API       >=1
+NoCTF.Worker    >=1，可水平扩展
+NoCTF.Runner    >=1，可按 Pool/Provider 扩展
+PostgreSQL
+Redis
+S3-compatible object storage（LocalFileSystem 仅非 HA）
+Frontend/reverse proxy
 ```
 
-2. Edit `.env` and set strong values for the required secrets:
+不支持单进程部署。API 不运行 Worker/Runner 业务 HostedService。
 
-```bash
-POSTGRES_PASSWORD=change_me_strong_password
-JWT_SECRET=change_me_at_least_32_chars_long_secret_key
-MINIO_ROOT_PASSWORD=change_me_minio_password
-RUNNER_API_KEY=change_me_runner_internal_api_key
-```
+## 进程权限
 
-3. Start the stack:
+- API：业务 DB、Wolverine Outbox、Redis、ObjectStorage、公开/内部 HTTP；无 Docker/Kubernetes/Libvirt 权限。
+- Worker：业务 DB、Wolverine queues、Redis、ObjectStorage；无宿主 Runtime socket。
+- Runner：所需业务表和 Wolverine runner queues、Redis heartbeat、内部 archive 读取 API，以及特定 Provider 权限；数据库 role 不授予 User/认证配置写权限，也不需要对象存储通用凭据。
 
-If Docker image pulls must use your local proxy on Windows PowerShell, set the proxy variables in the same terminal first:
+Runner 管理端口只在内部网络。Checker callback API 可达，但严格 JWT audience/permission。
 
-```powershell
-$env:HTTP_PROXY='http://127.0.0.1:7897'
-$env:HTTPS_PROXY='http://127.0.0.1:7897'
-$env:ALL_PROXY='http://127.0.0.1:7897'
-```
+## Provider 前置条件
 
-```bash
-cd deploy && docker compose up --build -d
-```
+- Docker Pool：Docker daemon，禁止把 socket 暴露给题目 Container。
+- Kubernetes Pool：统一 Namespace、NetworkPolicy 能力、固定 Kompose 版本与 kubectl/API 权限。
+- Libvirt Pool：QEMU/KVM/Libvirt、Runner 可访问 OvaSourceUrl；需要 URL 的 VM 具备 QEMU Guest Agent。
 
-4. Verify health:
+同 Pool 节点对 file:// OVA 路径必须有一致挂载。Provider/Pool 不可用会阻止新 Runtime 派发，不影响静态 API。
 
-```bash
-curl http://localhost/api/health
-```
+## 网络
 
-5. Open the app at `http://localhost`.
+外部 TLS 在可信代理终止或进程端到端 TLS。ForwardedHeaders 只信任明确代理。API CORS 精确 Origin+credentials；Refresh Cookie Secure/SameSite Strict。
 
-### Notes
+Runtime 网段与平台数据网隔离；默认拒绝横向访问和云元数据。Runner 仅允许必要 PostgreSQL/Redis/Provider/内部 API 流量；Patch archive 通过绑定单 Submission 的内部 API 读取，不开放对象存储通用网络/凭据。
 
-- The backend does not mount `/var/run/docker.sock`. Container access is isolated in the `runner` service; API-hosted Channel consumers call runner over the internal Compose network.
-- The Docker Compose API image builds the Vue SPA with Bun and serves the built `dist` from ASP.NET Core `wwwroot`, so no separate Nginx frontend container is required.
-- Uploaded files are stored in the `backend_uploads` volume by default. If you prefer S3, change the storage provider configuration.
-- Penetration Challenge ranges can run through the Docker Runner or the Kubernetes Runner. Set `NOCTF_PUBLIC_HOST` / `InstanceAccess:PublicHost` for Docker NodePort-style entry URLs, or `K8s:PublicEntry` / `K8s:IngressBaseDomain` for Kubernetes entries.
-- QQ group broadcasts are optional. Set `NOCTF_QQBOT_PUBLIC_BASE_URL` to the public competition origin used in message links, then configure the global and per-competition policy in WEB administration. The separately deployed BOT agent needs only outbound HTTPS access; follow [QQBot Integration](qqbot-integration.md) and keep its private key off the platform host.
-- Email verification is disabled until SMTP is configured. The environment variables `EMAIL_VERIFICATION_ENABLED`, `NOCTF_PUBLIC_BASE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENABLE_SSL`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_ADDRESS`, and `SMTP_FROM_NAME` provide deployment defaults. A system administrator can then review or replace those values from **Admin → Email verification** without restarting the platform. SMTP credentials are read only by the backend and are never returned to the browser. Production configuration requires HTTPS verification links and TLS-enabled SMTP. With TLS enabled, port 465 uses implicit TLS and other ports require STARTTLS. Existing accounts are marked verified by the migration; only accounts registered after activation require verification.
+## 请求大小
 
-## Kubernetes
+NoCTF 应用层不设置 Payload Too Large，不主动返回 413：Kestrel `MaxRequestBodySize=null`，multipart `MultipartBodyLengthLimit=long.MaxValue`，Endpoint 不附加 RequestSizeLimit。部署代理若设置外部上限属于运维策略，必须与产品方明确，不能被应用文档误称为业务规则。Flag 单项/解包安全限制仍在业务/Runner 层执行；无效 JSON/Flag 是 400，无法处理的 archive 是 422，均不是 413。
 
-NoCTF includes a full set of K8s manifests under `deploy/k8s/`. These manifests deploy the platform services plus a Kubernetes-backed Runner that creates per-instance namespaces for dynamic challenge workloads.
+## 配置/Secret
 
-### Prerequisites
+JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔离。PostgreSQL、Redis、S3 credentials、SMTP、FlagDerivationSecret 不写日志。FlagDerivationSecret 是每 Competition 数据，不是部署 Secret。
 
-- Kubernetes cluster (v1.25+)
-- `kubectl` configured for your cluster
-- NGINX Ingress Controller installed
-- A single backend replica is required because background Channels are process-local and non-durable.
-- Graceful shutdown stops new scoring admissions and drains Maintenance, Processing, then Projection for `BackgroundQueue__ShutdownDrainSeconds` (20 seconds by default). Forced termination can lose an accepted in-memory work item, and committed-but-not-enqueued Submissions are not recovered automatically.
+Runner Pool/Provider/resource max、Redis、Wolverine PostgreSQL transport、S3、CORS/Origin、Cookie Secure、SMTP 是强类型 IOptions 并在进程启动时 ValidateOnStart。
 
-### Creating Secrets
+## 健康与关闭
 
-Use `kubectl create secret` instead of editing `secret.yaml` to avoid committing credentials:
+Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL/Wolverine，API 另检查 Redis 的降级状态，Runner 检查 Provider/queue。Runtime 题目本身不使用平台 Health Probe。
 
-```bash
-kubectl create namespace noctf
+优雅关闭先停止接收/claim 新消息，等待当前短事务/Provider 操作到部署超时；未完成消息依 Wolverine lease 恢复。不得依赖内存 drain 状态。
 
-kubectl create secret generic noctf-secrets \
-  --namespace noctf \
-  --from-literal=jwt-secret='your-jwt-secret-at-least-32-chars' \
-  --from-literal=db-password='your-db-password' \
-  --from-literal=seed-admin-password='your-initial-admin-password' \
-  --from-literal=runner-api-key='your-runner-internal-api-key' \
-  --from-literal=runner-scoring-key='your-runner-scoring-jwt-key-at-least-32-chars' \
-  --from-literal=minio-access-key='your-minio-access-key' \
-  --from-literal=minio-secret-key='your-minio-secret-key' \
-  --from-literal=smtp-username='your-smtp-user' \
-  --from-literal=smtp-password='your-smtp-password'
-```
+## 运维边界
 
-The SMTP secret keys are optional while `EmailVerification__Enabled` is `false`. They may be supplied as bootstrap defaults before the first start, or configured later through **Admin → Email verification**. Administrator-saved SMTP passwords are AES-GCM protected in PostgreSQL with a purpose-specific key derived from the deployment JWT secret. Rotating `Authentication__SigningKey` therefore requires re-entering the SMTP password in the admin page; the password is never returned by the API or written to the audit log.
-
-### Build and Load Images
-
-From the repo root:
-
-```bash
-docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
-docker build -f backend/Dockerfile --target runner -t noctf-runner:latest .
-```
-
-For local clusters, load the images:
-
-```bash
-# kind
-kind load docker-image noctf-backend:latest
-kind load docker-image noctf-runner:latest
-
-# minikube
-minikube image load noctf-backend:latest
-minikube image load noctf-runner:latest
-```
-
-### Apply Manifests
-
-Apply in order to satisfy dependencies, or apply the entire directory at once:
-
-```bash
-# Ordered apply
-kubectl apply -f deploy/k8s/namespace.yaml
-kubectl apply -f deploy/k8s/secret.yaml
-kubectl apply -f deploy/k8s/configmap.yaml
-kubectl apply -f deploy/k8s/postgres-pvc.yaml
-kubectl apply -f deploy/k8s/postgres-deployment.yaml
-kubectl apply -f deploy/k8s/postgres-service.yaml
-kubectl apply -f deploy/k8s/redis-deployment.yaml
-kubectl apply -f deploy/k8s/redis-service.yaml
-kubectl apply -f deploy/k8s/minio-pvc.yaml
-kubectl apply -f deploy/k8s/minio-deployment.yaml
-kubectl apply -f deploy/k8s/minio-service.yaml
-kubectl apply -f deploy/k8s/minio-init-job.yaml
-kubectl apply -f deploy/k8s/runner-rbac.yaml
-kubectl apply -f deploy/k8s/runner-deployment.yaml
-kubectl apply -f deploy/k8s/runner-service.yaml
-kubectl apply -f deploy/k8s/backend-deployment.yaml
-kubectl apply -f deploy/k8s/backend-service.yaml
-kubectl apply -f deploy/k8s/ingress.yaml
-kubectl apply -f deploy/k8s/networkpolicy.yaml
-```
-
-Or apply everything at once:
-
-```bash
-kubectl apply -f deploy/k8s/
-```
-
-### Ingress Setup
-
-The ingress is configured for `noctf.local`. Add it to your hosts file:
-
-```bash
-# Replace <ingress-ip> with the actual external IP of your ingress controller
-echo "<ingress-ip> noctf.local minio.noctf.local" | sudo tee -a /etc/hosts
-```
-
-Verify:
-
-```bash
-kubectl get ingress -n noctf
-kubectl get all -n noctf
-```
-
-### Kubernetes Runner
-
-The Kubernetes Runner is selected with `Runner__Provider=Kubernetes` and uses either in-cluster ServiceAccount credentials or `K8s__KubeConfigPath` for an external runner. The included `runner-rbac.yaml` grants the Runner permission to create and delete per-instance namespaces, Deployments, Services, Jobs, NetworkPolicies, ResourceQuotas, LimitRanges, Secrets, and Ingresses.
-
-Useful settings:
-
-| Setting | Purpose |
-|---------|---------|
-| `K8s__PublicEntry` | Hostname/IP shown with NodePort entries |
-| `K8s__IngressBaseDomain` | Wildcard domain for Ingress entries, e.g. `challenges.example.com` |
-| `K8s__DefaultExposure` | `NodePort`, `Ingress`, or `ClusterIP` |
-| `K8s__NetworkMode` | `Isolated` by default; `Open` allows outbound traffic |
-| `K8s__Registries__0__Registry/UserName/Password` | Optional private registry credentials materialized as image pull Secrets |
-
-Optional kind/minikube smoke flow:
-
-```bash
-kubectl apply -f deploy/k8s/
-kubectl get pods -n noctf
-kubectl port-forward -n noctf svc/backend-service 8080:8080
-curl http://localhost:8080/api/health
-```
-
-Then create a dynamic challenge, start an instance, verify that the entry URL points to either the configured NodePort host or wildcard Ingress host, stop the instance, and confirm that the generated `noctf-inst-*` namespace is removed.
-
-### Docker Runner On Privileged Nodes
-
-AWD mode requires access to a container runtime for spawning challenge containers. This should be isolated to a dedicated Runner deployment.
-
-To enable Docker-backed Runner on a privileged node, mount the Docker socket only in a dedicated runner deployment:
-
-```yaml
-volumeMounts:
-  - name: docker-sock
-    mountPath: /var/run/docker.sock
-volumes:
-  - name: docker-sock
-    hostPath:
-      path: /var/run/docker.sock
-      type: Socket
-```
-
-Use a dedicated node pool with taints/tolerations for Runner workloads so privileged container access is isolated from API and database pods.
-
-### Network Policy Notes
-
-`networkpolicy.yaml` enforces a default-deny posture:
-
-- Backend can reach postgres (5432) and redis (6379)
-- Backend accepts traffic only from the `ingress-nginx` namespace
-- AWD challenge pods accept traffic only from pods labeled `app=noctf-checker`
-- DNS egress (port 53) is allowed for all pods
-
-Make sure the `ingress-nginx` namespace has the label `kubernetes.io/metadata.name: ingress-nginx`:
-
-```bash
-kubectl get namespace ingress-nginx --show-labels
-```
+平台不实现数据库/对象备份、PITR 或恢复编排；由外部运维负责。Redis 可丢失并重建。QQBot 不部署。

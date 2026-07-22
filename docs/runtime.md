@@ -1,0 +1,156 @@
+# Runtime 规范
+
+## 类型与 Provider
+
+RuntimeKind：
+
+- `Container`：单容器；Provider Docker/Kubernetes。
+- `Compose`：原始 compose.yaml；Provider Docker/Kubernetes（Kompose）。
+- `OvaVm`：Libvirt/QEMU/KVM，多 VM Appliance。
+
+RuntimeKind 与 RuntimeProvider 是独立 enum。Runtime 配置包含 RunnerPool，任务进入对应 Wolverine durable queue。
+
+模式兼容矩阵：
+
+| 模式/用途 | Container | Compose | OvaVm |
+|---|---:|---:|---:|
+| CTF Static/PerTeamRuntime | 是 | 是 | 是，但 FlagSource 只能 Static |
+| AWD 长期按队 Runtime | 是 | 是 | 否 |
+| AWDP 一次性 Fix target | 是 | 否 | 否 |
+| KoH shared Hill | 是 | 是 | 是 |
+
+OVA 永远不接收平台生成的动态/PerTeam/AWD Flag，也不执行 Flag 注入命令；“固定 Flag”必须作为 ChallengeFlag 预先存在并由题目镜像/虚拟机自身配置使用。
+
+## RuntimeInstance 生命周期
+
+```text
+不存在 -> Queued -> Provisioning -> Running -> Stopping -> Stopped
+             \----------\----------\----------\-> Failed
+                                                    \-> Stopping (Reset cleanup)
+```
+
+不存在不是持久化状态；真实实例从 Queued 开始。每次 Start/Reset 创建新 RuntimeInstance/Generation；Stopped/Failed 历史实例保留。容量不足只保持 Queued，Runner 接单并预留容量后才进入 Provisioning。Provider 报告资源 Running 即 Running，不做 ReadinessProbe/Health Check。
+
+API Start/Stop/Reset/Extend 返回 202、RuntimeInstanceId 与状态 URL。相同实例同时只允许一个状态变更；通过 State+ProcessingVersion 防重复/迟到。Failed 不公开 URL，可再次 Start 新 Generation。
+
+玩家动作按模式固定：CTF 允许 Start/Stop/Reset/Extend；AWD Runtime 由比赛生命周期自动 Start/Stop，玩家只允许 Reset；KoH shared Runtime 仅 Manager 管理；AWDP 一次性 target 没有玩家 Runtime API。管理动作也必须遵守相同状态机，只有系统 Competition Finish/Ban 清理可跳过玩家动作权限，但不能跳过版本栅栏。
+
+状态动作固定如下：
+
+- Start：没有 Queued/Provisioning/Running/Stopping 实例时，在题目级事务锁内创建 `generation=max+1` 的 Queued 实例；若最新 Failed 仍有 receipt，新实例以它为 replacement 并先执行幂等清理。已有活动实例返回 409 `RuntimeAlreadyActive` 和该实例 Id。
+- Stop：仅 Queued/Provisioning/Running 可接受。Queued 可直接变 Stopped；其余变 Stopping 并投递销毁。Stopped/Failed 返回 409 `RuntimeNotActive`，Stopping 返回原实例的 202。
+- Reset：仅 Provisioning/Running/Failed 可接受。在同一事务把旧实例置 Stopping，创建带 `replacesRuntimeInstanceId` 的新 Queued Generation；即使旧状态 Failed，清理仍幂等执行。新实例必须等旧资源完成清理后才能 Provisioning。这个替换对并发额度只占一个槽位。
+- Extend：只修改 Running 实例的 ExpiresAt 和 ProcessingVersion，并投递带新版本的到期消息；旧到期消息到达时版本不符即 superseded。
+
+GET 返回最新 Generation；活动实例优先于历史实例。Queued/Provisioning/Stopping 只返回状态和 Id，Running 才返回 URL，Stopped/Failed 返回终态；Failed 返回强类型 RuntimeFailureCode。Provider receipt 与原始错误只向管理者返回。
+
+## CTF 按需与 TTL
+
+CTF PerTeamRuntime 不预创建。首次 Start 时创建，每个 Team/CompetitionChallenge 同时最多一个。团队成员共享。
+
+- RuntimeLifetimeSeconds >0；进入 Running 时 `ExpiresAt=now+lifetime`。
+- 只有 `0 < remaining < 10 minutes` 可 Extend；更新为 `now+lifetime`，不累加旧时间。
+- 已到期/开始回收返回 409 RuntimeExpirationStarted。
+- TTL 使用真实 UTC，Paused 不冻结。
+- Stop 销毁资源和运行数据；Reset=销毁后立即新 Generation；固定 PerTeam Flag 不变。
+- MaxConcurrentRuntimeInstancesPerTeam <=0 无限；Container/Compose/OvaVm 各算一个实例。额度统计 Queued/Provisioning/Running/Stopping，Reset 的前后 Generation 合并算一个替换槽。AWD Start Gate 要求额度覆盖全部题；AWDP disposable/KoH shared 不计每队额度。
+
+## URL Binding
+
+公开连接最终只保存/返回完整字符串数组：
+
+```json
+{ "urls": ["http://host:31001", "ssh://user:password@host:31002"] }
+```
+
+配置按顺序声明多个 Binding：
+
+- Container：UrlTemplate + ContainerPort + Exposure；
+- Compose：UrlTemplate + ServiceName + ContainerPort + Exposure；
+- OVA：UrlTemplate + VmId + GuestPort? + Exposure。
+
+`Exposure` 只有 `OwnerOnly | Participants`。本队 Runtime GET 返回两类；AWD targets 对其他队只返回 Participants 且必须等加固期结束；KoH challenge detail 只返回 Participants；OwnerOnly 永不跨队。CTF 只允许 OwnerOnly，KoH 至少一个 Participants。Runner 展开时把全部 URL 与 Participants 的 0-based indexes 一起固化到 RuntimeInstance，因此之后配置变化不改变当前 Generation。响应仍只是按配置顺序筛选后的 `urls: string[]`，不暴露 Binding 元数据。
+
+占位符大小写敏感：`{HOST}`、`{PORT}`。直接原文替换，不 URL encode；未知占位符拒绝保存。Container/Compose 必须声明目标端口并使用动态映射；模板应使用 HOST/PORT。OVA 的 GuestPort 可空：空时不得用 PORT，Runner 直接以 VM 可访问地址展开 HOST，不做端口转发；模板也可使用固定绝对 URL。展开后必须是绝对 URI。
+
+只有 Running 向本队/管理者返回 URL。URL 可含凭据，不建 RuntimeCredential；停止后隐藏历史 URL。
+
+## Container 配置
+
+```text
+Provider: Docker | Kubernetes
+RunnerPool
+Image
+Command: string[]?
+Environment: map<string,string>
+UrlBindings[]
+Resources: CpuCores, MemoryBytes, PidsLimit, EphemeralStorageBytes
+EgressPolicy: DenyAll | InternetOnly
+RuntimeLifetimeSeconds
+OperationTimeoutSeconds
+FlagSource / FlagEnvironmentVariableName?
+```
+
+Command null 使用镜像默认。环境变量名合法且不能使用 `NOCTF_`。Image 可为 tag/digest，不强制 pin；配置变化只影响新 Generation。
+
+## Compose
+
+题目保存原始 compose.yaml，允许自定义内部 network。Docker Runner 直接运行 Compose；Kubernetes Runner 使用固定版本 Kompose 转换后部署到平台统一配置的 Namespace。
+
+保存与执行前解析 YAML，转换后解析 manifests。永久拒绝：privileged、host network/PID/IPC、hostPath/bind/named/external volume、tmpfs/emptyDir/PVC、configs/secrets mount、device、Docker socket、高危 capability、题目 Namespace/Ingress/NodePort/LoadBalancer。平台覆盖隔离标签、NetworkPolicy、资源限制与清理标签。
+
+不支持任何目录/卷挂载；只使用镜像自身可写层。Kompose 不支持字段、转换失败或危险资源使实例 Failed。
+
+Compose URL Binding 通过 ServiceName+ContainerPort 定位；配置顺序决定返回顺序。
+
+## OVA/Libvirt
+
+平台不上传、存储、校验或管理 OVA。配置只保存 `OvaSourceUrl`，允许 Provider 支持的绝对 URI（包括 https/file）。Runner Pool 节点自行保证可访问、导入、缓存与校验；失败使 RuntimeInstance Failed。
+
+一个 OVA 可含多 VM，整体作为 Appliance：Start/Stop/Reset/Expire 原子作用于全部 VM，不允许选手单独操作。VmId 来自 Provider/OVF 稳定标识；各 VM 位于该 Team/题独立虚拟网络并可互通。需要 URL 的 VM 使用 QEMU Guest Agent 获取地址；超时则整个实例失败。OVA 只允许 Static Flag，不注入 PerTeam Flag。
+
+## Flag 注入
+
+### CTF Container/Compose
+
+PerTeam Flag 仅以环境变量在创建时注入。每个目标服务配置一个合法变量名；Compose 可指定多个服务；Runner 覆盖 YAML/镜像同名值。需要文件的镜像由自身 ENTRYPOINT 写入。平台不挂载 Flag 文件/Secret。
+
+### AWD 热轮换
+
+题目配置 Shell 模板，例如：
+
+```sh
+echo ${FLAG} > /flag
+```
+
+Runner 在目标 Container/Compose service 执行 `/bin/sh -c`。`${FLAG}` 直接原文替换，不引用、不转义、不编码；模板作者是受信任管理者并承担 Shell 注入语义。模板至少出现一次 FLAG，未知占位符拒绝。AWD 不允许 OVA。
+
+非零/超时/Provider 失败由 Wolverine 用同一当轮 Flag 重试，只重试到 ValidUntil，之后最终失败。Flag 窗口不根据实际注入成功时间改变。
+
+## 网络安全
+
+每个 Team/题/Generation 独立网络。永久禁止平台 API/Worker/Runner 管理地址、PostgreSQL、Redis、对象存储内网、云元数据、其他 Team Runtime。Compose 内同实例服务可互通。
+
+EgressPolicy 默认 DenyAll；InternetOnly 仅公网+DNS，仍阻断私网与平台。入站只通过 URL Binding。
+
+永久禁止 privileged、host namespace、Docker socket、host mount、device 与 SYS_ADMIN/SYS_MODULE 等高危 capability。默认 no-new-privileges/drop all；特殊高权限环境使用隔离 VM。
+
+Kubernetes 使用统一 Namespace，平台注入不可覆盖标签：`noctf.io/runtime-instance-id`、`noctf.io/competition-id`、`noctf.io/competition-challenge-id`、`noctf.io/team-id`（shared 空缺）、`noctf.io/generation`、`noctf.io/managed=true`。Docker/Compose 使用完全相同的 labels。清理器必须同时匹配 managed、RuntimeInstanceId 与 Generation，不能按宽泛 Competition/Team 标签批量误删。
+
+## 资源与容量
+
+部署配置各 Provider/Pool 最大 CPU、内存、PID、临时磁盘。题目必须声明正请求值；Compose 声明服务与总额度；Runner 创建前验证并强制应用。无法落实配额则失败；容量不足保持 Queued且 TTL 未开始。
+
+Runner heartbeat/capacity 存 Redis TTL；实际 RunnerId/Pool 与 receipt 存 RuntimeInstance。Redis 故障不派发新实例。
+
+## Checker 调度字段
+
+AWD Checker 不建立 Operation 表。每个 AWD RuntimeInstance 保存 `CheckerSequence`（已分配的最大序号）、`LastAppliedCheckerSequence`、`LastAppliedCheckerBodySha256` 与 `NextCheckerDueAt`：
+
+1. Worker 在短事务中锁 RuntimeInstance，若已到期且没有更新序号的任务，就递增 CheckerSequence、推进 NextCheckerDueAt，并写 Runner Outbox；
+2. durable message 带 RuntimeInstanceId、Generation、CheckerSequence、Deadline 和最小权限 JWT；
+3. callback 先把 typed state 规范化为精确 ASCII `Up`/`Down`，body hash=`SHA256(UTF8(normalizedState))`；序号大于 LastApplied 时比较当前服务状态，只在 Up/Down 发生变化时插入 AwdServiceStatus，无变化也更新 LastApplied 序号与 body hash；
+4. callback 序号等于 LastApplied 且 body hash 相同是幂等成功，不同返回 409；更小返回 202 superseded；
+5. Paused 清空 NextCheckerDueAt 且不补跑，Resume 将它设为当前时间。Finished 后不再分配序号。
+
+这些字段只负责调度和 HTTP 重试幂等，不是计分状态副本；轮次末状态仍从默认 Up 加 AwdServiceStatus 变化事件推导。
