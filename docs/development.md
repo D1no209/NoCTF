@@ -1,160 +1,82 @@
-# Development Guide
+# 开发规范
 
-This guide explains how to set up a local development environment for NoCTF.
+## 技术基线
 
-## Prerequisites
+- .NET 10 / C# current；
+- FastEndpoints 8.2 StronglyTyped；
+- EF Core 10 + Npgsql/PostgreSQL；
+- Wolverine PostgreSQL persistence/transport；
+- Redis/SignalR backplane；
+- DynamicExpresso；
+- TUnit + NSubstitute + Testcontainers。
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Bun](https://bun.sh/) for frontend install, development, and production builds
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL, Redis, and container features)
+实现前以仓库 Central Package Management 的实际版本为准。
 
-Optional but recommended:
+## 功能纵切目录
 
-- [EF Core CLI tools](https://learn.microsoft.com/en-us/ef/core/cli/dotnet): `dotnet tool install --global dotnet-ef`
+```text
+NoCTF.Domain/
+  Competitions/
+  Challenges/
+  Teams/
+  Submissions/
+  Runtime/
 
-## Backend Development
+NoCTF.Application/
+  Competitions/Lifecycle/
+  Competitions/Scoring/
+  Submissions/Intake/
+  Submissions/Evaluation/
+  Submissions/Rejudging/
+  Flags/Generation/
+  Flags/Matching/
+  Runtime/Lifecycle/
 
-The backend is an ASP.NET Core application using FastEndpoints. In development mode it can proxy the frontend Vite dev server automatically.
-
-1. Start the required infrastructure services (PostgreSQL, Redis, MinIO, and Runner when testing container-backed modes) with Docker Compose:
-
-```bash
-cd deploy && docker compose up -d postgres redis minio runner
+NoCTF.Infrastructure/
+  Competitions/
+  Submissions/
+  Flags/
+  Runtime/
+  Storage/
+  Messaging/
 ```
 
-2. Ensure your local environment is configured. The backend reads from `appsettings.Development.json` and environment variables. At minimum you need a connection string and JWT secret. Example:
+接口和用例就近，不建横向 Ports/UseCaseAdapters/Services/Helpers 垃圾目录。Infrastructure 类型按业务职责命名，如 SubmissionStore，不统一加 Ef 前缀。
 
-```bash
-export ConnectionStrings__PostgreSql="Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=change_me_strong_password"
-export ConnectionStrings__Redis="localhost:6379"
-export Authentication__SigningKey="change_me_at_least_32_chars_long_secret_key"
-export RunnerScoring__SigningKey="change_me_at_least_32_chars_long_runner_key"
+## FastEndpoints
+
+一个 Endpoint 一个文件；Endpoint、Request、Response、Validator 同文件。复用 API model 放最接近概念所有权的 Endpoint 文件，禁止公共 Models/DTOs 文件。唯一例外是无业务字段的 signed-keyset `KeysetPage<T>`/cursor codec，集中在 API `Pagination` 功能目录，不能扩张为 DTO dumping ground。使用 ExecuteAsync、TypedResults、明确 Results union；禁止业务 Endpoint 手写响应。
+
+每个有输入约束的 Request 配 FluentValidation。Validator 校验协议形状，Application/Domain 必须二次校验业务不变量。
+
+## EF Core
+
+Data Annotations 优先。只有 jsonb、uuid[]、GIN、部分索引、复杂 check/value conversion 等必要内容用小型 IEntityTypeConfiguration/ModelBuilder，并说明原因。
+
+不使用 LINQ query syntax；全部 method syntax。只读查询 AsNoTracking/投影所需列；避免 N+1。异步 I/O 传 CancellationToken。
+
+迁移只能：
+
+```text
+dotnet ef migrations add ...
+dotnet ef migrations remove
+dotnet ef database update
 ```
 
-> On Windows PowerShell use `$env:ConnectionStrings__PostgreSql = "..."`
+禁止编辑生成文件。本目标不兼容旧 schema，最终只有 EF 生成 InitialBaseline。
 
-3. Run the API:
+## Bounded Concepts
 
-```bash
-dotnet run --project backend/src/NoCTF.API
-```
+状态、Kind、Provider、FailureCode、Permission、Result 等必须 enum/value object；开放文本才使用 string。协议文本转换只在边界。Runtime Config/Message/Callback 使用强类型 DTO 与 schemaVersion。
 
-The API will start on `http://localhost:5000` (or the port configured in launchSettings). In development mode, ASP.NET Core proxies the SPA to the Vite dev server at `http://localhost:5173`.
+## 消息
 
-4. Open the app in your browser:
+业务写+Outbox 同事务。Handler 假设至少一次投递，以 ProcessingVersion/唯一约束/自然键幂等。禁止 fire-and-forget、业务 Channel、同步阻塞 async 或在数据库事务中调用外部 Provider。
 
-```
-http://localhost:5000
-```
+## 日志
 
-### Database Migrations
+结构化日志包含 Competition/Challenge/Team/Submission/RuntimeInstance/Message Id。Flag 可记录；密码、任何 JWT/Token、InvitationToken、FlagDerivationSecret 不记录。异常不作为业务分支；Result/enum 表达预期失败。
 
-Add a new migration from the repo root:
+## 文档同步
 
-```bash
-dotnet ef migrations add MyMigrationName \
-  --project backend/src/NoCTF.Infrastructure \
-  --startup-project backend/src/NoCTF.API
-```
-
-Apply migrations:
-
-```bash
-dotnet ef database update \
-  --project backend/src/NoCTF.Infrastructure \
-  --startup-project backend/src/NoCTF.API
-```
-
-## Frontend Development
-
-The frontend is a Vue 3 single-page application built with Vite.
-
-1. Install dependencies:
-
-```bash
-cd frontend && bun install
-```
-
-2. Start the Vite dev server:
-
-```bash
-bun run dev
-```
-
-The dev server runs at `http://localhost:5173`.
-
-Vite proxies API and SignalR requests to the real local backend by default. Mock routes are only enabled when explicitly requested with `VITE_ENABLE_MOCKS=true`; do not enable them while validating login or management APIs against the backend.
-
-If the backend is running with `dotnet run`, you can also access the frontend through the backend URL (`http://localhost:5000`) because of the SPA proxy. The API project is configured with `SpaProxyLaunchCommand=bun run dev`; you can also start `bun run dev` yourself before opening the backend URL.
-
-Production publish uses the checked-in `bun.lock` to build the SPA and copy `frontend/dist` into the API `wwwroot`.
-
-### Generate the OpenAPI Client
-
-The frontend uses a typed API client generated from the backend OpenAPI spec.
-
-1. Make sure the backend is running locally.
-
-2. Fetch the backend OpenAPI artifact:
-
-```bash
-cd frontend && bun run fetch-openapi
-```
-
-3. Generate the client:
-
-```bash
-cd frontend && bun run generate-api
-```
-
-This runs `openapi-ts` against `backend/artifacts/openapi/swagger.json` and creates/updates the client code in the frontend source tree.
-
-## Running Tests
-
-NoCTF includes backend unit and integration tests in `backend/tests/NoCTF.Tests`.
-
-Run all tests:
-
-```bash
-dotnet test backend/tests/NoCTF.Tests
-```
-
-Run with verbosity:
-
-```bash
-dotnet test backend/tests/NoCTF.Tests --logger "console;verbosity=detailed"
-```
-
-## Project Layout for Developers
-
-```
-backend/src/
-  NoCTF.API/           # Web layer (endpoints, SignalR, auth, middleware)
-  NoCTF.Application/   # Services, DTOs, event handlers
-  NoCTF.Core/          # Entities, enums, domain constants
-  NoCTF.Infrastructure/# DbContext, migrations, storage, tenanting
-  NoCTF.PluginBase/    # Plugin contracts
-  NoCTF.Container.Docker/  # Docker orchestration
-  NoCTF.Runner.Client/ # HTTP client and contracts for runner calls
-  NoCTF.Runner/        # Runtime boundary that owns Docker access
-  NoCTF.API/            # HTTP API and in-process Channel consumers
-  NoCTF.Plugins.CTF/   # CTF plugin
-  NoCTF.Plugins.AWD/   # AWD plugin
-  NoCTF.Plugins.AWDP/  # AWDP plugin
-  NoCTF.Plugins.KoH/   # KoH plugin
-  NoCTF.Plugins.QQBot/ # Optional QQ notification plugin
-
-frontend/
-  src/                 # Vue 3 application source
-  package.json
-  vite.config.ts
-  openapi-ts.config.ts # Configuration for API generation
-```
-
-## Useful Tips
-
-- Use `dotnet watch run --project backend/src/NoCTF.API` for hot reload during backend development.
-- The backend health endpoint is a quick way to verify everything is wired up: `curl http://localhost:5000/api/health`
-- Swagger UI is available at `http://localhost:5000/swagger` when running in development mode.
-- If you change an endpoint DTO, regenerate the OpenAPI client so the frontend types stay in sync.
-- Keep QQBot platform code in C#. The separately deployed outbound NoneBot agent is under `integrations/qqbot`; never develop it inside the read-only reference checkout at `/workspace/QQBOT`.
+修改领域契约必须同时更新 docs、OpenAPI 和测试。不得以代码现状为理由修改文档来恢复已废弃 Penetration、单进程、RuntimeOperation、Artifact、TeamMember 或 Collaborator 表。
