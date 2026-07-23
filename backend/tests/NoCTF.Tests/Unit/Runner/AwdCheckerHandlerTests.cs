@@ -1,0 +1,72 @@
+using Microsoft.Extensions.Configuration;
+using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
+using NoCTF.Runner.Composition;
+using NoCTF.Runner.Messages;
+using Wolverine.Attributes;
+
+namespace NoCTF.Tests.Unit.Runner;
+
+public sealed class AwdCheckerHandlerTests
+{
+    [Test]
+    public async Task Checker_provider_io_explicitly_opts_out_of_ambient_ef_transactions()
+    {
+        var attributes = typeof(AwdCheckerHandler)
+            .GetCustomAttributes(typeof(NonTransactionalAttribute), inherit: true);
+
+        await Assert.That(attributes).HasSingleItem();
+    }
+
+    [Test]
+    public async Task Checker_job_receives_target_and_claim_bound_callback_only_at_execution_time()
+    {
+        var runner = new RecordingOneShotRunner();
+        var executor = new AwdCheckerExecutor(new StubProviderCatalog(runner));
+        var deadline = DateTimeOffset.Parse("2026-07-24T00:01:00Z");
+        var work = new AwdCheckerWork(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            RuntimeProvider.Docker,
+            "checker:latest",
+            ["/checker"],
+            new Dictionary<string, string> { ["MODE"] = "awd" },
+            new Uri("http://target.internal/health"),
+            new Uri("https://api.example/api/internal/v1/awd/check-results"),
+            "claim-bound-token",
+            deadline,
+            TimeSpan.FromMinutes(1));
+
+        await executor.ExecuteAsync(work, CancellationToken.None);
+
+        var request = runner.Request!;
+        await Assert.That(request.Environment["NOCTF_TARGET_URL"])
+            .IsEqualTo("http://target.internal/health");
+        await Assert.That(request.Environment["NOCTF_CALLBACK_URL"])
+            .IsEqualTo("https://api.example/api/internal/v1/awd/check-results");
+        await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"])
+            .IsEqualTo("claim-bound-token");
+        await Assert.That(request.OperationTimeout).IsEqualTo(TimeSpan.FromMinutes(1));
+    }
+
+    private sealed class StubProviderCatalog(IOneShotJobRunner runner)
+        : IOneShotRuntimeProviderCatalog
+    {
+        public IOneShotJobRunner OneShot(RuntimeProvider provider) => runner;
+    }
+
+    private sealed class RecordingOneShotRunner : IOneShotJobRunner
+    {
+        public ContainerRequest? Request { get; private set; }
+
+        public Task<OneShotResult> RunAsync(
+            ContainerRequest request,
+            CancellationToken cancellationToken)
+        {
+            Request = request;
+            var now = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
+            return Task.FromResult(new OneShotResult("checker", 0, "", "", now, now));
+        }
+    }
+}

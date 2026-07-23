@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260723210905_InitialBaseline")]
+    [Migration("20260723213135_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -729,6 +729,12 @@ namespace NoCTF.Infrastructure.Migrations
                             Kind = (short)1,
                             ProcessingVersion = 1L,
                             UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Kind = (short)2,
+                            ProcessingVersion = 1L,
+                            UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
                 });
 
@@ -738,6 +744,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("CheckerDeadlineAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checker_deadline_at");
 
                     b.Property<long>("CheckerSequence")
                         .HasColumnType("bigint")

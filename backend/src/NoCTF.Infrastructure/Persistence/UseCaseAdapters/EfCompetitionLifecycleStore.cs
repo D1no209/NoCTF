@@ -95,7 +95,16 @@ public sealed class EfCompetitionLifecycleStore(
                                 (DateTimeOffset?)null)
                             .SetProperty(
                                 instance => instance.CheckerSequence,
-                                instance => instance.CheckerSequence + 1),
+                                instance => instance.CheckerSequence + 1)
+                            .SetProperty(
+                                instance => instance.LastAppliedCheckerSequence,
+                                instance => instance.CheckerSequence + 1)
+                            .SetProperty(
+                                instance => instance.LastAppliedCheckerBodySha256,
+                                (byte[]?)null)
+                            .SetProperty(
+                                instance => instance.CheckerDeadlineAt,
+                                (DateTimeOffset?)null),
                         cancellationToken);
             }
             else if (from == CompetitionStatus.Paused && to == CompetitionStatus.Running)

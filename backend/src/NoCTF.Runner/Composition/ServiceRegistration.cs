@@ -13,6 +13,8 @@ using NoCTF.Runtime.Libvirt;
 using k8s;
 using NoCTF.Runner.Messages;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.Application.Authentication;
+using NoCTF.Infrastructure.Authentication;
 
 namespace NoCTF.Runner.Composition;
 
@@ -52,8 +54,12 @@ public static class ServiceRegistration
             provider.GetRequiredService<RuntimeProviderCatalog>());
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AwdFlagInjectionConfigurationCatalog>();
+        services.AddSingleton<AwdCheckerConfigurationCatalog>();
+        services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddSingleton<IAwdFlagInjectionExecutor, AwdFlagInjectionExecutor>();
         services.AddSingleton<IAwdFlagInjectionWorkReader, AwdFlagInjectionWorkReader>();
+        services.AddSingleton<IAwdCheckerWorkReader, AwdCheckerWorkReader>();
+        services.AddSingleton<IAwdCheckerExecutor, AwdCheckerExecutor>();
         services.AddSingleton<FixArchivePreparer>();
         services.AddScoped<IFixArchiveReader, EfFixArchiveReader>();
         services.AddSingleton<IObjectStorage, LocalObjectStorage>();

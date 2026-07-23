@@ -10,6 +10,9 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Notifications;
 using System.Text.Json;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using NoCTF.GameModes.Awd.Configuration;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle;
 
 namespace NoCTF.Worker;
@@ -19,6 +22,125 @@ public static class BackendMessageHandlers
     private static readonly TimeSpan RunnerReconciliationInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RunnerDependencyRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan CompetitionLifecycleInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan AwdCheckerDispatchInterval = TimeSpan.FromSeconds(1);
+
+    public static async Task Handle(
+        DispatchAwdCheckers message,
+        NoCtfDbContext db,
+        AwdCheckerConfigurationCatalog configurations,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken) =>
+        _ = await ExecuteAwdCheckerDispatchAsync(
+            message,
+            db,
+            configurations,
+            outbox,
+            cancellationToken);
+
+    public static async Task<MessageExecutionOutcome> ExecuteAwdCheckerDispatchAsync(
+        DispatchAwdCheckers message,
+        NoCtfDbContext db,
+        AwdCheckerConfigurationCatalog configurations,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        const int batchSize = 500;
+        var schedule = await db.DurableMaintenanceSchedules.SingleAsync(
+            candidate => candidate.Kind == MaintenanceChainKind.AwdCheckerDispatch,
+            cancellationToken);
+        if (schedule.ProcessingVersion != message.ProcessingVersion)
+            return MessageExecutionOutcome.Superseded;
+
+        var targets = await db.RuntimeInstances
+            .Where(runtime => runtime.State == RuntimeState.Running
+                && runtime.NextCheckerDueAt != null
+                && runtime.NextCheckerDueAt <= message.At
+                && runtime.RunnerId != null
+                && runtime.ControlCheckUrl != null
+                && (message.AfterRuntimeInstanceId == null
+                    || runtime.Id.CompareTo(message.AfterRuntimeInstanceId.Value) > 0))
+            .Join(
+                db.CompetitionChallenges,
+                runtime => runtime.CompetitionChallengeId,
+                challenge => challenge.Id,
+                (runtime, challenge) => new { Runtime = runtime, Challenge = challenge })
+            .Join(
+                db.Competitions,
+                pair => pair.Runtime.CompetitionId,
+                competition => competition.Id,
+                (pair, competition) => new
+                {
+                    pair.Runtime,
+                    pair.Challenge,
+                    Competition = competition
+                })
+            .Where(target => target.Competition.Mode == NoCTF.Domain.Competitions.GameMode.Awd
+                && target.Competition.Status == NoCTF.Domain.Competitions.CompetitionStatus.Running)
+            .OrderBy(target => target.Runtime.Id)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+
+        var applied = false;
+        foreach (var target in targets)
+        {
+            var settings = configurations.Get(
+                target.Competition.ConfigurationJson,
+                target.Challenge.ConfigurationJson);
+            if (settings.Checker is not { } checker)
+            {
+                target.Runtime.NextCheckerDueAt = null;
+                target.Runtime.CheckerDeadlineAt = null;
+                continue;
+            }
+
+            var interval = TimeSpan.FromSeconds(settings.CheckerIntervalSeconds);
+            if (target.Runtime.CheckerSequence > target.Runtime.LastAppliedCheckerSequence)
+            {
+                if (target.Runtime.CheckerDeadlineAt is { } deadline && deadline <= message.At)
+                {
+                    target.Runtime.LastAppliedCheckerSequence = target.Runtime.CheckerSequence;
+                    target.Runtime.LastAppliedCheckerBodySha256 = null;
+                    target.Runtime.CheckerDeadlineAt = null;
+                    await outbox.PublishAsync(new AwdCheckerFailed(
+                        target.Runtime.CompetitionId,
+                        target.Runtime.CompetitionChallengeId,
+                        target.Runtime.Id,
+                        target.Runtime.Generation,
+                        target.Runtime.CheckerSequence,
+                        target.Runtime.ProcessingVersion,
+                        message.At));
+                    applied = true;
+                }
+                target.Runtime.NextCheckerDueAt = message.At.Add(interval);
+                continue;
+            }
+
+            target.Runtime.CheckerSequence = checked(target.Runtime.CheckerSequence + 1);
+            target.Runtime.CheckerDeadlineAt = message.At.AddSeconds(checker.TimeoutSeconds);
+            target.Runtime.NextCheckerDueAt = message.At.Add(interval);
+            await outbox.PublishToRunnerNodeAsync(new RunAwdChecker(
+                target.Runtime.Id,
+                target.Runtime.CompetitionChallengeId,
+                target.Runtime.Generation,
+                target.Runtime.CheckerSequence,
+                target.Runtime.ProcessingVersion,
+                target.Runtime.CheckerDeadlineAt.Value,
+                target.Runtime.RunnerPool,
+                target.Runtime.RunnerId!));
+            applied = true;
+        }
+
+        var pageIsFull = targets.Count == batchSize;
+        var nextAt = pageIsFull ? DateTimeOffset.UtcNow : DateTimeOffset.UtcNow.Add(AwdCheckerDispatchInterval);
+        AdvanceMaintenanceSchedule(schedule, nextAt);
+        await outbox.ScheduleAsync(new DispatchAwdCheckers(
+            nextAt,
+            schedule.ProcessingVersion,
+            pageIsFull ? targets[^1].Runtime.Id : null), nextAt);
+        await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+        return applied ? MessageExecutionOutcome.Applied : MessageExecutionOutcome.Idempotent;
+    }
 
     public static async Task Handle(
         AdvanceAwdRound message,
@@ -73,6 +195,63 @@ public static class BackendMessageHandlers
             });
         }
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public static async Task Handle(
+        AwdCheckerFailed message,
+        NoCtfDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(candidate => candidate.Id == message.CompetitionId)
+            .Select(candidate => new { candidate.OwnerId, candidate.ManagerIds })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (competition is null)
+            return;
+        var recipients = competition.ManagerIds.Append(competition.OwnerId).Distinct().ToArray();
+        var failureId = CreateAwdCheckerFailureId(
+            message.RuntimeInstanceId,
+            message.CheckerSequence);
+        var existing = await db.Notifications.AsNoTracking()
+            .Where(notification => recipients.Contains(notification.UserId)
+                && notification.CompetitionId == message.CompetitionId
+                && notification.EntityId == failureId
+                && notification.Kind == NotificationKind.ManagementFailure)
+            .Select(notification => notification.UserId)
+            .ToListAsync(cancellationToken);
+        var payload = JsonSerializer.Serialize(new
+        {
+            code = "awd_checker_callback_missing",
+            message.CompetitionChallengeId,
+            message.RuntimeInstanceId,
+            message.Generation,
+            message.CheckerSequence,
+            message.ProcessingVersion
+        });
+        foreach (var userId in recipients.Except(existing))
+        {
+            db.Notifications.Add(new Notification
+            {
+                Id = Guid.CreateVersion7(message.OccurredAt),
+                UserId = userId,
+                CompetitionId = message.CompetitionId,
+                EntityId = failureId,
+                Kind = NotificationKind.ManagementFailure,
+                PayloadJson = payload,
+                CreatedAt = message.OccurredAt
+            });
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static Guid CreateAwdCheckerFailureId(Guid runtimeInstanceId, long checkerSequence)
+    {
+        Span<byte> input = stackalloc byte[24];
+        runtimeInstanceId.TryWriteBytes(input[..16]);
+        BinaryPrimitives.WriteInt64BigEndian(input[16..], checkerSequence);
+        Span<byte> hash = stackalloc byte[32];
+        SHA256.HashData(input, hash);
+        return new Guid(hash[..16]);
     }
 
     public static async Task Handle(
