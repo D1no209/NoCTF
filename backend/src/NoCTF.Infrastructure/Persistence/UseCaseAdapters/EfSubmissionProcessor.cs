@@ -4,6 +4,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
@@ -150,6 +151,32 @@ public sealed class EfSubmissionProcessor(
         var now = DateTimeOffset.UtcNow;
         if (evaluation.Decision.Result == ScoringResult.PlatformFailed)
         {
+            if (submission.Kind == SubmissionKind.Fix)
+            {
+                var target = await db.RuntimeInstances
+                    .Where(instance => instance.CompetitionId == submission.CompetitionId
+                        && instance.CompetitionChallengeId == submission.CompetitionChallengeId
+                        && instance.TeamId == submission.TeamId
+                        && instance.State == RuntimeState.Running)
+                    .OrderByDescending(instance => instance.Generation)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (target is not null && submission.PatchUploadId is Guid patchUploadId)
+                {
+                    await outbox.PublishAsync(new RunAwdpFixVerification(
+                        submission.Id,
+                        submission.CompetitionChallengeId,
+                        patchUploadId,
+                        target.Id,
+                        target.Generation,
+                        submission.ProcessingVersion));
+                    submission.EvaluationFailureCode = null;
+                    submission.EvaluationUpdatedAt = now;
+                    await db.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    await outbox.FlushOutgoingMessagesAsync();
+                    return;
+                }
+            }
             submission.EvaluationState = SubmissionEvaluationState.PlatformFailed;
             submission.EvaluationFailureCode =
                 evaluation.Decision.FailureCode ?? ScoringFailureCode.CheckerPlatformError;

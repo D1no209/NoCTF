@@ -3,6 +3,7 @@ using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.Postgresql;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Messaging;
 using Wolverine.ErrorHandling;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -27,6 +28,7 @@ builder.UseWolverine(options =>
     var runnerQueue = RunnerQueueName.FromPool(runnerPool);
     options.PublishMessage<ProvisionContainerRuntime>().ToPostgresqlQueue(runnerQueue.Value);
     options.PublishMessage<StopContainerRuntime>().ToPostgresqlQueue(runnerQueue.Value);
+    options.PublishMessage<RunAwdpFixVerification>().ToPostgresqlQueue(runnerQueue.Value);
 });
 
 await builder.Build().RunAsync();
