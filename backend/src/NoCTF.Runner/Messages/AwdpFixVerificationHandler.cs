@@ -19,12 +19,18 @@ public sealed class AwdpFixVerificationHandler(
     IObjectStorage objects,
     FixArchivePreparer preparer,
     IContainerSandboxLifecycle sandbox,
-    ITransactionalMessageOutbox outbox)
+    ITransactionalMessageOutbox outbox,
+    IConfiguration configuration)
 {
     public async Task Handle(
         RunAwdpFixVerification message,
         CancellationToken cancellationToken)
     {
+        RunnerNodeAssignmentGuard.Validate(
+            message,
+            configuration["Runner:Pool"] ?? "default",
+            configuration["Runner:Id"]
+                ?? throw new InvalidOperationException("Runner:Id is required."));
         var submission = await db.Submissions.AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == message.SubmissionId, cancellationToken);
         var runtime = await db.RuntimeInstances.AsNoTracking()
@@ -32,6 +38,10 @@ public sealed class AwdpFixVerificationHandler(
         if (submission is null || runtime is null
             || submission.ProcessingVersion != message.ProcessingVersion
             || runtime.Generation != message.Generation
+            || runtime.State != NoCTF.Domain.Runtime.RuntimeState.Running
+            || runtime.CompetitionChallengeId != message.CompetitionChallengeId
+            || !string.Equals(runtime.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
+            || !string.Equals(runtime.RunnerId, message.RunnerId, StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(runtime.ProviderReceiptJson))
             return;
 

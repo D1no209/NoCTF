@@ -48,11 +48,11 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken) =>
         results.RecordAwdpAsync(message, cancellationToken);
 
-    public static async Task<object?> Handle(
+    public static async Task Handle(
         DispatchRuntime message,
         NoCtfDbContext db,
         IChallengeRuntimeTemplateCatalog templates,
-        IRunnerCapacityGate capacity,
+        ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
         var target = await db.RuntimeInstances
@@ -70,7 +70,7 @@ public static class BackendMessageHandlers
         if (target is null ||
             target.Instance.State != RuntimeState.Queued ||
             target.Instance.ProcessingVersion != message.ProcessingVersion)
-            return null;
+            return;
 
         var template = templates.Get(target.Competition.Mode, target.Challenge.ConfigurationJson);
         if (template is null || template.Provider == RuntimeProvider.Libvirt)
@@ -79,22 +79,10 @@ public static class BackendMessageHandlers
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
             await db.SaveChangesAsync(cancellationToken);
-            return null;
+            return;
         }
 
         var limits = template.Limits ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
-        var capacityClaim = await capacity.TryClaimAsync(
-            new(message.RuntimeInstanceId, target.Instance.RunnerPool,
-                limits.MemoryBytes, limits.NanoCpus, limits.PidsLimit),
-            cancellationToken);
-        if (capacityClaim.Availability != RunnerCapacityAvailability.Claimed
-            || string.IsNullOrWhiteSpace(capacityClaim.RunnerId))
-            return null;
-
-        target.Instance.State = RuntimeState.Provisioning;
-        target.Instance.RunnerId = capacityClaim.RunnerId;
-        target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
-        await db.SaveChangesAsync(cancellationToken);
         var definition = new ContainerRequest(
             target.Instance.Id,
             template.Provider,
@@ -109,16 +97,16 @@ public static class BackendMessageHandlers
             OperationTimeout: template.OperationTimeoutSeconds is > 0
                 ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
                 : TimeSpan.FromMinutes(2));
-        return new ProvisionContainerRuntime(
+        await outbox.PublishToRunnerPoolAsync(new ClaimContainerRuntime(
             target.Instance.Id,
             target.Instance.ProcessingVersion,
             target.Instance.Generation,
             target.Instance.RunnerPool,
-            capacityClaim.RunnerId,
-            definition);
+            definition));
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task<object?> Handle(
+    public static async Task Handle(
         StopRuntime message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
@@ -130,7 +118,7 @@ public static class BackendMessageHandlers
         if (instance is null ||
             instance.State != RuntimeState.Stopping ||
             instance.ProcessingVersion != message.ProcessingVersion)
-            return null;
+            return;
         if (string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
         {
             instance.State = RuntimeState.Stopped;
@@ -144,14 +132,15 @@ public static class BackendMessageHandlers
                 await outbox.PublishAsync(new DispatchRuntime(replacement.Id, replacement.ProcessingVersion));
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
-            return null;
+            return;
         }
-        return new StopContainerRuntime(
+        await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             instance.Id,
             instance.ProcessingVersion,
             instance.RunnerPool,
-            instance.RuntimeProvider,
-            instance.ProviderReceiptJson);
+            instance.RunnerId
+                ?? throw new InvalidOperationException("Runtime receipt has no owning Runner.")));
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
     public static async Task Handle(

@@ -101,6 +101,9 @@ public sealed record OneShotResult(
 public interface IContainerLifecycle
 {
     Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken);
+    Task<ContainerReceipt> EnsureRunningAsync(
+        ContainerRequest request,
+        CancellationToken cancellationToken);
     Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken);
     Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken);
 }

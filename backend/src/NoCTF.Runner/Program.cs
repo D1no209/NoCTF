@@ -19,7 +19,10 @@ builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
     options => options.UseNpgsql(postgres).UseSnakeCaseNamingConvention());
 builder.Services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
 var runnerPool = builder.Configuration["Runner:Pool"] ?? "default";
-var queueName = RunnerQueueName.FromPool(runnerPool);
+var runnerId = builder.Configuration["Runner:Id"]
+    ?? throw new InvalidOperationException("Runner:Id is required.");
+var poolQueueName = RunnerQueueName.FromPool(runnerPool);
+var nodeQueueName = RunnerNodeQueueName.FromAssignment(runnerPool, runnerId);
 builder.UseWolverine(options =>
 {
     options.PersistMessagesWithPostgresql(postgres, "wolverine");
@@ -31,13 +34,15 @@ builder.UseWolverine(options =>
         .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
     options.Policies.OnException<Npgsql.NpgsqlException>()
         .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
-    options.ListenToPostgresqlQueue(queueName.Value).UseDurableInbox();
+    options.ListenToPostgresqlQueue(poolQueueName.Value).UseDurableInbox();
+    options.ListenToPostgresqlQueue(nodeQueueName.Value).UseDurableInbox();
+    options.PublishMessage<ClaimContainerRuntime>().ToPostgresqlQueue(poolQueueName.Value);
     options.PublishMessage<AwdpFixResult>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<DispatchRuntime>().ToPostgresqlQueue("noctf-worker");
 });
 var app = builder.Build();
 app.MapGet("/health/live", () => TypedResults.Ok(new { status = "live" }));
-app.MapGet("/health/ready", () => TypedResults.Ok(new { status = "ready", runnerPool }));
+app.MapGet("/health/ready", () => TypedResults.Ok(new { status = "ready", runnerPool, runnerId }));
 app.Run();
 
 public partial class Program;
