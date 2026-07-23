@@ -49,6 +49,10 @@ public sealed partial class TargetArchitectureRulesTests
         {
             var source = await File.ReadAllTextAsync(file);
             if (source.Contains("System.Threading.Channels", StringComparison.Ordinal)
+                || source.Contains("Task.Run(", StringComparison.Ordinal)
+                || source.Contains("RequiredMappingStrategy.Both", StringComparison.Ordinal)
+                || source.Contains("HandleAsync(", StringComparison.Ordinal)
+                || LegacyDimensionRegex().IsMatch(source)
                 || QuerySyntaxRegex().IsMatch(source))
                 violations.Add(Path.GetRelativePath(BackendRoot, file));
         }
@@ -128,4 +132,7 @@ public sealed partial class TargetArchitectureRulesTests
 
     [GeneratedRegex(@"\b(from|where|select|join)\s+[A-Za-z_][A-Za-z0-9_]*\s+in\b")]
     private static partial Regex QuerySyntaxRegex();
+
+    [GeneratedRegex(@"\b(ServiceId|StageId|RuntimeOperationId|ChallengeInstanceId)\b")]
+    private static partial Regex LegacyDimensionRegex();
 }
