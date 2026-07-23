@@ -179,6 +179,8 @@ public static class RuntimeWriteBackHandler
             }
             if (submission?.PatchUploadId is Guid patchUploadId)
             {
+                var deadline = instance.ExpiresAt
+                    ?? DateTimeOffset.UtcNow.AddMinutes(15);
                 await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
                     submission.Id,
                     submission.CompetitionChallengeId,
@@ -187,9 +189,18 @@ public static class RuntimeWriteBackHandler
                     instance.Generation,
                     instance.SubmissionProcessingVersion.Value,
                     instance.ProcessingVersion,
-                    instance.ExpiresAt ?? DateTimeOffset.UtcNow.AddMinutes(15),
+                    deadline,
                     instance.RunnerPool,
                     message.RunnerId));
+                await outbox.ScheduleAsync(new ExpireAwdpFixVerification(
+                    submission.Id,
+                    instance.Id,
+                    instance.Generation,
+                    instance.SubmissionProcessingVersion.Value,
+                    instance.ProcessingVersion,
+                    deadline,
+                    instance.RunnerPool,
+                    message.RunnerId), deadline);
             }
         }
         var now = DateTimeOffset.UtcNow;

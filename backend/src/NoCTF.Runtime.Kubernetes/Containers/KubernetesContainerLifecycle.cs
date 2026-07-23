@@ -92,7 +92,10 @@ public sealed class KubernetesContainerLifecycle(
                 RestartPolicy = "Never"
             }
         };
-        await client.CoreV1.CreateNamespacedPodAsync(pod, options.Namespace, cancellationToken: cancellationToken);
+        await client.CoreV1.CreateNamespacedPodAsync(
+            pod, options.Namespace, cancellationToken: cancellationToken);
+        if (request.AllowInternalCallback)
+            await EnsureInternalCallbackPolicyAsync(name, labels, cancellationToken);
         var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
         return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending,
             request.PortMappings, options.PublicHost, internalHost ?? $"{name}.{options.Namespace}.svc");
@@ -177,6 +180,19 @@ public sealed class KubernetesContainerLifecycle(
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
+        try
+        {
+            await client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
+                $"{receipt.ResourceId}-callback",
+                options.Namespace,
+                body: new V1DeleteOptions(),
+                cancellationToken: cancellationToken);
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // Only AWDP checker pods own a callback policy.
+        }
         try
         {
             await client.CoreV1.DeleteNamespacedServiceAsync(receipt.ResourceId, options.Namespace,
@@ -476,6 +492,73 @@ public sealed class KubernetesContainerLifecycle(
             }, options.Namespace, cancellationToken: cancellationToken);
             return service.Spec.ClusterIP;
         }
+    }
+
+    private async Task EnsureInternalCallbackPolicyAsync(
+        string name,
+        IReadOnlyDictionary<string, string> labels,
+        CancellationToken cancellationToken)
+    {
+        await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(new V1NetworkPolicy
+        {
+            Metadata = new V1ObjectMeta
+            {
+                Name = $"{name}-callback",
+                NamespaceProperty = options.Namespace,
+                Labels = labels.ToDictionary(pair => pair.Key, pair => pair.Value)
+            },
+            Spec = new V1NetworkPolicySpec
+            {
+                PodSelector = new V1LabelSelector
+                {
+                    MatchLabels = new Dictionary<string, string>
+                    {
+                        ["noctf.io/runtime-id"] = name,
+                        ["noctf.purpose"] = "awdp-checker"
+                    }
+                },
+                PolicyTypes = ["Egress"],
+                Egress =
+                [
+                    new V1NetworkPolicyEgressRule
+                    {
+                        To =
+                        [
+                            new V1NetworkPolicyPeer
+                            {
+                                PodSelector = new V1LabelSelector
+                                {
+                                    MatchLabels = new Dictionary<string, string> { ["app"] = "backend" }
+                                }
+                            }
+                        ]
+                    },
+                    new V1NetworkPolicyEgressRule
+                    {
+                        To =
+                        [
+                            new V1NetworkPolicyPeer
+                            {
+                                NamespaceSelector = new V1LabelSelector
+                                {
+                                    MatchLabels = new Dictionary<string, string>
+                                    {
+                                        ["kubernetes.io/metadata.name"] = "kube-system"
+                                    }
+                                },
+                                PodSelector = new V1LabelSelector
+                                {
+                                    MatchLabels = new Dictionary<string, string>
+                                    {
+                                        ["k8s-app"] = "kube-dns"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }, options.Namespace, cancellationToken: cancellationToken);
     }
 
     private async Task WaitUntilDeletedAsync(

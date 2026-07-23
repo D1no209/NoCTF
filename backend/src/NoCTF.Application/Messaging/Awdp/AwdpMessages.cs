@@ -26,3 +26,13 @@ public sealed record CleanupAwdpTarget(
     long ProcessingVersion,
     string RunnerPool,
     string RunnerId) : IRunnerNodeMessage;
+
+public sealed record ExpireAwdpFixVerification(
+    Guid SubmissionId,
+    Guid RuntimeInstanceId,
+    int Generation,
+    long ProcessingVersion,
+    long RuntimeProcessingVersion,
+    DateTimeOffset Deadline,
+    string RunnerPool,
+    string RunnerId);

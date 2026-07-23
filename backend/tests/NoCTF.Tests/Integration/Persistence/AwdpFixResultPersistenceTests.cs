@@ -10,6 +10,7 @@ using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -67,7 +68,76 @@ public sealed class AwdpFixResultPersistenceTests
             await Assert.That(scoring.Result).IsEqualTo(ScoringResult.Correct);
             await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
             await Assert.That(runtime.ProcessingVersion).IsEqualTo(4);
+
+            var expired = await AddPendingFixAsync(options, fixture, cancellationToken);
+            await using (var expireDb = new NoCtfDbContext(options))
+                await BackendMessageHandlers.Handle(new ExpireAwdpFixVerification(
+                    expired.SubmissionId,
+                    expired.RuntimeId,
+                    2,
+                    8,
+                    5,
+                    fixture.Now,
+                    "awdp",
+                    "runner-a"), expireDb, outbox, cancellationToken);
+            await using var expiredVerify = new NoCtfDbContext(options);
+            var expiredSubmission = await expiredVerify.Submissions.SingleAsync(
+                item => item.Id == expired.SubmissionId, cancellationToken);
+            var expiredRuntime = await expiredVerify.RuntimeInstances.SingleAsync(
+                item => item.Id == expired.RuntimeId, cancellationToken);
+            await Assert.That(expiredSubmission.EvaluationState)
+                .IsEqualTo(SubmissionEvaluationState.PlatformFailed);
+            await Assert.That(expiredRuntime.State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(outbox.NodeMessages.OfType<StopContainerRuntime>().Count())
+                .IsEqualTo(2);
         });
+    }
+
+    private static async Task<(Guid SubmissionId, Guid RuntimeId)> AddPendingFixAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var original = await db.Submissions.AsNoTracking()
+            .SingleAsync(item => item.Id == fixture.SubmissionId, cancellationToken);
+        var submissionId = Guid.NewGuid();
+        var runtimeId = Guid.NewGuid();
+        db.Submissions.Add(new Submission
+        {
+            Id = submissionId,
+            CompetitionId = original.CompetitionId,
+            TeamId = original.TeamId,
+            CompetitionChallengeId = original.CompetitionChallengeId,
+            SubmittedByUserId = original.SubmittedByUserId,
+            Kind = SubmissionKind.Fix,
+            ReceivedAt = fixture.Now,
+            EvaluationState = SubmissionEvaluationState.Processing,
+            EvaluationUpdatedAt = fixture.Now,
+            ProcessingVersion = 8
+        });
+        db.RuntimeInstances.Add(new RuntimeInstance
+        {
+            Id = runtimeId,
+            CompetitionId = original.CompetitionId,
+            CompetitionChallengeId = original.CompetitionChallengeId,
+            Purpose = RuntimePurpose.AwdpTarget,
+            SubmissionId = submissionId,
+            SubmissionProcessingVersion = 8,
+            Generation = 2,
+            RuntimeKind = RuntimeKind.Container,
+            RuntimeProvider = RuntimeProvider.Docker,
+            RunnerPool = "awdp",
+            RunnerId = "runner-a",
+            State = RuntimeState.Running,
+            ProcessingVersion = 5,
+            ConfigurationRevision = 2,
+            ProviderReceiptJson = "{}",
+            CreatedAt = fixture.Now,
+            RunningAt = fixture.Now
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return (submissionId, runtimeId);
     }
 
     private static async Task<Fixture> SeedAsync(

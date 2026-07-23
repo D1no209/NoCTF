@@ -320,6 +320,52 @@ public static class BackendMessageHandlers
         results.RecordAwdpAsync(message, cancellationToken);
 
     public static async Task Handle(
+        ExpireAwdpFixVerification message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        if (DateTimeOffset.UtcNow < message.Deadline)
+        {
+            await outbox.ScheduleAsync(message, message.Deadline);
+            await outbox.FlushOutgoingMessagesAsync();
+            return;
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var runtime = await db.RuntimeInstances.FromSqlInterpolated(
+                $"SELECT * FROM runtime_instances WHERE id = {message.RuntimeInstanceId} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+        var submission = await db.Submissions.FromSqlInterpolated(
+                $"SELECT * FROM submissions WHERE id = {message.SubmissionId} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+        if (runtime is null
+            || submission is null
+            || runtime.Purpose != RuntimePurpose.AwdpTarget
+            || runtime.SubmissionId != submission.Id
+            || runtime.Generation != message.Generation
+            || runtime.ProcessingVersion != message.RuntimeProcessingVersion
+            || runtime.State != RuntimeState.Running
+            || submission.ProcessingVersion != message.ProcessingVersion
+            || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing)
+            return;
+
+        submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
+        submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
+        submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+        runtime.State = RuntimeState.Stopping;
+        runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
+        await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
+            runtime.Id,
+            runtime.ProcessingVersion,
+            message.RunnerPool,
+            message.RunnerId));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    public static async Task Handle(
         DispatchRuntime message,
         NoCtfDbContext db,
         IChallengeRuntimeTemplateCatalog templates,
