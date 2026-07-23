@@ -11,8 +11,7 @@ public static class GameModeDefaultConfiguration
     {
         GameMode.Ctf => JsonSerializer.Serialize(new Ctf.Configuration.CtfConfiguration(1,
             new(500, 100, 10), []), Options),
-        GameMode.Awd => JsonSerializer.Serialize(new Awd.Configuration.AwdConfiguration(1,
-            300, 10, 2, 50, 100, 50, 50), Options),
+        GameMode.Awd => JsonSerializer.Serialize(Awd.Configuration.AwdConfiguration.Default, Options),
         GameMode.Awdp => JsonSerializer.Serialize(new Awdp.Configuration.AwdpConfiguration(1,
             300, new(Awdp.Configuration.AchievementSettlement.PerRound, 50),
             new(Awdp.Configuration.AchievementSettlement.PerRound, 50), 100, 50), Options),

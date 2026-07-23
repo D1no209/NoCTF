@@ -1,29 +1,56 @@
 using NoCTF.Application.Runtime.Ports;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.GameModes.Awd.Configuration;
 
 public sealed record AwdConfiguration(
     int SchemaVersion,
+    int HardeningDurationSeconds,
     int RoundDurationSeconds,
-    int TotalRounds,
-    int FlagValidityRounds,
+    AttackRewardMode AttackRewardMode,
     long AttackPoints,
-    long ServiceOnlinePoints,
-    long ServiceDownPenalty,
-    long VictimPenalty)
+    long VictimDefensePoolPoints,
+    int CheckerIntervalSeconds,
+    long ServiceHealthyPoints,
+    long ServiceUnhealthyPenalty)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+
+    public static AwdConfiguration Default { get; } = new(
+        CurrentSchemaVersion,
+        HardeningDurationSeconds: 0,
+        RoundDurationSeconds: 300,
+        AttackRewardMode: AttackRewardMode.FixedPerAttack,
+        AttackPoints: 50,
+        VictimDefensePoolPoints: 100,
+        CheckerIntervalSeconds: 30,
+        ServiceHealthyPoints: 100,
+        ServiceUnhealthyPenalty: 50);
 }
+
+[JsonConverter(typeof(AttackRewardModeJsonConverter))]
+public enum AttackRewardMode
+{
+    FixedPerAttack,
+    SplitVictimDefensePool
+}
+
+public sealed class AttackRewardModeJsonConverter()
+    : JsonStringEnumConverter<AttackRewardMode>(namingPolicy: null, allowIntegerValues: false);
 
 public sealed record AwdChallengeConfiguration(
     int SchemaVersion,
-    string FlagFormat,
-    int? MaxFlagAttempts = null,
+    AttackRewardMode? AttackRewardMode = null,
+    long? AttackPoints = null,
+    long? VictimDefensePoolPoints = null,
+    int? CheckerIntervalSeconds = null,
+    long? ServiceHealthyPoints = null,
+    long? ServiceUnhealthyPenalty = null,
     ChallengeRuntimeTemplate? Runtime = null,
     RunnerJobConfiguration? Checker = null,
     AwdFlagInjectionConfiguration? FlagInjection = null)
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 }
 
 public sealed record AwdFlagInjectionConfiguration(

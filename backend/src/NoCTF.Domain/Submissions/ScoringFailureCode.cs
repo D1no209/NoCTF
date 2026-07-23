@@ -24,6 +24,7 @@ public enum ScoringFailureCode
     ProducerUnavailable,
     FlagExpired,
     RoundOutOfRange,
+    HardeningActive,
     AwdpFixFailed,
     AwdpPatchFailed,
     AwdpPatchTimeout,

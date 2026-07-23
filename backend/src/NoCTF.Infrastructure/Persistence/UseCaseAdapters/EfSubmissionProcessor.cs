@@ -6,6 +6,7 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
+using NoCTF.GameModes.Awd.Scheduling;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
@@ -118,6 +119,16 @@ public sealed class EfSubmissionProcessor(
             ? await db.PatchUploads.AsNoTracking()
                 .SingleOrDefaultAsync(item => item.Id == patchUploadId, cancellationToken)
             : null;
+        TimeSpan? effectiveRunningTime = null;
+        if (configuration.Competition.Mode == GameMode.Awd)
+        {
+            var lifecycle = await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
+                .Where(audit => audit.CompetitionId == submission.CompetitionId
+                    && audit.OccurredAt <= submission.ReceivedAt)
+                .ToListAsync(cancellationToken);
+            effectiveRunningTime = AwdEffectiveRunningClock.Calculate(
+                lifecycle, submission.ReceivedAt);
+        }
         var decision = evaluatorCatalog.Get(configuration.Competition.Mode).Evaluate(new(
             submission,
             priorEvents,
@@ -126,7 +137,8 @@ public sealed class EfSubmissionProcessor(
             configuration.Competition.ConfigurationJson,
             configuration.CompetitionChallenge.ConfigurationJson,
             priorSubmissions,
-            configuration.Competition.StartAt));
+            configuration.Competition.StartAt,
+            effectiveRunningTime));
         return new(
             decision,
             configuration.Competition.ConfigurationRevision,

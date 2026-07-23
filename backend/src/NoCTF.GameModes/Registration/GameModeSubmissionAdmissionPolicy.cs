@@ -25,8 +25,8 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
 
     private static SubmissionAdmissionRules AwdRules(string json)
     {
-        var configuration = Awd.Configuration.AwdConfigurationUpgrader.ParseChallenge(json);
-        return new(true, false, configuration.MaxFlagAttempts, null);
+        _ = Awd.Configuration.AwdConfigurationUpgrader.ParseChallenge(json);
+        return new(true, false, null, null);
     }
 
     private static SubmissionAdmissionRules AwdpRules(string json)
