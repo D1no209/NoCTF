@@ -1,10 +1,12 @@
 [CmdletBinding()]
 param(
-    [switch]$SkipOpenApi
+    [switch]$SkipOpenApi,
+    [switch]$RequireDockerIntegration
 )
 
 $ErrorActionPreference = 'Stop'
 $backendRoot = Split-Path -Parent $PSScriptRoot
+$previousDockerRequirement = $env:NOCTF_REQUIRE_DOCKER_INTEGRATION
 function Assert-NativeSuccess([string]$Step) {
     if ($LASTEXITCODE -ne 0) {
         throw "$Step failed with exit code $LASTEXITCODE."
@@ -12,6 +14,9 @@ function Assert-NativeSuccess([string]$Step) {
 }
 Push-Location $backendRoot
 try {
+    if ($RequireDockerIntegration) {
+        $env:NOCTF_REQUIRE_DOCKER_INTEGRATION = 'true'
+    }
     dotnet build .\NoCTF.slnx --no-restore -m:1
     Assert-NativeSuccess 'Build'
     dotnet test .\NoCTF.slnx -- --minimum-expected-tests 1
@@ -28,5 +33,6 @@ try {
     Assert-NativeSuccess 'Git diff check'
 }
 finally {
+    $env:NOCTF_REQUIRE_DOCKER_INTEGRATION = $previousDockerRequirement
     Pop-Location
 }
