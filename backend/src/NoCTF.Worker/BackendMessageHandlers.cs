@@ -6,11 +6,30 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle;
 
 namespace NoCTF.Worker;
 
 public static class BackendMessageHandlers
 {
+    public static async Task Handle(
+        AdvanceCompetitionLifecycle message,
+        CompetitionLifecycleAdvancer advancer,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var transitions = await advancer.ExecuteAsync(message.At, cancellationToken);
+        foreach (var transition in transitions)
+        {
+            await outbox.PublishAsync(new ProjectLeaderboard(transition.CompetitionId));
+            if (transition.To == NoCTF.Domain.Competitions.CompetitionStatus.Running)
+                await outbox.PublishAsync(new ProvisionCompetitionRuntimes(transition.CompetitionId));
+            if (transition.To == NoCTF.Domain.Competitions.CompetitionStatus.Finished)
+                await outbox.PublishAsync(new CleanupCompetitionRuntimes(transition.CompetitionId));
+        }
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
     public static Task Handle(
         EvaluateSubmission message,
         ISubmissionProcessor processor,
@@ -27,6 +46,7 @@ public static class BackendMessageHandlers
         DispatchRuntime message,
         NoCtfDbContext db,
         IChallengeRuntimeTemplateCatalog templates,
+        IRunnerCapacityGate capacity,
         CancellationToken cancellationToken)
     {
         var target = await db.RuntimeInstances
@@ -56,7 +76,17 @@ public static class BackendMessageHandlers
             return null;
         }
 
+        var limits = template.Limits ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
+        var capacityClaim = await capacity.TryClaimAsync(
+            new(message.RuntimeInstanceId, target.Instance.RunnerPool,
+                limits.MemoryBytes, limits.NanoCpus, limits.PidsLimit),
+            cancellationToken);
+        if (capacityClaim.Availability != RunnerCapacityAvailability.Claimed
+            || string.IsNullOrWhiteSpace(capacityClaim.RunnerId))
+            return null;
+
         target.Instance.State = RuntimeState.Provisioning;
+        target.Instance.RunnerId = capacityClaim.RunnerId;
         target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
         await db.SaveChangesAsync(cancellationToken);
         var definition = new ContainerRequest(
@@ -67,7 +97,7 @@ public static class BackendMessageHandlers
             template.Environment ?? new Dictionary<string, string>(),
             MergeLabels(template.Labels, target.Instance),
             template.PortMappings ?? new Dictionary<int, int>(),
-            template.Limits ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256),
+            limits,
             template.Security ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
             template.TtlSeconds is > 0 ? TimeSpan.FromSeconds(template.TtlSeconds.Value) : null,
             OperationTimeout: template.OperationTimeoutSeconds is > 0
@@ -78,6 +108,7 @@ public static class BackendMessageHandlers
             target.Instance.ProcessingVersion,
             target.Instance.Generation,
             target.Instance.RunnerPool,
+            capacityClaim.RunnerId,
             definition);
     }
 

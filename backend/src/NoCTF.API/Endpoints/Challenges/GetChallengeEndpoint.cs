@@ -40,7 +40,7 @@ public sealed record ChallengeResponse(
 public sealed record ChallengeListResponse(IReadOnlyList<ChallengeResponse> Items);
 
 [Mapper(
-    RequiredMappingStrategy = RequiredMappingStrategy.Both,
+    RequiredMappingStrategy = RequiredMappingStrategy.Source,
     EnumMappingStrategy = EnumMappingStrategy.ByName)]
 internal static partial class ChallengeMapper
 {

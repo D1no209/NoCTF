@@ -87,6 +87,7 @@ public static class ServiceRegistration
             redisOptions.AbortOnConnectFail = false;
             return ConnectionMultiplexer.Connect(redisOptions);
         });
+        services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
 
         services.AddScoped<ISubmissionIntakeStore, EfSubmissionIntakeStore>();
         services.AddScoped<IPatchUploadStore, EfPatchUploadStore>();
@@ -197,7 +198,7 @@ public static class ServiceRegistration
         services.AddScoped<UpdateCompetitionConfiguration>();
         services.AddScoped<ICompetitionPermissionStore, EfCompetitionPermissionStore>();
         services.AddScoped<UpdateCompetitionPermissions>();
-        services.AddScoped<AdvanceCompetitionLifecycle>();
+        services.AddScoped<NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle>();
         services.AddScoped<TransitionCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
         services.Configure<PasswordHasherOptions>(options =>

@@ -8,6 +8,7 @@ public sealed record ProvisionContainerRuntime(
     long ProcessingVersion,
     int Generation,
     string RunnerPool,
+    string RunnerId,
     ContainerRequest Definition);
 
 public sealed record StopContainerRuntime(
@@ -29,7 +30,8 @@ public sealed record RuntimeProvisioned(
 public sealed record RuntimeProvisionFailed(
     Guid RuntimeInstanceId,
     long ProcessingVersion,
-    RuntimeFailureCode FailureCode);
+    RuntimeFailureCode FailureCode,
+    string? RunnerId = null);
 
 public sealed record RuntimeStopped(Guid RuntimeInstanceId, long ProcessingVersion);
 public sealed record RuntimeStopFailed(

@@ -39,7 +39,7 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
     }
 }
 
-[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Both)]
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
 internal static partial class ChallengeTemplateMapper
 {
     public static partial CreateChallengeTemplateCommand ToCommand(
