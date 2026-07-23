@@ -346,6 +346,8 @@ public static class BackendMessageHandlers
             || runtime.Generation != message.Generation
             || runtime.ProcessingVersion != message.RuntimeProcessingVersion
             || runtime.State != RuntimeState.Running
+            || !string.Equals(runtime.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
+            || !string.Equals(runtime.RunnerId, message.RunnerId, StringComparison.Ordinal)
             || submission.ProcessingVersion != message.ProcessingVersion
             || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing)
             return;

@@ -28,7 +28,8 @@ public static class ServiceRegistration
         var options = new DockerRuntimeOptions(
             configuration["Runtime:Docker:Endpoint"] ?? "npipe://./pipe/docker_engine",
             configuration["Runtime:Docker:Network"] ?? "noctf",
-            configuration["Runtime:Docker:PublicHost"] ?? "localhost");
+            configuration["Runtime:Docker:PublicHost"] ?? "localhost",
+            configuration["Runtime:Docker:CallbackNetwork"] ?? "noctf-callback");
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
         services.AddSingleton<IRuntimeResourceReaper>(provider =>
@@ -37,7 +38,9 @@ public static class ServiceRegistration
         services.AddSingleton(new KubernetesRuntimeOptions(
             configuration["Runtime:Kubernetes:Namespace"] ?? "noctf",
             configuration["Runtime:Kubernetes:PublicHost"] ?? "localhost",
-            configuration["Runtime:Kubernetes:ImagePullPolicy"] ?? "IfNotPresent"));
+            configuration["Runtime:Kubernetes:ImagePullPolicy"] ?? "IfNotPresent",
+            configuration["Runtime:Kubernetes:CallbackPodLabelKey"] ?? "noctf.io/internal-role",
+            configuration["Runtime:Kubernetes:CallbackPodLabelValue"] ?? "awdp-callback"));
         services.AddSingleton<IKubernetes>(_ => new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile()));
         services.AddSingleton<KubernetesContainerLifecycle>();
         services.AddSingleton<IRuntimeResourceReaper>(provider =>

@@ -92,13 +92,42 @@ public sealed class KubernetesContainerLifecycle(
                 RestartPolicy = "Never"
             }
         };
-        await client.CoreV1.CreateNamespacedPodAsync(
-            pod, options.Namespace, cancellationToken: cancellationToken);
-        if (request.AllowInternalCallback)
-            await EnsureInternalCallbackPolicyAsync(name, labels, cancellationToken);
-        var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
-        return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending,
-            request.PortMappings, options.PublicHost, internalHost ?? $"{name}.{options.Namespace}.svc");
+        var podCreated = false;
+        try
+        {
+            await client.CoreV1.CreateNamespacedPodAsync(
+                pod, options.Namespace, cancellationToken: cancellationToken);
+            podCreated = true;
+            if (request.AllowInternalCallback)
+                await EnsureInternalCallbackPolicyAsync(name, labels, request, cancellationToken);
+            var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
+            return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending,
+                request.PortMappings, options.PublicHost, internalHost ?? $"{name}.{options.Namespace}.svc");
+        }
+        catch
+        {
+            if (podCreated)
+            {
+                using var cleanupSource = new CancellationTokenSource(
+                    RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
+                try
+                {
+                    await DestroyAsync(new ContainerReceipt(
+                        request.OperationId,
+                        RuntimeProvider.Kubernetes,
+                        name,
+                        RuntimeStatus.Failed,
+                        request.PortMappings,
+                        options.PublicHost,
+                        null), cleanupSource.Token);
+                }
+                catch
+                {
+                    // Expiry labels and the resource reaper remain the final cleanup fallback.
+                }
+            }
+            throw;
+        }
     }
 
     public async Task<ContainerReceipt> EnsureRunningAsync(
@@ -180,41 +209,40 @@ public sealed class KubernetesContainerLifecycle(
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
-        try
-        {
-            await client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
+        var failures = new List<Exception>();
+        await TryDeleteAsync(() => client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
                 $"{receipt.ResourceId}-callback",
                 options.Namespace,
                 body: new V1DeleteOptions(),
-                cancellationToken: cancellationToken);
-        }
-        catch (k8s.Autorest.HttpOperationException exception)
-            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            // Only AWDP checker pods own a callback policy.
-        }
-        try
-        {
-            await client.CoreV1.DeleteNamespacedServiceAsync(receipt.ResourceId, options.Namespace,
-                body: new V1DeleteOptions(), cancellationToken: cancellationToken);
-        }
-        catch (k8s.Autorest.HttpOperationException exception)
-            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            // The receipt may represent a one-shot pod without a Service.
-        }
-        try
-        {
-            await client.CoreV1.DeleteNamespacedPodAsync(
+                cancellationToken: cancellationToken));
+        await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedServiceAsync(
+            receipt.ResourceId,
+            options.Namespace,
+            body: new V1DeleteOptions(),
+            cancellationToken: cancellationToken));
+        await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedPodAsync(
                 receipt.ResourceId,
                 options.Namespace,
                 body: new V1DeleteOptions { PropagationPolicy = "Foreground" },
-                cancellationToken: cancellationToken);
-        }
-        catch (k8s.Autorest.HttpOperationException exception)
-            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                cancellationToken: cancellationToken));
+        if (failures.Count > 0)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+
+        async Task TryDeleteAsync(Func<Task> delete)
         {
-            // Destroy is idempotent: an externally removed runtime is already stopped.
+            try
+            {
+                await delete();
+            }
+            catch (k8s.Autorest.HttpOperationException exception)
+                when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // The deterministic resource is already absent.
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
         }
     }
 
@@ -497,8 +525,10 @@ public sealed class KubernetesContainerLifecycle(
     private async Task EnsureInternalCallbackPolicyAsync(
         string name,
         IReadOnlyDictionary<string, string> labels,
+        ContainerRequest request,
         CancellationToken cancellationToken)
     {
+        var callbackPort = GetCallbackPort(request);
         await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(new V1NetworkPolicy
         {
             Metadata = new V1ObjectMeta
@@ -528,8 +558,19 @@ public sealed class KubernetesContainerLifecycle(
                             {
                                 PodSelector = new V1LabelSelector
                                 {
-                                    MatchLabels = new Dictionary<string, string> { ["app"] = "backend" }
+                                    MatchLabels = new Dictionary<string, string>
+                                    {
+                                        [options.CallbackPodLabelKey] = options.CallbackPodLabelValue
+                                    }
                                 }
+                            }
+                        ],
+                        Ports =
+                        [
+                            new V1NetworkPolicyPort
+                            {
+                                Protocol = "TCP",
+                                Port = callbackPort
                             }
                         ]
                     },
@@ -554,11 +595,34 @@ public sealed class KubernetesContainerLifecycle(
                                     }
                                 }
                             }
+                        ],
+                        Ports =
+                        [
+                            new V1NetworkPolicyPort
+                            {
+                                Protocol = "UDP",
+                                Port = 53
+                            },
+                            new V1NetworkPolicyPort
+                            {
+                                Protocol = "TCP",
+                                Port = 53
+                            }
                         ]
                     }
                 ]
             }
         }, options.Namespace, cancellationToken: cancellationToken);
+    }
+
+    private static int GetCallbackPort(ContainerRequest request)
+    {
+        if (!request.Environment.TryGetValue("NOCTF_CALLBACK_URL", out var callbackText)
+            || !Uri.TryCreate(callbackText, UriKind.Absolute, out var callback)
+            || callback.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException(
+                "An AWDP checker callback requires an absolute HTTP(S) callback URL.");
+        return callback.Port;
     }
 
     private async Task WaitUntilDeletedAsync(
