@@ -41,6 +41,7 @@ public sealed class AwdpFixVerificationHandler(
             .SingleOrDefaultAsync(item => item.Id == message.RuntimeInstanceId, cancellationToken);
         if (submission is null || runtime is null
             || submission.ProcessingVersion != message.ProcessingVersion
+            || runtime.SubmissionProcessingVersion != message.ProcessingVersion
             || runtime.ProcessingVersion != message.RuntimeProcessingVersion
             || runtime.Generation != message.Generation
             || runtime.State != NoCTF.Domain.Runtime.RuntimeState.Running

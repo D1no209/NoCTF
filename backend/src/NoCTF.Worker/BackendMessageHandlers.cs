@@ -343,6 +343,17 @@ public static class BackendMessageHandlers
             target.Instance.ProcessingVersion != message.ProcessingVersion)
             return;
 
+        if (target.Instance.Purpose == RuntimePurpose.AwdpTarget
+            && target.Instance.ConfigurationRevision != target.Challenge.Revision)
+        {
+            target.Instance.State = RuntimeState.Failed;
+            target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
+            target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
+            await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
         var template = templates.Get(target.Competition.Mode, target.Challenge.ConfigurationJson);
         if (template is null || template.Provider == RuntimeProvider.Libvirt)
         {
@@ -361,7 +372,7 @@ public static class BackendMessageHandlers
             {
                 var awdp = AwdpConfigurationParser.ParseChallenge(target.Challenge.ConfigurationJson);
                 definition = AwdpTargetDefinitionFactory.Create(
-                    target.Instance.Id, template, awdp.TargetPort);
+                    target.Instance.Id, template, awdp.TargetPort, DateTimeOffset.UtcNow);
             }
             else
             {
@@ -413,7 +424,8 @@ public static class BackendMessageHandlers
             item => item.Id == submissionId,
             cancellationToken);
         if (submission is null
-            || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing)
+            || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
+            || submission.ProcessingVersion != instance.SubmissionProcessingVersion)
             return;
         submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
         submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;

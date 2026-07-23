@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260723220937_InitialBaseline")]
+    [Migration("20260723222052_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -862,6 +862,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("submission_id");
 
+                    b.Property<long?>("SubmissionProcessingVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("submission_processing_version");
+
                     b.Property<Guid?>("TeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
@@ -906,7 +910,7 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.ToTable("runtime_instances", null, t =>
                         {
-                            t.HasCheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL)");
+                            t.HasCheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
 

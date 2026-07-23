@@ -8,7 +8,8 @@ public static class AwdpTargetDefinitionFactory
     public static ContainerRequest Create(
         Guid operationId,
         ChallengeRuntimeTemplate template,
-        int targetPort)
+        int targetPort,
+        DateTimeOffset now)
     {
         if (template.RuntimeKind != RuntimeKind.Container
             || template.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
@@ -17,6 +18,9 @@ public static class AwdpTargetDefinitionFactory
         if (targetPort is < 1 or > 65535)
             throw new InvalidOperationException("AWDP TargetPort must be between 1 and 65535.");
 
+        var ttl = template.TtlSeconds is > 0
+            ? TimeSpan.FromSeconds(template.TtlSeconds.Value)
+            : TimeSpan.FromMinutes(15);
         var labels = template.Labels is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(template.Labels, StringComparer.Ordinal);
@@ -24,6 +28,9 @@ public static class AwdpTargetDefinitionFactory
         labels["noctf.operation-id"] = operationId.ToString("D");
         labels["noctf.runtime-instance-id"] = operationId.ToString("D");
         labels["noctf.purpose"] = "awdp-target";
+        labels["noctf.io.job-kind"] = "awdp-verification";
+        labels["noctf.io.expires-at"] = now.Add(ttl).ToUnixTimeSeconds().ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
         return new ContainerRequest(
             operationId,
             template.Provider,
@@ -33,10 +40,8 @@ public static class AwdpTargetDefinitionFactory
             labels,
             new Dictionary<int, int>(),
             template.Limits ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256),
-            template.Security ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
-            Ttl: template.TtlSeconds is > 0
-                ? TimeSpan.FromSeconds(template.TtlSeconds.Value)
-                : TimeSpan.FromMinutes(15),
+            new ContainerSecurityPolicy(true, false, true, ["ALL"], []),
+            Ttl: ttl,
             OperationTimeout: template.OperationTimeoutSeconds is > 0
                 ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
                 : TimeSpan.FromMinutes(2),

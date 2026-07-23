@@ -24,13 +24,15 @@ public sealed class AwdpTargetRuntimeFactoryTests
             Guid.Parse("44444444-4444-4444-4444-444444444444"),
             template,
             generation: 2,
+            submissionProcessingVersion: 11,
             configurationRevision: 7,
-            DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
+            now: DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(target.Purpose).IsEqualTo(RuntimePurpose.AwdpTarget);
         await Assert.That(target.SubmissionId).IsEqualTo(submissionId);
         await Assert.That(target.TeamId).IsNull();
         await Assert.That(target.Generation).IsEqualTo(2);
+        await Assert.That(target.SubmissionProcessingVersion).IsEqualTo(11);
         await Assert.That(target.RunnerPool).IsEqualTo("awdp");
         await Assert.That(target.State).IsEqualTo(RuntimeState.Queued);
         await Assert.That(target.ExpiresAt).IsNull();

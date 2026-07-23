@@ -147,8 +147,23 @@ public static class RuntimeWriteBackHandler
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.SubmissionId is Guid submissionId)
         {
-            var submission = await db.Submissions.AsNoTracking()
+            var submission = await db.Submissions
                 .SingleOrDefaultAsync(item => item.Id == submissionId, cancellationToken);
+            if (submission is null
+                || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
+                || submission.ProcessingVersion != instance.SubmissionProcessingVersion)
+            {
+                instance.State = RuntimeState.Stopping;
+                instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+                await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
+                    instance.Id,
+                    instance.ProcessingVersion,
+                    instance.RunnerPool,
+                    message.RunnerId));
+                await db.SaveChangesAsync(cancellationToken);
+                await outbox.FlushOutgoingMessagesAsync();
+                return;
+            }
             if (submission?.PatchUploadId is Guid patchUploadId)
             {
                 await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
@@ -157,7 +172,7 @@ public static class RuntimeWriteBackHandler
                     patchUploadId,
                     instance.Id,
                     instance.Generation,
-                    submission.ProcessingVersion,
+                    instance.SubmissionProcessingVersion.Value,
                     instance.ProcessingVersion,
                     instance.ExpiresAt ?? DateTimeOffset.UtcNow.AddMinutes(15),
                     instance.RunnerPool,
@@ -216,7 +231,8 @@ public static class RuntimeWriteBackHandler
                 item => item.Id == submissionId,
                 cancellationToken);
             if (submission is not null
-                && submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing)
+                && submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
+                && submission.ProcessingVersion == instance.SubmissionProcessingVersion)
             {
                 submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
                 submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;

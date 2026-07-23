@@ -181,7 +181,7 @@ public sealed class EfSubmissionProcessor(
                     try
                     {
                         _ = AwdpTargetDefinitionFactory.Create(
-                            targetId, template, configuration.TargetPort);
+                            targetId, template, configuration.TargetPort, now);
                     }
                     catch (InvalidOperationException)
                     {
@@ -200,6 +200,7 @@ public sealed class EfSubmissionProcessor(
                             targetId,
                             template,
                             generation,
+                            submission.ProcessingVersion,
                             evaluation.CompetitionChallengeRevision,
                             now);
                         db.RuntimeInstances.Add(target);

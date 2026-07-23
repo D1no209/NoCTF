@@ -22,8 +22,7 @@ public enum RuntimeState : short
 public enum RuntimePurpose : short
 {
     Player,
-    AwdpTarget,
-    KohShared
+    AwdpTarget
 }
 
 public enum RuntimeFailureCode : short
@@ -45,6 +44,7 @@ public sealed class RuntimeInstance
     public Guid? TeamId { get; set; }
     public RuntimePurpose Purpose { get; set; }
     public Guid? SubmissionId { get; set; }
+    public long? SubmissionProcessingVersion { get; set; }
     public int Generation { get; set; }
     public RuntimeKind RuntimeKind { get; set; }
     public RuntimeProvider RuntimeProvider { get; set; }

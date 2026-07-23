@@ -233,6 +233,19 @@ public sealed class KubernetesContainerLifecycle(
         Guid operationId, DateTimeOffset expiresAt, CancellationToken cancellationToken)
     {
         var name = $"noctf-awdp-{operationId:N}";
+        try
+        {
+            _ = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
+                name,
+                options.Namespace,
+                cancellationToken: cancellationToken);
+            return name;
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // The deterministic policy has not been created for this operation yet.
+        }
         var labels = new Dictionary<string, string>
         {
             ["noctf.io/job-kind"] = "awdp-verification",

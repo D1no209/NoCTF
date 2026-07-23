@@ -18,7 +18,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                 "last_applied_checker_sequence <= checker_sequence");
             table.HasCheckConstraint(
                 "ck_runtime_instances_awdp_submission",
-                "(purpose = 1) = (submission_id IS NOT NULL)");
+                "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
         });
         builder.HasKey(instance => instance.Id);
         builder.Property(instance => instance.RuntimeKind).HasConversion<short>();

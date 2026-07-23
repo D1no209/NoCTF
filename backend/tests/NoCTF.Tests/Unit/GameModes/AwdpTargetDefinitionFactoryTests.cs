@@ -20,13 +20,17 @@ public sealed class AwdpTargetDefinitionFactoryTests
         var definition = AwdpTargetDefinitionFactory.Create(
             operationId,
             template,
-            targetPort: 8080);
+            targetPort: 8080,
+            DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(definition.NetworkIsolation)
             .IsEqualTo(ContainerNetworkIsolation.Isolated);
         await Assert.That(definition.InternalPorts).IsEquivalentTo([8080]);
         await Assert.That(definition.PortMappings).IsEmpty();
         await Assert.That(definition.Labels["noctf.purpose"]).IsEqualTo("awdp-target");
+        await Assert.That(definition.Labels["noctf.io.expires-at"]).IsEqualTo("1784852100");
+        await Assert.That(definition.Security.CapAdd).IsEmpty();
+        await Assert.That(definition.Security.CapDrop).Contains("ALL");
     }
 
     [Test]
@@ -44,7 +48,7 @@ public sealed class AwdpTargetDefinitionFactoryTests
             RuntimeKind: kind);
 
         var action = () => AwdpTargetDefinitionFactory.Create(
-            Guid.NewGuid(), template, 8080);
+            Guid.NewGuid(), template, 8080, DateTimeOffset.UtcNow);
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
