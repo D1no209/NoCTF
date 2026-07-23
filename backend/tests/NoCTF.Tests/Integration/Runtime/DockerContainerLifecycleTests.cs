@@ -90,43 +90,57 @@ public sealed class DockerContainerLifecycleTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Checker_joins_dedicated_callback_network_not_platform_network(
+    public async Task Checkers_use_distinct_internal_callback_networks_without_platform_access(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var dockerProbe = new ContainerBuilder("alpine:3.20")
-                .WithCommand("true")
+            await using var callback = new ContainerBuilder("alpine:3.20")
+                .WithCommand("sleep", "300")
+                .WithLabel("noctf.io/internal-role", "awdp-callback")
                 .Build();
-            await dockerProbe.StartAsync(cancellationToken);
+            await callback.StartAsync(cancellationToken);
             var endpoint = DockerEndpoint();
             using var docker = new DockerClientBuilder().WithEndpoint(new Uri(endpoint)).Build();
-            var callback = await docker.Networks.CreateNetworkAsync(
-                new NetworksCreateParameters { Name = $"noctf-callback-{Guid.NewGuid():N}", Internal = true },
-                cancellationToken);
             using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
-                endpoint, "noctf-platform", "localhost", callback.ID));
-            var operationId = Guid.NewGuid();
-            var sandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                operationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
-            ContainerReceipt? receipt = null;
+                endpoint, "noctf-platform", "localhost", callback.Id));
+            var firstOperationId = Guid.NewGuid();
+            var secondOperationId = Guid.NewGuid();
+            var firstSandbox = await lifecycle.CreateIsolatedNetworkAsync(
+                firstOperationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+            var secondSandbox = await lifecycle.CreateIsolatedNetworkAsync(
+                secondOperationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+            ContainerReceipt? first = null;
+            ContainerReceipt? second = null;
             try
             {
-                receipt = await lifecycle.CreateAsync(CheckerRequest(operationId, sandbox), cancellationToken);
-                var inspected = await docker.Containers.InspectContainerAsync(
-                    receipt!.ResourceId, cancellationToken);
-                await Assert.That(inspected.NetworkSettings!.Networks.Values
-                        .Select(network => network.NetworkID))
-                    .IsEquivalentTo([sandbox, callback.ID]);
-                await Assert.That(inspected.NetworkSettings.Networks.Keys.Contains("noctf-platform"))
+                first = await lifecycle.CreateAsync(
+                    CheckerRequest(firstOperationId, firstSandbox), cancellationToken);
+                second = await lifecycle.CreateAsync(
+                    CheckerRequest(secondOperationId, secondSandbox), cancellationToken);
+                var firstCallback = await docker.Networks.InspectNetworkAsync(
+                    $"noctf-callback-{firstOperationId:N}", cancellationToken);
+                var secondCallback = await docker.Networks.InspectNetworkAsync(
+                    $"noctf-callback-{secondOperationId:N}", cancellationToken);
+                await Assert.That(firstCallback.Internal).IsTrue();
+                await Assert.That(secondCallback.Internal).IsTrue();
+                await Assert.That(firstCallback.ID).IsNotEqualTo(secondCallback.ID);
+                await Assert.That(firstCallback.Containers.Keys)
+                    .IsEquivalentTo([callback.Id, first.ResourceId]);
+                await Assert.That(secondCallback.Containers.Keys)
+                    .IsEquivalentTo([callback.Id, second.ResourceId]);
+                var inspected = await docker.Containers.InspectContainerAsync(first.ResourceId, cancellationToken);
+                await Assert.That(inspected.NetworkSettings!.Networks.Keys.Contains("noctf-platform"))
                     .IsFalse();
             }
             finally
             {
-                if (receipt is not null)
-                    await lifecycle.DestroyAsync(receipt, cancellationToken);
-                await lifecycle.DeleteIsolatedNetworkAsync(sandbox, cancellationToken);
-                await docker.Networks.DeleteNetworkAsync(callback.ID, cancellationToken);
+                if (first is not null)
+                    await lifecycle.DestroyAsync(first, cancellationToken);
+                if (second is not null)
+                    await lifecycle.DestroyAsync(second, cancellationToken);
+                await lifecycle.DeleteIsolatedNetworkAsync(firstSandbox, cancellationToken);
+                await lifecycle.DeleteIsolatedNetworkAsync(secondSandbox, cancellationToken);
             }
         });
     }
@@ -145,13 +159,22 @@ public sealed class DockerContainerLifecycleTests
             var operationId = Guid.NewGuid();
             using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
                 DockerEndpoint(), "noctf-platform", "localhost", $"missing-{Guid.NewGuid():N}"));
+            var sandbox = await lifecycle.CreateIsolatedNetworkAsync(
+                operationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             Func<Task> action = () => lifecycle.CreateAsync(
-                CheckerRequest(operationId, null), cancellationToken);
+                CheckerRequest(operationId, sandbox), cancellationToken);
 
-            await Assert.That(action).ThrowsException();
-            var remaining = await lifecycle.GetAsync(
-                RuntimeProvider.Docker, $"noctf-{operationId:N}", cancellationToken);
-            await Assert.That(remaining).IsNull();
+            try
+            {
+                await Assert.That(action).ThrowsException();
+                var remaining = await lifecycle.GetAsync(
+                    RuntimeProvider.Docker, $"noctf-{operationId:N}", cancellationToken);
+                await Assert.That(remaining).IsNull();
+            }
+            finally
+            {
+                await lifecycle.DeleteIsolatedNetworkAsync(sandbox, cancellationToken);
+            }
         });
     }
 

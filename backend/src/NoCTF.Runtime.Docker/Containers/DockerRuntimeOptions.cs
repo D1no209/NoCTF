@@ -4,4 +4,6 @@ public sealed record DockerRuntimeOptions(
     string Endpoint = "npipe://./pipe/docker_engine",
     string NetworkName = "noctf",
     string PublicHost = "localhost",
-    string CallbackNetworkName = "noctf-callback");
+    string CallbackContainerName = "noctf-api",
+    string CallbackContainerLabelKey = "noctf.io/internal-role",
+    string CallbackContainerLabelValue = "awdp-callback");

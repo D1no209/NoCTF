@@ -47,6 +47,9 @@ public sealed class KubernetesContainerLifecycle(
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
         labels["noctf.io/runtime-id"] = name;
         if (request.NetworkName is not null) labels["noctf.io/sandbox"] = request.NetworkName;
+        if (request.Ttl is not null)
+            labels["noctf.io/expires-at"] = DateTimeOffset.UtcNow.Add(request.Ttl.Value)
+                .ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var pod = new V1Pod
         {
             Metadata = new V1ObjectMeta
@@ -92,12 +95,10 @@ public sealed class KubernetesContainerLifecycle(
                 RestartPolicy = "Never"
             }
         };
-        var podCreated = false;
         try
         {
             await client.CoreV1.CreateNamespacedPodAsync(
                 pod, options.Namespace, cancellationToken: cancellationToken);
-            podCreated = true;
             if (request.AllowInternalCallback)
                 await EnsureInternalCallbackPolicyAsync(name, labels, request, cancellationToken);
             var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
@@ -106,25 +107,22 @@ public sealed class KubernetesContainerLifecycle(
         }
         catch
         {
-            if (podCreated)
+            using var cleanupSource = new CancellationTokenSource(
+                RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
+            try
             {
-                using var cleanupSource = new CancellationTokenSource(
-                    RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
-                try
-                {
-                    await DestroyAsync(new ContainerReceipt(
-                        request.OperationId,
-                        RuntimeProvider.Kubernetes,
-                        name,
-                        RuntimeStatus.Failed,
-                        request.PortMappings,
-                        options.PublicHost,
-                        null), cleanupSource.Token);
-                }
-                catch
-                {
-                    // Expiry labels and the resource reaper remain the final cleanup fallback.
-                }
+                await DestroyAsync(new ContainerReceipt(
+                    request.OperationId,
+                    RuntimeProvider.Kubernetes,
+                    name,
+                    RuntimeStatus.Failed,
+                    request.PortMappings,
+                    options.PublicHost,
+                    null), cleanupSource.Token);
+            }
+            catch
+            {
+                // Expiry labels and the resource reaper remain the final cleanup fallback.
             }
             throw;
         }
