@@ -50,6 +50,8 @@ public sealed class CtfScoreExpression
         }
     }
 
+    public void ValidateSyntax(string expression) => _ = GetOrCompile(expression);
+
     private Lambda GetOrCompile(string expression)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expression);

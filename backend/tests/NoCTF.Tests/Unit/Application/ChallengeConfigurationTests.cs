@@ -101,8 +101,11 @@ public class ChallengeConfigurationTests
         Guid.NewGuid(),
         GameMode.Ctf,
         ValidJson,
+        ValidJson,
+        0,
         4,
         status,
+        2,
         DateTimeOffset.UtcNow);
 
     private sealed class Store(ChallengeConfigurationView? current) : IChallengeConfigurationStore
@@ -120,6 +123,7 @@ public class ChallengeConfigurationTests
             Guid competitionId,
             Guid challengeId,
             int expectedRevision,
+            int expectedCompetitionConfigurationRevision,
             string json,
             DateTimeOffset updatedAt,
             CancellationToken cancellationToken)
@@ -134,7 +138,11 @@ public class ChallengeConfigurationTests
     private sealed class Catalog(IReadOnlyList<string>? errors = null) : IChallengeConfigurationCatalog
     {
         public string GetDefaultJson(GameMode mode) => ValidJson;
-        public IReadOnlyList<string> Validate(GameMode mode, string json) => errors ?? [];
+        public IReadOnlyList<string> Validate(
+            GameMode mode,
+            string json,
+            string competitionConfigurationJson,
+            int eligibleTeamCount) => errors ?? [];
     }
 
     private sealed class Cache : ILeaderboardCache

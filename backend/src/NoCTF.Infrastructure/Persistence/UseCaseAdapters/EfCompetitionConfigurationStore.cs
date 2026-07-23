@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
@@ -15,6 +16,16 @@ public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompet
                 competition.ConfigurationJson,
                 competition.ConfigurationRevision,
                 competition.Status,
+                db.Teams.Count(team => team.CompetitionId == competition.Id
+                    && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                    && !team.IsBanned
+                    && team.DeletedAt == null),
+                db.CompetitionChallenges
+                    .Where(challenge => challenge.CompetitionId == competition.Id && challenge.DeletedAt == null)
+                    .OrderBy(challenge => challenge.Id)
+                    .Select(challenge => new CompetitionChallengeConfigurationSnapshot(
+                        challenge.Id, challenge.Revision, challenge.ConfigurationJson))
+                    .ToArray(),
                 competition.ConfigurationUpdatedAt))
             .SingleOrDefaultAsync(ct);
 
@@ -23,12 +34,22 @@ public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompet
         int expectedRevision,
         string json,
         bool allowWhileRunning,
+        IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
         DateTimeOffset now,
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
         if (status is null) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
+        var currentChallengeRevisions = await db.CompetitionChallenges.AsNoTracking()
+            .Where(challenge => challenge.CompetitionId == competitionId && challenge.DeletedAt == null)
+            .Select(challenge => new { challenge.Id, challenge.Revision })
+            .ToListAsync(ct);
+        if (currentChallengeRevisions.Count != expectedChallengeRevisions.Count
+            || currentChallengeRevisions.Any(challenge =>
+                !expectedChallengeRevisions.TryGetValue(challenge.Id, out var revision)
+                || revision != challenge.Revision))
+            return new(null, CompetitionConfigurationUpdateFailure.RevisionConflict);
         var changed = await db.Competitions
             .Where(x => x.Id == competitionId && x.ConfigurationRevision == expectedRevision)
             .ExecuteUpdateAsync(setters => setters

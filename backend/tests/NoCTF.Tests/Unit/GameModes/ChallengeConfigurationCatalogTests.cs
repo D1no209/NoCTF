@@ -57,6 +57,39 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task CtfChallengeExpression_IsValidatedWhenPointsAreInherited()
+    {
+        var configuration = new NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration(
+            NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration.CurrentSchemaVersion,
+            Points: null,
+            BloodRewards: null,
+            ScoreExpression: "initialPoints = minimumPoints");
+        var json = JsonSerializer.Serialize(configuration, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        var errors = new GameModeChallengeConfigurationCatalog().Validate(GameMode.Ctf, json);
+
+        await Assert.That(errors).IsNotEmpty();
+    }
+
+    [Test]
+    public async Task CtfChallengeExpression_UsesInheritedPointsAndEligibleTeamBoundary()
+    {
+        var challenge = new NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration(
+            1, Points: null, BloodRewards: null, ScoreExpression: "1m / (solveCount - 2)");
+        var competition = new NoCTF.GameModes.Ctf.Configuration.CtfConfiguration(
+            1, new(500, 100, 10), []);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        var errors = new GameModeChallengeConfigurationCatalog().Validate(
+            GameMode.Ctf,
+            JsonSerializer.Serialize(challenge, options),
+            JsonSerializer.Serialize(competition, options),
+            eligibleTeamCount: 2);
+
+        await Assert.That(errors).IsNotEmpty();
+    }
+
+    [Test]
     public async Task RuntimeTemplate_ParsesForEveryGameMode()
     {
         var configurations = new GameModeChallengeConfigurationCatalog();

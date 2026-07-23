@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
@@ -24,8 +25,14 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
                 item.Configuration.Id,
                 item.Competition.Mode,
                 item.Configuration.ConfigurationJson,
+                item.Competition.ConfigurationJson,
+                item.Competition.ConfigurationRevision,
                 item.Configuration.Revision,
                 item.Competition.Status,
+                db.Teams.Count(team => team.CompetitionId == item.Competition.Id
+                    && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                    && !team.IsBanned
+                    && team.DeletedAt == null),
                 item.Configuration.UpdatedAt))
             .SingleOrDefaultAsync(ct);
 
@@ -33,6 +40,7 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
         Guid competitionId,
         Guid challengeId,
         int expectedRevision,
+        int expectedCompetitionConfigurationRevision,
         string json,
         DateTimeOffset updatedAt,
         CancellationToken ct)
@@ -40,6 +48,11 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
         if (status is null) return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
+        if (!await db.Competitions.AsNoTracking().AnyAsync(competition =>
+                competition.Id == competitionId
+                && competition.ConfigurationRevision == expectedCompetitionConfigurationRevision,
+                ct))
+            return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
         if (!await db.CompetitionChallenges.AsNoTracking().AnyAsync(challenge => challenge.Id == challengeId
             && challenge.CompetitionId == competitionId && challenge.DeletedAt == null, ct))
             return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);

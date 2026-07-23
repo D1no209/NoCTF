@@ -227,7 +227,11 @@ public class ChallengeManagementTests
     {
         public string GetDefaultJson(GameMode mode) => """{"schemaVersion":1}""";
 
-        public IReadOnlyList<string> Validate(GameMode mode, string json) => [];
+        public IReadOnlyList<string> Validate(
+            GameMode mode,
+            string json,
+            string competitionConfigurationJson,
+            int eligibleTeamCount) => [];
     }
 
     private sealed class Cache : ILeaderboardCache

@@ -35,13 +35,23 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };
 
-    public IReadOnlyList<string> Validate(GameMode mode, string json)
+    public IReadOnlyList<string> Validate(GameMode mode, string json) =>
+        Validate(mode, json, GameModeDefaultConfiguration.GetCompetitionJson(mode), 1);
+
+    public IReadOnlyList<string> Validate(
+        GameMode mode,
+        string json,
+        string competitionConfigurationJson,
+        int eligibleTeamCount)
     {
         try
         {
             return mode switch
             {
-                GameMode.Ctf => CtfConfigurationValidator.Validate(CtfConfigurationUpgrader.ParseChallenge(json)),
+                GameMode.Ctf => CtfConfigurationValidator.Validate(
+                    CtfConfigurationUpgrader.ParseChallenge(json),
+                    CtfConfigurationUpgrader.ParseCompetition(competitionConfigurationJson),
+                    eligibleTeamCount),
                 GameMode.Awd => AwdConfigurationValidator.Validate(AwdConfigurationUpgrader.ParseChallenge(json)),
                 GameMode.Awdp => AwdpConfigurationValidator.Validate(AwdpConfigurationParser.ParseChallenge(json)),
                 GameMode.Koh => KohConfigurationValidator.Validate(KohConfigurationUpgrader.ParseChallenge(json)),
