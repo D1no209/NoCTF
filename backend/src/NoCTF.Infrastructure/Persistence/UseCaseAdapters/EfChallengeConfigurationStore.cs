@@ -2,10 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
+using NoCTF.Application.Messaging;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
-public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChallengeConfigurationStore
+public sealed class EfChallengeConfigurationStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox outbox) : IChallengeConfigurationStore
 {
     public Task<ChallengeConfigurationView?> FindAsync(
         Guid competitionId,
@@ -48,13 +51,20 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
         if (status is null) return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
-        if (!await db.Competitions.AsNoTracking().AnyAsync(competition =>
-                competition.Id == competitionId
-                && competition.ConfigurationRevision == expectedCompetitionConfigurationRevision,
-                ct))
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(candidate => candidate.Id == competitionId
+                && candidate.ConfigurationRevision == expectedCompetitionConfigurationRevision)
+            .Select(candidate => new { candidate.Mode, candidate.ConfigurationRevision })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null)
             return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
-        if (!await db.CompetitionChallenges.AsNoTracking().AnyAsync(challenge => challenge.Id == challengeId
-            && challenge.CompetitionId == competitionId && challenge.DeletedAt == null, ct))
+        var published = await db.CompetitionChallenges.AsNoTracking()
+            .Where(challenge => challenge.Id == challengeId
+                && challenge.CompetitionId == competitionId
+                && challenge.DeletedAt == null)
+            .Select(challenge => (bool?)challenge.IsPublished)
+            .SingleOrDefaultAsync(ct);
+        if (published is null)
             return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
         var changed = await db.CompetitionChallenges
             .Where(configuration =>
@@ -70,6 +80,19 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
 
         if (changed != 1) return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
+        if (competition.Mode == GameMode.Awd
+            && status == CompetitionStatus.Running
+            && published.Value)
+        {
+            await outbox.PublishAsync(new AdvanceAwdRound(
+                competitionId,
+                challengeId,
+                updatedAt,
+                competition.ConfigurationRevision,
+                checked(expectedRevision + 1)));
+        }
+        await outbox.FlushOutgoingMessagesAsync();
         await transaction.CommitAsync(ct);
         return new(await FindAsync(competitionId, challengeId, ct));
     }

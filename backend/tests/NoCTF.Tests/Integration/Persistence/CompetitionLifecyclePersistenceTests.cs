@@ -230,6 +230,9 @@ public sealed class CompetitionLifecyclePersistenceTests
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
             throw new NotSupportedException();
 
+        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+            where T : IRunnerNodeMessage => throw new NotSupportedException();
+
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
     }
 

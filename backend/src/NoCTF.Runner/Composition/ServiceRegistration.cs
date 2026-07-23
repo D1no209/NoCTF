@@ -12,6 +12,7 @@ using NoCTF.Runtime.Kubernetes.Containers;
 using NoCTF.Runtime.Libvirt;
 using k8s;
 using NoCTF.Runner.Messages;
+using NoCTF.GameModes.Awd.Configuration;
 
 namespace NoCTF.Runner.Composition;
 
@@ -47,6 +48,12 @@ public static class ServiceRegistration
             provider.GetRequiredService<RuntimeProviderCatalog>());
         services.AddSingleton<IContainerRuntimeProviderCatalog>(provider =>
             provider.GetRequiredService<RuntimeProviderCatalog>());
+        services.AddSingleton<IRuntimeProviderCatalog>(provider =>
+            provider.GetRequiredService<RuntimeProviderCatalog>());
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<AwdFlagInjectionConfigurationCatalog>();
+        services.AddSingleton<IAwdFlagInjectionExecutor, AwdFlagInjectionExecutor>();
+        services.AddSingleton<IAwdFlagInjectionWorkReader, AwdFlagInjectionWorkReader>();
         services.AddSingleton<FixArchivePreparer>();
         services.AddScoped<IFixArchiveReader, EfFixArchiveReader>();
         services.AddSingleton<IObjectStorage, LocalObjectStorage>();

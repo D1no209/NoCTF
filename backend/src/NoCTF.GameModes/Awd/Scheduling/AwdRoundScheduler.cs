@@ -5,6 +5,49 @@ using NoCTF.Domain.Challenges;
 /// <summary>Pure AWD clock and injection retry rules shared by scheduling handlers.</summary>
 public static class AwdRoundScheduler
 {
+    public static AwdRoundPlan PlanCurrentRound(
+        DateTimeOffset now,
+        DateTimeOffset competitionEndAt,
+        TimeSpan effectiveRunningTime,
+        TimeSpan hardeningDuration,
+        TimeSpan roundDuration,
+        AwdPersistedRoundWindow? latest)
+    {
+        if (now >= competitionEndAt)
+            return new(AwdRoundPlanKind.Finished, null);
+
+        if (latest is { } persisted)
+        {
+            if (now < persisted.ValidUntil)
+                return new(AwdRoundPlanKind.Current, persisted);
+            var successor = ResolvePersistedTimelineRound(
+                persisted.Round,
+                persisted.ValidStart,
+                persisted.ValidUntil,
+                now,
+                roundDuration);
+            return successor.ValidStart >= competitionEndAt
+                ? new(AwdRoundPlanKind.Finished, null)
+                : new(AwdRoundPlanKind.Create, successor);
+        }
+
+        var initial = ResolveInitialRound(
+            effectiveRunningTime,
+            hardeningDuration,
+            roundDuration);
+        if (initial is null)
+            return new(AwdRoundPlanKind.WaitingForHardening, null);
+        var elapsedWithinRound = effectiveRunningTime - initial.Value.StartOffset;
+        var validStart = now - elapsedWithinRound;
+        var window = new AwdPersistedRoundWindow(
+            initial.Value.Round,
+            validStart,
+            validStart + roundDuration);
+        return window.ValidStart >= competitionEndAt
+            ? new(AwdRoundPlanKind.Finished, null)
+            : new(AwdRoundPlanKind.Create, window);
+    }
+
     public static AwdRoundWindow? ResolveInitialRound(
         TimeSpan effectiveRunningTime,
         TimeSpan hardeningDuration,
@@ -88,3 +131,15 @@ public readonly record struct AwdPersistedRoundWindow(
     int Round,
     DateTimeOffset ValidStart,
     DateTimeOffset ValidUntil);
+
+public enum AwdRoundPlanKind
+{
+    WaitingForHardening,
+    Current,
+    Create,
+    Finished
+}
+
+public readonly record struct AwdRoundPlan(
+    AwdRoundPlanKind Kind,
+    AwdPersistedRoundWindow? Window);

@@ -10,5 +10,7 @@ public interface ITransactionalMessageOutbox
     ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
         where T : IRunnerPoolMessage;
     ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage;
+    ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+        where T : IRunnerNodeMessage;
     Task FlushOutgoingMessagesAsync();
 }

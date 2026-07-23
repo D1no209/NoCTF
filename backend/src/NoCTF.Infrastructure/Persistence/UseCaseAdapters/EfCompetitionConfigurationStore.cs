@@ -2,10 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
+using NoCTF.Application.Messaging;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
-public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompetitionConfigurationStore
+public sealed class EfCompetitionConfigurationStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox outbox) : ICompetitionConfigurationStore
 {
     public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking()
@@ -41,6 +44,10 @@ public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompet
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
         if (status is null) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
+        var mode = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == competitionId)
+            .Select(competition => competition.Mode)
+            .SingleAsync(ct);
         var currentChallengeRevisions = await db.CompetitionChallenges.AsNoTracking()
             .Where(challenge => challenge.CompetitionId == competitionId && challenge.DeletedAt == null)
             .Select(challenge => new { challenge.Id, challenge.Revision })
@@ -58,6 +65,26 @@ public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompet
                 .SetProperty(x => x.LeaderboardRevision, x => checked(x.LeaderboardRevision + 1))
                 .SetProperty(x => x.ConfigurationUpdatedAt, now), ct);
         if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.RevisionConflict);
+        await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
+        if (mode == GameMode.Awd && status == CompetitionStatus.Running)
+        {
+            var challenges = await db.CompetitionChallenges.AsNoTracking()
+                .Where(challenge => challenge.CompetitionId == competitionId
+                    && challenge.IsPublished
+                    && challenge.DeletedAt == null)
+                .Select(challenge => new { challenge.Id, challenge.Revision })
+                .ToListAsync(ct);
+            foreach (var challenge in challenges)
+            {
+                await outbox.PublishAsync(new AdvanceAwdRound(
+                    competitionId,
+                    challenge.Id,
+                    now,
+                    checked(expectedRevision + 1),
+                    challenge.Revision));
+            }
+        }
+        await outbox.FlushOutgoingMessagesAsync();
         await transaction.CommitAsync(ct);
         return new(await FindAsync(competitionId, ct));
     }

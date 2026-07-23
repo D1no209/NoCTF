@@ -6,6 +6,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Messaging;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -34,7 +35,9 @@ public sealed class ConfigurationRevisionFenceTests
 
             CompetitionConfigurationView competitionSnapshot;
             await using (var snapshotDb = new NoCtfDbContext(options))
-                competitionSnapshot = (await new EfCompetitionConfigurationStore(snapshotDb)
+                competitionSnapshot = (await new EfCompetitionConfigurationStore(
+                    snapshotDb,
+                    new OpenApiTransactionalMessageOutbox())
                     .FindAsync(ids.CompetitionId, cancellationToken))!;
 
             await using (var mutationDb = new NoCtfDbContext(options))
@@ -47,7 +50,9 @@ public sealed class ConfigurationRevisionFenceTests
 
             await using (var updateDb = new NoCtfDbContext(options))
             {
-                var result = await new EfCompetitionConfigurationStore(updateDb).TryUpdateAsync(
+                var result = await new EfCompetitionConfigurationStore(
+                    updateDb,
+                    new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,
                     competitionSnapshot.Revision,
                     """{"schemaVersion":1,"defaultPoints":{"initialPoints":600,"minimumPoints":100,"decayFactor":10},"bloodRewards":[]}""",
@@ -61,7 +66,9 @@ public sealed class ConfigurationRevisionFenceTests
 
             ChallengeConfigurationView challengeSnapshot;
             await using (var snapshotDb = new NoCtfDbContext(options))
-                challengeSnapshot = (await new EfChallengeConfigurationStore(snapshotDb)
+                challengeSnapshot = (await new EfChallengeConfigurationStore(
+                    snapshotDb,
+                    new OpenApiTransactionalMessageOutbox())
                     .FindAsync(ids.CompetitionId, ids.CompetitionChallengeId, cancellationToken))!;
 
             await using (var mutationDb = new NoCtfDbContext(options))
@@ -75,7 +82,9 @@ public sealed class ConfigurationRevisionFenceTests
 
             await using (var updateDb = new NoCtfDbContext(options))
             {
-                var result = await new EfChallengeConfigurationStore(updateDb).TryUpdateAsync(
+                var result = await new EfChallengeConfigurationStore(
+                    updateDb,
+                    new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,
                     ids.CompetitionChallengeId,
                     challengeSnapshot.Revision,

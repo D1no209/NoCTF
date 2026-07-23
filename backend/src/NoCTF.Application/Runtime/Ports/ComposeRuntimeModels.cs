@@ -25,4 +25,10 @@ public interface IComposeRuntime
     Task<ComposeReceipt> UpAsync(ComposeRequest request, CancellationToken cancellationToken);
     Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken);
     Task<ComposeStatus?> GetStatusAsync(ComposeReceipt receipt, CancellationToken cancellationToken);
+    Task<ContainerExecResult> ExecAsync(
+        ComposeReceipt receipt,
+        string serviceName,
+        IReadOnlyList<string> command,
+        TimeSpan timeout,
+        CancellationToken cancellationToken);
 }

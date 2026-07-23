@@ -1,4 +1,5 @@
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.GameModes.Flags;
 using System.Text.Json.Serialization;
 
 namespace NoCTF.GameModes.Awd.Configuration;
@@ -12,7 +13,8 @@ public sealed record AwdConfiguration(
     long VictimDefensePoolPoints,
     int CheckerIntervalSeconds,
     long ServiceHealthyPoints,
-    long ServiceUnhealthyPenalty)
+    long ServiceUnhealthyPenalty,
+    PerTeamFlagTemplate? FlagTemplate = null)
 {
     public const int CurrentSchemaVersion = 2;
 
@@ -48,11 +50,13 @@ public sealed record AwdChallengeConfiguration(
     long? ServiceUnhealthyPenalty = null,
     ChallengeRuntimeTemplate? Runtime = null,
     RunnerJobConfiguration? Checker = null,
-    AwdFlagInjectionConfiguration? FlagInjection = null)
+    AwdFlagInjectionConfiguration? FlagInjection = null,
+    PerTeamFlagTemplate? FlagTemplate = null)
 {
     public const int CurrentSchemaVersion = 3;
 }
 
 public sealed record AwdFlagInjectionConfiguration(
-    IReadOnlyList<string> Command,
-    int TimeoutSeconds = 30);
+    string Command,
+    int TimeoutSeconds = 30,
+    string? ServiceName = null);

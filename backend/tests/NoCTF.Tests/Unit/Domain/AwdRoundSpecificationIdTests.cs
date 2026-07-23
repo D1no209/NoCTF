@@ -1,4 +1,5 @@
 using NoCTF.Domain.Challenges;
+using System.Text.Json;
 
 namespace NoCTF.Tests.Unit.Domain;
 
@@ -31,5 +32,17 @@ public sealed class AwdRoundSpecificationIdTests
         await Assert.That(() => AwdRoundSpecificationId.Parse(
                 Guid.Parse("00000001-0000-0000-0000-000000000001")))
             .Throws<FormatException>();
+    }
+
+    [Test]
+    public async Task Json_boundary_round_trips_the_canonical_guid_string()
+    {
+        var expected = AwdRoundSpecificationId.FromRound(132);
+
+        var json = JsonSerializer.Serialize(expected);
+        var actual = JsonSerializer.Deserialize<AwdRoundSpecificationId>(json);
+
+        await Assert.That(json).IsEqualTo("\"00000132-0000-0000-0000-000000000000\"");
+        await Assert.That(actual).IsEqualTo(expected);
     }
 }

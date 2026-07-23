@@ -155,6 +155,24 @@ public sealed class EfCompetitionLifecycleStore(
             await outbox.PublishAsync(new ProvisionCompetitionRuntimes(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.CleanupRuntimes))
             await outbox.PublishAsync(new CleanupCompetitionRuntimes(competitionId));
+        if (competition.Mode == GameMode.Awd && to == CompetitionStatus.Running)
+        {
+            var challenges = await db.CompetitionChallenges.AsNoTracking()
+                .Where(challenge => challenge.CompetitionId == competitionId
+                    && challenge.IsPublished
+                    && challenge.DeletedAt == null)
+                .Select(challenge => new { challenge.Id, challenge.Revision })
+                .ToListAsync(cancellationToken);
+            foreach (var challenge in challenges)
+            {
+                await outbox.PublishAsync(new AdvanceAwdRound(
+                    competitionId,
+                    challenge.Id,
+                    now,
+                    competition.ConfigurationRevision,
+                    challenge.Revision));
+            }
+        }
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         if (transaction is not null)

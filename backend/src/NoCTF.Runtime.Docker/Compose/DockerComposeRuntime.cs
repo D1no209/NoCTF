@@ -40,6 +40,36 @@ public sealed class DockerComposeRuntime : IComposeRuntime
         return new(receipt.ProjectName, services.Count == 0 ? RuntimeStatus.Stopped : RuntimeStatus.Running, services);
     }
 
+    public async Task<ContainerExecResult> ExecAsync(
+        ComposeReceipt receipt,
+        string serviceName,
+        IReadOnlyList<string> command,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout);
+        try
+        {
+            string[] arguments = ["-T", serviceName, .. command];
+            await RunDockerAsync(
+                receipt.Namespace,
+                receipt.ProjectName,
+                "exec",
+                timeoutSource.Token,
+                arguments);
+            return new(0, false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new(-1, true);
+        }
+        catch (ComposeCommandFailedException exception)
+        {
+            return new(exception.ExitCode, false);
+        }
+    }
+
     private async Task<string> RunDockerAsync(
         string directory,
         string project,
@@ -71,7 +101,9 @@ public sealed class DockerComposeRuntime : IComposeRuntime
         await process.WaitForExitAsync(cancellationToken);
         var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
         if (process.ExitCode != 0)
-            throw new InvalidOperationException(await process.StandardError.ReadToEndAsync(cancellationToken));
+            throw new ComposeCommandFailedException(
+                process.ExitCode,
+                await process.StandardError.ReadToEndAsync(cancellationToken));
         return output;
     }
 
@@ -83,4 +115,9 @@ public sealed class DockerComposeRuntime : IComposeRuntime
         "exited" or "dead" => RuntimeStatus.Stopped,
         _ => RuntimeStatus.Failed
     };
+}
+
+public sealed class ComposeCommandFailedException(int exitCode, string message) : Exception(message)
+{
+    public int ExitCode { get; } = exitCode;
 }
