@@ -51,7 +51,8 @@ public sealed class KubernetesContainerLifecycle(
         {
             labels["noctf.io/managed"] = "true";
             labels["noctf.io/job-kind"] = "awdp-verification";
-            labels["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D");
+            labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
+                ?? request.OperationId).ToString("D");
             labels["noctf.io/generation"] = request.Generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture);
         }
@@ -284,15 +285,20 @@ public sealed class KubernetesContainerLifecycle(
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken)
     {
-        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+        if (identity.RuntimeInstanceId == Guid.Empty
+            || identity.Generation <= 0
+            || identity.TargetPort is < 1 or > 65535)
             throw new ArgumentOutOfRangeException(nameof(identity));
         var name = $"noctf-awdp-{identity.RuntimeInstanceId:N}";
         try
         {
-            _ = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
+            var existing = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
                 name,
                 options.Namespace,
                 cancellationToken: cancellationToken);
+            if (!HasResourceIdentity(existing.Metadata.Labels, identity))
+                throw new InvalidOperationException(
+                    "The existing AWDP sandbox policy has a different ownership identity.");
             return name;
         }
         catch (k8s.Autorest.HttpOperationException exception)
@@ -323,8 +329,36 @@ public sealed class KubernetesContainerLifecycle(
                 {
                     PodSelector = selector,
                     PolicyTypes = ["Ingress", "Egress"],
-                    Ingress = [new V1NetworkPolicyIngressRule { FromProperty = [new V1NetworkPolicyPeer { PodSelector = selector }] }],
-                    Egress = [new V1NetworkPolicyEgressRule { To = [new V1NetworkPolicyPeer { PodSelector = selector }] }]
+                    Ingress =
+                    [
+                        new V1NetworkPolicyIngressRule
+                        {
+                            FromProperty = [new V1NetworkPolicyPeer { PodSelector = selector }],
+                            Ports =
+                            [
+                                new V1NetworkPolicyPort
+                                {
+                                    Protocol = "TCP",
+                                    Port = identity.TargetPort
+                                }
+                            ]
+                        }
+                    ],
+                    Egress =
+                    [
+                        new V1NetworkPolicyEgressRule
+                        {
+                            To = [new V1NetworkPolicyPeer { PodSelector = selector }],
+                            Ports =
+                            [
+                                new V1NetworkPolicyPort
+                                {
+                                    Protocol = "TCP",
+                                    Port = identity.TargetPort
+                                }
+                            ]
+                        }
+                    ]
                 }
             }, options.Namespace, cancellationToken: cancellationToken);
             return name;
@@ -335,7 +369,17 @@ public sealed class KubernetesContainerLifecycle(
                 RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
             try
             {
-                await DeleteIsolatedNetworkAsync(name, cleanup.Token);
+                var ambiguous = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
+                    name,
+                    options.Namespace,
+                    cancellationToken: cleanup.Token);
+                if (HasResourceIdentity(ambiguous.Metadata.Labels, identity))
+                    await DeleteIsolatedNetworkAsync(name, cleanup.Token);
+            }
+            catch (k8s.Autorest.HttpOperationException exception)
+                when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // The server did not create the policy.
             }
             catch
             {
@@ -752,4 +796,18 @@ public sealed class KubernetesContainerLifecycle(
         && long.TryParse(text, System.Globalization.NumberStyles.None,
             System.Globalization.CultureInfo.InvariantCulture, out var expiresAt)
         && expiresAt <= now.ToUnixTimeSeconds();
+
+    private static bool HasResourceIdentity(
+        IDictionary<string, string>? labels,
+        RuntimeResourceIdentity identity) =>
+        labels is not null
+        && labels.TryGetValue("noctf.io/managed", out var managed)
+        && string.Equals(managed, "true", StringComparison.Ordinal)
+        && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
+        && Guid.TryParse(runtimeText, out var runtimeId)
+        && runtimeId == identity.RuntimeInstanceId
+        && labels.TryGetValue("noctf.io/generation", out var generationText)
+        && int.TryParse(generationText, System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var generation)
+        && generation == identity.Generation;
 }

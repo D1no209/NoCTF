@@ -248,7 +248,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken)
     {
-        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+        if (identity.RuntimeInstanceId == Guid.Empty
+            || identity.Generation <= 0
+            || identity.TargetPort is < 1 or > 65535)
             throw new ArgumentOutOfRangeException(nameof(identity));
         var name = $"noctf-awdp-{identity.RuntimeInstanceId:N}";
         var existing = await client.Networks.ListNetworksAsync(new NetworksListParameters
@@ -261,7 +263,12 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         var current = existing.SingleOrDefault(network =>
             string.Equals(network.Name, name, StringComparison.Ordinal));
         if (current is not null)
+        {
+            if (!current.Internal || !HasResourceIdentity(current.Labels, identity))
+                throw new InvalidOperationException(
+                    "The existing AWDP sandbox network has a different ownership identity.");
             return current.ID;
+        }
 
         try
         {
@@ -289,7 +296,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             try
             {
                 var ambiguous = await FindNetworkAsync(name, cleanup.Token);
-                if (ambiguous is not null)
+                if (ambiguous is not null && HasResourceIdentity(ambiguous.Labels, identity))
                     await DeleteNetworkAsync(ambiguous, cleanup.Token);
             }
             catch
@@ -470,7 +477,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     ["noctf.io/network-purpose"] = "awdp-callback",
                     ["noctf.io/managed"] = "true",
                     ["noctf.io/job-kind"] = "awdp-verification",
-                    ["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D"),
+                    ["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
+                        ?? request.OperationId).ToString("D"),
                     ["noctf.io/generation"] = request.Generation.ToString(
                         System.Globalization.CultureInfo.InvariantCulture),
                     ["noctf.io/expires-at"] = ExpiresAt(request).ToUnixTimeSeconds().ToString(
@@ -482,7 +490,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         if (!network.Internal
             || network.Labels is null
             || !network.Labels.TryGetValue("noctf.io/network-purpose", out var purpose)
-            || !string.Equals(purpose, "awdp-callback", StringComparison.Ordinal))
+            || !string.Equals(purpose, "awdp-callback", StringComparison.Ordinal)
+            || !HasResourceIdentity(network.Labels, new RuntimeResourceIdentity(
+                request.RuntimeInstanceId ?? request.OperationId,
+                request.Generation,
+                1)))
             throw new InvalidOperationException("The AWDP callback network is not an internal managed network.");
 
         if (network.Containers?.ContainsKey(callbackContainer.ID) != true)
@@ -561,7 +573,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             labels["noctf.io/managed"] = "true";
             labels["noctf.io/job-kind"] = "awdp-verification";
-            labels["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D");
+            labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
+                ?? request.OperationId).ToString("D");
             labels["noctf.io/generation"] = request.Generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture);
         }
@@ -604,4 +617,18 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         && long.TryParse(text, System.Globalization.NumberStyles.None,
             System.Globalization.CultureInfo.InvariantCulture, out var expiresAt)
         && expiresAt <= now.ToUnixTimeSeconds();
+
+    private static bool HasResourceIdentity(
+        IDictionary<string, string>? labels,
+        RuntimeResourceIdentity identity) =>
+        labels is not null
+        && labels.TryGetValue("noctf.io/managed", out var managed)
+        && string.Equals(managed, "true", StringComparison.Ordinal)
+        && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
+        && Guid.TryParse(runtimeText, out var runtimeId)
+        && runtimeId == identity.RuntimeInstanceId
+        && labels.TryGetValue("noctf.io/generation", out var generationText)
+        && int.TryParse(generationText, System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var generation)
+        && generation == identity.Generation;
 }

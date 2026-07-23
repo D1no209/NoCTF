@@ -125,7 +125,24 @@ public sealed class KubernetesContainerLifecycleTests
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
                 Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(NotFound()));
+            .Returns(
+                Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(NotFound()),
+                Task.FromResult(new HttpOperationResponse<V1NetworkPolicy>
+                {
+                    Body = new V1NetworkPolicy
+                    {
+                        Metadata = new V1ObjectMeta
+                        {
+                            Labels = new Dictionary<string, string>
+                            {
+                                ["noctf.io/managed"] = "true",
+                                ["noctf.io/runtime-instance-id"] =
+                                    "019be6f7-882e-7cae-9389-898a98fbfe22",
+                                ["noctf.io/generation"] = "3"
+                            }
+                        }
+                    }
+                }));
         networking.CreateNamespacedNetworkPolicyWithHttpMessagesAsync(
                 Arg.Any<V1NetworkPolicy>(), Arg.Any<string>(), Arg.Any<string?>(),
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool?>(),
@@ -137,7 +154,7 @@ public sealed class KubernetesContainerLifecycleTests
 
         Func<Task> action = () => lifecycle.CreateIsolatedNetworkAsync(
             new RuntimeResourceIdentity(
-                Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3),
+                Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3, 8080),
             DateTimeOffset.UtcNow.AddMinutes(1),
             CancellationToken.None);
 
