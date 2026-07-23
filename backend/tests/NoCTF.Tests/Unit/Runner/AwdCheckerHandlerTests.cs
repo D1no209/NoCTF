@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using System.Diagnostics;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
@@ -52,6 +53,30 @@ public sealed class AwdCheckerHandlerTests
         await Assert.That(request.OperationTimeout).IsEqualTo(TimeSpan.FromMinutes(1));
     }
 
+    [Test]
+    public async Task Checker_timeout_cancels_a_hung_provider_wait()
+    {
+        var runner = new HangingOneShotRunner();
+        var executor = new AwdCheckerExecutor(new StubProviderCatalog(runner));
+        var work = new AwdCheckerWork(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            8,
+            RuntimeProvider.Docker,
+            "checker:latest",
+            ["/checker"],
+            new Dictionary<string, string>(),
+            new Uri("http://target.internal/health"),
+            new Uri("https://api.example/api/internal/v1/awd/check-results"),
+            "claim-bound-token",
+            DateTimeOffset.UtcNow.AddMinutes(1),
+            TimeSpan.FromMilliseconds(20));
+
+        var outcome = await executor.ExecuteAsync(work, CancellationToken.None);
+
+        await Assert.That(outcome).IsEqualTo(AwdCheckerExecutionOutcome.TimedOut);
+        await Assert.That(runner.WasCancelled).IsTrue();
+    }
+
     private sealed class StubProviderCatalog(IOneShotJobRunner runner)
         : IOneShotRuntimeProviderCatalog
     {
@@ -69,6 +94,27 @@ public sealed class AwdCheckerHandlerTests
             Request = request;
             var now = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
             return Task.FromResult(new OneShotResult("checker", 0, "", "", now, now));
+        }
+    }
+
+    private sealed class HangingOneShotRunner : IOneShotJobRunner
+    {
+        public bool WasCancelled { get; private set; }
+
+        public async Task<OneShotResult> RunAsync(
+            ContainerRequest request,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                WasCancelled = true;
+                throw;
+            }
+            throw new UnreachableException();
         }
     }
 }
