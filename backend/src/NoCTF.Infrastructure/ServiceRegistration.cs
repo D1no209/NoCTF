@@ -121,7 +121,6 @@ public static class ServiceRegistration
         services.AddSingleton<ISubmissionAdmissionModePolicy, GameModeSubmissionAdmissionPolicy>();
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
-        services.AddSingleton<AwdpCheckExitCodeMapper>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
         services.AddScoped<ITeamModerationStore, EfTeamModerationStore>();

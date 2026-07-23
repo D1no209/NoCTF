@@ -20,7 +20,8 @@ public sealed class FixArchivePreparer
             throw new ArgumentOutOfRangeException(nameof(configuration), "Archive extraction limits must be positive.");
     }
 
-    public async Task PrepareTarAsync(Stream source, string fileName, string workDirectory, string tarPath,
+    public async Task PrepareTarAsync(Stream source, string fileName, string patchEntrypoint,
+        string workDirectory, string tarPath,
         CancellationToken cancellationToken)
     {
         if (!fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
@@ -29,11 +30,28 @@ public sealed class FixArchivePreparer
             Directory.Delete(workDirectory, recursive: true);
         var payloadRoot = Path.Combine(workDirectory, "noctf", "fix");
         Directory.CreateDirectory(payloadRoot);
-        await ExtractTarGzipAsync(source, payloadRoot, cancellationToken);
+        int entryCount;
+        try
+        {
+            entryCount = await ExtractTarGzipAsync(source, payloadRoot, cancellationToken);
+        }
+        catch (EndOfStreamException exception)
+        {
+            throw new InvalidDataException("Fix archive cannot be empty or truncated.", exception);
+        }
+        if (entryCount == 0)
+            throw new InvalidDataException("Fix archive cannot be empty.");
+        var entrypointPath = SafePath(payloadRoot, patchEntrypoint);
+        if (!File.Exists(entrypointPath))
+            throw new InvalidDataException(
+                "Fix archive must contain the configured patch entrypoint at its exact path.");
         TarFile.CreateFromDirectory(workDirectory, tarPath, includeBaseDirectory: false);
     }
 
-    private async Task ExtractTarGzipAsync(Stream source, string root, CancellationToken cancellationToken)
+    private async Task<int> ExtractTarGzipAsync(
+        Stream source,
+        string root,
+        CancellationToken cancellationToken)
     {
         var countedSource = new CountingReadStream(source);
         await using var payload = new GZipStream(countedSource, CompressionMode.Decompress, leaveOpen: true);
@@ -61,6 +79,7 @@ public sealed class FixArchivePreparer
             if (countedSource.BytesRead > 0 && expanded / (double)countedSource.BytesRead > maxCompressionRatio)
                 throw new InvalidDataException("Fix archive exceeds the configured compression ratio.");
         }
+        return count;
     }
 
     private sealed class CountingReadStream(Stream inner) : Stream

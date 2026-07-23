@@ -60,11 +60,10 @@ public static class ServiceRegistration
         services.AddSingleton<IAwdFlagInjectionWorkReader, AwdFlagInjectionWorkReader>();
         services.AddSingleton<IAwdCheckerWorkReader, AwdCheckerWorkReader>();
         services.AddSingleton<IAwdCheckerExecutor, AwdCheckerExecutor>();
+        services.AddSingleton<IAwdpFixWorkReader, AwdpFixWorkReader>();
+        services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
         services.AddSingleton<FixArchivePreparer>();
-        services.AddScoped<IFixArchiveReader, EfFixArchiveReader>();
         services.AddSingleton<IObjectStorage, LocalObjectStorage>();
-        services.AddSingleton<IContainerSandboxLifecycle>(provider =>
-            provider.GetRequiredService<DockerContainerLifecycle>());
         services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();
         return services;
     }

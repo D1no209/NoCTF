@@ -41,6 +41,19 @@ public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);
 
+    public string IssueAwdpFixResult(AwdpFixResultTokenRequest request) =>
+        Write(request.RunnerId, request.IssuedAt, request.Deadline,
+        [
+            new("permission", "awdp:fix-result:write"),
+            new("resource", $"submission:{request.SubmissionId:D}:runtime:{request.RuntimeInstanceId:D}"),
+            new("submission_id", request.SubmissionId.ToString("D")),
+            new("runtime_instance_id", request.RuntimeInstanceId.ToString("D")),
+            new("generation", request.Generation.ToString(), ClaimValueTypes.Integer32),
+            new("processing_version", request.ProcessingVersion.ToString(), ClaimValueTypes.Integer64),
+            new("runtime_processing_version", request.RuntimeProcessingVersion.ToString(), ClaimValueTypes.Integer64),
+            new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+        ]);
+
     private string Write(
         string runnerId,
         DateTimeOffset issuedAt,

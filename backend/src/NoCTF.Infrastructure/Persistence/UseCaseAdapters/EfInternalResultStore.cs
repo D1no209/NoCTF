@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
@@ -11,7 +12,6 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 public sealed class EfInternalResultStore(
     NoCtfDbContext db,
-    AwdpCheckExitCodeMapper awdp,
     ITransactionalMessageOutbox outbox) : IInternalResultStore
 {
     public async Task<InternalResultDisposition> RecordAwdAsync(
@@ -114,6 +114,18 @@ public sealed class EfInternalResultStore(
                 result.BodySha256)
                 ? InternalResultDisposition.Duplicate
                 : InternalResultDisposition.Conflict;
+        var runtime = await db.RuntimeInstances.FromSqlInterpolated(
+                $"SELECT * FROM runtime_instances WHERE id = {result.RuntimeInstanceId} FOR UPDATE")
+            .SingleOrDefaultAsync(ct);
+        if (runtime is null
+            || runtime.Purpose != RuntimePurpose.AwdpTarget
+            || runtime.SubmissionId != submission.Id)
+            return InternalResultDisposition.NotFound;
+        if (runtime.Generation != result.Generation
+            || runtime.ProcessingVersion > result.RuntimeProcessingVersion)
+            return InternalResultDisposition.Superseded;
+        if (runtime.ProcessingVersion < result.RuntimeProcessingVersion)
+            return InternalResultDisposition.Conflict;
         var context = await db.CompetitionChallenges
             .Where(challenge => challenge.Id == submission.CompetitionChallengeId)
             .Join(
@@ -125,7 +137,7 @@ public sealed class EfInternalResultStore(
         if (context.Competition.Mode != GameMode.Awdp || submission.Kind != SubmissionKind.Fix)
             return InternalResultDisposition.NotFound;
 
-        var decision = awdp.Map(result.ExitCode, result.TimedOut);
+        var decision = AwdpFixOutcomeMapper.Map(result.Outcome);
         if (decision.Result == ScoringResult.PlatformFailed)
         {
             submission.EvaluationState = SubmissionEvaluationState.PlatformFailed;
@@ -166,6 +178,14 @@ public sealed class EfInternalResultStore(
         }
         submission.EvaluationResultBodySha256 = result.BodySha256;
         submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+        runtime.State = RuntimeState.Stopping;
+        runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
+        await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
+            runtime.Id,
+            runtime.ProcessingVersion,
+            runtime.RunnerPool,
+            runtime.RunnerId
+                ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
         await db.SaveChangesAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         await transaction.CommitAsync(ct);

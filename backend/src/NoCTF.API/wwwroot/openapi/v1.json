@@ -1530,17 +1530,27 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": ""
           }
         }
       }
@@ -7437,14 +7447,26 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "exitCode": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "timedOut": {
-            "type": "boolean"
+          "outcome": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdpFixResultOutcome"
           }
         }
+      },
+      "NoCTFAPIEndpointsInternalAwdpFixResultOutcome": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Fixed",
+          "StillVulnerable",
+          "RuleViolation",
+          "ServiceUnavailable"
+        ],
+        "enum": [
+          "Fixed",
+          "StillVulnerable",
+          "RuleViolation",
+          "ServiceUnavailable"
+        ]
       },
       "NoCTFAPIEndpointsCompetitionsCompetitionResponse": {
         "type": "object",

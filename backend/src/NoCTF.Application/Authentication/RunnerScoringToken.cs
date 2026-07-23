@@ -9,9 +9,20 @@ public sealed record AwdCheckerTokenRequest(
     DateTimeOffset Deadline,
     DateTimeOffset IssuedAt);
 
+public sealed record AwdpFixResultTokenRequest(
+    string RunnerId,
+    Guid SubmissionId,
+    Guid RuntimeInstanceId,
+    int Generation,
+    long ProcessingVersion,
+    long RuntimeProcessingVersion,
+    DateTimeOffset Deadline,
+    DateTimeOffset IssuedAt);
+
 public interface IRunnerScoringTokenIssuer
 {
     string Issue(string runnerId, DateTimeOffset now);
     string IssueFixArchiveRead(string runnerId, Guid uploadId, Guid submissionId, DateTimeOffset now);
     string IssueAwdChecker(AwdCheckerTokenRequest request);
+    string IssueAwdpFixResult(AwdpFixResultTokenRequest request);
 }

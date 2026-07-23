@@ -98,7 +98,7 @@ public sealed class AwdCheckerPersistenceTests
             await Assert.That(second.CompetitionChallengeRevision).IsEqualTo(0);
             await using (var downDb = new NoCtfDbContext(options))
             {
-                var store = new EfInternalResultStore(downDb, new AwdpCheckExitCodeMapper(), outbox);
+                var store = new EfInternalResultStore(downDb, outbox);
                 var down = AwdCheckResult.Create(
                     fixture.RuntimeId, 3, 2, 7, AwdServiceState.Down, fixture.Now.AddSeconds(3));
                 await Assert.That(await store.RecordAwdAsync(down, cancellationToken))
@@ -291,7 +291,7 @@ public sealed class AwdCheckerPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        var store = new EfInternalResultStore(db, new AwdpCheckExitCodeMapper(), outbox);
+        var store = new EfInternalResultStore(db, outbox);
         return await store.RecordAwdAsync(result, cancellationToken);
     }
 
