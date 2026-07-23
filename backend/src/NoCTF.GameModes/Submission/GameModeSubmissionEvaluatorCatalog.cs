@@ -47,11 +47,9 @@ public sealed class AwdSubmissionEvaluator : ISubmissionEvaluator
             return ModeSubmissionEvaluatorRules.Reject(submission, ScoringFailureCode.FixNotSupported);
 
         var configuration = AwdConfigurationUpgrader.ParseCompetition(context.CompetitionConfigurationJson);
-        var start = context.CompetitionStartTime ?? submission.ReceivedAt;
-        var currentRound = SubmissionRoundCalculator.Calculate(
-            submission.ReceivedAt, start, configuration.RoundDurationSeconds);
-        if (submission.ReceivedAt < start || currentRound > configuration.TotalRounds)
-            return ModeSubmissionEvaluatorRules.Reject(submission, ScoringFailureCode.RoundOutOfRange);
+        if (context.EffectiveRunningTime is TimeSpan effectiveRunningTime
+            && effectiveRunningTime < TimeSpan.FromSeconds(configuration.HardeningDurationSeconds))
+            return ModeSubmissionEvaluatorRules.Reject(submission, ScoringFailureCode.HardeningActive);
 
         var candidates = context.ApplicableFlags
             .Where(flag => flag.TeamId is not null && DefaultEfSubmissionEvaluator.Matches(submission, flag))

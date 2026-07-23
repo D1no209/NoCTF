@@ -22,7 +22,8 @@ public sealed record SubmissionProcessingContext(
     string CompetitionConfigurationJson,
     string ChallengeConfigurationJson,
     IReadOnlyList<Submission>? PriorSubmissions = null,
-    DateTimeOffset? CompetitionStartTime = null);
+    DateTimeOffset? CompetitionStartTime = null,
+    TimeSpan? EffectiveRunningTime = null);
 
 public interface ISubmissionEvaluator
 {

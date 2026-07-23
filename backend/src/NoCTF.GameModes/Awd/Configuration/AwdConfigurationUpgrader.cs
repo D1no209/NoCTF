@@ -12,14 +12,11 @@ public static class AwdConfigurationUpgrader
         VersionedConfiguration.Parse<AwdChallengeConfiguration>(json, AwdChallengeConfiguration.CurrentSchemaVersion, UpgradeChallenge);
 
     private static JsonObject Upgrade(JsonObject root, int fromVersion) =>
-        throw new GameModeConfigurationException($"AWD schemaVersion {fromVersion} has no registered upgrader.");
+        throw new GameModeConfigurationException($"AWD schemaVersion {fromVersion} is obsolete and has no compatibility upgrader.");
 
     private static JsonObject UpgradeChallenge(JsonObject root, int fromVersion)
     {
-        if (fromVersion != 1)
-            throw new GameModeConfigurationException($"AWD challenge schemaVersion {fromVersion} has no registered upgrader.");
-        root["checker"] = null;
-        root["schemaVersion"] = 2;
-        return root;
+        throw new GameModeConfigurationException(
+            $"AWD challenge schemaVersion {fromVersion} is obsolete and has no compatibility upgrader.");
     }
 }

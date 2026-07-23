@@ -6843,6 +6843,7 @@
           "ProducerUnavailable",
           "FlagExpired",
           "RoundOutOfRange",
+          "HardeningActive",
           "AwdpFixFailed",
           "AwdpPatchFailed",
           "AwdpPatchTimeout",
@@ -6876,7 +6877,8 @@
           23,
           24,
           25,
-          26
+          26,
+          27
         ]
       },
       "NoCTFAPIEndpointsSubmissionsGetSubmissionStatusRequest": {

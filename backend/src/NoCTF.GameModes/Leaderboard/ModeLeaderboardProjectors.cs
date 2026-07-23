@@ -177,32 +177,59 @@ internal static class AwdLeaderboardProjection
     public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
     {
         var configuration = TryParse(input.CompetitionConfigurationJson)
-            ?? new AwdConfiguration(1, 300, 10, 2, 50, 100, 50, 50);
+            ?? AwdConfiguration.Default;
+        var challenges = (input.Challenges ?? [])
+            .Where(challenge => !challenge.IsDeleted)
+            .ToDictionary(challenge => challenge.Id);
         var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
         var values = teams.Keys.ToDictionary(team => team, _ => 0L);
         var solves = input.Submissions
             .Where(fact => teams.ContainsKey(fact.TeamId)
                           && fact.Kind == SubmissionKind.Flag
-                          && fact.Event is { DeletedAt: null, Result: ScoringResult.Correct })
+                          && fact.Event is
+                          {
+                              DeletedAt: null,
+                              Result: ScoringResult.Correct,
+                              SpecificationKind: NoCTF.Domain.Challenges.SpecificationKind.AwdRound,
+                              SpecificationId: not null
+                          }
+                          && fact.CompetitionChallengeId is not null
+                          && fact.VictimTeamId is not null
+                          && fact.VictimTeamId != fact.TeamId
+                          && teams.ContainsKey(fact.VictimTeamId.Value)
+                          && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.ReceivedAt)
             .ThenBy(fact => fact.SubmissionId)
             .ToList();
-        foreach (var solve in solves)
+        var attacks = solves
+            .GroupBy(fact => new
+            {
+                ChallengeId = fact.CompetitionChallengeId!.Value,
+                RoundId = fact.Event.SpecificationId!.Value,
+                VictimId = fact.VictimTeamId!.Value,
+                AttackerId = fact.TeamId
+            })
+            .Select(group => group.First())
+            .ToList();
+        foreach (var pool in attacks.GroupBy(fact => new
+                 {
+                     ChallengeId = fact.CompetitionChallengeId!.Value,
+                     RoundId = fact.Event.SpecificationId!.Value,
+                     VictimId = fact.VictimTeamId!.Value
+                 }))
         {
-            values[solve.TeamId] += configuration.AttackPoints;
-            if (solve.VictimTeamId is { } victim
-                && victim != solve.TeamId
-                && values.ContainsKey(victim))
-                values[victim] -= configuration.VictimPenalty;
+            var settings = Effective(configuration, challenges.GetValueOrDefault(pool.Key.ChallengeId)?.ConfigurationJson);
+            var attackers = pool.Select(fact => fact.TeamId).Distinct().ToList();
+            var reward = settings.AttackRewardMode == AttackRewardMode.FixedPerAttack
+                ? settings.AttackPoints
+                : settings.VictimDefensePoolPoints / attackers.Count;
+            foreach (var attacker in attackers)
+                values[attacker] = checked(values[attacker] + reward);
+            values[pool.Key.VictimId] = checked(
+                values[pool.Key.VictimId] - settings.VictimDefensePoolPoints);
         }
-        foreach (var system in input.SystemEvents.Where(fact => fact.Event.DeletedAt is null && fact.Event.Kind == ScoringEventKind.AwdServiceStatus && fact.Event.TeamId is not null))
-        {
-            var team = system.Event.TeamId!.Value;
-            if (!values.ContainsKey(team)) continue;
-            values[team] += system.Event.Result == ScoringResult.Correct
-                ? configuration.ServiceOnlinePoints
-                : -configuration.ServiceDownPenalty;
-        }
+        // AwdServiceStatus is a state-change fact, not a score delta. Service points are
+        // projected only after complete round windows are supplied to the projection input.
         foreach (var hint in ProjectionPenalties.HintCosts(input, teams.Keys))
             values[hint.Key] = checked(values[hint.Key] - hint.Value);
         var rows = teams.Values.Select(team => new LeaderboardEntry(
@@ -210,8 +237,8 @@ internal static class AwdLeaderboardProjection
             team.Id,
             team.Name,
             values[team.Id],
-            solves.Count(solve => solve.TeamId == team.Id),
-            LastSolve(solves, team.Id),
+            attacks.Count(solve => solve.TeamId == team.Id),
+            LastSolve(attacks, team.Id),
             []));
         return rows.OrderByDescending(row => row.Score)
             .ThenByDescending(row => row.LastScoreAt)
@@ -235,6 +262,31 @@ internal static class AwdLeaderboardProjection
         try { return JsonSerializer.Deserialize<AwdConfiguration>(json!, JsonOptions); }
         catch (JsonException) { return null; }
     }
+
+    private static AwdScoringSettings Effective(AwdConfiguration competition, string? challengeJson)
+    {
+        var challenge = TryParseChallenge(challengeJson);
+        return new(
+            challenge?.AttackRewardMode ?? competition.AttackRewardMode,
+            challenge?.AttackPoints ?? competition.AttackPoints,
+            challenge?.VictimDefensePoolPoints ?? competition.VictimDefensePoolPoints,
+            challenge?.ServiceHealthyPoints ?? competition.ServiceHealthyPoints,
+            challenge?.ServiceUnhealthyPenalty ?? competition.ServiceUnhealthyPenalty);
+    }
+
+    private static AwdChallengeConfiguration? TryParseChallenge(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<AwdChallengeConfiguration>(json, JsonOptions); }
+        catch (JsonException) { return null; }
+    }
+
+    private sealed record AwdScoringSettings(
+        AttackRewardMode AttackRewardMode,
+        long AttackPoints,
+        long VictimDefensePoolPoints,
+        long ServiceHealthyPoints,
+        long ServiceUnhealthyPenalty);
 }
 
 public sealed class AwdpLeaderboardProjector : IGameModeLeaderboardProjector

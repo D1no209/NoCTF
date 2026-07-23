@@ -18,7 +18,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             new CtfChallengeConfiguration(CtfChallengeConfiguration.CurrentSchemaVersion, null, null, null),
             JsonOptions),
         GameMode.Awd => JsonSerializer.Serialize(
-            new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion, "flag{round_team_service}", null),
+            new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion),
             JsonOptions),
         GameMode.Awdp => JsonSerializer.Serialize(
             new AwdpChallengeConfiguration(
