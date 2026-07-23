@@ -5,6 +5,12 @@ namespace NoCTF.Infrastructure.Caching;
 
 public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRunnerCapacityGate
 {
+    private const string HeartbeatScript = """
+        if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 0 then return 0 end
+        if redis.call('EXISTS', KEYS[2]) == 0 then return 0 end
+        return 1
+        """;
+
     private const string ClaimScript = """
         if redis.call('SISMEMBER', KEYS[4], ARGV[4]) == 0 then return 0 end
         if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
@@ -38,6 +44,32 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         redis.call('DEL', KEYS[2])
         return 1
         """;
+
+    public async Task<RunnerHeartbeatStatus> GetHeartbeatAsync(
+        string runnerPool,
+        string runnerId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(runnerPool);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runnerId);
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var database = redis.GetDatabase();
+            var live = (long)await database.ScriptEvaluateAsync(
+                HeartbeatScript,
+                [
+                    new RedisKey($"runner-pool:{runnerPool}:members"),
+                    new RedisKey($"runner:{runnerId}:heartbeat")
+                ],
+                [runnerId]);
+            return live == 1 ? RunnerHeartbeatStatus.Online : RunnerHeartbeatStatus.Offline;
+        }
+        catch (RedisException)
+        {
+            return RunnerHeartbeatStatus.Unavailable;
+        }
+    }
 
     public async Task<RunnerCapacityClaim> TryClaimAsync(
         RunnerCapacityRequest request,

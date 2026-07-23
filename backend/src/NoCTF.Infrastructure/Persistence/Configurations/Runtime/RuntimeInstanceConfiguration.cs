@@ -22,6 +22,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
         builder.Property(instance => instance.RuntimeProvider).HasConversion<short>();
         builder.Property(instance => instance.State).HasConversion<short>();
         builder.Property(instance => instance.FailureCode).HasConversion<short>();
+        builder.Property(instance => instance.ProcessingVersion).IsConcurrencyToken();
         builder.Property(instance => instance.ProviderReceiptJson).HasColumnType("jsonb");
         builder.Property(instance => instance.Urls).HasColumnType("text[]");
         builder.Property(instance => instance.ParticipantUrlIndexes).HasColumnType("integer[]");

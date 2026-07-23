@@ -10,6 +10,32 @@ public sealed class RedisRunnerCapacityGateTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Heartbeat_status_requires_pool_membership_and_a_live_key(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await container.StartAsync(cancellationToken);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var database = redis.GetDatabase();
+            const string pool = "integration";
+            const string runner = "runner-heartbeat";
+            await database.SetAddAsync($"runner-pool:{pool}:members", runner);
+            await database.StringSetAsync(
+                $"runner:{runner}:heartbeat", "alive", TimeSpan.FromMinutes(1));
+            var gate = new RedisRunnerCapacityGate(redis);
+
+            await Assert.That(await gate.GetHeartbeatAsync(pool, runner, cancellationToken))
+                .IsEqualTo(RunnerHeartbeatStatus.Online);
+            await database.KeyDeleteAsync($"runner:{runner}:heartbeat");
+            await Assert.That(await gate.GetHeartbeatAsync(pool, runner, cancellationToken))
+                .IsEqualTo(RunnerHeartbeatStatus.Offline);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Claim_for_node_never_assigns_another_pool_member(CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>

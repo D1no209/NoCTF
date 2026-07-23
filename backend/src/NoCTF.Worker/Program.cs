@@ -5,6 +5,9 @@ using Wolverine.Postgresql;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Messaging;
 using Wolverine.ErrorHandling;
+using Microsoft.EntityFrameworkCore;
+using NoCTF.Domain.Platform;
+using NoCTF.Infrastructure.Persistence;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddNoCtfInfrastructure(builder.Configuration);
@@ -24,6 +27,20 @@ builder.UseWolverine(options =>
     options.Policies.OnException<Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException>()
         .RetryTimes(5);
     options.ListenToPostgresqlQueue("noctf-worker").UseDurableInbox();
+    options.PublishMessage<ReconcileRunnerAssignments>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<ReleaseRunnerCapacity>().ToPostgresqlQueue("noctf-worker");
 });
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+await host.StartAsync();
+await using (var scope = host.Services.CreateAsyncScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+    var version = await db.DurableMaintenanceSchedules
+        .Where(schedule => schedule.Kind == MaintenanceChainKind.RunnerAssignmentReconciliation)
+        .Select(schedule => schedule.ProcessingVersion)
+        .SingleAsync();
+    await host.Services.GetRequiredService<IMessageBus>().SendAsync(
+        new ReconcileRunnerAssignments(DateTimeOffset.UtcNow, version));
+}
+await host.WaitForShutdownAsync();
