@@ -61,6 +61,32 @@ public enum AwdpCheckerExecutionOutcome
     TimedOut
 }
 
+public static class AwdpCheckerCompletionPolicy
+{
+    public static AwdpFixOutcome? ResultFor(AwdpCheckerExecutionOutcome outcome) => outcome switch
+    {
+        AwdpCheckerExecutionOutcome.Completed => null,
+        AwdpCheckerExecutionOutcome.TimedOut => AwdpFixOutcome.PlatformFailed,
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
+    };
+}
+
+public static class AwdpPatchCommand
+{
+    public static IReadOnlyList<string> Create(
+        IReadOnlyList<string>? command,
+        string patchEntrypoint)
+    {
+        var entrypoint = $"/noctf/fix/{patchEntrypoint}";
+        return command is not { Count: > 0 }
+            ? ["/bin/sh", entrypoint]
+            : [.. command.Select(argument =>
+                string.Equals(argument, "{entrypoint}", StringComparison.Ordinal)
+                    ? entrypoint
+                    : argument)];
+    }
+}
+
 public sealed class AwdpFixWorkReader(
     IServiceScopeFactory scopes,
     IRunnerScoringTokenIssuer tokens,
@@ -146,9 +172,9 @@ public sealed class AwdpFixWorkReader(
             message.RuntimeProcessingVersion,
             message.Deadline,
             now));
-        var patchCommand = settings.PatchCommand is { Count: > 0 }
-            ? settings.PatchCommand
-            : ["/bin/sh", $"/noctf/fix/{settings.PatchEntrypoint}"];
+        var patchCommand = AwdpPatchCommand.Create(
+            settings.PatchCommand,
+            settings.PatchEntrypoint);
         return new(
             target.Upload.ObjectKey,
             target.Upload.OriginalFileName,
@@ -207,7 +233,8 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
             work.Timeout,
             NetworkName: work.NetworkId,
-            OperationTimeout: work.Timeout);
+            OperationTimeout: work.Timeout,
+            AllowInternalCallback: true);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(work.Timeout);
         try
@@ -258,12 +285,13 @@ public sealed class AwdpFixVerificationHandler(
         if (work is null)
             return;
 
-        var outcome = AwdpFixOutcome.PlatformFailed;
-        var workDirectory = Path.Combine(
+        AwdpFixOutcome? outcome = AwdpFixOutcome.PlatformFailed;
+        var operationDirectory = Path.Combine(
             Path.GetTempPath(),
             "noctf-awdp",
             $"{message.SubmissionId:N}-{message.RuntimeInstanceId:N}");
-        var tarPath = Path.Combine(workDirectory, "fix.tar");
+        var workDirectory = Path.Combine(operationDirectory, "work");
+        var tarPath = Path.Combine(operationDirectory, "fix.tar");
         try
         {
             var stored = await objects.InspectAsync(work.ObjectKey, cancellationToken);
@@ -300,8 +328,9 @@ public sealed class AwdpFixVerificationHandler(
                     outcome = AwdpFixOutcome.PatchFailed;
                 else
                 {
-                    _ = await checker.ExecuteAsync(work.Checker, cancellationToken);
-                    outcome = AwdpFixOutcome.PlatformFailed;
+                    var execution = await checker.ExecuteAsync(
+                        work.Checker, cancellationToken);
+                    outcome = AwdpCheckerCompletionPolicy.ResultFor(execution);
                 }
             }
         }
@@ -315,17 +344,19 @@ public sealed class AwdpFixVerificationHandler(
         }
         finally
         {
-            if (Directory.Exists(workDirectory))
-                Directory.Delete(workDirectory, recursive: true);
+            if (Directory.Exists(operationDirectory))
+                Directory.Delete(operationDirectory, recursive: true);
         }
 
+        if (outcome is not AwdpFixOutcome result)
+            return;
         await outbox.PublishAsync(AwdpFixResult.Create(
             message.SubmissionId,
             message.RuntimeInstanceId,
             message.Generation,
             message.ProcessingVersion,
             message.RuntimeProcessingVersion,
-            outcome,
+            result,
             DateTimeOffset.UtcNow));
         await outbox.FlushOutgoingMessagesAsync();
     }

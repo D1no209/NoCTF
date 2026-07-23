@@ -81,7 +81,8 @@ public sealed record ContainerRequest(
     string? NetworkName = null,
     TimeSpan? OperationTimeout = null,
     ContainerNetworkIsolation NetworkIsolation = ContainerNetworkIsolation.Shared,
-    IReadOnlyList<int>? InternalPorts = null)
+    IReadOnlyList<int>? InternalPorts = null,
+    bool AllowInternalCallback = false)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];

@@ -51,6 +51,14 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 CapAdd = request.Security.CapAdd.ToList()
             }
         }, cancellationToken);
+        if (request.AllowInternalCallback
+            && !string.Equals(request.NetworkName, options.NetworkName, StringComparison.Ordinal))
+        {
+            await client.Networks.ConnectNetworkAsync(
+                options.NetworkName,
+                new NetworkConnectParameters { Container = response.ID },
+                cancellationToken);
+        }
         await client.Containers.StartContainerAsync(response.ID, new ContainerStartParameters(), cancellationToken);
         return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
             request.PortMappings, options.PublicHost, containerName);

@@ -41,6 +41,7 @@ public sealed class AwdpCheckerExecutorTests
         await Assert.That(request.Environment).DoesNotContainKey("OBJECT_KEY");
         await Assert.That(request.Labels["noctf.purpose"]).IsEqualTo("awdp-checker");
         await Assert.That(request.PortMappings).IsEmpty();
+        await Assert.That(request.AllowInternalCallback).IsTrue();
     }
 
     [Test]
@@ -54,6 +55,17 @@ public sealed class AwdpCheckerExecutorTests
 
         await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.TimedOut);
         await Assert.That(runner.ObservedCancellation).IsTrue();
+    }
+
+    [Test]
+    public async Task Completed_checker_waits_for_authenticated_callback_instead_of_racing_it()
+    {
+        await Assert.That(AwdpCheckerCompletionPolicy.ResultFor(
+                AwdpCheckerExecutionOutcome.Completed))
+            .IsNull();
+        await Assert.That(AwdpCheckerCompletionPolicy.ResultFor(
+                AwdpCheckerExecutionOutcome.TimedOut))
+            .IsEqualTo(NoCTF.Domain.Submissions.AwdpFixOutcome.PlatformFailed);
     }
 
     private static AwdpCheckerWork Work() => new(

@@ -62,6 +62,8 @@ public sealed class FixArchivePreparer
         while (await reader.GetNextEntryAsync(copyData: false, cancellationToken) is { } entry)
         {
             if (++count > maxEntries) throw new InvalidDataException("Fix archive contains too many entries.");
+            if (entry.Format is not (TarEntryFormat.Ustar or TarEntryFormat.Pax))
+                throw new InvalidDataException("Fix archive must use a POSIX tar format.");
             var normalizedName = entry.Name.Replace('\\', '/').TrimEnd('/');
             if (!names.Add(normalizedName))
                 throw new InvalidDataException("Fix archive contains duplicate paths.");

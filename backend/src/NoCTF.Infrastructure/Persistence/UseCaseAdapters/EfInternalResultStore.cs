@@ -136,6 +136,24 @@ public sealed class EfInternalResultStore(
             .SingleAsync(ct);
         if (context.Competition.Mode != GameMode.Awdp || submission.Kind != SubmissionKind.Fix)
             return InternalResultDisposition.NotFound;
+        if (runtime.ConfigurationRevision != context.Challenge.Revision)
+        {
+            submission.EvaluationState = SubmissionEvaluationState.PlatformFailed;
+            submission.EvaluationFailureCode = ScoringFailureCode.CheckerPlatformError;
+            submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+            runtime.State = RuntimeState.Stopping;
+            runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
+            await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
+                runtime.Id,
+                runtime.ProcessingVersion,
+                runtime.RunnerPool,
+                runtime.RunnerId
+                    ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
+            await db.SaveChangesAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
+            await transaction.CommitAsync(ct);
+            return InternalResultDisposition.Superseded;
+        }
 
         var decision = AwdpFixOutcomeMapper.Map(result.Outcome);
         if (decision.Result == ScoringResult.PlatformFailed)
