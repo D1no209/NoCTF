@@ -420,6 +420,7 @@ namespace NoCTF.Infrastructure.Migrations
                     team_id = table.Column<Guid>(type: "uuid", nullable: true),
                     purpose = table.Column<short>(type: "smallint", nullable: false),
                     submission_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    submission_processing_version = table.Column<long>(type: "bigint", nullable: true),
                     generation = table.Column<int>(type: "integer", nullable: false),
                     runtime_kind = table.Column<short>(type: "smallint", nullable: false),
                     runtime_provider = table.Column<short>(type: "smallint", nullable: false),
@@ -449,7 +450,7 @@ namespace NoCTF.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_runtime_instances", x => x.id);
-                    table.CheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL)");
+                    table.CheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
                     table.CheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
                     table.CheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
                     table.ForeignKey(

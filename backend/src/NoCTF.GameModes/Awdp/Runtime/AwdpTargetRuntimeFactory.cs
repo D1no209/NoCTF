@@ -12,6 +12,7 @@ public static class AwdpTargetRuntimeFactory
         Guid runtimeInstanceId,
         ChallengeRuntimeTemplate template,
         int generation,
+        long submissionProcessingVersion,
         int configurationRevision,
         DateTimeOffset now)
     {
@@ -30,6 +31,7 @@ public static class AwdpTargetRuntimeFactory
             TeamId = null,
             Purpose = RuntimePurpose.AwdpTarget,
             SubmissionId = submissionId,
+            SubmissionProcessingVersion = submissionProcessingVersion,
             Generation = generation,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = template.Provider,

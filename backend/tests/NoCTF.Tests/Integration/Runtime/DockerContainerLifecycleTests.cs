@@ -12,6 +12,35 @@ public sealed class DockerContainerLifecycleTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Isolated_network_replay_returns_the_original_network(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var dockerProbe = new ContainerBuilder("alpine:3.20")
+                .WithCommand("true")
+                .Build();
+            await dockerProbe.StartAsync(cancellationToken);
+            using var lifecycle = CreateLifecycle();
+            var operationId = Guid.NewGuid();
+            var first = await lifecycle.CreateIsolatedNetworkAsync(
+                operationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+            try
+            {
+                var replay = await lifecycle.CreateIsolatedNetworkAsync(
+                    operationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+
+                await Assert.That(replay).IsEqualTo(first);
+            }
+            finally
+            {
+                await lifecycle.DeleteIsolatedNetworkAsync(first, cancellationToken);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task ExecWithInputAsync_WritesStdinWithoutStoppingContainer(CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>

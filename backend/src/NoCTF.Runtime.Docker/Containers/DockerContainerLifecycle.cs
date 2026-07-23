@@ -181,9 +181,22 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     public async Task<string> CreateIsolatedNetworkAsync(
         Guid operationId, DateTimeOffset expiresAt, CancellationToken cancellationToken)
     {
+        var name = $"noctf-awdp-{operationId:N}";
+        var existing = await client.Networks.ListNetworksAsync(new NetworksListParameters
+        {
+            Filters = new Dictionary<string, IDictionary<string, bool>>
+            {
+                ["name"] = new Dictionary<string, bool> { [name] = true }
+            }
+        }, cancellationToken);
+        var current = existing.SingleOrDefault(network =>
+            string.Equals(network.Name, name, StringComparison.Ordinal));
+        if (current is not null)
+            return current.ID;
+
         var response = await client.Networks.CreateNetworkAsync(new NetworksCreateParameters
         {
-            Name = $"noctf-awdp-{operationId:N}",
+            Name = name,
             Internal = true,
             Labels = new Dictionary<string, string>
             {
