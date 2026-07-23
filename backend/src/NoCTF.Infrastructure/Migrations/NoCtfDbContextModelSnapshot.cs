@@ -704,6 +704,12 @@ namespace NoCTF.Infrastructure.Migrations
                             Kind = (short)0,
                             ProcessingVersion = 1L,
                             UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Kind = (short)1,
+                            ProcessingVersion = 1L,
+                            UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
                 });
 

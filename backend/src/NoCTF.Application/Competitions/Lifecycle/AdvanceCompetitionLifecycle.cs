@@ -24,8 +24,18 @@ public interface ICompetitionLifecycleStore
         Guid? actorId,
         string? reason,
         bool automatic,
+        CompetitionLifecycleEffects effects,
         CancellationToken cancellationToken) =>
         TryTransitionAsync(competitionId, from, to, cancellationToken);
+}
+
+[Flags]
+public enum CompetitionLifecycleEffects
+{
+    None = 0,
+    ProjectLeaderboard = 1,
+    ProvisionRuntimes = 2,
+    CleanupRuntimes = 4
 }
 
 /// <summary>Advances published and running competitions using wall-clock deadlines without extending pauses.</summary>
@@ -38,6 +48,22 @@ public sealed class AdvanceCompetitionLifecycle(
         var transitions = new List<CompetitionLifecycleTransition>();
         foreach (var competition in await store.GetDueAsync(now, cancellationToken))
         {
+            if (competition.Status is CompetitionStatus.Published or CompetitionStatus.Running or CompetitionStatus.Paused
+                && now >= competition.EndTime)
+            {
+                if (await store.TryTransitionWithAuditAsync(
+                        competition.CompetitionId,
+                        competition.Status,
+                        CompetitionStatus.Finished,
+                        null,
+                        "end_time_reached",
+                        true,
+                        EffectsFor(CompetitionStatus.Finished),
+                        cancellationToken))
+                    transitions.Add(new(competition.CompetitionId, competition.Status, CompetitionStatus.Finished));
+                continue;
+            }
+
             if (competition.Status == CompetitionStatus.Published && now >= competition.StartTime)
             {
                 if (startGate is not null
@@ -45,25 +71,33 @@ public sealed class AdvanceCompetitionLifecycle(
                         competition.CompetitionId,
                         cancellationToken)) is { Count: > 0 })
                     continue;
-                if (await store.TryTransitionWithAuditAsync(competition.CompetitionId, competition.Status, CompetitionStatus.Running, null, "start_time_reached", true, cancellationToken))
+                if (await store.TryTransitionWithAuditAsync(
+                        competition.CompetitionId,
+                        competition.Status,
+                        CompetitionStatus.Running,
+                        null,
+                        "start_time_reached",
+                        true,
+                        EffectsFor(CompetitionStatus.Running),
+                        cancellationToken))
                     transitions.Add(new(competition.CompetitionId, competition.Status, CompetitionStatus.Running));
-            }
-
-            if (competition.Status is CompetitionStatus.Published or CompetitionStatus.Running or CompetitionStatus.Paused
-                && now >= competition.EndTime)
-            {
-                if (await store.TryTransitionWithAuditAsync(competition.CompetitionId, competition.Status, CompetitionStatus.Finished, null, "end_time_reached", true, cancellationToken))
-                    transitions.Add(new(competition.CompetitionId, competition.Status, CompetitionStatus.Finished));
             }
         }
         return transitions;
     }
+
+    internal static CompetitionLifecycleEffects EffectsFor(CompetitionStatus target) =>
+        CompetitionLifecycleEffects.ProjectLeaderboard | target switch
+        {
+            CompetitionStatus.Running => CompetitionLifecycleEffects.ProvisionRuntimes,
+            CompetitionStatus.Finished => CompetitionLifecycleEffects.CleanupRuntimes,
+            _ => CompetitionLifecycleEffects.None
+        };
 }
 
 public sealed class TransitionCompetitionLifecycle(
     ICompetitionLifecycleStore store,
     ILeaderboardCache cache,
-    IBackendMessagePublisher messages,
     ICompetitionLifecycleNotificationPublisher? notifications = null,
     CompetitionStartGate? startGate = null)
 {
@@ -92,14 +126,17 @@ public sealed class TransitionCompetitionLifecycle(
         var validation = CompetitionLifecyclePolicy.ValidateTransition(current.Value, target);
         if (!validation.Succeeded)
             return validation;
-        if (!await store.TryTransitionWithAuditAsync(competitionId, current.Value, target, actorId, reason, false, cancellationToken))
+        if (!await store.TryTransitionWithAuditAsync(
+                competitionId,
+                current.Value,
+                target,
+                actorId,
+                reason,
+                false,
+                AdvanceCompetitionLifecycle.EffectsFor(target),
+                cancellationToken))
             return OperationResult.Failure("lifecycle_conflict", "Competition status changed concurrently.");
         await cache.InvalidateAsync(competitionId, cancellationToken);
-        await messages.ProjectLeaderboardAsync(competitionId, cancellationToken);
-        if (target == CompetitionStatus.Running)
-            await messages.ProvisionCompetitionRuntimesAsync(competitionId, cancellationToken);
-        if (target == CompetitionStatus.Finished)
-            await messages.CleanupCompetitionRuntimesAsync(competitionId, cancellationToken);
         if (notifications is not null)
             await notifications.PublishAsync(competitionId, current.Value, target, DateTimeOffset.UtcNow, cancellationToken);
         return OperationResult.Success();

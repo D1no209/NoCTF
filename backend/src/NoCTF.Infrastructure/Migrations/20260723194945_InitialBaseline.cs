@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
 namespace NoCTF.Infrastructure.Migrations
 {
     /// <inheritdoc />
@@ -585,7 +587,11 @@ namespace NoCTF.Infrastructure.Migrations
             migrationBuilder.InsertData(
                 table: "durable_maintenance_schedules",
                 columns: new[] { "kind", "processing_version", "updated_at" },
-                values: new object[] { (short)0, 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) });
+                values: new object[,]
+                {
+                    { (short)0, 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) },
+                    { (short)1, 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) }
+                });
 
             migrationBuilder.CreateIndex(
                 name: "ix_challenge_attachments_challenge_id",

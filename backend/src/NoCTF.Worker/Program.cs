@@ -29,6 +29,7 @@ builder.UseWolverine(options =>
     options.ListenToPostgresqlQueue("noctf-worker").UseDurableInbox();
     options.PublishMessage<ReconcileRunnerAssignments>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<ReleaseRunnerCapacity>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<AdvanceCompetitionLifecycle>().ToPostgresqlQueue("noctf-worker");
 });
 
 var host = builder.Build();
@@ -36,11 +37,15 @@ await host.StartAsync();
 await using (var scope = host.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-    var version = await db.DurableMaintenanceSchedules
-        .Where(schedule => schedule.Kind == MaintenanceChainKind.RunnerAssignmentReconciliation)
-        .Select(schedule => schedule.ProcessingVersion)
-        .SingleAsync();
-    await host.Services.GetRequiredService<IMessageBus>().SendAsync(
-        new ReconcileRunnerAssignments(DateTimeOffset.UtcNow, version));
+    var schedules = await db.DurableMaintenanceSchedules.ToDictionaryAsync(
+        schedule => schedule.Kind,
+        schedule => schedule.ProcessingVersion);
+    var bus = host.Services.GetRequiredService<IMessageBus>();
+    await bus.SendAsync(new ReconcileRunnerAssignments(
+        DateTimeOffset.UtcNow,
+        schedules[MaintenanceChainKind.RunnerAssignmentReconciliation]));
+    await bus.SendAsync(new AdvanceCompetitionLifecycle(
+        DateTimeOffset.UtcNow,
+        schedules[MaintenanceChainKind.CompetitionLifecycle]));
 }
 await host.WaitForShutdownAsync();

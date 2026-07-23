@@ -4,7 +4,8 @@ namespace NoCTF.Domain.Platform;
 
 public enum MaintenanceChainKind : short
 {
-    RunnerAssignmentReconciliation
+    RunnerAssignmentReconciliation,
+    CompetitionLifecycle
 }
 
 public sealed class DurableMaintenanceSchedule
