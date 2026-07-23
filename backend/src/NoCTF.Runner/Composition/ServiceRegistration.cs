@@ -1,4 +1,8 @@
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Storage;
+using NoCTF.Application.Submissions.PatchUploads;
+using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Storage;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Runtime.Kubernetes.Compose;
@@ -42,6 +46,10 @@ public static class ServiceRegistration
         services.AddSingleton<IContainerRuntimeProviderCatalog>(provider =>
             provider.GetRequiredService<RuntimeProviderCatalog>());
         services.AddSingleton<FixArchivePreparer>();
+        services.AddScoped<IFixArchiveReader, EfFixArchiveReader>();
+        services.AddSingleton<IObjectStorage, LocalObjectStorage>();
+        services.AddSingleton<IContainerSandboxLifecycle>(provider =>
+            provider.GetRequiredService<DockerContainerLifecycle>());
         return services;
     }
 }

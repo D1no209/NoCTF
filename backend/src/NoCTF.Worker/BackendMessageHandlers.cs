@@ -42,6 +42,12 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken) =>
         leaderboard.RefreshAsync(message.CompetitionId, cancellationToken);
 
+    public static Task Handle(
+        AwdpFixResult message,
+        IInternalResultStore results,
+        CancellationToken cancellationToken) =>
+        results.RecordAwdpAsync(message, cancellationToken);
+
     public static async Task<object?> Handle(
         DispatchRuntime message,
         NoCtfDbContext db,

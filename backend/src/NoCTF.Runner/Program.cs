@@ -3,6 +3,9 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Composition;
 using NoCTF.Runtime.Libvirt;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Messaging;
+using NoCTF.Application.Submissions.Processing;
+using NoCTF.Infrastructure.Messaging;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.Postgresql;
@@ -14,6 +17,7 @@ var postgres = builder.Configuration.GetConnectionString("PostgreSql")
     ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
 builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
     options => options.UseNpgsql(postgres).UseSnakeCaseNamingConvention());
+builder.Services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
 var runnerPool = builder.Configuration["Runner:Pool"] ?? "default";
 var queueName = RunnerQueueName.FromPool(runnerPool);
 builder.UseWolverine(options =>
@@ -28,6 +32,7 @@ builder.UseWolverine(options =>
     options.Policies.OnException<Npgsql.NpgsqlException>()
         .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
     options.ListenToPostgresqlQueue(queueName.Value).UseDurableInbox();
+    options.PublishMessage<AwdpFixResult>().ToPostgresqlQueue("noctf-worker");
 });
 var app = builder.Build();
 app.MapGet("/health/live", () => TypedResults.Ok(new { status = "live" }));
