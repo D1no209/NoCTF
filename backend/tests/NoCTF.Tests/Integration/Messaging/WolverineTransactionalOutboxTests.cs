@@ -1,7 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using NoCTF.Application.Competitions.Lifecycle;
+using NoCTF.Application.Messaging;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Identity;
+using NoCTF.Domain.Platform;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
@@ -9,6 +17,8 @@ using Wolverine.ErrorHandling;
 using Wolverine.Persistence.Durability;
 using Wolverine.Persistence.Durability.DeadLetterManagement;
 using Wolverine.Postgresql;
+using LifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle;
+using LifecycleMessage = NoCTF.Application.Messaging.AdvanceCompetitionLifecycle;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -139,12 +149,182 @@ public sealed class WolverineTransactionalOutboxTests
         });
     }
 
+    [Test]
+    [Timeout(300_000)]
+    public async Task Lifecycle_chain_survives_restart_and_replayed_version_has_one_successor(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var connectionString = postgres.GetConnectionString();
+            using (var migrateHost = BuildHost(connectionString))
+            {
+                await using var scope = migrateHost.Services.CreateAsyncScope();
+                await scope.ServiceProvider.GetRequiredService<NoCtfDbContext>()
+                    .Database.MigrateAsync(cancellationToken);
+            }
+
+            var observation = LifecycleChainObservation.Expect();
+            using (var firstHost = BuildHost(connectionString))
+            {
+                await firstHost.StartAsync(cancellationToken);
+                try
+                {
+                    var bus = firstHost.Services.GetRequiredService<IMessageBus>();
+                    var now = DateTimeOffset.UtcNow;
+                    await bus.SendAsync(new LifecycleMessage(now, 1));
+                    await bus.SendAsync(new LifecycleMessage(now, 1));
+                    await observation.FirstCommitted.WaitAsync(cancellationToken);
+                    await WaitForLifecycleVersionAsync(firstHost, 2, cancellationToken);
+                }
+                finally
+                {
+                    await firstHost.StopAsync(cancellationToken);
+                }
+            }
+
+            using (var restartedHost = BuildHost(connectionString))
+            {
+                await restartedHost.StartAsync(cancellationToken);
+                try
+                {
+                    await observation.SuccessorCommitted.WaitAsync(cancellationToken);
+                    await using var scope = restartedHost.Services.CreateAsyncScope();
+                    var schedule = await scope.ServiceProvider
+                        .GetRequiredService<NoCtfDbContext>()
+                        .DurableMaintenanceSchedules.AsNoTracking()
+                        .SingleAsync(
+                            candidate => candidate.Kind
+                                == MaintenanceChainKind.CompetitionLifecycle,
+                            cancellationToken);
+                    await Assert.That(schedule.ProcessingVersion).IsEqualTo(3);
+                    await Assert.That(observation.AppliedVersions.Count(version => version == 1))
+                        .IsEqualTo(1);
+                    await Assert.That(observation.AppliedVersions.Count(version => version == 2))
+                        .IsEqualTo(1);
+                }
+                finally
+                {
+                    await restartedHost.StopAsync(cancellationToken);
+                }
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Lifecycle_state_and_outbox_roll_back_then_commit_together_on_replay(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var connectionString = postgres.GetConnectionString();
+            var competitionId = Guid.CreateVersion7();
+            using var host = BuildHost(connectionString);
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+                await db.Database.MigrateAsync(cancellationToken);
+                var now = DateTimeOffset.UtcNow;
+                var ownerId = Guid.CreateVersion7();
+                db.Users.Add(new User
+                {
+                    Id = ownerId,
+                    UserName = "lifecycle-owner",
+                    NormalizedUserName = "LIFECYCLE-OWNER",
+                    Email = "lifecycle-owner@example.test",
+                    NormalizedEmail = "LIFECYCLE-OWNER@EXAMPLE.TEST",
+                    PasswordHash = "test",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                db.Competitions.Add(new Competition
+                {
+                    Id = competitionId,
+                    Title = "Lifecycle outbox",
+                    OwnerId = ownerId,
+                    Mode = GameMode.Ctf,
+                    Status = CompetitionStatus.Running,
+                    RunningSince = now.AddMinutes(-1),
+                    StartAt = now.AddHours(-1),
+                    EndAt = now.AddHours(1),
+                    FlagDerivationSecret = new byte[32],
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    ConfigurationUpdatedAt = now
+                });
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            LifecycleTransitionProbeHandler.Fail = true;
+            var observed = LifecycleTransitionObservation.Expect(competitionId);
+            await host.StartAsync(cancellationToken);
+            try
+            {
+                await host.Services.GetRequiredService<IMessageBus>()
+                    .SendAsync(new FinishLifecycleProbe(competitionId));
+                var deadLetters = host.Services.GetRequiredService<IDeadLetters>();
+                var deadLetter = await WaitForLifecycleDeadLetterAsync(
+                    deadLetters,
+                    competitionId,
+                    cancellationToken);
+                await AssertLifecycleStatusAsync(
+                    host,
+                    competitionId,
+                    CompetitionStatus.Running,
+                    cancellationToken);
+
+                LifecycleTransitionProbeHandler.Fail = false;
+                await deadLetters.ReplayAsync(
+                    new DeadLetterEnvelopeQuery([deadLetter.Id]),
+                    cancellationToken);
+
+                await Assert.That(await observed.WaitAsync(cancellationToken)).IsTrue();
+                await AssertLifecycleStatusAsync(
+                    host,
+                    competitionId,
+                    CompetitionStatus.Finished,
+                    cancellationToken);
+            }
+            finally
+            {
+                LifecycleTransitionProbeHandler.Fail = true;
+                await host.StopAsync(cancellationToken);
+            }
+        });
+    }
+
     private static PostgreSqlContainer CreatePostgres() =>
         new PostgreSqlBuilder("postgres:17-alpine")
             .WithDatabase("noctf_wolverine_test")
             .WithUsername("postgres")
             .WithPassword("postgres")
             .Build();
+
+    private static async Task WaitForLifecycleVersionAsync(
+        IHost host,
+        long expectedVersion,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            await using var scope = host.Services.CreateAsyncScope();
+            var version = await scope.ServiceProvider.GetRequiredService<NoCtfDbContext>()
+                .DurableMaintenanceSchedules.AsNoTracking()
+                .Where(candidate => candidate.Kind == MaintenanceChainKind.CompetitionLifecycle)
+                .Select(candidate => candidate.ProcessingVersion)
+                .SingleAsync(cancellationToken);
+            if (version >= expectedVersion)
+                return;
+            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
+        }
+        throw new TimeoutException(
+            $"The lifecycle chain did not commit processing version {expectedVersion}.");
+    }
 
     private static async Task<DeadLetterEnvelope> WaitForDeadLetterAsync(
         IDeadLetters deadLetters,
@@ -165,11 +345,49 @@ public sealed class WolverineTransactionalOutboxTests
         throw new TimeoutException("The rollback probe did not reach Wolverine dead-letter storage.");
     }
 
+    private static async Task<DeadLetterEnvelope> WaitForLifecycleDeadLetterAsync(
+        IDeadLetters deadLetters,
+        Guid competitionId,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 150; attempt++)
+        {
+            var result = await deadLetters.QueryAsync(
+                new DeadLetterEnvelopeQuery { PageSize = 100 },
+                cancellationToken);
+            var envelope = result.Envelopes.FirstOrDefault(candidate =>
+                candidate.Message is FinishLifecycleProbe probe
+                && probe.CompetitionId == competitionId);
+            if (envelope is not null)
+                return envelope;
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+        }
+        throw new TimeoutException("The lifecycle probe did not reach Wolverine dead-letter storage.");
+    }
+
+    private static async Task AssertLifecycleStatusAsync(
+        IHost host,
+        Guid competitionId,
+        CompetitionStatus expected,
+        CancellationToken cancellationToken)
+    {
+        await using var scope = host.Services.CreateAsyncScope();
+        var status = await scope.ServiceProvider.GetRequiredService<NoCtfDbContext>()
+            .Competitions.AsNoTracking()
+            .Where(competition => competition.Id == competitionId)
+            .Select(competition => competition.Status)
+            .SingleAsync(cancellationToken);
+        await Assert.That(status).IsEqualTo(expected);
+    }
+
     private static IHost BuildHost(string connectionString)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
             options => options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
+        builder.Services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
+        builder.Services.AddScoped(_ => new LifecycleAdvancer(
+            new EmptyLifecycleStore()));
         builder.UseWolverine(options =>
         {
             options.Discovery.IncludeType<OutboxBusinessProbeHandler>();
@@ -178,11 +396,16 @@ public sealed class WolverineTransactionalOutboxTests
             options.Discovery.IncludeType<ObserveScheduledOutboxProbeHandler>();
             options.Discovery.IncludeType<RollbackOutboxProbeHandler>();
             options.Discovery.IncludeType<ObserveRollbackOutboxProbeHandler>();
+            options.Discovery.IncludeType<LifecycleMaintenanceProbeHandler>();
+            options.Discovery.IncludeType<LifecycleTransitionProbeHandler>();
+            options.Discovery.IncludeType<ObserveLifecycleProjectionHandler>();
             options.PersistMessagesWithPostgresql(connectionString, "wolverine_test");
             options.UseEntityFrameworkCoreTransactions();
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
             options.Durability.ScheduledJobPollingTime = TimeSpan.FromMilliseconds(100);
             options.Policies.OnException<RollbackProbeException>().MoveToErrorQueue();
+            options.Policies.OnException<DbUpdateConcurrencyException>().RetryTimes(5);
+            options.Policies.OnException<LifecycleTransitionProbeException>().MoveToErrorQueue();
             options.ListenToPostgresqlQueue("outbox-probe").UseDurableInbox();
             options.PublishMessage<WriteOutboxBusinessProbe>()
                 .ToPostgresqlQueue("outbox-probe");
@@ -196,8 +419,32 @@ public sealed class WolverineTransactionalOutboxTests
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<ObserveRollbackOutboxProbe>()
                 .ToPostgresqlQueue("outbox-probe");
+            options.PublishMessage<LifecycleMessage>()
+                .ToPostgresqlQueue("outbox-probe");
+            options.PublishMessage<FinishLifecycleProbe>()
+                .ToPostgresqlQueue("outbox-probe");
+            options.PublishMessage<ProjectLeaderboard>()
+                .ToPostgresqlQueue("outbox-probe");
         });
         return builder.Build();
+    }
+
+    private sealed class EmptyLifecycleStore : ICompetitionLifecycleStore
+    {
+        public Task<CompetitionStatus?> GetStatusAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult<CompetitionStatus?>(null);
+
+        public Task<IReadOnlyList<CompetitionLifecycleSnapshot>> GetDueAsync(
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<CompetitionLifecycleSnapshot>>([]);
+
+        public Task<bool> TryTransitionAsync(
+            Guid competitionId,
+            CompetitionStatus from,
+            CompetitionStatus to,
+            CancellationToken cancellationToken) => Task.FromResult(false);
     }
 }
 
@@ -207,6 +454,7 @@ public sealed record WriteScheduledOutboxProbe(Guid Id, DateTimeOffset DueAt);
 public sealed record ObserveScheduledOutboxProbe(Guid Id);
 public sealed record WriteRollbackOutboxProbe(Guid Id);
 public sealed record ObserveRollbackOutboxProbe(Guid Id);
+public sealed record FinishLifecycleProbe(Guid CompetitionId);
 
 public sealed class OutboxBusinessProbeHandler
 {
@@ -281,6 +529,138 @@ public sealed class ObserveOutboxBusinessProbeHandler
             .SqlQuery<int>($"SELECT count(*)::int AS value FROM outbox_business_probe WHERE id = {message.Id}")
             .SingleAsync(cancellationToken);
         OutboxProbeObservation.Complete(message.Id, count == 1);
+    }
+}
+
+public sealed class LifecycleMaintenanceProbeHandler
+{
+    public static async Task Handle(
+        LifecycleMessage message,
+        LifecycleAdvancer advancer,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var outcome = await BackendMessageHandlers.ExecuteCompetitionLifecycleAsync(
+            message,
+            advancer,
+            db,
+            outbox,
+            cancellationToken);
+        LifecycleChainObservation.Record(message.ProcessingVersion, outcome);
+    }
+}
+
+public sealed class LifecycleTransitionProbeHandler
+{
+    public static volatile bool Fail = true;
+
+    public static async Task Handle(
+        FinishLifecycleProbe message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var store = new EfCompetitionLifecycleStore(db, null!, outbox);
+        var applied = await store.TryTransitionWithAuditAsync(
+            message.CompetitionId,
+            CompetitionStatus.Running,
+            CompetitionStatus.Finished,
+            null,
+            "integration_probe",
+            true,
+            CompetitionLifecycleEffects.ProjectLeaderboard,
+            cancellationToken);
+        if (!applied)
+            throw new InvalidOperationException("The lifecycle transition was not applied.");
+        if (Fail)
+            throw new LifecycleTransitionProbeException();
+    }
+}
+
+public sealed class ObserveLifecycleProjectionHandler
+{
+    public static async Task Handle(
+        ProjectLeaderboard message,
+        NoCtfDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var committed = await db.Competitions.AsNoTracking().AnyAsync(
+            competition => competition.Id == message.CompetitionId
+                && competition.Status == CompetitionStatus.Finished,
+            cancellationToken);
+        LifecycleTransitionObservation.Complete(message.CompetitionId, committed);
+    }
+}
+
+public sealed class LifecycleTransitionProbeException : Exception;
+
+internal sealed record LifecycleChainTasks(
+    Task FirstCommitted,
+    Task SuccessorCommitted,
+    IReadOnlyList<long> AppliedVersions);
+
+internal static class LifecycleChainObservation
+{
+    private static readonly object Sync = new();
+    private static TaskCompletionSource First = CreateSource();
+    private static TaskCompletionSource Successor = CreateSource();
+    private static readonly List<long> Versions = [];
+
+    public static LifecycleChainTasks Expect()
+    {
+        lock (Sync)
+        {
+            First = CreateSource();
+            Successor = CreateSource();
+            Versions.Clear();
+            return new(First.Task, Successor.Task, Versions);
+        }
+    }
+
+    public static void Record(long version, MessageExecutionOutcome outcome)
+    {
+        if (outcome is not (MessageExecutionOutcome.Applied or MessageExecutionOutcome.Idempotent))
+            return;
+        lock (Sync)
+        {
+            Versions.Add(version);
+            if (version == 1)
+                First.TrySetResult();
+            else if (version == 2)
+                Successor.TrySetResult();
+        }
+    }
+
+    private static TaskCompletionSource CreateSource() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+internal static class LifecycleTransitionObservation
+{
+    private static readonly object Sync = new();
+    private static readonly Dictionary<Guid, TaskCompletionSource<bool>> Pending = [];
+
+    public static Task<bool> Expect(Guid competitionId)
+    {
+        lock (Sync)
+        {
+            var source = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            Pending.Add(competitionId, source);
+            return source.Task;
+        }
+    }
+
+    public static void Complete(Guid competitionId, bool committed)
+    {
+        TaskCompletionSource<bool>? source;
+        lock (Sync)
+        {
+            if (!Pending.Remove(competitionId, out source))
+                return;
+        }
+        source.SetResult(committed);
     }
 }
 

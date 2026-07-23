@@ -15,23 +15,46 @@ public static class BackendMessageHandlers
 {
     private static readonly TimeSpan RunnerReconciliationInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RunnerDependencyRetryDelay = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan CompetitionLifecycleInterval = TimeSpan.FromSeconds(30);
 
     public static async Task Handle(
         AdvanceCompetitionLifecycle message,
         CompetitionLifecycleAdvancer advancer,
+        NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
+        _ = await ExecuteCompetitionLifecycleAsync(
+            message,
+            advancer,
+            db,
+            outbox,
+            cancellationToken);
+    }
+
+    public static async Task<MessageExecutionOutcome> ExecuteCompetitionLifecycleAsync(
+        AdvanceCompetitionLifecycle message,
+        CompetitionLifecycleAdvancer advancer,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var schedule = await db.DurableMaintenanceSchedules.SingleAsync(
+            candidate => candidate.Kind == MaintenanceChainKind.CompetitionLifecycle,
+            cancellationToken);
+        if (schedule.ProcessingVersion != message.ProcessingVersion)
+            return MessageExecutionOutcome.Superseded;
         var transitions = await advancer.ExecuteAsync(message.At, cancellationToken);
-        foreach (var transition in transitions)
-        {
-            await outbox.PublishAsync(new ProjectLeaderboard(transition.CompetitionId));
-            if (transition.To == NoCTF.Domain.Competitions.CompetitionStatus.Running)
-                await outbox.PublishAsync(new ProvisionCompetitionRuntimes(transition.CompetitionId));
-            if (transition.To == NoCTF.Domain.Competitions.CompetitionStatus.Finished)
-                await outbox.PublishAsync(new CleanupCompetitionRuntimes(transition.CompetitionId));
-        }
+        var nextAt = DateTimeOffset.UtcNow.Add(CompetitionLifecycleInterval);
+        AdvanceMaintenanceSchedule(schedule, nextAt);
+        await outbox.ScheduleAsync(
+            new AdvanceCompetitionLifecycle(nextAt, schedule.ProcessingVersion),
+            nextAt);
+        await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
+        return transitions.Count > 0
+            ? MessageExecutionOutcome.Applied
+            : MessageExecutionOutcome.Idempotent;
     }
 
     public static Task Handle(

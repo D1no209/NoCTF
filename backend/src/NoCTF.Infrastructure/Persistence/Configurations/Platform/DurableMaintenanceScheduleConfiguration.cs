@@ -13,11 +13,18 @@ internal sealed class DurableMaintenanceScheduleConfiguration
         builder.Property(schedule => schedule.Kind).HasConversion<short>();
 
         // Data annotations cannot seed the singleton durable chain fence.
-        builder.HasData(new DurableMaintenanceSchedule
-        {
-            Kind = MaintenanceChainKind.RunnerAssignmentReconciliation,
-            ProcessingVersion = 1,
-            UpdatedAt = DateTimeOffset.UnixEpoch
-        });
+        builder.HasData(
+            new DurableMaintenanceSchedule
+            {
+                Kind = MaintenanceChainKind.RunnerAssignmentReconciliation,
+                ProcessingVersion = 1,
+                UpdatedAt = DateTimeOffset.UnixEpoch
+            },
+            new DurableMaintenanceSchedule
+            {
+                Kind = MaintenanceChainKind.CompetitionLifecycle,
+                ProcessingVersion = 1,
+                UpdatedAt = DateTimeOffset.UnixEpoch
+            });
     }
 }

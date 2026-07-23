@@ -1,10 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Domain.Competitions;
+using NoCTF.Application.Messaging;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
-public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitionLifecycleStore
+public sealed class EfCompetitionLifecycleStore(
+    NoCtfDbContext db,
+    CompetitionStartGate startGate,
+    ITransactionalMessageOutbox outbox) : ICompetitionLifecycleStore
 {
     public Task<CompetitionStatus?> GetStatusAsync(Guid competitionId, CancellationToken cancellationToken) =>
         db.Competitions.AsNoTracking()
@@ -47,12 +52,21 @@ public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitio
         Guid? actorId,
         string? reason,
         bool automatic,
+        CompetitionLifecycleEffects effects,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        var ownsTransaction = db.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction
+            ? await db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable,
+                cancellationToken)
+            : null;
         var lockedStatus = await CompetitionWriteLock.AcquireAsync(
             db, competitionId, cancellationToken);
         if (lockedStatus != from)
+            return false;
+        if (from == CompetitionStatus.Published && to == CompetitionStatus.Running
+            && (await startGate.ValidateAsync(competitionId, cancellationToken)) is not { Count: 0 })
             return false;
         var competition = await db.Competitions
             .Include(item => item.LifecycleAudits)
@@ -67,6 +81,61 @@ public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitio
         }
         if (to == CompetitionStatus.Running)
             competition.RunningSince = now;
+        if (competition.Mode == GameMode.Awd)
+        {
+            if (from == CompetitionStatus.Running && to == CompetitionStatus.Paused)
+            {
+                await db.RuntimeInstances
+                    .Where(instance => instance.CompetitionId == competitionId
+                        && instance.NextCheckerDueAt != null)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(
+                                instance => instance.NextCheckerDueAt,
+                                (DateTimeOffset?)null)
+                            .SetProperty(
+                                instance => instance.CheckerSequence,
+                                instance => instance.CheckerSequence + 1),
+                        cancellationToken);
+            }
+            else if (from == CompetitionStatus.Paused && to == CompetitionStatus.Running)
+            {
+                await db.RuntimeInstances
+                    .Where(instance => instance.CompetitionId == competitionId
+                        && instance.State == NoCTF.Domain.Runtime.RuntimeState.Running)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(
+                            instance => instance.NextCheckerDueAt,
+                            now),
+                        cancellationToken);
+                var pauseStartedAt = competition.LifecycleAudits
+                    .Where(audit => audit.From == CompetitionStatus.Running
+                        && audit.To == CompetitionStatus.Paused)
+                    .OrderByDescending(audit => audit.OccurredAt)
+                    .ThenByDescending(audit => audit.Id)
+                    .Select(audit => (DateTimeOffset?)audit.OccurredAt)
+                    .FirstOrDefault();
+                if (pauseStartedAt is DateTimeOffset pausedAt)
+                {
+                    var pauseDuration = now - pausedAt;
+                    var currentFlags = await db.ChallengeFlags
+                        .Join(
+                            db.CompetitionChallenges,
+                            flag => flag.CompetitionChallengeId,
+                            challenge => (Guid?)challenge.Id,
+                            (flag, challenge) => new { Flag = flag, Challenge = challenge })
+                        .Where(item => item.Challenge.CompetitionId == competitionId
+                            && item.Flag.SpecificationKind == SpecificationKind.AwdRound
+                            && item.Flag.ValidStart <= pausedAt
+                            && item.Flag.ValidUntil > pausedAt
+                            && item.Flag.DeletedAt == null)
+                        .Select(item => item.Flag)
+                        .ToListAsync(cancellationToken);
+                    foreach (var flag in currentFlags)
+                        flag.ValidUntil = flag.ValidUntil!.Value.Add(pauseDuration);
+                }
+            }
+        }
         competition.Status = to;
         competition.UpdatedAt = now;
         competition.LifecycleAudits.Add(new CompetitionLifecycleAudit
@@ -80,8 +149,16 @@ public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitio
             OccurredAt = now
         });
         competition.LeaderboardRevision = checked(competition.LeaderboardRevision + 1);
+        if (effects.HasFlag(CompetitionLifecycleEffects.ProjectLeaderboard))
+            await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
+        if (effects.HasFlag(CompetitionLifecycleEffects.ProvisionRuntimes))
+            await outbox.PublishAsync(new ProvisionCompetitionRuntimes(competitionId));
+        if (effects.HasFlag(CompetitionLifecycleEffects.CleanupRuntimes))
+            await outbox.PublishAsync(new CleanupCompetitionRuntimes(competitionId));
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
         return true;
     }
 }

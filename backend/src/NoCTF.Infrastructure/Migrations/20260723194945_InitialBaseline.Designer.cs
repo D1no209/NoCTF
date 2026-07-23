@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260723192815_InitialBaseline")]
+    [Migration("20260723194945_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -705,6 +705,12 @@ namespace NoCTF.Infrastructure.Migrations
                         new
                         {
                             Kind = (short)0,
+                            ProcessingVersion = 1L,
+                            UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Kind = (short)1,
                             ProcessingVersion = 1L,
                             UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
