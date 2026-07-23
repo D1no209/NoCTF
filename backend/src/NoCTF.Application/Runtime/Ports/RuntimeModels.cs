@@ -104,7 +104,9 @@ public sealed record ContainerReceipt(
     IReadOnlyDictionary<int, int> PortMappings,
     string? PublicHost,
     string? InternalHost,
-    string? NetworkId = null);
+    string? NetworkId = null,
+    Guid? RuntimeInstanceId = null,
+    int Generation = 0);
 
 public sealed record OneShotResult(
     string ResourceId,
