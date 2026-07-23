@@ -33,7 +33,15 @@ public interface IAwdCheckerWorkReader
 
 public interface IAwdCheckerExecutor
 {
-    Task<OneShotResult> ExecuteAsync(AwdCheckerWork work, CancellationToken cancellationToken);
+    Task<AwdCheckerExecutionOutcome> ExecuteAsync(
+        AwdCheckerWork work,
+        CancellationToken cancellationToken);
+}
+
+public enum AwdCheckerExecutionOutcome
+{
+    Completed,
+    TimedOut
 }
 
 public sealed class AwdCheckerWorkReader(
@@ -133,7 +141,7 @@ public sealed class AwdCheckerWorkReader(
 public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
     : IAwdCheckerExecutor
 {
-    public Task<OneShotResult> ExecuteAsync(
+    public async Task<AwdCheckerExecutionOutcome> ExecuteAsync(
         AwdCheckerWork work,
         CancellationToken cancellationToken)
     {
@@ -160,7 +168,20 @@ public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
             new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
             work.Timeout,
             OperationTimeout: work.Timeout);
-        return providers.OneShot(work.Provider).RunAsync(request, cancellationToken);
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(work.Timeout);
+        try
+        {
+            _ = await providers.OneShot(work.Provider).RunAsync(
+                request,
+                timeoutSource.Token);
+            return AwdCheckerExecutionOutcome.Completed;
+        }
+        catch (OperationCanceledException) when (
+            !cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
+        {
+            return AwdCheckerExecutionOutcome.TimedOut;
+        }
     }
 
     private static Guid CreateOperationId(Guid runtimeInstanceId, long checkerSequence)
