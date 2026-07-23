@@ -1,12 +1,14 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Application.Storage;
-using NoCTF.Application.Submissions.PatchUploads;
 using NoCTF.Application.Submissions.Processing;
+using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Composition;
@@ -14,13 +16,230 @@ using Wolverine.Attributes;
 
 namespace NoCTF.Runner.Messages;
 
+public sealed record AwdpCheckerWork(
+    Guid RuntimeInstanceId,
+    RuntimeProvider Provider,
+    string Image,
+    IReadOnlyList<string> Command,
+    IReadOnlyDictionary<string, string> Environment,
+    string NetworkId,
+    string TargetHost,
+    int TargetPort,
+    int TargetReadyTimeoutSeconds,
+    Uri CallbackUrl,
+    string CallbackToken,
+    TimeSpan Timeout);
+
+public sealed record AwdpFixWork(
+    string ObjectKey,
+    string OriginalFileName,
+    long ByteLength,
+    byte[] Sha256,
+    ContainerReceipt TargetReceipt,
+    string PatchEntrypoint,
+    IReadOnlyList<string> PatchCommand,
+    TimeSpan PatchTimeout,
+    AwdpCheckerWork Checker);
+
+public interface IAwdpFixWorkReader
+{
+    Task<AwdpFixWork?> ReadAsync(
+        RunAwdpFixVerification message,
+        CancellationToken cancellationToken);
+}
+
+public interface IAwdpCheckerExecutor
+{
+    Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
+        AwdpCheckerWork work,
+        CancellationToken cancellationToken);
+}
+
+public enum AwdpCheckerExecutionOutcome
+{
+    Completed,
+    TimedOut
+}
+
+public sealed class AwdpFixWorkReader(
+    IServiceScopeFactory scopes,
+    IRunnerScoringTokenIssuer tokens,
+    IConfiguration configuration,
+    TimeProvider timeProvider) : IAwdpFixWorkReader
+{
+    public async Task<AwdpFixWork?> ReadAsync(
+        RunAwdpFixVerification message,
+        CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        var target = await db.Submissions.AsNoTracking()
+            .Where(submission => submission.Id == message.SubmissionId
+                && submission.CompetitionChallengeId == message.CompetitionChallengeId
+                && submission.Kind == SubmissionKind.Fix
+                && submission.EvaluationState == SubmissionEvaluationState.Processing
+                && submission.ProcessingVersion == message.ProcessingVersion
+                && submission.PatchUploadId == message.PatchUploadId)
+            .Join(
+                db.PatchUploads.AsNoTracking(),
+                submission => submission.PatchUploadId,
+                upload => upload.Id,
+                (submission, upload) => new { Submission = submission, Upload = upload })
+            .Join(
+                db.RuntimeInstances.AsNoTracking()
+                    .Where(runtime => runtime.Id == message.RuntimeInstanceId
+                        && runtime.Purpose == RuntimePurpose.AwdpTarget
+                        && runtime.SubmissionId == message.SubmissionId
+                        && runtime.SubmissionProcessingVersion == message.ProcessingVersion
+                        && runtime.Generation == message.Generation
+                        && runtime.ProcessingVersion == message.RuntimeProcessingVersion
+                        && runtime.State == RuntimeState.Running
+                        && runtime.RunnerPool == message.RunnerPool
+                        && runtime.RunnerId == message.RunnerId),
+                pair => pair.Submission.Id,
+                runtime => runtime.SubmissionId,
+                (pair, runtime) => new { pair.Submission, pair.Upload, Runtime = runtime })
+            .Join(
+                db.CompetitionChallenges.AsNoTracking(),
+                item => item.Submission.CompetitionChallengeId,
+                challenge => challenge.Id,
+                (item, challenge) => new
+                {
+                    item.Upload,
+                    item.Runtime,
+                    challenge.ConfigurationJson,
+                    challenge.Revision
+                })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (target is null
+            || target.Runtime.ConfigurationRevision != target.Revision
+            || timeProvider.GetUtcNow() >= message.Deadline
+            || string.IsNullOrWhiteSpace(target.Runtime.ProviderReceiptJson))
+            return null;
+
+        var settings = AwdpConfigurationParser.ParseChallenge(target.ConfigurationJson);
+        if (settings.Checker is not { } checker
+            || settings.TargetPort is < 1 or > 65535)
+            return null;
+        var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
+            target.Runtime.ProviderReceiptJson);
+        if (receipt?.NetworkId is not { Length: > 0 } networkId
+            || receipt.InternalHost is not { Length: > 0 } targetHost)
+            return null;
+
+        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"] ?? "http://noctf-api";
+        if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri))
+            throw new InvalidOperationException(
+                "RunnerScoring:CallbackBaseUrl must be an absolute URI.");
+        var now = timeProvider.GetUtcNow();
+        var remaining = message.Deadline - now;
+        if (remaining <= TimeSpan.Zero)
+            return null;
+        var checkerTimeout = TimeSpan.FromSeconds(checker.TimeoutSeconds);
+        var timeout = checkerTimeout < remaining ? checkerTimeout : remaining;
+        var callbackToken = tokens.IssueAwdpFixResult(new(
+            message.RunnerId,
+            message.SubmissionId,
+            message.RuntimeInstanceId,
+            message.Generation,
+            message.ProcessingVersion,
+            message.RuntimeProcessingVersion,
+            message.Deadline,
+            now));
+        var patchCommand = settings.PatchCommand is { Count: > 0 }
+            ? settings.PatchCommand
+            : ["/bin/sh", $"/noctf/fix/{settings.PatchEntrypoint}"];
+        return new(
+            target.Upload.ObjectKey,
+            target.Upload.OriginalFileName,
+            target.Upload.ByteLength,
+            target.Upload.Sha256,
+            receipt,
+            settings.PatchEntrypoint,
+            patchCommand,
+            TimeSpan.FromSeconds(settings.PatchTimeoutSeconds),
+            new(
+                message.RuntimeInstanceId,
+                checker.Provider,
+                checker.Image,
+                checker.Command ?? [],
+                checker.Environment ?? new Dictionary<string, string>(),
+                networkId,
+                targetHost,
+                settings.TargetPort,
+                settings.ReadyTimeoutSeconds,
+                new Uri(baseUri, "/api/internal/v1/awdp/fix-results"),
+                callbackToken,
+                timeout));
+    }
+}
+
+public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
+    : IAwdpCheckerExecutor
+{
+    public async Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
+        AwdpCheckerWork work,
+        CancellationToken cancellationToken)
+    {
+        var environment = new Dictionary<string, string>(work.Environment, StringComparer.Ordinal)
+        {
+            ["TARGET_HOST"] = work.TargetHost,
+            ["TARGET_PORT"] = work.TargetPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["TARGET_READY_TIMEOUT_SECONDS"] = work.TargetReadyTimeoutSeconds.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            ["NOCTF_CALLBACK_URL"] = work.CallbackUrl.AbsoluteUri,
+            ["NOCTF_CALLBACK_TOKEN"] = work.CallbackToken
+        };
+        var request = new ContainerRequest(
+            CreateOperationId(work.RuntimeInstanceId),
+            work.Provider,
+            work.Image,
+            work.Command,
+            environment,
+            new Dictionary<string, string>
+            {
+                ["noctf.managed"] = "true",
+                ["noctf.runtime-instance-id"] = work.RuntimeInstanceId.ToString("D"),
+                ["noctf.purpose"] = "awdp-checker"
+            },
+            new Dictionary<int, int>(),
+            new ContainerResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
+            new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
+            work.Timeout,
+            NetworkName: work.NetworkId,
+            OperationTimeout: work.Timeout);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(work.Timeout);
+        try
+        {
+            _ = await providers.OneShot(work.Provider).RunAsync(request, timeout.Token);
+            return AwdpCheckerExecutionOutcome.Completed;
+        }
+        catch (OperationCanceledException) when (
+            !cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
+            return AwdpCheckerExecutionOutcome.TimedOut;
+        }
+    }
+
+    private static Guid CreateOperationId(Guid runtimeInstanceId)
+    {
+        Span<byte> input = stackalloc byte[24];
+        runtimeInstanceId.TryWriteBytes(input[..16]);
+        BinaryPrimitives.WriteInt64BigEndian(input[16..], 0x617764702d63686b);
+        Span<byte> hash = stackalloc byte[32];
+        SHA256.HashData(input, hash);
+        return new Guid(hash[..16]);
+    }
+}
+
 [NonTransactional]
 public sealed class AwdpFixVerificationHandler(
-    NoCtfDbContext db,
-    IFixArchiveReader archives,
+    IAwdpFixWorkReader reader,
     IObjectStorage objects,
     FixArchivePreparer preparer,
-    IContainerSandboxLifecycle sandbox,
+    IRuntimeProviderCatalog providers,
+    IAwdpCheckerExecutor checker,
     ITransactionalMessageOutbox outbox,
     IConfiguration configuration)
 {
@@ -35,86 +254,64 @@ public sealed class AwdpFixVerificationHandler(
                 ?? throw new InvalidOperationException("Runner:Id is required."));
         if (DateTimeOffset.UtcNow >= message.Deadline)
             return;
-        var submission = await db.Submissions.AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == message.SubmissionId, cancellationToken);
-        var runtime = await db.RuntimeInstances.AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == message.RuntimeInstanceId, cancellationToken);
-        if (submission is null || runtime is null
-            || submission.ProcessingVersion != message.ProcessingVersion
-            || runtime.SubmissionProcessingVersion != message.ProcessingVersion
-            || runtime.ProcessingVersion != message.RuntimeProcessingVersion
-            || runtime.Generation != message.Generation
-            || runtime.State != NoCTF.Domain.Runtime.RuntimeState.Running
-            || runtime.CompetitionChallengeId != message.CompetitionChallengeId
-            || !string.Equals(runtime.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
-            || !string.Equals(runtime.RunnerId, message.RunnerId, StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(runtime.ProviderReceiptJson))
+        var work = await reader.ReadAsync(message, cancellationToken);
+        if (work is null)
             return;
 
-        var occurredAt = DateTimeOffset.UtcNow;
-        var exitCode = 3;
-        var timedOut = false;
-        var workDirectory = Path.Combine(Path.GetTempPath(), "noctf-awdp", message.SubmissionId.ToString("N"));
+        var outcome = AwdpFixOutcome.PlatformFailed;
+        var workDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "noctf-awdp",
+            $"{message.SubmissionId:N}-{message.RuntimeInstanceId:N}");
         var tarPath = Path.Combine(workDirectory, "fix.tar");
         try
         {
-            var archive = await archives.FindAsync(message.SubmissionId, cancellationToken);
-            var upload = await db.PatchUploads.AsNoTracking()
-                .SingleOrDefaultAsync(item => item.Id == message.PatchUploadId
-                    && item.SubmissionId == message.SubmissionId, cancellationToken);
-            var stored = archive is null || upload is null
-                ? null
-                : await objects.InspectAsync(upload.ObjectKey, cancellationToken);
-            if (archive is null || upload is null || stored is null
-                || stored.Length != upload.ByteLength
+            var stored = await objects.InspectAsync(work.ObjectKey, cancellationToken);
+            if (stored is null
+                || stored.Length != work.ByteLength
                 || !CryptographicOperations.FixedTimeEquals(
-                    Convert.FromHexString(stored.Sha256), upload.Sha256))
+                    Convert.FromHexString(stored.Sha256), work.Sha256))
             {
-                exitCode = 3;
+                outcome = AwdpFixOutcome.PlatformFailed;
             }
             else
             {
-                await using var source = await objects.OpenReadAsync(upload.ObjectKey, cancellationToken);
+                await using var source = await objects.OpenReadAsync(
+                    work.ObjectKey, cancellationToken);
                 await preparer.PrepareTarAsync(
-                    source, upload.OriginalFileName, workDirectory, tarPath, cancellationToken);
-                var receipt = JsonSerializer.Deserialize<ContainerReceipt>(runtime.ProviderReceiptJson)
-                    ?? throw new InvalidDataException("Runtime provider receipt is invalid.");
+                    source,
+                    work.OriginalFileName,
+                    work.PatchEntrypoint,
+                    workDirectory,
+                    tarPath,
+                    cancellationToken);
+                var sandbox = providers.Sandbox(work.TargetReceipt.Provider);
                 await using (var tar = File.OpenRead(tarPath))
-                    await sandbox.CopyArchiveAsync(receipt, tar, cancellationToken);
-
-                var challenge = await db.CompetitionChallenges.AsNoTracking()
-                    .SingleAsync(item => item.Id == submission.CompetitionChallengeId, cancellationToken);
-                var configuration = AwdpConfigurationParser.ParseChallenge(challenge.ConfigurationJson);
-                var patchCommand = configuration.PatchCommand is { Count: > 0 }
-                    ? configuration.PatchCommand
-                    : ["/bin/sh", $"/noctf/fix/{configuration.PatchEntrypoint}"];
-                var patchResult = await sandbox.ExecAsync(
-                    receipt, patchCommand, TimeSpan.FromSeconds(configuration.PatchTimeoutSeconds), cancellationToken);
-                timedOut = patchResult.TimedOut;
-                exitCode = timedOut ? 3 : patchResult.ExitCode;
-
-                if (!timedOut && exitCode == 0)
+                    await sandbox.CopyArchiveAsync(
+                        work.TargetReceipt, tar, cancellationToken);
+                var patch = await sandbox.ExecAsync(
+                    work.TargetReceipt,
+                    work.PatchCommand,
+                    work.PatchTimeout,
+                    cancellationToken);
+                if (patch.TimedOut)
+                    outcome = AwdpFixOutcome.PatchTimeout;
+                else if (patch.ExitCode != 0)
+                    outcome = AwdpFixOutcome.PatchFailed;
+                else
                 {
-                    var checker = configuration.Checker;
-                    if (checker is null || checker.Command is not { Count: > 0 })
-                        exitCode = 3;
-                    else
-                    {
-                        var checkerResult = await sandbox.ExecAsync(
-                            receipt, checker.Command, TimeSpan.FromSeconds(checker.TimeoutSeconds), cancellationToken);
-                        timedOut = checkerResult.TimedOut;
-                        exitCode = timedOut ? 3 : checkerResult.ExitCode;
-                    }
+                    _ = await checker.ExecuteAsync(work.Checker, cancellationToken);
+                    outcome = AwdpFixOutcome.PlatformFailed;
                 }
             }
         }
         catch (InvalidDataException)
         {
-            exitCode = 2;
+            outcome = AwdpFixOutcome.RuleViolation;
         }
         catch (FileNotFoundException)
         {
-            exitCode = 3;
+            outcome = AwdpFixOutcome.PlatformFailed;
         }
         finally
         {
@@ -122,14 +319,14 @@ public sealed class AwdpFixVerificationHandler(
                 Directory.Delete(workDirectory, recursive: true);
         }
 
-        var body = Encoding.UTF8.GetBytes($"{exitCode}:{timedOut.ToString().ToLowerInvariant()}");
-        await outbox.PublishAsync(new AwdpFixResult(
+        await outbox.PublishAsync(AwdpFixResult.Create(
             message.SubmissionId,
+            message.RuntimeInstanceId,
+            message.Generation,
             message.ProcessingVersion,
-            exitCode,
-            timedOut,
-            SHA256.HashData(body),
-            occurredAt));
+            message.RuntimeProcessingVersion,
+            outcome,
+            DateTimeOffset.UtcNow));
         await outbox.FlushOutgoingMessagesAsync();
     }
 }

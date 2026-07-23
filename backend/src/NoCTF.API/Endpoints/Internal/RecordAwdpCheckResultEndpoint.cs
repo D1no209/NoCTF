@@ -1,17 +1,34 @@
-using System.Globalization;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
+using System.Text.Json.Serialization;
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Submissions.Processing;
+using NoCTF.Domain.Submissions;
 
 namespace NoCTF.API.Endpoints.Internal;
 
 public sealed class RecordAwdpCheckResultRequest
 {
-    public int ExitCode { get; set; }
-    public bool TimedOut { get; set; }
+    [JsonConverter(typeof(AwdpFixOutcomeJsonConverter))]
+    public AwdpFixResultOutcome Outcome { get; set; }
+}
+
+public enum AwdpFixResultOutcome
+{
+    Fixed,
+    StillVulnerable,
+    RuleViolation,
+    ServiceUnavailable
+}
+
+public sealed class AwdpFixOutcomeJsonConverter()
+    : JsonStringEnumConverter<AwdpFixResultOutcome>(namingPolicy: null, allowIntegerValues: false);
+
+public sealed class RecordAwdpCheckResultValidator : Validator<RecordAwdpCheckResultRequest>
+{
+    public RecordAwdpCheckResultValidator() =>
+        RuleFor(request => request.Outcome).IsInEnum();
 }
 
 public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
@@ -37,20 +54,33 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
         CancellationToken ct)
     {
         if (!Guid.TryParse(User.FindFirstValue("submission_id"), out var submissionId) ||
+            !Guid.TryParse(User.FindFirstValue("runtime_instance_id"), out var runtimeInstanceId) ||
+            !string.Equals(
+                User.FindFirstValue("resource"),
+                $"submission:{submissionId:D}:runtime:{runtimeInstanceId:D}",
+                StringComparison.Ordinal) ||
+            !int.TryParse(User.FindFirstValue("generation"), out var generation) ||
             !long.TryParse(User.FindFirstValue("processing_version"), out var processingVersion) ||
+            !long.TryParse(
+                User.FindFirstValue("runtime_processing_version"),
+                out var runtimeProcessingVersion) ||
             !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
             DateTimeOffset.UtcNow.ToUnixTimeSeconds() > deadline)
             return TypedResults.Unauthorized();
-        var canonical = string.Create(
-            CultureInfo.InvariantCulture,
-            $"{request.ExitCode}:{(request.TimedOut ? 1 : 0)}");
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
-        var disposition = await record.AwdpAsync(new(
+        var disposition = await record.AwdpAsync(AwdpFixResult.Create(
             submissionId,
+            runtimeInstanceId,
+            generation,
             processingVersion,
-            request.ExitCode,
-            request.TimedOut,
-            hash,
+            runtimeProcessingVersion,
+            request.Outcome switch
+            {
+                AwdpFixResultOutcome.Fixed => AwdpFixOutcome.Fixed,
+                AwdpFixResultOutcome.StillVulnerable => AwdpFixOutcome.StillVulnerable,
+                AwdpFixResultOutcome.RuleViolation => AwdpFixOutcome.RuleViolation,
+                AwdpFixResultOutcome.ServiceUnavailable => AwdpFixOutcome.ServiceUnavailable,
+                _ => throw new ArgumentOutOfRangeException(nameof(request), request.Outcome, null)
+            },
             DateTimeOffset.UtcNow), ct);
         return disposition switch
         {

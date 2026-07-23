@@ -62,11 +62,45 @@ public static class AwdServiceStateTransition
 
 public sealed record AwdpFixResult(
     Guid SubmissionId,
+    Guid RuntimeInstanceId,
+    int Generation,
     long ProcessingVersion,
-    int ExitCode,
-    bool TimedOut,
+    long RuntimeProcessingVersion,
+    AwdpFixOutcome Outcome,
     byte[] BodySha256,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt)
+{
+    public static AwdpFixResult Create(
+        Guid submissionId,
+        Guid runtimeInstanceId,
+        int generation,
+        long processingVersion,
+        long runtimeProcessingVersion,
+        AwdpFixOutcome outcome,
+        DateTimeOffset occurredAt)
+    {
+        var canonical = outcome switch
+        {
+            AwdpFixOutcome.Fixed => "Fixed",
+            AwdpFixOutcome.StillVulnerable => "StillVulnerable",
+            AwdpFixOutcome.RuleViolation => "RuleViolation",
+            AwdpFixOutcome.ServiceUnavailable => "ServiceUnavailable",
+            AwdpFixOutcome.PatchFailed => "PatchFailed",
+            AwdpFixOutcome.PatchTimeout => "PatchTimeout",
+            AwdpFixOutcome.PlatformFailed => "PlatformFailed",
+            _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
+        };
+        return new(
+            submissionId,
+            runtimeInstanceId,
+            generation,
+            processingVersion,
+            runtimeProcessingVersion,
+            outcome,
+            SHA256.HashData(Encoding.UTF8.GetBytes(canonical)),
+            occurredAt);
+    }
+}
 
 public interface IInternalResultStore
 {

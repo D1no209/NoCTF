@@ -39,4 +39,34 @@ public sealed class RunnerScoringTokenIssuerTests
         await Assert.That(token.ValidTo)
             .IsEqualTo(deadline.AddHours(24).UtcDateTime);
     }
+
+    [Test]
+    public async Task Awdp_callback_token_binds_submission_target_and_versions()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RunnerScoring:SigningKey"] = "runner-scoring-test-key-with-at-least-32-bytes",
+                ["RunnerScoring:Issuer"] = "issuer",
+                ["RunnerScoring:Audience"] = "audience"
+            })
+            .Build();
+        var issuer = new RunnerScoringTokenIssuer(configuration);
+        var submissionId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var runtimeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var issuedAt = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
+
+        var encoded = issuer.IssueAwdpFixResult(new AwdpFixResultTokenRequest(
+            "runner-a", submissionId, runtimeId, 3, 4, 5, issuedAt.AddMinutes(2), issuedAt));
+
+        var token = new JwtSecurityTokenHandler().ReadJwtToken(encoded);
+        await Assert.That(token.Claims.Single(claim => claim.Type == "permission").Value)
+            .IsEqualTo("awdp:fix-result:write");
+        await Assert.That(token.Claims.Single(claim => claim.Type == "resource").Value)
+            .IsEqualTo($"submission:{submissionId:D}:runtime:{runtimeId:D}");
+        await Assert.That(token.Claims.Single(claim => claim.Type == "generation").Value)
+            .IsEqualTo("3");
+        await Assert.That(token.Claims.Single(claim => claim.Type == "runtime_processing_version").Value)
+            .IsEqualTo("5");
+    }
 }
