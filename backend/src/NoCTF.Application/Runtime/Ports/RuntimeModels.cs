@@ -16,6 +16,27 @@ public enum RuntimeAllocation
     PerTeam
 }
 
+public enum RuntimeExposure
+{
+    OwnerOnly,
+    Participants
+}
+
+public enum RuntimeFlagSource
+{
+    Static,
+    PerTeam,
+    AwdRotation
+}
+
+public sealed record RuntimeUrlBinding(
+    string UrlTemplate,
+    RuntimeExposure Exposure,
+    int? ContainerPort = null,
+    string? ServiceName = null,
+    string? VmId = null,
+    int? GuestPort = null);
+
 public sealed record ChallengeRuntimeTemplate(
     RuntimeProvider Provider,
     RuntimeAllocation Allocation,
@@ -27,7 +48,12 @@ public sealed record ChallengeRuntimeTemplate(
     ContainerResourceLimits? Limits = null,
     ContainerSecurityPolicy? Security = null,
     int? TtlSeconds = null,
-    int? OperationTimeoutSeconds = null);
+    int? OperationTimeoutSeconds = null,
+    RuntimeKind RuntimeKind = RuntimeKind.Container,
+    string RunnerPool = "default",
+    IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
+    RuntimeFlagSource FlagSource = RuntimeFlagSource.Static,
+    string? OvaSourceUrl = null);
 
 public interface IChallengeRuntimeTemplateCatalog
 {
