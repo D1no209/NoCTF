@@ -6,6 +6,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Platform;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -24,6 +25,8 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<ScoringEvent> ScoringEvents => Set<ScoringEvent>();
+    public DbSet<DurableMaintenanceSchedule> DurableMaintenanceSchedules =>
+        Set<DurableMaintenanceSchedule>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NoCtfDbContext).Assembly);

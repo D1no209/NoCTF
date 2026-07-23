@@ -678,6 +678,35 @@ namespace NoCTF.Infrastructure.Migrations
                     b.ToTable("notifications", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Platform.DurableMaintenanceSchedule", b =>
+                {
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("ProcessingVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("processing_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Kind")
+                        .HasName("pk_durable_maintenance_schedules");
+
+                    b.ToTable("durable_maintenance_schedules", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Kind = (short)0,
+                            ProcessingVersion = 1L,
+                            UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Runtime.RuntimeInstance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -739,6 +768,7 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnName("participant_url_indexes");
 
                     b.Property<long>("ProcessingVersion")
+                        .IsConcurrencyToken()
                         .HasColumnType("bigint")
                         .HasColumnName("processing_version");
 
@@ -750,6 +780,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("replaces_runtime_instance_id");
 
+                    b.Property<Guid?>("RunnerAssignmentReleaseToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("runner_assignment_release_token");
+
                     b.Property<string>("RunnerId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
@@ -760,6 +794,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("runner_pool");
+
+                    b.Property<DateTimeOffset?>("RunnerUnavailableAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("runner_unavailable_at");
 
                     b.Property<DateTimeOffset?>("RunningAt")
                         .HasColumnType("timestamp with time zone")

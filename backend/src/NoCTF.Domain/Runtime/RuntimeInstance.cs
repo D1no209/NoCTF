@@ -43,8 +43,10 @@ public sealed class RuntimeInstance
     public string? RunnerId { get; set; }
     [MaxLength(256)]
     public string RunnerPool { get; set; } = string.Empty;
+    public Guid? RunnerAssignmentReleaseToken { get; set; }
     public RuntimeState State { get; set; }
     public RuntimeFailureCode? FailureCode { get; set; }
+    public DateTimeOffset? RunnerUnavailableAt { get; set; }
     public long ProcessingVersion { get; set; }
     public int ConfigurationRevision { get; set; }
     public Guid? ReplacesRuntimeInstanceId { get; set; }

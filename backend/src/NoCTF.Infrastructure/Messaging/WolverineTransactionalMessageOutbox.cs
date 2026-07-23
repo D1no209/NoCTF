@@ -10,6 +10,8 @@ public sealed class WolverineTransactionalMessageOutbox(
     IDbContextOutbox<NoCtfDbContext> outbox) : ITransactionalMessageOutbox
 {
     public ValueTask PublishAsync<T>(T message) => outbox.PublishAsync(message);
+    public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
+        outbox.ScheduleAsync(message, scheduledAt);
 
     public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage
     {
@@ -41,6 +43,8 @@ public sealed class WolverineTransactionalMessageOutbox(
 public sealed class OpenApiTransactionalMessageOutbox : ITransactionalMessageOutbox
 {
     public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
+    public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
+        ValueTask.CompletedTask;
     public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
         ValueTask.CompletedTask;
     public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)

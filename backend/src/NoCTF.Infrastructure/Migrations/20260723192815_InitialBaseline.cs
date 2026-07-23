@@ -12,6 +12,19 @@ namespace NoCTF.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "durable_maintenance_schedules",
+                columns: table => new
+                {
+                    kind = table.Column<short>(type: "smallint", nullable: false),
+                    processing_version = table.Column<long>(type: "bigint", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_durable_maintenance_schedules", x => x.kind);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "users",
                 columns: table => new
                 {
@@ -404,8 +417,10 @@ namespace NoCTF.Infrastructure.Migrations
                     runtime_provider = table.Column<short>(type: "smallint", nullable: false),
                     runner_id = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     runner_pool = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    runner_assignment_release_token = table.Column<Guid>(type: "uuid", nullable: true),
                     state = table.Column<short>(type: "smallint", nullable: false),
                     failure_code = table.Column<short>(type: "smallint", nullable: true),
+                    runner_unavailable_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     processing_version = table.Column<long>(type: "bigint", nullable: false),
                     configuration_revision = table.Column<int>(type: "integer", nullable: false),
                     replaces_runtime_instance_id = table.Column<Guid>(type: "uuid", nullable: true),
@@ -566,6 +581,11 @@ namespace NoCTF.Infrastructure.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
+
+            migrationBuilder.InsertData(
+                table: "durable_maintenance_schedules",
+                columns: new[] { "kind", "processing_version", "updated_at" },
+                values: new object[] { (short)0, 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) });
 
             migrationBuilder.CreateIndex(
                 name: "ix_challenge_attachments_challenge_id",
@@ -956,6 +976,9 @@ namespace NoCTF.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "competition_lifecycle_audits");
+
+            migrationBuilder.DropTable(
+                name: "durable_maintenance_schedules");
 
             migrationBuilder.DropTable(
                 name: "email_verification_tokens");

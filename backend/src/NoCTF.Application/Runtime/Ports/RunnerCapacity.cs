@@ -7,6 +7,13 @@ public enum RunnerCapacityAvailability
     Unavailable
 }
 
+public enum RunnerHeartbeatStatus
+{
+    Online,
+    Offline,
+    Unavailable
+}
+
 public enum RunnerCapacityClaimState
 {
     Acquired,
@@ -34,6 +41,11 @@ public sealed record RunnerCapacityClaim(
 
 public interface IRunnerCapacityGate
 {
+    Task<RunnerHeartbeatStatus> GetHeartbeatAsync(
+        string runnerPool,
+        string runnerId,
+        CancellationToken cancellationToken);
+
     Task<RunnerCapacityClaim> TryClaimAsync(
         RunnerCapacityRequest request,
         CancellationToken cancellationToken);
