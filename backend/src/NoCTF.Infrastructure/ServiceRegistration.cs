@@ -44,6 +44,7 @@ using Wolverine.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using NoCTF.Domain.Identity;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Authentication;
 using NoCTF.Application.Administration;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.GameModes.Awd.Configuration;
@@ -79,6 +80,7 @@ public static class ServiceRegistration
             services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
         }
         services.AddScoped<IBackendMessagePublisher, WolverineBackendMessagePublisher>();
+        services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (string.IsNullOrWhiteSpace(redis))
@@ -182,6 +184,7 @@ public static class ServiceRegistration
         services.AddScoped<ICompetitionLifecycleStore, EfCompetitionLifecycleStore>();
         services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
         services.AddSingleton<AwdRoundConfigurationCatalog>();
+        services.AddSingleton<AwdCheckerConfigurationCatalog>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICompetitionStartGateStore, EfCompetitionStartGateStore>();
         services.AddScoped<CompetitionStartGate>();

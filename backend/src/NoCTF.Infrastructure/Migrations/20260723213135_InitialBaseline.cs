@@ -438,6 +438,7 @@ namespace NoCTF.Infrastructure.Migrations
                     last_applied_checker_sequence = table.Column<long>(type: "bigint", nullable: false),
                     last_applied_checker_body_sha256 = table.Column<byte[]>(type: "bytea", nullable: true),
                     next_checker_due_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    checker_deadline_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     running_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -594,7 +595,8 @@ namespace NoCTF.Infrastructure.Migrations
                 values: new object[,]
                 {
                     { (short)0, 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) },
-                    { (short)1, 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) }
+                    { (short)1, 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) },
+                    { (short)2, 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) }
                 });
 
             migrationBuilder.CreateIndex(

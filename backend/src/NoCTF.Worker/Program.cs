@@ -33,6 +33,8 @@ builder.UseWolverine(options =>
     options.PublishMessage<AdvanceAwdRound>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<GenerateAwdFlags>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<AwdFlagInjectionFailed>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<DispatchAwdCheckers>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<AwdCheckerFailed>().ToPostgresqlQueue("noctf-worker");
 });
 
 var host = builder.Build();
@@ -50,5 +52,8 @@ await using (var scope = host.Services.CreateAsyncScope())
     await bus.SendAsync(new AdvanceCompetitionLifecycle(
         DateTimeOffset.UtcNow,
         schedules[MaintenanceChainKind.CompetitionLifecycle]));
+    await bus.SendAsync(new DispatchAwdCheckers(
+        DateTimeOffset.UtcNow,
+        schedules[MaintenanceChainKind.AwdCheckerDispatch]));
 }
 await host.WaitForShutdownAsync();

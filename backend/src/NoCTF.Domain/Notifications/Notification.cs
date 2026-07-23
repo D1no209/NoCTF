@@ -18,5 +18,6 @@ public enum NotificationKind : short
     TeamRegistrationChanged,
     SubmissionEvaluated,
     RuntimeStateChanged,
-    StartGateFailed
+    StartGateFailed,
+    ManagementFailure
 }

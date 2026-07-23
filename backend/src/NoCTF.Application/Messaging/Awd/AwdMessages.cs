@@ -48,3 +48,17 @@ public sealed record RunAwdChecker(
     DateTimeOffset Deadline,
     string RunnerPool,
     string RunnerId) : IRunnerNodeMessage;
+
+public sealed record DispatchAwdCheckers(
+    DateTimeOffset At,
+    long ProcessingVersion,
+    Guid? AfterRuntimeInstanceId = null);
+
+public sealed record AwdCheckerFailed(
+    Guid CompetitionId,
+    Guid CompetitionChallengeId,
+    Guid RuntimeInstanceId,
+    int Generation,
+    long CheckerSequence,
+    long ProcessingVersion,
+    DateTimeOffset OccurredAt);

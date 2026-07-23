@@ -71,14 +71,18 @@ public static class AuthenticationRegistration
             options.AddPolicy("AwdCheckResult", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
+                .RequireClaim("token_type", "internal")
                 .RequireClaim("permission", "awd:check-result:write")
+                .RequireClaim("resource")
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("generation")
                 .RequireClaim("checker_sequence")
+                .RequireClaim("processing_version")
                 .RequireClaim("deadline"));
             options.AddPolicy("AwdpFixResult", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
+                .RequireClaim("token_type", "internal")
                 .RequireClaim("permission", "awdp:fix-result:write")
                 .RequireClaim("submission_id")
                 .RequireClaim("processing_version")
@@ -86,6 +90,7 @@ public static class AuthenticationRegistration
             options.AddPolicy("FixArchiveRead", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
+                .RequireClaim("token_type", "internal")
                 .RequireClaim("permission", "awdp:fix-archive:read")
                 .RequireClaim("submission_id"));
         });

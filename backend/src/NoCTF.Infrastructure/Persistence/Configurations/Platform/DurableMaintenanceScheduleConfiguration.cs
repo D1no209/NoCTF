@@ -25,6 +25,12 @@ internal sealed class DurableMaintenanceScheduleConfiguration
                 Kind = MaintenanceChainKind.CompetitionLifecycle,
                 ProcessingVersion = 1,
                 UpdatedAt = DateTimeOffset.UnixEpoch
+            },
+            new DurableMaintenanceSchedule
+            {
+                Kind = MaintenanceChainKind.AwdCheckerDispatch,
+                ProcessingVersion = 1,
+                UpdatedAt = DateTimeOffset.UnixEpoch
             });
     }
 }

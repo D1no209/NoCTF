@@ -58,6 +58,7 @@ public sealed class RuntimeInstance
     public long LastAppliedCheckerSequence { get; set; }
     public byte[]? LastAppliedCheckerBodySha256 { get; set; }
     public DateTimeOffset? NextCheckerDueAt { get; set; }
+    public DateTimeOffset? CheckerDeadlineAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? RunningAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }

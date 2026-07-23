@@ -1427,7 +1427,7 @@
           "Api"
         ],
         "summary": "Records a claim-bound AWD checker result.",
-        "description": "Generation and CheckerSequence come exclusively from the internal JWT.",
+        "description": "Runtime, generation, processing version, checker sequence, and deadline come exclusively from the internal JWT.",
         "operationId": "NoCTFAPIEndpointsInternalRecordAwdCheckResultEndpoint",
         "requestBody": {
           "x-name": "RecordAwdCheckResultRequest",
@@ -1463,17 +1463,27 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": ""
           }
         }
       }
@@ -7377,14 +7387,16 @@
           "TeamRegistrationChanged",
           "SubmissionEvaluated",
           "RuntimeStateChanged",
-          "StartGateFailed"
+          "StartGateFailed",
+          "ManagementFailure"
         ],
         "enum": [
           0,
           1,
           2,
           3,
-          4
+          4,
+          5
         ]
       },
       "NoCTFAPIEndpointsNotificationsListNotificationsRequest": {
@@ -7404,10 +7416,22 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "up": {
-            "type": "boolean"
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainRuntimeAwdServiceState"
           }
         }
+      },
+      "NoCTFDomainRuntimeAwdServiceState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Up",
+          "Down"
+        ],
+        "enum": [
+          "Up",
+          "Down"
+        ]
       },
       "NoCTFAPIEndpointsInternalRecordAwdpCheckResultRequest": {
         "type": "object",
