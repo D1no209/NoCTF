@@ -15,6 +15,8 @@ public sealed record RunAwdpFixVerification(
     Guid RuntimeInstanceId,
     int Generation,
     long ProcessingVersion,
+    long RuntimeProcessingVersion,
+    DateTimeOffset Deadline,
     string RunnerPool,
     string RunnerId) : IRunnerNodeMessage;
 

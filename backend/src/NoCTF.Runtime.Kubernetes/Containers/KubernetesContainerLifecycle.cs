@@ -66,7 +66,7 @@ public sealed class KubernetesContainerLifecycle(
                         Command = request.Command.ToList(),
                         ImagePullPolicy = options.ImagePullPolicy,
                         Env = request.Environment.Select(pair => new V1EnvVar { Name = pair.Key, Value = pair.Value }).ToList(),
-                        Ports = request.PortMappings.Keys.Select(port => new V1ContainerPort { ContainerPort = port }).ToList(),
+                        Ports = request.ContainerPorts.Select(port => new V1ContainerPort { ContainerPort = port }).ToList(),
                         SecurityContext = new V1SecurityContext
                         {
                             AllowPrivilegeEscalation = !request.Security.NoNewPrivileges,
@@ -427,7 +427,7 @@ public sealed class KubernetesContainerLifecycle(
         ContainerRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.NetworkName is null || request.PortMappings.Count == 0)
+        if (request.NetworkName is null || request.ContainerPorts.Count == 0)
             return null;
 
         try
@@ -452,7 +452,7 @@ public sealed class KubernetesContainerLifecycle(
                 Spec = new V1ServiceSpec
                 {
                     Selector = new Dictionary<string, string> { ["noctf.io/runtime-id"] = name },
-                    Ports = request.PortMappings.Keys.Select(port => new V1ServicePort
+                    Ports = request.ContainerPorts.Select(port => new V1ServicePort
                     {
                         Name = $"tcp-{port}",
                         Port = port,

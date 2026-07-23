@@ -13,6 +13,8 @@ using System.Text.Json;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Awdp.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle;
 
 namespace NoCTF.Worker;
@@ -347,25 +349,49 @@ public static class BackendMessageHandlers
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
+            await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             return;
         }
 
-        var limits = template.Limits ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
-        var definition = new ContainerRequest(
-            target.Instance.Id,
-            template.Provider,
-            template.Image,
-            template.Command ?? [],
-            template.Environment ?? new Dictionary<string, string>(),
-            MergeLabels(template.Labels, target.Instance),
-            template.PortMappings ?? new Dictionary<int, int>(),
-            limits,
-            template.Security ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
-            template.TtlSeconds is > 0 ? TimeSpan.FromSeconds(template.TtlSeconds.Value) : null,
-            OperationTimeout: template.OperationTimeoutSeconds is > 0
-                ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
-                : TimeSpan.FromMinutes(2));
+        ContainerRequest definition;
+        try
+        {
+            if (target.Instance.Purpose == RuntimePurpose.AwdpTarget)
+            {
+                var awdp = AwdpConfigurationParser.ParseChallenge(target.Challenge.ConfigurationJson);
+                definition = AwdpTargetDefinitionFactory.Create(
+                    target.Instance.Id, template, awdp.TargetPort);
+            }
+            else
+            {
+                var limits = template.Limits
+                    ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
+                definition = new ContainerRequest(
+                    target.Instance.Id,
+                    template.Provider,
+                    template.Image,
+                    template.Command ?? [],
+                    template.Environment ?? new Dictionary<string, string>(),
+                    MergeLabels(template.Labels, target.Instance),
+                    template.PortMappings ?? new Dictionary<int, int>(),
+                    limits,
+                    template.Security ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
+                    template.TtlSeconds is > 0 ? TimeSpan.FromSeconds(template.TtlSeconds.Value) : null,
+                    OperationTimeout: template.OperationTimeoutSeconds is > 0
+                        ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
+                        : TimeSpan.FromMinutes(2));
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            target.Instance.State = RuntimeState.Failed;
+            target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
+            target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
+            await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
         await outbox.PublishToRunnerPoolAsync(new ClaimContainerRuntime(
             target.Instance.Id,
             target.Instance.ProcessingVersion,
@@ -373,6 +399,25 @@ public static class BackendMessageHandlers
             target.Instance.RunnerPool,
             definition));
         await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private static async Task FailAwdpSubmissionAsync(
+        RuntimeInstance instance,
+        NoCtfDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (instance.Purpose != RuntimePurpose.AwdpTarget
+            || instance.SubmissionId is not Guid submissionId)
+            return;
+        var submission = await db.Submissions.SingleOrDefaultAsync(
+            item => item.Id == submissionId,
+            cancellationToken);
+        if (submission is null
+            || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing)
+            return;
+        submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
+        submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
+        submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public static async Task Handle(

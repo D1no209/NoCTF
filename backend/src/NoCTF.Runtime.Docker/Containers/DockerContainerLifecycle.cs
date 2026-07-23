@@ -25,7 +25,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         if (request.Provider != RuntimeProvider.Docker)
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Docker runtime cannot create another provider.");
 
-        var exposedPorts = request.PortMappings.Keys.ToDictionary(port => $"{port}/tcp", _ => new EmptyStruct());
+        var exposedPorts = request.ContainerPorts.ToDictionary(port => $"{port}/tcp", _ => new EmptyStruct());
         var bindings = request.PortMappings.ToDictionary(
             pair => $"{pair.Key}/tcp",
             pair => (IList<PortBinding>)[new() { HostPort = pair.Value.ToString() }]);

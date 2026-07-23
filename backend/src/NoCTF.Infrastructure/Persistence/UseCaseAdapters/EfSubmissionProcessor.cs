@@ -7,6 +7,8 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Awd.Scheduling;
+using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Awdp.Runtime;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
@@ -165,31 +167,52 @@ public sealed class EfSubmissionProcessor(
         {
             if (submission.Kind == SubmissionKind.Fix)
             {
-                var target = await db.RuntimeInstances
-                    .Where(instance => instance.CompetitionId == submission.CompetitionId
-                        && instance.CompetitionChallengeId == submission.CompetitionChallengeId
-                        && instance.TeamId == submission.TeamId
-                        && instance.State == RuntimeState.Running)
-                    .OrderByDescending(instance => instance.Generation)
-                    .FirstOrDefaultAsync(cancellationToken);
-                if (target is not null && submission.PatchUploadId is Guid patchUploadId)
+                var challenge = await db.CompetitionChallenges.AsNoTracking()
+                    .SingleAsync(
+                        item => item.Id == submission.CompetitionChallengeId,
+                        cancellationToken);
+                var configuration = AwdpConfigurationParser.ParseChallenge(
+                    challenge.ConfigurationJson);
+                if (configuration.Runtime is { } template
+                    && submission.PatchUploadId is not null)
                 {
-                    await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
-                        submission.Id,
-                        submission.CompetitionChallengeId,
-                        patchUploadId,
-                        target.Id,
-                        target.Generation,
-                        submission.ProcessingVersion,
-                        target.RunnerPool,
-                        target.RunnerId
-                            ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
-                    submission.EvaluationFailureCode = null;
-                    submission.EvaluationUpdatedAt = now;
-                    await db.SaveChangesAsync(cancellationToken);
-                    await transaction.CommitAsync(cancellationToken);
-                    await outbox.FlushOutgoingMessagesAsync();
-                    return;
+                    var targetId = Guid.CreateVersion7(now);
+                    var configurationIsValid = true;
+                    try
+                    {
+                        _ = AwdpTargetDefinitionFactory.Create(
+                            targetId, template, configuration.TargetPort);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        configurationIsValid = false;
+                    }
+
+                    if (configurationIsValid)
+                    {
+                        var generation = checked((await db.RuntimeInstances
+                            .Where(instance => instance.SubmissionId == submission.Id)
+                            .MaxAsync(instance => (int?)instance.Generation, cancellationToken) ?? 0) + 1);
+                        var target = AwdpTargetRuntimeFactory.Create(
+                            submission.Id,
+                            submission.CompetitionId,
+                            submission.CompetitionChallengeId,
+                            targetId,
+                            template,
+                            generation,
+                            evaluation.CompetitionChallengeRevision,
+                            now);
+                        db.RuntimeInstances.Add(target);
+                        await outbox.PublishAsync(new DispatchRuntime(
+                            target.Id,
+                            target.ProcessingVersion));
+                        submission.EvaluationFailureCode = null;
+                        submission.EvaluationUpdatedAt = now;
+                        await db.SaveChangesAsync(cancellationToken);
+                        await transaction.CommitAsync(cancellationToken);
+                        await outbox.FlushOutgoingMessagesAsync();
+                        return;
+                    }
                 }
             }
             submission.EvaluationState = SubmissionEvaluationState.PlatformFailed;

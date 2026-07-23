@@ -808,6 +808,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("provider_receipt_json");
 
+                    b.Property<short>("Purpose")
+                        .HasColumnType("smallint")
+                        .HasColumnName("purpose");
+
                     b.Property<Guid?>("ReplacesRuntimeInstanceId")
                         .HasColumnType("uuid")
                         .HasColumnName("replaces_runtime_instance_id");
@@ -851,6 +855,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("stopped_at");
 
+                    b.Property<Guid?>("SubmissionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submission_id");
+
                     b.Property<Guid?>("TeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
@@ -869,13 +877,18 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("ReplacesRuntimeInstanceId")
                         .HasDatabaseName("ix_runtime_instances_replaces_runtime_instance_id");
 
+                    b.HasIndex("SubmissionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_runtime_instances_submission_id")
+                        .HasFilter("purpose = 1 AND submission_id IS NOT NULL AND state IN (0, 1, 2, 3)");
+
                     b.HasIndex("TeamId")
                         .HasDatabaseName("ix_runtime_instances_team_id");
 
                     b.HasIndex("CompetitionChallengeId", "TeamId")
                         .IsUnique()
                         .HasDatabaseName("ix_runtime_instances_competition_challenge_id_team_id")
-                        .HasFilter("state IN (0, 1, 2)");
+                        .HasFilter("purpose = 0 AND state IN (0, 1, 2)");
 
                     b.HasIndex("State", "NextCheckerDueAt")
                         .HasDatabaseName("ix_runtime_instances_state_next_checker_due_at")
@@ -890,6 +903,8 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.ToTable("runtime_instances", null, t =>
                         {
+                            t.HasCheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
 
                             t.HasCheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
@@ -1430,6 +1445,12 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasForeignKey("ReplacesRuntimeInstanceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_runtime_instances_runtime_instances_replaces_runtime_instan");
+
+                    b.HasOne("NoCTF.Domain.Submissions.Submission", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_runtime_instances_submissions_submission_id");
 
                     b.HasOne("NoCTF.Domain.Teams.Team", null)
                         .WithMany()

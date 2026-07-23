@@ -10,9 +10,11 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Composition;
+using Wolverine.Attributes;
 
 namespace NoCTF.Runner.Messages;
 
+[NonTransactional]
 public sealed class AwdpFixVerificationHandler(
     NoCtfDbContext db,
     IFixArchiveReader archives,
@@ -31,12 +33,15 @@ public sealed class AwdpFixVerificationHandler(
             configuration["Runner:Pool"] ?? "default",
             configuration["Runner:Id"]
                 ?? throw new InvalidOperationException("Runner:Id is required."));
+        if (DateTimeOffset.UtcNow >= message.Deadline)
+            return;
         var submission = await db.Submissions.AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == message.SubmissionId, cancellationToken);
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == message.RuntimeInstanceId, cancellationToken);
         if (submission is null || runtime is null
             || submission.ProcessingVersion != message.ProcessingVersion
+            || runtime.ProcessingVersion != message.RuntimeProcessingVersion
             || runtime.Generation != message.Generation
             || runtime.State != NoCTF.Domain.Runtime.RuntimeState.Running
             || runtime.CompetitionChallengeId != message.CompetitionChallengeId

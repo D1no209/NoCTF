@@ -29,6 +29,12 @@ public enum RuntimeFlagSource
     AwdRotation
 }
 
+public enum ContainerNetworkIsolation
+{
+    Shared,
+    Isolated
+}
+
 public sealed record RuntimeUrlBinding(
     string UrlTemplate,
     RuntimeExposure Exposure,
@@ -73,7 +79,13 @@ public sealed record ContainerRequest(
     TimeSpan? Ttl,
     RunnerScoringCallback? ScoringCallback = null,
     string? NetworkName = null,
-    TimeSpan? OperationTimeout = null);
+    TimeSpan? OperationTimeout = null,
+    ContainerNetworkIsolation NetworkIsolation = ContainerNetworkIsolation.Shared,
+    IReadOnlyList<int>? InternalPorts = null)
+{
+    public IReadOnlyList<int> ContainerPorts =>
+        [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];
+}
 
 /// <summary>Restricted metadata for a Runner-authenticated system-result callback.</summary>
 public sealed record RunnerScoringCallback(
@@ -88,7 +100,8 @@ public sealed record ContainerReceipt(
     RuntimeStatus Status,
     IReadOnlyDictionary<int, int> PortMappings,
     string? PublicHost,
-    string? InternalHost);
+    string? InternalHost,
+    string? NetworkId = null);
 
 public sealed record OneShotResult(
     string ResourceId,

@@ -26,6 +26,7 @@ public sealed class EfRuntimeInstanceStore(
             .Where(instance =>
                 instance.CompetitionId == competitionId &&
                 instance.CompetitionChallengeId == competitionChallengeId &&
+                instance.Purpose == RuntimePurpose.Player &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .Select(instance => new RuntimeInstanceView(
@@ -57,6 +58,7 @@ public sealed class EfRuntimeInstanceStore(
         var current = await db.RuntimeInstances
             .Where(instance =>
                 instance.CompetitionChallengeId == command.CompetitionChallengeId &&
+                instance.Purpose == RuntimePurpose.Player &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .FirstOrDefaultAsync(ct);
@@ -147,6 +149,7 @@ public sealed class EfRuntimeInstanceStore(
             CompetitionId = command.CompetitionId,
             CompetitionChallengeId = command.CompetitionChallengeId,
             TeamId = scope.TeamId,
+            Purpose = RuntimePurpose.Player,
             Generation = generation,
             RuntimeKind = template.RuntimeKind,
             RuntimeProvider = template.Provider,
