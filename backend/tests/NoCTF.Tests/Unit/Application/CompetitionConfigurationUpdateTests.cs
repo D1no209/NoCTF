@@ -59,26 +59,31 @@ public sealed class CompetitionConfigurationUpdateTests
 
         public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken cancellationToken) =>
             Task.FromResult<CompetitionConfigurationView?>(new(
-                CompetitionId, GameMode.Ctf, "{\"value\":1}", 1, status, DateTimeOffset.UtcNow));
+                CompetitionId, GameMode.Ctf, "{\"value\":1}", 1, status, 2, [], DateTimeOffset.UtcNow));
 
         public Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
             Guid competitionId,
             int expectedRevision,
             string json,
             bool allowWhileRunning,
+            IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             UpdateCalls++;
             AllowWhileRunning = allowWhileRunning;
             return Task.FromResult(new CompetitionConfigurationUpdateResult(
-                new(competitionId, GameMode.Ctf, json, expectedRevision + 1, status, now)));
+                new(competitionId, GameMode.Ctf, json, expectedRevision + 1, status, 2, [], now)));
         }
     }
 
     private sealed class Validator : ICompetitionConfigurationValidator
     {
-        public IReadOnlyList<string> Validate(GameMode mode, string json) => [];
+        public IReadOnlyList<string> Validate(
+            GameMode mode,
+            string json,
+            int eligibleTeamCount,
+            IReadOnlyList<string> challengeConfigurationJsons) => [];
     }
 
     private sealed class CacheAndScheduler : ILeaderboardCache, IBackendMessagePublisher

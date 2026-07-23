@@ -1,4 +1,5 @@
 using NoCTF.GameModes.Ctf.Scoring;
+using DynamicExpresso.Exceptions;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
 
@@ -6,7 +7,9 @@ public static class CtfConfigurationValidator
 {
     private static readonly CtfScoreExpression ScoreExpression = new();
 
-    public static IReadOnlyList<string> Validate(CtfConfiguration configuration)
+    public static IReadOnlyList<string> Validate(CtfConfiguration configuration) => Validate(configuration, 1);
+
+    public static IReadOnlyList<string> Validate(CtfConfiguration configuration, int eligibleTeamCount)
     {
         var errors = ValidatePoints(configuration.DefaultPoints).ToList();
         if (configuration.WrongSubmissionPenalty < 0)
@@ -20,36 +23,43 @@ public static class CtfConfigurationValidator
             if (reward.Policy != BloodRewardPolicy.FixedPoints && reward.Value > 100)
                 errors.Add("Blood reward percentages cannot exceed 100.");
         }
-        ValidateExpression(configuration.ScoreExpression, configuration.DefaultPoints, errors);
+        ValidateExpression(configuration.ScoreExpression, configuration.DefaultPoints, eligibleTeamCount, errors);
         return errors;
     }
 
-    public static IReadOnlyList<string> Validate(CtfChallengeConfiguration configuration)
+    public static IReadOnlyList<string> Validate(CtfChallengeConfiguration configuration) =>
+        Validate(configuration, null, 1);
+
+    public static IReadOnlyList<string> Validate(
+        CtfChallengeConfiguration configuration,
+        CtfConfiguration? competitionConfiguration,
+        int eligibleTeamCount)
     {
         var errors = configuration.Points is null
             ? []
             : ValidatePoints(configuration.Points).ToList();
         if (configuration.WrongSubmissionPenalty is < 0)
             errors.Add("WrongSubmissionPenalty cannot be negative.");
-        if (configuration.BloodRewards is null)
+        if (configuration.BloodRewards is { } rewards)
         {
-            ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
-            errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
-            return errors;
-        }
-        if (configuration.BloodRewards.Count > 3)
-            errors.Add("At most three blood rewards are supported.");
-        foreach (var reward in configuration.BloodRewards)
-        {
-            if (reward.Value < 0)
-                errors.Add("Blood reward values cannot be negative.");
-            if (reward.Policy != BloodRewardPolicy.FixedPoints && reward.Value > 100)
-                errors.Add("Blood reward percentages cannot exceed 100.");
+            if (rewards.Count > 3)
+                errors.Add("At most three blood rewards are supported.");
+            foreach (var reward in rewards)
+            {
+                if (reward.Value < 0)
+                    errors.Add("Blood reward values cannot be negative.");
+                if (reward.Policy != BloodRewardPolicy.FixedPoints && reward.Value > 100)
+                    errors.Add("Blood reward percentages cannot exceed 100.");
+            }
         }
         ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
-        if (configuration.Points is not null)
-            ValidateExpression(configuration.ScoreExpression, configuration.Points, errors);
+        var effectivePoints = configuration.Points ?? competitionConfiguration?.DefaultPoints;
+        var effectiveExpression = configuration.ScoreExpression ?? competitionConfiguration?.ScoreExpression;
+        if (effectivePoints is not null)
+            ValidateExpression(effectiveExpression, effectivePoints, eligibleTeamCount, errors);
+        else
+            ValidateExpressionSyntax(effectiveExpression, errors);
         return errors;
     }
 
@@ -72,6 +82,7 @@ public static class CtfConfigurationValidator
     private static void ValidateExpression(
         string? expression,
         CtfPointConfiguration points,
+        int eligibleTeamCount,
         ICollection<string> errors)
     {
         if (string.IsNullOrWhiteSpace(expression))
@@ -79,9 +90,24 @@ public static class CtfConfigurationValidator
         try
         {
             ScoreExpression.Validate(expression, points.InitialPoints, points.MinimumPoints,
-                points.DecayFactor, eligibleTeamCount: 1);
+                points.DecayFactor, eligibleTeamCount);
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
+        catch (Exception exception) when (exception is DynamicExpressoException or ArgumentException
+            or InvalidOperationException or OverflowException or DivideByZeroException)
+        {
+            errors.Add($"ScoreExpression is invalid: {exception.Message}");
+        }
+    }
+
+    private static void ValidateExpressionSyntax(string? expression, ICollection<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+            return;
+        try
+        {
+            ScoreExpression.ValidateSyntax(expression);
+        }
+        catch (Exception exception) when (exception is DynamicExpressoException or ArgumentException or InvalidOperationException)
         {
             errors.Add($"ScoreExpression is invalid: {exception.Message}");
         }

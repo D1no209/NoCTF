@@ -5,17 +5,25 @@ using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Competitions.Configuration;
 
+public sealed record CompetitionChallengeConfigurationSnapshot(Guid Id, int Revision, string Json);
+
 public sealed record CompetitionConfigurationView(
     Guid CompetitionId,
     GameMode Mode,
     string Json,
     int Revision,
     CompetitionStatus CompetitionStatus,
+    int EligibleTeamCount,
+    IReadOnlyList<CompetitionChallengeConfigurationSnapshot> ChallengeConfigurations,
     DateTimeOffset UpdatedAt);
 
 public interface ICompetitionConfigurationValidator
 {
-    IReadOnlyList<string> Validate(GameMode mode, string json);
+    IReadOnlyList<string> Validate(
+        GameMode mode,
+        string json,
+        int eligibleTeamCount,
+        IReadOnlyList<string> challengeConfigurationJsons);
 }
 
 public interface ICompetitionConfigurationStore
@@ -26,6 +34,7 @@ public interface ICompetitionConfigurationStore
         int expectedRevision,
         string json,
         bool allowWhileRunning,
+        IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
@@ -56,12 +65,22 @@ public sealed class UpdateCompetitionConfiguration(
     {
         var current = await store.FindAsync(competitionId, ct);
         if (current is null) return OperationResult<CompetitionConfigurationView>.Failure("competition_not_found", "Competition was not found.");
-        var errors = validator.Validate(current.Mode, json);
+        var errors = validator.Validate(
+            current.Mode,
+            json,
+            current.EligibleTeamCount,
+            current.ChallengeConfigurations.Select(challenge => challenge.Json).ToArray());
         if (errors.Count > 0)
             return OperationResult<CompetitionConfigurationView>.Failure("invalid_configuration", string.Join(" ", errors));
         const bool allowWhileRunning = true;
         var result = await store.TryUpdateAsync(
-            competitionId, expectedRevision, json, allowWhileRunning, now, ct);
+            competitionId,
+            expectedRevision,
+            json,
+            allowWhileRunning,
+            current.ChallengeConfigurations.ToDictionary(challenge => challenge.Id, challenge => challenge.Revision),
+            now,
+            ct);
         if (result.Configuration is null)
         {
             var failure = result.Failure ?? CompetitionConfigurationUpdateFailure.RevisionConflict;

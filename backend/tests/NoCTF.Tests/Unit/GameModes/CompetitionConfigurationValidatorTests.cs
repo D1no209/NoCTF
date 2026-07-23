@@ -24,6 +24,28 @@ public class CompetitionConfigurationValidatorTests
     }
 
     [Test]
+    public async Task CtfExpression_DivideByZero_IsReturnedAsValidationFailure()
+    {
+        const string json = """{"schemaVersion":1,"defaultPoints":{"initialPoints":500,"minimumPoints":100,"decayFactor":10},"bloodRewards":[],"scoreExpression":"1m / (initialPoints - initialPoints)"}""";
+
+        var errors = new GameModeCompetitionConfigurationValidator().Validate(GameMode.Ctf, json, 2);
+
+        await Assert.That(errors).IsNotEmpty();
+    }
+
+    [Test]
+    public async Task CtfCompetitionExpression_IsValidatedAgainstChallengePointOverrides()
+    {
+        const string competition = """{"schemaVersion":1,"defaultPoints":{"initialPoints":500,"minimumPoints":0,"decayFactor":10},"bloodRewards":[],"scoreExpression":"1m / (initialPoints - 100m)"}""";
+        const string challenge = """{"schemaVersion":1,"points":{"initialPoints":100,"minimumPoints":0,"decayFactor":10},"bloodRewards":null}""";
+
+        var errors = new GameModeCompetitionConfigurationValidator().Validate(
+            GameMode.Ctf, competition, 2, [challenge]);
+
+        await Assert.That(errors).IsNotEmpty();
+    }
+
+    [Test]
     public async Task AwdpCurrentConfiguration_ParsesFinalPenaltyFieldsWithoutUpgrade()
     {
         const string current = """{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"violationPenalty":5,"serviceDownPenalty":7}""";
