@@ -45,6 +45,8 @@ public sealed record RunAwdChecker(
     int Generation,
     long CheckerSequence,
     long ProcessingVersion,
+    int CompetitionConfigurationRevision,
+    int CompetitionChallengeRevision,
     DateTimeOffset Deadline,
     string RunnerPool,
     string RunnerId) : IRunnerNodeMessage;
@@ -54,7 +56,7 @@ public sealed record DispatchAwdCheckers(
     long ProcessingVersion,
     Guid? AfterRuntimeInstanceId = null);
 
-public sealed record AwdCheckerFailed(
+public sealed record AwdCheckerCallbackMissing(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid RuntimeInstanceId,

@@ -28,6 +28,7 @@ public sealed class AwdCheckerHandlerTests
         var deadline = DateTimeOffset.Parse("2026-07-24T00:01:00Z");
         var work = new AwdCheckerWork(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            7,
             RuntimeProvider.Docker,
             "checker:latest",
             ["/checker"],
@@ -41,6 +42,7 @@ public sealed class AwdCheckerHandlerTests
         await executor.ExecuteAsync(work, CancellationToken.None);
 
         var request = runner.Request!;
+        await Assert.That(request.OperationId).IsNotEqualTo(work.RuntimeInstanceId);
         await Assert.That(request.Environment["NOCTF_TARGET_URL"])
             .IsEqualTo("http://target.internal/health");
         await Assert.That(request.Environment["NOCTF_CALLBACK_URL"])

@@ -68,6 +68,15 @@ public sealed class EfCompetitionConfigurationStore(
         await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
         if (mode == GameMode.Awd && status == CompetitionStatus.Running)
         {
+            await db.RuntimeInstances
+                .Where(runtime => runtime.CompetitionId == competitionId
+                    && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(runtime => runtime.CheckerSequence, runtime => runtime.CheckerSequence + 1)
+                    .SetProperty(runtime => runtime.LastAppliedCheckerSequence, runtime => runtime.CheckerSequence + 1)
+                    .SetProperty(runtime => runtime.LastAppliedCheckerBodySha256, (byte[]?)null)
+                    .SetProperty(runtime => runtime.CheckerDeadlineAt, (DateTimeOffset?)null)
+                    .SetProperty(runtime => runtime.NextCheckerDueAt, now), ct);
             var challenges = await db.CompetitionChallenges.AsNoTracking()
                 .Where(challenge => challenge.CompetitionId == competitionId
                     && challenge.IsPublished

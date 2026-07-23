@@ -4,6 +4,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -67,16 +68,15 @@ public sealed class AwdCheckerPersistenceTests
                 await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Idempotent);
                 await Assert.That(outbox.NodeMessages.OfType<RunAwdChecker>().Count()).IsEqualTo(1);
             }
-            await using (var callbackDb = new NoCtfDbContext(options))
-            {
-                var store = new EfInternalResultStore(callbackDb, new AwdpCheckExitCodeMapper(), outbox);
-                var up = AwdCheckResult.Create(
-                    fixture.RuntimeId, 3, 1, 7, AwdServiceState.Up, fixture.Now.AddSeconds(1));
-                await Assert.That(await store.RecordAwdAsync(up, cancellationToken))
-                    .IsEqualTo(InternalResultDisposition.Applied);
-                await Assert.That(await store.RecordAwdAsync(up, cancellationToken))
-                    .IsEqualTo(InternalResultDisposition.Duplicate);
-            }
+            var up = AwdCheckResult.Create(
+                fixture.RuntimeId, 3, 1, 7, AwdServiceState.Up, fixture.Now.AddSeconds(1));
+            var concurrentCallbacks = await Task.WhenAll(
+                RecordAsync(options, outbox, up, cancellationToken),
+                RecordAsync(options, outbox, up, cancellationToken));
+            await Assert.That(concurrentCallbacks.Count(
+                outcome => outcome == InternalResultDisposition.Applied)).IsEqualTo(1);
+            await Assert.That(concurrentCallbacks.Count(
+                outcome => outcome == InternalResultDisposition.Duplicate)).IsEqualTo(1);
 
             await using (var dueDb = new NoCtfDbContext(options))
             {
@@ -94,6 +94,8 @@ public sealed class AwdCheckerPersistenceTests
 
             var second = outbox.NodeMessages.OfType<RunAwdChecker>()
                 .Single(message => message.CheckerSequence == 2);
+            await Assert.That(second.CompetitionConfigurationRevision).IsEqualTo(0);
+            await Assert.That(second.CompetitionChallengeRevision).IsEqualTo(0);
             await using (var downDb = new NoCtfDbContext(options))
             {
                 var store = new EfInternalResultStore(downDb, new AwdpCheckExitCodeMapper(), outbox);
@@ -107,6 +109,64 @@ public sealed class AwdCheckerPersistenceTests
                     .IsEqualTo(InternalResultDisposition.Conflict);
             }
 
+            await using (var thirdDispatchDb = new NoCtfDbContext(options))
+            {
+                var runtime = await thirdDispatchDb.RuntimeInstances.SingleAsync(cancellationToken);
+                runtime.NextCheckerDueAt = fixture.Now.AddSeconds(4);
+                await thirdDispatchDb.SaveChangesAsync(cancellationToken);
+                var schedule = await thirdDispatchDb.DurableMaintenanceSchedules.SingleAsync(
+                    item => item.Kind == NoCTF.Domain.Platform.MaintenanceChainKind.AwdCheckerDispatch,
+                    cancellationToken);
+                await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                    new(fixture.Now.AddSeconds(4), schedule.ProcessingVersion),
+                    thirdDispatchDb, catalog, outbox, cancellationToken);
+            }
+            var third = outbox.NodeMessages.OfType<RunAwdChecker>()
+                .Single(message => message.CheckerSequence == 3);
+            await using (var deadlineDb = new NoCtfDbContext(options))
+            {
+                var schedule = await deadlineDb.DurableMaintenanceSchedules.SingleAsync(
+                    item => item.Kind == NoCTF.Domain.Platform.MaintenanceChainKind.AwdCheckerDispatch,
+                    cancellationToken);
+                await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                    new(third.Deadline, schedule.ProcessingVersion),
+                    deadlineDb, catalog, outbox, cancellationToken);
+            }
+            await Assert.That(outbox.Published.OfType<AwdCheckerCallbackMissing>().Count()).IsEqualTo(1);
+
+            var configurationUpdatedAt = fixture.Now.AddSeconds(20);
+            await using (var configurationDb = new NoCtfDbContext(options))
+            {
+                var store = new EfChallengeConfigurationStore(configurationDb, outbox);
+                var update = await store.TryUpdateAsync(
+                    fixture.CompetitionId,
+                    fixture.CompetitionChallengeId,
+                    expectedRevision: 0,
+                    expectedCompetitionConfigurationRevision: 0,
+                    JsonSerializer.Serialize(new AwdChallengeConfiguration(
+                        AwdChallengeConfiguration.CurrentSchemaVersion,
+                        Checker: new RunnerJobConfiguration(
+                            RuntimeProvider.Docker,
+                            "checker:v2",
+                            ["/checker"],
+                            TimeoutSeconds: 10))),
+                    configurationUpdatedAt,
+                    cancellationToken);
+                await Assert.That(update.Failure).IsNull();
+            }
+            await using (var replacementDb = new NoCtfDbContext(options))
+            {
+                var schedule = await replacementDb.DurableMaintenanceSchedules.SingleAsync(
+                    item => item.Kind == NoCTF.Domain.Platform.MaintenanceChainKind.AwdCheckerDispatch,
+                    cancellationToken);
+                await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                    new(configurationUpdatedAt, schedule.ProcessingVersion),
+                    replacementDb, catalog, outbox, cancellationToken);
+            }
+            var replacement = outbox.NodeMessages.OfType<RunAwdChecker>()
+                .Single(message => message.CheckerSequence == 5);
+            await Assert.That(replacement.CompetitionChallengeRevision).IsEqualTo(1);
+
             await using var verify = new NoCtfDbContext(options);
             var events = await verify.ScoringEvents.AsNoTracking()
                 .Where(item => item.Kind == ScoringEventKind.AwdServiceStatus)
@@ -114,8 +174,9 @@ public sealed class AwdCheckerPersistenceTests
             await Assert.That(events).HasSingleItem();
             await Assert.That(events[0].Result).IsEqualTo(ScoringResult.Wrong);
             var runtimeState = await verify.RuntimeInstances.AsNoTracking().SingleAsync(cancellationToken);
-            await Assert.That(runtimeState.LastAppliedCheckerSequence).IsEqualTo(2);
-            await Assert.That(runtimeState.CheckerDeadlineAt).IsNull();
+            await Assert.That(runtimeState.CheckerSequence).IsEqualTo(5);
+            await Assert.That(runtimeState.LastAppliedCheckerSequence).IsEqualTo(4);
+            await Assert.That(runtimeState.CheckerDeadlineAt).IsNotNull();
             await Assert.That(second.Deadline).IsEqualTo(fixture.Now.AddSeconds(12));
         });
     }
@@ -208,7 +269,7 @@ public sealed class AwdCheckerPersistenceTests
             RunningAt = now
         });
         await db.SaveChangesAsync(cancellationToken);
-        return new(now, runtimeId);
+        return new(now, competitionId, competitionChallengeId, runtimeId);
     }
 
     private static User NewUser(Guid id, string name, DateTimeOffset now) => new()
@@ -223,7 +284,22 @@ public sealed class AwdCheckerPersistenceTests
         UpdatedAt = now
     };
 
-    private sealed record Fixture(DateTimeOffset Now, Guid RuntimeId);
+    private static async Task<InternalResultDisposition> RecordAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        ITransactionalMessageOutbox outbox,
+        AwdCheckResult result,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var store = new EfInternalResultStore(db, new AwdpCheckExitCodeMapper(), outbox);
+        return await store.RecordAwdAsync(result, cancellationToken);
+    }
+
+    private sealed record Fixture(
+        DateTimeOffset Now,
+        Guid CompetitionId,
+        Guid CompetitionChallengeId,
+        Guid RuntimeId);
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {

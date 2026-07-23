@@ -85,6 +85,16 @@ public sealed class EfChallengeConfigurationStore(
             && status == CompetitionStatus.Running
             && published.Value)
         {
+            await db.RuntimeInstances
+                .Where(runtime => runtime.CompetitionId == competitionId
+                    && runtime.CompetitionChallengeId == challengeId
+                    && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(runtime => runtime.CheckerSequence, runtime => runtime.CheckerSequence + 1)
+                    .SetProperty(runtime => runtime.LastAppliedCheckerSequence, runtime => runtime.CheckerSequence + 1)
+                    .SetProperty(runtime => runtime.LastAppliedCheckerBodySha256, (byte[]?)null)
+                    .SetProperty(runtime => runtime.CheckerDeadlineAt, (DateTimeOffset?)null)
+                    .SetProperty(runtime => runtime.NextCheckerDueAt, updatedAt), ct);
             await outbox.PublishAsync(new AdvanceAwdRound(
                 competitionId,
                 challengeId,

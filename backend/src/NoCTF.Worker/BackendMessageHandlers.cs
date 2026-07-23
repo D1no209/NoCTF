@@ -53,8 +53,10 @@ public static class BackendMessageHandlers
 
         var targets = await db.RuntimeInstances
             .Where(runtime => runtime.State == RuntimeState.Running
-                && runtime.NextCheckerDueAt != null
-                && runtime.NextCheckerDueAt <= message.At
+                && ((runtime.NextCheckerDueAt != null
+                        && runtime.NextCheckerDueAt <= message.At)
+                    || (runtime.CheckerDeadlineAt != null
+                        && runtime.CheckerDeadlineAt <= message.At))
                 && runtime.RunnerId != null
                 && runtime.ControlCheckUrl != null
                 && (message.AfterRuntimeInstanceId == null
@@ -101,7 +103,7 @@ public static class BackendMessageHandlers
                     target.Runtime.LastAppliedCheckerSequence = target.Runtime.CheckerSequence;
                     target.Runtime.LastAppliedCheckerBodySha256 = null;
                     target.Runtime.CheckerDeadlineAt = null;
-                    await outbox.PublishAsync(new AwdCheckerFailed(
+                    await outbox.PublishAsync(new AwdCheckerCallbackMissing(
                         target.Runtime.CompetitionId,
                         target.Runtime.CompetitionChallengeId,
                         target.Runtime.Id,
@@ -111,7 +113,8 @@ public static class BackendMessageHandlers
                         message.At));
                     applied = true;
                 }
-                target.Runtime.NextCheckerDueAt = message.At.Add(interval);
+                if (target.Runtime.NextCheckerDueAt <= message.At)
+                    target.Runtime.NextCheckerDueAt = message.At.Add(interval);
                 continue;
             }
 
@@ -124,6 +127,8 @@ public static class BackendMessageHandlers
                 target.Runtime.Generation,
                 target.Runtime.CheckerSequence,
                 target.Runtime.ProcessingVersion,
+                target.Competition.ConfigurationRevision,
+                target.Challenge.Revision,
                 target.Runtime.CheckerDeadlineAt.Value,
                 target.Runtime.RunnerPool,
                 target.Runtime.RunnerId!));
@@ -198,7 +203,7 @@ public static class BackendMessageHandlers
     }
 
     public static async Task Handle(
-        AwdCheckerFailed message,
+        AwdCheckerCallbackMissing message,
         NoCtfDbContext db,
         CancellationToken cancellationToken)
     {
