@@ -60,7 +60,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             await client.Containers.StartContainerAsync(
                 response.ID, new ContainerStartParameters(), cancellationToken);
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
-                request.PortMappings, options.PublicHost, containerName);
+                request.PortMappings, options.PublicHost, containerName,
+                RuntimeInstanceId: request.RuntimeInstanceId,
+                Generation: request.Generation);
         }
         catch
         {
@@ -81,7 +83,13 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             {
                 try
                 {
-                    await DeleteCallbackNetworkAsync(request.OperationId, cleanupSource.Token);
+                    await DeleteCallbackNetworkAsync(
+                        request.OperationId,
+                        new RuntimeResourceIdentity(
+                            request.RuntimeInstanceId ?? request.OperationId,
+                            request.Generation,
+                            1),
+                        cleanupSource.Token);
                 }
                 catch
                 {
@@ -189,7 +197,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
         try
         {
-            await DeleteCallbackNetworkAsync(receipt.OperationId, cancellationToken);
+            if (receipt.RuntimeInstanceId is Guid runtimeInstanceId && receipt.Generation > 0)
+                await DeleteCallbackNetworkAsync(
+                    receipt.OperationId,
+                    new RuntimeResourceIdentity(runtimeInstanceId, receipt.Generation, 1),
+                    cancellationToken);
         }
         catch (Exception exception)
         {
@@ -513,10 +525,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     private async Task DeleteCallbackNetworkAsync(
         Guid operationId,
+        RuntimeResourceIdentity identity,
         CancellationToken cancellationToken)
     {
         var network = await FindNetworkAsync(CallbackNetworkName(operationId), cancellationToken);
-        if (network is null)
+        if (network is null || !HasResourceIdentity(network.Labels, identity))
             return;
         await DeleteNetworkAsync(network, cancellationToken);
     }
