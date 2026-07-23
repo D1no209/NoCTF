@@ -47,7 +47,15 @@ public sealed class KubernetesContainerLifecycle(
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
         labels["noctf.io/runtime-id"] = name;
         if (request.NetworkName is not null) labels["noctf.io/sandbox"] = request.NetworkName;
-        if (request.Ttl is not null)
+        if (request.AllowInternalCallback)
+        {
+            labels["noctf.io/managed"] = "true";
+            labels["noctf.io/job-kind"] = "awdp-verification";
+            labels["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D");
+            labels["noctf.io/generation"] = request.Generation.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+        if (request.AllowInternalCallback && request.Ttl is not null)
             labels["noctf.io/expires-at"] = DateTimeOffset.UtcNow.Add(request.Ttl.Value)
                 .ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var pod = new V1Pod
@@ -272,9 +280,13 @@ public sealed class KubernetesContainerLifecycle(
     }
 
     public async Task<string> CreateIsolatedNetworkAsync(
-        Guid operationId, DateTimeOffset expiresAt, CancellationToken cancellationToken)
+        RuntimeResourceIdentity identity,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken)
     {
-        var name = $"noctf-awdp-{operationId:N}";
+        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+            throw new ArgumentOutOfRangeException(nameof(identity));
+        var name = $"noctf-awdp-{identity.RuntimeInstanceId:N}";
         try
         {
             _ = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
@@ -291,6 +303,10 @@ public sealed class KubernetesContainerLifecycle(
         var labels = new Dictionary<string, string>
         {
             ["noctf.io/job-kind"] = "awdp-verification",
+            ["noctf.io/managed"] = "true",
+            ["noctf.io/runtime-instance-id"] = identity.RuntimeInstanceId.ToString("D"),
+            ["noctf.io/generation"] = identity.Generation.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
             ["noctf.io/expires-at"] = expiresAt.ToUnixTimeSeconds().ToString(
                 System.Globalization.CultureInfo.InvariantCulture)
         };
@@ -298,18 +314,35 @@ public sealed class KubernetesContainerLifecycle(
         {
             MatchLabels = new Dictionary<string, string> { ["noctf.io/sandbox"] = name }
         };
-        await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(new V1NetworkPolicy
+        try
         {
-            Metadata = new V1ObjectMeta { Name = name, NamespaceProperty = options.Namespace, Labels = labels },
-            Spec = new V1NetworkPolicySpec
+            await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(new V1NetworkPolicy
             {
-                PodSelector = selector,
-                PolicyTypes = ["Ingress", "Egress"],
-                Ingress = [new V1NetworkPolicyIngressRule { FromProperty = [new V1NetworkPolicyPeer { PodSelector = selector }] }],
-                Egress = [new V1NetworkPolicyEgressRule { To = [new V1NetworkPolicyPeer { PodSelector = selector }] }]
+                Metadata = new V1ObjectMeta { Name = name, NamespaceProperty = options.Namespace, Labels = labels },
+                Spec = new V1NetworkPolicySpec
+                {
+                    PodSelector = selector,
+                    PolicyTypes = ["Ingress", "Egress"],
+                    Ingress = [new V1NetworkPolicyIngressRule { FromProperty = [new V1NetworkPolicyPeer { PodSelector = selector }] }],
+                    Egress = [new V1NetworkPolicyEgressRule { To = [new V1NetworkPolicyPeer { PodSelector = selector }] }]
+                }
+            }, options.Namespace, cancellationToken: cancellationToken);
+            return name;
+        }
+        catch
+        {
+            using var cleanup = new CancellationTokenSource(
+                RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
+            try
+            {
+                await DeleteIsolatedNetworkAsync(name, cleanup.Token);
             }
-        }, options.Namespace, cancellationToken: cancellationToken);
-        return name;
+            catch
+            {
+                // The ownership-labelled reaper is the final fallback.
+            }
+            throw;
+        }
     }
 
     public async Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken)
@@ -412,22 +445,23 @@ public sealed class KubernetesContainerLifecycle(
     public async Task<RuntimeResourceReapResult> ReapExpiredAsync(
         DateTimeOffset now, CancellationToken cancellationToken)
     {
-        const string selector = "noctf.io/expires-at";
+        const string selector =
+            "noctf.io/managed=true,noctf.io/job-kind=awdp-verification,noctf.io/expires-at";
         var removed = 0;
         var failed = 0;
         var pods = await client.CoreV1.ListNamespacedPodAsync(
             options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
-        foreach (var pod in pods.Items.Where(item => IsExpired(item.Metadata.Labels, now)))
+        foreach (var pod in pods.Items.Where(item => IsOwnedExpired(item.Metadata.Labels, now)))
             await TryDeleteAsync(async () => { await client.CoreV1.DeleteNamespacedPodAsync(
                 pod.Metadata.Name, options.Namespace, body: new V1DeleteOptions(), cancellationToken: cancellationToken); });
         var services = await client.CoreV1.ListNamespacedServiceAsync(
             options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
-        foreach (var service in services.Items.Where(item => IsExpired(item.Metadata.Labels, now)))
+        foreach (var service in services.Items.Where(item => IsOwnedExpired(item.Metadata.Labels, now)))
             await TryDeleteAsync(async () => { await client.CoreV1.DeleteNamespacedServiceAsync(
                 service.Metadata.Name, options.Namespace, body: new V1DeleteOptions(), cancellationToken: cancellationToken); });
         var policies = await client.NetworkingV1.ListNamespacedNetworkPolicyAsync(
             options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
-        foreach (var policy in policies.Items.Where(item => IsExpired(item.Metadata.Labels, now)))
+        foreach (var policy in policies.Items.Where(item => IsOwnedExpired(item.Metadata.Labels, now)))
             await TryDeleteAsync(async () => { await client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
                 policy.Metadata.Name, options.Namespace, body: new V1DeleteOptions(), cancellationToken: cancellationToken); });
         return new(removed, failed);
@@ -701,8 +735,19 @@ public sealed class KubernetesContainerLifecycle(
         throw new InvalidOperationException("Kubernetes exec ended without an exit code.");
     }
 
-    private static bool IsExpired(IDictionary<string, string>? labels, DateTimeOffset now) =>
+    private static bool IsOwnedExpired(IDictionary<string, string>? labels, DateTimeOffset now) =>
         labels is not null
+        && labels.TryGetValue("noctf.io/managed", out var managed)
+        && string.Equals(managed, "true", StringComparison.Ordinal)
+        && labels.TryGetValue("noctf.io/job-kind", out var jobKind)
+        && string.Equals(jobKind, "awdp-verification", StringComparison.Ordinal)
+        && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
+        && Guid.TryParse(runtimeText, out var runtimeId)
+        && runtimeId != Guid.Empty
+        && labels.TryGetValue("noctf.io/generation", out var generationText)
+        && int.TryParse(generationText, System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var generation)
+        && generation > 0
         && labels.TryGetValue("noctf.io/expires-at", out var text)
         && long.TryParse(text, System.Globalization.NumberStyles.None,
             System.Globalization.CultureInfo.InvariantCulture, out var expiresAt)

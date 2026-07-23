@@ -420,7 +420,11 @@ public static class BackendMessageHandlers
             {
                 var awdp = AwdpConfigurationParser.ParseChallenge(target.Challenge.ConfigurationJson);
                 definition = AwdpTargetDefinitionFactory.Create(
-                    target.Instance.Id, template, awdp.TargetPort, DateTimeOffset.UtcNow);
+                    target.Instance.Id,
+                    target.Instance.Generation,
+                    template,
+                    awdp.TargetPort,
+                    DateTimeOffset.UtcNow);
             }
             else
             {

@@ -95,6 +95,55 @@ public sealed class KubernetesContainerLifecycleTests
             call.GetMethodInfo().Name == "DeleteNamespacedPodWithHttpMessagesAsync")).IsTrue();
     }
 
+    [Test]
+    public async Task Ordinary_runtime_ttl_does_not_start_at_provider_create_time()
+    {
+        var (client, core, _) = CreateClient();
+        V1Pod? createdPod = null;
+        core.CreateNamespacedPodWithHttpMessagesAsync(
+                Arg.Do<V1Pod>(pod => createdPod = pod),
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<bool?>(), Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1Pod> { Body = new V1Pod() }));
+        var lifecycle = new KubernetesContainerLifecycle(client, new KubernetesRuntimeOptions());
+
+        _ = await lifecycle.CreateAsync(
+            CheckerRequest() with { AllowInternalCallback = false }, CancellationToken.None);
+
+        await Assert.That(createdPod!.Metadata.Labels.ContainsKey("noctf.io/expires-at")).IsFalse();
+    }
+
+    [Test]
+    public async Task Ambiguous_sandbox_policy_create_failure_attempts_deterministic_cleanup()
+    {
+        var (client, _, networking) = CreateClient();
+        networking.ReadNamespacedNetworkPolicyWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(NotFound()));
+        networking.CreateNamespacedNetworkPolicyWithHttpMessagesAsync(
+                Arg.Any<V1NetworkPolicy>(), Arg.Any<string>(), Arg.Any<string?>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(
+                new TimeoutException("response lost")));
+        var lifecycle = new KubernetesContainerLifecycle(client, new KubernetesRuntimeOptions());
+
+        Func<Task> action = () => lifecycle.CreateIsolatedNetworkAsync(
+            new RuntimeResourceIdentity(
+                Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3),
+            DateTimeOffset.UtcNow.AddMinutes(1),
+            CancellationToken.None);
+
+        await Assert.That(action).Throws<TimeoutException>();
+        await Assert.That(networking.ReceivedCalls().Any(call =>
+            call.GetMethodInfo().Name == "DeleteNamespacedNetworkPolicyWithHttpMessagesAsync"))
+            .IsTrue();
+    }
+
     private static (IKubernetes Client, ICoreV1Operations Core, INetworkingV1Operations Networking)
         CreateClient()
     {
@@ -127,5 +176,12 @@ public sealed class KubernetesContainerLifecycleTests
         new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
         TimeSpan.FromMinutes(1),
         NetworkName: "sandbox-a",
-        AllowInternalCallback: true);
+        AllowInternalCallback: true,
+        Generation: 3);
+
+    private static HttpOperationException NotFound() => new("not found")
+    {
+        Response = new HttpResponseMessageWrapper(
+            new HttpResponseMessage(System.Net.HttpStatusCode.NotFound), string.Empty)
+    };
 }

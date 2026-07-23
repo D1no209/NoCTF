@@ -119,7 +119,7 @@ public sealed class IsolatedContainerProvisionerTests
         public List<string> DeletedNetworks { get; } = [];
         public bool CleanupTokenWasCancelled { get; private set; }
         public Task<string> CreateIsolatedNetworkAsync(
-            Guid operationId,
+            RuntimeResourceIdentity identity,
             DateTimeOffset expiresAt,
             CancellationToken cancellationToken) => Task.FromResult("network-1");
         public Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken)

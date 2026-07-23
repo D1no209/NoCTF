@@ -181,7 +181,7 @@ public sealed class EfSubmissionProcessor(
                     try
                     {
                         _ = AwdpTargetDefinitionFactory.Create(
-                            targetId, template, configuration.TargetPort, now);
+                            targetId, 1, template, configuration.TargetPort, now);
                     }
                     catch (InvalidOperationException)
                     {
