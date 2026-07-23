@@ -6,6 +6,7 @@ using NoCTF.Application.Runtime.Instances;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.Postgresql;
+using Wolverine.ErrorHandling;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddNoCtfRunner(builder.Configuration);
@@ -20,6 +21,12 @@ builder.UseWolverine(options =>
     options.PersistMessagesWithPostgresql(postgres, "wolverine");
     options.UseEntityFrameworkCoreTransactions();
     options.Durability.Mode = DurabilityMode.Balanced;
+    options.Policies.OnException<TimeoutException>()
+        .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
+    options.Policies.OnException<System.Net.Http.HttpRequestException>()
+        .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
+    options.Policies.OnException<Npgsql.NpgsqlException>()
+        .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
     options.ListenToPostgresqlQueue(queueName.Value).UseDurableInbox();
 });
 var app = builder.Build();

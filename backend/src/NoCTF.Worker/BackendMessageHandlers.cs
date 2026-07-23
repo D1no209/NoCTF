@@ -110,6 +110,61 @@ public static class BackendMessageHandlers
     }
 
     public static async Task Handle(
+        CleanupCompetitionRuntimes message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var runtimes = await db.RuntimeInstances
+            .Where(instance => instance.CompetitionId == message.CompetitionId
+                && (instance.State == RuntimeState.Queued
+                    || instance.State == RuntimeState.Provisioning
+                    || instance.State == RuntimeState.Running))
+            .OrderBy(instance => instance.CreatedAt)
+            .ToListAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        foreach (var instance in runtimes)
+        {
+            if (instance.State == RuntimeState.Queued && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
+            {
+                instance.State = RuntimeState.Stopped;
+                instance.StoppedAt = now;
+                instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+                continue;
+            }
+
+            instance.State = RuntimeState.Stopping;
+            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+            if (!string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
+                await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
+            else
+            {
+                instance.State = RuntimeState.Stopped;
+                instance.StoppedAt = now;
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    public static async Task Handle(
+        ProvisionCompetitionRuntimes message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var queued = await db.RuntimeInstances
+            .Where(instance => instance.CompetitionId == message.CompetitionId
+                && instance.State == RuntimeState.Queued)
+            .OrderBy(instance => instance.CreatedAt)
+            .ToListAsync(cancellationToken);
+        foreach (var instance in queued)
+            await outbox.PublishAsync(new DispatchRuntime(instance.Id, instance.ProcessingVersion));
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    public static async Task Handle(
         DrainSubmissions message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,

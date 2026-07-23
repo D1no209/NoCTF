@@ -68,7 +68,7 @@ public sealed class CreatePatchUpload(
                 "archive_invalid", validation);
 
         var id = Guid.CreateVersion7(now);
-        var objectKey = $"patches/{competitionId:N}/{scope.TeamId:N}/{id:N}.tar.gz";
+        var objectKey = $"fix-uploads/{id:N}";
         var stored = await objects.PutAsync(
             objectKey,
             Path.GetFileName(fileName),
@@ -112,6 +112,7 @@ public sealed class CreatePatchUpload(
             using var tar = new TarReader(gzip, leaveOpen: true);
             var entries = 0;
             long totalLength = 0;
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             while (tar.GetNextEntry(copyData: false) is { } entry)
             {
                 entries++;
@@ -126,6 +127,9 @@ public sealed class CreatePatchUpload(
                 if (Path.IsPathRooted(entry.Name)
                     || entry.Name.Split('/', '\\').Any(segment => segment == ".."))
                     return "The archive contains a path outside its extraction root.";
+                var normalizedName = entry.Name.Replace('\\', '/').TrimEnd('/');
+                if (!names.Add(normalizedName))
+                    return "The archive contains duplicate paths.";
                 if (entry.Length > MaxSingleFileBytes)
                     return "An archive entry exceeds the single-file limit.";
                 totalLength = checked(totalLength + entry.Length);

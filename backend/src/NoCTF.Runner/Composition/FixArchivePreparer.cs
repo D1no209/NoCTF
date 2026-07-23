@@ -3,67 +3,96 @@ using System.IO.Compression;
 
 namespace NoCTF.Runner.Composition;
 
-public sealed class FixArchivePreparer(IConfiguration configuration)
+public sealed class FixArchivePreparer
 {
-    private readonly long maxExpandedBytes = configuration.GetValue("FixVerification:MaxExpandedBytes", 268_435_456L);
-    private readonly int maxEntries = configuration.GetValue("FixVerification:MaxArchiveEntries", 2048);
+    private readonly long maxExpandedBytes;
+    private readonly int maxEntries;
+    private readonly long maxSingleFileBytes;
+    private readonly double maxCompressionRatio;
+
+    public FixArchivePreparer(IConfiguration configuration)
+    {
+        maxExpandedBytes = configuration.GetValue("FixVerification:MaxExpandedBytes", 268_435_456L);
+        maxEntries = configuration.GetValue("FixVerification:MaxArchiveEntries", 2048);
+        maxSingleFileBytes = configuration.GetValue("FixVerification:MaxSingleFileBytes", 64L * 1024 * 1024);
+        maxCompressionRatio = configuration.GetValue("FixVerification:MaxCompressionRatio", 100d);
+        if (maxExpandedBytes <= 0 || maxEntries <= 0 || maxSingleFileBytes <= 0 || maxCompressionRatio <= 0)
+            throw new ArgumentOutOfRangeException(nameof(configuration), "Archive extraction limits must be positive.");
+    }
 
     public async Task PrepareTarAsync(Stream source, string fileName, string workDirectory, string tarPath,
         CancellationToken cancellationToken)
     {
+        if (!fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Fix archive must use the .tar.gz format.");
+        if (Directory.Exists(workDirectory))
+            Directory.Delete(workDirectory, recursive: true);
         var payloadRoot = Path.Combine(workDirectory, "noctf", "fix");
         Directory.CreateDirectory(payloadRoot);
-        if (fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-            await ExtractZipAsync(source, payloadRoot, cancellationToken);
-        else
-            await ExtractTarAsync(source, fileName, payloadRoot, cancellationToken);
+        await ExtractTarGzipAsync(source, payloadRoot, cancellationToken);
         TarFile.CreateFromDirectory(workDirectory, tarPath, includeBaseDirectory: false);
     }
 
-    private async Task ExtractZipAsync(Stream source, string root, CancellationToken cancellationToken)
+    private async Task ExtractTarGzipAsync(Stream source, string root, CancellationToken cancellationToken)
     {
-        using var archive = new ZipArchive(source, ZipArchiveMode.Read, leaveOpen: true);
-        if (archive.Entries.Count > maxEntries) throw new InvalidDataException("Fix archive contains too many entries.");
-        long expanded = 0;
-        foreach (var entry in archive.Entries)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if ((entry.ExternalAttributes >> 16 & 0xF000) == 0xA000)
-                throw new InvalidDataException("Fix archive links are forbidden.");
-            var path = SafePath(root, entry.FullName);
-            if (entry.FullName.EndsWith('/')) { Directory.CreateDirectory(path); continue; }
-            expanded = checked(expanded + entry.Length);
-            if (expanded > maxExpandedBytes) throw new InvalidDataException("Fix archive expands beyond the configured limit.");
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            await using var input = entry.Open();
-            await using var output = File.Create(path);
-            await input.CopyToAsync(output, cancellationToken);
-        }
-    }
-
-    private async Task ExtractTarAsync(Stream source, string fileName, string root, CancellationToken cancellationToken)
-    {
-        Stream payload = source;
-        if (fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)
-            || fileName.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase))
-            payload = new GZipStream(source, CompressionMode.Decompress, leaveOpen: true);
-        await using var disposablePayload = payload == source ? null : payload;
+        var countedSource = new CountingReadStream(source);
+        await using var payload = new GZipStream(countedSource, CompressionMode.Decompress, leaveOpen: true);
         using var reader = new TarReader(payload, leaveOpen: true);
         long expanded = 0;
         var count = 0;
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         while (await reader.GetNextEntryAsync(copyData: false, cancellationToken) is { } entry)
         {
             if (++count > maxEntries) throw new InvalidDataException("Fix archive contains too many entries.");
+            var normalizedName = entry.Name.Replace('\\', '/').TrimEnd('/');
+            if (!names.Add(normalizedName))
+                throw new InvalidDataException("Fix archive contains duplicate paths.");
             var path = SafePath(root, entry.Name);
             if (entry.EntryType == TarEntryType.Directory) { Directory.CreateDirectory(path); continue; }
-            if (entry.EntryType is not TarEntryType.RegularFile and not TarEntryType.V7RegularFile)
+            if (entry.EntryType is not TarEntryType.RegularFile)
                 throw new InvalidDataException("Fix archive contains a forbidden entry type.");
+            if (entry.Length < 0 || entry.Length > maxSingleFileBytes)
+                throw new InvalidDataException("Fix archive contains a file beyond the configured per-file limit.");
             expanded = checked(expanded + entry.Length);
             if (expanded > maxExpandedBytes) throw new InvalidDataException("Fix archive expands beyond the configured limit.");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             await using var output = File.Create(path);
             if (entry.DataStream is not null) await entry.DataStream.CopyToAsync(output, cancellationToken);
+            if (countedSource.BytesRead > 0 && expanded / (double)countedSource.BytesRead > maxCompressionRatio)
+                throw new InvalidDataException("Fix archive exceeds the configured compression ratio.");
         }
+    }
+
+    private sealed class CountingReadStream(Stream inner) : Stream
+    {
+        public long BytesRead { get; private set; }
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => inner.Length;
+        public override long Position { get => inner.Position; set => inner.Position = value; }
+        public override void Flush() => inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = inner.Read(buffer, offset, count);
+            BytesRead = checked(BytesRead + read);
+            return read;
+        }
+        public override int Read(Span<byte> buffer)
+        {
+            var read = inner.Read(buffer);
+            BytesRead = checked(BytesRead + read);
+            return read;
+        }
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var read = await inner.ReadAsync(buffer, cancellationToken);
+            BytesRead = checked(BytesRead + read);
+            return read;
+        }
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private static string SafePath(string root, string name)
