@@ -115,9 +115,13 @@ public sealed class EfAdminRuntimeStore(
                 return new(null, RuntimeMutationFailure.InvalidState);
             if (action == RuntimeAction.Reset && (current is null || !IsActive(current.State)))
                 return new(null, RuntimeMutationFailure.InvalidState);
-            if (current is not null && action == RuntimeAction.Reset)
+            var requiresCleanup = current is not null
+                && (action == RuntimeAction.Reset
+                    || current.State == RuntimeState.Failed
+                    && !string.IsNullOrWhiteSpace(current.ProviderReceiptJson));
+            if (requiresCleanup)
             {
-                current.State = RuntimeState.Stopping;
+                current!.State = RuntimeState.Stopping;
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
             }
@@ -130,34 +134,46 @@ public sealed class EfAdminRuntimeStore(
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
                 TeamId = teamId,
-                Generation = current is null ? 0 : checked(current.Generation + 1),
-                RuntimeKind = RuntimeKind.Container,
+                Generation = checked((current?.Generation ?? 0) + 1),
+                RuntimeKind = template.RuntimeKind,
                 RuntimeProvider = template.Provider,
-                RunnerPool = "default",
+                RunnerPool = template.RunnerPool,
                 State = RuntimeState.Queued,
                 ConfigurationRevision = scope.Challenge.Revision,
-                ReplacesRuntimeInstanceId = action == RuntimeAction.Reset ? current?.Id : null,
+                ReplacesRuntimeInstanceId = requiresCleanup ? current?.Id : null,
                 CreatedAt = now,
-                ExpiresAt = template.TtlSeconds is > 0 ? now.AddSeconds(template.TtlSeconds.Value) : null
+                ExpiresAt = null
             };
             db.RuntimeInstances.Add(entity);
-            await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
+            if (!requiresCleanup)
+                await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
         }
         else if (action == RuntimeAction.Stop)
         {
             if (current is null || !IsActive(current.State))
                 return new(null, RuntimeMutationFailure.InvalidState);
-            current.State = RuntimeState.Stopping;
             current.ProcessingVersion = checked(current.ProcessingVersion + 1);
             entity = current;
-            await outbox.PublishAsync(new StopRuntime(entity.Id, entity.ProcessingVersion));
+            if (current.State == RuntimeState.Queued)
+            {
+                current.State = RuntimeState.Stopped;
+                current.StoppedAt = now;
+            }
+            else
+            {
+                current.State = RuntimeState.Stopping;
+                await outbox.PublishAsync(new StopRuntime(entity.Id, entity.ProcessingVersion));
+            }
         }
         else if (action == RuntimeAction.Extend)
         {
             if (teamId is null || current is null || current.State != RuntimeState.Running ||
                 current.ExpiresAt is null || extension is null || extension <= TimeSpan.Zero)
                 return new(null, RuntimeMutationFailure.InvalidState);
-            current.ExpiresAt = current.ExpiresAt.Value.Add(extension.Value);
+            var remaining = current.ExpiresAt.Value - now;
+            if (remaining <= TimeSpan.Zero || remaining >= TimeSpan.FromMinutes(10))
+                return new(null, RuntimeMutationFailure.InvalidState);
+            current.ExpiresAt = now.Add(extension.Value);
             current.ProcessingVersion = checked(current.ProcessingVersion + 1);
             entity = current;
         }
