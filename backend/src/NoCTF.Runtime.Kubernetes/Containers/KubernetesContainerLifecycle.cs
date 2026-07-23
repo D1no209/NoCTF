@@ -576,7 +576,7 @@ public sealed class KubernetesContainerLifecycle(
                     MatchLabels = new Dictionary<string, string>
                     {
                         ["noctf.io/runtime-id"] = name,
-                        ["noctf.purpose"] = "awdp-checker"
+                        ["noctf.io/purpose"] = "awdp-checker"
                     }
                 },
                 PolicyTypes = ["Egress"],

@@ -42,7 +42,10 @@ public sealed class KubernetesContainerLifecycleTests
 
         await Assert.That(createdPolicy).IsNotNull();
         await Assert.That(createdPod!.Metadata.Labels.ContainsKey("noctf.io/expires-at")).IsTrue();
-        var egress = createdPolicy!.Spec.Egress;
+        await Assert.That(createdPolicy!.Spec.PodSelector.MatchLabels.All(label =>
+            createdPod.Metadata.Labels.TryGetValue(label.Key, out var value)
+            && string.Equals(value, label.Value, StringComparison.Ordinal))).IsTrue();
+        var egress = createdPolicy.Spec.Egress;
         await Assert.That(egress).Count().IsEqualTo(2);
         var callback = egress.Single(rule => rule.To.Any(peer =>
             peer.PodSelector?.MatchLabels?.ContainsKey("noctf.io/internal-role") == true));
@@ -170,7 +173,7 @@ public sealed class KubernetesContainerLifecycleTests
         {
             ["NOCTF_CALLBACK_URL"] = "https://callback.noctf.svc:8443/api/internal/v1/awdp/fix-results"
         },
-        new Dictionary<string, string> { ["noctf.purpose"] = "awdp-checker" },
+        new Dictionary<string, string> { ["noctf.io/purpose"] = "awdp-checker" },
         new Dictionary<int, int>(),
         new ContainerResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
         new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
