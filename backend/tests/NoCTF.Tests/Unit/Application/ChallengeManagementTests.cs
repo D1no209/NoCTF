@@ -1,4 +1,4 @@
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Scoring.Leaderboard;
@@ -12,30 +12,28 @@ public class ChallengeManagementTests
     [Arguments(CompetitionStatus.Running)]
     [Arguments(CompetitionStatus.Paused)]
     [Arguments(CompetitionStatus.Finished)]
-    public async Task CreateChallenge_LockedCompetition_RejectsMutation(CompetitionStatus status)
+    public async Task CreateChallenge_AllLifecycleStatesAllowMutation(CompetitionStatus status)
     {
         var store = new Store { Status = status };
 
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
 
-        await Assert.That(result.ErrorCode).IsEqualTo("challenge_locked");
-        await Assert.That(store.CreateCalls).IsEqualTo(0);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.CreateCalls).IsEqualTo(1);
     }
 
     [Test]
-    [Arguments("", "web", 0, "invalid_title")]
-    [Arguments("challenge", "", 0, "invalid_direction")]
-    [Arguments("challenge", "web", -1, "invalid_order")]
+    [Arguments(-1L, 0, "invalid_base_score")]
+    [Arguments(100L, -1, "invalid_order")]
     public async Task CreateChallenge_InvalidDefinition_ReturnsSpecificError(
-        string title,
-        string direction,
+        long baseScore,
         int order,
         string expectedError)
     {
         var store = new Store();
 
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
-            CreateCommand() with { Title = title, Direction = direction, Order = order });
+            CreateCommand() with { BaseScore = baseScore, Order = order });
 
         await Assert.That(result.ErrorCode).IsEqualTo(expectedError);
         await Assert.That(store.CreateCalls).IsEqualTo(0);
@@ -76,9 +74,8 @@ public class ChallengeManagementTests
 
     [Test]
     [Arguments(ChallengeMutation.Update)]
-    [Arguments(ChallengeMutation.Publish)]
     [Arguments(ChallengeMutation.Delete)]
-    public async Task Mutation_ActiveCompetition_IsRejectedBeforeStoreWrite(ChallengeMutation mutation)
+    public async Task Mutation_ActiveCompetition_IsAllowed(ChallengeMutation mutation)
     {
         var store = new Store { Status = CompetitionStatus.Running };
         var cache = new Cache();
@@ -88,20 +85,17 @@ public class ChallengeManagementTests
         {
             ChallengeMutation.Update => (await new UpdateChallenge(store, cache, scheduler)
                 .ExecuteAsync(UpdateCommand())).ErrorCode,
-            ChallengeMutation.Publish => (await new SetChallengePublished(store, cache, scheduler)
-                .ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), true, DateTimeOffset.UtcNow)).ErrorCode,
             ChallengeMutation.Delete => (await new DeleteChallenge(store, cache, scheduler)
                 .ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow)).ErrorCode,
             _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
         };
 
-        await Assert.That(error).IsEqualTo("challenge_locked");
-        await Assert.That(store.MutationCalls).IsEqualTo(0);
+        await Assert.That(error).IsNull();
+        await Assert.That(store.MutationCalls).IsEqualTo(1);
     }
 
     [Test]
     [Arguments(ChallengeMutation.Update)]
-    [Arguments(ChallengeMutation.Publish)]
     [Arguments(ChallengeMutation.Delete)]
     public async Task Mutation_Succeeds_InvalidatesAndQueuesCompetitionRebuild(ChallengeMutation mutation)
     {
@@ -114,8 +108,6 @@ public class ChallengeManagementTests
         {
             ChallengeMutation.Update => (object)await new UpdateChallenge(store, cache, scheduler)
                 .ExecuteAsync(UpdateCommand(competitionId)),
-            ChallengeMutation.Publish => await new SetChallengePublished(store, cache, scheduler)
-                .ExecuteAsync(competitionId, Guid.NewGuid(), true, DateTimeOffset.UtcNow),
             ChallengeMutation.Delete => await new DeleteChallenge(store, cache, scheduler)
                 .ExecuteAsync(competitionId, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow),
             _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
@@ -128,25 +120,23 @@ public class ChallengeManagementTests
     public enum ChallengeMutation
     {
         Update,
-        Publish,
         Delete
     }
 
-    private static CreateChallengeCommand CreateCommand(Guid? competitionId = null) => new(
+    private static CreateCompetitionChallengeCommand CreateCommand(Guid? competitionId = null) => new(
         competitionId ?? Guid.NewGuid(),
-        "Web 100",
-        "Description",
-        "Web",
+        Guid.NewGuid(),
+        100,
         1,
         DateTimeOffset.UtcNow);
 
-    private static UpdateChallengeCommand UpdateCommand(Guid? competitionId = null) => new(
+    private static UpdateCompetitionChallengeCommand UpdateCommand(Guid? competitionId = null) => new(
         competitionId ?? Guid.NewGuid(),
         Guid.NewGuid(),
-        "Web 100",
-        "Description",
-        "Web",
+        100,
         2,
+        true,
+        0,
         DateTimeOffset.UtcNow);
 
     private sealed class Store : IChallengeManagementStore
@@ -154,11 +144,14 @@ public class ChallengeManagementTests
         private readonly ChallengeView challenge = new(
             Guid.NewGuid(),
             Guid.NewGuid(),
+            Guid.NewGuid(),
             "Web 100",
             "Description",
             "Web",
+            100,
             1,
             false,
+            0,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow);
 
@@ -174,7 +167,7 @@ public class ChallengeManagementTests
                 Status is null ? null : new ChallengeCompetitionContext(GameMode.Ctf, Status.Value));
 
         public Task<ChallengeMutationResult> CreateAsync(
-            CreateChallengeCommand command,
+            CreateCompetitionChallengeCommand command,
             string configurationJson,
             CancellationToken cancellationToken)
         {
@@ -202,17 +195,16 @@ public class ChallengeManagementTests
         }
 
         public Task<ChallengeMutationResult> UpdateAsync(
-            UpdateChallengeCommand command,
+            UpdateCompetitionChallengeCommand command,
             CancellationToken cancellationToken)
         {
             MutationCalls++;
             return Task.FromResult(new ChallengeMutationResult(challenge, null));
         }
 
-        public Task<ChallengeMutationFailure?> SetPublishedAsync(
+        public Task<ChallengeMutationFailure?> SoftDeleteAsync(
             Guid competitionId,
             Guid challengeId,
-            bool published,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
@@ -220,10 +212,9 @@ public class ChallengeManagementTests
             return Task.FromResult<ChallengeMutationFailure?>(null);
         }
 
-        public Task<ChallengeMutationFailure?> SoftDeleteAsync(
+        public Task<ChallengeMutationFailure?> RestoreAsync(
             Guid competitionId,
             Guid challengeId,
-            Guid actorId,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
@@ -255,7 +246,7 @@ public class ChallengeManagementTests
         }
     }
 
-    private sealed class Scheduler : IBackgroundWorkScheduler
+    private sealed class Scheduler : IBackendMessagePublisher
     {
         public Guid? RebuildCompetitionId { get; private set; }
 
@@ -265,10 +256,10 @@ public class ChallengeManagementTests
         public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
 
-        public ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken) =>
+        public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
 
-        public ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken)
+        public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken)
         {
             RebuildCompetitionId = competitionId;
             return ValueTask.CompletedTask;

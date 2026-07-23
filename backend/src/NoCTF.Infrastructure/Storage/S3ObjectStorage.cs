@@ -2,6 +2,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Storage;
+using System.Security.Cryptography;
 
 namespace NoCTF.Infrastructure.Storage;
 
@@ -11,33 +12,41 @@ public sealed class S3ObjectStorage(
 {
     private readonly string bucket = configuration["Storage:S3:Bucket"] ?? "noctf";
 
-    public Task<FixUploadGrant> CreateUploadAsync(Guid uploadId, string objectKey, string contentType, long length, TimeSpan lifetime, CancellationToken cancellationToken)
-    {
-        var request = new GetPreSignedUrlRequest
-        {
-            BucketName = bucket,
-            Key = objectKey,
-            Verb = HttpVerb.PUT,
-            ContentType = contentType,
-            Expires = DateTime.UtcNow.Add(lifetime)
-        };
-        return Task.FromResult(new FixUploadGrant(uploadId, objectKey,
-            new Uri(client.GetPreSignedURL(request)), DateTimeOffset.UtcNow.Add(lifetime)));
-    }
-
     public async Task<StoredObject> PutAsync(string objectKey, string fileName, string contentType, Stream content, CancellationToken cancellationToken)
     {
-        await client.PutObjectAsync(new PutObjectRequest
+        string? temporaryPath = null;
+        Stream upload = content;
+        if (!content.CanSeek)
         {
-            BucketName = bucket,
-            Key = objectKey,
-            InputStream = content,
-            ContentType = contentType,
-            AutoCloseStream = false
-        }, cancellationToken);
-        var metadata = await InspectAsync(objectKey, cancellationToken)
-            ?? throw new InvalidOperationException("Uploaded object could not be inspected.");
-        return metadata with { FileName = fileName, ContentType = contentType };
+            temporaryPath = Path.Combine(Path.GetTempPath(), $"noctf-upload-{Guid.NewGuid():N}");
+            await using (var temporaryOutput = File.Create(temporaryPath))
+                await content.CopyToAsync(temporaryOutput, cancellationToken);
+            upload = File.OpenRead(temporaryPath);
+        }
+        try
+        {
+            var position = upload.Position;
+            var sha256 = Convert.ToHexString(await SHA256.HashDataAsync(upload, cancellationToken));
+            upload.Position = position;
+            var request = new PutObjectRequest
+            {
+                BucketName = bucket,
+                Key = objectKey,
+                InputStream = upload,
+                ContentType = contentType,
+                AutoCloseStream = false
+            };
+            request.Metadata["x-amz-meta-sha256"] = sha256;
+            await client.PutObjectAsync(request, cancellationToken);
+            return new(objectKey, fileName, contentType, upload.Length - position, sha256);
+        }
+        finally
+        {
+            if (!ReferenceEquals(upload, content))
+                await upload.DisposeAsync();
+            if (temporaryPath is not null && File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
     }
 
     public async Task<StoredObject?> InspectAsync(string objectKey, CancellationToken cancellationToken)

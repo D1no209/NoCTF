@@ -10,21 +10,34 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
     {
         builder.ToTable("teams");
         builder.HasKey(team => team.Id);
-        builder.HasQueryFilter(team => !team.Deletion.IsDeleted);
+        builder.HasQueryFilter(team => team.DeletedAt == null);
         builder.Property(team => team.Name).HasMaxLength(128);
+        builder.Property(team => team.NormalizedName).HasMaxLength(128);
+        builder.Property(team => team.MemberIds).HasColumnType("uuid[]");
+        builder.Property(team => team.RegistrationStatus).HasConversion<short>();
         builder.Property(team => team.InvitationToken).HasMaxLength(32);
-        builder.OwnsOne(team => team.Ban);
-        builder.OwnsOne(team => team.Deletion);
-        builder.HasIndex(team => new { team.CompetitionId, team.Name }).IsUnique();
+        builder.HasIndex(team => new { team.CompetitionId, team.NormalizedName }).IsUnique()
+            .HasFilter("deleted_at IS NULL");
         builder.HasIndex(team => new { team.CompetitionId, team.RegistrationStatus });
         builder.HasIndex(team => team.InvitationToken).IsUnique();
-        builder.OwnsMany(team => team.Members, members =>
+        builder.HasIndex(team => team.MemberIds).HasMethod("gin");
+        builder.HasOne<NoCTF.Domain.Competitions.Competition>().WithMany()
+            .HasForeignKey(team => team.CompetitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
+            .HasForeignKey(team => team.CaptainId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(table =>
         {
-            members.ToTable("team_members");
-            members.WithOwner().HasForeignKey("TeamId");
-            members.HasKey(member => member.Id);
-            members.HasIndex("TeamId", nameof(TeamMember.MemberOrder)).IsUnique();
-            members.HasIndex("TeamId", nameof(TeamMember.UserId)).IsUnique();
+            table.HasCheckConstraint(
+                "ck_teams_captain_is_member",
+                "captain_id = ANY(member_ids)");
+            table.HasCheckConstraint(
+                "ck_teams_members_not_empty",
+                "cardinality(member_ids) > 0");
+            table.HasCheckConstraint(
+                "ck_teams_invitation_token_length",
+                "char_length(invitation_token) = 32");
         });
     }
 }

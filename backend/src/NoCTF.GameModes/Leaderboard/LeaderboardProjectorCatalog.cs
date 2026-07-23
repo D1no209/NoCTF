@@ -11,8 +11,7 @@ public sealed class LeaderboardProjectorCatalog : ILeaderboardProjectorCatalog
             [GameMode.Ctf] = new CtfLeaderboardProjector(),
             [GameMode.Awd] = new AwdLeaderboardProjector(),
             [GameMode.Awdp] = new AwdpLeaderboardProjector(),
-            [GameMode.Koh] = new KohLeaderboardProjector(),
-            [GameMode.Penetration] = new PenetrationLeaderboardProjector()
+            [GameMode.Koh] = new KohLeaderboardProjector()
         };
 
     public IGameModeLeaderboardProjector Get(GameMode mode) => _projectors[mode];

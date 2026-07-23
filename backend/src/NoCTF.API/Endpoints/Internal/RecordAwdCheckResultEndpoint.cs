@@ -1,66 +1,64 @@
+using System.Security.Claims;
+using System.Security.Cryptography;
 using FastEndpoints;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using NoCTF.Application.BackgroundWork;
 using NoCTF.Application.Submissions.Processing;
-using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Internal;
 
 public sealed class RecordAwdCheckResultRequest
 {
-    public Guid CompetitionId { get; set; }
-    public Guid TeamId { get; set; }
-    public Guid CompetitionChallengeId { get; set; }
-    public int ExitCode { get; set; }
-    public bool TimedOut { get; set; }
-    public DateTimeOffset OccurredAt { get; set; }
-    public string SourceKey { get; set; } = string.Empty;
+    public bool Up { get; set; }
 }
 
-[Mapper]
-internal static partial class AwdCheckResultMapper
-{
-    public static partial RecordAwdCheckResultCommand ToCommand(RecordAwdCheckResultRequest request);
-}
+public sealed record InternalResultResponse(string Disposition);
 
-public sealed class RecordAwdCheckResultEndpoint(RecordAwdCheckResult record)
+public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
     : Endpoint<RecordAwdCheckResultRequest,
-        Results<Created<SystemScoringEventResponse>, Ok<SystemScoringEventResponse>, ProblemHttpResult>>
+        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound, Conflict, UnauthorizedHttpResult>>
 {
     public override void Configure()
     {
-        Post("/internal/competitions/{competitionId}/awd-check-results");
-        AuthSchemes("RunnerScoringBearer");
-        Policies("ScoringInput");
-        Summary(summary => summary.Summary = "Record an idempotent Runner-authenticated AWD service check.");
+        Post("/api/internal/v1/awd/check-results");
+        AuthSchemes("Internal");
+        Policies("AwdCheckResult");
+        RoutePrefixOverride(string.Empty);
+        Summary(summary =>
+        {
+            summary.Summary = "Records a claim-bound AWD checker result.";
+            summary.Description = "Generation and CheckerSequence come exclusively from the internal JWT.";
+        });
     }
 
-    public override async Task<Results<Created<SystemScoringEventResponse>, Ok<SystemScoringEventResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<
+        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound, Conflict, UnauthorizedHttpResult>> ExecuteAsync(
         RecordAwdCheckResultRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
-        request.CompetitionId = Route<Guid>("competitionId");
-        if (request.TeamId == Guid.Empty || request.CompetitionChallengeId == Guid.Empty
-            || string.IsNullOrWhiteSpace(request.SourceKey) || request.SourceKey.Length > 256)
-            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid AWD check result.");
-        try
+        if (!Guid.TryParse(User.FindFirstValue("runtime_instance_id"), out var runtimeId) ||
+            !int.TryParse(User.FindFirstValue("generation"), out var generation) ||
+            !long.TryParse(User.FindFirstValue("checker_sequence"), out var checkerSequence) ||
+            !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds() > deadline)
+            return TypedResults.Unauthorized();
+        var hash = SHA256.HashData([request.Up ? (byte)1 : (byte)0]);
+        var disposition = await record.AwdAsync(new(
+            runtimeId,
+            generation,
+            checkerSequence,
+            request.Up,
+            hash,
+            DateTimeOffset.UtcNow), ct);
+        return disposition switch
         {
-            var result = await record.ExecuteAsync(AwdCheckResultMapper.ToCommand(request), cancellationToken);
-            if (result.Failure == SystemScoringEventRecordFailure.CompetitionNotFound)
-                return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "Competition was not found.");
-            if (result.Failure is SystemScoringEventRecordFailure.CompetitionFinished or SystemScoringEventRecordFailure.CompetitionModeMismatch)
-                return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "AWD checker result was rejected.");
-            if (result.Failure == SystemScoringEventRecordFailure.SourceConflict)
-                return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Source key belongs to a different AWD check fact.");
-            var response = new SystemScoringEventResponse(result.ScoringEventId, result.Created);
-            return result.Created
-                ? TypedResults.Created($"/internal/competitions/{request.CompetitionId}/scoring-events/{result.ScoringEventId}", response)
-                : TypedResults.Ok(response);
-        }
-        catch (BackgroundWorkUnavailableException)
-        {
-            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "System event processing is unavailable.");
-        }
+            InternalResultDisposition.Applied or InternalResultDisposition.Duplicate =>
+                TypedResults.Ok(new InternalResultResponse(disposition.ToString().ToLowerInvariant())),
+            InternalResultDisposition.Superseded =>
+                TypedResults.Accepted(
+                    uri: (string?)null,
+                    value: new InternalResultResponse("superseded")),
+            InternalResultDisposition.NotFound => TypedResults.NotFound(),
+            _ => TypedResults.Conflict()
+        };
     }
 }

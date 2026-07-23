@@ -18,7 +18,8 @@ public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
 
     public IssuedAccessToken Issue(AuthenticatedUser user)
     {
-        var expires = DateTimeOffset.UtcNow.Add(lifetime);
+        var now = DateTimeOffset.UtcNow;
+        var expires = now.Add(lifetime);
         var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
             issuer: issuer,
@@ -29,9 +30,11 @@ public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
                 new(ClaimTypes.Name, user.UserName),
                 new(ClaimTypes.Role, user.Role),
                 new("token_version", user.TokenVersion.ToString()),
-                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
+                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+                new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new("token_type", "access")
             ],
-            notBefore: DateTime.UtcNow,
+            notBefore: now.UtcDateTime,
             expires: expires.UtcDateTime,
             signingCredentials: credentials);
         return new(new JwtSecurityTokenHandler().WriteToken(token), expires);
@@ -74,7 +77,7 @@ public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
                     ValidAudience = refreshAudience,
                     ValidateLifetime = true,
                     RequireExpirationTime = true,
-                    ClockSkew = TimeSpan.FromSeconds(30)
+                    ClockSkew = TimeSpan.Zero
                 }, out _);
             if (!string.Equals(principal.FindFirstValue("token_type"), "refresh", StringComparison.Ordinal))
                 return null;

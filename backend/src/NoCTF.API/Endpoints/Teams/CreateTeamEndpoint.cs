@@ -3,8 +3,49 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Teams.Registration;
+using NoCTF.Domain.Teams;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Teams;
+
+public sealed class CreateTeamRequest
+{
+    public Guid CompetitionId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? AvatarUrl { get; set; }
+}
+
+public sealed record TeamResponse(
+    Guid Id,
+    Guid CompetitionId,
+    string Name,
+    string? AvatarUrl,
+    Guid CaptainId,
+    IReadOnlyList<Guid> MemberIds,
+    TeamRegistrationStatus RegistrationStatus,
+    bool IsLocked,
+    DateTimeOffset RegisteredAt);
+
+public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);
+
+public sealed class UpdateTeamRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid TeamId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? AvatarUrl { get; set; }
+}
+
+[Mapper]
+internal static partial class TeamMapper
+{
+    public static partial CreateTeamCommand ToCommand(
+        CreateTeamRequest request,
+        Guid userId,
+        DateTimeOffset registeredAt);
+    public static partial TeamResponse ToResponse(TeamView view);
+    public static partial UpdateTeamCommand ToCommand(UpdateTeamRequest request);
+}
 
 public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user)
     : Endpoint<CreateTeamRequest, Results<Created<TeamResponse>, NotFound, ProblemHttpResult>>

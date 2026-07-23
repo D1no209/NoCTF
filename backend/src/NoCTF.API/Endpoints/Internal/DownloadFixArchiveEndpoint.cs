@@ -1,53 +1,48 @@
+using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Storage;
+using NoCTF.Application.Submissions.PatchUploads;
 
 namespace NoCTF.API.Endpoints.Internal;
 
-public sealed class DownloadFixArchiveRequest
-{
-    public Guid UploadId { get; set; }
-}
-
 public sealed class DownloadFixArchiveEndpoint(
-    IFixArchiveDownloadStore archives,
-    IObjectStorage storage)
-    : Endpoint<DownloadFixArchiveRequest, Results<FileStreamHttpResult, NotFound, ProblemHttpResult>>
+    IFixArchiveReader archives,
+    IObjectStorage objects)
+    : EndpointWithoutRequest<Results<FileStreamHttpResult, NotFound, UnauthorizedHttpResult>>
 {
     public override void Configure()
     {
-        Get("/internal/fix-archives/{uploadId}");
-        AuthSchemes("RunnerScoringBearer");
+        Get("/api/internal/v1/awdp/fix-archives/{submissionId}");
+        AuthSchemes("Internal");
         Policies("FixArchiveRead");
-        Summary(summary => summary.Summary = "Download the single Fix archive bound to a Runner JWT.");
+        RoutePrefixOverride(string.Empty);
+        Summary(summary =>
+        {
+            summary.Summary = "Download one AWDP fix archive";
+            summary.Description = "Returns only the archive bound to the internal JWT submission claim.";
+        });
     }
 
-    public override async Task<Results<FileStreamHttpResult, NotFound, ProblemHttpResult>> ExecuteAsync(
-        DownloadFixArchiveRequest request,
-        CancellationToken cancellationToken)
+    public override async Task<
+        Results<FileStreamHttpResult, NotFound, UnauthorizedHttpResult>> ExecuteAsync(
+        CancellationToken ct)
     {
-        request.UploadId = Route<Guid>("uploadId");
-        if (!Guid.TryParse(User.FindFirst("upload_id")?.Value, out var tokenUploadId)
-            || !Guid.TryParse(User.FindFirst("submission_id")?.Value, out var submissionId)
-            || tokenUploadId != request.UploadId)
+        var routeId = Route<Guid>("submissionId");
+        if (!Guid.TryParse(
+                User.FindFirstValue("submission_id"),
+                out var claimedId)
+            || claimedId != routeId)
+            return TypedResults.Unauthorized();
+        var archive = await archives.FindAsync(routeId, ct);
+        if (archive is null)
             return TypedResults.NotFound();
-
-        var archive = await archives.AuthorizeAsync(
-            request.UploadId, submissionId, DateTimeOffset.UtcNow, cancellationToken);
-        if (archive is null) return TypedResults.NotFound();
-        try
-        {
-            var stream = await storage.OpenReadAsync(archive.ObjectKey, cancellationToken);
-            return TypedResults.File(stream, archive.ContentType, archive.FileName, enableRangeProcessing: false);
-        }
-        catch (FileNotFoundException)
-        {
-            return TypedResults.NotFound();
-        }
-        catch
-        {
-            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Fix archive storage is unavailable.");
-        }
+        var stream = await objects.OpenReadAsync(archive.ObjectKey, ct);
+        return TypedResults.Stream(
+            stream,
+            string.IsNullOrWhiteSpace(archive.ContentType)
+                ? "application/gzip"
+                : archive.ContentType,
+            archive.FileName);
     }
 }

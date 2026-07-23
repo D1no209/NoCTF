@@ -1,9 +1,17 @@
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.Login;
 using Microsoft.AspNetCore.Http;
 
 namespace NoCTF.API.Endpoints.Authentication;
+
+public sealed record LoginResponse(
+    Guid UserId,
+    string UserName,
+    string Role,
+    string AccessToken,
+    DateTimeOffset ExpiresAt);
 
 public sealed class LoginRequest
 {
@@ -11,7 +19,16 @@ public sealed class LoginRequest
     public string Password { get; set; } = string.Empty;
 }
 
-public sealed class LoginEndpoint(LoginUser login, IConfiguration configuration)
+public sealed class LoginValidator : Validator<LoginRequest>
+{
+    public LoginValidator()
+    {
+        RuleFor(request => request.Login).NotEmpty().MaximumLength(320);
+        RuleFor(request => request.Password).NotEmpty().MaximumLength(1024);
+    }
+}
+
+public sealed class LoginEndpoint(LoginUser login)
     : Endpoint<LoginRequest, Results<Ok<LoginResponse>, UnauthorizedHttpResult>>
 {
     public override void Configure()
@@ -29,12 +46,12 @@ public sealed class LoginEndpoint(LoginUser login, IConfiguration configuration)
         {
             return TypedResults.Unauthorized();
         }
-        HttpContext.Response.Cookies.Append("noctf_refresh", result.Value!.RefreshToken, new CookieOptions
+        HttpContext.Response.Cookies.Append("__Secure-noctf_refresh", result.Value!.RefreshToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = configuration.GetValue("Authentication:RefreshCookieSecure", true),
+            Secure = true,
             SameSite = SameSiteMode.Strict,
-            Path = "/auth",
+            Path = "/api/v1/auth",
             MaxAge = TimeSpan.FromDays(30)
         });
         return TypedResults.Ok(new LoginResponse(

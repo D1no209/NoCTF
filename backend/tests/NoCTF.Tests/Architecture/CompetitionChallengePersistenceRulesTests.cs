@@ -7,10 +7,10 @@ namespace NoCTF.Tests.Architecture;
 public sealed class CompetitionChallengePersistenceRulesTests
 {
     [Test]
-    public async Task Competition_challenge_has_template_and_competition_foreign_keys_and_owned_children()
+    public async Task Aggregate_children_have_restrict_foreign_keys_and_no_independent_dbsets()
     {
         await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .UseNpgsql("Host=localhost;Database=noctf_model_tests;Username=noctf;Password=noctf")
             .Options);
 
         var competitionChallenge = db.Model.FindEntityType(typeof(CompetitionChallenge));
@@ -21,9 +21,19 @@ public sealed class CompetitionChallengePersistenceRulesTests
         await Assert.That(competitionChallenge.GetForeignKeys()
             .Any(key => key.Properties.Single().Name == nameof(CompetitionChallenge.ChallengeId)
                         && key.PrincipalEntityType.ClrType == typeof(Challenge))).IsTrue();
-        await Assert.That(db.Model.GetEntityTypes()
-            .Any(type => type.ClrType == typeof(CompetitionChallengeHint) && type.IsOwned())).IsTrue();
-        await Assert.That(db.Model.GetEntityTypes()
-            .Any(type => type.ClrType == typeof(ChallengeAttachment) && type.IsOwned())).IsTrue();
+        var hintType = db.Model.FindEntityType(typeof(CompetitionChallengeHint));
+        await Assert.That(hintType).IsNotNull();
+        await Assert.That(hintType!.GetForeignKeys().Single().DeleteBehavior)
+            .IsEqualTo(DeleteBehavior.Restrict);
+        await Assert.That(typeof(NoCtfDbContext).GetProperties()
+            .Any(property => property.PropertyType == typeof(DbSet<CompetitionChallengeHint>)))
+            .IsFalse();
+        var attachmentType = db.Model.FindEntityType(typeof(ChallengeAttachment));
+        await Assert.That(attachmentType).IsNotNull();
+        await Assert.That(attachmentType!.GetForeignKeys().Single().DeleteBehavior)
+            .IsEqualTo(DeleteBehavior.Restrict);
+        await Assert.That(typeof(NoCtfDbContext).GetProperties()
+            .Any(property => property.PropertyType == typeof(DbSet<ChallengeAttachment>)))
+            .IsFalse();
     }
 }

@@ -14,7 +14,6 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
             GameMode.Awd => AwdRules(challengeConfigurationJson),
             GameMode.Awdp => AwdpRules(challengeConfigurationJson),
             GameMode.Koh => new(false, false, null, null),
-            GameMode.Penetration => PenetrationRules(challengeConfigurationJson),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
         };
 
@@ -38,11 +37,5 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
             configuration.Fix is not null,
             configuration.Break is null ? null : configuration.MaxBreakAttempts,
             configuration.Fix is null ? null : configuration.MaxFixAttempts);
-    }
-
-    private static SubmissionAdmissionRules PenetrationRules(string json)
-    {
-        var configuration = Penetration.Configuration.PenetrationConfigurationUpgrader.ParseChallenge(json);
-        return new(true, false, configuration.MaxFlagAttempts, null);
     }
 }

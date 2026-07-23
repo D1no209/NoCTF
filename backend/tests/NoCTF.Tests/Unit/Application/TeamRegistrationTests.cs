@@ -46,7 +46,16 @@ public class TeamRegistrationTests
         public Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken cancellationToken)
         {
             Status = status;
-            TeamView team = new(Guid.NewGuid(), command.CompetitionId, command.Name, command.AvatarUrl, command.UserId, status, false, command.RegisteredAt);
+            TeamView team = new(
+                Guid.NewGuid(),
+                command.CompetitionId,
+                command.Name,
+                command.AvatarUrl,
+                command.UserId,
+                [command.UserId],
+                status,
+                false,
+                command.RegisteredAt);
             return Task.FromResult(new TeamCreateStoreResult(team, null));
         }
         public Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TeamView>>([]);

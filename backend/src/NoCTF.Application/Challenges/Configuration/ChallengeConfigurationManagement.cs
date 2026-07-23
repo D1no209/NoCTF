@@ -1,4 +1,4 @@
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Common;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
@@ -60,7 +60,7 @@ public sealed class UpdateChallengeConfiguration(
     IChallengeConfigurationStore store,
     IChallengeConfigurationCatalog catalog,
     ILeaderboardCache cache,
-    IBackgroundWorkScheduler scheduler)
+    IBackendMessagePublisher messages)
 {
     public async Task<OperationResult<ChallengeConfigurationView>> ExecuteAsync(
         Guid competitionId,
@@ -84,11 +84,6 @@ public sealed class UpdateChallengeConfiguration(
             return OperationResult<ChallengeConfigurationView>.Failure(
                 "challenge_not_found",
                 "Challenge was not found.");
-        if (current.CompetitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
-            return OperationResult<ChallengeConfigurationView>.Failure(
-                "configuration_locked",
-                "Active or finished challenge configuration is read-only.");
-
         var errors = catalog.Validate(current.Mode, json);
         if (errors.Count > 0)
             return OperationResult<ChallengeConfigurationView>.Failure(
@@ -121,7 +116,7 @@ public sealed class UpdateChallengeConfiguration(
         }
 
         await cache.InvalidateAsync(competitionId, ct);
-        await scheduler.EnqueueCompetitionRebuildAsync(competitionId, ct);
+        await messages.RebuildCompetitionAsync(competitionId, ct);
         return OperationResult<ChallengeConfigurationView>.Success(result.Configuration);
     }
 }

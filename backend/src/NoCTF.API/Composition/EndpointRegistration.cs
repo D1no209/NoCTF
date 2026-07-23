@@ -10,7 +10,7 @@ public static class EndpointRegistration
     {
         app.UseFastEndpoints(options =>
         {
-            options.Endpoints.RoutePrefix = string.Empty;
+            options.Endpoints.RoutePrefix = "api/v1";
             options.Errors.ResponseBuilder = (failures, context, statusCode) =>
             {
                 var problem = new ValidationProblemDetails { Status = statusCode, Instance = context.Request.Path };

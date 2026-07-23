@@ -1,4 +1,4 @@
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
@@ -64,20 +64,18 @@ public class CompetitionLifecycleUseCaseTests
         public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    private sealed class Scheduler : IBackgroundWorkScheduler
+    private sealed class Scheduler : IBackendMessagePublisher
     {
         public Guid? Provisioned { get; private set; }
         public Guid? Cleaned { get; private set; }
-        public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueRuntimeCleanupAsync(Guid competitionId, CancellationToken cancellationToken)
+        public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask CleanupCompetitionRuntimesAsync(Guid competitionId, CancellationToken cancellationToken)
         {
             Cleaned = competitionId;
             return ValueTask.CompletedTask;
         }
-        public ValueTask EnqueueRuntimeProvisionAsync(Guid competitionId, CancellationToken cancellationToken)
+        public ValueTask ProvisionCompetitionRuntimesAsync(Guid competitionId, CancellationToken cancellationToken)
         {
             Provisioned = competitionId;
             return ValueTask.CompletedTask;

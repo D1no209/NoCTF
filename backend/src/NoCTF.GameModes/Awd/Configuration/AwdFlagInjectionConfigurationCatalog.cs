@@ -1,8 +1,8 @@
-using NoCTF.Application.SystemProducers;
-
 namespace NoCTF.GameModes.Awd.Configuration;
 
-public sealed class AwdFlagInjectionConfigurationCatalog : IAwdFlagInjectionConfigurationCatalog
+public sealed record AwdFlagInjectionSettings(IReadOnlyList<string> Command, int TimeoutSeconds);
+
+public sealed class AwdFlagInjectionConfigurationCatalog
 {
     public AwdFlagInjectionSettings? Get(string challengeConfigurationJson)
     {

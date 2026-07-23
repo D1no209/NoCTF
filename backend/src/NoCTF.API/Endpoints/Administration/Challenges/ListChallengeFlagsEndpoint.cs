@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Administration.ChallengeBank;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Teams.Moderation;
@@ -7,26 +8,32 @@ using NoCTF.Application.Teams.Moderation;
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class ListChallengeFlagsEndpoint(
-    ListChallengeFlags list,
+    ManageChallengeFlags flags,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeFlagSecretListResponse>, ForbidHttpResult>>
+    : EndpointWithoutRequest<Results<Ok<ChallengeFlagListResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
         Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Lists protected Challenge Flags for administrators.");
+        Summary(summary => summary.Summary = "Lists competition-scoped flags.");
     }
 
-    public override async Task<Results<Ok<ChallengeFlagSecretListResponse>, ForbidHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<ChallengeFlagListResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
+        if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
-
-        var flags = await list.ExecuteAsync(competitionId, Route<Guid>("competitionChallengeId"), ct);
-        return TypedResults.Ok(ChallengeFlagMapper.ToListResponse(flags));
+        var items = await flags.ListAsync(
+            ChallengeFlagScope.Competition(competitionId, Route<Guid>("competitionChallengeId")),
+            actorId: null,
+            isAdministrator: true,
+            ct);
+        return items is null
+            ? TypedResults.NotFound()
+            : TypedResults.Ok(new ChallengeFlagListResponse(
+                items.Select(ChallengeFlagMapping.ToResponse).ToArray()));
     }
 }

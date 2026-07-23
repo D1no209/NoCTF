@@ -1,0 +1,197 @@
+using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Teams;
+
+namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+
+public sealed class EfRuntimeInstanceStore(
+    NoCtfDbContext db,
+    IChallengeRuntimeTemplateCatalog templates,
+    ITransactionalMessageOutbox outbox) : IRuntimeInstanceStore
+{
+    public async Task<RuntimeInstanceView?> FindPlayerRuntimeAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        CancellationToken ct)
+    {
+        var scope = await ResolveScopeAsync(competitionId, competitionChallengeId, userId, ct);
+        if (scope is null || scope.Mode is GameMode.Koh or GameMode.Awdp)
+            return null;
+        return await db.RuntimeInstances.AsNoTracking()
+            .Where(instance =>
+                instance.CompetitionId == competitionId &&
+                instance.CompetitionChallengeId == competitionChallengeId &&
+                instance.TeamId == scope.TeamId)
+            .OrderByDescending(instance => instance.Generation)
+            .Select(instance => new RuntimeInstanceView(
+                instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId,
+                instance.Generation, instance.RuntimeKind, instance.RuntimeProvider, instance.RunnerPool,
+                instance.State, instance.FailureCode, instance.ProcessingVersion, instance.Urls,
+                instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt))
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<RuntimeMutationResult> MutatePlayerRuntimeAsync(
+        RuntimeMutationCommand command,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var scope = await ResolveScopeAsync(
+            command.CompetitionId,
+            command.CompetitionChallengeId,
+            command.UserId,
+            ct);
+        if (scope is null || scope.Status != CompetitionStatus.Running)
+            return new(null, RuntimeMutationFailure.NotFound);
+        if (scope.Mode is GameMode.Koh or GameMode.Awdp)
+            return new(null, RuntimeMutationFailure.Unsupported);
+        if (scope.Mode == GameMode.Awd && command.Action is RuntimeAction.Start or RuntimeAction.Stop or RuntimeAction.Extend)
+            return new(null, RuntimeMutationFailure.Unsupported);
+
+        await AcquireLockAsync(scope.TeamId, command.CompetitionChallengeId, ct);
+        var current = await db.RuntimeInstances
+            .Where(instance =>
+                instance.CompetitionChallengeId == command.CompetitionChallengeId &&
+                instance.TeamId == scope.TeamId)
+            .OrderByDescending(instance => instance.Generation)
+            .FirstOrDefaultAsync(ct);
+
+        RuntimeInstance entity;
+        switch (command.Action)
+        {
+            case RuntimeAction.Start:
+                if (current is not null && IsActive(current.State))
+                    return new(null, RuntimeMutationFailure.InvalidState);
+                try { entity = Create(scope, command, current?.Generation + 1 ?? 0, null); }
+                catch (InvalidOperationException) { return new(null, RuntimeMutationFailure.ConfigurationInvalid); }
+                db.RuntimeInstances.Add(entity);
+                await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
+                break;
+            case RuntimeAction.Reset:
+                if (current is null || !IsActive(current.State))
+                    return new(null, RuntimeMutationFailure.InvalidState);
+                current.State = RuntimeState.Stopping;
+                current.ProcessingVersion = checked(current.ProcessingVersion + 1);
+                await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
+                try { entity = Create(scope, command, checked(current.Generation + 1), current.Id); }
+                catch (InvalidOperationException) { return new(null, RuntimeMutationFailure.ConfigurationInvalid); }
+                db.RuntimeInstances.Add(entity);
+                await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
+                break;
+            case RuntimeAction.Stop:
+                if (current is null || !IsActive(current.State))
+                    return new(null, RuntimeMutationFailure.InvalidState);
+                current.State = RuntimeState.Stopping;
+                current.ProcessingVersion = checked(current.ProcessingVersion + 1);
+                entity = current;
+                await outbox.PublishAsync(new StopRuntime(entity.Id, entity.ProcessingVersion));
+                break;
+            case RuntimeAction.Extend:
+                if (current is null || current.State != RuntimeState.Running || current.ExpiresAt is null)
+                    return new(null, RuntimeMutationFailure.InvalidState);
+                current.ExpiresAt = current.ExpiresAt.Value.Add(command.Extension!.Value);
+                current.ProcessingVersion = checked(current.ProcessingVersion + 1);
+                entity = current;
+                break;
+            default:
+                return new(null, RuntimeMutationFailure.Unsupported);
+        }
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
+            return new(Map(entity));
+        }
+        catch (DbUpdateException)
+        {
+            return new(null, RuntimeMutationFailure.Conflict);
+        }
+    }
+
+    private RuntimeInstance Create(
+        RuntimeScope scope,
+        RuntimeMutationCommand command,
+        int generation,
+        Guid? replaces)
+    {
+        var template = templates.Get(scope.Mode, scope.ConfigurationJson)
+            ?? throw new InvalidOperationException("The challenge does not define a runtime template.");
+        return new RuntimeInstance
+        {
+            Id = Guid.CreateVersion7(command.Now),
+            CompetitionId = command.CompetitionId,
+            CompetitionChallengeId = command.CompetitionChallengeId,
+            TeamId = scope.TeamId,
+            Generation = generation,
+            RuntimeKind = RuntimeKind.Container,
+            RuntimeProvider = template.Provider,
+            RunnerPool = "default",
+            State = RuntimeState.Queued,
+            ConfigurationRevision = scope.ConfigurationRevision,
+            ReplacesRuntimeInstanceId = replaces,
+            CreatedAt = command.Now,
+            ExpiresAt = template.TtlSeconds is > 0
+                ? command.Now.AddSeconds(template.TtlSeconds.Value)
+                : null
+        };
+    }
+
+    private async Task<RuntimeScope?> ResolveScopeAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        CancellationToken ct) =>
+        await db.Teams.AsNoTracking()
+            .Where(team =>
+                team.CompetitionId == competitionId &&
+                team.MemberIds.Contains(userId) &&
+                !team.IsBanned &&
+                team.RegistrationStatus == TeamRegistrationStatus.Approved)
+            .Join(
+                db.CompetitionChallenges.AsNoTracking(),
+                team => team.CompetitionId,
+                challenge => challenge.CompetitionId,
+                (team, challenge) => new { Team = team, Challenge = challenge })
+            .Join(
+                db.Competitions.AsNoTracking(),
+                pair => pair.Team.CompetitionId,
+                competition => competition.Id,
+                (pair, competition) => new { pair.Team, pair.Challenge, Competition = competition })
+            .Where(item => item.Challenge.Id == competitionChallengeId)
+            .Select(item => new RuntimeScope(
+                item.Team.Id,
+                item.Competition.Mode,
+                item.Competition.Status,
+                item.Challenge.ConfigurationJson,
+                item.Challenge.Revision))
+            .SingleOrDefaultAsync(ct);
+
+    private Task AcquireLockAsync(Guid teamId, Guid challengeId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({teamId.ToString() + ":" + challengeId.ToString()}, 0))",
+            ct);
+
+    private static bool IsActive(RuntimeState state) =>
+        state is RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping;
+
+    private static RuntimeInstanceView Map(RuntimeInstance instance) =>
+        new(
+            instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId,
+            instance.Generation, instance.RuntimeKind, instance.RuntimeProvider, instance.RunnerPool,
+            instance.State, instance.FailureCode, instance.ProcessingVersion, instance.Urls,
+            instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt);
+
+    private sealed record RuntimeScope(
+        Guid TeamId,
+        GameMode Mode,
+        CompetitionStatus Status,
+        string ConfigurationJson,
+        int ConfigurationRevision);
+}

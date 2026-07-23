@@ -8,14 +8,6 @@ namespace NoCTF.Infrastructure.Storage;
 public sealed class LocalObjectStorage(IConfiguration configuration) : IObjectStorage
 {
     private readonly string root = Path.GetFullPath(configuration["Storage:LocalRoot"] ?? "storage");
-    private readonly Uri baseUri = new(configuration["Storage:PublicBaseUrl"] ?? "http://localhost:5000/");
-
-    public Task<FixUploadGrant> CreateUploadAsync(Guid uploadId, string objectKey, string contentType, long length, TimeSpan lifetime, CancellationToken cancellationToken)
-    {
-        Directory.CreateDirectory(Path.Combine(root, Path.GetDirectoryName(objectKey) ?? string.Empty));
-        return Task.FromResult(new FixUploadGrant(uploadId, objectKey,
-            new Uri(baseUri, $"storage/uploads/{uploadId}"), DateTimeOffset.UtcNow.Add(lifetime)));
-    }
 
     public async Task<StoredObject> PutAsync(string objectKey, string fileName, string contentType, Stream content, CancellationToken cancellationToken)
     {

@@ -1,9 +1,22 @@
-using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
 
 namespace NoCTF.GameModes.Awdp.Scoring;
 
-public sealed class AwdpCheckExitCodeMapper : IAwdpCheckExitCodeMapper
+public enum AwdpCheckOutcome
+{
+    FixSuccess,
+    FixFailed,
+    FixRuleViolation,
+    FixServiceError,
+    PlatformFailure
+}
+
+public sealed record AwdpCheckDecision(
+    AwdpCheckOutcome Outcome,
+    ScoringResult Result,
+    ScoringFailureCode? FailureCode);
+
+public sealed class AwdpCheckExitCodeMapper
 {
     public AwdpCheckDecision Map(int exitCode, bool timedOut)
     {

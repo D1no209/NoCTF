@@ -4,6 +4,7 @@ namespace NoCTF.Domain.Competitions;
 public enum CompetitionStatus
 {
     Draft,
+    Visible,
     Published,
     Running,
     Paused,
@@ -16,6 +17,5 @@ public enum GameMode
     Ctf,
     Awd,
     Awdp,
-    Koh,
-    Penetration
+    Koh
 }

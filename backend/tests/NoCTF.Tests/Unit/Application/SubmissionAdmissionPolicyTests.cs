@@ -9,7 +9,7 @@ public class SubmissionAdmissionPolicyTests
     public async Task Submission_received_before_end_remains_valid_after_processing_delay()
     {
         var snapshot = Snapshot(CompetitionStatus.Running);
-        var receivedAt = snapshot.EndTime.AddSeconds(-1);
+        var receivedAt = snapshot.EndAt.AddSeconds(-1);
 
         var result = Check(snapshot, receivedAt);
 
@@ -21,7 +21,7 @@ public class SubmissionAdmissionPolicyTests
     {
         var snapshot = Snapshot(CompetitionStatus.Running);
 
-        var result = Check(snapshot, snapshot.EndTime.AddTicks(1));
+        var result = Check(snapshot, snapshot.EndAt.AddTicks(1));
 
         await Assert.That(result.ErrorCode).IsEqualTo("competition_finished");
     }

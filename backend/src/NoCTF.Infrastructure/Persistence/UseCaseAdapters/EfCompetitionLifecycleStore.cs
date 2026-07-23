@@ -8,7 +8,7 @@ public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitio
 {
     public Task<CompetitionStatus?> GetStatusAsync(Guid competitionId, CancellationToken cancellationToken) =>
         db.Competitions.AsNoTracking()
-            .Where(item => item.Id == competitionId && !item.Deletion.IsDeleted)
+            .Where(item => item.Id == competitionId && item.DeletedAt == null)
             .Select(item => (CompetitionStatus?)item.Status)
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -16,12 +16,12 @@ public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitio
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         await db.Competitions.AsNoTracking()
-            .Where(item => !item.Deletion.IsDeleted
-                && ((item.Status == CompetitionStatus.Published && item.StartTime <= now)
+            .Where(item => item.DeletedAt == null
+                && ((item.Status == CompetitionStatus.Published && item.StartAt <= now)
                     || (item.Status != CompetitionStatus.Draft
                         && item.Status != CompetitionStatus.Finished
-                        && item.EndTime <= now)))
-            .Select(item => new CompetitionLifecycleSnapshot(item.Id, item.Status, item.StartTime, item.EndTime))
+                        && item.EndAt <= now)))
+            .Select(item => new CompetitionLifecycleSnapshot(item.Id, item.Status, item.StartAt, item.EndAt))
             .ToListAsync(cancellationToken);
 
     public async Task<bool> TryTransitionAsync(
@@ -50,26 +50,36 @@ public sealed class EfCompetitionLifecycleStore(NoCtfDbContext db) : ICompetitio
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
-        var changed = await db.Competitions
-            .Where(item => item.Id == competitionId && item.Status == from && !item.Deletion.IsDeleted)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(item => item.Status, to)
-                .SetProperty(item => item.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken);
-        if (changed != 1)
+        var lockedStatus = await CompetitionWriteLock.AcquireAsync(
+            db, competitionId, cancellationToken);
+        if (lockedStatus != from)
             return false;
         var competition = await db.Competitions
             .Include(item => item.LifecycleAudits)
             .SingleAsync(item => item.Id == competitionId, cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        if (from == CompetitionStatus.Running && competition.RunningSince is { } runningSince)
+        {
+            competition.AccumulatedRunningSeconds = checked(
+                competition.AccumulatedRunningSeconds
+                + (long)Math.Floor((now - runningSince).TotalSeconds));
+            competition.RunningSince = null;
+        }
+        if (to == CompetitionStatus.Running)
+            competition.RunningSince = now;
+        competition.Status = to;
+        competition.UpdatedAt = now;
         competition.LifecycleAudits.Add(new CompetitionLifecycleAudit
         {
-            Id = Guid.CreateVersion7(DateTimeOffset.UtcNow),
+            Id = Guid.CreateVersion7(now),
             From = from,
             To = to,
             ActorId = actorId,
             Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
             Automatic = automatic,
-            OccurredAt = DateTimeOffset.UtcNow
+            OccurredAt = now
         });
+        competition.LeaderboardRevision = checked(competition.LeaderboardRevision + 1);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;

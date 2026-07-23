@@ -1,8 +1,6 @@
 using System.Reflection;
 using FastEndpoints;
-using Microsoft.AspNetCore.Http;
 using NoCTF.API.Endpoints.Submissions;
-using NoCTF.Runner.Endpoints;
 
 namespace NoCTF.Tests.Architecture;
 
@@ -11,11 +9,7 @@ public class FastEndpointsRulesTests
     [Test]
     public async Task Business_endpoints_use_execute_async_and_typed_result_contracts()
     {
-        var endpointTypes = new[]
-            {
-                typeof(SubmitFlagEndpoint).Assembly,
-                typeof(CreateContainerEndpoint).Assembly
-            }
+        var endpointTypes = new[] { typeof(SubmitFlagEndpoint).Assembly }
             .SelectMany(assembly => assembly.GetTypes())
             .Where(type => !type.IsAbstract && InheritsEndpoint(type))
             .ToList();
@@ -43,18 +37,6 @@ public class FastEndpointsRulesTests
         await Assert.That(handleOverrides).IsEmpty();
         await Assert.That(missingExecute).IsEmpty();
         await Assert.That(untypedContracts).IsEmpty();
-    }
-
-    [Test]
-    public async Task Fix_archive_upload_uses_strongly_typed_form_file_binding()
-    {
-        var fileProperty = typeof(UploadFixArchiveRequest).GetProperty(nameof(UploadFixArchiveRequest.File));
-
-        await Assert.That(fileProperty).IsNotNull();
-        await Assert.That(fileProperty!.PropertyType).IsEqualTo(typeof(IFormFile));
-        await Assert.That(typeof(UploadFixArchiveEndpoint)
-            .GetMethod(nameof(UploadFixArchiveEndpoint.ExecuteAsync), BindingFlags.Public | BindingFlags.Instance)
-            ?.ToString()).DoesNotContain("HttpContext");
     }
 
     private static bool InheritsEndpoint(Type type)

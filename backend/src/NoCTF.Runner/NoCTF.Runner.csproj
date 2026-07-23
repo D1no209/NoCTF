@@ -2,11 +2,15 @@
   <ItemGroup>
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
+    <ProjectReference Include="../NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
     <ProjectReference Include="../NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
     <ProjectReference Include="../NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
+    <ProjectReference Include="../NoCTF.Runtime.Libvirt/NoCTF.Runtime.Libvirt.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FastEndpoints" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
+    <PackageReference Include="WolverineFx.Postgresql" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" />
   </ItemGroup>
 </Project>

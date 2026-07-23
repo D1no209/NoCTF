@@ -1,5 +1,8 @@
+using System.Security.Cryptography;
+using System.Text;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
+using SubmissionEntity = NoCTF.Domain.Submissions.Submission;
 
 namespace NoCTF.GameModes.Submission;
 
@@ -9,34 +12,29 @@ public sealed class DefaultEfSubmissionEvaluator : ISubmissionEvaluator
     {
         var submission = context.Submission;
         if (submission.Kind == SubmissionKind.Fix)
-        {
-            var result = context.FixRecord?.VerificationStatus switch
-            {
-                NoCTF.Domain.Submissions.FixVerificationStatus.Valid => ScoringResult.Correct,
-                NoCTF.Domain.Submissions.FixVerificationStatus.PlatformFailed => ScoringResult.PlatformFailed,
-                _ => ScoringResult.Rejected
-            };
-            return new(ScoringEventKind.SubmissionEvaluation, result,
-                result switch
-                {
-                    ScoringResult.Correct => null,
-                    ScoringResult.PlatformFailed => context.FixRecord?.FailureCategory ?? ScoringFailureCode.StorageUnavailable,
-                    _ => ScoringFailureCode.FixArchiveMissing
-                },
-                submission.ReceivedAt, "ef-v1");
-        }
+            return new(ScoringEventKind.SubmissionEvaluation, ScoringResult.PlatformFailed,
+                ScoringFailureCode.CheckerPlatformError, submission.ReceivedAt, "fix-runner-required-v1");
         var duplicate = context.PriorEvents.Any(x => x.TeamId == submission.TeamId
             && x.CompetitionChallengeId == submission.CompetitionChallengeId
-            && x.Result == ScoringResult.Correct);
-        FlagFingerprint? fingerprint = submission.FlagHash is not null && submission.FlagLength is { } length
-            ? new FlagFingerprint(submission.FlagHash, length)
-            : null;
+            && x.Result == ScoringResult.Correct
+            && x.DeletedAt is null);
         var correct = context.ApplicableFlags.Any(x =>
-            fingerprint?.Matches(x.Flag) == true
+            Matches(submission, x)
             && (x.TeamId is null || x.TeamId == submission.TeamId)
             && (x.ValidStart is null || x.ValidStart <= submission.ReceivedAt)
-            && (x.ValidEnd is null || x.ValidEnd >= submission.ReceivedAt));
+            && (x.ValidUntil is null || submission.ReceivedAt < x.ValidUntil));
         return new(ScoringEventKind.SubmissionEvaluation, duplicate ? ScoringResult.Duplicate : correct ? ScoringResult.Correct : ScoringResult.Wrong,
             null, submission.ReceivedAt, "ef-v1");
     }
+
+    internal static bool Matches(SubmissionEntity submission, NoCTF.Domain.Challenges.ChallengeFlag flag)
+    {
+        if (submission.SubmittedFlag is null || submission.SubmittedFlagSha256 is not { Length: 32 }
+            || flag.FlagSha256 is not { Length: 32 })
+            return false;
+        return CryptographicOperations.FixedTimeEquals(submission.SubmittedFlagSha256, flag.FlagSha256)
+            && string.Equals(submission.SubmittedFlag, flag.Flag, StringComparison.Ordinal);
+    }
+
+    internal static byte[] Hash(string value) => SHA256.HashData(Encoding.UTF8.GetBytes(value));
 }

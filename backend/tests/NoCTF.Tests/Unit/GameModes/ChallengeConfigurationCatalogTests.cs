@@ -39,7 +39,6 @@ public class ChallengeConfigurationCatalogTests
     [Arguments(GameMode.Awd, "{\"schemaVersion\":1,\"flagFormat\":\"\"}")]
     [Arguments(GameMode.Awdp, "{\"schemaVersion\":1,\"break\":null,\"fix\":null,\"requireBreakBeforeFix\":false,\"maxBreakAttempts\":0,\"maxFixAttempts\":0}")]
     [Arguments(GameMode.Koh, "{\"schemaVersion\":1,\"agentUrl\":\"file:///secret\"}")]
-    [Arguments(GameMode.Penetration, "{\"schemaVersion\":1,\"stages\":[{\"id\":\"00000000-0000-0000-0000-000000000001\",\"number\":0,\"name\":\"\",\"prerequisiteIds\":[],\"points\":null}]}")]
     public async Task Validate_InvalidModeSpecificConfiguration_ReturnsErrors(GameMode mode, string json)
     {
         var errors = new GameModeChallengeConfigurationCatalog().Validate(mode, json);

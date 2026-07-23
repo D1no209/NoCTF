@@ -15,16 +15,15 @@ public sealed record SubmissionAdmissionSnapshot(
     int AcceptedFlagAttempts,
     int AcceptedFixAttempts,
     CompetitionStatus CompetitionStatus,
-    DateTimeOffset StartTime,
-    DateTimeOffset EndTime,
+    DateTimeOffset StartAt,
+    DateTimeOffset EndAt,
     bool CompetitionDeleted,
     bool ChallengeDeleted,
     bool ChallengePublished,
     bool TeamDeleted,
     bool TeamBanned,
     bool TeamApproved,
-    bool UserBelongsToTeam,
-    Guid? ChallengeInstanceId = null);
+    bool UserBelongsToTeam);
 
 public sealed record SubmissionAdmissionRules(
     bool AllowsFlag,
@@ -43,12 +42,9 @@ public interface ISubmissionAdmissionModePolicy
 public enum SubmissionAcceptanceState
 {
     Created,
-    Existing,
-    IdempotencyConflict,
     AttemptsExhausted,
     SnapshotChanged,
-    UploadUnavailable,
-    BackgroundWorkUnavailable
+    PatchUploadUnavailable
 }
 
 public sealed record SubmissionAcceptanceResult(
@@ -58,26 +54,16 @@ public sealed record SubmissionAcceptanceResult(
 
 public sealed record SubmissionAccepted(Guid SubmissionId, DateTimeOffset ReceivedAt);
 
-public sealed record AwdAttackTarget(Guid TeamId, Guid ServiceId);
-
 public sealed record FlagSubmissionCommand(
     Guid CompetitionId,
-    Guid TeamId,
     Guid CompetitionChallengeId,
     Guid UserId,
     string Flag,
-    string IdempotencyKey,
-    string IpAddress,
-    DateTimeOffset ReceivedAt,
-    AwdAttackTarget? AttackTarget = null,
-    Guid? StageId = null);
+    DateTimeOffset ReceivedAt);
 
 public sealed record FixSubmissionCommand(
     Guid CompetitionId,
-    Guid TeamId,
     Guid CompetitionChallengeId,
     Guid UserId,
-    Guid UploadId,
-    string IdempotencyKey,
-    string IpAddress,
+    Guid PatchUploadId,
     DateTimeOffset ReceivedAt);

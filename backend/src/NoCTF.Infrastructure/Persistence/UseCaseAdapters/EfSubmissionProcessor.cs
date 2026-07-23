@@ -1,128 +1,205 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Application.BackgroundWork;
-using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Submissions.Intake;
-using NoCTF.Domain.Submissions;
+using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
-using Microsoft.Extensions.Logging;
+using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
-/// <summary>Evaluates a submission once and binds its current score-free event.</summary>
 public sealed class EfSubmissionProcessor(
     NoCtfDbContext db,
-    IBackgroundWorkScheduler scheduler,
     ISubmissionEvaluatorCatalog evaluatorCatalog,
     ISubmissionAdmissionModePolicy admissionModePolicy,
-    VerifyFixSubmission verifyFixSubmission,
-    ILogger<EfSubmissionProcessor> logger) : ISubmissionProcessor
+    ITransactionalMessageOutbox outbox) : ISubmissionProcessor
 {
-    public async Task ProcessAsync(Guid submissionId, CancellationToken ct)
+    public async Task ProcessAsync(
+        Guid submissionId,
+        long processingVersion,
+        CancellationToken cancellationToken)
     {
-        var kind = await db.Submissions.AsNoTracking()
-            .Where(submission => submission.Id == submissionId)
-            .Select(submission => new { submission.Kind, submission.ScoringEventId })
-            .SingleOrDefaultAsync(ct);
-        if (kind is null)
+        if (!await ClaimAsync(submissionId, processingVersion, cancellationToken))
             return;
-        if (kind.ScoringEventId is not null)
-            return;
-        if (kind.Kind == SubmissionKind.Fix)
-        {
-            var verification = await verifyFixSubmission.ExecuteAsync(submissionId, DateTimeOffset.UtcNow, ct);
-            if (!verification.Succeeded && verification.Error == FixVerificationError.Concurrency)
-                return;
-        }
 
-        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-        var submission = await db.Submissions.Include(x => x.ScoringEvent)
-            .SingleOrDefaultAsync(x => x.Id == submissionId, ct);
-        if (submission is null || submission.ScoringEvent is not null) return;
-        if (submission.TeamId is not Guid teamId || submission.CompetitionChallengeId is not Guid competitionChallengeId) return;
-
-        var result = await EvaluateAsync(submission, ct);
-        var now = DateTimeOffset.UtcNow;
-        var scoringEvent = new ScoringEvent
-        {
-            Id = Guid.CreateVersion7(now), CompetitionId = submission.CompetitionId, TeamId = teamId,
-            CompetitionChallengeId = competitionChallengeId,
-            SubmissionId = submission.Id, Kind = ScoringEventKind.SubmissionEvaluation,
-            Result = result.Result, FailureCode = result.FailureCode, OccurredAt = result.OccurredAt,
-            ProcessedAt = now, ProcessedWorkerId = Environment.MachineName, EvaluatorVersion = result.EvaluatorVersion, CreatedAt = now
-        };
-        db.ScoringEvents.Add(scoringEvent);
-        submission.ScoringEventId = scoringEvent.Id;
-        submission.ProcessingVersion++;
-        submission.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        await scheduler.EnqueueLeaderboardRefreshAsync(submission.CompetitionId, ct);
-        logger.LogInformation("Processed submission {SubmissionId} as {Result}", submissionId, result.Result);
+        var evaluation = await EvaluateAsync(submissionId, cancellationToken);
+        await CompleteAsync(submissionId, checked(processingVersion + 1), evaluation, cancellationToken);
     }
 
-    private async Task<ScoringEventDecision> EvaluateAsync(Submission submission, CancellationToken ct)
+    private async Task<bool> ClaimAsync(
+        Guid submissionId,
+        long expectedVersion,
+        CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        var submission = await db.Submissions.SingleOrDefaultAsync(
+            item => item.Id == submissionId, cancellationToken);
+        if (submission is null
+            || submission.EvaluationState != SubmissionEvaluationState.Queued
+            || submission.ProcessingVersion != expectedVersion)
+            return false;
+        submission.EvaluationState = SubmissionEvaluationState.Processing;
+        submission.ProcessingVersion = checked(submission.ProcessingVersion + 1);
+        submission.EvaluationFailureCode = null;
+        submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        db.ChangeTracker.Clear();
+        return true;
+    }
+
+    private async Task<Evaluation> EvaluateAsync(Guid submissionId, CancellationToken cancellationToken)
+    {
+        var submission = await db.Submissions.AsNoTracking()
+            .SingleAsync(item => item.Id == submissionId, cancellationToken);
         var configuration = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == submission.CompetitionId)
-            .Join(db.CompetitionChallenges.AsNoTracking(),
-                competition => submission.CompetitionChallengeId,
-                challenge => challenge.Id,
+            .Join(
+                db.CompetitionChallenges.AsNoTracking()
+                    .Where(challenge => challenge.Id == submission.CompetitionChallengeId),
+                competition => competition.Id,
+                challenge => challenge.CompetitionId,
                 (competition, challenge) => new
                 {
-                    competition.Mode,
-                    competition.StartTime,
-                    CompetitionJson = competition.ConfigurationJson,
-                    ChallengeJson = challenge.ConfigurationJson
+                    Competition = competition,
+                    CompetitionChallenge = challenge
                 })
-            .SingleAsync(ct);
+            .SingleAsync(cancellationToken);
         var rules = admissionModePolicy.GetRules(
-            configuration.Mode,
-            configuration.CompetitionJson,
-            configuration.ChallengeJson);
-        var maxAttempts = submission.Kind == SubmissionKind.Flag
+            configuration.Competition.Mode,
+            configuration.Competition.ConfigurationJson,
+            configuration.CompetitionChallenge.ConfigurationJson);
+        var maxAttempts = submission.Kind is SubmissionKind.Flag or SubmissionKind.Break
             ? rules.MaxFlagAttempts
             : rules.MaxFixAttempts;
         if (maxAttempts is > 0)
         {
             var acceptedIds = await db.Submissions.AsNoTracking()
-                .Where(candidate => candidate.CompetitionId == submission.CompetitionId
-                                    && candidate.TeamId == submission.TeamId
-                                    && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
-                                    && candidate.Kind == submission.Kind)
+                .Where(candidate =>
+                    candidate.CompetitionId == submission.CompetitionId
+                    && candidate.TeamId == submission.TeamId
+                    && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
+                    && candidate.Kind == submission.Kind
+                    && candidate.EvaluationState != SubmissionEvaluationState.PlatformFailed)
                 .OrderBy(candidate => candidate.ReceivedAt)
                 .ThenBy(candidate => candidate.Id)
                 .Select(candidate => candidate.Id)
-                .ToListAsync(ct);
-            var ordinal = acceptedIds.IndexOf(submission.Id) + 1;
-            if (ordinal > maxAttempts)
+                .ToListAsync(cancellationToken);
+            if (acceptedIds.IndexOf(submission.Id) + 1 > maxAttempts)
                 return new(
-                    ScoringEventKind.SubmissionEvaluation,
-                    ScoringResult.AttemptsExhausted,
-                    null,
-                    submission.ReceivedAt,
-                    "admission-v1");
+                    new(
+                        ScoringEventKind.SubmissionEvaluation,
+                        ScoringResult.AttemptsExhausted,
+                        null,
+                        submission.ReceivedAt,
+                        "attempt-limit-v2"),
+                    configuration.Competition.ConfigurationRevision,
+                    configuration.CompetitionChallenge.Revision);
         }
 
-        var prior = await db.ScoringEvents.Where(x => x.CompetitionId == submission.CompetitionId && x.SubmissionId != submission.Id).ToListAsync(ct);
+        var priorEvents = await db.ScoringEvents.AsNoTracking()
+            .Where(@event =>
+                @event.CompetitionId == submission.CompetitionId
+                && @event.SubmissionId != submission.Id)
+            .ToListAsync(cancellationToken);
         var priorSubmissions = await db.Submissions.AsNoTracking()
-            .Where(x => x.CompetitionId == submission.CompetitionId && x.Id != submission.Id)
-            .ToListAsync(ct);
-        var flagTeamId = configuration.Mode == GameMode.Awd
-            ? submission.SubjectTeamId ?? submission.VictimTeamId
-            : submission.TeamId;
-        var flags = await db.ChallengeFlags.Where(x => x.CompetitionId == submission.CompetitionId
-            && x.Status == NoCTF.Domain.Challenges.ChallengeFlagStatus.Active
-            && x.CompetitionChallengeId == submission.CompetitionChallengeId
-            && (x.TeamId == null || x.TeamId == flagTeamId)).ToListAsync(ct);
-        var fix = await db.FixSubmissionRecords.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id, ct);
-        return evaluatorCatalog.Get(configuration.Mode).Evaluate(new(
+            .Where(item => item.CompetitionId == submission.CompetitionId && item.Id != submission.Id)
+            .ToListAsync(cancellationToken);
+        var flags = await db.ChallengeFlags.AsNoTracking()
+            .Where(flag =>
+                flag.CompetitionChallengeId == submission.CompetitionChallengeId
+                || flag.ChallengeId == configuration.CompetitionChallenge.ChallengeId)
+            .Where(flag => flag.TeamId == null || flag.TeamId == submission.TeamId
+                || configuration.Competition.Mode == GameMode.Awd)
+            .ToListAsync(cancellationToken);
+        var patch = submission.PatchUploadId is { } patchUploadId
+            ? await db.PatchUploads.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == patchUploadId, cancellationToken)
+            : null;
+        var decision = evaluatorCatalog.Get(configuration.Competition.Mode).Evaluate(new(
             submission,
-            prior,
+            priorEvents,
             flags,
-            fix,
-            configuration.CompetitionJson,
-            configuration.ChallengeJson,
+            patch,
+            configuration.Competition.ConfigurationJson,
+            configuration.CompetitionChallenge.ConfigurationJson,
             priorSubmissions,
-            configuration.StartTime));
+            configuration.Competition.StartAt));
+        return new(
+            decision,
+            configuration.Competition.ConfigurationRevision,
+            configuration.CompetitionChallenge.Revision);
     }
+
+    private async Task CompleteAsync(
+        Guid submissionId,
+        long processingVersion,
+        Evaluation evaluation,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        var submission = await db.Submissions.SingleOrDefaultAsync(
+            item => item.Id == submissionId, cancellationToken);
+        if (submission is null
+            || submission.EvaluationState != SubmissionEvaluationState.Processing
+            || submission.ProcessingVersion != processingVersion)
+            return;
+
+        var now = DateTimeOffset.UtcNow;
+        if (evaluation.Decision.Result == ScoringResult.PlatformFailed)
+        {
+            submission.EvaluationState = SubmissionEvaluationState.PlatformFailed;
+            submission.EvaluationFailureCode =
+                evaluation.Decision.FailureCode ?? ScoringFailureCode.CheckerPlatformError;
+            submission.EvaluationUpdatedAt = now;
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
+
+        if (submission.CurrentScoringEventId is { } currentEventId)
+        {
+            var current = await db.ScoringEvents.IgnoreQueryFilters()
+                .SingleAsync(item => item.Id == currentEventId, cancellationToken);
+            current.DeletedAt = now;
+        }
+        var scoringEvent = new ScoringEvent
+        {
+            Id = Guid.CreateVersion7(now),
+            CompetitionId = submission.CompetitionId,
+            CompetitionChallengeId = submission.CompetitionChallengeId,
+            SubmissionId = submission.Id,
+            TeamId = submission.TeamId,
+            VictimTeamId = evaluation.Decision.VictimTeamId,
+            Kind = ScoringEventKind.SubmissionEvaluation,
+            Result = evaluation.Decision.Result,
+            FailureCode = evaluation.Decision.FailureCode,
+            SpecificationKind = evaluation.Decision.SpecificationKind,
+            SpecificationId = evaluation.Decision.SpecificationId,
+            ProcessingVersion = submission.ProcessingVersion,
+            CompetitionConfigurationRevision = evaluation.CompetitionRevision,
+            CompetitionChallengeRevision = evaluation.CompetitionChallengeRevision,
+            OccurredAt = evaluation.Decision.OccurredAt,
+            CreatedAt = now
+        };
+        db.ScoringEvents.Add(scoringEvent);
+        submission.CurrentScoringEventId = scoringEvent.Id;
+        submission.EvaluationState = SubmissionEvaluationState.Completed;
+        submission.EvaluationFailureCode = null;
+        submission.EvaluationUpdatedAt = now;
+        var competition = await db.Competitions.SingleAsync(
+            item => item.Id == submission.CompetitionId, cancellationToken);
+        competition.LeaderboardRevision = checked(competition.LeaderboardRevision + 1);
+        await outbox.PublishAsync(new ProjectLeaderboard(submission.CompetitionId));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private sealed record Evaluation(
+        ScoringEventDecision Decision,
+        int CompetitionRevision,
+        int CompetitionChallengeRevision);
 }

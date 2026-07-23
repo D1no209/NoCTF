@@ -10,7 +10,9 @@ public class CompetitionLifecyclePolicyTests
     {
         var valid = new[]
         {
-            (CompetitionStatus.Draft, CompetitionStatus.Published),
+            (CompetitionStatus.Draft, CompetitionStatus.Visible),
+            (CompetitionStatus.Visible, CompetitionStatus.Published),
+            (CompetitionStatus.Published, CompetitionStatus.Visible),
             (CompetitionStatus.Published, CompetitionStatus.Running),
             (CompetitionStatus.Running, CompetitionStatus.Paused),
             (CompetitionStatus.Paused, CompetitionStatus.Running),

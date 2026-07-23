@@ -11,7 +11,7 @@ public sealed class TransferTeamCaptainRequest { public Guid NewCaptainId { get;
 public sealed class TransferTeamCaptainEndpoint(TransferTeamCaptain transfer, IUserContext user)
     : Endpoint<TransferTeamCaptainRequest, Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
-    public override void Configure() { Post("/competitions/{competitionId}/teams/{teamId}/captain"); AuthSchemes("Bearer"); }
+    public override void Configure() { Post("/competitions/{competitionId}/teams/{teamId}/captain/transfer"); AuthSchemes("Bearer"); }
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(TransferTeamCaptainRequest request, CancellationToken ct)
     {
         var result = await transfer.ExecuteAsync(Route<Guid>("competitionId"), Route<Guid>("teamId"), user.UserId, request.NewCaptainId, ct);

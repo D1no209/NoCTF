@@ -23,7 +23,18 @@ public sealed class RedisLeaderboardCache(
     {
         if (redis is null) return null;
         var payload = await redis.GetDatabase().StringGetAsync(Key(competitionId));
-        return payload.IsNullOrEmpty ? null : JsonSerializer.Deserialize<LeaderboardResponse>(payload.ToString(), JsonOptions);
+        if (payload.IsNullOrEmpty)
+            return null;
+        var snapshot = JsonSerializer.Deserialize<LeaderboardResponse>(payload.ToString(), JsonOptions);
+        if (snapshot is null)
+            return null;
+        var status = await GetStatusAsync(competitionId, ct);
+        return snapshot with
+        {
+            TargetRevision = status.TargetRevision,
+            Stale = snapshot.SnapshotRevision < status.TargetRevision,
+            LastFailureAt = status.LastFailureAt
+        };
     }
 
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
@@ -31,8 +42,10 @@ public sealed class RedisLeaderboardCache(
         if (redis is null) return;
         var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == competitionId, ct);
         if (competition is null) return;
+        try
+        {
         var teams = await db.Teams.AsNoTracking().Where(x => x.CompetitionId == competitionId)
-            .Select(x => new LeaderboardTeamFact(x.Id, x.Name, x.Ban.IsBanned, x.Deletion.IsDeleted)).ToListAsync(ct);
+            .Select(x => new LeaderboardTeamFact(x.Id, x.Name, x.IsBanned, x.DeletedAt != null)).ToListAsync(ct);
         var challenges = await db.CompetitionChallenges.AsNoTracking()
             .Where(instance => instance.CompetitionId == competitionId)
             .Join(db.Challenges.AsNoTracking(), instance => instance.ChallengeId, template => template.Id,
@@ -40,27 +53,63 @@ public sealed class RedisLeaderboardCache(
             .Select(item => new LeaderboardChallengeFact(
                 item.Instance.Id,
                 item.Template.Direction,
-                item.Instance.Deletion.IsDeleted || item.Template.Deletion.IsDeleted,
+                item.Instance.DeletedAt != null || item.Template.DeletedAt != null,
                 item.Instance.ConfigurationJson))
             .ToListAsync(ct);
         var competitionConfiguration = competition.ConfigurationJson;
-        var submissions = await db.Submissions.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.ScoringEventId != null)
-            .Join(db.ScoringEvents.AsNoTracking(), s => s.ScoringEventId, e => e.Id, (s, e) => new LeaderboardSubmissionFact(
-                s.Id, s.TeamId!.Value, s.CompetitionChallengeId, s.Kind, s.ReceivedAt, e,
-                s.SubjectTeamId, s.VictimTeamId, s.ServiceId, s.ControlIntervalSeconds, s.StageId)).ToListAsync(ct);
+        var submissions = await db.Submissions.AsNoTracking()
+            .Where(x => x.CompetitionId == competitionId && x.CurrentScoringEventId != null)
+            .Join(db.ScoringEvents.AsNoTracking(), s => s.CurrentScoringEventId, e => (Guid?)e.Id,
+                (s, e) => new LeaderboardSubmissionFact(
+                    s.Id, s.TeamId, s.CompetitionChallengeId, s.Kind, s.ReceivedAt, e,
+                    null, e.VictimTeamId, null, null, null))
+            .ToListAsync(ct);
         var system = await db.ScoringEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.SubmissionId == null)
             .Select(x => new LeaderboardSystemFact(x)).ToListAsync(ct);
         var projection = projectionEngine.Project(
-            new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration, competition.StartTime));
+            new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration, competition.StartAt));
         var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, projection.Entries)
         {
             Subjects = projection.Subjects,
-            FirstBloods = projection.FirstBloods
+            FirstBloods = projection.FirstBloods,
+            SnapshotRevision = competition.LeaderboardRevision,
+            TargetRevision = competition.LeaderboardRevision,
+            Stale = false
         };
-        await redis.GetDatabase().StringSetAsync(Key(competitionId), JsonSerializer.Serialize(response, JsonOptions), ttl);
+        var database = redis.GetDatabase();
+        await database.StringSetAsync(Key(competitionId), JsonSerializer.Serialize(response, JsonOptions), ttl);
+        await database.KeyDeleteAsync(FailureKey(competitionId));
         await publisher.PublishAsync(competitionId, response.GeneratedAt, ct);
+        }
+        catch
+        {
+            await redis.GetDatabase().StringSetAsync(
+                FailureKey(competitionId),
+                DateTimeOffset.UtcNow.ToString("O"),
+                ttl);
+            throw;
+        }
     }
 
-    public Task InvalidateAsync(Guid competitionId, CancellationToken ct) => redis is null ? Task.CompletedTask : redis.GetDatabase().KeyDeleteAsync(Key(competitionId));
+    public Task InvalidateAsync(Guid competitionId, CancellationToken ct) => Task.CompletedTask;
+
+    public async Task<LeaderboardCacheStatus> GetStatusAsync(
+        Guid competitionId,
+        CancellationToken ct)
+    {
+        var targetRevision = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == competitionId)
+            .Select(competition => competition.LeaderboardRevision)
+            .SingleOrDefaultAsync(ct);
+        if (redis is null)
+            return new(targetRevision, null);
+        var failure = await redis.GetDatabase().StringGetAsync(FailureKey(competitionId));
+        return new(
+            targetRevision,
+            DateTimeOffset.TryParse(failure.ToString(), out var failedAt)
+                ? failedAt
+                : null);
+    }
     private static string Key(Guid competitionId) => $"leaderboard:{competitionId:N}";
+    private static string FailureKey(Guid competitionId) => $"leaderboard:{competitionId:N}:failure";
 }

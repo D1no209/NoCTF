@@ -1,5 +1,5 @@
 using NoCTF.Application.Common;
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 
@@ -41,7 +41,7 @@ public interface ICompetitionModerationAuthorizer
 }
 
 /// <summary>Applies a relational ban ruling and schedules an in-process reconstruction.</summary>
-public sealed class ModerateTeam(ITeamModerationStore store, ILeaderboardCache cache, IBackgroundWorkScheduler scheduler)
+public sealed class ModerateTeam(ITeamModerationStore store, ILeaderboardCache cache, IBackendMessagePublisher messages)
 {
     public async Task<OperationResult> ExecuteAsync(
         TeamModerationCommand command,
@@ -65,7 +65,7 @@ public sealed class ModerateTeam(ITeamModerationStore store, ILeaderboardCache c
         };
 
         await cache.InvalidateAsync(command.CompetitionId, cancellationToken);
-        await scheduler.EnqueueCompetitionRebuildAsync(command.CompetitionId, cancellationToken);
+        await messages.RebuildCompetitionAsync(command.CompetitionId, cancellationToken);
         return OperationResult.Success();
     }
 }

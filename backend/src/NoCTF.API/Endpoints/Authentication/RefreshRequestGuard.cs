@@ -8,9 +8,8 @@ public static class RefreshRequestGuard
         if (string.IsNullOrWhiteSpace(suppliedOrigin))
             suppliedOrigin = request.Headers.Referer.FirstOrDefault();
 
-        // Non-browser clients do not consistently send Origin or Referer. The refresh cookie is
-        // still HttpOnly and SameSite=Strict, so retain that supported client contract.
-        if (string.IsNullOrWhiteSpace(suppliedOrigin)) return true;
+        if (string.IsNullOrWhiteSpace(suppliedOrigin))
+            return false;
         if (!Uri.TryCreate(suppliedOrigin, UriKind.Absolute, out var supplied)) return false;
 
         var apiOrigin = new Uri($"{request.Scheme}://{request.Host}");

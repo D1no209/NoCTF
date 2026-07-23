@@ -14,15 +14,5 @@ public enum RuntimeProvider
 {
     Docker,
     Kubernetes,
-    Runner
-}
-
-public enum RuntimeOperationKind
-{
-    CreateContainer,
-    DestroyContainer,
-    ComposeUp,
-    ComposeDown,
-    ComposeStatus,
-    OneShot
+    Libvirt
 }

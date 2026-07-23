@@ -35,7 +35,7 @@ public class DependencyRulesTests
     [Test]
     public async Task GameModes_are_compile_time_catalog_entries()
     {
-        await Assert.That(GameModeCatalog.All).Count().IsEqualTo(5);
+        await Assert.That(GameModeCatalog.All).Count().IsEqualTo(4);
         await Assert.That(typeof(GameModeCatalog).Assembly.GetReferencedAssemblies().Select(reference => reference.Name))
             .DoesNotContain("Marten");
     }

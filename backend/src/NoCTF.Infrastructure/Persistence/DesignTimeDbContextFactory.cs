@@ -11,6 +11,7 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<NoC
             ?? "Host=localhost;Port=5432;Database=noctf;Username=postgres;Password=postgres";
         var options = new DbContextOptionsBuilder<NoCtfDbContext>()
             .UseNpgsql(connectionString)
+            .UseSnakeCaseNamingConvention()
             .Options;
         return new(options);
     }

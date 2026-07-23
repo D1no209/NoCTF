@@ -20,7 +20,9 @@ public static class CompetitionLifecyclePolicy
     public static OperationResult ValidateTransition(CompetitionStatus from, CompetitionStatus to) =>
         (from, to) switch
         {
-            (CompetitionStatus.Draft, CompetitionStatus.Published) => OperationResult.Success(),
+            (CompetitionStatus.Draft, CompetitionStatus.Visible) => OperationResult.Success(),
+            (CompetitionStatus.Visible, CompetitionStatus.Published) => OperationResult.Success(),
+            (CompetitionStatus.Published, CompetitionStatus.Visible) => OperationResult.Success(),
             (CompetitionStatus.Published, CompetitionStatus.Running) => OperationResult.Success(),
             (CompetitionStatus.Running, CompetitionStatus.Paused) => OperationResult.Success(),
             (CompetitionStatus.Paused, CompetitionStatus.Running) => OperationResult.Success(),

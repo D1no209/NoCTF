@@ -1,274 +1,151 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
-using NoCTF.Infrastructure.BackgroundWork;
-using DomainSubmissionKind = NoCTF.Domain.Submissions.SubmissionKind;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
-/// <summary>Accepts Submission facts atomically with idempotency and attempt-limit checks.</summary>
 public sealed class EfSubmissionIntakeStore(
     NoCtfDbContext db,
-    IBackgroundWorkScheduler scheduler,
-    IBackgroundWorkAdmissionGate admissionGate,
-    TimeProvider? configuredTimeProvider = null)
-    : ISubmissionIntakeStore
+    ITransactionalMessageOutbox outbox) : ISubmissionIntakeStore
 {
-    public async Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
+    public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
         Guid competitionId,
-        string idempotencyKey,
-        Guid teamId,
-        Guid challengeId,
+        Guid competitionChallengeId,
         Guid userId,
-        DomainSubmissionKind kind,
-        AwdAttackTarget? attackTarget,
-        Guid? stageId,
-        Guid? challengeInstanceId,
-        FlagFingerprint? flagFingerprint,
-        CancellationToken ct)
-    {
-        if (!admissionGate.IsAccepting)
-            return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
-
-        var existing = await db.Submissions.AsNoTracking().SingleOrDefaultAsync(
-            submission => submission.CompetitionId == competitionId
-                          && submission.IdempotencyKey == idempotencyKey,
-            ct);
-        if (existing is null)
-            return null;
-        if (!Matches(existing, teamId, challengeId, userId, kind, attackTarget, stageId, challengeInstanceId, flagFingerprint))
-            return new(SubmissionAcceptanceState.IdempotencyConflict);
-
-        if (existing.ScoringEventId is null)
-        {
-            using var admission = admissionGate.TryEnter();
-            if (admission is null)
-                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
-            using var enqueueCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, admission.DrainCancellation);
-            try
-            {
-                await scheduler.EnqueueSubmissionAsync(existing.Id, enqueueCancellation.Token);
-            }
-            catch (BackgroundWorkUnavailableException)
-            {
-                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
-            }
-            catch (OperationCanceledException) when (admission.DrainCancellation.IsCancellationRequested)
-            {
-                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
-            }
-        }
-
-        return new(SubmissionAcceptanceState.Existing, existing.Id, existing.ReceivedAt);
-    }
-
-    public async Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
-        Guid competitionId,
-        Guid teamId,
-        Guid challengeId,
-        Guid userId,
-        CancellationToken ct)
-        => await SubmissionAdmissionPersistence.LoadAsync(
-            db, competitionId, teamId, challengeId, userId,
-            (configuredTimeProvider ?? TimeProvider.System).GetUtcNow(), ct);
+        CancellationToken cancellationToken) =>
+        SubmissionAdmissionPersistence.LoadAsync(
+            db, competitionId, competitionChallengeId, userId, cancellationToken);
 
     public async Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
         FlagSubmissionReceived received,
         SubmissionAdmissionSnapshot snapshot,
         int? maxAttempts,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
-        using var admission = admissionGate.TryEnter();
-        if (admission is null)
-            return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
+        var results = await TryAcceptFlagsAsync(
+            [received], snapshot, maxAttempts, cancellationToken);
+        return results[0];
+    }
 
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, received.CompetitionId, ct);
-        if (status != CompetitionStatus.Running)
-            return new(SubmissionAcceptanceState.SnapshotChanged);
-
-        var existing = await FindAcceptedAsync(
-            received.CompetitionId, received.IdempotencyKey, received.TeamId, received.CompetitionChallengeId,
-            received.UserId, DomainSubmissionKind.Flag, received.AttackTarget, received.StageId,
-            received.ChallengeInstanceId, received.FlagFingerprint, ct);
-        if (existing is not null)
-            return existing;
-
+    public async Task<IReadOnlyList<SubmissionAcceptanceResult>> TryAcceptFlagsAsync(
+        IReadOnlyList<FlagSubmissionReceived> received,
+        SubmissionAdmissionSnapshot snapshot,
+        int? maxAttempts,
+        CancellationToken cancellationToken)
+    {
+        if (received.Count == 0)
+            return [];
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        await AcquireAttemptLockAsync(
+            received[0].TeamId,
+            received[0].CompetitionChallengeId,
+            received[0].Kind,
+            cancellationToken);
         var current = await LoadAdmissionAsync(
-            received.CompetitionId, received.TeamId, received.CompetitionChallengeId, received.UserId, ct);
-        if (!SubmissionAdmissionPersistence.Matches(snapshot, current))
-            return new(SubmissionAcceptanceState.SnapshotChanged);
-        if (maxAttempts is > 0 && current!.AcceptedFlagAttempts >= maxAttempts)
-            return new(SubmissionAcceptanceState.AttemptsExhausted);
+            received[0].CompetitionId,
+            received[0].CompetitionChallengeId,
+            received[0].UserId,
+            cancellationToken);
+        if (!SubmissionAdmissionPersistence.Matches(snapshot, current)
+            || current!.CompetitionStatus != CompetitionStatus.Running)
+            return received.Select(_ => new SubmissionAcceptanceResult(
+                SubmissionAcceptanceState.SnapshotChanged)).ToArray();
+        if (maxAttempts is > 0
+            && checked(current.AcceptedFlagAttempts + received.Count) > maxAttempts)
+            return received.Select(_ => new SubmissionAcceptanceResult(
+                SubmissionAcceptanceState.AttemptsExhausted)).ToArray();
 
-        var entity = new Submission
+        var entities = received.Select(item => new Submission
         {
-            Id = received.SubmissionId,
-            CompetitionId = received.CompetitionId,
-            TeamId = received.TeamId,
-            CompetitionChallengeId = received.CompetitionChallengeId,
-            UserId = received.UserId,
-            Kind = DomainSubmissionKind.Flag,
-            FlagHash = received.FlagFingerprint.Sha256,
-            FlagLength = received.FlagFingerprint.Length,
-            SubjectTeamId = received.AttackTarget?.TeamId,
-            VictimTeamId = received.AttackTarget?.TeamId,
-            ServiceId = received.AttackTarget?.ServiceId,
-            StageId = received.StageId,
-            ChallengeInstanceId = received.ChallengeInstanceId,
-            IdempotencyKey = received.IdempotencyKey,
-            ReceivedAt = received.ReceivedAt,
-            CreatedAt = received.ReceivedAt,
-            UpdatedAt = received.ReceivedAt
-        };
-        db.Submissions.Add(entity);
-        var result = await SaveAsync(entity, transaction, received.IdempotencyKey, received.TeamId,
-            received.CompetitionChallengeId, received.UserId, DomainSubmissionKind.Flag, ct);
-        if (result.State == SubmissionAcceptanceState.Created)
-        {
-            using var enqueueCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, admission.DrainCancellation);
-            try { await scheduler.EnqueueSubmissionAsync(entity.Id, enqueueCancellation.Token); }
-            catch (BackgroundWorkUnavailableException) { return new(SubmissionAcceptanceState.BackgroundWorkUnavailable); }
-            catch (OperationCanceledException) when (admission.DrainCancellation.IsCancellationRequested)
-            {
-                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
-            }
-        }
-        return result;
+            Id = item.SubmissionId,
+            CompetitionId = item.CompetitionId,
+            CompetitionChallengeId = item.CompetitionChallengeId,
+            TeamId = item.TeamId,
+            SubmittedByUserId = item.UserId,
+            Kind = item.Kind,
+            SubmittedFlag = item.SubmittedFlag,
+            SubmittedFlagSha256 = item.SubmittedFlagSha256,
+            ReceivedAt = item.ReceivedAt,
+            EvaluationState = SubmissionEvaluationState.Queued,
+            EvaluationUpdatedAt = item.ReceivedAt,
+            ProcessingVersion = 0
+        }).ToArray();
+        db.Submissions.AddRange(entities);
+        foreach (var entity in entities)
+            await outbox.PublishAsync(new EvaluateSubmission(entity.Id, entity.ProcessingVersion));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+        return entities.Select(entity => new SubmissionAcceptanceResult(
+            SubmissionAcceptanceState.Created,
+            entity.Id,
+            entity.ReceivedAt)).ToArray();
     }
 
     public async Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
         FixSubmissionReceived received,
         SubmissionAdmissionSnapshot snapshot,
         int? maxAttempts,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
-        using var admission = admissionGate.TryEnter();
-        if (admission is null)
-            return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
-
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, received.CompetitionId, ct);
-        if (status != CompetitionStatus.Running)
-            return new(SubmissionAcceptanceState.SnapshotChanged);
-
-        var existing = await FindAcceptedAsync(
-            received.CompetitionId, received.IdempotencyKey, received.TeamId, received.CompetitionChallengeId,
-            received.UserId, DomainSubmissionKind.Fix, null, null, null, null, ct);
-        if (existing is not null)
-            return existing;
-
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        await AcquireAttemptLockAsync(
+            received.TeamId, received.CompetitionChallengeId, SubmissionKind.Fix, cancellationToken);
         var current = await LoadAdmissionAsync(
-            received.CompetitionId, received.TeamId, received.CompetitionChallengeId, received.UserId, ct);
-        if (!SubmissionAdmissionPersistence.Matches(snapshot, current))
+            received.CompetitionId, received.CompetitionChallengeId, received.UserId, cancellationToken);
+        if (!SubmissionAdmissionPersistence.Matches(snapshot, current)
+            || current!.CompetitionStatus != CompetitionStatus.Running)
             return new(SubmissionAcceptanceState.SnapshotChanged);
-        if (maxAttempts is > 0 && current!.AcceptedFixAttempts >= maxAttempts)
+        if (maxAttempts is > 0 && current.AcceptedFixAttempts >= maxAttempts)
             return new(SubmissionAcceptanceState.AttemptsExhausted);
 
-        var record = await db.FixSubmissionRecords.SingleOrDefaultAsync(
-            item => item.UploadId == received.UploadId
-                    && item.VerificationStatus == FixVerificationStatus.Created,
-            ct);
-        if (record is null || record.SubmissionId is not null || record.ExpiresAt <= received.ReceivedAt
-            || record.CompetitionId != received.CompetitionId || record.TeamId != received.TeamId
-            || record.CompetitionChallengeId != received.CompetitionChallengeId)
-            return new(SubmissionAcceptanceState.UploadUnavailable);
+        var patch = await db.PatchUploads.SingleOrDefaultAsync(
+            upload => upload.Id == received.PatchUploadId
+                && upload.CompetitionId == received.CompetitionId
+                && upload.CompetitionChallengeId == received.CompetitionChallengeId
+                && upload.TeamId == received.TeamId
+                && upload.ConsumedAt == null
+                && upload.SubmissionId == null,
+            cancellationToken);
+        if (patch is null)
+            return new(SubmissionAcceptanceState.PatchUploadUnavailable);
 
         var entity = new Submission
         {
             Id = received.SubmissionId,
             CompetitionId = received.CompetitionId,
-            TeamId = received.TeamId,
             CompetitionChallengeId = received.CompetitionChallengeId,
-            UserId = received.UserId,
-            Kind = DomainSubmissionKind.Fix,
-            IdempotencyKey = received.IdempotencyKey,
+            TeamId = received.TeamId,
+            SubmittedByUserId = received.UserId,
+            Kind = SubmissionKind.Fix,
+            PatchUploadId = patch.Id,
             ReceivedAt = received.ReceivedAt,
-            CreatedAt = received.ReceivedAt,
-            UpdatedAt = received.ReceivedAt
+            EvaluationState = SubmissionEvaluationState.Queued,
+            EvaluationUpdatedAt = received.ReceivedAt,
+            ProcessingVersion = 0
         };
-        record.SubmissionId = entity.Id;
-        record.ClaimedAt = received.ReceivedAt;
-        record.VerificationStatus = FixVerificationStatus.Claimed;
-        record.UpdatedAt = received.ReceivedAt;
+        patch.ConsumedAt = received.ReceivedAt;
+        patch.SubmissionId = entity.Id;
         db.Submissions.Add(entity);
-
-        var result = await SaveAsync(entity, transaction, received.IdempotencyKey, received.TeamId,
-            received.CompetitionChallengeId, received.UserId, DomainSubmissionKind.Fix, ct);
-        if (result.State == SubmissionAcceptanceState.Created)
-        {
-            using var enqueueCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, admission.DrainCancellation);
-            try { await scheduler.EnqueueSubmissionAsync(entity.Id, enqueueCancellation.Token); }
-            catch (BackgroundWorkUnavailableException) { return new(SubmissionAcceptanceState.BackgroundWorkUnavailable); }
-            catch (OperationCanceledException) when (admission.DrainCancellation.IsCancellationRequested)
-            {
-                return new(SubmissionAcceptanceState.BackgroundWorkUnavailable);
-            }
-        }
-        return result;
+        await outbox.PublishAsync(new EvaluateSubmission(entity.Id, entity.ProcessingVersion));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(SubmissionAcceptanceState.Created, entity.Id, entity.ReceivedAt);
     }
 
-    private async Task<SubmissionAcceptanceResult> SaveAsync(
-        Submission entity,
-        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
-        string idempotencyKey,
+    private Task AcquireAttemptLockAsync(
         Guid teamId,
-        Guid challengeId,
-        Guid userId,
-        DomainSubmissionKind kind,
-        CancellationToken ct)
-    {
-        try
-        {
-            await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            return new(SubmissionAcceptanceState.Created, entity.Id, entity.ReceivedAt);
-        }
-        catch (DbUpdateException)
-        {
-            await transaction.RollbackAsync(ct);
-            db.ChangeTracker.Clear();
-            var attackTarget = entity.SubjectTeamId is { } target && entity.ServiceId is { } service
-                ? new AwdAttackTarget(target, service)
-                : null;
-            return await FindAcceptedAsync(
-                    entity.CompetitionId, idempotencyKey, teamId, challengeId, userId, kind, attackTarget,
-                    entity.StageId,
-                    entity.ChallengeInstanceId,
-                    entity.FlagHash is not null && entity.FlagLength is { } length
-                        ? new FlagFingerprint(entity.FlagHash, length)
-                        : null,
-                    ct)
-                ?? new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged);
-        }
-    }
-
-    private static bool Matches(
-        Submission submission,
-        Guid teamId,
-        Guid challengeId,
-        Guid userId,
-        DomainSubmissionKind kind,
-        AwdAttackTarget? attackTarget,
-        Guid? stageId,
-        Guid? challengeInstanceId,
-        FlagFingerprint? flagFingerprint) =>
-        submission.TeamId == teamId
-        && submission.CompetitionChallengeId == challengeId
-        && submission.UserId == userId
-        && submission.Kind == kind
-        && submission.SubjectTeamId == attackTarget?.TeamId
-        && submission.VictimTeamId == attackTarget?.TeamId
-        && submission.ServiceId == attackTarget?.ServiceId
-        && submission.StageId == stageId
-        && submission.ChallengeInstanceId == challengeInstanceId
-        && (flagFingerprint is null
-            ? submission.FlagHash is null
-            : submission.FlagHash == flagFingerprint.Value.Sha256
-              && submission.FlagLength == flagFingerprint.Value.Length);
-
+        Guid competitionChallengeId,
+        SubmissionKind kind,
+        CancellationToken cancellationToken) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({'s' + teamId.ToString("N") + competitionChallengeId.ToString("N") + ((short)kind).ToString()}, 0))",
+            cancellationToken);
 }

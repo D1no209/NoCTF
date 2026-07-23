@@ -4,6 +4,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.Application.Authentication.Login;
 using NoCTF.Application.Authentication.RefreshJwt;
+using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Submissions.PatchUploads;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Infrastructure;
 using NoCTF.API.OpenApi;
@@ -12,7 +14,7 @@ using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Notifications;
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.API.SignalR.Publishing;
 using NSwag;
@@ -59,12 +61,21 @@ public static class ServiceRegistration
             services.AddScoped<SubmitFix>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
+            services.AddScoped<RegisterUser>();
+            services.AddScoped<GetCurrentUser>();
+            services.AddScoped<ChangePassword>();
+            services.AddScoped<LogoutAll>();
+            services.AddScoped<IEmailVerificationStore, SwaggerEmailVerificationStore>();
+            services.AddScoped<ResendEmailVerification>();
+            services.AddScoped<VerifyEmail>();
             services.AddScoped<ModerateTeam>();
-            services.AddScoped<CreateFixUpload>();
         }
         else
         {
             services.AddScoped<ISubmissionIntakeStore, SwaggerSubmissionStore>();
+            services.AddScoped<IPatchUploadStore, SwaggerPatchUploadStore>();
+            services.AddScoped<CreatePatchUpload>();
+            services.AddScoped<IFixArchiveReader, SwaggerFixArchiveReader>();
             services.AddScoped<ISubmissionStatusReader, SwaggerStatusReader>();
             services.AddScoped<IUserAuthenticationStore, SwaggerAuthenticationStore>();
             services.AddScoped<IAccessTokenVersionReader, SwaggerAccessTokenVersionReader>();
@@ -75,17 +86,16 @@ public static class ServiceRegistration
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
             services.AddScoped<ModerateTeam>();
-            services.AddScoped<CreateFixUpload>();
             services.AddScoped<ITeamModerationStore, SwaggerModerationStore>();
             services.AddScoped<ICompetitionModerationAuthorizer, SwaggerModerationAuthorizer>();
-            services.AddSingleton<IBackgroundWorkScheduler, SwaggerBackgroundWorkScheduler>();
+            services.AddSingleton<IBackendMessagePublisher, SwaggerBackendMessagePublisher>();
             services.AddScoped<ILeaderboardCache, SwaggerLeaderboardCache>();
-            services.AddScoped<IFixUploadSessionStore, SwaggerFixUploadStore>();
             services.AddSingleton<IObjectStorage, SwaggerObjectStorage>();
         }
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
         services.AddScoped<ISubmissionResultPublisher, SignalRSubmissionResultPublisher>();
+        services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
         services.AddScoped<ILeaderboardRefreshPublisher, SignalRLeaderboardRefreshPublisher>();
         services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
         if (includeInfrastructure

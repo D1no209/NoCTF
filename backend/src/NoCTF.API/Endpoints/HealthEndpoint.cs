@@ -10,6 +10,7 @@ public sealed class HealthEndpoint : EndpointWithoutRequest<Ok<HealthResponse>>
     public override void Configure()
     {
         Get("/health");
+        RoutePrefixOverride(string.Empty);
         AllowAnonymous();
     }
 

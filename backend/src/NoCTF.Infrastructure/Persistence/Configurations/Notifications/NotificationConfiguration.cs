@@ -10,7 +10,14 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
     {
         builder.ToTable("notifications");
         builder.HasKey(notification => notification.Id);
-        builder.Property(notification => notification.DataJson).HasColumnType("jsonb");
-        builder.HasIndex(notification => new { notification.UserId, notification.IsRead, notification.CreatedAt });
+        builder.Property(notification => notification.Kind).HasConversion<short>();
+        builder.Property(notification => notification.PayloadJson).HasColumnType("jsonb");
+        builder.HasIndex(notification => new { notification.UserId, notification.CreatedAt, notification.Id });
+        builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
+            .HasForeignKey(notification => notification.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<NoCTF.Domain.Competitions.Competition>().WithMany()
+            .HasForeignKey(notification => notification.CompetitionId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

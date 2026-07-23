@@ -6,14 +6,18 @@
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
     <ProjectReference Include="../NoCTF.GameModes/NoCTF.GameModes.csproj" />
-    <ProjectReference Include="../NoCTF.Integrations.QQBot/NoCTF.Integrations.QQBot.csproj" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="AWSSDK.S3" />
+    <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
+    <PackageReference Include="WolverineFx.Postgresql" />
   </ItemGroup>
 </Project>

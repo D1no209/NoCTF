@@ -43,6 +43,17 @@ public sealed class RefreshAccessTokenTests
 
         public Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) =>
             Task.FromResult<AuthenticatedUser?>(user.Id == userId ? user : null);
+
+        public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken) =>
+            Task.FromResult<UserProfile?>(null);
+        public Task<CreateUserState> CreateAsync(Guid userId, string userName, string email,
+            string password, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(CreateUserState.Created);
+        public Task<bool> ChangePasswordAsync(Guid userId, string currentPassword,
+            string newPassword, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+        public Task<bool> IncrementTokenVersionAsync(Guid userId, DateTimeOffset now,
+            CancellationToken cancellationToken) => Task.FromResult(false);
     }
 
     private sealed class Issuer(RefreshTokenPrincipal? principal) : IAccessTokenIssuer

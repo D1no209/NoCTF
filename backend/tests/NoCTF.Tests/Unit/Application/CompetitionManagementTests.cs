@@ -37,14 +37,14 @@ public class CompetitionManagementTests
     [Test]
     [Arguments(CompetitionStatus.Running)]
     [Arguments(CompetitionStatus.Paused)]
-    public async Task UpdateCompetition_ActiveCompetitionLocksScheduleAndRegistrationRules(CompetitionStatus status)
+    public async Task UpdateCompetition_ActiveCompetitionAllowsConfigurationChanges(CompetitionStatus status)
     {
         var now = DateTimeOffset.UtcNow;
         var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), status, true, 5, Guid.NewGuid()) };
         var result = await new UpdateCompetition(store).ExecuteAsync(new(store.Last.Id, "CTF", null,
             now, now.AddHours(3), true, 5, Guid.NewGuid(), now));
 
-        await Assert.That(result.ErrorCode).IsEqualTo("active_configuration_locked");
+        await Assert.That(result.Succeeded).IsTrue();
     }
 
     [Test]
@@ -61,7 +61,7 @@ public class CompetitionManagementTests
     }
 
     [Test]
-    public async Task CompetitionManagementPolicy_RunningLocksEveryOperationalField()
+    public async Task CompetitionManagementPolicy_AllowsOperationalFieldsWhileRunning()
     {
         var now = DateTimeOffset.UtcNow;
         var current = new CompetitionView(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now,
@@ -78,12 +78,12 @@ public class CompetitionManagementTests
         ];
 
         foreach (var mutation in mutations)
-            await Assert.That(CompetitionManagementPolicy.ValidateUpdate(current, mutation).ErrorCode)
-                .IsEqualTo("active_configuration_locked");
+            await Assert.That(CompetitionManagementPolicy.ValidateUpdate(current, mutation).Succeeded)
+                .IsTrue();
     }
 
     [Test]
-    public async Task FinishedCompetition_RejectsUpdateAndDelete()
+    public async Task FinishedCompetition_AllowsUpdateButRejectsDelete()
     {
         var now = DateTimeOffset.UtcNow;
         var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), CompetitionStatus.Finished, true, 5, Guid.NewGuid()) };
@@ -92,7 +92,7 @@ public class CompetitionManagementTests
             store.Last.StartTime, store.Last.EndTime, true, 5, Guid.NewGuid(), now));
         var delete = await new DeleteCompetition(store).ExecuteAsync(store.Last.Id, Guid.NewGuid(), now);
 
-        await Assert.That(update.ErrorCode).IsEqualTo("competition_finished");
+        await Assert.That(update.Succeeded).IsTrue();
         await Assert.That(delete.ErrorCode).IsEqualTo("competition_finished");
     }
 

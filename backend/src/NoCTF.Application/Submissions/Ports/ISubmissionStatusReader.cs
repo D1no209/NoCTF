@@ -8,13 +8,18 @@ public sealed record SubmissionStatusView(
     Guid TeamId,
     Guid CompetitionChallengeId,
     SubmissionKind Kind,
+    SubmissionEvaluationState EvaluationState,
     ScoringResult? Result,
-    DateTimeOffset ReceivedAt,
-    DateTimeOffset? CompletedAt,
     ScoringFailureCode? FailureCode,
-    string? EvaluatorVersion);
+    DateTimeOffset ReceivedAt,
+    DateTimeOffset EvaluationUpdatedAt,
+    long ProcessingVersion);
 
 public interface ISubmissionStatusReader
 {
-    Task<SubmissionStatusView?> FindAsync(Guid competitionId, Guid submissionId, Guid userId, CancellationToken cancellationToken);
+    Task<SubmissionStatusView?> FindAsync(
+        Guid competitionId,
+        Guid submissionId,
+        Guid userId,
+        CancellationToken cancellationToken);
 }

@@ -1,4 +1,4 @@
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
@@ -13,7 +13,7 @@ public sealed class CompetitionConfigurationUpdateTests
         var store = new Store(CompetitionStatus.Running);
         var dependencies = new CacheAndScheduler();
         var useCase = new UpdateCompetitionConfiguration(
-            store, new Validator(), new ChangePolicy(true), dependencies, dependencies);
+            store, new Validator(), dependencies, dependencies);
 
         var result = await useCase.ExecuteAsync(store.CompetitionId, 1, "{\"value\":2}", DateTimeOffset.UtcNow);
 
@@ -24,31 +24,31 @@ public sealed class CompetitionConfigurationUpdateTests
     }
 
     [Test]
-    public async Task Running_destructive_change_is_rejected_before_store()
+    public async Task Running_destructive_change_is_allowed()
     {
         var store = new Store(CompetitionStatus.Running);
         var dependencies = new CacheAndScheduler();
         var useCase = new UpdateCompetitionConfiguration(
-            store, new Validator(), new ChangePolicy(false), dependencies, dependencies);
+            store, new Validator(), dependencies, dependencies);
 
         var result = await useCase.ExecuteAsync(store.CompetitionId, 1, "{\"value\":2}", DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("configuration_locked");
-        await Assert.That(store.UpdateCalls).IsEqualTo(0);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.UpdateCalls).IsEqualTo(1);
     }
 
     [Test]
-    public async Task Paused_change_remains_locked_even_when_non_destructive()
+    public async Task Paused_change_is_allowed()
     {
         var store = new Store(CompetitionStatus.Paused);
         var dependencies = new CacheAndScheduler();
         var useCase = new UpdateCompetitionConfiguration(
-            store, new Validator(), new ChangePolicy(true), dependencies, dependencies);
+            store, new Validator(), dependencies, dependencies);
 
         var result = await useCase.ExecuteAsync(store.CompetitionId, 1, "{\"value\":2}", DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("configuration_locked");
-        await Assert.That(store.UpdateCalls).IsEqualTo(0);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.UpdateCalls).IsEqualTo(1);
     }
 
     private sealed class Store(CompetitionStatus status) : ICompetitionConfigurationStore
@@ -81,12 +81,7 @@ public sealed class CompetitionConfigurationUpdateTests
         public IReadOnlyList<string> Validate(GameMode mode, string json) => [];
     }
 
-    private sealed class ChangePolicy(bool allowed) : ICompetitionConfigurationChangePolicy
-    {
-        public bool IsNonDestructive(GameMode mode, string currentJson, string proposedJson) => allowed;
-    }
-
-    private sealed class CacheAndScheduler : ILeaderboardCache, IBackgroundWorkScheduler
+    private sealed class CacheAndScheduler : ILeaderboardCache, IBackendMessagePublisher
     {
         public int Invalidated { get; private set; }
         public int Rebuilt { get; private set; }
@@ -98,13 +93,11 @@ public sealed class CompetitionConfigurationUpdateTests
             Invalidated++;
             return Task.CompletedTask;
         }
-        public ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken)
+        public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken)
         {
             Rebuilt++;
             return ValueTask.CompletedTask;
         }
-        public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 }
