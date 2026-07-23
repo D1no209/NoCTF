@@ -1,17 +1,22 @@
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.Messaging;
 
 public sealed record AdvanceAwdRound(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
-    int Round,
+    DateTimeOffset At,
+    int CompetitionConfigurationRevision,
     long ProcessingVersion);
 
 public sealed record GenerateAwdFlags(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
-    int Round,
+    AwdRoundSpecificationId Round,
+    DateTimeOffset ValidStart,
+    DateTimeOffset ValidUntil,
+    int CompetitionConfigurationRevision,
     long ProcessingVersion);
 
 public sealed record InjectAwdFlag(
@@ -22,7 +27,17 @@ public sealed record InjectAwdFlag(
     long ProcessingVersion,
     DateTimeOffset ValidUntil,
     string RunnerPool,
-    string RunnerId) : IRunnerNodeMessage;
+    string RunnerId,
+    int FailedAttempts = 0) : IRunnerNodeMessage;
+
+public sealed record AwdFlagInjectionFailed(
+    Guid CompetitionId,
+    Guid CompetitionChallengeId,
+    Guid RuntimeInstanceId,
+    Guid ChallengeFlagId,
+    int Generation,
+    long ProcessingVersion,
+    DateTimeOffset OccurredAt);
 
 public sealed record RunAwdChecker(
     Guid RuntimeInstanceId,

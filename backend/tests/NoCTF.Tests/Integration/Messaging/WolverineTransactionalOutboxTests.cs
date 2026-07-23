@@ -6,6 +6,11 @@ using NoCTF.Application.Messaging;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Platform;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Teams;
+using NoCTF.Domain.Runtime;
+using NoCTF.Application.Competitions.Awd;
+using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
@@ -298,6 +303,139 @@ public sealed class WolverineTransactionalOutboxTests
         });
     }
 
+    [Test]
+    [Timeout(300_000)]
+    public async Task Awd_round_fact_node_injection_and_replay_share_real_wolverine_durability(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            using var host = BuildHost(postgres.GetConnectionString());
+            var now = DateTimeOffset.UtcNow;
+            Guid competitionId;
+            Guid competitionChallengeId;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+                await db.Database.MigrateAsync(cancellationToken);
+                var ownerId = Guid.CreateVersion7();
+                competitionId = Guid.CreateVersion7();
+                var challengeId = Guid.CreateVersion7();
+                competitionChallengeId = Guid.CreateVersion7();
+                var teamId = Guid.CreateVersion7();
+                db.Users.Add(new User
+                {
+                    Id = ownerId,
+                    UserName = "awd-outbox-owner",
+                    NormalizedUserName = "AWD-OUTBOX-OWNER",
+                    Email = "awd-outbox@example.test",
+                    NormalizedEmail = "AWD-OUTBOX@EXAMPLE.TEST",
+                    PasswordHash = "test",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                db.Competitions.Add(new Competition
+                {
+                    Id = competitionId,
+                    Title = "AWD outbox",
+                    OwnerId = ownerId,
+                    Mode = GameMode.Awd,
+                    Status = CompetitionStatus.Running,
+                    ConfigurationJson = System.Text.Json.JsonSerializer.Serialize(
+                        AwdConfiguration.Default with
+                        {
+                            HardeningDurationSeconds = 0,
+                            RoundDurationSeconds = 300
+                        },
+                        new System.Text.Json.JsonSerializerOptions(
+                            System.Text.Json.JsonSerializerDefaults.Web)),
+                    RunningSince = now.AddMinutes(-1),
+                    StartAt = now.AddHours(-1),
+                    EndAt = now.AddHours(1),
+                    FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    ConfigurationUpdatedAt = now
+                });
+                db.Challenges.Add(new Challenge
+                {
+                    Id = challengeId,
+                    OwnerId = ownerId,
+                    Title = "AWD outbox challenge",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                db.CompetitionChallenges.Add(new CompetitionChallenge
+                {
+                    Id = competitionChallengeId,
+                    CompetitionId = competitionId,
+                    ChallengeId = challengeId,
+                    IsPublished = true,
+                    UpdatedAt = now
+                });
+                db.Teams.Add(new Team
+                {
+                    Id = teamId,
+                    CompetitionId = competitionId,
+                    Name = "Blue",
+                    NormalizedName = "BLUE",
+                    CaptainId = ownerId,
+                    MemberIds = [ownerId],
+                    InvitationToken = "0123456789abcdef0123456789abcdef",
+                    RegistrationStatus = TeamRegistrationStatus.Approved,
+                    RegisteredAt = now
+                });
+                db.RuntimeInstances.Add(new RuntimeInstance
+                {
+                    Id = Guid.CreateVersion7(),
+                    CompetitionId = competitionId,
+                    CompetitionChallengeId = competitionChallengeId,
+                    TeamId = teamId,
+                    Generation = 1,
+                    RuntimeKind = RuntimeKind.Container,
+                    RuntimeProvider = RuntimeProvider.Docker,
+                    RunnerPool = "test-pool",
+                    RunnerId = "test-runner",
+                    State = RuntimeState.Running,
+                    ProviderReceiptJson = "{}",
+                    CreatedAt = now,
+                    RunningAt = now
+                });
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            var observed = AwdInjectionObservation.Expect();
+            await host.StartAsync(cancellationToken);
+            try
+            {
+                var message = new AdvanceAwdRound(
+                    competitionId,
+                    competitionChallengeId,
+                    now,
+                    0,
+                    0);
+                var bus = host.Services.GetRequiredService<IMessageBus>();
+                await bus.SendAsync(message);
+                await bus.SendAsync(message);
+                await Assert.That(await observed.WaitAsync(cancellationToken)).IsTrue();
+                await Task.Delay(250, cancellationToken);
+                await using var scope = host.Services.CreateAsyncScope();
+                var flagCount = await scope.ServiceProvider.GetRequiredService<NoCtfDbContext>()
+                    .ChallengeFlags.CountAsync(
+                        flag => flag.CompetitionChallengeId == competitionChallengeId,
+                        cancellationToken);
+                await Assert.That(flagCount).IsEqualTo(1);
+                await Assert.That(AwdInjectionObservation.Count).IsEqualTo(1);
+            }
+            finally
+            {
+                await host.StopAsync(cancellationToken);
+            }
+        });
+    }
+
     private static PostgreSqlContainer CreatePostgres() =>
         new PostgreSqlBuilder("postgres:17-alpine")
             .WithDatabase("noctf_wolverine_test")
@@ -388,6 +526,9 @@ public sealed class WolverineTransactionalOutboxTests
         builder.Services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
         builder.Services.AddScoped(_ => new LifecycleAdvancer(
             new EmptyLifecycleStore()));
+        builder.Services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
+        builder.Services.AddSingleton<AwdRoundConfigurationCatalog>();
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.UseWolverine(options =>
         {
             options.Discovery.IncludeType<OutboxBusinessProbeHandler>();
@@ -399,6 +540,8 @@ public sealed class WolverineTransactionalOutboxTests
             options.Discovery.IncludeType<LifecycleMaintenanceProbeHandler>();
             options.Discovery.IncludeType<LifecycleTransitionProbeHandler>();
             options.Discovery.IncludeType<ObserveLifecycleProjectionHandler>();
+            options.Discovery.IncludeType<AwdRoundProbeHandler>();
+            options.Discovery.IncludeType<ObserveAwdInjectionHandler>();
             options.PersistMessagesWithPostgresql(connectionString, "wolverine_test");
             options.UseEntityFrameworkCoreTransactions();
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
@@ -407,6 +550,10 @@ public sealed class WolverineTransactionalOutboxTests
             options.Policies.OnException<DbUpdateConcurrencyException>().RetryTimes(5);
             options.Policies.OnException<LifecycleTransitionProbeException>().MoveToErrorQueue();
             options.ListenToPostgresqlQueue("outbox-probe").UseDurableInbox();
+            options.ListenToPostgresqlQueue(
+                NoCTF.Application.Runtime.Instances.RunnerNodeQueueName
+                    .FromAssignment("test-pool", "test-runner").Value)
+                .UseDurableInbox();
             options.PublishMessage<WriteOutboxBusinessProbe>()
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<ObserveOutboxBusinessProbe>()
@@ -424,6 +571,10 @@ public sealed class WolverineTransactionalOutboxTests
             options.PublishMessage<FinishLifecycleProbe>()
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<ProjectLeaderboard>()
+                .ToPostgresqlQueue("outbox-probe");
+            options.PublishMessage<AdvanceAwdRound>()
+                .ToPostgresqlQueue("outbox-probe");
+            options.PublishMessage<GenerateAwdFlags>()
                 .ToPostgresqlQueue("outbox-probe");
         });
         return builder.Build();
@@ -594,6 +745,59 @@ public sealed class ObserveLifecycleProjectionHandler
 }
 
 public sealed class LifecycleTransitionProbeException : Exception;
+
+public sealed class AwdRoundProbeHandler
+{
+    public static async Task Handle(
+        AdvanceAwdRound message,
+        IAwdRoundCoordinator coordinator,
+        CancellationToken cancellationToken) =>
+        _ = await coordinator.AdvanceAsync(message, cancellationToken);
+
+    public static async Task Handle(
+        GenerateAwdFlags message,
+        IAwdRoundCoordinator coordinator,
+        CancellationToken cancellationToken) =>
+        _ = await coordinator.GenerateFlagsAsync(message, cancellationToken);
+}
+
+public sealed class ObserveAwdInjectionHandler
+{
+    public static async Task Handle(
+        InjectAwdFlag message,
+        NoCtfDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var committed = await db.ChallengeFlags.AsNoTracking().AnyAsync(
+            flag => flag.Id == message.ChallengeFlagId,
+            cancellationToken);
+        AwdInjectionObservation.Record(committed);
+    }
+}
+
+internal static class AwdInjectionObservation
+{
+    private static TaskCompletionSource<bool> completion = CreateSource();
+    private static int count;
+
+    public static int Count => Volatile.Read(ref count);
+
+    public static Task<bool> Expect()
+    {
+        Interlocked.Exchange(ref count, 0);
+        completion = CreateSource();
+        return completion.Task;
+    }
+
+    public static void Record(bool committed)
+    {
+        Interlocked.Increment(ref count);
+        completion.TrySetResult(committed);
+    }
+
+    private static TaskCompletionSource<bool> CreateSource() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
 
 internal sealed record LifecycleChainTasks(
     Task FirstCommitted,

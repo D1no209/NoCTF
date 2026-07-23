@@ -17,8 +17,14 @@ public interface IContainerRuntimeProviderCatalog
     IContainerLifecycle Containers(RuntimeProvider provider);
 }
 
+public interface IRuntimeProviderCatalog : IContainerRuntimeProviderCatalog
+{
+    IContainerSandboxLifecycle Sandbox(RuntimeProvider provider);
+    IComposeRuntime Compose(RuntimeProvider provider);
+}
+
 public sealed class RuntimeProviderCatalog(IServiceProvider services)
-    : IOneShotRuntimeProviderCatalog, IContainerRuntimeProviderCatalog
+    : IOneShotRuntimeProviderCatalog, IRuntimeProviderCatalog
 {
     public IContainerLifecycle Containers(RuntimeProvider provider) => provider switch
     {
@@ -31,6 +37,13 @@ public sealed class RuntimeProviderCatalog(IServiceProvider services)
     {
         RuntimeProvider.Docker => services.GetRequiredService<DockerComposeRuntime>(),
         RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesComposeRuntime>(),
+        _ => throw new UnsupportedRuntimeProviderException(provider)
+    };
+
+    public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) => provider switch
+    {
+        RuntimeProvider.Docker => services.GetRequiredService<DockerContainerLifecycle>(),
+        RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesContainerLifecycle>(),
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 

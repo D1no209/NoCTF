@@ -154,7 +154,7 @@ public class ChallengeConfigurationCatalogTests
         var root = JsonNode.Parse(json)!.AsObject();
         root["flagInjection"] = new JsonObject
         {
-            ["command"] = new JsonArray("/usr/local/bin/set-flag"),
+            ["command"] = "/usr/local/bin/set-flag '${FLAG}'",
             ["timeoutSeconds"] = 30
         };
         return root.ToJsonString();

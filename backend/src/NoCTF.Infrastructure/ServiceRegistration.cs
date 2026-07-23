@@ -45,6 +45,8 @@ using Microsoft.AspNetCore.Identity;
 using NoCTF.Domain.Identity;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Administration;
+using NoCTF.Application.Competitions.Awd;
+using NoCTF.GameModes.Awd.Configuration;
 
 namespace NoCTF.Infrastructure;
 
@@ -178,6 +180,9 @@ public static class ServiceRegistration
             services.AddSingleton<IObjectStorage, LocalObjectStorage>();
         }
         services.AddScoped<ICompetitionLifecycleStore, EfCompetitionLifecycleStore>();
+        services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
+        services.AddSingleton<AwdRoundConfigurationCatalog>();
+        services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICompetitionStartGateStore, EfCompetitionStartGateStore>();
         services.AddScoped<CompetitionStartGate>();
         services.AddScoped<ICompetitionManagementStore, EfCompetitionManagementStore>();

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Registration;
+using NoCTF.GameModes.Flags;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -95,5 +96,18 @@ public sealed class AwdConfigurationTests
 
         await Assert.That(() => AwdConfigurationUpgrader.ParseCompetition(json))
             .Throws<GameModeConfigurationException>();
+    }
+
+    [Test]
+    public async Task Invalid_flag_template_is_rejected_when_configuration_is_saved()
+    {
+        var configuration = AwdConfiguration.Default with
+        {
+            FlagTemplate = new PerTeamFlagTemplate("flag", "[UNKNOWN]", false)
+        };
+
+        var errors = AwdConfigurationValidator.Validate(configuration);
+
+        await Assert.That(errors).Contains("FlagTemplate is invalid.");
     }
 }

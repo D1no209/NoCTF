@@ -1,8 +1,11 @@
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.Domain.Challenges;
 
 /// <summary>Canonical Guid encoding of the 1-based AWD round number.</summary>
+[JsonConverter(typeof(AwdRoundSpecificationIdJsonConverter))]
 public readonly record struct AwdRoundSpecificationId
 {
     public const int MaximumRound = 99_999_999;
@@ -41,4 +44,32 @@ public readonly record struct AwdRoundSpecificationId
     }
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
+}
+
+public sealed class AwdRoundSpecificationIdJsonConverter
+    : JsonConverter<AwdRoundSpecificationId>
+{
+    public override AwdRoundSpecificationId Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String
+            || !Guid.TryParseExact(reader.GetString(), "D", out var value))
+            throw new JsonException("AWD round specification id must be a canonical Guid string.");
+        try
+        {
+            return AwdRoundSpecificationId.Parse(value);
+        }
+        catch (FormatException exception)
+        {
+            throw new JsonException("AWD round specification id is not canonical.", exception);
+        }
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        AwdRoundSpecificationId value,
+        JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.Value.ToString("D", CultureInfo.InvariantCulture));
 }

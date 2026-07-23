@@ -5,8 +5,11 @@ using NoCTF.Domain.Platform;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Competitions.Awd;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Domain.Notifications;
+using System.Text.Json;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle;
 
 namespace NoCTF.Worker;
@@ -16,6 +19,61 @@ public static class BackendMessageHandlers
     private static readonly TimeSpan RunnerReconciliationInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RunnerDependencyRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan CompetitionLifecycleInterval = TimeSpan.FromSeconds(30);
+
+    public static async Task Handle(
+        AdvanceAwdRound message,
+        IAwdRoundCoordinator coordinator,
+        CancellationToken cancellationToken) =>
+        _ = await coordinator.AdvanceAsync(message, cancellationToken);
+
+    public static async Task Handle(
+        GenerateAwdFlags message,
+        IAwdRoundCoordinator coordinator,
+        CancellationToken cancellationToken) =>
+        _ = await coordinator.GenerateFlagsAsync(message, cancellationToken);
+
+    public static async Task Handle(
+        AwdFlagInjectionFailed message,
+        NoCtfDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(candidate => candidate.Id == message.CompetitionId)
+            .Select(candidate => new { candidate.OwnerId, candidate.ManagerIds })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (competition is null)
+            return;
+        var recipients = competition.ManagerIds.Append(competition.OwnerId).Distinct().ToArray();
+        var existing = await db.Notifications.AsNoTracking()
+            .Where(notification => recipients.Contains(notification.UserId)
+                && notification.CompetitionId == message.CompetitionId
+                && notification.EntityId == message.ChallengeFlagId
+                && notification.Kind == NotificationKind.RuntimeStateChanged)
+            .Select(notification => notification.UserId)
+            .ToListAsync(cancellationToken);
+        var payload = JsonSerializer.Serialize(new
+        {
+            code = "awd_flag_injection_failed",
+            message.CompetitionChallengeId,
+            message.ChallengeFlagId,
+            message.Generation,
+            message.ProcessingVersion
+        });
+        foreach (var userId in recipients.Except(existing))
+        {
+            db.Notifications.Add(new Notification
+            {
+                Id = Guid.CreateVersion7(message.OccurredAt),
+                UserId = userId,
+                CompetitionId = message.CompetitionId,
+                EntityId = message.ChallengeFlagId,
+                Kind = NotificationKind.RuntimeStateChanged,
+                PayloadJson = payload,
+                CreatedAt = message.OccurredAt
+            });
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
 
     public static async Task Handle(
         AdvanceCompetitionLifecycle message,

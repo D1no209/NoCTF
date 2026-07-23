@@ -235,6 +235,18 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<long>("AwdScheduleChallengeRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("awd_schedule_challenge_revision");
+
+                    b.Property<int>("AwdScheduleCompetitionRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("awd_schedule_competition_revision");
+
+                    b.Property<DateTimeOffset?>("AwdScheduleDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("awd_schedule_due_at");
+
                     b.Property<long>("BaseScore")
                         .HasColumnType("bigint")
                         .HasColumnName("base_score");
@@ -259,6 +271,10 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<bool>("IsPublished")
                         .HasColumnType("boolean")
                         .HasColumnName("is_published");
+
+                    b.Property<int>("LastScheduledAwdRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_scheduled_awd_round");
 
                     b.Property<int>("Order")
                         .HasColumnType("integer")

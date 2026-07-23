@@ -439,6 +439,14 @@ public sealed class RunnerAssignmentReconciliationTests
             return ValueTask.CompletedTask;
         }
 
+        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+            where T : IRunnerNodeMessage
+        {
+            RunnerNodeMessages.Add(message);
+            Scheduled.Add((message!, scheduledAt));
+            return ValueTask.CompletedTask;
+        }
+
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
     }
 }

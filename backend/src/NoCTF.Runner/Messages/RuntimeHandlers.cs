@@ -117,6 +117,7 @@ public static class RuntimeWriteBackHandler
     public static async Task Handle(
         RuntimeProvisioned message,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
@@ -137,7 +138,31 @@ public static class RuntimeWriteBackHandler
         instance.RunningAt = DateTimeOffset.UtcNow;
         instance.ExpiresAt = message.ExpiresAt;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        var now = DateTimeOffset.UtcNow;
+        var currentAwdFlag = instance.TeamId is null
+            ? null
+            : await db.ChallengeFlags.AsNoTracking()
+                .Where(flag => flag.CompetitionChallengeId == instance.CompetitionChallengeId
+                    && flag.TeamId == instance.TeamId
+                    && flag.SpecificationKind == NoCTF.Domain.Challenges.SpecificationKind.AwdRound
+                    && flag.ValidStart <= now
+                    && flag.ValidUntil > now
+                    && flag.DeletedAt == null)
+                .SingleOrDefaultAsync(cancellationToken);
+        if (currentAwdFlag is not null)
+        {
+            await outbox.PublishToRunnerNodeAsync(new InjectAwdFlag(
+                instance.Id,
+                instance.CompetitionChallengeId,
+                currentAwdFlag.Id,
+                instance.Generation,
+                instance.ProcessingVersion,
+                currentAwdFlag.ValidUntil!.Value,
+                instance.RunnerPool,
+                instance.RunnerId));
+        }
         await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
     public static async Task Handle(

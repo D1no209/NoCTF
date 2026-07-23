@@ -30,6 +30,9 @@ builder.UseWolverine(options =>
     options.PublishMessage<ReconcileRunnerAssignments>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<ReleaseRunnerCapacity>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<AdvanceCompetitionLifecycle>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<AdvanceAwdRound>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<GenerateAwdFlags>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<AwdFlagInjectionFailed>().ToPostgresqlQueue("noctf-worker");
 });
 
 var host = builder.Build();

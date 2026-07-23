@@ -11,6 +11,10 @@ public sealed class CompetitionChallenge
     public bool IsPublished { get; set; }
     public string ConfigurationJson { get; set; } = """{"schemaVersion":1}""";
     public int Revision { get; set; }
+    public int LastScheduledAwdRound { get; set; }
+    public int AwdScheduleCompetitionRevision { get; set; }
+    public long AwdScheduleChallengeRevision { get; set; }
+    public DateTimeOffset? AwdScheduleDueAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public List<CompetitionChallengeHint> Hints { get; set; } = [];

@@ -178,6 +178,10 @@ namespace NoCTF.Infrastructure.Migrations
                     is_published = table.Column<bool>(type: "boolean", nullable: false),
                     configuration_json = table.Column<string>(type: "jsonb", nullable: false),
                     revision = table.Column<int>(type: "integer", nullable: false),
+                    last_scheduled_awd_round = table.Column<int>(type: "integer", nullable: false),
+                    awd_schedule_competition_revision = table.Column<int>(type: "integer", nullable: false),
+                    awd_schedule_challenge_revision = table.Column<long>(type: "bigint", nullable: false),
+                    awd_schedule_due_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     deleted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },

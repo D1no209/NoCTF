@@ -6,6 +6,7 @@ public enum MessageExecutionOutcome
     Idempotent,
     Superseded,
     DeferredCapacity,
+    DeferredSchedule,
     RejectedBusiness,
     Conflict
 }

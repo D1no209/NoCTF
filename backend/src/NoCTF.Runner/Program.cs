@@ -39,6 +39,7 @@ builder.UseWolverine(options =>
     options.PublishMessage<ClaimContainerRuntime>().ToPostgresqlQueue(poolQueueName.Value);
     options.PublishMessage<AwdpFixResult>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<DispatchRuntime>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<AwdFlagInjectionFailed>().ToPostgresqlQueue("noctf-worker");
 });
 var app = builder.Build();
 app.MapGet("/health/live", () => TypedResults.Ok(new { status = "live" }));

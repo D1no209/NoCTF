@@ -34,6 +34,15 @@ public sealed class WolverineTransactionalMessageOutbox(
         return outbox.EndpointFor(ToPostgresqlQueueUri(queue.Value)).SendAsync(message);
     }
 
+    public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+        where T : IRunnerNodeMessage
+    {
+        var queue = RunnerNodeQueueName.FromAssignment(message.RunnerPool, message.RunnerId);
+        return outbox.EndpointFor(ToPostgresqlQueueUri(queue.Value)).SendAsync(
+            message,
+            new DeliveryOptions { ScheduledTime = scheduledAt });
+    }
+
     public Task FlushOutgoingMessagesAsync() => outbox.FlushOutgoingMessagesAsync();
 
     private static Uri ToPostgresqlQueueUri(string queueName) =>
@@ -51,5 +60,7 @@ public sealed class OpenApiTransactionalMessageOutbox : ITransactionalMessageOut
         where T : IRunnerPoolMessage => ValueTask.CompletedTask;
     public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
         ValueTask.CompletedTask;
+    public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+        where T : IRunnerNodeMessage => ValueTask.CompletedTask;
     public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
 }

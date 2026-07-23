@@ -104,4 +104,83 @@ public sealed class AwdRoundSchedulerTests
 
         await Assert.That(result).IsEqualTo(new AwdPersistedRoundWindow(4, start, end));
     }
+
+    [Test]
+    public async Task Round_plan_waits_until_effective_hardening_time_finishes()
+    {
+        var now = DateTimeOffset.Parse("2026-07-24T00:10:00Z");
+
+        var result = AwdRoundScheduler.PlanCurrentRound(
+            now,
+            now.AddHours(1),
+            TimeSpan.FromMinutes(9),
+            TimeSpan.FromMinutes(10),
+            TimeSpan.FromMinutes(5),
+            latest: null);
+
+        await Assert.That(result.Kind).IsEqualTo(AwdRoundPlanKind.WaitingForHardening);
+        await Assert.That(result.Window).IsNull();
+    }
+
+    [Test]
+    public async Task Initial_late_delivery_preserves_the_current_logical_window()
+    {
+        var now = DateTimeOffset.Parse("2026-07-24T00:17:00Z");
+
+        var result = AwdRoundScheduler.PlanCurrentRound(
+            now,
+            now.AddHours(1),
+            TimeSpan.FromMinutes(17),
+            TimeSpan.FromMinutes(10),
+            TimeSpan.FromMinutes(5),
+            latest: null);
+
+        await Assert.That(result.Kind).IsEqualTo(AwdRoundPlanKind.Create);
+        await Assert.That(result.Window).IsEqualTo(new AwdPersistedRoundWindow(
+            2,
+            DateTimeOffset.Parse("2026-07-24T00:15:00Z"),
+            DateTimeOffset.Parse("2026-07-24T00:20:00Z")));
+    }
+
+    [Test]
+    public async Task Existing_current_round_is_idempotent_even_after_duration_changes()
+    {
+        var now = DateTimeOffset.Parse("2026-07-24T00:17:00Z");
+        var latest = new AwdPersistedRoundWindow(
+            4,
+            DateTimeOffset.Parse("2026-07-24T00:15:00Z"),
+            DateTimeOffset.Parse("2026-07-24T00:20:00Z"));
+
+        var result = AwdRoundScheduler.PlanCurrentRound(
+            now,
+            now.AddHours(1),
+            TimeSpan.FromMinutes(17),
+            TimeSpan.FromMinutes(10),
+            TimeSpan.FromMinutes(30),
+            latest);
+
+        await Assert.That(result.Kind).IsEqualTo(AwdRoundPlanKind.Current);
+        await Assert.That(result.Window).IsEqualTo(latest);
+    }
+
+    [Test]
+    public async Task EndAt_prevents_a_successor_whose_start_is_not_before_the_deadline()
+    {
+        var latest = new AwdPersistedRoundWindow(
+            4,
+            DateTimeOffset.Parse("2026-07-24T00:15:00Z"),
+            DateTimeOffset.Parse("2026-07-24T00:20:00Z"));
+        var endAt = DateTimeOffset.Parse("2026-07-24T00:20:00Z");
+
+        var result = AwdRoundScheduler.PlanCurrentRound(
+            endAt,
+            endAt,
+            TimeSpan.FromMinutes(20),
+            TimeSpan.FromMinutes(10),
+            TimeSpan.FromMinutes(5),
+            latest);
+
+        await Assert.That(result.Kind).IsEqualTo(AwdRoundPlanKind.Finished);
+        await Assert.That(result.Window).IsNull();
+    }
 }
