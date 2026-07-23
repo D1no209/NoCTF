@@ -6,6 +6,7 @@ using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.GameModes.Ctf.Scoring;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -20,6 +21,9 @@ public sealed class CtfLeaderboardProjector : IGameModeLeaderboardProjector
 internal static class CtfLeaderboardProjection
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly CtfScoreExpression ScoreExpression = new();
+    private const string DefaultScoreExpression =
+        "solveCount <= 1 ? initialPoints : solveCount >= decayParameter ? minimumPoints : initialPoints + (minimumPoints - initialPoints) * ((solveCount - 1m) / (decayParameter - 1m)) * ((solveCount - 1m) / (decayParameter - 1m))";
 
     public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
     {
@@ -34,6 +38,10 @@ internal static class CtfLeaderboardProjection
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.ReceivedAt)
             .ThenBy(fact => fact.SubmissionId)
+            .GroupBy(fact => (fact.TeamId, fact.CompetitionChallengeId))
+            .Select(group => group.First())
+            .OrderBy(fact => fact.ReceivedAt)
+            .ThenBy(fact => fact.SubmissionId)
             .ToList();
 
         var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points)>>();
@@ -46,9 +54,20 @@ internal static class CtfLeaderboardProjection
                 : null);
             var points = configuration.Points ?? defaults.DefaultPoints;
             var index = solveNumber.GetValueOrDefault(challengeId);
-            var score = Calculate(points, index);
-            if (index == 0)
-                score += FirstBlood(configuration.BloodRewards ?? defaults.BloodRewards, points);
+            var expression = configuration.ScoreExpression
+                ?? defaults.ScoreExpression
+                ?? DefaultScoreExpression;
+            var score = ScoreExpression.Evaluate(expression, new(
+                points.InitialPoints,
+                points.MinimumPoints,
+                index,
+                validTeams.Count,
+                points.DecayFactor));
+            score = checked(score + BloodRewardAt(
+                configuration.BloodRewards ?? defaults.BloodRewards,
+                index,
+                score,
+                points));
             solveNumber[challengeId] = index + 1;
             if (!awarded.TryGetValue(solve.TeamId, out var teamSolves))
                 awarded[solve.TeamId] = teamSolves = [];
@@ -66,7 +85,8 @@ internal static class CtfLeaderboardProjection
                 .OrderBy(summary => summary.CompetitionChallengeId)
                 .ToList();
             var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
-            return new LeaderboardEntry(0, team.Id, team.Name, own.Sum(item => item.Points), own.Count,
+            var total = own.Aggregate(0L, (sum, item) => checked(sum + item.Points));
+            return new LeaderboardEntry(0, team.Id, team.Name, total, own.Count,
                 last == default ? null : last, summaries);
         });
         return rows
@@ -77,23 +97,28 @@ internal static class CtfLeaderboardProjection
             .ToList();
     }
 
-    private static long Calculate(CtfPointConfiguration points, int index)
+    private static long BloodRewardAt(
+        IReadOnlyList<BloodReward> rewards,
+        int solveIndex,
+        long solvePoints,
+        CtfPointConfiguration points)
     {
-        var value = points.InitialPoints * Math.Pow((double)points.DecayFactor, index);
-        return Math.Max(points.MinimumPoints, (long)Math.Round(value, MidpointRounding.AwayFromZero));
+        if ((uint)solveIndex >= (uint)rewards.Count)
+            return 0;
+
+        var reward = rewards[solveIndex];
+        var basis = reward.Policy switch
+        {
+            BloodRewardPolicy.FixedPoints => reward.Value,
+            BloodRewardPolicy.InitialPointsPercentage => points.InitialPoints * reward.Value / 100m,
+            BloodRewardPolicy.SolveTimePointsPercentage => solvePoints * reward.Value / 100m,
+            _ => 0m
+        };
+        return checked((long)Math.Round(basis, MidpointRounding.AwayFromZero));
     }
 
-    private static long FirstBlood(IReadOnlyList<BloodReward> rewards, CtfPointConfiguration points) =>
-        rewards.Sum(reward => reward.Policy switch
-        {
-            BloodRewardPolicy.FixedPoints => (long)Math.Round(reward.Value, MidpointRounding.AwayFromZero),
-            BloodRewardPolicy.InitialPointsPercentage => (long)Math.Round(points.InitialPoints * reward.Value / 100m, MidpointRounding.AwayFromZero),
-            BloodRewardPolicy.SolveTimePointsPercentage => (long)Math.Round(points.InitialPoints * reward.Value / 100m, MidpointRounding.AwayFromZero),
-            _ => 0
-        });
-
     private static CtfConfiguration ParseCompetition(string? json) =>
-        TryParse<CtfConfiguration>(json) ?? new(CtfConfiguration.CurrentSchemaVersion, new(500, 100, 10), []);
+        TryParse<CtfConfiguration>(json) ?? new(CtfConfiguration.CurrentSchemaVersion, new(500, 100, 10), [], null);
 
     private static CtfChallengeConfiguration ParseChallenge(string? json) =>
         TryParse<CtfChallengeConfiguration>(json)
