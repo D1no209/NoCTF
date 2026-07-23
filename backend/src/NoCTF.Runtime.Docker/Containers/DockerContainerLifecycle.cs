@@ -33,13 +33,14 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         CreateContainerResponse? response = null;
         try
         {
+            var labels = BuildLabels(request);
             response = await client.Containers.CreateContainerAsync(new CreateContainerParameters
             {
                 Name = containerName,
                 Image = request.Image,
                 Cmd = request.Command.ToList(),
                 Env = request.Environment.Select(pair => $"{pair.Key}={pair.Value}").ToList(),
-                Labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value),
+                Labels = labels,
                 ExposedPorts = exposedPorts,
                 HostConfig = new HostConfig
                 {
@@ -55,16 +56,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 }
             }, cancellationToken);
             if (request.AllowInternalCallback)
-            {
-                if (string.Equals(options.CallbackNetworkName, options.NetworkName, StringComparison.Ordinal)
-                    || string.Equals(options.CallbackNetworkName, request.NetworkName, StringComparison.Ordinal))
-                    throw new InvalidOperationException(
-                        "The AWDP callback network must be dedicated and separate from platform and sandbox networks.");
-                await client.Networks.ConnectNetworkAsync(
-                    options.CallbackNetworkName,
-                    new NetworkConnectParameters { Container = response.ID },
-                    cancellationToken);
-            }
+                await ConnectInternalCallbackAsync(request, response.ID, cancellationToken);
             await client.Containers.StartContainerAsync(
                 response.ID, new ContainerStartParameters(), cancellationToken);
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
@@ -72,20 +64,28 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
         catch
         {
-            if (response is not null)
+            using var cleanupSource = new CancellationTokenSource(
+                RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
+            try
             {
-                using var cleanupSource = new CancellationTokenSource(
-                    RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
+                await client.Containers.RemoveContainerAsync(
+                    response?.ID ?? containerName,
+                    new ContainerRemoveParameters { Force = true },
+                    cleanupSource.Token);
+            }
+            catch
+            {
+                // The expiry-labelled reaper remains the final container cleanup fallback.
+            }
+            if (request.AllowInternalCallback)
+            {
                 try
                 {
-                    await client.Containers.RemoveContainerAsync(
-                        response.ID,
-                        new ContainerRemoveParameters { Force = true },
-                        cleanupSource.Token);
+                    await DeleteCallbackNetworkAsync(request.OperationId, cleanupSource.Token);
                 }
                 catch
                 {
-                    // The expiry-labelled reaper remains the final cleanup fallback.
+                    // The expiry-labelled reaper remains the final network cleanup fallback.
                 }
             }
             throw;
@@ -159,6 +159,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
+        Exception? failure = null;
         try
         {
             await client.Containers.StopContainerAsync(receipt.ResourceId, new ContainerStopParameters(), cancellationToken);
@@ -168,6 +169,20 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             // Destroy is idempotent: an externally removed runtime is already stopped.
         }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+        try
+        {
+            await DeleteCallbackNetworkAsync(receipt.OperationId, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            failure ??= exception;
+        }
+        if (failure is not null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     public async Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)
@@ -357,7 +372,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             try
             {
-                await client.Networks.DeleteNetworkAsync(network.ID, cancellationToken);
+                await DeleteNetworkAsync(network, cancellationToken);
                 removed++;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -373,6 +388,133 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     }
 
     public void Dispose() => client.Dispose();
+
+    private async Task ConnectInternalCallbackAsync(
+        ContainerRequest request,
+        string checkerContainerId,
+        CancellationToken cancellationToken)
+    {
+        if (!request.Environment.TryGetValue("NOCTF_CALLBACK_URL", out var callbackText)
+            || !Uri.TryCreate(callbackText, UriKind.Absolute, out var callback)
+            || callback.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException(
+                "An AWDP checker callback requires an absolute HTTP(S) callback URL.");
+        var callbackContainer = await client.Containers.InspectContainerAsync(
+            options.CallbackContainerName, cancellationToken);
+        if (callbackContainer.Config?.Labels is null
+            || !callbackContainer.Config.Labels.TryGetValue(
+                options.CallbackContainerLabelKey, out var callbackRole)
+            || !string.Equals(
+                callbackRole, options.CallbackContainerLabelValue, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "The configured AWDP callback container does not carry the required role label.");
+
+        var networkName = CallbackNetworkName(request.OperationId);
+        var network = await FindNetworkAsync(networkName, cancellationToken);
+        if (network is null)
+        {
+            _ = await client.Networks.CreateNetworkAsync(new NetworksCreateParameters
+            {
+                Name = networkName,
+                Internal = true,
+                Labels = new Dictionary<string, string>
+                {
+                    ["noctf.io/network-purpose"] = "awdp-callback",
+                    ["noctf.io/expires-at"] = ExpiresAt(request).ToUnixTimeSeconds().ToString(
+                        System.Globalization.CultureInfo.InvariantCulture)
+                }
+            }, cancellationToken);
+            network = await client.Networks.InspectNetworkAsync(networkName, cancellationToken);
+        }
+        if (!network.Internal
+            || network.Labels is null
+            || !network.Labels.TryGetValue("noctf.io/network-purpose", out var purpose)
+            || !string.Equals(purpose, "awdp-callback", StringComparison.Ordinal))
+            throw new InvalidOperationException("The AWDP callback network is not an internal managed network.");
+
+        if (network.Containers?.ContainsKey(callbackContainer.ID) != true)
+        {
+            await client.Networks.ConnectNetworkAsync(network.ID, new NetworkConnectParameters
+            {
+                Container = callbackContainer.ID,
+                EndpointConfig = new EndpointSettings { Aliases = [callback.Host] }
+            }, cancellationToken);
+        }
+        await client.Networks.ConnectNetworkAsync(
+            network.ID,
+            new NetworkConnectParameters { Container = checkerContainerId },
+            cancellationToken);
+    }
+
+    private async Task DeleteCallbackNetworkAsync(
+        Guid operationId,
+        CancellationToken cancellationToken)
+    {
+        var network = await FindNetworkAsync(CallbackNetworkName(operationId), cancellationToken);
+        if (network is null)
+            return;
+        await DeleteNetworkAsync(network, cancellationToken);
+    }
+
+    private async Task DeleteNetworkAsync(
+        NetworkResponse network,
+        CancellationToken cancellationToken)
+    {
+        if (network.Labels?.TryGetValue("noctf.io/network-purpose", out var purpose) == true
+            && string.Equals(purpose, "awdp-callback", StringComparison.Ordinal))
+        {
+            var current = await client.Networks.InspectNetworkAsync(network.ID, cancellationToken);
+            foreach (var containerId in current.Containers?.Keys ?? [])
+            {
+                try
+                {
+                    await client.Networks.DisconnectNetworkAsync(
+                        network.ID,
+                        new NetworkDisconnectParameters { Container = containerId, Force = true },
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // Force deletion below is still attempted for stale endpoints.
+                }
+            }
+        }
+        await client.Networks.DeleteNetworkAsync(network.ID, cancellationToken);
+    }
+
+    private async Task<NetworkResponse?> FindNetworkAsync(
+        string networkName,
+        CancellationToken cancellationToken)
+    {
+        var networks = await client.Networks.ListNetworksAsync(new NetworksListParameters
+        {
+            Filters = new Dictionary<string, IDictionary<string, bool>>
+            {
+                ["name"] = new Dictionary<string, bool> { [networkName] = true }
+            }
+        }, cancellationToken);
+        return networks.SingleOrDefault(network =>
+            string.Equals(network.Name, networkName, StringComparison.Ordinal));
+    }
+
+    private static Dictionary<string, string> BuildLabels(ContainerRequest request)
+    {
+        var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
+        if (request.Ttl is not null)
+            labels["noctf.io/expires-at"] = ExpiresAt(request).ToUnixTimeSeconds().ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        return labels;
+    }
+
+    private static DateTimeOffset ExpiresAt(ContainerRequest request) =>
+        DateTimeOffset.UtcNow.Add(request.Ttl ?? TimeSpan.FromMinutes(15));
+
+    private static string CallbackNetworkName(Guid operationId) =>
+        $"noctf-callback-{operationId:N}";
 
     private static RuntimeStatus ToRuntimeStatus(string? status) => status?.ToLowerInvariant() switch
     {

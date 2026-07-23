@@ -14,7 +14,14 @@ public sealed class KubernetesContainerLifecycleTests
     [Test]
     public async Task Checker_callback_policy_only_allows_callback_port_and_dns()
     {
-        var (client, _, networking) = CreateClient();
+        var (client, core, networking) = CreateClient();
+        V1Pod? createdPod = null;
+        core.CreateNamespacedPodWithHttpMessagesAsync(
+                Arg.Do<V1Pod>(pod => createdPod = pod),
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<bool?>(), Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1Pod> { Body = new V1Pod() }));
         V1NetworkPolicy? createdPolicy = null;
         networking.CreateNamespacedNetworkPolicyWithHttpMessagesAsync(
                 Arg.Do<V1NetworkPolicy>(policy => createdPolicy = policy),
@@ -34,6 +41,7 @@ public sealed class KubernetesContainerLifecycleTests
         _ = await lifecycle.CreateAsync(CheckerRequest(), CancellationToken.None);
 
         await Assert.That(createdPolicy).IsNotNull();
+        await Assert.That(createdPod!.Metadata.Labels.ContainsKey("noctf.io/expires-at")).IsTrue();
         var egress = createdPolicy!.Spec.Egress;
         await Assert.That(egress).Count().IsEqualTo(2);
         var callback = egress.Single(rule => rule.To.Any(peer =>
@@ -63,6 +71,26 @@ public sealed class KubernetesContainerLifecycleTests
         Func<Task> action = () => lifecycle.CreateAsync(CheckerRequest(), CancellationToken.None);
 
         await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(core.ReceivedCalls().Any(call =>
+            call.GetMethodInfo().Name == "DeleteNamespacedPodWithHttpMessagesAsync")).IsTrue();
+    }
+
+    [Test]
+    public async Task Ambiguous_pod_create_failure_still_attempts_deterministic_cleanup()
+    {
+        var (client, core, _) = CreateClient();
+        core.CreateNamespacedPodWithHttpMessagesAsync(
+                Arg.Any<V1Pod>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<string?>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1Pod>>(
+                new TimeoutException("response lost")));
+        var lifecycle = new KubernetesContainerLifecycle(client, new KubernetesRuntimeOptions());
+
+        Func<Task> action = () => lifecycle.CreateAsync(CheckerRequest(), CancellationToken.None);
+
+        await Assert.That(action).Throws<TimeoutException>();
         await Assert.That(core.ReceivedCalls().Any(call =>
             call.GetMethodInfo().Name == "DeleteNamespacedPodWithHttpMessagesAsync")).IsTrue();
     }

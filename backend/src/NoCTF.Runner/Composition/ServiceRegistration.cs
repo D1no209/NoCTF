@@ -29,7 +29,9 @@ public static class ServiceRegistration
             configuration["Runtime:Docker:Endpoint"] ?? "npipe://./pipe/docker_engine",
             configuration["Runtime:Docker:Network"] ?? "noctf",
             configuration["Runtime:Docker:PublicHost"] ?? "localhost",
-            configuration["Runtime:Docker:CallbackNetwork"] ?? "noctf-callback");
+            configuration["Runtime:Docker:CallbackContainer"] ?? "noctf-api",
+            configuration["Runtime:Docker:CallbackContainerLabelKey"] ?? "noctf.io/internal-role",
+            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback");
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
         services.AddSingleton<IRuntimeResourceReaper>(provider =>
