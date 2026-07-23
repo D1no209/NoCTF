@@ -43,6 +43,9 @@ internal static class CtfLeaderboardProjection
             .OrderBy(fact => fact.ReceivedAt)
             .ThenBy(fact => fact.SubmissionId)
             .ToList();
+        var currentSolveCounts = solves
+            .GroupBy(solve => solve.CompetitionChallengeId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
 
         var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points)>>();
         var solveNumber = new Dictionary<Guid, int>();
@@ -54,19 +57,27 @@ internal static class CtfLeaderboardProjection
                 : null);
             var points = configuration.Points ?? defaults.DefaultPoints;
             var index = solveNumber.GetValueOrDefault(challengeId);
+            var solveOrdinal = checked(index + 1);
             var expression = configuration.ScoreExpression
                 ?? defaults.ScoreExpression
                 ?? DefaultScoreExpression;
             var score = ScoreExpression.Evaluate(expression, new(
                 points.InitialPoints,
                 points.MinimumPoints,
-                index,
+                currentSolveCounts[challengeId],
                 validTeams.Count,
                 points.DecayFactor));
             score = checked(score + BloodRewardAt(
                 configuration.BloodRewards ?? defaults.BloodRewards,
                 index,
-                score,
+                () => currentSolveCounts[challengeId] == solveOrdinal
+                    ? score
+                    : ScoreExpression.Evaluate(expression, new(
+                        points.InitialPoints,
+                        points.MinimumPoints,
+                        solveOrdinal,
+                        validTeams.Count,
+                        points.DecayFactor)),
                 points));
             solveNumber[challengeId] = index + 1;
             if (!awarded.TryGetValue(solve.TeamId, out var teamSolves))
@@ -119,7 +130,7 @@ internal static class CtfLeaderboardProjection
     private static long BloodRewardAt(
         IReadOnlyList<BloodReward> rewards,
         int solveIndex,
-        long solvePoints,
+        Func<long> solvePoints,
         CtfPointConfiguration points)
     {
         if ((uint)solveIndex >= (uint)rewards.Count)
@@ -130,7 +141,7 @@ internal static class CtfLeaderboardProjection
         {
             BloodRewardPolicy.FixedPoints => reward.Value,
             BloodRewardPolicy.InitialPointsPercentage => points.InitialPoints * reward.Value / 100m,
-            BloodRewardPolicy.SolveTimePointsPercentage => solvePoints * reward.Value / 100m,
+            BloodRewardPolicy.SolveTimePointsPercentage => solvePoints() * reward.Value / 100m,
             _ => 0m
         };
         return checked((long)Math.Round(basis, MidpointRounding.AwayFromZero));

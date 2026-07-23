@@ -117,4 +117,77 @@ public sealed class CtfLeaderboardProjectorTests
                 Result = result, OccurredAt = occurredAt, CreatedAt = occurredAt
             });
     }
+
+    [Test]
+    public async Task Projector_uses_one_based_distinct_solve_count_for_score_and_blood_value()
+    {
+        var firstTeam = Guid.NewGuid();
+        var secondTeam = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
+        var start = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
+        var challengeConfiguration = new CtfChallengeConfiguration(
+            CtfChallengeConfiguration.CurrentSchemaVersion,
+            new(100, 0, 10),
+            [
+                new(BloodRewardPolicy.FixedPoints, 0),
+                new(BloodRewardPolicy.SolveTimePointsPercentage, 50)
+            ],
+            ScoreExpression: "initialPoints - solveCount * 10m");
+        var input = new LeaderboardProjectionInput(
+            competitionId,
+            GameMode.Ctf,
+            [new(firstTeam, "first", false, false), new(secondTeam, "second", false, false)],
+            [Fact(firstTeam, start), Fact(secondTeam, start.AddSeconds(1))],
+            [],
+            [new(challengeId, "Web", false, JsonSerializer.Serialize(challengeConfiguration))],
+            JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 0, 10), [])),
+            start);
+
+        var rows = new CtfLeaderboardProjector().Project(input);
+
+        await Assert.That(rows.Single(row => row.TeamId == firstTeam).Score).IsEqualTo(80);
+        await Assert.That(rows.Single(row => row.TeamId == secondTeam).Score).IsEqualTo(120);
+
+        LeaderboardSubmissionFact Fact(Guid teamId, DateTimeOffset at) => new(
+            Guid.NewGuid(), teamId, challengeId, SubmissionKind.Flag, at,
+            new ScoringEvent
+            {
+                Id = Guid.NewGuid(), CompetitionId = competitionId, TeamId = teamId,
+                CompetitionChallengeId = challengeId, Kind = ScoringEventKind.SubmissionEvaluation,
+                Result = ScoringResult.Correct, OccurredAt = at, CreatedAt = at
+            });
+    }
+
+    [Test]
+    public async Task Fixed_blood_reward_does_not_evaluate_irrelevant_slot_score()
+    {
+        var teams = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        var challengeId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
+        var start = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
+        var input = new LeaderboardProjectionInput(
+            competitionId,
+            GameMode.Ctf,
+            teams.Select((id, index) => new LeaderboardTeamFact(id, $"team-{index}", false, false)).ToList(),
+            teams.Select((id, index) => new LeaderboardSubmissionFact(
+                Guid.NewGuid(), id, challengeId, SubmissionKind.Flag, start.AddSeconds(index),
+                new ScoringEvent
+                {
+                    Id = Guid.NewGuid(), CompetitionId = competitionId, TeamId = id,
+                    CompetitionChallengeId = challengeId, Kind = ScoringEventKind.SubmissionEvaluation,
+                    Result = ScoringResult.Correct, OccurredAt = start.AddSeconds(index), CreatedAt = start
+                })).ToList(),
+            [],
+            [new(challengeId, "Web", false, JsonSerializer.Serialize(new CtfChallengeConfiguration(
+                1, new(100, 0, 10),
+                [new(BloodRewardPolicy.FixedPoints, 10), new(BloodRewardPolicy.FixedPoints, 20)],
+                ScoreExpression: "100m / (solveCount - 2)")))],
+            JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 0, 10), [])),
+            start);
+
+        var rows = new CtfLeaderboardProjector().Project(input);
+
+        await Assert.That(rows.Count).IsEqualTo(3);
+    }
 }
