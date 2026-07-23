@@ -82,7 +82,8 @@ public sealed record ContainerRequest(
     TimeSpan? OperationTimeout = null,
     ContainerNetworkIsolation NetworkIsolation = ContainerNetworkIsolation.Shared,
     IReadOnlyList<int>? InternalPorts = null,
-    bool AllowInternalCallback = false)
+    bool AllowInternalCallback = false,
+    int Generation = 0)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];
@@ -132,7 +133,9 @@ public sealed record ContainerExecResult(int ExitCode, bool TimedOut);
 public interface IContainerSandboxLifecycle
 {
     Task<string> CreateIsolatedNetworkAsync(
-        Guid operationId, DateTimeOffset expiresAt, CancellationToken cancellationToken);
+        RuntimeResourceIdentity identity,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken);
     Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken);
     Task CopyArchiveAsync(ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken);
     Task<ContainerExecResult> ExecAsync(
@@ -144,6 +147,8 @@ public interface IContainerSandboxLifecycle
         TimeSpan timeout,
         CancellationToken cancellationToken);
 }
+
+public readonly record struct RuntimeResourceIdentity(Guid RuntimeInstanceId, int Generation);
 
 public sealed record RuntimeResourceReapResult(int RemovedCount, int FailedCount);
 

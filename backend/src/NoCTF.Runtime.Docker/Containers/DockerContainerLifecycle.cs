@@ -163,7 +163,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         try
         {
             await client.Containers.StopContainerAsync(receipt.ResourceId, new ContainerStopParameters(), cancellationToken);
-            await client.Containers.RemoveContainerAsync(receipt.ResourceId, new ContainerRemoveParameters { Force = true }, cancellationToken);
         }
         catch (DockerContainerNotFoundException)
         {
@@ -172,6 +171,21 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         catch (Exception exception)
         {
             failure = exception;
+        }
+        try
+        {
+            await client.Containers.RemoveContainerAsync(
+                receipt.ResourceId,
+                new ContainerRemoveParameters { Force = true },
+                cancellationToken);
+        }
+        catch (DockerContainerNotFoundException)
+        {
+            // A failed or skipped stop may still race with external cleanup.
+        }
+        catch (Exception exception)
+        {
+            failure ??= exception;
         }
         try
         {
@@ -230,9 +244,13 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             new CopyToContainerParameters { Path = "/" }, tarArchive, cancellationToken);
 
     public async Task<string> CreateIsolatedNetworkAsync(
-        Guid operationId, DateTimeOffset expiresAt, CancellationToken cancellationToken)
+        RuntimeResourceIdentity identity,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken)
     {
-        var name = $"noctf-awdp-{operationId:N}";
+        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+            throw new ArgumentOutOfRangeException(nameof(identity));
+        var name = $"noctf-awdp-{identity.RuntimeInstanceId:N}";
         var existing = await client.Networks.ListNetworksAsync(new NetworksListParameters
         {
             Filters = new Dictionary<string, IDictionary<string, bool>>
@@ -245,18 +263,41 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         if (current is not null)
             return current.ID;
 
-        var response = await client.Networks.CreateNetworkAsync(new NetworksCreateParameters
+        try
         {
-            Name = name,
-            Internal = true,
-            Labels = new Dictionary<string, string>
+            var response = await client.Networks.CreateNetworkAsync(new NetworksCreateParameters
             {
-                ["noctf.io/job-kind"] = "awdp-verification",
-                ["noctf.io/expires-at"] = expiresAt.ToUnixTimeSeconds().ToString(
-                    System.Globalization.CultureInfo.InvariantCulture)
+                Name = name,
+                Internal = true,
+                Labels = new Dictionary<string, string>
+                {
+                    ["noctf.io/job-kind"] = "awdp-verification",
+                    ["noctf.io/managed"] = "true",
+                    ["noctf.io/runtime-instance-id"] = identity.RuntimeInstanceId.ToString("D"),
+                    ["noctf.io/generation"] = identity.Generation.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture),
+                    ["noctf.io/expires-at"] = expiresAt.ToUnixTimeSeconds().ToString(
+                        System.Globalization.CultureInfo.InvariantCulture)
+                }
+            }, cancellationToken);
+            return response.ID;
+        }
+        catch
+        {
+            using var cleanup = new CancellationTokenSource(
+                RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
+            try
+            {
+                var ambiguous = await FindNetworkAsync(name, cleanup.Token);
+                if (ambiguous is not null)
+                    await DeleteNetworkAsync(ambiguous, cleanup.Token);
             }
-        }, cancellationToken);
-        return response.ID;
+            catch
+            {
+                // The ownership-labelled reaper is the final fallback.
+            }
+            throw;
+        }
     }
 
     public Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken) =>
@@ -340,11 +381,16 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         var failed = 0;
         var filters = new Dictionary<string, IDictionary<string, bool>>
         {
-            ["label"] = new Dictionary<string, bool> { ["noctf.io/expires-at"] = true }
+            ["label"] = new Dictionary<string, bool>
+            {
+                ["noctf.io/managed=true"] = true,
+                ["noctf.io/job-kind=awdp-verification"] = true,
+                ["noctf.io/expires-at"] = true
+            }
         };
         var containers = await client.Containers.ListContainersAsync(
             new ContainersListParameters { All = true, Filters = filters }, cancellationToken);
-        foreach (var container in containers.Where(item => IsExpired(item.Labels, now)))
+        foreach (var container in containers.Where(item => IsOwnedExpired(item.Labels, now)))
         {
             try
             {
@@ -368,7 +414,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
         var networks = await client.Networks.ListNetworksAsync(
             new NetworksListParameters { Filters = filters }, cancellationToken);
-        foreach (var network in networks.Where(item => IsExpired(item.Labels, now)))
+        foreach (var network in networks.Where(item => IsOwnedExpired(item.Labels, now)))
         {
             try
             {
@@ -394,6 +440,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         string checkerContainerId,
         CancellationToken cancellationToken)
     {
+        if (request.Generation <= 0)
+            throw new InvalidOperationException("An AWDP checker requires a positive Runtime generation.");
         if (!request.Environment.TryGetValue("NOCTF_CALLBACK_URL", out var callbackText)
             || !Uri.TryCreate(callbackText, UriKind.Absolute, out var callback)
             || callback.Scheme is not ("http" or "https"))
@@ -420,6 +468,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 Labels = new Dictionary<string, string>
                 {
                     ["noctf.io/network-purpose"] = "awdp-callback",
+                    ["noctf.io/managed"] = "true",
+                    ["noctf.io/job-kind"] = "awdp-verification",
+                    ["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D"),
+                    ["noctf.io/generation"] = request.Generation.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture),
                     ["noctf.io/expires-at"] = ExpiresAt(request).ToUnixTimeSeconds().ToString(
                         System.Globalization.CultureInfo.InvariantCulture)
                 }
@@ -504,7 +557,15 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     private static Dictionary<string, string> BuildLabels(ContainerRequest request)
     {
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
-        if (request.Ttl is not null)
+        if (request.AllowInternalCallback)
+        {
+            labels["noctf.io/managed"] = "true";
+            labels["noctf.io/job-kind"] = "awdp-verification";
+            labels["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D");
+            labels["noctf.io/generation"] = request.Generation.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+        if (request.AllowInternalCallback && request.Ttl is not null)
             labels["noctf.io/expires-at"] = ExpiresAt(request).ToUnixTimeSeconds().ToString(
                 System.Globalization.CultureInfo.InvariantCulture);
         return labels;
@@ -526,8 +587,19 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         _ => RuntimeStatus.Failed
     };
 
-    private static bool IsExpired(IDictionary<string, string>? labels, DateTimeOffset now) =>
+    private static bool IsOwnedExpired(IDictionary<string, string>? labels, DateTimeOffset now) =>
         labels is not null
+        && labels.TryGetValue("noctf.io/managed", out var managed)
+        && string.Equals(managed, "true", StringComparison.Ordinal)
+        && labels.TryGetValue("noctf.io/job-kind", out var jobKind)
+        && string.Equals(jobKind, "awdp-verification", StringComparison.Ordinal)
+        && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
+        && Guid.TryParse(runtimeText, out var runtimeId)
+        && runtimeId != Guid.Empty
+        && labels.TryGetValue("noctf.io/generation", out var generationText)
+        && int.TryParse(generationText, System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var generation)
+        && generation > 0
         && labels.TryGetValue("noctf.io/expires-at", out var text)
         && long.TryParse(text, System.Globalization.NumberStyles.None,
             System.Globalization.CultureInfo.InvariantCulture, out var expiresAt)

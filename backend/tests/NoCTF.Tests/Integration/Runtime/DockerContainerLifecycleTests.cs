@@ -26,11 +26,13 @@ public sealed class DockerContainerLifecycleTests
             using var lifecycle = CreateLifecycle();
             var operationId = Guid.NewGuid();
             var first = await lifecycle.CreateIsolatedNetworkAsync(
-                operationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                new RuntimeResourceIdentity(operationId, 1),
+                DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             try
             {
                 var replay = await lifecycle.CreateIsolatedNetworkAsync(
-                    operationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                    new RuntimeResourceIdentity(operationId, 1),
+                    DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
 
                 await Assert.That(replay).IsEqualTo(first);
             }
@@ -97,7 +99,7 @@ public sealed class DockerContainerLifecycleTests
         {
             await using var callback = new ContainerBuilder("alpine:3.20")
                 .WithCommand("sleep", "300")
-                .WithLabel("noctf.io/internal-role", "awdp-callback")
+                .WithLabel("noctf.io/internal-role", "awdp-callback-gateway")
                 .Build();
             await callback.StartAsync(cancellationToken);
             var endpoint = DockerEndpoint();
@@ -107,9 +109,11 @@ public sealed class DockerContainerLifecycleTests
             var firstOperationId = Guid.NewGuid();
             var secondOperationId = Guid.NewGuid();
             var firstSandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                firstOperationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                new RuntimeResourceIdentity(firstOperationId, 1),
+                DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             var secondSandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                secondOperationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                new RuntimeResourceIdentity(secondOperationId, 1),
+                DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             ContainerReceipt? first = null;
             ContainerReceipt? second = null;
             try
@@ -160,7 +164,8 @@ public sealed class DockerContainerLifecycleTests
             using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
                 DockerEndpoint(), "noctf-platform", "localhost", $"missing-{Guid.NewGuid():N}"));
             var sandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                operationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                new RuntimeResourceIdentity(operationId, 1),
+                DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             Func<Task> action = () => lifecycle.CreateAsync(
                 CheckerRequest(operationId, sandbox), cancellationToken);
 
@@ -198,7 +203,8 @@ public sealed class DockerContainerLifecycleTests
         new ContainerSecurityPolicy(true, false, true, ["ALL"], []),
         TimeSpan.FromMinutes(1),
         NetworkName: networkName,
-        AllowInternalCallback: true);
+        AllowInternalCallback: true,
+        Generation: 1);
 
     private static ContainerReceipt Receipt(string resourceId) => new(
         Guid.NewGuid(), RuntimeProvider.Docker, resourceId, RuntimeStatus.Running,

@@ -7,6 +7,7 @@ public static class AwdpTargetDefinitionFactory
 {
     public static ContainerRequest Create(
         Guid operationId,
+        int generation,
         ChallengeRuntimeTemplate template,
         int targetPort,
         DateTimeOffset now)
@@ -24,11 +25,12 @@ public static class AwdpTargetDefinitionFactory
         var labels = template.Labels is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(template.Labels, StringComparer.Ordinal);
-        labels["noctf.managed"] = "true";
-        labels["noctf.operation-id"] = operationId.ToString("D");
-        labels["noctf.runtime-instance-id"] = operationId.ToString("D");
-        labels["noctf.purpose"] = "awdp-target";
-        labels["noctf.io.job-kind"] = "awdp-verification";
+        labels["noctf.io/managed"] = "true";
+        labels["noctf.io/runtime-instance-id"] = operationId.ToString("D");
+        labels["noctf.io/generation"] = generation.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        labels["noctf.io/purpose"] = "awdp-target";
+        labels["noctf.io/job-kind"] = "awdp-verification";
         labels["noctf.io/expires-at"] = now.Add(ttl).ToUnixTimeSeconds().ToString(
             System.Globalization.CultureInfo.InvariantCulture);
         return new ContainerRequest(
@@ -46,6 +48,7 @@ public static class AwdpTargetDefinitionFactory
                 ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
                 : TimeSpan.FromMinutes(2),
             NetworkIsolation: ContainerNetworkIsolation.Isolated,
-            InternalPorts: [targetPort]);
+            InternalPorts: [targetPort],
+            Generation: generation);
     }
 }

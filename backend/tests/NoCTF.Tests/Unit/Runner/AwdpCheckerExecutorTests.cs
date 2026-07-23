@@ -14,6 +14,7 @@ public sealed class AwdpCheckerExecutorTests
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
         var work = new AwdpCheckerWork(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            3,
             RuntimeProvider.Docker,
             "checker:latest",
             ["/checker"],
@@ -39,7 +40,9 @@ public sealed class AwdpCheckerExecutorTests
         await Assert.That(request.Environment["TARGET_READY_TIMEOUT_SECONDS"]).IsEqualTo("30");
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"]).IsEqualTo("callback-token");
         await Assert.That(request.Environment).DoesNotContainKey("OBJECT_KEY");
-        await Assert.That(request.Labels["noctf.purpose"]).IsEqualTo("awdp-checker");
+        await Assert.That(request.Labels["noctf.io/purpose"]).IsEqualTo("awdp-checker");
+        await Assert.That(request.Labels["noctf.io/managed"]).IsEqualTo("true");
+        await Assert.That(request.Labels["noctf.io/generation"]).IsEqualTo("3");
         await Assert.That(request.PortMappings).IsEmpty();
         await Assert.That(request.AllowInternalCallback).IsTrue();
     }
@@ -70,6 +73,7 @@ public sealed class AwdpCheckerExecutorTests
 
     private static AwdpCheckerWork Work() => new(
         Guid.Parse("11111111-1111-1111-1111-111111111111"),
+        3,
         RuntimeProvider.Docker,
         "checker:latest",
         ["/checker"],

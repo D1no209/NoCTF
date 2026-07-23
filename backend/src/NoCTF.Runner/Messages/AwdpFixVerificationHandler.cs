@@ -18,6 +18,7 @@ namespace NoCTF.Runner.Messages;
 
 public sealed record AwdpCheckerWork(
     Guid RuntimeInstanceId,
+    int Generation,
     RuntimeProvider Provider,
     string Image,
     IReadOnlyList<string> Command,
@@ -186,6 +187,7 @@ public sealed class AwdpFixWorkReader(
             TimeSpan.FromSeconds(settings.PatchTimeoutSeconds),
             new(
                 message.RuntimeInstanceId,
+                message.Generation,
                 checker.Provider,
                 checker.Image,
                 checker.Command ?? [],
@@ -224,9 +226,12 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             environment,
             new Dictionary<string, string>
             {
-                ["noctf.managed"] = "true",
-                ["noctf.runtime-instance-id"] = work.RuntimeInstanceId.ToString("D"),
-                ["noctf.purpose"] = "awdp-checker"
+                ["noctf.io/managed"] = "true",
+                ["noctf.io/runtime-instance-id"] = work.RuntimeInstanceId.ToString("D"),
+                ["noctf.io/generation"] = work.Generation.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture),
+                ["noctf.io/job-kind"] = "awdp-verification",
+                ["noctf.io/purpose"] = "awdp-checker"
             },
             new Dictionary<int, int>(),
             new ContainerResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
@@ -234,7 +239,8 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             work.Timeout,
             NetworkName: work.NetworkId,
             OperationTimeout: work.Timeout,
-            AllowInternalCallback: true);
+            AllowInternalCallback: true,
+            Generation: work.Generation);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(work.Timeout);
         try
