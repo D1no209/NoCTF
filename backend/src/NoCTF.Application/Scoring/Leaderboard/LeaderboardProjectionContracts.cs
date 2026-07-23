@@ -23,13 +23,9 @@ public sealed record LeaderboardSubmissionFact(
     SubmissionKind Kind,
     DateTimeOffset ReceivedAt,
     ScoringEvent Event,
-    Guid? SubjectTeamId = null,
-    Guid? VictimTeamId = null,
-    Guid? ServiceId = null,
-    long? ControlIntervalSeconds = null,
-    Guid? StageId = null);
+    Guid? VictimTeamId = null);
 
-public sealed record LeaderboardSystemFact(ScoringEvent Event);
+public sealed record LeaderboardSystemFact(ScoringEvent Event, long CurrentValue = 0);
 
 public interface IGameModeLeaderboardProjector
 {

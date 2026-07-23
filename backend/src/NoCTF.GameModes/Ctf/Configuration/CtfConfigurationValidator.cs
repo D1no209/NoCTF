@@ -9,6 +9,8 @@ public static class CtfConfigurationValidator
     public static IReadOnlyList<string> Validate(CtfConfiguration configuration)
     {
         var errors = ValidatePoints(configuration.DefaultPoints).ToList();
+        if (configuration.WrongSubmissionPenalty < 0)
+            errors.Add("WrongSubmissionPenalty cannot be negative.");
         if (configuration.BloodRewards.Count > 3)
             errors.Add("At most three blood rewards are supported.");
         foreach (var reward in configuration.BloodRewards)
@@ -27,6 +29,8 @@ public static class CtfConfigurationValidator
         var errors = configuration.Points is null
             ? []
             : ValidatePoints(configuration.Points).ToList();
+        if (configuration.WrongSubmissionPenalty is < 0)
+            errors.Add("WrongSubmissionPenalty cannot be negative.");
         if (configuration.BloodRewards is null)
         {
             ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);

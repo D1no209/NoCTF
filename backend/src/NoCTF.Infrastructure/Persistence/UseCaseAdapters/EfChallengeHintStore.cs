@@ -198,11 +198,18 @@ public sealed class EfChallengeHintStore(
             .Join(db.ScoringEvents.AsNoTracking(), item => item.CurrentScoringEventId, fact => (Guid?)fact.Id,
                 (item, fact) => new LeaderboardSubmissionFact(
                     item.Id, item.TeamId, item.CompetitionChallengeId, item.Kind, item.ReceivedAt, fact,
-                    null, fact.VictimTeamId, null, null, null))
+                    fact.VictimTeamId))
             .ToListAsync(ct);
         var system = await db.ScoringEvents.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId && item.SubmissionId == null)
-            .Select(item => new LeaderboardSystemFact(item))
+            .Select(item => new LeaderboardSystemFact(
+                item,
+                item.Kind == ScoringEventKind.HintUnlock && item.SpecificationId != null
+                    ? db.Set<CompetitionChallengeHint>()
+                        .Where(hint => hint.Id == item.SpecificationId && hint.DeletedAt == null)
+                        .Select(hint => hint.Cost)
+                        .SingleOrDefault()
+                    : 0))
             .ToListAsync(ct);
         var result = projection.Project(new(
             competitionId, competition.Mode, teams, submissions, system, challenges,
