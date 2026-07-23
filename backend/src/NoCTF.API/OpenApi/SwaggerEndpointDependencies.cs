@@ -3,32 +3,67 @@ using NoCTF.Application.Common;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Ports;
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Submissions.PatchUploads;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.API.OpenApi;
 
 internal sealed class SwaggerSubmissionStore : ISubmissionIntakeStore
 {
-    public Task<SubmissionAcceptanceResult?> FindAcceptedAsync(
-        Guid competitionId, string idempotencyKey, Guid teamId, Guid challengeId, Guid userId,
-        NoCTF.Domain.Submissions.SubmissionKind kind, AwdAttackTarget? attackTarget,
-        Guid? stageId,
-        Guid? challengeInstanceId,
-        NoCTF.Domain.Submissions.FlagFingerprint? flagFingerprint,
+    public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
         CancellationToken cancellationToken) =>
-        Task.FromResult<SubmissionAcceptanceResult?>(null);
-    public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(Guid competitionId, Guid teamId, Guid challengeId, Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult<SubmissionAdmissionSnapshot?>(null);
     public Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
         FlagSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts,
         CancellationToken cancellationToken) =>
         Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
+    public Task<IReadOnlyList<SubmissionAcceptanceResult>> TryAcceptFlagsAsync(
+        IReadOnlyList<FlagSubmissionReceived> received,
+        SubmissionAdmissionSnapshot snapshot,
+        int? maxAttempts,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<SubmissionAcceptanceResult>>(
+            received.Select(_ => new SubmissionAcceptanceResult(
+                SubmissionAcceptanceState.SnapshotChanged)).ToArray());
     public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
         FixSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts,
         CancellationToken cancellationToken) =>
         Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
+}
+
+internal sealed class SwaggerPatchUploadStore : IPatchUploadStore
+{
+    public Task<PatchUploadScope?> ResolveScopeAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<PatchUploadScope?>(null);
+    public Task<bool> SaveAsync(
+        Guid patchUploadId,
+        PatchUploadScope scope,
+        string objectKey,
+        string fileName,
+        string contentType,
+        long byteLength,
+        byte[] sha256,
+        DateTimeOffset uploadedAt,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(false);
+}
+
+internal sealed class SwaggerFixArchiveReader : IFixArchiveReader
+{
+    public Task<FixArchiveDescriptor?> FindAsync(
+        Guid submissionId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<FixArchiveDescriptor?>(null);
 }
 
 internal sealed class SwaggerSubmissionAdmissionModePolicy : ISubmissionAdmissionModePolicy
@@ -50,12 +85,48 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
     public Task<AuthenticatedUser?> FindByLoginAsync(string login, CancellationToken cancellationToken) => Task.FromResult<AuthenticatedUser?>(null);
     public Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) => Task.FromResult<AuthenticatedUser?>(null);
     public Task<bool> VerifyPasswordAsync(Guid userId, string password, CancellationToken cancellationToken) => Task.FromResult(false);
+    public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<UserProfile?>(null);
+    public Task<CreateUserState> CreateAsync(
+        Guid userId,
+        string userName,
+        string email,
+        string password,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(CreateUserState.Created);
+    public Task<bool> ChangePasswordAsync(
+        Guid userId,
+        string currentPassword,
+        string newPassword,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(false);
+    public Task<bool> IncrementTokenVersionAsync(
+        Guid userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(false);
 }
 
 internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReader
 {
     public Task<bool> IsCurrentAsync(Guid userId, int tokenVersion, CancellationToken cancellationToken) =>
         Task.FromResult(false);
+}
+
+internal sealed class SwaggerEmailVerificationStore : IEmailVerificationStore
+{
+    public Task<EmailVerificationState> IssueAsync(
+        Guid userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(EmailVerificationState.Issued);
+    public Task<EmailVerificationState> VerifyAsync(
+        string token,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(EmailVerificationState.Verified);
 }
 
 internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
@@ -84,12 +155,12 @@ internal sealed class SwaggerModerationAuthorizer : ICompetitionModerationAuthor
         Task.FromResult(false);
 }
 
-internal sealed class SwaggerBackgroundWorkScheduler : IBackgroundWorkScheduler
+internal sealed class SwaggerBackendMessagePublisher : IBackendMessagePublisher
 {
-    public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-    public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-    public ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-    public ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask CleanupCompetitionRuntimesAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask ProvisionCompetitionRuntimesAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 internal sealed class SwaggerLeaderboardCache : ILeaderboardCache

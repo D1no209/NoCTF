@@ -15,7 +15,6 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
                 GameMode.Awd => Awd.Configuration.AwdConfigurationValidator.Validate(Awd.Configuration.AwdConfigurationUpgrader.ParseCompetition(json)),
                 GameMode.Awdp => Awdp.Configuration.AwdpConfigurationValidator.Validate(Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(json)),
                 GameMode.Koh => Koh.Configuration.KohConfigurationValidator.Validate(Koh.Configuration.KohConfigurationUpgrader.ParseCompetition(json)),
-                GameMode.Penetration => ValidatePenetration(json),
                 _ => ["Unsupported game mode."]
             };
         }
@@ -23,11 +22,5 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
         {
             return [exception.Message];
         }
-    }
-
-    private static IReadOnlyList<string> ValidatePenetration(string json)
-    {
-        Penetration.Configuration.PenetrationConfigurationUpgrader.ParseCompetition(json);
-        return [];
     }
 }

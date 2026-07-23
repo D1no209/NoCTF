@@ -13,11 +13,12 @@ public sealed class EfCompetitionManagementStore(NoCtfDbContext db) : ICompetiti
         var competition = new Competition
         {
             Id = id, Title = command.Title.Trim(), Description = command.Description?.Trim(), OwnerId = command.OwnerId,
-            Mode = command.Mode, StartTime = command.StartTime, EndTime = command.EndTime,
+            Mode = command.Mode, StartAt = command.StartTime, EndAt = command.EndTime,
             Status = CompetitionStatus.Draft, TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove,
             MaxTeamMembers = command.MaxTeamMembers, CreatedAt = command.CreatedAt, UpdatedAt = command.CreatedAt,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
-            ConfigurationRevision = 0, ConfigurationUpdatedAt = command.CreatedAt
+            ConfigurationRevision = 0, ConfigurationUpdatedAt = command.CreatedAt,
+            FlagDerivationSecret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)
         };
         db.Competitions.Add(competition);
         await db.SaveChangesAsync(ct);
@@ -37,14 +38,13 @@ public sealed class EfCompetitionManagementStore(NoCtfDbContext db) : ICompetiti
     {
         var affected = await db.Competitions
             .Where(x => x.Id == command.CompetitionId
-                && !x.Deletion.IsDeleted
-                && x.Status == expectedStatus
-                && x.Status != CompetitionStatus.Finished)
+                && x.DeletedAt == null
+                && x.Status == expectedStatus)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.Title, command.Title.Trim())
                 .SetProperty(x => x.Description, command.Description == null ? null : command.Description.Trim())
-                .SetProperty(x => x.StartTime, command.StartTime)
-                .SetProperty(x => x.EndTime, command.EndTime)
+                .SetProperty(x => x.StartAt, command.StartTime)
+                .SetProperty(x => x.EndAt, command.EndTime)
                 .SetProperty(x => x.TeamRegistrationAutoApprove, command.TeamRegistrationAutoApprove)
                 .SetProperty(x => x.MaxTeamMembers, command.MaxTeamMembers)
                 .SetProperty(x => x.UpdatedAt, command.UpdatedAt), ct);
@@ -60,26 +60,24 @@ public sealed class EfCompetitionManagementStore(NoCtfDbContext db) : ICompetiti
     {
         var affected = await db.Competitions
             .Where(x => x.Id == competitionId
-                && !x.Deletion.IsDeleted
+                && x.DeletedAt == null
                 && x.Status == expectedStatus
                 && x.Status != CompetitionStatus.Running
                 && x.Status != CompetitionStatus.Paused
                 && x.Status != CompetitionStatus.Finished)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.Deletion.IsDeleted, true)
-                .SetProperty(x => x.Deletion.DeletedAt, deletedAt)
-                .SetProperty(x => x.Deletion.DeletedById, actorId)
+                .SetProperty(x => x.DeletedAt, deletedAt)
                 .SetProperty(x => x.UpdatedAt, deletedAt), ct);
         return affected == 1;
     }
 
     private IQueryable<CompetitionView> Query(bool includeDraft) =>
         db.Competitions.AsNoTracking()
-            .Where(x => !x.Deletion.IsDeleted && (includeDraft || x.Status != CompetitionStatus.Draft))
-            .Select(x => new CompetitionView(x.Id, x.Title, x.Description, x.Mode, x.StartTime, x.EndTime,
+            .Where(x => x.DeletedAt == null && (includeDraft || x.Status != CompetitionStatus.Draft))
+            .Select(x => new CompetitionView(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt,
                 x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers, x.OwnerId));
 
     private static CompetitionView Map(Competition x) =>
-        new(x.Id, x.Title, x.Description, x.Mode, x.StartTime, x.EndTime, x.Status,
+        new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
             x.TeamRegistrationAutoApprove, x.MaxTeamMembers, x.OwnerId);
 }

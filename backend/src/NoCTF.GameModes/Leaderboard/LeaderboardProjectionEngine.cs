@@ -54,7 +54,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
             .ToDictionary(challenge => challenge.Id);
         var observations = new List<SlotObservation>();
         foreach (var fact in input.Submissions
-                     .Where(fact => validTeams.Contains(fact.TeamId) && !fact.Event.IsDeleted)
+                     .Where(fact => validTeams.Contains(fact.TeamId) && fact.Event.DeletedAt is null)
                      .OrderBy(fact => fact.ReceivedAt)
                      .ThenBy(fact => fact.SubmissionId))
         {
@@ -64,7 +64,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
             if (observation is not null) observations.Add(observation);
         }
         foreach (var fact in input.SystemEvents
-                     .Where(fact => !fact.Event.IsDeleted && fact.Event.TeamId is Guid teamId && validTeams.Contains(teamId))
+                     .Where(fact => fact.Event.DeletedAt is null && fact.Event.TeamId is Guid teamId && validTeams.Contains(teamId))
                      .OrderBy(fact => fact.Event.OccurredAt)
                      .ThenBy(fact => fact.Event.Id))
         {
@@ -94,8 +94,6 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
                 Slot(fact.TeamId, $"break:{challengeId:N}", LeaderboardSlotKind.Break, challengeLabel, fact.ReceivedAt, fact.SubmissionId, succeeded, false),
             GameMode.Awdp when fact.Kind == SubmissionKind.Fix && challengeId is not null =>
                 Slot(fact.TeamId, $"fix:{challengeId:N}", LeaderboardSlotKind.Fix, challengeLabel, fact.ReceivedAt, fact.SubmissionId, succeeded, false),
-            GameMode.Penetration when fact.StageId is Guid stageId =>
-                Slot(fact.TeamId, $"stage:{stageId:N}", LeaderboardSlotKind.Stage, challengeLabel, fact.ReceivedAt, fact.SubmissionId, succeeded, true),
             _ => null
         };
     }
@@ -112,10 +110,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
             : string.Empty;
         return mode switch
         {
-            GameMode.Awd when scoringEvent.Kind == ScoringEventKind.AwdServiceCheck =>
-                Slot(teamId, $"service:{challengeId}", LeaderboardSlotKind.Service, label, scoringEvent.OccurredAt,
-                    scoringEvent.Id, scoringEvent.Result == ScoringResult.Correct, false),
-            GameMode.Awdp when scoringEvent.Kind == ScoringEventKind.AwdpFixCheck =>
+            GameMode.Awd when scoringEvent.Kind == ScoringEventKind.AwdServiceStatus =>
                 Slot(teamId, $"service:{challengeId}", LeaderboardSlotKind.Service, label, scoringEvent.OccurredAt,
                     scoringEvent.Id, scoringEvent.Result == ScoringResult.Correct, false),
             GameMode.Koh when scoringEvent.Kind == ScoringEventKind.KohObservation =>

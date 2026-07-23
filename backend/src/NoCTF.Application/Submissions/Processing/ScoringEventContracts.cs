@@ -9,13 +9,16 @@ public sealed record ScoringEventDecision(
     ScoringResult Result,
     ScoringFailureCode? FailureCode,
     DateTimeOffset OccurredAt,
-    string EvaluatorVersion);
+    string EvaluatorVersion,
+    Guid? VictimTeamId = null,
+    SpecificationKind? SpecificationKind = null,
+    Guid? SpecificationId = null);
 
 public sealed record SubmissionProcessingContext(
     Submission Submission,
     IReadOnlyList<ScoringEvent> PriorEvents,
     IReadOnlyList<ChallengeFlag> ApplicableFlags,
-    FixSubmissionRecord? FixRecord,
+    PatchUpload? PatchUpload,
     string CompetitionConfigurationJson,
     string ChallengeConfigurationJson,
     IReadOnlyList<Submission>? PriorSubmissions = null,
@@ -29,9 +32,4 @@ public interface ISubmissionEvaluator
 public interface ISubmissionEvaluatorCatalog
 {
     ISubmissionEvaluator Get(GameMode mode);
-}
-
-public interface ISystemScoringEventEvaluator
-{
-    ScoringEventDecision Evaluate(ScoringEvent systemEvent);
 }

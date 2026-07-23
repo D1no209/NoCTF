@@ -1,12 +1,10 @@
-using FastEndpoints;
 using NoCTF.Application.Runtime.Ports;
-using NoCTF.Application.Authentication;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Runtime.Kubernetes.Compose;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Containers;
-using NoCTF.Runner.Endpoints;
+using NoCTF.Runtime.Libvirt;
 using k8s;
 
 namespace NoCTF.Runner.Composition;
@@ -36,20 +34,14 @@ public static class ServiceRegistration
         services.AddSingleton<IRuntimeResourceReaper>(provider =>
             provider.GetRequiredService<KubernetesContainerLifecycle>());
         services.AddSingleton<KubernetesComposeRuntime>();
+        services.AddSingleton<ILibvirtProcessAdapter, LibvirtProcessAdapter>();
+        services.AddSingleton<LibvirtApplianceLifecycle>();
         services.AddSingleton<RuntimeProviderCatalog>();
         services.AddSingleton<IOneShotRuntimeProviderCatalog>(provider =>
             provider.GetRequiredService<RuntimeProviderCatalog>());
         services.AddSingleton<IContainerRuntimeProviderCatalog>(provider =>
             provider.GetRequiredService<RuntimeProviderCatalog>());
-        services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
-        services.AddSingleton<IRunnerScoringCallbackDispatcher, RunnerScoringCallbackDispatcher>();
         services.AddSingleton<FixArchivePreparer>();
-        services.AddHostedService<RunnerResourceReaperHostedService>();
-        services.AddFastEndpoints(discovery =>
-        {
-            discovery.Assemblies = [typeof(RunOneShotEndpoint).Assembly];
-            discovery.DisableAutoDiscovery = true;
-        });
         return services;
     }
 }

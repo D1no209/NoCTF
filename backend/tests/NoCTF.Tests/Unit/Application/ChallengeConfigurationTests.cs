@@ -1,4 +1,4 @@
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
@@ -11,7 +11,7 @@ public class ChallengeConfigurationTests
     [Arguments(CompetitionStatus.Running)]
     [Arguments(CompetitionStatus.Paused)]
     [Arguments(CompetitionStatus.Finished)]
-    public async Task UpdateChallengeConfiguration_ActiveOrFinishedCompetition_IsLocked(
+    public async Task UpdateChallengeConfiguration_IsAllowedInEveryLifecycleState(
         CompetitionStatus status)
     {
         var store = new Store(View(status));
@@ -28,8 +28,8 @@ public class ChallengeConfigurationTests
             ValidJson,
             DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("configuration_locked");
-        await Assert.That(store.UpdateCalls).IsEqualTo(0);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.UpdateCalls).IsEqualTo(1);
     }
 
     [Test]
@@ -150,16 +150,16 @@ public class ChallengeConfigurationTests
         }
     }
 
-    private sealed class Scheduler : IBackgroundWorkScheduler
+    private sealed class Scheduler : IBackendMessagePublisher
     {
         public Guid? RebuildCompetitionId { get; private set; }
         public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
         public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
-        public ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken) =>
+        public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
-        public ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken)
+        public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken)
         {
             RebuildCompetitionId = competitionId;
             return ValueTask.CompletedTask;

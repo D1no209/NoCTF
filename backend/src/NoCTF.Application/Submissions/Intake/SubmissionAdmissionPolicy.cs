@@ -21,7 +21,7 @@ public static class SubmissionAdmissionPolicy
             return OperationResult.Failure("team_forbidden", "The user cannot submit for this team.");
         if (snapshot.TeamBanned)
             return OperationResult.Failure("team_banned", "The team is banned.");
-        if (kind == SubmissionKind.Flag && !rules.AllowsFlag
+        if (kind is SubmissionKind.Flag or SubmissionKind.Break && !rules.AllowsFlag
             || kind == SubmissionKind.Fix && !rules.AllowsFix)
             return OperationResult.Failure("submission_kind_unsupported", "This game mode does not accept this submission kind.");
         if (snapshot.CompetitionStatus != CompetitionStatus.Running)
@@ -33,12 +33,12 @@ public static class SubmissionAdmissionPolicy
                 CompetitionStatus.Finished => OperationResult.Failure("competition_finished", "The competition has finished."),
                 _ => OperationResult.Failure("competition_unavailable", "The competition is not accepting submissions.")
             };
-        if (receivedAt < snapshot.StartTime)
+        if (receivedAt < snapshot.StartAt)
             return OperationResult.Failure("competition_not_started", "The competition has not started.");
-        if (receivedAt > snapshot.EndTime)
+        if (receivedAt >= snapshot.EndAt)
             return OperationResult.Failure("competition_finished", "The submission arrived after the deadline.");
-        var maxAttempts = kind == SubmissionKind.Flag ? rules.MaxFlagAttempts : rules.MaxFixAttempts;
-        var acceptedAttempts = kind == SubmissionKind.Flag
+        var maxAttempts = kind is SubmissionKind.Flag or SubmissionKind.Break ? rules.MaxFlagAttempts : rules.MaxFixAttempts;
+        var acceptedAttempts = kind is SubmissionKind.Flag or SubmissionKind.Break
             ? snapshot.AcceptedFlagAttempts
             : snapshot.AcceptedFixAttempts;
         if (maxAttempts is > 0 && acceptedAttempts >= maxAttempts)

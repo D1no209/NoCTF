@@ -9,7 +9,7 @@ public sealed class EfCompetitionHubAccess(NoCtfDbContext db) : ICompetitionHubA
     public Task<bool> CanJoinAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
         db.Competitions.AsNoTracking().AnyAsync(competition =>
             competition.Id == competitionId
-            && !competition.Deletion.IsDeleted
+            && competition.DeletedAt == null
             && competition.Status != CompetitionStatus.Draft,
             cancellationToken);
 }

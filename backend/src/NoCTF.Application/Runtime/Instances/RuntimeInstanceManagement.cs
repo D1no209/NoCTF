@@ -1,0 +1,131 @@
+using NoCTF.Application.Common;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Runtime;
+
+namespace NoCTF.Application.Runtime.Instances;
+
+public enum RuntimeAction
+{
+    Start,
+    Stop,
+    Reset,
+    Extend
+}
+
+public sealed record RuntimeInstanceView(
+    Guid Id,
+    Guid CompetitionId,
+    Guid CompetitionChallengeId,
+    Guid? TeamId,
+    int Generation,
+    RuntimeKind RuntimeKind,
+    RuntimeProvider Provider,
+    string RunnerPool,
+    RuntimeState State,
+    RuntimeFailureCode? FailureCode,
+    long ProcessingVersion,
+    IReadOnlyList<string> Urls,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? RunningAt,
+    DateTimeOffset? ExpiresAt,
+    DateTimeOffset? StoppedAt,
+    string? RunnerId = null,
+    string? ProviderReceiptJson = null,
+    string? ControlCheckUrl = null);
+
+public sealed record RuntimeMutationCommand(
+    Guid CompetitionId,
+    Guid CompetitionChallengeId,
+    Guid UserId,
+    RuntimeAction Action,
+    TimeSpan? Extension,
+    DateTimeOffset Now);
+
+public enum RuntimeMutationFailure
+{
+    NotFound,
+    Unsupported,
+    InvalidState,
+    CapacityExceeded,
+    Conflict,
+    ConfigurationInvalid
+}
+
+public sealed record RuntimeMutationResult(
+    RuntimeInstanceView? Runtime,
+    RuntimeMutationFailure? Failure = null);
+
+public interface IRuntimeInstanceStore
+{
+    Task<RuntimeInstanceView?> FindPlayerRuntimeAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        CancellationToken cancellationToken);
+    Task<RuntimeMutationResult> MutatePlayerRuntimeAsync(
+        RuntimeMutationCommand command,
+        CancellationToken cancellationToken);
+}
+
+public sealed record RuntimeTargetView(Guid TeamId, string TeamName, IReadOnlyList<string> Urls);
+
+public interface IRuntimeTargetReader
+{
+    Task<IReadOnlyList<RuntimeTargetView>?> ListAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+}
+
+public sealed class ListRuntimeTargets(IRuntimeTargetReader reader)
+{
+    public Task<IReadOnlyList<RuntimeTargetView>?> ExecuteAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        reader.ListAsync(competitionId, competitionChallengeId, userId, now, ct);
+}
+
+public sealed class GetPlayerRuntime(IRuntimeInstanceStore store)
+{
+    public Task<RuntimeInstanceView?> ExecuteAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        CancellationToken ct = default) =>
+        store.FindPlayerRuntimeAsync(competitionId, competitionChallengeId, userId, ct);
+}
+
+public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)
+{
+    public async Task<OperationResult<RuntimeInstanceView>> ExecuteAsync(
+        RuntimeMutationCommand command,
+        CancellationToken ct = default)
+    {
+        if (command.Action == RuntimeAction.Extend &&
+            (command.Extension is null || command.Extension <= TimeSpan.Zero || command.Extension > TimeSpan.FromHours(24)))
+        {
+            return OperationResult<RuntimeInstanceView>.Failure(
+                "invalid_extension",
+                "Extension must be greater than zero and no more than 24 hours.");
+        }
+
+        var result = await store.MutatePlayerRuntimeAsync(command, ct);
+        if (result.Runtime is not null)
+            return OperationResult<RuntimeInstanceView>.Success(result.Runtime);
+        var failure = result.Failure ?? RuntimeMutationFailure.Conflict;
+        return OperationResult<RuntimeInstanceView>.Failure(failure switch
+        {
+            RuntimeMutationFailure.NotFound => "runtime_not_found",
+            RuntimeMutationFailure.Unsupported => "runtime_action_unsupported",
+            RuntimeMutationFailure.InvalidState => "runtime_state_conflict",
+            RuntimeMutationFailure.CapacityExceeded => "runtime_capacity_exceeded",
+            RuntimeMutationFailure.ConfigurationInvalid => "runtime_configuration_invalid",
+            _ => "runtime_conflict"
+        }, "Runtime action was rejected.");
+    }
+}

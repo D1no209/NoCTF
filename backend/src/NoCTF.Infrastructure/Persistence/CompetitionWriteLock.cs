@@ -10,8 +10,11 @@ internal static class CompetitionWriteLock
         Guid competitionId,
         CancellationToken cancellationToken)
     {
-        var statuses = await db.Database.SqlQuery<int>(
-                $"""SELECT "Status" AS "Value" FROM competitions WHERE "Id" = {competitionId} AND NOT "Deletion_IsDeleted" FOR UPDATE""")
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({'c' + competitionId.ToString("N")}, 0))",
+            cancellationToken);
+        var statuses = await db.Database.SqlQuery<short>(
+                $"""SELECT status AS "Value" FROM competitions WHERE id = {competitionId} AND deleted_at IS NULL""")
             .ToListAsync(cancellationToken);
         return statuses.Count == 1 ? (CompetitionStatus)statuses[0] : null;
     }

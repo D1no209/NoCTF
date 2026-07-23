@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace NoCTF.Domain.Submissions;
 
 /// <summary>Accepted input facts. Processing conclusions live in <see cref="ScoringEvent"/>.</summary>
@@ -5,24 +7,19 @@ public sealed class Submission
 {
     public Guid Id { get; set; }
     public Guid CompetitionId { get; set; }
-    public Guid? TeamId { get; set; }
-    public Guid? CompetitionChallengeId { get; set; }
-    public Guid? UserId { get; set; }
+    public Guid TeamId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+    public Guid SubmittedByUserId { get; set; }
     public SubmissionKind Kind { get; set; }
     public DateTimeOffset ReceivedAt { get; set; }
-    public string? FlagHash { get; set; }
-    public int? FlagLength { get; set; }
-    public string? IdempotencyKey { get; set; }
-    public Guid? SubjectTeamId { get; set; }
-    public Guid? VictimTeamId { get; set; }
-    public Guid? ServiceId { get; set; }
-    public Guid? StageId { get; set; }
-    public Guid? ChallengeInstanceId { get; set; }
-    public long? ControlIntervalSeconds { get; set; }
-    public bool CheckerPlatformError { get; set; }
-    public Guid? ScoringEventId { get; set; }
-    public ScoringEvent? ScoringEvent { get; set; }
+    public string? SubmittedFlag { get; set; }
+    public byte[]? SubmittedFlagSha256 { get; set; }
+    public Guid? PatchUploadId { get; set; }
+    public SubmissionEvaluationState EvaluationState { get; set; }
+    public ScoringFailureCode? EvaluationFailureCode { get; set; }
+    public DateTimeOffset EvaluationUpdatedAt { get; set; }
+    public Guid? CurrentScoringEventId { get; set; }
     public long ProcessingVersion { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
+    [MaxLength(32)]
+    public byte[]? EvaluationResultBodySha256 { get; set; }
 }

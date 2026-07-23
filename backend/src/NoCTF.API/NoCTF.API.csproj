@@ -8,8 +8,6 @@
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.GameModes/NoCTF.GameModes.csproj" />
     <ProjectReference Include="../NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
-    <ProjectReference Include="../NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
-    <ProjectReference Include="../NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FastEndpoints" />
@@ -18,5 +16,9 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Riok.Mapperly" PrivateAssets="all" />
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
+    <PackageReference Include="WolverineFx.Postgresql" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" />
   </ItemGroup>
 </Project>

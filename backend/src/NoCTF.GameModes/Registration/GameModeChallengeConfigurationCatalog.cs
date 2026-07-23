@@ -5,7 +5,6 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
-using NoCTF.GameModes.Penetration.Configuration;
 
 namespace NoCTF.GameModes.Registration;
 
@@ -33,9 +32,6 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         GameMode.Koh => JsonSerializer.Serialize(
             new KohChallengeConfiguration(KohChallengeConfiguration.CurrentSchemaVersion, "http://localhost"),
             JsonOptions),
-        GameMode.Penetration => JsonSerializer.Serialize(
-            new PenetrationChallengeConfiguration(PenetrationChallengeConfiguration.CurrentSchemaVersion, [], null),
-            JsonOptions),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };
 
@@ -49,8 +45,6 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                 GameMode.Awd => AwdConfigurationValidator.Validate(AwdConfigurationUpgrader.ParseChallenge(json)),
                 GameMode.Awdp => AwdpConfigurationValidator.Validate(AwdpConfigurationParser.ParseChallenge(json)),
                 GameMode.Koh => KohConfigurationValidator.Validate(KohConfigurationUpgrader.ParseChallenge(json)),
-                GameMode.Penetration => PenetrationConfigurationValidator.Validate(
-                    PenetrationConfigurationUpgrader.ParseChallenge(json)),
                 _ => ["Unsupported game mode."]
             };
         }

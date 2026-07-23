@@ -10,21 +10,30 @@ internal sealed class ScoringEventConfiguration : IEntityTypeConfiguration<Scori
     {
         builder.ToTable("scoring_events");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.ProcessedWorkerId).HasMaxLength(128);
-        builder.Property(x => x.EvaluatorVersion).HasMaxLength(128);
-        builder.Property(x => x.SourceKey).HasMaxLength(256);
-        builder.Property(x => x.RowVersion).IsConcurrencyToken();
+        builder.Property(x => x.Kind).HasConversion<short>();
+        builder.Property(x => x.Result).HasConversion<short>();
+        builder.Property(x => x.FailureCode).HasConversion<short>();
+        builder.Property(x => x.SpecificationKind).HasConversion<short>();
         builder.HasIndex(x => new { x.CompetitionId, x.OccurredAt, x.Id });
         builder.HasIndex(x => x.SubmissionId);
         builder.HasIndex(x => new { x.CompetitionId, x.TeamId, x.CompetitionChallengeId, x.Kind, x.OccurredAt });
-        builder.HasIndex(x => new { x.CompetitionId, x.Kind, x.SourceKey }).IsUnique()
-            .HasFilter("\"IsDeleted\" = FALSE AND \"SourceKey\" IS NOT NULL");
-        builder.HasQueryFilter(x => !x.IsDeleted);
+        builder.HasIndex(x => x.SubmissionId).IsUnique()
+            .HasFilter("submission_id IS NOT NULL AND deleted_at IS NULL");
+        builder.HasQueryFilter(x => x.DeletedAt == null);
         builder.HasOne(x => x.Submission).WithMany().HasForeignKey(x => x.SubmissionId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<NoCTF.Domain.Challenges.CompetitionChallenge>()
             .WithMany()
             .HasForeignKey(scoringEvent => scoringEvent.CompetitionChallengeId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<NoCTF.Domain.Competitions.Competition>().WithMany()
+            .HasForeignKey(scoringEvent => scoringEvent.CompetitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<NoCTF.Domain.Teams.Team>().WithMany()
+            .HasForeignKey(scoringEvent => scoringEvent.TeamId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<NoCTF.Domain.Teams.Team>().WithMany()
+            .HasForeignKey(scoringEvent => scoringEvent.VictimTeamId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

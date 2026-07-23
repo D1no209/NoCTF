@@ -5,19 +5,21 @@ namespace NoCTF.Application.Submissions.Ports;
 public sealed record AdminSubmissionStatusView(
     Guid SubmissionId,
     Guid CompetitionId,
-    Guid? TeamId,
-    Guid? CompetitionChallengeId,
+    Guid TeamId,
+    Guid CompetitionChallengeId,
+    Guid SubmittedByUserId,
     SubmissionKind Kind,
+    SubmissionEvaluationState EvaluationState,
     ScoringResult? Result,
     ScoringFailureCode? FailureCode,
     DateTimeOffset ReceivedAt,
-    DateTimeOffset? ProcessedAt,
-    string? ProcessedWorkerId,
-    string? EvaluatorVersion,
-    bool IsCurrentEventDeleted,
+    DateTimeOffset EvaluationUpdatedAt,
     long ProcessingVersion);
 
 public interface IAdminSubmissionStatusReader
 {
-    Task<AdminSubmissionStatusView?> FindAsync(Guid competitionId, Guid submissionId, CancellationToken cancellationToken);
+    Task<AdminSubmissionStatusView?> FindAsync(
+        Guid competitionId,
+        Guid submissionId,
+        CancellationToken cancellationToken);
 }

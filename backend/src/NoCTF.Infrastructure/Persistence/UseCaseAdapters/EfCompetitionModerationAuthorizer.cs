@@ -9,36 +9,38 @@ public sealed class EfCompetitionModerationAuthorizer(NoCtfDbContext db) : IComp
     public async Task<bool> CanModerateAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken)
     {
         var privileged = await db.Users.AsNoTracking().AnyAsync(user =>
-            user.Id == userId && (user.Role == UserRole.Administrator || user.Role == UserRole.Organizer),
+            user.Id == userId && user.Role == UserRole.Administrator,
             cancellationToken);
         return privileged || await db.Competitions.AsNoTracking().AnyAsync(competition =>
-            competition.Id == competitionId && !competition.Deletion.IsDeleted
-                && (competition.OwnerId == userId || competition.Collaborators.Any(collaborator =>
-                    collaborator.UserId == userId && collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager)),
+            competition.Id == competitionId && competition.DeletedAt == null
+                && (competition.OwnerId == userId || competition.ManagerIds.Contains(userId)),
             cancellationToken);
     }
 
     public async Task<bool> CanJudgeAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken)
     {
         var privileged = await db.Users.AsNoTracking().AnyAsync(user =>
-            user.Id == userId && (user.Role == UserRole.Administrator || user.Role == UserRole.Organizer), cancellationToken);
+            user.Id == userId && user.Role == UserRole.Administrator, cancellationToken);
         return privileged
             || await db.Competitions.AsNoTracking().AnyAsync(competition =>
-                competition.Id == competitionId && !competition.Deletion.IsDeleted
-                    && (competition.OwnerId == userId || competition.Collaborators.Any(collaborator =>
-                        collaborator.UserId == userId && (collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager
-                            || collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Judge))),
+                competition.Id == competitionId && competition.DeletedAt == null
+                    && (competition.OwnerId == userId
+                        || competition.ManagerIds.Contains(userId)
+                        || competition.JudgeIds.Contains(userId)),
                 cancellationToken);
     }
 
     public async Task<bool> CanObserveAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken)
     {
         var privileged = await db.Users.AsNoTracking().AnyAsync(user =>
-            user.Id == userId && (user.Role == UserRole.Administrator || user.Role == UserRole.Organizer), cancellationToken);
+            user.Id == userId && user.Role == UserRole.Administrator, cancellationToken);
         return privileged
             || await db.Competitions.AsNoTracking().AnyAsync(competition =>
-                competition.Id == competitionId && !competition.Deletion.IsDeleted
-                    && (competition.OwnerId == userId || competition.Collaborators.Any(collaborator => collaborator.UserId == userId)),
+                competition.Id == competitionId && competition.DeletedAt == null
+                    && (competition.OwnerId == userId
+                        || competition.ManagerIds.Contains(userId)
+                        || competition.JudgeIds.Contains(userId)
+                        || competition.ObserverIds.Contains(userId)),
                 cancellationToken);
     }
 }

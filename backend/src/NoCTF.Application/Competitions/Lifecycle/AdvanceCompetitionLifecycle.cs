@@ -1,6 +1,6 @@
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Common;
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Notifications;
 
@@ -29,7 +29,9 @@ public interface ICompetitionLifecycleStore
 }
 
 /// <summary>Advances published and running competitions using wall-clock deadlines without extending pauses.</summary>
-public sealed class AdvanceCompetitionLifecycle(ICompetitionLifecycleStore store)
+public sealed class AdvanceCompetitionLifecycle(
+    ICompetitionLifecycleStore store,
+    CompetitionStartGate? startGate = null)
 {
     public async Task<IReadOnlyList<CompetitionLifecycleTransition>> ExecuteAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
@@ -38,6 +40,11 @@ public sealed class AdvanceCompetitionLifecycle(ICompetitionLifecycleStore store
         {
             if (competition.Status == CompetitionStatus.Published && now >= competition.StartTime)
             {
+                if (startGate is not null
+                    && (await startGate.ValidateAsync(
+                        competition.CompetitionId,
+                        cancellationToken)) is { Count: > 0 })
+                    continue;
                 if (await store.TryTransitionWithAuditAsync(competition.CompetitionId, competition.Status, CompetitionStatus.Running, null, "start_time_reached", true, cancellationToken))
                     transitions.Add(new(competition.CompetitionId, competition.Status, CompetitionStatus.Running));
             }
@@ -56,8 +63,9 @@ public sealed class AdvanceCompetitionLifecycle(ICompetitionLifecycleStore store
 public sealed class TransitionCompetitionLifecycle(
     ICompetitionLifecycleStore store,
     ILeaderboardCache cache,
-    IBackgroundWorkScheduler scheduler,
-    ICompetitionLifecycleNotificationPublisher? notifications = null)
+    IBackendMessagePublisher messages,
+    ICompetitionLifecycleNotificationPublisher? notifications = null,
+    CompetitionStartGate? startGate = null)
 {
     public async Task<OperationResult> ExecuteAsync(
         Guid competitionId,
@@ -69,17 +77,29 @@ public sealed class TransitionCompetitionLifecycle(
         var current = await store.GetStatusAsync(competitionId, cancellationToken);
         if (current is null)
             return OperationResult.Failure("competition_not_found", "Competition was not found.");
+        if (target == CompetitionStatus.Running
+            && current == CompetitionStatus.Published
+            && startGate is not null)
+        {
+            var errors = await startGate.ValidateAsync(competitionId, cancellationToken);
+            if (errors is null)
+                return OperationResult.Failure("competition_not_found", "Competition was not found.");
+            if (errors.Count > 0)
+                return OperationResult.Failure(
+                    "competition_start_gate_failed",
+                    string.Join(" ", errors.Select(error => error.Message)));
+        }
         var validation = CompetitionLifecyclePolicy.ValidateTransition(current.Value, target);
         if (!validation.Succeeded)
             return validation;
         if (!await store.TryTransitionWithAuditAsync(competitionId, current.Value, target, actorId, reason, false, cancellationToken))
             return OperationResult.Failure("lifecycle_conflict", "Competition status changed concurrently.");
         await cache.InvalidateAsync(competitionId, cancellationToken);
-        await scheduler.EnqueueLeaderboardRefreshAsync(competitionId, cancellationToken);
+        await messages.ProjectLeaderboardAsync(competitionId, cancellationToken);
         if (target == CompetitionStatus.Running)
-            await scheduler.EnqueueRuntimeProvisionAsync(competitionId, cancellationToken);
+            await messages.ProvisionCompetitionRuntimesAsync(competitionId, cancellationToken);
         if (target == CompetitionStatus.Finished)
-            await scheduler.EnqueueRuntimeCleanupAsync(competitionId, cancellationToken);
+            await messages.CleanupCompetitionRuntimesAsync(competitionId, cancellationToken);
         if (notifications is not null)
             await notifications.PublishAsync(competitionId, current.Value, target, DateTimeOffset.UtcNow, cancellationToken);
         return OperationResult.Success();

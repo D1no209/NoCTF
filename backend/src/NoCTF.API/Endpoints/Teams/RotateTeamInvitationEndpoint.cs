@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -14,8 +13,11 @@ public sealed class RotateTeamInvitationEndpoint(RotateTeamInvitation rotate, IU
     public override void Configure() { Post("/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate"); AuthSchemes("Bearer"); }
     public override async Task<Results<Ok<RotateTeamInvitationResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
-        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-        var result = await rotate.ExecuteAsync(Route<Guid>("competitionId"), Route<Guid>("teamId"), user.UserId, token, ct);
+        var result = await rotate.ExecuteAsync(
+            Route<Guid>("competitionId"),
+            Route<Guid>("teamId"),
+            user.UserId,
+            ct);
         if (result.ErrorCode == "team_not_found") return TypedResults.NotFound();
         if (result.ErrorCode == "team_forbidden") return TypedResults.Forbid();
         return result.Succeeded ? TypedResults.Ok(new RotateTeamInvitationResponse(result.Value!)) : TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, detail: result.ErrorMessage);

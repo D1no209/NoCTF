@@ -1,8 +1,10 @@
-using NoCTF.Application.SystemProducers;
+using NoCTF.Application.Runtime.Ports;
 
 namespace NoCTF.GameModes.Awd.Configuration;
 
-public sealed class AwdCheckerConfigurationCatalog : IAwdCheckerConfigurationCatalog
+public sealed record AwdCheckerSettings(int RoundDurationSeconds, RunnerJobConfiguration? Checker);
+
+public sealed class AwdCheckerConfigurationCatalog
 {
     public AwdCheckerSettings Get(string competitionConfigurationJson, string challengeConfigurationJson)
     {

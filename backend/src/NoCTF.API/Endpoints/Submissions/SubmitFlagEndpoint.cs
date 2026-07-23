@@ -1,62 +1,149 @@
 using FastEndpoints;
-using Microsoft.AspNetCore.Http;
+using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.API.Security;
 using NoCTF.Application.Submissions.Intake;
+using NoCTF.Application.Submissions.Ports;
+using NoCTF.Domain.Submissions;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Submissions;
+
+public sealed record AcceptedSubmissionResponse(Guid SubmissionId, DateTimeOffset ReceivedAt);
+
+public sealed record SubmissionStatusResponse(
+    Guid SubmissionId,
+    Guid CompetitionId,
+    Guid TeamId,
+    Guid CompetitionChallengeId,
+    SubmissionKind Kind,
+    SubmissionEvaluationState EvaluationState,
+    ScoringResult? Result,
+    ScoringFailureCode? FailureCode,
+    DateTimeOffset ReceivedAt,
+    DateTimeOffset EvaluationUpdatedAt,
+    long ProcessingVersion);
+
+public sealed record AdminSubmissionStatusResponse(
+    Guid SubmissionId,
+    Guid CompetitionId,
+    Guid TeamId,
+    Guid CompetitionChallengeId,
+    Guid SubmittedByUserId,
+    SubmissionKind Kind,
+    SubmissionEvaluationState EvaluationState,
+    ScoringResult? Result,
+    ScoringFailureCode? FailureCode,
+    DateTimeOffset ReceivedAt,
+    DateTimeOffset EvaluationUpdatedAt,
+    long ProcessingVersion);
+
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
+public static partial class SubmissionMapper
+{
+    public static partial AcceptedSubmissionResponse ToResponse(SubmissionAccepted accepted);
+    public static partial SubmissionStatusResponse ToStatusResponse(SubmissionStatusView view);
+    public static partial AdminSubmissionStatusResponse ToAdminStatusResponse(
+        AdminSubmissionStatusView view);
+}
+
+internal static class SubmissionProblemDetails
+{
+    public static int StatusFor(string? code) => code switch
+    {
+        "team_banned" or "team_forbidden" => StatusCodes.Status403Forbidden,
+        "competition_finished" or "competition_not_started" => StatusCodes.Status409Conflict,
+        "background_work_unavailable" => StatusCodes.Status503ServiceUnavailable,
+        _ => StatusCodes.Status400BadRequest
+    };
+
+    public static ProblemHttpResult Create(int status, string? code, string? detail) =>
+        TypedResults.Problem(
+            statusCode: status,
+            title: "Submission was not accepted.",
+            detail: detail,
+            type: "https://httpstatuses.com/" + status,
+            extensions: string.IsNullOrWhiteSpace(code)
+                ? null
+                : new Dictionary<string, object?> { ["code"] = code });
+}
 
 public sealed class SubmitFlagRequest
 {
     public Guid CompetitionId { get; set; }
-    public Guid TeamId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
-    public string Flag { get; set; } = string.Empty;
-    public string IdempotencyKey { get; set; } = string.Empty;
-    public Guid? TargetTeamId { get; set; }
-    public Guid? ServiceId { get; set; }
-    public Guid? StageId { get; set; }
+    public string? Flag { get; set; }
+    public IReadOnlyList<string>? Flags { get; set; }
 }
 
-public sealed class SubmitFlagEndpoint(
-    SubmitFlag submitFlag,
-    IUserContext userContext,
-    IHttpContextAccessor httpContextAccessor) : Endpoint<SubmitFlagRequest,
-        Microsoft.AspNetCore.Http.HttpResults.Results<Accepted<AcceptedSubmissionResponse>, ProblemHttpResult>>
+public sealed class SubmitFlagRequestValidator : Validator<SubmitFlagRequest>
+{
+    public SubmitFlagRequestValidator()
+    {
+        RuleFor(request => request)
+            .Must(request => request.Flag is not null ^ request.Flags is not null)
+            .WithMessage("Exactly one of flag or flags is required.");
+        RuleForEach(request => request.Flags)
+            .NotNull();
+    }
+}
+
+public sealed record FlagSubmissionItem(Guid SubmissionId, string StatusUrl);
+
+public sealed record FlagSubmissionAcceptedResponse(
+    Guid? SubmissionId,
+    string? StatusUrl,
+    IReadOnlyList<FlagSubmissionItem>? Submissions);
+
+public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userContext)
+    : Endpoint<SubmitFlagRequest,
+        Results<Accepted<FlagSubmissionAcceptedResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
-        Post("/competitions/{competitionId}/submissions/flags");
+        Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions");
         AuthSchemes("Bearer");
         Options(options => options.WithMetadata(new EnableRateLimitingAttribute("submission")));
-        Description(builder => builder.ProducesProblemFE(StatusCodes.Status400BadRequest)
-            .ProducesProblemFE(StatusCodes.Status403Forbidden)
-            .ProducesProblemFE(StatusCodes.Status409Conflict)
-            .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
-        Summary(summary => summary.Summary = "Accept a Flag submission for asynchronous processing.");
+        Summary(summary =>
+        {
+            summary.Summary = "Submit one Flag or an ordered AWD Flag collection.";
+            summary.Description =
+                "Creates independent immutable attempts. The accepted response is not an evaluation result.";
+        });
     }
 
-    public override async Task<Microsoft.AspNetCore.Http.HttpResults.Results<Accepted<AcceptedSubmissionResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Accepted<FlagSubmissionAcceptedResponse>, ProblemHttpResult>> ExecuteAsync(
         SubmitFlagRequest request,
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        var result = await submitFlag.ExecuteAsync(new(
-            request.CompetitionId, request.TeamId, request.CompetitionChallengeId, userContext.UserId, request.Flag, request.IdempotencyKey,
-            httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
+        var values = request.Flags ?? [request.Flag!];
+        var result = await submitFlag.ExecuteBatchAsync(
+            request.CompetitionId,
+            request.CompetitionChallengeId,
+            userContext.UserId,
+            values,
             DateTimeOffset.UtcNow,
-            request.TargetTeamId is null && request.ServiceId is null
-                ? null
-                : new(request.TargetTeamId ?? Guid.Empty, request.ServiceId ?? Guid.Empty),
-            request.StageId), cancellationToken);
+            cancellationToken);
         if (!result.Succeeded)
+            return SubmissionProblemDetails.Create(
+                SubmissionProblemDetails.StatusFor(result.ErrorCode),
+                result.ErrorCode,
+                result.ErrorMessage);
+        var accepted = new List<FlagSubmissionItem>(values.Count);
+        foreach (var submission in result.Value!)
         {
-            return SubmissionProblemDetails.Create(SubmissionProblemDetails.StatusFor(result.ErrorCode), result.ErrorCode, result.ErrorMessage);
+            var statusUrl =
+                $"/api/v1/competitions/{request.CompetitionId}/submissions/{submission.SubmissionId}";
+            accepted.Add(new(submission.SubmissionId, statusUrl));
         }
-        return TypedResults.Accepted<AcceptedSubmissionResponse>(
-            uri: (string?)null,
-            value: SubmissionMapper.ToResponse(result.Value!));
-    }
 
+        var body = request.Flags is null
+            ? new FlagSubmissionAcceptedResponse(
+                accepted[0].SubmissionId, accepted[0].StatusUrl, null)
+            : new FlagSubmissionAcceptedResponse(null, null, accepted);
+        return TypedResults.Accepted<FlagSubmissionAcceptedResponse>((string?)null, body);
+    }
 }

@@ -1,13 +1,22 @@
 using NoCTF.Application.Common;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
-using NoCTF.Application.BackgroundWork;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 
 namespace NoCTF.Application.Teams.Registration;
 
 public sealed record CreateTeamCommand(Guid CompetitionId, Guid UserId, string Name, string? AvatarUrl, DateTimeOffset RegisteredAt);
-public sealed record TeamView(Guid Id, Guid CompetitionId, string Name, string? AvatarUrl, Guid CaptainId, TeamRegistrationStatus RegistrationStatus, bool IsLocked, DateTimeOffset RegisteredAt);
+public sealed record TeamView(
+    Guid Id,
+    Guid CompetitionId,
+    string Name,
+    string? AvatarUrl,
+    Guid CaptainId,
+    IReadOnlyList<Guid> MemberIds,
+    TeamRegistrationStatus RegistrationStatus,
+    bool IsLocked,
+    DateTimeOffset RegisteredAt);
 public sealed record TeamRegistrationPolicy(CompetitionStatus Status, bool AutoApprove, bool CompetitionDeleted);
 public enum TeamRegistrationFailure
 {
@@ -33,6 +42,14 @@ public interface ITeamRegistrationStore
     Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken cancellationToken);
     Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken cancellationToken);
     Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken cancellationToken);
+    Task<TeamReviewStoreResult> ResubmitAsync(
+        Guid competitionId,
+        Guid teamId,
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new TeamReviewStoreResult(
+            false,
+            TeamRegistrationFailure.TeamReviewConflict));
     Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken cancellationToken);
     Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken cancellationToken) =>
         Task.FromResult<TeamView?>(null);
@@ -97,7 +114,7 @@ public sealed class GetMyTeam(ITeamRegistrationStore store)
         store.FindForUserAsync(competitionId, userId, includePending, ct);
 }
 
-public sealed class UpdateTeam(ITeamRegistrationStore store, ILeaderboardCache cache, IBackgroundWorkScheduler scheduler)
+public sealed class UpdateTeam(ITeamRegistrationStore store, ILeaderboardCache cache, IBackendMessagePublisher messages)
 {
     public async Task<OperationResult<TeamView>> ExecuteAsync(UpdateTeamCommand command, CancellationToken ct = default)
     {
@@ -108,19 +125,19 @@ public sealed class UpdateTeam(ITeamRegistrationStore store, ILeaderboardCache c
         if (result.Team is null)
             return OperationResult<TeamView>.Failure(TeamRegistrationFailureProtocol.Code(result.Failure ?? TeamRegistrationFailure.TeamConflict), "Team was not found or can no longer be changed.");
         await cache.InvalidateAsync(command.CompetitionId, ct);
-        await scheduler.EnqueueLeaderboardRefreshAsync(command.CompetitionId, ct);
+        await messages.ProjectLeaderboardAsync(command.CompetitionId, ct);
         return OperationResult<TeamView>.Success(result.Team);
     }
 }
 
-public sealed class DeleteTeam(ITeamRegistrationStore store, ILeaderboardCache cache, IBackgroundWorkScheduler scheduler)
+public sealed class DeleteTeam(ITeamRegistrationStore store, ILeaderboardCache cache, IBackendMessagePublisher messages)
 {
     public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset now, CancellationToken ct = default)
     {
         var failure = await store.SoftDeleteAsync(competitionId, teamId, actorId, now, ct);
         if (failure is not null) return OperationResult.Failure(TeamRegistrationFailureProtocol.Code(failure.Value), "Team was not deleted.");
         await cache.InvalidateAsync(competitionId, ct);
-        await scheduler.EnqueueCompetitionRebuildAsync(competitionId, ct);
+        await messages.RebuildCompetitionAsync(competitionId, ct);
         return OperationResult.Success();
     }
 }
@@ -139,5 +156,28 @@ public sealed class ReviewTeamRegistration(ITeamRegistrationStore store)
         return result.Changed
             ? OperationResult.Success()
             : OperationResult.Failure(TeamRegistrationFailureProtocol.Code(result.Failure ?? TeamRegistrationFailure.TeamReviewConflict), "Team registration was not reviewed.");
+    }
+}
+
+public sealed class ResubmitTeamRegistration(ITeamRegistrationStore store)
+{
+    public async Task<OperationResult> ExecuteAsync(
+        Guid competitionId,
+        Guid teamId,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var policy = await store.GetPolicyAsync(competitionId, ct);
+        if (policy is null || policy.CompetitionDeleted)
+            return OperationResult.Failure("competition_not_found", "Competition was not found.");
+        if (policy.Status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+            return OperationResult.Failure("registration_closed", "Team registration is closed.");
+        var result = await store.ResubmitAsync(competitionId, teamId, userId, ct);
+        return result.Changed
+            ? OperationResult.Success()
+            : OperationResult.Failure(
+                TeamRegistrationFailureProtocol.Code(
+                    result.Failure ?? TeamRegistrationFailure.TeamReviewConflict),
+                "Rejected registration was not resubmitted.");
     }
 }

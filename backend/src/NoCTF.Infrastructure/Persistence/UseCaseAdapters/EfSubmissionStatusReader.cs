@@ -1,21 +1,52 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Submissions.Ports;
-using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 public sealed class EfSubmissionStatusReader(NoCtfDbContext db) : ISubmissionStatusReader
 {
-    public async Task<SubmissionStatusView?> FindAsync(Guid competitionId, Guid submissionId, Guid userId, CancellationToken ct)
+    public async Task<SubmissionStatusView?> FindAsync(
+        Guid competitionId,
+        Guid submissionId,
+        Guid userId,
+        CancellationToken cancellationToken)
     {
-        var canRead = await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId && x.Collaborators.Any(collaborator => collaborator.UserId == userId), ct)
-            || await db.Teams.AsNoTracking().AnyAsync(x => x.CompetitionId == competitionId && x.Members.Any(member => member.UserId == userId), ct);
-        if (!canRead) return null;
-        var item = await db.Submissions.AsNoTracking().Include(x => x.ScoringEvent)
-            .SingleOrDefaultAsync(x => x.Id == submissionId && x.CompetitionId == competitionId, ct);
-        if (item?.TeamId is not Guid teamId || item.CompetitionChallengeId is not Guid challengeId) return null;
-        return new(item.Id, item.CompetitionId, teamId, challengeId, item.Kind, item.ScoringEvent?.Result, item.ReceivedAt,
-            item.ScoringEvent?.ProcessedAt, item.ScoringEvent?.FailureCode, item.ScoringEvent?.EvaluatorVersion);
+        var canRead = await db.Competitions.AsNoTracking().AnyAsync(
+                competition => competition.Id == competitionId
+                    && (competition.OwnerId == userId
+                        || competition.ManagerIds.Contains(userId)
+                        || competition.JudgeIds.Contains(userId)
+                        || competition.ObserverIds.Contains(userId)),
+                cancellationToken)
+            || await db.Teams.AsNoTracking().AnyAsync(
+                team => team.CompetitionId == competitionId && team.MemberIds.Contains(userId),
+                cancellationToken);
+        if (!canRead)
+            return null;
+        return await db.Submissions.AsNoTracking()
+            .Where(submission =>
+                submission.Id == submissionId && submission.CompetitionId == competitionId)
+            .GroupJoin(
+                db.ScoringEvents.AsNoTracking(),
+                submission => submission.CurrentScoringEventId,
+                scoringEvent => (Guid?)scoringEvent.Id,
+                (submission, scoringEvents) => new { submission, scoringEvents })
+            .SelectMany(
+                item => item.scoringEvents.DefaultIfEmpty(),
+                (item, scoringEvent) => new SubmissionStatusView(
+                    item.submission.Id,
+                    item.submission.CompetitionId,
+                    item.submission.TeamId,
+                    item.submission.CompetitionChallengeId,
+                    item.submission.Kind,
+                    item.submission.EvaluationState,
+                    scoringEvent == null ? null : scoringEvent.Result,
+                    item.submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed
+                        ? item.submission.EvaluationFailureCode
+                        : scoringEvent == null ? null : scoringEvent.FailureCode,
+                    item.submission.ReceivedAt,
+                    item.submission.EvaluationUpdatedAt,
+                    item.submission.ProcessingVersion))
+            .SingleOrDefaultAsync(cancellationToken);
     }
-
 }

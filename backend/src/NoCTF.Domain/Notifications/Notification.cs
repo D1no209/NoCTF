@@ -6,9 +6,17 @@ public sealed class Notification
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public Guid? CompetitionId { get; set; }
-    public string Type { get; set; } = string.Empty;
-    public string DataJson { get; set; } = "{}";
-    public bool IsRead { get; set; }
+    public Guid? EntityId { get; set; }
+    public NotificationKind Kind { get; set; }
+    public string PayloadJson { get; set; } = "{}";
     public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? ReadAt { get; set; }
+}
+
+public enum NotificationKind : short
+{
+    CompetitionLifecycleChanged,
+    TeamRegistrationChanged,
+    SubmissionEvaluated,
+    RuntimeStateChanged,
+    StartGateFailed
 }

@@ -15,7 +15,7 @@ public sealed class GetChallengeEndpoint(
 {
     public override void Configure()
     {
-        Get("/admin/competitions/{competitionId}/challenges/{challengeId}");
+        Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}");
         AuthSchemes("Bearer");
         Summary(summary => summary.Summary = "Gets challenge details, including unpublished challenges.");
     }
@@ -30,7 +30,7 @@ public sealed class GetChallengeEndpoint(
 
         var item = await get.ExecuteAsync(
             competitionId,
-            Route<Guid>("challengeId"),
+            Route<Guid>("competitionChallengeId"),
             includeUnpublished: true,
             ct);
 

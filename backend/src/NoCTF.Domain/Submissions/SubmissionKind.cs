@@ -3,9 +3,21 @@ namespace NoCTF.Domain.Submissions;
 public enum SubmissionKind
 {
     Flag,
-    Fix,
-    AwdServiceCheck,
-    KohObservation,
-    PenetrationStage,
-    SystemInput
+    Break,
+    Fix
+}
+
+public enum EvaluationDispatchMode : short
+{
+    Automatic,
+    ManualBatch
+}
+
+public enum SubmissionEvaluationState : short
+{
+    Pending,
+    Queued,
+    Processing,
+    Completed,
+    PlatformFailed
 }

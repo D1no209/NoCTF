@@ -17,8 +17,6 @@ public static class GameModeDefaultConfiguration
             300, new(Awdp.Configuration.AchievementSettlement.PerRound, 50),
             new(Awdp.Configuration.AchievementSettlement.PerRound, 50), 100, 50), Options),
         GameMode.Koh => JsonSerializer.Serialize(new Koh.Configuration.KohConfiguration(1, 5, 10), Options),
-        GameMode.Penetration => JsonSerializer.Serialize(new Penetration.Configuration.PenetrationConfiguration(1,
-            new(500, 100, 10), []), Options),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };
 }

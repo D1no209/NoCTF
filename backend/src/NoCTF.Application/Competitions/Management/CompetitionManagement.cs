@@ -51,14 +51,6 @@ public static class CompetitionManagementPolicy
 {
     public static OperationResult ValidateUpdate(CompetitionView current, UpdateCompetitionCommand command)
     {
-        if (current.Status == CompetitionStatus.Finished)
-            return OperationResult.Failure("competition_finished", "Finished competitions are read-only.");
-        if (current.Status is CompetitionStatus.Running or CompetitionStatus.Paused
-            && (command.StartTime != current.StartTime
-                || command.EndTime != current.EndTime
-                || command.TeamRegistrationAutoApprove != current.TeamRegistrationAutoApprove
-                || command.MaxTeamMembers != current.MaxTeamMembers))
-            return OperationResult.Failure("active_configuration_locked", "Running or paused competitions can change only title and description.");
         return OperationResult.Success();
     }
 

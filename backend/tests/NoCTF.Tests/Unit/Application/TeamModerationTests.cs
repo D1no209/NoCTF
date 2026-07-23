@@ -42,13 +42,11 @@ public class TeamModerationTests
         public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    private sealed class Scheduler : NoCTF.Application.BackgroundWork.IBackgroundWorkScheduler
+    private sealed class Scheduler : NoCTF.Application.Messaging.IBackendMessagePublisher
     {
         public Guid? RebuildCompetitionId { get; private set; }
-        public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueLeaderboardRefreshAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask EnqueueCompetitionRebuildAsync(Guid competitionId, CancellationToken cancellationToken)
+        public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken)
         {
             RebuildCompetitionId = competitionId;
             return ValueTask.CompletedTask;

@@ -12,8 +12,7 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
         builder.ToTable("competition_challenges");
         builder.HasKey(item => item.Id);
         builder.Property(item => item.ConfigurationJson).HasColumnType("jsonb");
-        builder.OwnsOne(item => item.Deletion);
-        builder.HasQueryFilter(item => !item.Deletion.IsDeleted);
+        builder.HasQueryFilter(item => item.DeletedAt == null);
         builder.HasOne<Competition>()
             .WithMany()
             .HasForeignKey(item => item.CompetitionId)
@@ -22,13 +21,23 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
             .WithMany()
             .HasForeignKey(item => item.ChallengeId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(item => new { item.CompetitionId, item.Order }).IsUnique();
-        builder.HasIndex(item => new { item.CompetitionId, item.ChallengeId }).IsUnique();
-        builder.OwnsMany(item => item.Hints, hints =>
-        {
-            hints.ToTable("competition_challenge_hints");
-            hints.WithOwner().HasForeignKey("CompetitionChallengeId");
-            hints.HasKey(hint => hint.Id);
-        });
+        builder.HasIndex(item => new { item.CompetitionId, item.Order }).IsUnique()
+            .HasFilter("deleted_at IS NULL");
+        builder.HasIndex(item => new { item.CompetitionId, item.ChallengeId }).IsUnique()
+            .HasFilter("deleted_at IS NULL");
+        builder.HasMany(item => item.Hints)
+            .WithOne()
+            .HasForeignKey(hint => hint.CompetitionChallengeId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CompetitionChallengeHintConfiguration
+    : IEntityTypeConfiguration<CompetitionChallengeHint>
+{
+    public void Configure(EntityTypeBuilder<CompetitionChallengeHint> builder)
+    {
+        builder.ToTable("competition_challenge_hints");
+        builder.HasKey(hint => hint.Id);
     }
 }

@@ -8,7 +8,7 @@ public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompet
 {
     public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == competitionId && !competition.Deletion.IsDeleted)
+            .Where(competition => competition.Id == competitionId && competition.DeletedAt == null)
             .Select(competition => new CompetitionConfigurationView(
                 competition.Id,
                 competition.Mode,
@@ -29,14 +29,12 @@ public sealed class EfCompetitionConfigurationStore(NoCtfDbContext db) : ICompet
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
         if (status is null) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
-        if (status is CompetitionStatus.Paused or CompetitionStatus.Finished
-            || status == CompetitionStatus.Running && !allowWhileRunning)
-            return new(null, CompetitionConfigurationUpdateFailure.ConfigurationLocked);
         var changed = await db.Competitions
             .Where(x => x.Id == competitionId && x.ConfigurationRevision == expectedRevision)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.ConfigurationJson, json)
                 .SetProperty(x => x.ConfigurationRevision, expectedRevision + 1)
+                .SetProperty(x => x.LeaderboardRevision, x => checked(x.LeaderboardRevision + 1))
                 .SetProperty(x => x.ConfigurationUpdatedAt, now), ct);
         if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.RevisionConflict);
         await transaction.CommitAsync(ct);

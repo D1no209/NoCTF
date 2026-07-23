@@ -1,8 +1,11 @@
-using NoCTF.Application.SystemProducers;
-
 namespace NoCTF.GameModes.Koh.Configuration;
 
-public sealed class KohProducerConfigurationCatalog : IKohProducerConfigurationCatalog
+public sealed record KohProducerSettings(
+    int PollIntervalSeconds,
+    Uri AgentUrl,
+    IReadOnlyDictionary<string, Guid> TeamIdentifiers);
+
+public sealed class KohProducerConfigurationCatalog
 {
     public KohProducerSettings Get(string competitionConfigurationJson, string challengeConfigurationJson)
     {

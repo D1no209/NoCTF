@@ -17,8 +17,8 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
                 (item, competition) => new { item.Configuration, item.Challenge, Competition = competition })
             .Where(item => item.Configuration.Id == challengeId
                            && item.Configuration.CompetitionId == competitionId
-                           && !item.Challenge.Deletion.IsDeleted
-                           && !item.Competition.Deletion.IsDeleted)
+                           && item.Challenge.DeletedAt == null
+                           && item.Competition.DeletedAt == null)
             .Select(item => new ChallengeConfigurationView(
                 item.Competition.Id,
                 item.Configuration.Id,
@@ -40,17 +40,15 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
         if (status is null) return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
-        if (status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
-            return new(null, ChallengeConfigurationUpdateFailure.ConfigurationLocked);
         if (!await db.CompetitionChallenges.AsNoTracking().AnyAsync(challenge => challenge.Id == challengeId
-            && challenge.CompetitionId == competitionId && !challenge.Deletion.IsDeleted, ct))
+            && challenge.CompetitionId == competitionId && challenge.DeletedAt == null, ct))
             return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
         var changed = await db.CompetitionChallenges
             .Where(configuration =>
                 configuration.Id == challengeId
                 && configuration.Revision == expectedRevision
                 && configuration.CompetitionId == competitionId
-                && !configuration.Deletion.IsDeleted
+                && configuration.DeletedAt == null
                 )
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(configuration => configuration.ConfigurationJson, json)
@@ -58,6 +56,7 @@ public sealed class EfChallengeConfigurationStore(NoCtfDbContext db) : IChalleng
                 .SetProperty(configuration => configuration.UpdatedAt, updatedAt), ct);
 
         if (changed != 1) return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
+        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         return new(await FindAsync(competitionId, challengeId, ct));
     }

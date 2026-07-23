@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Administration.ChallengeBank;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Teams.Moderation;
@@ -7,36 +8,32 @@ using NoCTF.Application.Teams.Moderation;
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class GetChallengeFlagEndpoint(
-    GetChallengeFlag get,
+    ManageChallengeFlags flags,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : Endpoint<GetChallengeFlagRequest,
-        Results<Ok<ChallengeFlagSecretResponse>, NotFound, ForbidHttpResult>>
+    : EndpointWithoutRequest<Results<Ok<ChallengeFlagResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
         Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Gets a protected Challenge Flag for administrators.");
+        Summary(summary => summary.Summary = "Gets a competition-scoped flag.");
     }
 
-    public override async Task<Results<Ok<ChallengeFlagSecretResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
-        GetChallengeFlagRequest request,
+    public override async Task<Results<Ok<ChallengeFlagResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
         CancellationToken ct)
     {
-        request.CompetitionId = Route<Guid>("competitionId");
-        request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
-        request.FlagId = Route<Guid>("flagId");
-        if (!await authorizer.CanModerateAsync(user.UserId, request.CompetitionId, ct))
+        var competitionId = Route<Guid>("competitionId");
+        if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
-
-        var flag = await get.ExecuteAsync(
-            request.CompetitionId,
-            request.CompetitionChallengeId,
-            request.FlagId,
+        var result = await flags.GetAsync(
+            ChallengeFlagScope.Competition(competitionId, Route<Guid>("competitionChallengeId")),
+            Route<Guid>("flagId"),
+            actorId: null,
+            isAdministrator: true,
             ct);
-        return flag is null
+        return result is null
             ? TypedResults.NotFound()
-            : TypedResults.Ok(ChallengeFlagMapper.ToResponse(flag));
+            : TypedResults.Ok(ChallengeFlagMapping.ToResponse(result));
     }
 }

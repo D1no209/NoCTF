@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
+  </ItemGroup>
+</Project>

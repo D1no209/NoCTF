@@ -5,6 +5,7 @@ namespace NoCTF.API.Security;
 public interface IUserContext
 {
     Guid UserId { get; }
+    bool IsAdministrator { get; }
 }
 
 public sealed class HttpUserContext(IHttpContextAccessor accessor) : IUserContext
@@ -14,4 +15,7 @@ public sealed class HttpUserContext(IHttpContextAccessor accessor) : IUserContex
             ?? accessor.HttpContext?.User.FindFirstValue("sub"), out var userId)
             ? userId
             : Guid.Empty;
+
+    public bool IsAdministrator =>
+        accessor.HttpContext?.User.IsInRole("Administrator") == true;
 }

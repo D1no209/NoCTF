@@ -8,18 +8,18 @@ public class NoRawFlagLoggingTests
     [Test]
     public async Task Flag_input_string_representation_redacts_plaintext()
     {
-        var value = new FlagSubmissionReceived
-        {
-            SubmissionId = Guid.NewGuid(),
-            CompetitionId = Guid.NewGuid(),
-            TeamId = Guid.NewGuid(),
-            CompetitionChallengeId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            FlagFingerprint = FlagFingerprint.Create("flag{do-not-leak}"),
-            IdempotencyKey = "test-1",
-            IpAddress = "127.0.0.1",
-            ReceivedAt = DateTimeOffset.UtcNow
-        };
+        const string rawFlag = "flag{do-not-leak}";
+        var value = new FlagSubmissionReceived(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            SubmissionKind.Flag,
+            rawFlag,
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(rawFlag)),
+            DateTimeOffset.UtcNow);
 
         await Assert.That(value.ToString()).DoesNotContain("do-not-leak");
     }

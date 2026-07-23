@@ -17,299 +17,619 @@ namespace NoCTF.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("NoCTF.Domain.Auditing.AuditEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("ActorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("CompetitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("IpAddress")
-                        .HasColumnType("text");
-
-                    b.Property<string>("MetadataJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("SubjectId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SubjectType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId", "OccurredAt");
-
-                    b.ToTable("audit_entries", (string)null);
-                });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
 
                     b.Property<string>("Description")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("description");
 
                     b.Property<string>("Direction")
                         .IsRequired()
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("direction");
+
+                    b.PrimitiveCollection<Guid[]>("ManagerIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("manager_ids");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("title");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.Property<short>("Visibility")
+                        .HasColumnType("smallint")
+                        .HasColumnName("visibility");
 
-                    b.ToTable("challenges", (string)null);
+                    b.HasKey("Id")
+                        .HasName("pk_challenges");
+
+                    b.HasIndex("ManagerIds")
+                        .HasDatabaseName("ix_challenges_manager_ids");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ManagerIds"), "gin");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_challenges_owner_id");
+
+                    b.ToTable("challenges", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_challenges_owner_not_manager", "NOT (owner_id = ANY(manager_ids))");
+                        });
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("file_name");
+
+                    b.Property<long>("Length")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_length");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("object_key");
+
+                    b.Property<byte[]>("Sha256Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("sha256");
+
+                    b.HasKey("Id")
+                        .HasName("pk_challenge_attachments");
+
+                    b.HasIndex("ChallengeId")
+                        .HasDatabaseName("ix_challenge_attachments_challenge_id");
+
+                    b.HasIndex("ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_challenge_attachments_object_key");
+
+                    b.ToTable("challenge_attachments", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeFlag", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
-                    b.Property<Guid?>("ChallengeInstanceId")
-                        .HasColumnType("uuid");
+                    b.Property<Guid?>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
 
-                    b.Property<Guid>("CompetitionChallengeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
+                    b.Property<Guid?>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
 
                     b.Property<string>("Flag")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("flag");
 
-                    b.Property<Guid?>("InjectionClaimToken")
-                        .HasColumnType("uuid");
+                    b.Property<byte[]>("FlagSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("flag_sha256");
 
-                    b.Property<DateTimeOffset?>("InjectionClaimedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid?>("SpecificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("specification_id");
 
-                    b.Property<long>("RowVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid?>("StageId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<short?>("SpecificationKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("specification_kind");
 
                     b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("ValidEnd")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
 
                     b.Property<DateTimeOffset?>("ValidStart")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_start");
 
-                    b.HasKey("Id");
+                    b.Property<DateTimeOffset?>("ValidUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_until");
 
-                    b.HasIndex("CompetitionChallengeId");
+                    b.HasKey("Id")
+                        .HasName("pk_challenge_flags");
 
-                    b.HasIndex("CompetitionId", "CompetitionChallengeId", "TeamId", "ValidStart")
-                        .IsUnique()
-                        .HasFilter("\"TeamId\" IS NOT NULL AND \"StageId\" IS NULL");
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_challenge_flags_team_id");
 
-                    b.HasIndex("CompetitionId", "CompetitionChallengeId", "TeamId", "StageId", "ChallengeInstanceId", "ValidStart", "ValidEnd")
-                        .HasDatabaseName("IX_challenge_flags_CompetitionId_CompetitionChallengeId_TeamI~1");
+                    b.HasIndex("ChallengeId", "FlagSha256")
+                        .HasDatabaseName("ix_challenge_flags_challenge_id_flag_sha256")
+                        .HasFilter("deleted_at IS NULL");
 
-                    b.ToTable("challenge_flags", (string)null);
+                    b.HasIndex("CompetitionChallengeId", "FlagSha256")
+                        .HasDatabaseName("ix_challenge_flags_competition_challenge_id_flag_sha256")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("CompetitionChallengeId", "TeamId", "SpecificationKind", "SpecificationId")
+                        .HasDatabaseName("ix_challenge_flags_competition_challenge_id_team_id_specificat");
+
+                    b.ToTable("challenge_flags", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_challenge_flags_scope", "(challenge_id IS NULL) <> (competition_challenge_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_challenge_flags_specification", "(specification_kind IS NULL) = (specification_id IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallenge", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
-                    b.Property<int>("BaseScore")
-                        .HasColumnType("integer");
+                    b.Property<long>("BaseScore")
+                        .HasColumnType("bigint")
+                        .HasColumnName("base_score");
 
                     b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
 
                     b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
 
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("configuration_json");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
 
                     b.Property<bool>("IsPublished")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_published");
 
                     b.Property<int>("Order")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("order");
 
                     b.Property<int>("Revision")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_competition_challenges");
 
-                    b.HasIndex("ChallengeId");
+                    b.HasIndex("ChallengeId")
+                        .HasDatabaseName("ix_competition_challenges_challenge_id");
 
                     b.HasIndex("CompetitionId", "ChallengeId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_challenges_competition_id_challenge_id")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.HasIndex("CompetitionId", "Order")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_challenges_competition_id_order")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("competition_challenges", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallengeHint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<long>("Cost")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cost");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_challenge_hints");
+
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_competition_challenge_hints_competition_challenge_id");
+
+                    b.ToTable("competition_challenge_hints", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AccumulatedRunningSeconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("accumulated_running_seconds");
 
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("configuration_json");
 
                     b.Property<int>("ConfigurationRevision")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("configuration_revision");
 
                     b.Property<DateTimeOffset>("ConfigurationUpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("configuration_updated_at");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
 
                     b.Property<string>("Description")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("description");
 
-                    b.Property<DateTimeOffset>("EndTime")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset>("EndAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("end_at");
+
+                    b.Property<byte[]>("FlagDerivationSecret")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea")
+                        .HasColumnName("flag_derivation_secret");
+
+                    b.PrimitiveCollection<Guid[]>("JudgeIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("judge_ids");
+
+                    b.Property<long>("LeaderboardRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("leaderboard_revision");
+
+                    b.PrimitiveCollection<Guid[]>("ManagerIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("manager_ids");
+
+                    b.Property<int>("MaxConcurrentRuntimeInstancesPerTeam")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_concurrent_runtime_instances_per_team");
 
                     b.Property<int>("MaxTeamMembers")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("max_team_members");
 
-                    b.Property<int>("Mode")
-                        .HasColumnType("integer");
+                    b.Property<short>("Mode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("mode");
+
+                    b.PrimitiveCollection<Guid[]>("ObserverIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("observer_ids");
 
                     b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
 
-                    b.Property<DateTimeOffset>("StartTime")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset?>("RunningSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("running_since");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<DateTimeOffset>("StartAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("start_at");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
 
                     b.Property<bool>("TeamRegistrationAutoApprove")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasColumnName("team_registration_auto_approve");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("title");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_competitions");
 
-                    b.HasIndex("Status", "StartTime");
+                    b.HasIndex("JudgeIds")
+                        .HasDatabaseName("ix_competitions_judge_ids");
 
-                    b.ToTable("competitions", (string)null);
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("JudgeIds"), "gin");
+
+                    b.HasIndex("ManagerIds")
+                        .HasDatabaseName("ix_competitions_manager_ids");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ManagerIds"), "gin");
+
+                    b.HasIndex("ObserverIds")
+                        .HasDatabaseName("ix_competitions_observer_ids");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ObserverIds"), "gin");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_competitions_owner_id");
+
+                    b.HasIndex("Status", "StartAt")
+                        .HasDatabaseName("ix_competitions_status_start_at");
+
+                    b.ToTable("competitions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_competitions_flag_secret_length", "octet_length(flag_derivation_secret) = 32");
+
+                            t.HasCheckConstraint("ck_competitions_owner_not_permission", "NOT (owner_id = ANY(manager_ids)) AND NOT (owner_id = ANY(judge_ids)) AND NOT (owner_id = ANY(observer_ids))");
+
+                            t.HasCheckConstraint("ck_competitions_permission_roles_exclusive", "NOT (manager_ids && judge_ids) AND NOT (manager_ids && observer_ids) AND NOT (judge_ids && observer_ids)");
+
+                            t.HasCheckConstraint("ck_competitions_schedule", "start_at < end_at");
+                        });
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.CompetitionLifecycleAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<bool>("Automatic")
+                        .HasColumnType("boolean")
+                        .HasColumnName("automatic");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<short>("From")
+                        .HasColumnType("smallint")
+                        .HasColumnName("from");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<short>("To")
+                        .HasColumnType("smallint")
+                        .HasColumnName("to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_lifecycle_audits");
+
+                    b.HasIndex("CompetitionId", "OccurredAt")
+                        .HasDatabaseName("ix_competition_lifecycle_audits_competition_id_occurred_at");
+
+                    b.ToTable("competition_lifecycle_audits", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Identity.EmailVerificationToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<byte[]>("TokenSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("token_sha256");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_verification_tokens");
+
+                    b.HasIndex("TokenSha256")
+                        .IsUnique()
+                        .HasDatabaseName("ix_email_verification_tokens_token_sha256");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_email_verification_tokens_user_id");
+
+                    b.ToTable("email_verification_tokens", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Identity.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(254)
-                        .HasColumnType("character varying(254)");
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
 
                     b.Property<DateTimeOffset?>("EmailVerifiedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("email_verified_at");
 
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
-                        .HasMaxLength(254)
-                        .HasColumnType("character varying(254)");
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("normalized_email");
 
                     b.Property<string>("NormalizedUserName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("normalized_user_name");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("password_hash");
 
-                    b.Property<int>("Role")
-                        .HasColumnType("integer");
+                    b.Property<short>("Role")
+                        .HasColumnType("smallint")
+                        .HasColumnName("role");
 
                     b.Property<int>("TokenVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("token_version");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_users");
 
                     b.HasIndex("NormalizedEmail")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_normalized_email");
 
                     b.HasIndex("NormalizedUserName")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_normalized_user_name");
 
                     b.ToTable("users", (string)null);
                 });
@@ -318,276 +638,381 @@ namespace NoCTF.Infrastructure.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<Guid?>("CompetitionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
-                    b.Property<string>("DataJson")
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("PayloadJson")
                         .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("ReadAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload_json");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_notifications");
 
-                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_notifications_competition_id");
+
+                    b.HasIndex("UserId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_notifications_user_id_created_at_id");
 
                     b.ToTable("notifications", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Runtime.ChallengeInstance", b =>
+            modelBuilder.Entity("NoCTF.Domain.Runtime.RuntimeInstance", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("CheckerSequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("checker_sequence");
 
                     b.Property<Guid>("CompetitionChallengeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
 
                     b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<int>("ConfigurationRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("configuration_revision");
+
+                    b.Property<string>("ControlCheckUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("control_check_url");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EntryUrl")
-                        .HasColumnType("text");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<DateTimeOffset?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
 
-                    b.Property<int>("Provider")
-                        .HasColumnType("integer");
+                    b.Property<short?>("FailureCode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("failure_code");
 
-                    b.Property<string>("Receipt")
+                    b.Property<int>("Generation")
+                        .HasColumnType("integer")
+                        .HasColumnName("generation");
+
+                    b.Property<byte[]>("LastAppliedCheckerBodySha256")
+                        .HasColumnType("bytea")
+                        .HasColumnName("last_applied_checker_body_sha256");
+
+                    b.Property<long>("LastAppliedCheckerSequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_applied_checker_sequence");
+
+                    b.Property<DateTimeOffset?>("NextCheckerDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_checker_due_at");
+
+                    b.PrimitiveCollection<int[]>("ParticipantUrlIndexes")
                         .IsRequired()
-                        .HasColumnType("jsonb");
+                        .HasColumnType("integer[]")
+                        .HasColumnName("participant_url_indexes");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<long>("ProcessingVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("processing_version");
+
+                    b.Property<string>("ProviderReceiptJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("provider_receipt_json");
+
+                    b.Property<Guid?>("ReplacesRuntimeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replaces_runtime_instance_id");
+
+                    b.Property<string>("RunnerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("runner_id");
+
+                    b.Property<string>("RunnerPool")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("runner_pool");
+
+                    b.Property<DateTimeOffset?>("RunningAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("running_at");
+
+                    b.Property<short>("RuntimeKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("runtime_kind");
+
+                    b.Property<short>("RuntimeProvider")
+                        .HasColumnType("smallint")
+                        .HasColumnName("runtime_provider");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset?>("StoppedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("stopped_at");
 
                     b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.PrimitiveCollection<string[]>("Urls")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("urls");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_runtime_instances");
 
-                    b.HasIndex("CompetitionChallengeId");
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_runtime_instances_competition_id");
 
-                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId");
+                    b.HasIndex("ReplacesRuntimeInstanceId")
+                        .HasDatabaseName("ix_runtime_instances_replaces_runtime_instance_id");
 
-                    b.ToTable("challenge_instances", (string)null);
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_runtime_instances_team_id");
+
+                    b.HasIndex("CompetitionChallengeId", "TeamId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_runtime_instances_competition_challenge_id_team_id")
+                        .HasFilter("state IN (0, 1, 2)");
+
+                    b.HasIndex("State", "NextCheckerDueAt")
+                        .HasDatabaseName("ix_runtime_instances_state_next_checker_due_at")
+                        .HasFilter("next_checker_due_at IS NOT NULL");
+
+                    b.HasIndex("CompetitionChallengeId", "TeamId", "Generation")
+                        .IsUnique()
+                        .HasDatabaseName("ix_runtime_instances_competition_challenge_id_team_id_generati");
+
+                    b.HasIndex("RunnerPool", "State", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_runtime_instances_runner_pool_state_created_at_id");
+
+                    b.ToTable("runtime_instances", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
+
+                            t.HasCheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
+                        });
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Runtime.RuntimeOperation", b =>
+            modelBuilder.Entity("NoCTF.Domain.Submissions.PatchUpload", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
-                    b.Property<Guid?>("ChallengeInstanceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClaimToken")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ErrorCode")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Kind")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("OperationKey")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId", "OperationKey")
-                        .IsUnique();
-
-                    b.HasIndex("CompetitionId", "Status");
-
-                    b.ToTable("runtime_operations", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Submissions.FixSubmissionRecord", b =>
-                {
-                    b.Property<Guid>("UploadId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("ClaimedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<long>("ByteLength")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_length");
 
                     b.Property<Guid>("CompetitionChallengeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
 
                     b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
 
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("FailureCategory")
-                        .HasColumnType("integer");
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("content_type");
 
                     b.Property<string>("ObjectKey")
                         .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("object_key");
 
-                    b.Property<string>("ObjectMetadata")
-                        .HasColumnType("jsonb");
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("original_file_name");
 
-                    b.Property<long>("RowVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                    b.Property<byte[]>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("sha256");
 
                     b.Property<Guid?>("SubmissionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("submission_id");
 
                     b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
 
-                    b.Property<int>("VerificationStatus")
-                        .HasColumnType("integer");
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploaded_by_user_id");
 
-                    b.Property<DateTimeOffset?>("VerifiedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.HasKey("Id")
+                        .HasName("pk_patch_uploads");
 
-                    b.Property<string>("VerifierVersion")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_patch_uploads_competition_challenge_id");
 
-                    b.HasKey("UploadId");
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_patch_uploads_competition_id");
+
+                    b.HasIndex("ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_patch_uploads_object_key");
 
                     b.HasIndex("SubmissionId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_patch_uploads_submission_id")
+                        .HasFilter("submission_id IS NOT NULL");
 
-                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "ExpiresAt");
+                    b.HasIndex("UploadedByUserId")
+                        .HasDatabaseName("ix_patch_uploads_uploaded_by_user_id");
 
-                    b.ToTable("fix_submission_records", (string)null);
+                    b.HasIndex("TeamId", "CompetitionChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_patch_uploads_team_id_competition_challenge_id")
+                        .HasFilter("consumed_at IS NULL");
+
+                    b.ToTable("patch_uploads", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_patch_uploads_consumption", "(consumed_at IS NULL) = (submission_id IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Submissions.ScoringEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ChallengeInstanceId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<Guid?>("CompetitionChallengeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<int>("CompetitionChallengeRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("competition_challenge_revision");
+
+                    b.Property<int>("CompetitionConfigurationRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("competition_configuration_revision");
 
                     b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
 
-                    b.Property<Guid?>("DeletedById")
-                        .HasColumnType("uuid");
+                    b.Property<short?>("FailureCode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("failure_code");
 
-                    b.Property<string>("EvaluatorVersion")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<int?>("FailureCode")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("Kind")
-                        .HasColumnType("integer");
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
 
                     b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
 
-                    b.Property<DateTimeOffset>("ProcessedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<long?>("ProcessingVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("processing_version");
 
-                    b.Property<string>("ProcessedWorkerId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                    b.Property<short>("Result")
+                        .HasColumnType("smallint")
+                        .HasColumnName("result");
 
-                    b.Property<int>("Result")
-                        .HasColumnType("integer");
+                    b.Property<Guid?>("SpecificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("specification_id");
 
-                    b.Property<long>("RowVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("SourceKey")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid?>("StageId")
-                        .HasColumnType("uuid");
+                    b.Property<short?>("SpecificationKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("specification_kind");
 
                     b.Property<Guid?>("SubmissionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("submission_id");
 
                     b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
 
-                    b.HasKey("Id");
+                    b.Property<Guid?>("VictimTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("victim_team_id");
 
-                    b.HasIndex("CompetitionChallengeId");
+                    b.HasKey("Id")
+                        .HasName("pk_scoring_events");
+
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_scoring_events_competition_challenge_id");
 
                     b.HasIndex("SubmissionId")
-                        .IsUnique();
-
-                    b.HasIndex("CompetitionId", "Kind", "SourceKey")
                         .IsUnique()
-                        .HasFilter("\"IsDeleted\" = FALSE AND \"SourceKey\" IS NOT NULL");
+                        .HasDatabaseName("ix_scoring_events_submission_id")
+                        .HasFilter("submission_id IS NOT NULL AND deleted_at IS NULL");
 
-                    b.HasIndex("CompetitionId", "OccurredAt", "Id");
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_scoring_events_team_id");
 
-                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "OccurredAt");
+                    b.HasIndex("VictimTeamId")
+                        .HasDatabaseName("ix_scoring_events_victim_team_id");
+
+                    b.HasIndex("CompetitionId", "OccurredAt", "Id")
+                        .HasDatabaseName("ix_scoring_events_competition_id_occurred_at_id");
+
+                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "OccurredAt")
+                        .HasDatabaseName("ix_scoring_events_competition_id_team_id_competition_challenge");
 
                     b.ToTable("scoring_events", (string)null);
                 });
@@ -596,209 +1021,249 @@ namespace NoCTF.Infrastructure.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
-                    b.Property<Guid?>("ChallengeInstanceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("CheckerPlatformError")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid?>("CompetitionChallengeId")
-                        .HasColumnType("uuid");
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
 
                     b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
 
-                    b.Property<long?>("ControlIntervalSeconds")
-                        .HasColumnType("bigint");
+                    b.Property<Guid?>("CurrentScoringEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_scoring_event_id");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<short?>("EvaluationFailureCode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("evaluation_failure_code");
 
-                    b.Property<string>("FlagHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                    b.Property<byte[]>("EvaluationResultBodySha256")
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea")
+                        .HasColumnName("evaluation_result_body_sha256");
 
-                    b.Property<int?>("FlagLength")
-                        .HasColumnType("integer");
+                    b.Property<short>("EvaluationState")
+                        .HasColumnType("smallint")
+                        .HasColumnName("evaluation_state");
 
-                    b.Property<string>("IdempotencyKey")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                    b.Property<DateTimeOffset>("EvaluationUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("evaluation_updated_at");
 
-                    b.Property<int>("Kind")
-                        .HasColumnType("integer");
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("PatchUploadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patch_upload_id");
 
                     b.Property<long>("ProcessingVersion")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("bigint")
+                        .HasColumnName("processing_version");
 
                     b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
 
-                    b.Property<Guid?>("ScoringEventId")
-                        .HasColumnType("uuid");
+                    b.Property<Guid>("SubmittedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitted_by_user_id");
 
-                    b.Property<Guid?>("ServiceId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("SubmittedFlag")
+                        .HasColumnType("text")
+                        .HasColumnName("submitted_flag");
 
-                    b.Property<Guid?>("StageId")
-                        .HasColumnType("uuid");
+                    b.Property<byte[]>("SubmittedFlagSha256")
+                        .HasColumnType("bytea")
+                        .HasColumnName("submitted_flag_sha256");
 
-                    b.Property<Guid?>("SubjectTeamId")
-                        .HasColumnType("uuid");
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
 
-                    b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid");
+                    b.HasKey("Id")
+                        .HasName("pk_submissions");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_submissions_competition_challenge_id");
 
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid");
+                    b.HasIndex("CurrentScoringEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_submissions_current_scoring_event_id");
 
-                    b.Property<Guid?>("VictimTeamId")
-                        .HasColumnType("uuid");
+                    b.HasIndex("PatchUploadId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_submissions_patch_upload_id");
 
-                    b.HasKey("Id");
+                    b.HasIndex("SubmittedByUserId")
+                        .HasDatabaseName("ix_submissions_submitted_by_user_id");
 
-                    b.HasIndex("CompetitionChallengeId");
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_submissions_team_id");
 
-                    b.HasIndex("ScoringEventId")
-                        .IsUnique();
+                    b.HasIndex("CompetitionId", "ReceivedAt", "Id")
+                        .HasDatabaseName("ix_submissions_competition_id_received_at_id");
 
-                    b.HasIndex("CompetitionId", "IdempotencyKey")
-                        .IsUnique();
+                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "ReceivedAt", "Id")
+                        .HasDatabaseName("ix_submissions_competition_id_team_id_competition_challenge_id");
 
-                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "ReceivedAt", "Id");
-
-                    b.ToTable("submissions", (string)null);
+                    b.ToTable("submissions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_submissions_payload", "(kind IN (0, 1) AND submitted_flag IS NOT NULL AND submitted_flag_sha256 IS NOT NULL AND patch_upload_id IS NULL) OR (kind = 2 AND submitted_flag IS NULL AND submitted_flag_sha256 IS NULL AND patch_upload_id IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Teams.Team", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<string>("AvatarUrl")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("avatar_url");
+
+                    b.Property<string>("BanReason")
+                        .HasColumnType("text")
+                        .HasColumnName("ban_reason");
+
+                    b.Property<DateTimeOffset?>("BannedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("banned_at");
+
+                    b.Property<Guid?>("BannedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("banned_by_id");
+
+                    b.Property<Guid>("CaptainId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("captain_id");
 
                     b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
 
                     b.Property<string>("InvitationToken")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("invitation_token");
+
+                    b.Property<bool>("IsBanned")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_banned");
 
                     b.Property<bool>("IsLocked")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_locked");
+
+                    b.PrimitiveCollection<Guid[]>("MemberIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("member_ids");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("normalized_name");
 
                     b.Property<DateTimeOffset>("RegisteredAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registered_at");
 
-                    b.Property<int>("RegistrationStatus")
-                        .HasColumnType("integer");
+                    b.Property<short>("RegistrationStatus")
+                        .HasColumnType("smallint")
+                        .HasColumnName("registration_status");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_teams");
+
+                    b.HasIndex("CaptainId")
+                        .HasDatabaseName("ix_teams_captain_id");
 
                     b.HasIndex("InvitationToken")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_teams_invitation_token");
 
-                    b.HasIndex("CompetitionId", "Name")
-                        .IsUnique();
+                    b.HasIndex("MemberIds")
+                        .HasDatabaseName("ix_teams_member_ids");
 
-                    b.HasIndex("CompetitionId", "RegistrationStatus");
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("MemberIds"), "gin");
 
-                    b.ToTable("teams", (string)null);
+                    b.HasIndex("CompetitionId", "NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_teams_competition_id_normalized_name")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("CompetitionId", "RegistrationStatus")
+                        .HasDatabaseName("ix_teams_competition_id_registration_status");
+
+                    b.ToTable("teams", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_teams_captain_is_member", "captain_id = ANY(member_ids)");
+
+                            t.HasCheckConstraint("ck_teams_invitation_token_length", "char_length(invitation_token) = 32");
+
+                            t.HasCheckConstraint("ck_teams_members_not_empty", "cardinality(member_ids) > 0");
+                        });
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>
                 {
-                    b.OwnsOne("NoCTF.Domain.Shared.SoftDeleteState", "Deletion", b1 =>
-                        {
-                            b1.Property<Guid>("ChallengeId")
-                                .HasColumnType("uuid");
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_challenges_users_owner_id");
+                });
 
-                            b1.Property<DateTimeOffset?>("DeletedAt")
-                                .HasColumnType("timestamp with time zone");
-
-                            b1.Property<Guid?>("DeletedById")
-                                .HasColumnType("uuid");
-
-                            b1.Property<bool>("IsDeleted")
-                                .HasColumnType("boolean");
-
-                            b1.HasKey("ChallengeId");
-
-                            b1.ToTable("challenges");
-
-                            b1.WithOwner()
-                                .HasForeignKey("ChallengeId");
-                        });
-
-                    b.OwnsMany("NoCTF.Domain.Challenges.ChallengeAttachment", "Attachments", b1 =>
-                        {
-                            b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("uuid");
-
-                            b1.Property<Guid>("ChallengeId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasColumnType("text");
-
-                            b1.Property<string>("FileName")
-                                .IsRequired()
-                                .HasColumnType("text");
-
-                            b1.Property<long>("Length")
-                                .HasColumnType("bigint");
-
-                            b1.Property<string>("ObjectKey")
-                                .IsRequired()
-                                .HasMaxLength(1024)
-                                .HasColumnType("character varying(1024)");
-
-                            b1.Property<string>("Sha256")
-                                .IsRequired()
-                                .HasColumnType("text");
-
-                            b1.HasKey("Id");
-
-                            b1.HasIndex("ChallengeId");
-
-                            b1.HasIndex("ObjectKey")
-                                .IsUnique();
-
-                            b1.ToTable("challenge_attachments", (string)null);
-
-                            b1.WithOwner()
-                                .HasForeignKey("ChallengeId");
-                        });
-
-                    b.Navigation("Attachments");
-
-                    b.Navigation("Deletion")
-                        .IsRequired();
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeAttachment", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithMany("Attachments")
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_challenge_attachments_challenges_challenge_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeFlag", b =>
                 {
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_challenge_flags_challenges_challenge_id");
+
                     b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
                         .WithMany()
                         .HasForeignKey("CompetitionChallengeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasConstraintName("fk_challenge_flags_competition_challenges_competition_challeng");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_challenge_flags_teams_team_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallenge", b =>
@@ -807,187 +1272,131 @@ namespace NoCTF.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ChallengeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenges_challenges_challenge_id");
 
                     b.HasOne("NoCTF.Domain.Competitions.Competition", null)
                         .WithMany()
                         .HasForeignKey("CompetitionId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenges_competitions_competition_id");
+                });
 
-                    b.OwnsOne("NoCTF.Domain.Shared.SoftDeleteState", "Deletion", b1 =>
-                        {
-                            b1.Property<Guid>("CompetitionChallengeId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<DateTimeOffset?>("DeletedAt")
-                                .HasColumnType("timestamp with time zone");
-
-                            b1.Property<Guid?>("DeletedById")
-                                .HasColumnType("uuid");
-
-                            b1.Property<bool>("IsDeleted")
-                                .HasColumnType("boolean");
-
-                            b1.HasKey("CompetitionChallengeId");
-
-                            b1.ToTable("competition_challenges");
-
-                            b1.WithOwner()
-                                .HasForeignKey("CompetitionChallengeId");
-                        });
-
-                    b.OwnsMany("NoCTF.Domain.Challenges.CompetitionChallengeHint", "Hints", b1 =>
-                        {
-                            b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("uuid");
-
-                            b1.Property<Guid>("CompetitionChallengeId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<string>("Content")
-                                .IsRequired()
-                                .HasColumnType("text");
-
-                            b1.Property<int>("Cost")
-                                .HasColumnType("integer");
-
-                            b1.Property<DateTimeOffset?>("PublishedAt")
-                                .HasColumnType("timestamp with time zone");
-
-                            b1.HasKey("Id");
-
-                            b1.HasIndex("CompetitionChallengeId");
-
-                            b1.ToTable("competition_challenge_hints", (string)null);
-
-                            b1.WithOwner()
-                                .HasForeignKey("CompetitionChallengeId");
-                        });
-
-                    b.Navigation("Deletion")
-                        .IsRequired();
-
-                    b.Navigation("Hints");
+            modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallengeHint", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany("Hints")
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_hints_competition_challenges_competit");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
                 {
-                    b.OwnsOne("NoCTF.Domain.Shared.SoftDeleteState", "Deletion", b1 =>
-                        {
-                            b1.Property<Guid>("CompetitionId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<DateTimeOffset?>("DeletedAt")
-                                .HasColumnType("timestamp with time zone");
-
-                            b1.Property<Guid?>("DeletedById")
-                                .HasColumnType("uuid");
-
-                            b1.Property<bool>("IsDeleted")
-                                .HasColumnType("boolean");
-
-                            b1.HasKey("CompetitionId");
-
-                            b1.ToTable("competitions");
-
-                            b1.WithOwner()
-                                .HasForeignKey("CompetitionId");
-                        });
-
-                    b.OwnsMany("NoCTF.Domain.Competitions.CompetitionCollaborator", "Collaborators", b1 =>
-                        {
-                            b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("uuid");
-
-                            b1.Property<DateTimeOffset>("AddedAt")
-                                .HasColumnType("timestamp with time zone");
-
-                            b1.Property<Guid>("CompetitionId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<int>("Role")
-                                .HasColumnType("integer");
-
-                            b1.Property<Guid>("UserId")
-                                .HasColumnType("uuid");
-
-                            b1.HasKey("Id");
-
-                            b1.HasIndex("CompetitionId", "UserId")
-                                .IsUnique();
-
-                            b1.ToTable("competition_collaborators", (string)null);
-
-                            b1.WithOwner()
-                                .HasForeignKey("CompetitionId");
-                        });
-
-                    b.OwnsMany("NoCTF.Domain.Competitions.CompetitionLifecycleAudit", "LifecycleAudits", b1 =>
-                        {
-                            b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("uuid");
-
-                            b1.Property<Guid?>("ActorId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<bool>("Automatic")
-                                .HasColumnType("boolean");
-
-                            b1.Property<Guid>("CompetitionId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<int>("From")
-                                .HasColumnType("integer");
-
-                            b1.Property<DateTimeOffset>("OccurredAt")
-                                .HasColumnType("timestamp with time zone");
-
-                            b1.Property<string>("Reason")
-                                .HasMaxLength(256)
-                                .HasColumnType("character varying(256)");
-
-                            b1.Property<int>("To")
-                                .HasColumnType("integer");
-
-                            b1.HasKey("Id");
-
-                            b1.HasIndex("CompetitionId", "OccurredAt");
-
-                            b1.ToTable("competition_lifecycle_audits", (string)null);
-
-                            b1.WithOwner()
-                                .HasForeignKey("CompetitionId");
-                        });
-
-                    b.Navigation("Collaborators");
-
-                    b.Navigation("Deletion")
-                        .IsRequired();
-
-                    b.Navigation("LifecycleAudits");
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competitions_users_owner_id");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Runtime.ChallengeInstance", b =>
+            modelBuilder.Entity("NoCTF.Domain.Competitions.CompetitionLifecycleAudit", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany("LifecycleAudits")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_lifecycle_audits_competitions_competition_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Identity.EmailVerificationToken", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_email_verification_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Notifications.Notification", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_notifications_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_notifications_users_user_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Runtime.RuntimeInstance", b =>
                 {
                     b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
                         .WithMany()
                         .HasForeignKey("CompetitionChallengeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_runtime_instances_competition_challenges_competition_challe");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_runtime_instances_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacesRuntimeInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_runtime_instances_runtime_instances_replaces_runtime_instan");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_runtime_instances_teams_team_id");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Submissions.FixSubmissionRecord", b =>
+            modelBuilder.Entity("NoCTF.Domain.Submissions.PatchUpload", b =>
                 {
-                    b.HasOne("NoCTF.Domain.Submissions.Submission", "Submission")
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
                         .WithMany()
-                        .HasForeignKey("SubmissionId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_competition_challenges_competition_challenge_");
 
-                    b.Navigation("Submission");
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_users_uploaded_by_user_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Submissions.ScoringEvent", b =>
@@ -995,12 +1404,33 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
                         .WithMany()
                         .HasForeignKey("CompetitionChallengeId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_scoring_events_competition_challenges_competition_challenge");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_scoring_events_competitions_competition_id");
 
                     b.HasOne("NoCTF.Domain.Submissions.Submission", "Submission")
                         .WithMany()
                         .HasForeignKey("SubmissionId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_scoring_events_submissions_submission_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_scoring_events_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("VictimTeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_scoring_events_teams_victim_team_id");
 
                     b.Navigation("Submission");
                 });
@@ -1010,104 +1440,74 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
                         .WithMany()
                         .HasForeignKey("CompetitionChallengeId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_submissions_competition_challenges_competition_challenge_id");
 
-                    b.HasOne("NoCTF.Domain.Submissions.ScoringEvent", "ScoringEvent")
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
                         .WithMany()
-                        .HasForeignKey("ScoringEventId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_submissions_competitions_competition_id");
 
-                    b.Navigation("ScoringEvent");
+                    b.HasOne("NoCTF.Domain.Submissions.ScoringEvent", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentScoringEventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_submissions_scoring_events_current_scoring_event_id");
+
+                    b.HasOne("NoCTF.Domain.Submissions.PatchUpload", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.Submissions.Submission", "PatchUploadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_submissions_patch_uploads_patch_upload_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_submissions_users_submitted_by_user_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_submissions_teams_team_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Teams.Team", b =>
                 {
-                    b.OwnsOne("NoCTF.Domain.Shared.SoftDeleteState", "Deletion", b1 =>
-                        {
-                            b1.Property<Guid>("TeamId")
-                                .HasColumnType("uuid");
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("CaptainId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_teams_users_captain_id");
 
-                            b1.Property<DateTimeOffset?>("DeletedAt")
-                                .HasColumnType("timestamp with time zone");
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_teams_competitions_competition_id");
+                });
 
-                            b1.Property<Guid?>("DeletedById")
-                                .HasColumnType("uuid");
+            modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>
+                {
+                    b.Navigation("Attachments");
+                });
 
-                            b1.Property<bool>("IsDeleted")
-                                .HasColumnType("boolean");
+            modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallenge", b =>
+                {
+                    b.Navigation("Hints");
+                });
 
-                            b1.HasKey("TeamId");
-
-                            b1.ToTable("teams");
-
-                            b1.WithOwner()
-                                .HasForeignKey("TeamId");
-                        });
-
-                    b.OwnsOne("NoCTF.Domain.Teams.TeamBanState", "Ban", b1 =>
-                        {
-                            b1.Property<Guid>("TeamId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<DateTimeOffset?>("BannedAt")
-                                .HasColumnType("timestamp with time zone");
-
-                            b1.Property<Guid?>("BannedById")
-                                .HasColumnType("uuid");
-
-                            b1.Property<bool>("IsBanned")
-                                .HasColumnType("boolean");
-
-                            b1.Property<string>("Reason")
-                                .HasColumnType("text");
-
-                            b1.HasKey("TeamId");
-
-                            b1.ToTable("teams");
-
-                            b1.WithOwner()
-                                .HasForeignKey("TeamId");
-                        });
-
-                    b.OwnsMany("NoCTF.Domain.Teams.TeamMember", "Members", b1 =>
-                        {
-                            b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("uuid");
-
-                            b1.Property<DateTimeOffset>("JoinedAt")
-                                .HasColumnType("timestamp with time zone");
-
-                            b1.Property<int>("MemberOrder")
-                                .HasColumnType("integer");
-
-                            b1.Property<Guid>("TeamId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<Guid>("UserId")
-                                .HasColumnType("uuid");
-
-                            b1.HasKey("Id");
-
-                            b1.HasIndex("TeamId", "MemberOrder")
-                                .IsUnique();
-
-                            b1.HasIndex("TeamId", "UserId")
-                                .IsUnique();
-
-                            b1.ToTable("team_members", (string)null);
-
-                            b1.WithOwner()
-                                .HasForeignKey("TeamId");
-                        });
-
-                    b.Navigation("Ban")
-                        .IsRequired();
-
-                    b.Navigation("Deletion")
-                        .IsRequired();
-
-                    b.Navigation("Members");
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
+                {
+                    b.Navigation("LifecycleAudits");
                 });
 #pragma warning restore 612, 618
         }

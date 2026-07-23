@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Domain.Auditing;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Runtime;
@@ -19,13 +18,14 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();
     public DbSet<ChallengeFlag> ChallengeFlags => Set<ChallengeFlag>();
-    public DbSet<ChallengeInstance> ChallengeInstances => Set<ChallengeInstance>();
-    public DbSet<RuntimeOperation> RuntimeOperations => Set<RuntimeOperation>();
+    public DbSet<RuntimeInstance> RuntimeInstances => Set<RuntimeInstance>();
+    public DbSet<PatchUpload> PatchUploads => Set<PatchUpload>();
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<Notification> Notifications => Set<Notification>();
-    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<ScoringEvent> ScoringEvents => Set<ScoringEvent>();
-    public DbSet<FixSubmissionRecord> FixSubmissionRecords => Set<FixSubmissionRecord>();
-    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NoCtfDbContext).Assembly);
+    }
 }

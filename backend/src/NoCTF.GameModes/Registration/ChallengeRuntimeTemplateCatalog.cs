@@ -5,7 +5,6 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
-using NoCTF.GameModes.Penetration.Configuration;
 
 namespace NoCTF.GameModes.Registration;
 
@@ -19,7 +18,6 @@ public sealed class ChallengeRuntimeTemplateCatalog : IChallengeRuntimeTemplateC
         GameMode.Awd => Parse<AwdChallengeConfiguration>(challengeConfigurationJson).Runtime,
         GameMode.Awdp => Parse<AwdpChallengeConfiguration>(challengeConfigurationJson).Runtime,
         GameMode.Koh => Parse<KohChallengeConfiguration>(challengeConfigurationJson).Runtime,
-        GameMode.Penetration => Parse<PenetrationChallengeConfiguration>(challengeConfigurationJson).Runtime,
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };
 

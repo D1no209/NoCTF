@@ -8,7 +8,8 @@ namespace NoCTF.API.Composition;
 
 public static class AuthenticationRegistration
 {
-    public const string RunnerScoringScheme = "RunnerScoringBearer";
+    public const string AccessScheme = JwtBearerDefaults.AuthenticationScheme;
+    public const string InternalScheme = "Internal";
 
     public static IServiceCollection AddNoCtfAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
@@ -18,15 +19,14 @@ public static class AuthenticationRegistration
         var runnerKey = ReadKey(configuration["RunnerScoring:SigningKey"], "RunnerScoring:SigningKey");
         var runnerIssuer = configuration["RunnerScoring:Issuer"] ?? "NoCTF.Runner";
         var runnerAudience = configuration["RunnerScoring:Audience"] ?? "NoCTF.ScoringInput";
-        var clockSkew = TimeSpan.FromSeconds(configuration.GetValue("Authentication:ClockSkewSeconds", 30));
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+        services.AddAuthentication(AccessScheme)
+            .AddJwtBearer(AccessScheme, options =>
             {
                 options.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = context =>
                     {
-                        if (context.HttpContext.Request.Path.StartsWithSegments("/hubs/competition")
+                        if (context.HttpContext.Request.Path.StartsWithSegments("/hubs/v1/competitions")
                             && context.Request.Query.TryGetValue("access_token", out var token))
                             context.Token = token;
                         return Task.CompletedTask;
@@ -42,10 +42,10 @@ public static class AuthenticationRegistration
                     ValidAudience = audience,
                     ValidateLifetime = true,
                     RequireExpirationTime = true,
-                    ClockSkew = clockSkew
+                    ClockSkew = TimeSpan.Zero
                 };
             })
-            .AddJwtBearer(RunnerScoringScheme, options =>
+            .AddJwtBearer(InternalScheme, options =>
             {
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -57,26 +57,36 @@ public static class AuthenticationRegistration
                     ValidAudience = runnerAudience,
                     ValidateLifetime = true,
                     RequireExpirationTime = true,
-                    ClockSkew = clockSkew,
+                    ClockSkew = TimeSpan.Zero,
                     NameClaimType = "runner_id"
                 };
             });
         services.AddScoped<IAuthorizationHandler, CurrentTokenVersionHandler>();
         services.AddAuthorization(options =>
         {
-            options.DefaultPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+            options.DefaultPolicy = new AuthorizationPolicyBuilder(AccessScheme)
                 .RequireAuthenticatedUser()
                 .AddRequirements(new CurrentTokenVersionRequirement())
                 .Build();
-            options.AddPolicy("ScoringInput", policy => policy
-                .AddAuthenticationSchemes(RunnerScoringScheme)
+            options.AddPolicy("AwdCheckResult", policy => policy
+                .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
-                .RequireClaim("scope", "scoring.write"));
+                .RequireClaim("permission", "awd:check-result:write")
+                .RequireClaim("runtime_instance_id")
+                .RequireClaim("generation")
+                .RequireClaim("checker_sequence")
+                .RequireClaim("deadline"));
+            options.AddPolicy("AwdpFixResult", policy => policy
+                .AddAuthenticationSchemes(InternalScheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim("permission", "awdp:fix-result:write")
+                .RequireClaim("submission_id")
+                .RequireClaim("processing_version")
+                .RequireClaim("deadline"));
             options.AddPolicy("FixArchiveRead", policy => policy
-                .AddAuthenticationSchemes(RunnerScoringScheme)
+                .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
-                .RequireClaim("scope", "fix-archive.read")
-                .RequireClaim("upload_id")
+                .RequireClaim("permission", "awdp:fix-archive:read")
                 .RequireClaim("submission_id"));
         });
         return services;
