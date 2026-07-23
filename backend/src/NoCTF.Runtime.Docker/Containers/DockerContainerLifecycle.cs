@@ -30,38 +30,66 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             pair => $"{pair.Key}/tcp",
             pair => (IList<PortBinding>)[new() { HostPort = pair.Value.ToString() }]);
         var containerName = $"noctf-{request.OperationId:N}";
-        var response = await client.Containers.CreateContainerAsync(new CreateContainerParameters
+        CreateContainerResponse? response = null;
+        try
         {
-            Name = containerName,
-            Image = request.Image,
-            Cmd = request.Command.ToList(),
-            Env = request.Environment.Select(pair => $"{pair.Key}={pair.Value}").ToList(),
-            Labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value),
-            ExposedPorts = exposedPorts,
-            HostConfig = new HostConfig
+            response = await client.Containers.CreateContainerAsync(new CreateContainerParameters
             {
-                PortBindings = bindings,
-                NetworkMode = request.NetworkName ?? options.NetworkName,
-                Memory = request.Limits.MemoryBytes,
-                NanoCPUs = request.Limits.NanoCpus,
-                PidsLimit = request.Limits.PidsLimit,
-                SecurityOpt = request.Security.NoNewPrivileges ? ["no-new-privileges:true"] : [],
-                ReadonlyRootfs = request.Security.ReadonlyRootfs,
-                CapDrop = request.Security.CapDrop.ToList(),
-                CapAdd = request.Security.CapAdd.ToList()
+                Name = containerName,
+                Image = request.Image,
+                Cmd = request.Command.ToList(),
+                Env = request.Environment.Select(pair => $"{pair.Key}={pair.Value}").ToList(),
+                Labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value),
+                ExposedPorts = exposedPorts,
+                HostConfig = new HostConfig
+                {
+                    PortBindings = bindings,
+                    NetworkMode = request.NetworkName ?? options.NetworkName,
+                    Memory = request.Limits.MemoryBytes,
+                    NanoCPUs = request.Limits.NanoCpus,
+                    PidsLimit = request.Limits.PidsLimit,
+                    SecurityOpt = request.Security.NoNewPrivileges ? ["no-new-privileges:true"] : [],
+                    ReadonlyRootfs = request.Security.ReadonlyRootfs,
+                    CapDrop = request.Security.CapDrop.ToList(),
+                    CapAdd = request.Security.CapAdd.ToList()
+                }
+            }, cancellationToken);
+            if (request.AllowInternalCallback)
+            {
+                if (string.Equals(options.CallbackNetworkName, options.NetworkName, StringComparison.Ordinal)
+                    || string.Equals(options.CallbackNetworkName, request.NetworkName, StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        "The AWDP callback network must be dedicated and separate from platform and sandbox networks.");
+                await client.Networks.ConnectNetworkAsync(
+                    options.CallbackNetworkName,
+                    new NetworkConnectParameters { Container = response.ID },
+                    cancellationToken);
             }
-        }, cancellationToken);
-        if (request.AllowInternalCallback
-            && !string.Equals(request.NetworkName, options.NetworkName, StringComparison.Ordinal))
-        {
-            await client.Networks.ConnectNetworkAsync(
-                options.NetworkName,
-                new NetworkConnectParameters { Container = response.ID },
-                cancellationToken);
+            await client.Containers.StartContainerAsync(
+                response.ID, new ContainerStartParameters(), cancellationToken);
+            return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
+                request.PortMappings, options.PublicHost, containerName);
         }
-        await client.Containers.StartContainerAsync(response.ID, new ContainerStartParameters(), cancellationToken);
-        return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
-            request.PortMappings, options.PublicHost, containerName);
+        catch
+        {
+            if (response is not null)
+            {
+                using var cleanupSource = new CancellationTokenSource(
+                    RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
+                try
+                {
+                    await client.Containers.RemoveContainerAsync(
+                        response.ID,
+                        new ContainerRemoveParameters { Force = true },
+                        cleanupSource.Token);
+                }
+                catch
+                {
+                    // The expiry-labelled reaper remains the final cleanup fallback.
+                }
+            }
+            throw;
+        }
     }
 
     public async Task<ContainerReceipt> EnsureRunningAsync(

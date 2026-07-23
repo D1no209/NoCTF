@@ -1,4 +1,6 @@
 using System.Text;
+using Docker.DotNet;
+using Docker.DotNet.Models;
 using DotNet.Testcontainers.Builders;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
@@ -86,9 +88,94 @@ public sealed class DockerContainerLifecycleTests
         });
     }
 
-    private static DockerContainerLifecycle CreateLifecycle() => new(new DockerRuntimeOptions(
-        Environment.GetEnvironmentVariable("DOCKER_HOST") ??
-        (OperatingSystem.IsWindows() ? "npipe://./pipe/docker_engine" : "unix:///var/run/docker.sock")));
+    [Test]
+    [Timeout(300_000)]
+    public async Task Checker_joins_dedicated_callback_network_not_platform_network(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var dockerProbe = new ContainerBuilder("alpine:3.20")
+                .WithCommand("true")
+                .Build();
+            await dockerProbe.StartAsync(cancellationToken);
+            var endpoint = DockerEndpoint();
+            using var docker = new DockerClientBuilder().WithEndpoint(new Uri(endpoint)).Build();
+            var callback = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters { Name = $"noctf-callback-{Guid.NewGuid():N}", Internal = true },
+                cancellationToken);
+            using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
+                endpoint, "noctf-platform", "localhost", callback.ID));
+            var operationId = Guid.NewGuid();
+            var sandbox = await lifecycle.CreateIsolatedNetworkAsync(
+                operationId, DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+            ContainerReceipt? receipt = null;
+            try
+            {
+                receipt = await lifecycle.CreateAsync(CheckerRequest(operationId, sandbox), cancellationToken);
+                var inspected = await docker.Containers.InspectContainerAsync(
+                    receipt!.ResourceId, cancellationToken);
+                await Assert.That(inspected.NetworkSettings!.Networks.Values
+                        .Select(network => network.NetworkID))
+                    .IsEquivalentTo([sandbox, callback.ID]);
+                await Assert.That(inspected.NetworkSettings.Networks.Keys.Contains("noctf-platform"))
+                    .IsFalse();
+            }
+            finally
+            {
+                if (receipt is not null)
+                    await lifecycle.DestroyAsync(receipt, cancellationToken);
+                await lifecycle.DeleteIsolatedNetworkAsync(sandbox, cancellationToken);
+                await docker.Networks.DeleteNetworkAsync(callback.ID, cancellationToken);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Callback_network_failure_removes_container_created_before_receipt(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var dockerProbe = new ContainerBuilder("alpine:3.20")
+                .WithCommand("true")
+                .Build();
+            await dockerProbe.StartAsync(cancellationToken);
+            var operationId = Guid.NewGuid();
+            using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
+                DockerEndpoint(), "noctf-platform", "localhost", $"missing-{Guid.NewGuid():N}"));
+            Func<Task> action = () => lifecycle.CreateAsync(
+                CheckerRequest(operationId, null), cancellationToken);
+
+            await Assert.That(action).ThrowsException();
+            var remaining = await lifecycle.GetAsync(
+                RuntimeProvider.Docker, $"noctf-{operationId:N}", cancellationToken);
+            await Assert.That(remaining).IsNull();
+        });
+    }
+
+    private static DockerContainerLifecycle CreateLifecycle() => new(new DockerRuntimeOptions(DockerEndpoint()));
+
+    private static string DockerEndpoint() => Environment.GetEnvironmentVariable("DOCKER_HOST") ??
+        (OperatingSystem.IsWindows() ? "npipe://./pipe/docker_engine" : "unix:///var/run/docker.sock");
+
+    private static ContainerRequest CheckerRequest(Guid operationId, string? networkName) => new(
+        operationId,
+        RuntimeProvider.Docker,
+        "alpine:3.20",
+        ["sleep", "300"],
+        new Dictionary<string, string>
+        {
+            ["NOCTF_CALLBACK_URL"] = "http://callback:8080/api/internal/v1/awdp/fix-results"
+        },
+        new Dictionary<string, string> { ["noctf.purpose"] = "awdp-checker" },
+        new Dictionary<int, int>(),
+        new ContainerResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+        new ContainerSecurityPolicy(true, false, true, ["ALL"], []),
+        TimeSpan.FromMinutes(1),
+        NetworkName: networkName,
+        AllowInternalCallback: true);
 
     private static ContainerReceipt Receipt(string resourceId) => new(
         Guid.NewGuid(), RuntimeProvider.Docker, resourceId, RuntimeStatus.Running,

@@ -70,6 +70,28 @@ public sealed class AwdpFixResultPersistenceTests
             await Assert.That(runtime.ProcessingVersion).IsEqualTo(4);
 
             var expired = await AddPendingFixAsync(options, fixture, cancellationToken);
+            await using (var wrongOwnerDb = new NoCtfDbContext(options))
+                await BackendMessageHandlers.Handle(new ExpireAwdpFixVerification(
+                    expired.SubmissionId,
+                    expired.RuntimeId,
+                    2,
+                    8,
+                    5,
+                    fixture.Now,
+                    "awdp",
+                    "runner-b"), wrongOwnerDb, outbox, cancellationToken);
+            await using (var wrongOwnerVerify = new NoCtfDbContext(options))
+            {
+                var pendingSubmission = await wrongOwnerVerify.Submissions.SingleAsync(
+                    item => item.Id == expired.SubmissionId, cancellationToken);
+                var runningRuntime = await wrongOwnerVerify.RuntimeInstances.SingleAsync(
+                    item => item.Id == expired.RuntimeId, cancellationToken);
+                await Assert.That(pendingSubmission.EvaluationState)
+                    .IsEqualTo(SubmissionEvaluationState.Processing);
+                await Assert.That(runningRuntime.State).IsEqualTo(RuntimeState.Running);
+                await Assert.That(outbox.NodeMessages.OfType<StopContainerRuntime>().Count())
+                    .IsEqualTo(1);
+            }
             await using (var expireDb = new NoCtfDbContext(options))
                 await BackendMessageHandlers.Handle(new ExpireAwdpFixVerification(
                     expired.SubmissionId,
