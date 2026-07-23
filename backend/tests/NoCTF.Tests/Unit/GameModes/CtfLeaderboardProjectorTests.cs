@@ -14,6 +14,7 @@ public sealed class CtfLeaderboardProjectorTests
     {
         var teamId = Guid.NewGuid();
         var challengeId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
         var at = DateTimeOffset.UtcNow;
         var json = JsonSerializer.Serialize(new CtfConfiguration(
             CtfConfiguration.CurrentSchemaVersion,
@@ -82,6 +83,38 @@ public sealed class CtfLeaderboardProjectorTests
                 Id = Guid.NewGuid(), CompetitionId = competitionId, TeamId = teamId,
                 CompetitionChallengeId = challengeId, Kind = ScoringEventKind.SubmissionEvaluation,
                 Result = ScoringResult.Correct, OccurredAt = at, CreatedAt = at
+            });
+    }
+
+    [Test]
+    public async Task Projector_applies_only_current_wrong_submission_penalty()
+    {
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var at = DateTimeOffset.UtcNow;
+        var competitionId = Guid.NewGuid();
+        var input = new LeaderboardProjectionInput(
+            competitionId, GameMode.Ctf,
+            [new(teamId, "red", false, false)],
+            [
+                Fact(ScoringResult.Correct, at),
+                Fact(ScoringResult.Wrong, at.AddSeconds(1))
+            ], [],
+            [new(challengeId, "Web", false, JsonSerializer.Serialize(
+                new CtfChallengeConfiguration(1, new(100, 100, 10), [], null, null, null, 25)))],
+            JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 100, 10), [], null, 10)), at);
+
+        var row = new CtfLeaderboardProjector().Project(input).Single();
+
+        await Assert.That(row.Score).IsEqualTo(75);
+
+        LeaderboardSubmissionFact Fact(ScoringResult result, DateTimeOffset occurredAt) => new(
+            Guid.NewGuid(), teamId, challengeId, SubmissionKind.Flag, occurredAt,
+            new ScoringEvent
+            {
+                Id = Guid.NewGuid(), CompetitionId = competitionId, TeamId = teamId,
+                CompetitionChallengeId = challengeId, Kind = ScoringEventKind.SubmissionEvaluation,
+                Result = result, OccurredAt = occurredAt, CreatedAt = occurredAt
             });
     }
 }

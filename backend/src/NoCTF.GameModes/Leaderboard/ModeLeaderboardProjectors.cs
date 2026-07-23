@@ -74,6 +74,23 @@ internal static class CtfLeaderboardProjection
             teamSolves.Add((solve, score));
         }
 
+        var wrongPenalties = input.Submissions
+            .Where(fact => validTeams.ContainsKey(fact.TeamId)
+                && fact.Kind == SubmissionKind.Flag
+                && fact.Event is { DeletedAt: null, Result: ScoringResult.Wrong })
+            .GroupBy(fact => fact.TeamId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Aggregate(0L, (total, fact) =>
+                {
+                    var challenge = fact.CompetitionChallengeId is Guid challengeId
+                        ? ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson)
+                        : null;
+                    var penalty = challenge?.WrongSubmissionPenalty ?? defaults.WrongSubmissionPenalty;
+                    return checked(total + penalty);
+                }));
+        var hintCosts = ProjectionPenalties.HintCosts(input, validTeams.Keys);
+
         var rows = validTeams.Values.Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
@@ -85,7 +102,9 @@ internal static class CtfLeaderboardProjection
                 .OrderBy(summary => summary.CompetitionChallengeId)
                 .ToList();
             var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
-            var total = own.Aggregate(0L, (sum, item) => checked(sum + item.Points));
+            var total = checked(own.Aggregate(0L, (sum, item) => checked(sum + item.Points))
+                - wrongPenalties.GetValueOrDefault(team.Id)
+                - hintCosts.GetValueOrDefault(team.Id));
             return new LeaderboardEntry(0, team.Id, team.Name, total, own.Count,
                 last == default ? null : last, summaries);
         });
@@ -173,6 +192,8 @@ internal static class AwdLeaderboardProjection
                 ? configuration.ServiceOnlinePoints
                 : -configuration.ServiceDownPenalty;
         }
+        foreach (var hint in ProjectionPenalties.HintCosts(input, teams.Keys))
+            values[hint.Key] = checked(values[hint.Key] - hint.Value);
         var rows = teams.Values.Select(team => new LeaderboardEntry(
             0,
             team.Id,
@@ -265,13 +286,15 @@ internal static class AwdpLeaderboardProjection
                             => competition.ServiceDownPenalty,
                         _ => 0L
                     })));
+        var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
         var rows = teams.Values.Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
             var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
             var awardedScore = own.Aggregate(0L, (total, item) => checked(total + item.Points));
             return new LeaderboardEntry(0, team.Id, team.Name,
-                checked(awardedScore - penalties.GetValueOrDefault(team.Id)), own.Count,
+                checked(awardedScore - penalties.GetValueOrDefault(team.Id)
+                    - hintCosts.GetValueOrDefault(team.Id)), own.Count,
                 last == default ? null : last, []);
         });
         return rows.OrderByDescending(row => row.Score)
@@ -332,12 +355,14 @@ internal static class KohLeaderboardProjection
             .OrderBy(fact => fact.Event.OccurredAt)
             .ThenBy(fact => fact.Event.Id)
             .ToList();
+        var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
         var rows = teams.Values.Select(team =>
         {
             var own = observations.Where(fact => fact.Event.TeamId == team.Id).ToList();
             var last = own.Select(fact => fact.Event.OccurredAt).LastOrDefault();
             return new LeaderboardEntry(0, team.Id, team.Name,
-                own.Count * configuration.ControlPointsPerInterval,
+                checked(own.Count * configuration.ControlPointsPerInterval
+                    - hintCosts.GetValueOrDefault(team.Id)),
                 0,
                 last == default ? null : last,
                 []);
@@ -361,5 +386,26 @@ internal static class KohLeaderboardProjection
         {
             return new(1, 5, 10);
         }
+    }
+}
+
+internal static class ProjectionPenalties
+{
+    public static IReadOnlyDictionary<Guid, long> HintCosts(
+        LeaderboardProjectionInput input,
+        IEnumerable<Guid> teamIds)
+    {
+        var validTeams = teamIds.ToHashSet();
+        return input.SystemEvents
+            .Where(fact => fact.Event is
+            {
+                DeletedAt: null,
+                Kind: ScoringEventKind.HintUnlock,
+                TeamId: not null
+            } && validTeams.Contains(fact.Event.TeamId!.Value))
+            .GroupBy(fact => fact.Event.TeamId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Aggregate(0L, (total, fact) => checked(total + fact.CurrentValue)));
     }
 }

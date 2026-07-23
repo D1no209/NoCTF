@@ -16,7 +16,8 @@ public sealed record CtfConfiguration(
     int SchemaVersion,
     CtfPointConfiguration DefaultPoints,
     IReadOnlyList<BloodReward> BloodRewards,
-    string? ScoreExpression = null)
+    string? ScoreExpression = null,
+    long WrongSubmissionPenalty = 0)
 {
     public const int CurrentSchemaVersion = 1;
 }
@@ -27,7 +28,8 @@ public sealed record CtfChallengeConfiguration(
     IReadOnlyList<BloodReward>? BloodRewards,
     int? MaxFlagAttempts = null,
     ChallengeRuntimeTemplate? Runtime = null,
-    string? ScoreExpression = null)
+    string? ScoreExpression = null,
+    long? WrongSubmissionPenalty = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

@@ -89,8 +89,8 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
             GameMode.Ctf when fact.Kind == SubmissionKind.Flag && challengeId is not null =>
                 Slot(fact.TeamId, $"challenge:{challengeId:N}", LeaderboardSlotKind.Challenge, challengeLabel, fact.ReceivedAt, fact.SubmissionId, succeeded, true),
             GameMode.Awd when fact.Kind == SubmissionKind.Flag =>
-                Slot(fact.TeamId, $"service:{fact.ServiceId ?? challengeId}", LeaderboardSlotKind.Service, challengeLabel, fact.ReceivedAt, fact.SubmissionId, succeeded, false),
-            GameMode.Awdp when fact.Kind == SubmissionKind.Flag && challengeId is not null =>
+                Slot(fact.TeamId, $"service:{challengeId}", LeaderboardSlotKind.Service, challengeLabel, fact.ReceivedAt, fact.SubmissionId, succeeded, false),
+            GameMode.Awdp when fact.Kind == SubmissionKind.Break && challengeId is not null =>
                 Slot(fact.TeamId, $"break:{challengeId:N}", LeaderboardSlotKind.Break, challengeLabel, fact.ReceivedAt, fact.SubmissionId, succeeded, false),
             GameMode.Awdp when fact.Kind == SubmissionKind.Fix && challengeId is not null =>
                 Slot(fact.TeamId, $"fix:{challengeId:N}", LeaderboardSlotKind.Fix, challengeLabel, fact.ReceivedAt, fact.SubmissionId, succeeded, false),

@@ -7,6 +7,7 @@ using NoCTF.Infrastructure.Persistence;
 using StackExchange.Redis;
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Notifications;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Infrastructure.Caching;
 
@@ -62,10 +63,18 @@ public sealed class RedisLeaderboardCache(
             .Join(db.ScoringEvents.AsNoTracking(), s => s.CurrentScoringEventId, e => (Guid?)e.Id,
                 (s, e) => new LeaderboardSubmissionFact(
                     s.Id, s.TeamId, s.CompetitionChallengeId, s.Kind, s.ReceivedAt, e,
-                    null, e.VictimTeamId, null, null, null))
+                    e.VictimTeamId))
             .ToListAsync(ct);
         var system = await db.ScoringEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.SubmissionId == null)
-            .Select(x => new LeaderboardSystemFact(x)).ToListAsync(ct);
+            .Select(x => new LeaderboardSystemFact(
+                x,
+                x.Kind == ScoringEventKind.HintUnlock && x.SpecificationId != null
+                    ? db.Set<CompetitionChallengeHint>()
+                        .Where(hint => hint.Id == x.SpecificationId && hint.DeletedAt == null)
+                        .Select(hint => hint.Cost)
+                        .SingleOrDefault()
+                    : 0))
+            .ToListAsync(ct);
         var projection = projectionEngine.Project(
             new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration, competition.StartAt));
         var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, projection.Entries)
