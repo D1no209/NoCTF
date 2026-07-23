@@ -3,20 +3,48 @@ using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Application.Runtime.Instances;
 
+public sealed record ClaimContainerRuntime(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    int Generation,
+    string RunnerPool,
+    ContainerRequest Definition) : IRunnerPoolMessage;
+
 public sealed record ProvisionContainerRuntime(
     Guid RuntimeInstanceId,
     long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId,
-    ContainerRequest Definition);
+    ContainerRequest Definition) : IRunnerNodeMessage;
 
 public sealed record StopContainerRuntime(
     Guid RuntimeInstanceId,
     long ProcessingVersion,
     string RunnerPool,
+    string RunnerId) : IRunnerNodeMessage;
+
+public sealed record RuntimeStopWork(
     RuntimeProvider Provider,
     string ProviderReceiptJson);
+
+public enum RuntimeProvisionWorkStatus
+{
+    Current,
+    AssignmentRetained,
+    AssignmentAbsent
+}
+
+public interface IRuntimeNodeWorkReader
+{
+    Task<RuntimeProvisionWorkStatus> ReadProvisionStatusAsync(
+        ProvisionContainerRuntime message,
+        CancellationToken cancellationToken);
+
+    Task<RuntimeStopWork?> ReadStopAsync(
+        StopContainerRuntime message,
+        CancellationToken cancellationToken);
+}
 
 public sealed record RuntimeProvisioned(
     Guid RuntimeInstanceId,

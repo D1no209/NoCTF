@@ -12,19 +12,36 @@ namespace NoCTF.Runner.Messages;
 public sealed class RuntimeProviderHandler(
     RuntimeProviderCatalog providers,
     IConfiguration configuration,
-    IRunnerCapacityGate capacity)
+    IRunnerCapacityGate capacity,
+    IRuntimeNodeWorkReader workReader)
 {
     public async Task<object> Handle(
         ProvisionContainerRuntime message,
         CancellationToken cancellationToken)
     {
-        ValidatePool(message.RunnerPool);
-        if (!string.Equals(message.RunnerId, ReadRunnerId(), StringComparison.Ordinal))
-            throw new InvalidOperationException("Runtime message was assigned to a different Runner.");
+        ValidateAssignment(message);
+        var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
+        if (workStatus != RuntimeProvisionWorkStatus.Current)
+        {
+            if (workStatus == RuntimeProvisionWorkStatus.AssignmentAbsent)
+            {
+                await capacity.ReleaseAsync(
+                    message.RuntimeInstanceId,
+                    message.RunnerId,
+                    cancellationToken);
+            }
+            return new RuntimeProvisionFailed(
+                message.RuntimeInstanceId,
+                message.ProcessingVersion,
+                RuntimeFailureCode.RunnerUnavailable,
+                message.RunnerId);
+        }
         try
         {
-            var receipt = await providers.Containers(message.Definition.Provider)
-                .CreateAsync(message.Definition, cancellationToken);
+            var receipt = await IdempotentContainerProvisioner.ProvisionAsync(
+                providers.Containers(message.Definition.Provider),
+                message.Definition,
+                cancellationToken);
             return new RuntimeProvisioned(
                 message.RuntimeInstanceId,
                 message.ProcessingVersion,
@@ -59,12 +76,15 @@ public sealed class RuntimeProviderHandler(
         StopContainerRuntime message,
         CancellationToken cancellationToken)
     {
-        ValidatePool(message.RunnerPool);
+        ValidateAssignment(message);
         try
         {
-            var receipt = JsonSerializer.Deserialize<ContainerReceipt>(message.ProviderReceiptJson)
+            var work = await workReader.ReadStopAsync(message, cancellationToken);
+            if (work is null)
+                return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+            var receipt = JsonSerializer.Deserialize<ContainerReceipt>(work.ProviderReceiptJson)
                 ?? throw new InvalidOperationException("Provider receipt is invalid.");
-            await providers.Containers(message.Provider).DestroyAsync(receipt, cancellationToken);
+            await providers.Containers(work.Provider).DestroyAsync(receipt, cancellationToken);
             await capacity.ReleaseAsync(message.RuntimeInstanceId, ReadRunnerId(), cancellationToken);
             return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
         }
@@ -77,14 +97,10 @@ public sealed class RuntimeProviderHandler(
         }
     }
 
-    private void ValidatePool(string messagePool)
+    private void ValidateAssignment(IRunnerNodeMessage message)
     {
         var configuredPool = configuration["Runner:Pool"] ?? "default";
-        if (!string.Equals(configuredPool, messagePool, StringComparison.Ordinal)
-            || RunnerQueueName.FromPool(messagePool) != RunnerQueueName.FromPool(configuredPool))
-        {
-            throw new InvalidOperationException("Runtime message was delivered to the wrong Runner pool.");
-        }
+        RunnerNodeAssignmentGuard.Validate(message, configuredPool, ReadRunnerId());
     }
 
     private string ReadRunnerId() => configuration["Runner:Id"]

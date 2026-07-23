@@ -7,6 +7,19 @@ public enum RunnerCapacityAvailability
     Unavailable
 }
 
+public enum RunnerCapacityClaimState
+{
+    Acquired,
+    AlreadyOwned
+}
+
+public enum RunnerCapacityReleaseOutcome
+{
+    Released,
+    AlreadyReleased,
+    OwnerMismatch
+}
+
 public sealed record RunnerCapacityRequest(
     Guid RuntimeInstanceId,
     string Pool,
@@ -16,7 +29,8 @@ public sealed record RunnerCapacityRequest(
 
 public sealed record RunnerCapacityClaim(
     RunnerCapacityAvailability Availability,
-    string? RunnerId = null);
+    string? RunnerId = null,
+    RunnerCapacityClaimState? State = null);
 
 public interface IRunnerCapacityGate
 {
@@ -24,7 +38,12 @@ public interface IRunnerCapacityGate
         RunnerCapacityRequest request,
         CancellationToken cancellationToken);
 
-    Task ReleaseAsync(
+    Task<RunnerCapacityClaim> TryClaimForRunnerAsync(
+        RunnerCapacityRequest request,
+        string runnerId,
+        CancellationToken cancellationToken);
+
+    Task<RunnerCapacityReleaseOutcome> ReleaseAsync(
         Guid runtimeInstanceId,
         string runnerId,
         CancellationToken cancellationToken);

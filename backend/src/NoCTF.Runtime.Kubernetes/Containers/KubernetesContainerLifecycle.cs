@@ -93,33 +93,86 @@ public sealed class KubernetesContainerLifecycle(
             }
         };
         await client.CoreV1.CreateNamespacedPodAsync(pod, options.Namespace, cancellationToken: cancellationToken);
-        string? internalHost = null;
-        if (request.NetworkName is not null && request.PortMappings.Count > 0)
-        {
-            var service = await client.CoreV1.CreateNamespacedServiceAsync(new V1Service
-            {
-                Metadata = new V1ObjectMeta
-                {
-                    Name = name,
-                    NamespaceProperty = options.Namespace,
-                    Labels = labels
-                },
-                Spec = new V1ServiceSpec
-                {
-                    Selector = new Dictionary<string, string> { ["noctf.io/runtime-id"] = name },
-                    Ports = request.PortMappings.Keys.Select(port => new V1ServicePort
-                    {
-                        Name = $"tcp-{port}",
-                        Port = port,
-                        TargetPort = port
-                    }).ToList(),
-                    Type = "ClusterIP"
-                }
-            }, options.Namespace, cancellationToken: cancellationToken);
-            internalHost = service.Spec.ClusterIP;
-        }
+        var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
         return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending,
             request.PortMappings, options.PublicHost, internalHost ?? $"{name}.{options.Namespace}.svc");
+    }
+
+    public async Task<ContainerReceipt> EnsureRunningAsync(
+        ContainerRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Provider != RuntimeProvider.Kubernetes)
+            throw new ArgumentOutOfRangeException(nameof(request), request.Provider,
+                "Kubernetes runtime cannot reconcile another provider.");
+
+        var name = $"noctf-{request.OperationId:N}";
+        V1Pod? pod;
+        try
+        {
+            pod = await client.CoreV1.ReadNamespacedPodAsync(
+                name,
+                options.Namespace,
+                cancellationToken: cancellationToken);
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            pod = null;
+        }
+
+        if (pod is null)
+        {
+            _ = await CreateAsync(request, cancellationToken);
+        }
+        else if (ToRuntimeStatus(pod.Status?.Phase) is RuntimeStatus.Stopped or RuntimeStatus.Failed)
+        {
+            await DestroyAsync(new ContainerReceipt(
+                request.OperationId,
+                RuntimeProvider.Kubernetes,
+                name,
+                ToRuntimeStatus(pod.Status?.Phase),
+                request.PortMappings,
+                options.PublicHost,
+                null), cancellationToken);
+            await WaitUntilDeletedAsync(
+                name,
+                request.OperationTimeout ?? TimeSpan.FromMinutes(2),
+                cancellationToken);
+            _ = await CreateAsync(request, cancellationToken);
+        }
+
+        var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
+        labels["noctf.io/runtime-id"] = name;
+        if (request.NetworkName is not null) labels["noctf.io/sandbox"] = request.NetworkName;
+        var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(request.OperationTimeout ?? TimeSpan.FromMinutes(2));
+        try
+        {
+            await WaitUntilRunningAsync(name, timeout.Token);
+        }
+        catch (OperationCanceledException) when (
+            timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            await DestroyAsync(new ContainerReceipt(
+                request.OperationId,
+                RuntimeProvider.Kubernetes,
+                name,
+                RuntimeStatus.Failed,
+                request.PortMappings,
+                options.PublicHost,
+                internalHost), cancellationToken);
+            throw new TimeoutException("Kubernetes runtime did not reach Running before the operation deadline.");
+        }
+        return new ContainerReceipt(
+            request.OperationId,
+            RuntimeProvider.Kubernetes,
+            name,
+            RuntimeStatus.Running,
+            request.PortMappings,
+            options.PublicHost,
+            internalHost ?? $"{name}.{options.Namespace}.svc");
     }
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
@@ -367,6 +420,91 @@ public sealed class KubernetesContainerLifecycle(
         "failed" => RuntimeStatus.Failed,
         _ => RuntimeStatus.Failed
     };
+
+    private async Task<string?> EnsureServiceAsync(
+        string name,
+        IReadOnlyDictionary<string, string> labels,
+        ContainerRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.NetworkName is null || request.PortMappings.Count == 0)
+            return null;
+
+        try
+        {
+            var existing = await client.CoreV1.ReadNamespacedServiceAsync(
+                name,
+                options.Namespace,
+                cancellationToken: cancellationToken);
+            return existing.Spec.ClusterIP;
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            var service = await client.CoreV1.CreateNamespacedServiceAsync(new V1Service
+            {
+                Metadata = new V1ObjectMeta
+                {
+                    Name = name,
+                    NamespaceProperty = options.Namespace,
+                    Labels = labels.ToDictionary(pair => pair.Key, pair => pair.Value)
+                },
+                Spec = new V1ServiceSpec
+                {
+                    Selector = new Dictionary<string, string> { ["noctf.io/runtime-id"] = name },
+                    Ports = request.PortMappings.Keys.Select(port => new V1ServicePort
+                    {
+                        Name = $"tcp-{port}",
+                        Port = port,
+                        TargetPort = port
+                    }).ToList(),
+                    Type = "ClusterIP"
+                }
+            }, options.Namespace, cancellationToken: cancellationToken);
+            return service.Spec.ClusterIP;
+        }
+    }
+
+    private async Task WaitUntilDeletedAsync(
+        string name,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(timeout);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var podExists = true;
+            var serviceExists = true;
+            try
+            {
+                _ = await client.CoreV1.ReadNamespacedPodAsync(
+                    name,
+                    options.Namespace,
+                    cancellationToken: cancellationToken);
+            }
+            catch (k8s.Autorest.HttpOperationException exception)
+                when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                podExists = false;
+            }
+            try
+            {
+                _ = await client.CoreV1.ReadNamespacedServiceAsync(
+                    name,
+                    options.Namespace,
+                    cancellationToken: cancellationToken);
+            }
+            catch (k8s.Autorest.HttpOperationException exception)
+                when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                serviceExists = false;
+            }
+            if (!podExists && !serviceExists)
+                return;
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+        }
+        throw new TimeoutException("Kubernetes terminal resources were not deleted before recreation.");
+    }
 
     private async Task WaitUntilRunningAsync(string podName, CancellationToken cancellationToken)
     {

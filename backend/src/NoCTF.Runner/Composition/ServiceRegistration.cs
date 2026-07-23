@@ -1,4 +1,5 @@
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Submissions.PatchUploads;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
@@ -10,6 +11,7 @@ using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Containers;
 using NoCTF.Runtime.Libvirt;
 using k8s;
+using NoCTF.Runner.Messages;
 
 namespace NoCTF.Runner.Composition;
 
@@ -50,6 +52,7 @@ public static class ServiceRegistration
         services.AddSingleton<IObjectStorage, LocalObjectStorage>();
         services.AddSingleton<IContainerSandboxLifecycle>(provider =>
             provider.GetRequiredService<DockerContainerLifecycle>());
+        services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();
         return services;
     }
 }

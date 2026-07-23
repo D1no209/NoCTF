@@ -174,13 +174,16 @@ public sealed class EfSubmissionProcessor(
                     .FirstOrDefaultAsync(cancellationToken);
                 if (target is not null && submission.PatchUploadId is Guid patchUploadId)
                 {
-                    await outbox.PublishAsync(new RunAwdpFixVerification(
+                    await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
                         submission.Id,
                         submission.CompetitionChallengeId,
                         patchUploadId,
                         target.Id,
                         target.Generation,
-                        submission.ProcessingVersion));
+                        submission.ProcessingVersion,
+                        target.RunnerPool,
+                        target.RunnerId
+                            ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
                     submission.EvaluationFailureCode = null;
                     submission.EvaluationUpdatedAt = now;
                     await db.SaveChangesAsync(cancellationToken);

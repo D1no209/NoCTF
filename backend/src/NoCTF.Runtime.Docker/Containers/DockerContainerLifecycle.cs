@@ -56,6 +56,71 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             request.PortMappings, options.PublicHost, containerName);
     }
 
+    public async Task<ContainerReceipt> EnsureRunningAsync(
+        ContainerRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Provider != RuntimeProvider.Docker)
+            throw new ArgumentOutOfRangeException(nameof(request), request.Provider,
+                "Docker runtime cannot reconcile another provider.");
+
+        var resourceName = $"noctf-{request.OperationId:N}";
+        ContainerInspectResponse? existing;
+        try
+        {
+            existing = await client.Containers.InspectContainerAsync(resourceName, cancellationToken);
+        }
+        catch (DockerContainerNotFoundException)
+        {
+            return await CreateAsync(request, cancellationToken);
+        }
+
+        var status = ToRuntimeStatus(existing.State?.Status);
+        if (status == RuntimeStatus.Pending)
+        {
+            await client.Containers.StartContainerAsync(
+                existing.ID,
+                new ContainerStartParameters(),
+                cancellationToken);
+            existing = await client.Containers.InspectContainerAsync(existing.ID, cancellationToken);
+            status = ToRuntimeStatus(existing.State?.Status);
+        }
+
+        if (status == RuntimeStatus.Starting)
+        {
+            var timeout = request.OperationTimeout ?? TimeSpan.FromMinutes(2);
+            var deadline = DateTimeOffset.UtcNow.Add(timeout);
+            while (status == RuntimeStatus.Starting && DateTimeOffset.UtcNow < deadline)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+                existing = await client.Containers.InspectContainerAsync(existing.ID, cancellationToken);
+                status = ToRuntimeStatus(existing.State?.Status);
+            }
+        }
+
+        if (status != RuntimeStatus.Running)
+        {
+            await DestroyAsync(new ContainerReceipt(
+                request.OperationId,
+                RuntimeProvider.Docker,
+                existing.ID,
+                status,
+                request.PortMappings,
+                options.PublicHost,
+                resourceName), cancellationToken);
+            return await CreateAsync(request, cancellationToken);
+        }
+
+        return new ContainerReceipt(
+            request.OperationId,
+            RuntimeProvider.Docker,
+            existing.ID,
+            RuntimeStatus.Running,
+            request.PortMappings,
+            options.PublicHost,
+            resourceName);
+    }
+
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
         try

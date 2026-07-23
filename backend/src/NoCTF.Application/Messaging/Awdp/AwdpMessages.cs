@@ -1,3 +1,5 @@
+using NoCTF.Application.Runtime.Instances;
+
 namespace NoCTF.Application.Messaging;
 
 public sealed record CreateAwdpTarget(
@@ -12,9 +14,13 @@ public sealed record RunAwdpFixVerification(
     Guid PatchUploadId,
     Guid RuntimeInstanceId,
     int Generation,
-    long ProcessingVersion);
+    long ProcessingVersion,
+    string RunnerPool,
+    string RunnerId) : IRunnerNodeMessage;
 
 public sealed record CleanupAwdpTarget(
     Guid RuntimeInstanceId,
     int Generation,
-    long ProcessingVersion);
+    long ProcessingVersion,
+    string RunnerPool,
+    string RunnerId) : IRunnerNodeMessage;

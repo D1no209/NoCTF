@@ -6,7 +6,13 @@ namespace NoCTF.Infrastructure.Caching;
 public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRunnerCapacityGate
 {
     private const string ClaimScript = """
+        if redis.call('SISMEMBER', KEYS[4], ARGV[4]) == 0 then return 0 end
         if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
+        local existingRunner = redis.call('HGET', KEYS[3], 'runnerId')
+        if existingRunner then
+            if existingRunner == ARGV[4] then return 2 end
+            return 0
+        end
         local memory = tonumber(redis.call('HGET', KEYS[2], 'availableMemoryBytes') or '-1')
         local cpu = tonumber(redis.call('HGET', KEYS[2], 'availableNanoCpus') or '-1')
         local pids = tonumber(redis.call('HGET', KEYS[2], 'availablePids') or '-1')
@@ -19,6 +25,9 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         """;
 
     private const string ReleaseScript = """
+        local owner = redis.call('HGET', KEYS[2], 'runnerId')
+        if not owner then return 0 end
+        if owner ~= ARGV[1] then return -1 end
         local memory = redis.call('HGET', KEYS[2], 'memoryBytes')
         local cpu = redis.call('HGET', KEYS[2], 'nanoCpus')
         local pids = redis.call('HGET', KEYS[2], 'pidsLimit')
@@ -48,7 +57,8 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                     [
                         new RedisKey($"runner:{runnerId}:heartbeat"),
                         new RedisKey($"runner:{runnerId}:capacity"),
-                        new RedisKey($"runner-claim:{request.RuntimeInstanceId:N}")
+                        new RedisKey($"runner-claim:{request.RuntimeInstanceId:N}"),
+                        new RedisKey($"runner-pool:{request.Pool}:members")
                     ],
                     [
                         request.MemoryBytes,
@@ -56,8 +66,13 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                         request.PidsLimit,
                         runnerId
                     ]);
-                if (claimed == 1)
-                    return new(RunnerCapacityAvailability.Claimed, runnerId);
+                if (claimed == 1 || claimed == 2)
+                    return new(
+                        RunnerCapacityAvailability.Claimed,
+                        runnerId,
+                        claimed == 1
+                            ? RunnerCapacityClaimState.Acquired
+                            : RunnerCapacityClaimState.AlreadyOwned);
             }
             return new(RunnerCapacityAvailability.Insufficient);
         }
@@ -67,19 +82,65 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         }
     }
 
-    public async Task ReleaseAsync(
+    public async Task<RunnerCapacityClaim> TryClaimForRunnerAsync(
+        RunnerCapacityRequest request,
+        string runnerId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(runnerId);
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var database = redis.GetDatabase();
+            var claimed = (long)await database.ScriptEvaluateAsync(
+                ClaimScript,
+                [
+                    new RedisKey($"runner:{runnerId}:heartbeat"),
+                    new RedisKey($"runner:{runnerId}:capacity"),
+                    new RedisKey($"runner-claim:{request.RuntimeInstanceId:N}"),
+                    new RedisKey($"runner-pool:{request.Pool}:members")
+                ],
+                [
+                    request.MemoryBytes,
+                    request.NanoCpus,
+                    request.PidsLimit,
+                    runnerId
+                ]);
+            return claimed == 1 || claimed == 2
+                ? new(
+                    RunnerCapacityAvailability.Claimed,
+                    runnerId,
+                    claimed == 1
+                        ? RunnerCapacityClaimState.Acquired
+                        : RunnerCapacityClaimState.AlreadyOwned)
+                : new(RunnerCapacityAvailability.Insufficient);
+        }
+        catch (RedisException)
+        {
+            return new(RunnerCapacityAvailability.Unavailable);
+        }
+    }
+
+    public async Task<RunnerCapacityReleaseOutcome> ReleaseAsync(
         Guid runtimeInstanceId,
         string runnerId,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var database = redis.GetDatabase();
-        await database.ScriptEvaluateAsync(
+        var released = (long)await database.ScriptEvaluateAsync(
             ReleaseScript,
             [
                 new RedisKey($"runner:{runnerId}:capacity"),
                 new RedisKey($"runner-claim:{runtimeInstanceId:N}")
             ],
-            []);
+            [runnerId]);
+        return released switch
+        {
+            1 => RunnerCapacityReleaseOutcome.Released,
+            0 => RunnerCapacityReleaseOutcome.AlreadyReleased,
+            -1 => RunnerCapacityReleaseOutcome.OwnerMismatch,
+            _ => throw new InvalidOperationException("Redis returned an unknown capacity release result.")
+        };
     }
 }

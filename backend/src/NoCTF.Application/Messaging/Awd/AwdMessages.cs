@@ -1,3 +1,5 @@
+using NoCTF.Application.Runtime.Instances;
+
 namespace NoCTF.Application.Messaging;
 
 public sealed record AdvanceAwdRound(
@@ -18,7 +20,9 @@ public sealed record InjectAwdFlag(
     Guid ChallengeFlagId,
     int Generation,
     long ProcessingVersion,
-    DateTimeOffset ValidUntil);
+    DateTimeOffset ValidUntil,
+    string RunnerPool,
+    string RunnerId) : IRunnerNodeMessage;
 
 public sealed record RunAwdChecker(
     Guid RuntimeInstanceId,
@@ -26,4 +30,6 @@ public sealed record RunAwdChecker(
     int Generation,
     long CheckerSequence,
     long ProcessingVersion,
-    DateTimeOffset Deadline);
+    DateTimeOffset Deadline,
+    string RunnerPool,
+    string RunnerId) : IRunnerNodeMessage;

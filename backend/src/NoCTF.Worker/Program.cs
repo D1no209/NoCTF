@@ -24,11 +24,6 @@ builder.UseWolverine(options =>
     options.Policies.OnException<Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException>()
         .RetryTimes(5);
     options.ListenToPostgresqlQueue("noctf-worker").UseDurableInbox();
-    var runnerPool = builder.Configuration["Runner:Pool"] ?? "default";
-    var runnerQueue = RunnerQueueName.FromPool(runnerPool);
-    options.PublishMessage<ProvisionContainerRuntime>().ToPostgresqlQueue(runnerQueue.Value);
-    options.PublishMessage<StopContainerRuntime>().ToPostgresqlQueue(runnerQueue.Value);
-    options.PublishMessage<RunAwdpFixVerification>().ToPostgresqlQueue(runnerQueue.Value);
 });
 
 await builder.Build().RunAsync();
