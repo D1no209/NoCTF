@@ -121,6 +121,7 @@ public static class BackendMessageHandlers
     public static async Task<object?> Handle(
         StopRuntime message,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
@@ -135,7 +136,14 @@ public static class BackendMessageHandlers
             instance.State = RuntimeState.Stopped;
             instance.StoppedAt = DateTimeOffset.UtcNow;
             instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+            var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
+                candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
+                    && candidate.State == RuntimeState.Queued,
+                cancellationToken);
+            if (replacement is not null)
+                await outbox.PublishAsync(new DispatchRuntime(replacement.Id, replacement.ProcessingVersion));
             await db.SaveChangesAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
             return null;
         }
         return new StopContainerRuntime(

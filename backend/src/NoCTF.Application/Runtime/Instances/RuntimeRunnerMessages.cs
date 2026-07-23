@@ -25,7 +25,8 @@ public sealed record RuntimeProvisioned(
     RuntimeProvider Provider,
     string ProviderReceiptJson,
     IReadOnlyList<string> Urls,
-    IReadOnlyList<int> ParticipantUrlIndexes);
+    IReadOnlyList<int> ParticipantUrlIndexes,
+    DateTimeOffset? ExpiresAt);
 
 public sealed record RuntimeProvisionFailed(
     Guid RuntimeInstanceId,

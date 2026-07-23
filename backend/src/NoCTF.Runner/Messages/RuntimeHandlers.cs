@@ -5,6 +5,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Composition;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Messaging;
 
 namespace NoCTF.Runner.Messages;
 
@@ -31,7 +32,8 @@ public sealed class RuntimeProviderHandler(
                 receipt.Provider,
                 JsonSerializer.Serialize(receipt),
                 [],
-                []);
+                [],
+                message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null);
         }
         catch (TimeoutException)
         {
@@ -117,6 +119,7 @@ public static class RuntimeWriteBackHandler
         instance.ParticipantUrlIndexes = [.. message.ParticipantUrlIndexes];
         instance.State = RuntimeState.Running;
         instance.RunningAt = DateTimeOffset.UtcNow;
+        instance.ExpiresAt = message.ExpiresAt;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -145,6 +148,7 @@ public static class RuntimeWriteBackHandler
     public static async Task Handle(
         RuntimeStopped message,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
@@ -158,7 +162,14 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
+                && candidate.State == RuntimeState.Queued,
+            cancellationToken);
+        if (replacement is not null)
+            await outbox.PublishAsync(new DispatchRuntime(replacement.Id, replacement.ProcessingVersion));
         await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
     public static async Task Handle(

@@ -67,10 +67,18 @@ public sealed class EfRuntimeInstanceStore(
             case RuntimeAction.Start:
                 if (current is not null && IsActive(current.State))
                     return new(null, RuntimeMutationFailure.InvalidState);
-                try { entity = Create(scope, command, current?.Generation + 1 ?? 0, null); }
+                var replacesFailed = current is { State: RuntimeState.Failed, ProviderReceiptJson: not null };
+                if (replacesFailed)
+                {
+                    current!.State = RuntimeState.Stopping;
+                    current.ProcessingVersion = checked(current.ProcessingVersion + 1);
+                    await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
+                }
+                try { entity = Create(scope, command, checked((current?.Generation ?? 0) + 1), replacesFailed ? current!.Id : null); }
                 catch (InvalidOperationException) { return new(null, RuntimeMutationFailure.ConfigurationInvalid); }
                 db.RuntimeInstances.Add(entity);
-                await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
+                if (!replacesFailed)
+                    await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
                 break;
             case RuntimeAction.Reset:
                 if (current is null || !IsActive(current.State))
@@ -81,20 +89,30 @@ public sealed class EfRuntimeInstanceStore(
                 try { entity = Create(scope, command, checked(current.Generation + 1), current.Id); }
                 catch (InvalidOperationException) { return new(null, RuntimeMutationFailure.ConfigurationInvalid); }
                 db.RuntimeInstances.Add(entity);
-                await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
                 break;
             case RuntimeAction.Stop:
                 if (current is null || !IsActive(current.State))
                     return new(null, RuntimeMutationFailure.InvalidState);
-                current.State = RuntimeState.Stopping;
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 entity = current;
-                await outbox.PublishAsync(new StopRuntime(entity.Id, entity.ProcessingVersion));
+                if (current.State == RuntimeState.Queued)
+                {
+                    current.State = RuntimeState.Stopped;
+                    current.StoppedAt = command.Now;
+                }
+                else
+                {
+                    current.State = RuntimeState.Stopping;
+                    await outbox.PublishAsync(new StopRuntime(entity.Id, entity.ProcessingVersion));
+                }
                 break;
             case RuntimeAction.Extend:
                 if (current is null || current.State != RuntimeState.Running || current.ExpiresAt is null)
                     return new(null, RuntimeMutationFailure.InvalidState);
-                current.ExpiresAt = current.ExpiresAt.Value.Add(command.Extension!.Value);
+                var remaining = current.ExpiresAt.Value - command.Now;
+                if (remaining <= TimeSpan.Zero || remaining >= TimeSpan.FromMinutes(10))
+                    return new(null, RuntimeMutationFailure.InvalidState);
+                current.ExpiresAt = command.Now.Add(command.Extension!.Value);
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 entity = current;
                 break;
@@ -130,16 +148,14 @@ public sealed class EfRuntimeInstanceStore(
             CompetitionChallengeId = command.CompetitionChallengeId,
             TeamId = scope.TeamId,
             Generation = generation,
-            RuntimeKind = RuntimeKind.Container,
+            RuntimeKind = template.RuntimeKind,
             RuntimeProvider = template.Provider,
-            RunnerPool = "default",
+            RunnerPool = template.RunnerPool,
             State = RuntimeState.Queued,
             ConfigurationRevision = scope.ConfigurationRevision,
             ReplacesRuntimeInstanceId = replaces,
             CreatedAt = command.Now,
-            ExpiresAt = template.TtlSeconds is > 0
-                ? command.Now.AddSeconds(template.TtlSeconds.Value)
-                : null
+            ExpiresAt = null
         };
     }
 
