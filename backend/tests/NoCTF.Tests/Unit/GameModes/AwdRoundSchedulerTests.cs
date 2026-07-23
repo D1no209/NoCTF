@@ -70,4 +70,38 @@ public sealed class AwdRoundSchedulerTests
 
         await Assert.That(result).IsNull();
     }
+
+    [Test]
+    public async Task Restart_advances_only_one_round_number_without_backfilling_missed_windows()
+    {
+        var latestEnd = DateTimeOffset.Parse("2026-07-24T00:02:00Z");
+        var dueAt = latestEnd.AddMinutes(7);
+
+        var result = AwdRoundScheduler.ResolvePersistedTimelineRound(
+            latestRound: 4,
+            latestStart: latestEnd.AddMinutes(-2),
+            latestEnd,
+            dueAt,
+            TimeSpan.FromMinutes(2));
+
+        await Assert.That(result.Round).IsEqualTo(5);
+        await Assert.That(result.ValidStart).IsEqualTo(latestEnd.AddMinutes(6));
+        await Assert.That(result.ValidUntil).IsEqualTo(latestEnd.AddMinutes(8));
+    }
+
+    [Test]
+    public async Task Duplicate_delivery_keeps_the_current_persisted_window()
+    {
+        var start = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
+        var end = start.AddMinutes(2);
+
+        var result = AwdRoundScheduler.ResolvePersistedTimelineRound(
+            latestRound: 4,
+            start,
+            end,
+            start.AddMinutes(1),
+            TimeSpan.FromMinutes(9));
+
+        await Assert.That(result).IsEqualTo(new AwdPersistedRoundWindow(4, start, end));
+    }
 }
