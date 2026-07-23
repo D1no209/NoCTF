@@ -149,10 +149,23 @@ public static class RuntimeWriteBackHandler
         {
             var submission = await db.Submissions
                 .SingleOrDefaultAsync(item => item.Id == submissionId, cancellationToken);
+            var currentChallengeRevision = await db.CompetitionChallenges.AsNoTracking()
+                .Where(challenge => challenge.Id == instance.CompetitionChallengeId)
+                .Select(challenge => (int?)challenge.Revision)
+                .SingleOrDefaultAsync(cancellationToken);
             if (submission is null
                 || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
-                || submission.ProcessingVersion != instance.SubmissionProcessingVersion)
+                || submission.ProcessingVersion != instance.SubmissionProcessingVersion
+                || currentChallengeRevision != instance.ConfigurationRevision)
             {
+                if (submission is not null
+                    && submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
+                    && submission.ProcessingVersion == instance.SubmissionProcessingVersion)
+                {
+                    submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
+                    submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
+                    submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+                }
                 instance.State = RuntimeState.Stopping;
                 instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
                 await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(

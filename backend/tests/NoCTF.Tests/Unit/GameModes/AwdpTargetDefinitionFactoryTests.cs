@@ -28,7 +28,7 @@ public sealed class AwdpTargetDefinitionFactoryTests
         await Assert.That(definition.InternalPorts).IsEquivalentTo([8080]);
         await Assert.That(definition.PortMappings).IsEmpty();
         await Assert.That(definition.Labels["noctf.purpose"]).IsEqualTo("awdp-target");
-        await Assert.That(definition.Labels["noctf.io.expires-at"]).IsEqualTo("1784852100");
+        await Assert.That(definition.Labels["noctf.io/expires-at"]).IsEqualTo("1784852100");
         await Assert.That(definition.Security.CapAdd).IsEmpty();
         await Assert.That(definition.Security.CapDrop).Contains("ALL");
     }

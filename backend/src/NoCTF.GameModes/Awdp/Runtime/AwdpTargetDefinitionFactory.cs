@@ -29,7 +29,7 @@ public static class AwdpTargetDefinitionFactory
         labels["noctf.runtime-instance-id"] = operationId.ToString("D");
         labels["noctf.purpose"] = "awdp-target";
         labels["noctf.io.job-kind"] = "awdp-verification";
-        labels["noctf.io.expires-at"] = now.Add(ttl).ToUnixTimeSeconds().ToString(
+        labels["noctf.io/expires-at"] = now.Add(ttl).ToUnixTimeSeconds().ToString(
             System.Globalization.CultureInfo.InvariantCulture);
         return new ContainerRequest(
             operationId,
