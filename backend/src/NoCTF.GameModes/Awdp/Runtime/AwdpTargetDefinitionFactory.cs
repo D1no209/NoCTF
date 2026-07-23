@@ -49,6 +49,7 @@ public static class AwdpTargetDefinitionFactory
                 : TimeSpan.FromMinutes(2),
             NetworkIsolation: ContainerNetworkIsolation.Isolated,
             InternalPorts: [targetPort],
-            Generation: generation);
+            Generation: generation,
+            RuntimeInstanceId: operationId);
     }
 }

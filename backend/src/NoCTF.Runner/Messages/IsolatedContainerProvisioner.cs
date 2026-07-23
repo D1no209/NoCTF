@@ -20,7 +20,10 @@ public static class IsolatedContainerProvisioner
                 cancellationToken);
 
         var networkId = await sandbox.CreateIsolatedNetworkAsync(
-            new RuntimeResourceIdentity(request.OperationId, request.Generation),
+            new RuntimeResourceIdentity(
+                request.RuntimeInstanceId ?? request.OperationId,
+                request.Generation,
+                request.InternalPorts?.SingleOrDefault() ?? 0),
             now.Add(request.Ttl ?? TimeSpan.FromMinutes(15)),
             cancellationToken);
         try

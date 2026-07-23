@@ -154,7 +154,8 @@ public sealed class AwdpFixWorkReader(
             || receipt.InternalHost is not { Length: > 0 } targetHost)
             return null;
 
-        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"] ?? "http://noctf-api";
+        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"]
+            ?? "http://noctf-awdp-callback:8080";
         if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri))
             throw new InvalidOperationException(
                 "RunnerScoring:CallbackBaseUrl must be an absolute URI.");
@@ -240,7 +241,8 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             NetworkName: work.NetworkId,
             OperationTimeout: work.Timeout,
             AllowInternalCallback: true,
-            Generation: work.Generation);
+            Generation: work.Generation,
+            RuntimeInstanceId: work.RuntimeInstanceId);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(work.Timeout);
         try

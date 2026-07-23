@@ -83,7 +83,8 @@ public sealed record ContainerRequest(
     ContainerNetworkIsolation NetworkIsolation = ContainerNetworkIsolation.Shared,
     IReadOnlyList<int>? InternalPorts = null,
     bool AllowInternalCallback = false,
-    int Generation = 0)
+    int Generation = 0,
+    Guid? RuntimeInstanceId = null)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];
@@ -148,7 +149,10 @@ public interface IContainerSandboxLifecycle
         CancellationToken cancellationToken);
 }
 
-public readonly record struct RuntimeResourceIdentity(Guid RuntimeInstanceId, int Generation);
+public readonly record struct RuntimeResourceIdentity(
+    Guid RuntimeInstanceId,
+    int Generation,
+    int TargetPort);
 
 public sealed record RuntimeResourceReapResult(int RemovedCount, int FailedCount);
 

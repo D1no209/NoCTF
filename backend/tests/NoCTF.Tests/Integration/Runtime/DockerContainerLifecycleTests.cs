@@ -26,12 +26,12 @@ public sealed class DockerContainerLifecycleTests
             using var lifecycle = CreateLifecycle();
             var operationId = Guid.NewGuid();
             var first = await lifecycle.CreateIsolatedNetworkAsync(
-                new RuntimeResourceIdentity(operationId, 1),
+                new RuntimeResourceIdentity(operationId, 1, 8080),
                 DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             try
             {
                 var replay = await lifecycle.CreateIsolatedNetworkAsync(
-                    new RuntimeResourceIdentity(operationId, 1),
+                    new RuntimeResourceIdentity(operationId, 1, 8080),
                     DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
 
                 await Assert.That(replay).IsEqualTo(first);
@@ -109,10 +109,10 @@ public sealed class DockerContainerLifecycleTests
             var firstOperationId = Guid.NewGuid();
             var secondOperationId = Guid.NewGuid();
             var firstSandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                new RuntimeResourceIdentity(firstOperationId, 1),
+                new RuntimeResourceIdentity(firstOperationId, 1, 8080),
                 DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             var secondSandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                new RuntimeResourceIdentity(secondOperationId, 1),
+                new RuntimeResourceIdentity(secondOperationId, 1, 8080),
                 DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             ContainerReceipt? first = null;
             ContainerReceipt? second = null;
@@ -164,7 +164,7 @@ public sealed class DockerContainerLifecycleTests
             using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
                 DockerEndpoint(), "noctf-platform", "localhost", $"missing-{Guid.NewGuid():N}"));
             var sandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                new RuntimeResourceIdentity(operationId, 1),
+                new RuntimeResourceIdentity(operationId, 1, 8080),
                 DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             Func<Task> action = () => lifecycle.CreateAsync(
                 CheckerRequest(operationId, sandbox), cancellationToken);
