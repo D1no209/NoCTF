@@ -38,9 +38,11 @@ public sealed class RuntimeProviderHandler(
         }
         try
         {
-            var receipt = await IdempotentContainerProvisioner.ProvisionAsync(
+            var receipt = await IsolatedContainerProvisioner.ProvisionAsync(
                 providers.Containers(message.Definition.Provider),
+                providers.Sandbox(message.Definition.Provider),
                 message.Definition,
+                DateTimeOffset.UtcNow,
                 cancellationToken);
             return new RuntimeProvisioned(
                 message.RuntimeInstanceId,
@@ -84,7 +86,11 @@ public sealed class RuntimeProviderHandler(
                 return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
             var receipt = JsonSerializer.Deserialize<ContainerReceipt>(work.ProviderReceiptJson)
                 ?? throw new InvalidOperationException("Provider receipt is invalid.");
-            await providers.Containers(work.Provider).DestroyAsync(receipt, cancellationToken);
+            await IsolatedContainerProvisioner.DestroyAsync(
+                providers.Containers(work.Provider),
+                providers.Sandbox(work.Provider),
+                receipt,
+                cancellationToken);
             await capacity.ReleaseAsync(message.RuntimeInstanceId, ReadRunnerId(), cancellationToken);
             return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
         }
@@ -138,6 +144,26 @@ public static class RuntimeWriteBackHandler
         instance.RunningAt = DateTimeOffset.UtcNow;
         instance.ExpiresAt = message.ExpiresAt;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        if (instance.Purpose == RuntimePurpose.AwdpTarget
+            && instance.SubmissionId is Guid submissionId)
+        {
+            var submission = await db.Submissions.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == submissionId, cancellationToken);
+            if (submission?.PatchUploadId is Guid patchUploadId)
+            {
+                await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
+                    submission.Id,
+                    submission.CompetitionChallengeId,
+                    patchUploadId,
+                    instance.Id,
+                    instance.Generation,
+                    submission.ProcessingVersion,
+                    instance.ProcessingVersion,
+                    instance.ExpiresAt ?? DateTimeOffset.UtcNow.AddMinutes(15),
+                    instance.RunnerPool,
+                    message.RunnerId));
+            }
+        }
         var now = DateTimeOffset.UtcNow;
         var currentAwdFlag = instance.TeamId is null
             ? null
@@ -183,6 +209,20 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Failed;
         instance.FailureCode = message.FailureCode;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        if (instance.Purpose == RuntimePurpose.AwdpTarget
+            && instance.SubmissionId is Guid submissionId)
+        {
+            var submission = await db.Submissions.SingleOrDefaultAsync(
+                item => item.Id == submissionId,
+                cancellationToken);
+            if (submission is not null
+                && submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing)
+            {
+                submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
+                submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
+                submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
         await db.SaveChangesAsync(cancellationToken);
     }
 

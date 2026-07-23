@@ -16,9 +16,13 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             table.HasCheckConstraint(
                 "ck_runtime_instances_checker_sequence",
                 "last_applied_checker_sequence <= checker_sequence");
+            table.HasCheckConstraint(
+                "ck_runtime_instances_awdp_submission",
+                "(purpose = 1) = (submission_id IS NOT NULL)");
         });
         builder.HasKey(instance => instance.Id);
         builder.Property(instance => instance.RuntimeKind).HasConversion<short>();
+        builder.Property(instance => instance.Purpose).HasConversion<short>();
         builder.Property(instance => instance.RuntimeProvider).HasConversion<short>();
         builder.Property(instance => instance.State).HasConversion<short>();
         builder.Property(instance => instance.FailureCode).HasConversion<short>();
@@ -36,7 +40,10 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
         {
             instance.CompetitionChallengeId,
             instance.TeamId
-        }).IsUnique().HasFilter("state IN (0, 1, 2)");
+        }).IsUnique().HasFilter("purpose = 0 AND state IN (0, 1, 2)");
+        builder.HasIndex(instance => instance.SubmissionId)
+            .IsUnique()
+            .HasFilter("purpose = 1 AND submission_id IS NOT NULL AND state IN (0, 1, 2, 3)");
         builder.HasIndex(instance => new
         {
             instance.RunnerPool,
@@ -52,6 +59,8 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             .HasForeignKey(instance => instance.CompetitionChallengeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<NoCTF.Domain.Teams.Team>().WithMany()
             .HasForeignKey(instance => instance.TeamId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<NoCTF.Domain.Submissions.Submission>().WithMany()
+            .HasForeignKey(instance => instance.SubmissionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RuntimeInstance>().WithMany()
             .HasForeignKey(instance => instance.ReplacesRuntimeInstanceId).OnDelete(DeleteBehavior.Restrict);
     }

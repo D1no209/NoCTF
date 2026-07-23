@@ -418,6 +418,8 @@ namespace NoCTF.Infrastructure.Migrations
                     competition_id = table.Column<Guid>(type: "uuid", nullable: false),
                     competition_challenge_id = table.Column<Guid>(type: "uuid", nullable: false),
                     team_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    purpose = table.Column<short>(type: "smallint", nullable: false),
+                    submission_id = table.Column<Guid>(type: "uuid", nullable: true),
                     generation = table.Column<int>(type: "integer", nullable: false),
                     runtime_kind = table.Column<short>(type: "smallint", nullable: false),
                     runtime_provider = table.Column<short>(type: "smallint", nullable: false),
@@ -447,6 +449,7 @@ namespace NoCTF.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_runtime_instances", x => x.id);
+                    table.CheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL)");
                     table.CheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
                     table.CheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
                     table.ForeignKey(
@@ -761,7 +764,7 @@ namespace NoCTF.Infrastructure.Migrations
                 table: "runtime_instances",
                 columns: new[] { "competition_challenge_id", "team_id" },
                 unique: true,
-                filter: "state IN (0, 1, 2)");
+                filter: "purpose = 0 AND state IN (0, 1, 2)");
 
             migrationBuilder.CreateIndex(
                 name: "ix_runtime_instances_competition_challenge_id_team_id_generati",
@@ -789,6 +792,13 @@ namespace NoCTF.Infrastructure.Migrations
                 table: "runtime_instances",
                 columns: new[] { "state", "next_checker_due_at" },
                 filter: "next_checker_due_at IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_runtime_instances_submission_id",
+                table: "runtime_instances",
+                column: "submission_id",
+                unique: true,
+                filter: "purpose = 1 AND submission_id IS NOT NULL AND state IN (0, 1, 2, 3)");
 
             migrationBuilder.CreateIndex(
                 name: "ix_runtime_instances_team_id",
@@ -904,6 +914,14 @@ namespace NoCTF.Infrastructure.Migrations
                 table: "users",
                 column: "normalized_user_name",
                 unique: true);
+
+            migrationBuilder.AddForeignKey(
+                name: "fk_runtime_instances_submissions_submission_id",
+                table: "runtime_instances",
+                column: "submission_id",
+                principalTable: "submissions",
+                principalColumn: "id",
+                onDelete: ReferentialAction.Restrict);
 
             migrationBuilder.AddForeignKey(
                 name: "fk_scoring_events_submissions_submission_id",

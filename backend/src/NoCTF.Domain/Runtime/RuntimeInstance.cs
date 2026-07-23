@@ -19,6 +19,13 @@ public enum RuntimeState : short
     Failed
 }
 
+public enum RuntimePurpose : short
+{
+    Player,
+    AwdpTarget,
+    KohShared
+}
+
 public enum RuntimeFailureCode : short
 {
     InvalidConfiguration,
@@ -36,6 +43,8 @@ public sealed class RuntimeInstance
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
     public Guid? TeamId { get; set; }
+    public RuntimePurpose Purpose { get; set; }
+    public Guid? SubmissionId { get; set; }
     public int Generation { get; set; }
     public RuntimeKind RuntimeKind { get; set; }
     public RuntimeProvider RuntimeProvider { get; set; }
