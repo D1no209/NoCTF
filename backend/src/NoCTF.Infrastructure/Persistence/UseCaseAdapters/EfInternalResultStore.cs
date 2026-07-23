@@ -19,14 +19,14 @@ public sealed class EfInternalResultStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
-            item => item.Id == result.RuntimeInstanceId, ct);
+        var runtime = await db.RuntimeInstances.FromSqlInterpolated(
+                $"SELECT * FROM runtime_instances WHERE id = {result.RuntimeInstanceId} FOR UPDATE")
+            .SingleOrDefaultAsync(ct);
         if (runtime is null)
             return InternalResultDisposition.NotFound;
         if (runtime.Generation != result.Generation ||
             result.ProcessingVersion < runtime.ProcessingVersion ||
-            result.CheckerSequence < runtime.LastAppliedCheckerSequence ||
-            result.CheckerSequence < runtime.CheckerSequence)
+            result.CheckerSequence < runtime.LastAppliedCheckerSequence)
             return InternalResultDisposition.Superseded;
         if (result.ProcessingVersion > runtime.ProcessingVersion)
             return InternalResultDisposition.Conflict;

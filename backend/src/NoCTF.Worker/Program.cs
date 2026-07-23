@@ -34,7 +34,7 @@ builder.UseWolverine(options =>
     options.PublishMessage<GenerateAwdFlags>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<AwdFlagInjectionFailed>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<DispatchAwdCheckers>().ToPostgresqlQueue("noctf-worker");
-    options.PublishMessage<AwdCheckerFailed>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<AwdCheckerCallbackMissing>().ToPostgresqlQueue("noctf-worker");
 });
 
 var host = builder.Build();

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
 using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
@@ -13,6 +15,7 @@ namespace NoCTF.Runner.Messages;
 
 public sealed record AwdCheckerWork(
     Guid RuntimeInstanceId,
+    long CheckerSequence,
     RuntimeProvider Provider,
     string Image,
     IReadOnlyList<string> Command,
@@ -64,7 +67,8 @@ public sealed class AwdCheckerWorkReader(
                 (runtime, challenge) => new
                 {
                     Runtime = runtime,
-                    ChallengeConfiguration = challenge.ConfigurationJson
+                    ChallengeConfiguration = challenge.ConfigurationJson,
+                    challenge.Revision
                 })
             .Join(
                 db.Competitions.AsNoTracking(),
@@ -74,14 +78,18 @@ public sealed class AwdCheckerWorkReader(
                 {
                     pair.Runtime,
                     pair.ChallengeConfiguration,
+                    pair.Revision,
                     CompetitionConfiguration = competition.ConfigurationJson,
+                    competition.ConfigurationRevision,
                     competition.Status,
                     competition.Mode
                 })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || target.Mode != NoCTF.Domain.Competitions.GameMode.Awd
-            || target.Status != NoCTF.Domain.Competitions.CompetitionStatus.Running)
+            || target.Status != NoCTF.Domain.Competitions.CompetitionStatus.Running
+            || target.ConfigurationRevision != message.CompetitionConfigurationRevision
+            || target.Revision != message.CompetitionChallengeRevision)
             return null;
         var settings = configurations.Get(
             target.CompetitionConfiguration,
@@ -93,6 +101,10 @@ public sealed class AwdCheckerWorkReader(
         if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri))
             throw new InvalidOperationException("RunnerScoring:CallbackBaseUrl must be an absolute URI.");
         var callbackUrl = new Uri(baseUri, "/api/internal/v1/awd/check-results");
+        var issuedAt = timeProvider.GetUtcNow();
+        var remaining = message.Deadline - issuedAt;
+        if (remaining <= TimeSpan.Zero)
+            return null;
         var token = tokens.IssueAwdChecker(new(
             message.RunnerId,
             message.RuntimeInstanceId,
@@ -100,9 +112,10 @@ public sealed class AwdCheckerWorkReader(
             message.CheckerSequence,
             message.ProcessingVersion,
             message.Deadline,
-            timeProvider.GetUtcNow()));
+            issuedAt));
         return new(
             message.RuntimeInstanceId,
+            message.CheckerSequence,
             checker.Provider,
             checker.Image,
             checker.Command ?? [],
@@ -111,7 +124,9 @@ public sealed class AwdCheckerWorkReader(
             callbackUrl,
             token,
             message.Deadline,
-            TimeSpan.FromSeconds(checker.TimeoutSeconds));
+            TimeSpan.FromSeconds(checker.TimeoutSeconds) < remaining
+                ? TimeSpan.FromSeconds(checker.TimeoutSeconds)
+                : remaining);
     }
 }
 
@@ -129,7 +144,7 @@ public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
             ["NOCTF_CALLBACK_TOKEN"] = work.CallbackToken
         };
         var request = new ContainerRequest(
-            work.RuntimeInstanceId,
+            CreateOperationId(work.RuntimeInstanceId, work.CheckerSequence),
             work.Provider,
             work.Image,
             work.Command,
@@ -146,6 +161,16 @@ public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
             work.Timeout,
             OperationTimeout: work.Timeout);
         return providers.OneShot(work.Provider).RunAsync(request, cancellationToken);
+    }
+
+    private static Guid CreateOperationId(Guid runtimeInstanceId, long checkerSequence)
+    {
+        Span<byte> input = stackalloc byte[24];
+        runtimeInstanceId.TryWriteBytes(input[..16]);
+        BinaryPrimitives.WriteInt64BigEndian(input[16..], checkerSequence);
+        Span<byte> hash = stackalloc byte[32];
+        SHA256.HashData(input, hash);
+        return new Guid(hash[..16]);
     }
 }
 
