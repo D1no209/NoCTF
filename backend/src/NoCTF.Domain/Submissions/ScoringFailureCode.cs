@@ -22,6 +22,7 @@ public enum ScoringFailureCode
     InvalidObservation,
     ProducerTimeout,
     ProducerUnavailable,
+    AmbiguousFlagMatch,
     FlagExpired,
     RoundOutOfRange,
     HardeningActive,

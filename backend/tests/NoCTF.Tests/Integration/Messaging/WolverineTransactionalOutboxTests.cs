@@ -25,6 +25,8 @@ using Wolverine.Postgresql;
 using Wolverine.Runtime;
 using LifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 using LifecycleMessage = NoCTF.Application.Messaging.AdvanceCompetitionLifecycle;
+using NoCTF.Application.Competitions.Koh;
+using NoCTF.GameModes.Koh.Configuration;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -545,6 +547,8 @@ public sealed class WolverineTransactionalOutboxTests
         builder.Services.AddScoped<LifecycleAdvancer>();
         builder.Services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
         builder.Services.AddSingleton<AwdRoundConfigurationCatalog>();
+        builder.Services.AddSingleton<KohProducerConfigurationCatalog>();
+        builder.Services.AddSingleton<IKohControlClient, UnusedKohControlClient>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.UseWolverine(options =>
         {
@@ -559,6 +563,8 @@ public sealed class WolverineTransactionalOutboxTests
             options.Discovery.IncludeType<ObserveLifecycleProjectionHandler>();
             options.Discovery.IncludeType<AwdRoundProbeHandler>();
             options.Discovery.IncludeType<ObserveAwdInjectionHandler>();
+            options.Discovery.IncludeType<KohPollingHandler>();
+            options.Discovery.IncludeType<KohObservationHandler>();
             options.PersistMessagesWithPostgresql(connectionString, "wolverine_test");
             options.UseEntityFrameworkCoreTransactions();
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
@@ -613,6 +619,15 @@ public sealed class WolverineTransactionalOutboxTests
             CompetitionStatus from,
             CompetitionStatus to,
             CancellationToken cancellationToken) => Task.FromResult(false);
+    }
+
+    public sealed class UnusedKohControlClient : IKohControlClient
+    {
+        public Task<KohControlResponse> ObserveAsync(
+            Uri controlUrl,
+            TimeSpan timeout,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("The Wolverine code-generation probe does not poll KoH.");
     }
 }
 
