@@ -547,6 +547,25 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Runtime_url_bindings_reject_null_entries()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            Limits: new(268_435_456, 500_000_000, 128),
+            UrlBindings: [null!]);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("Runtime URL bindings cannot contain null entries.");
+    }
+
+    [Test]
     public async Task Control_check_url_binding_is_reserved_for_KoH()
     {
         var runtime = new ChallengeRuntimeTemplate(

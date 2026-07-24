@@ -58,7 +58,8 @@ public static class CtfConfigurationValidator
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
             errors.Add("CTF runtimes must use PerTeam allocation.");
         if ((configuration.Runtime?.UrlBindings ?? [])
-            .Any(binding => binding.Exposure != RuntimeExposure.OwnerOnly))
+            .Any(binding => binding is not null
+                && binding.Exposure != RuntimeExposure.OwnerOnly))
         {
             errors.Add("CTF runtime URL bindings must use OwnerOnly exposure.");
         }
