@@ -30,7 +30,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                 null),
             JsonOptions),
         GameMode.Koh => JsonSerializer.Serialize(
-            new KohChallengeConfiguration(KohChallengeConfiguration.CurrentSchemaVersion, "http://localhost"),
+            new KohChallengeConfiguration(KohChallengeConfiguration.CurrentSchemaVersion),
             JsonOptions),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };

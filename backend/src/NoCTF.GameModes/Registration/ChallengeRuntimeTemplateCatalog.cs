@@ -74,16 +74,36 @@ internal static class ChallengeRuntimeTemplateValidator
             if (!security.RunAsNonRoot) errors.Add("Runtime security must require a non-root user.");
             if (!security.NoNewPrivileges) errors.Add("Runtime security must disable privilege escalation.");
         }
-        foreach (var binding in runtime.UrlBindings ?? [])
+        foreach (var binding in (runtime.UrlBindings ?? [])
+                     .Append(runtime.ControlCheckUrlBinding)
+                     .Where(binding => binding is not null)
+                     .Select(binding => binding!))
         {
             if (!Enum.IsDefined(binding.Exposure) || string.IsNullOrWhiteSpace(binding.UrlTemplate))
                 errors.Add("Runtime URL bindings require a valid exposure and template.");
-            if (binding.UrlTemplate.Contains('{')
-                && !binding.UrlTemplate.Contains("{HOST}", StringComparison.Ordinal)
-                && !binding.UrlTemplate.Contains("{PORT}", StringComparison.Ordinal))
+            var remainingTemplate = binding.UrlTemplate
+                .Replace("{HOST}", string.Empty, StringComparison.Ordinal)
+                .Replace("{PORT}", string.Empty, StringComparison.Ordinal);
+            if (remainingTemplate.Contains('{') || remainingTemplate.Contains('}'))
                 errors.Add("Runtime URL bindings only allow HOST and PORT placeholders.");
-            if (binding.ContainerPort is < 1 or > 65535 || binding.GuestPort is < 1 or > 65535)
+            if (binding.ContainerPort is < 1 or > 65535
+                || binding.GuestPort is < 1 or > 65535)
                 errors.Add("Runtime URL binding ports must be between 1 and 65535.");
+            if (runtime.RuntimeKind == RuntimeKind.Container
+                && binding.ContainerPort is null)
+                errors.Add("Container URL bindings require ContainerPort.");
+        }
+        if (runtime.RuntimeKind == RuntimeKind.Container)
+        {
+            foreach (var binding in runtime.UrlBindings ?? [])
+            {
+                if (binding.ContainerPort is not int containerPort)
+                    continue;
+                if (!(runtime.PortMappings ?? new Dictionary<int, int>())
+                    .TryGetValue(containerPort, out var hostPort)
+                    || hostPort != 0)
+                    errors.Add("Container public URL bindings require a dynamic port mapping.");
+            }
         }
         return errors;
     }

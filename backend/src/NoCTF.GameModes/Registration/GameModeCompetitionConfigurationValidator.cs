@@ -40,20 +40,32 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
         IReadOnlyList<string> challengeConfigurationJsons)
     {
         var errors = Validate(mode, json, eligibleTeamCount, challengeConfigurationJsons).ToList();
-        if (mode != GameMode.Awdp || errors.Count > 0)
+        if (errors.Count > 0)
             return errors;
 
         try
         {
-            var competition = Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(json);
-            foreach (var challengeJson in challengeConfigurationJsons)
+            if (mode == GameMode.Awdp)
             {
-                var challenge = Awdp.Configuration.AwdpConfigurationParser.ParseChallenge(
-                    challengeJson);
-                errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.ValidateForStart(
-                    Awdp.Configuration.AwdpConfigurationResolver.Resolve(
-                        competition,
-                        challenge)));
+                var competition = Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(json);
+                foreach (var challengeJson in challengeConfigurationJsons)
+                {
+                    var challenge = Awdp.Configuration.AwdpConfigurationParser.ParseChallenge(
+                        challengeJson);
+                    errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.ValidateForStart(
+                        Awdp.Configuration.AwdpConfigurationResolver.Resolve(
+                            competition,
+                            challenge)));
+                }
+            }
+            else if (mode == GameMode.Koh)
+            {
+                foreach (var challengeJson in challengeConfigurationJsons)
+                {
+                    errors.AddRange(Koh.Configuration.KohConfigurationValidator.ValidateForStart(
+                        Koh.Configuration.KohConfigurationUpgrader.ParseChallenge(
+                            challengeJson)));
+                }
             }
             return errors;
         }

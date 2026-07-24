@@ -54,7 +54,8 @@ public sealed record RuntimeProvisioned(
     string ProviderReceiptJson,
     IReadOnlyList<string> Urls,
     IReadOnlyList<int> ParticipantUrlIndexes,
-    DateTimeOffset? ExpiresAt);
+    DateTimeOffset? ExpiresAt,
+    string? ControlCheckUrl = null);
 
 public sealed record RuntimeProvisionFailed(
     Guid RuntimeInstanceId,

@@ -44,15 +44,38 @@ public sealed class RuntimeProviderHandler(
                 message.Definition,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
+            ExpandedRuntimeUrls expanded;
+            try
+            {
+                expanded = RuntimeUrlExpander.ExpandContainer(
+                    receipt,
+                    message.Definition.UrlBindings,
+                    message.Definition.ControlCheckUrlBinding);
+            }
+            catch (InvalidOperationException)
+            {
+                await IsolatedContainerProvisioner.DestroyAsync(
+                    providers.Containers(message.Definition.Provider),
+                    providers.Sandbox(message.Definition.Provider),
+                    receipt,
+                    cancellationToken);
+                await ReleaseCapacityAsync(message, cancellationToken);
+                return new RuntimeProvisionFailed(
+                    message.RuntimeInstanceId,
+                    message.ProcessingVersion,
+                    RuntimeFailureCode.UrlExpansionFailed,
+                    message.RunnerId);
+            }
             return new RuntimeProvisioned(
                 message.RuntimeInstanceId,
                 message.ProcessingVersion,
                 ReadRunnerId(),
                 receipt.Provider,
                 JsonSerializer.Serialize(receipt),
-                [],
-                [],
-                message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null);
+                expanded.Urls,
+                expanded.ParticipantUrlIndexes,
+                message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
+                expanded.ControlCheckUrl);
         }
         catch (TimeoutException)
         {
@@ -140,6 +163,7 @@ public static class RuntimeWriteBackHandler
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
         instance.Urls = [.. message.Urls];
         instance.ParticipantUrlIndexes = [.. message.ParticipantUrlIndexes];
+        instance.ControlCheckUrl = message.ControlCheckUrl;
         instance.State = RuntimeState.Running;
         instance.RunningAt = DateTimeOffset.UtcNow;
         instance.ExpiresAt = message.ExpiresAt;

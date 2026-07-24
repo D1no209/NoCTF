@@ -54,7 +54,7 @@ public class ChallengeConfigurationCatalogTests
     [Arguments(GameMode.Ctf, "{\"schemaVersion\":1,\"points\":{\"initialPoints\":0,\"minimumPoints\":0,\"decayFactor\":1},\"bloodRewards\":[]}")]
     [Arguments(GameMode.Awd, "{\"schemaVersion\":1,\"flagFormat\":\"\"}")]
     [Arguments(GameMode.Awdp, "{\"schemaVersion\":1,\"break\":null,\"fix\":null,\"requireBreakBeforeFix\":false,\"maxBreakSubmissions\":0,\"maxFixSubmissions\":0,\"violationPenalty\":-1}")]
-    [Arguments(GameMode.Koh, "{\"schemaVersion\":1,\"agentUrl\":\"file:///secret\"}")]
+    [Arguments(GameMode.Koh, "{\"schemaVersion\":1,\"pollIntervalSeconds\":0}")]
     public async Task Validate_InvalidModeSpecificConfiguration_ReturnsErrors(GameMode mode, string json)
     {
         var errors = new GameModeChallengeConfigurationCatalog().Validate(mode, json);
@@ -124,14 +124,19 @@ public class ChallengeConfigurationCatalogTests
 
         foreach (var mode in Enum.GetValues<GameMode>())
         {
-            var json = WithRuntime(configurations.GetDefaultJson(mode), template);
+            var expectedAllocation = mode == GameMode.Koh
+                ? RuntimeAllocation.Shared
+                : RuntimeAllocation.PerTeam;
+            var json = WithRuntime(
+                configurations.GetDefaultJson(mode),
+                template with { Allocation = expectedAllocation });
             if (mode == GameMode.Awd)
                 json = WithAwdFlagInjection(json);
             var parsed = runtimes.Get(mode, json);
 
             await Assert.That(parsed).IsNotNull();
             await Assert.That(parsed!.Provider).IsEqualTo(RuntimeProvider.Kubernetes);
-            await Assert.That(parsed.Allocation).IsEqualTo(RuntimeAllocation.PerTeam);
+            await Assert.That(parsed.Allocation).IsEqualTo(expectedAllocation);
             await Assert.That(parsed.Image).IsEqualTo(template.Image);
             await Assert.That(configurations.Validate(mode, json)).IsEmpty();
         }
@@ -156,6 +161,54 @@ public class ChallengeConfigurationCatalogTests
             await Assert.That(errors).IsNotEmpty();
             await Assert.That(errors).Contains("Runtime image is required.");
         }
+    }
+
+    [Test]
+    public async Task Koh_start_requires_shared_runtime_and_control_check_binding()
+    {
+        var competition = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Koh);
+        var challenge = new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Koh);
+        var validator = new GameModeCompetitionConfigurationValidator();
+
+        var errors = validator.ValidateForStart(
+            GameMode.Koh,
+            competition,
+            eligibleTeamCount: 1,
+            [challenge]);
+
+        await Assert.That(errors)
+            .Contains("Runtime is required before a KoH competition can start.");
+    }
+
+    [Test]
+    public async Task Koh_shared_runtime_with_control_binding_is_valid_for_start()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.Shared,
+            "registry.example/hill:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            Limits: new(268_435_456, 500_000_000, 128),
+            Security: new(true, true, true, ["ALL"], []),
+            UrlBindings:
+            [
+                new("http://{HOST}:{PORT}", RuntimeExposure.Participants, ContainerPort: 8080)
+            ],
+            ControlCheckUrlBinding: new(
+                "http://{HOST}:{PORT}/control",
+                RuntimeExposure.OwnerOnly,
+                ContainerPort: 8080));
+        var challenge = WithRuntime(
+            new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Koh),
+            runtime);
+
+        var errors = new GameModeCompetitionConfigurationValidator().ValidateForStart(
+            GameMode.Koh,
+            GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Koh),
+            eligibleTeamCount: 1,
+            [challenge]);
+
+        await Assert.That(errors).IsEmpty();
     }
 
     private static string WithRuntime(string json, ChallengeRuntimeTemplate runtime)
