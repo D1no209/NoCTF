@@ -2,8 +2,7 @@ namespace NoCTF.GameModes.Koh.Configuration;
 
 public sealed record KohProducerSettings(
     int PollIntervalSeconds,
-    Uri AgentUrl,
-    IReadOnlyDictionary<string, Guid> TeamIdentifiers);
+    long ControlPointsPerInterval);
 
 public sealed class KohProducerConfigurationCatalog
 {
@@ -12,8 +11,7 @@ public sealed class KohProducerConfigurationCatalog
         var competition = KohConfigurationUpgrader.ParseCompetition(competitionConfigurationJson);
         var challenge = KohConfigurationUpgrader.ParseChallenge(challengeConfigurationJson);
         return new(
-            competition.PollIntervalSeconds,
-            new Uri(challenge.AgentUrl, UriKind.Absolute),
-            challenge.TeamIdentifiers ?? new Dictionary<string, Guid>(StringComparer.Ordinal));
+            challenge.PollIntervalSeconds ?? competition.PollIntervalSeconds,
+            challenge.ControlPointsPerInterval ?? competition.ControlPointsPerInterval);
     }
 }

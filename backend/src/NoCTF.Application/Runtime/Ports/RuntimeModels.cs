@@ -59,7 +59,8 @@ public sealed record ChallengeRuntimeTemplate(
     string RunnerPool = "default",
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
     RuntimeFlagSource FlagSource = RuntimeFlagSource.Static,
-    string? OvaSourceUrl = null);
+    string? OvaSourceUrl = null,
+    RuntimeUrlBinding? ControlCheckUrlBinding = null);
 
 public interface IChallengeRuntimeTemplateCatalog
 {
@@ -84,7 +85,9 @@ public sealed record ContainerRequest(
     IReadOnlyList<int>? InternalPorts = null,
     bool AllowInternalCallback = false,
     int Generation = 0,
-    Guid? RuntimeInstanceId = null)
+    Guid? RuntimeInstanceId = null,
+    IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
+    RuntimeUrlBinding? ControlCheckUrlBinding = null)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];

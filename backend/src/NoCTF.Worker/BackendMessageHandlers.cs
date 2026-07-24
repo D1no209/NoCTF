@@ -7,6 +7,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Notifications;
 using System.Text.Json;
@@ -450,7 +451,15 @@ public static class BackendMessageHandlers
                     template.TtlSeconds is > 0 ? TimeSpan.FromSeconds(template.TtlSeconds.Value) : null,
                     OperationTimeout: template.OperationTimeoutSeconds is > 0
                         ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
-                        : TimeSpan.FromMinutes(2));
+                        : TimeSpan.FromMinutes(2),
+                    InternalPorts: target.Competition.Mode == GameMode.Koh
+                        && template.ControlCheckUrlBinding?.ContainerPort is int controlPort
+                            ? [controlPort]
+                            : null,
+                    UrlBindings: template.UrlBindings,
+                    ControlCheckUrlBinding: target.Competition.Mode == GameMode.Koh
+                        ? template.ControlCheckUrlBinding
+                        : null);
             }
         }
         catch (InvalidOperationException)

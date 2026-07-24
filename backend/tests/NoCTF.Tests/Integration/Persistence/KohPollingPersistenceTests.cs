@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -12,7 +13,9 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Runner.Messages;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
@@ -42,6 +45,41 @@ public sealed class KohPollingPersistenceTests
             var clock = new MutableTimeProvider(fixture.DueAt.AddSeconds(16));
             var configurations = new KohProducerConfigurationCatalog();
             RecordKohObservation observation;
+            var dispatchOutbox = new RecordingOutbox();
+            await using (var dispatchDb = new NoCtfDbContext(options))
+            {
+                await BackendMessageHandlers.Handle(
+                    new DispatchRuntime(fixture.RuntimeId, 0),
+                    dispatchDb,
+                    new ChallengeRuntimeTemplateCatalog(),
+                    dispatchOutbox,
+                    cancellationToken);
+            }
+            var claim = dispatchOutbox.RunnerPoolMessages
+                .OfType<ClaimContainerRuntime>()
+                .Single();
+            await Assert.That(claim.Definition.UrlBindings).Count().IsEqualTo(1);
+            await Assert.That(claim.Definition.ControlCheckUrlBinding).IsNotNull();
+            await using (var provisionDb = new NoCtfDbContext(options))
+            {
+                var runtime = await provisionDb.RuntimeInstances.SingleAsync(cancellationToken);
+                runtime.State = RuntimeState.Provisioning;
+                await provisionDb.SaveChangesAsync(cancellationToken);
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisioned(
+                        fixture.RuntimeId,
+                        0,
+                        "runner-a",
+                        RuntimeProvider.Docker,
+                        "{}",
+                        ["http://runner.example:32000/play"],
+                        [0],
+                        null,
+                        "http://hill.internal/control"),
+                    provisionDb,
+                    new RecordingOutbox(),
+                    cancellationToken);
+            }
 
             await using (var readDb = new NoCtfDbContext(options))
             {
@@ -155,6 +193,21 @@ public sealed class KohPollingPersistenceTests
         var competitionChallengeId = Guid.CreateVersion7();
         var teamId = Guid.CreateVersion7();
         const string flag = "NOCTF{raw-koh-control}";
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.Shared,
+            "registry.example/hill:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            Limits: new(268_435_456, 500_000_000, 128),
+            Security: new(true, true, true, ["ALL"], []),
+            UrlBindings:
+            [
+                new("http://{HOST}:{PORT}/play", RuntimeExposure.Participants, ContainerPort: 8080)
+            ],
+            ControlCheckUrlBinding: new(
+                "http://{HOST}:{PORT}/control",
+                RuntimeExposure.OwnerOnly,
+                ContainerPort: 8080));
         db.Users.Add(new User
         {
             Id = ownerId,
@@ -199,7 +252,7 @@ public sealed class KohPollingPersistenceTests
             ChallengeId = challengeId,
             IsPublished = true,
             ConfigurationJson = JsonSerializer.Serialize(
-                new KohChallengeConfiguration(1, "http://unused.example"),
+                new KohChallengeConfiguration(1, runtime),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = dueAt
         });
@@ -224,9 +277,10 @@ public sealed class KohPollingPersistenceTests
             FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
             CreatedAt = dueAt
         });
+        var runtimeId = Guid.CreateVersion7();
         db.RuntimeInstances.Add(new RuntimeInstance
         {
-            Id = Guid.CreateVersion7(),
+            Id = runtimeId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = null,
@@ -236,14 +290,11 @@ public sealed class KohPollingPersistenceTests
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerPool = "default",
             RunnerId = "runner-a",
-            State = RuntimeState.Running,
-            ProviderReceiptJson = "{}",
-            ControlCheckUrl = "http://hill.internal/control",
+            State = RuntimeState.Queued,
             CreatedAt = dueAt,
-            RunningAt = dueAt
         });
         await db.SaveChangesAsync(cancellationToken);
-        return new(dueAt, competitionId, competitionChallengeId, teamId, flag);
+        return new(dueAt, competitionId, competitionChallengeId, teamId, runtimeId, flag);
     }
 
     private sealed record Fixture(
@@ -251,6 +302,7 @@ public sealed class KohPollingPersistenceTests
         Guid CompetitionId,
         Guid CompetitionChallengeId,
         Guid TeamId,
+        Guid RuntimeId,
         string Flag);
 
     private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
@@ -270,6 +322,7 @@ public sealed class KohPollingPersistenceTests
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {
         public List<object> Published { get; } = [];
+        public List<object> RunnerPoolMessages { get; } = [];
         public List<(object Message, DateTimeOffset At)> Scheduled { get; } = [];
 
         public ValueTask PublishAsync<T>(T message)
@@ -284,8 +337,11 @@ public sealed class KohPollingPersistenceTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
-            throw new NotSupportedException();
+        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage
+        {
+            RunnerPoolMessages.Add(message);
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
             where T : IRunnerPoolMessage => throw new NotSupportedException();

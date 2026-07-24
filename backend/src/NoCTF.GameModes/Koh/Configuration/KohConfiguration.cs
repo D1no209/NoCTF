@@ -9,9 +9,9 @@ public sealed record KohConfiguration(int SchemaVersion, int PollIntervalSeconds
 
 public sealed record KohChallengeConfiguration(
     int SchemaVersion,
-    string AgentUrl,
     ChallengeRuntimeTemplate? Runtime = null,
-    IReadOnlyDictionary<string, Guid>? TeamIdentifiers = null)
+    int? PollIntervalSeconds = null,
+    long? ControlPointsPerInterval = null)
 {
     public const int CurrentSchemaVersion = 1;
 }
