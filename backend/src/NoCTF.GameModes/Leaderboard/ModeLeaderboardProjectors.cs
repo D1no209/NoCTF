@@ -315,12 +315,20 @@ internal static class AwdpLeaderboardProjection
             .OrderBy(fact => fact.ReceivedAt)
             .ThenBy(fact => fact.SubmissionId)
             .ToList();
+        var correctBreaks = facts
+            .Where(fact => fact.Kind == SubmissionKind.Break)
+            .Select(fact => (fact.TeamId, fact.CompetitionChallengeId!.Value))
+            .ToHashSet();
         var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points)>>();
         var milestones = new HashSet<(Guid TeamId, Guid ChallengeId, SubmissionKind Kind, int Round)>();
         foreach (var fact in facts)
         {
             var challengeId = fact.CompetitionChallengeId!.Value;
             var challenge = ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
+            if (fact.Kind == SubmissionKind.Fix
+                && (challenge.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix)
+                && !correctBreaks.Contains((fact.TeamId, challengeId)))
+                continue;
             var achievement = fact.Kind == SubmissionKind.Break
                 ? challenge.Break ?? competition.Break
                 : challenge.Fix ?? competition.Fix;
@@ -376,12 +384,12 @@ internal static class AwdpLeaderboardProjection
 
     private static AwdpConfiguration ParseCompetition(string? json) =>
         TryParse<AwdpConfiguration>(json)
-        ?? new(2, 300, new(AchievementSettlement.PerRound, 50),
+        ?? new(AwdpConfiguration.CurrentSchemaVersion, 300, new(AchievementSettlement.PerRound, 50),
             new(AchievementSettlement.PerRound, 50), 0, 0);
 
     private static AwdpChallengeConfiguration ParseChallenge(string? json) =>
         TryParse<AwdpChallengeConfiguration>(json)
-        ?? new(1, null, null, true, 10, 10);
+        ?? new(AwdpChallengeConfiguration.CurrentSchemaVersion, null, null, null, 10, 10);
 
     private static T? TryParse<T>(string? json) where T : class
     {
