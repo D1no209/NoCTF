@@ -311,6 +311,22 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Awd_checker_rejects_non_container_provider()
+    {
+        var checker = new RunnerJobConfiguration(
+            RuntimeProvider.Libvirt,
+            "registry.example/checker:v1");
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Awd,
+            WithChecker(catalog.GetDefaultJson(GameMode.Awd), checker));
+
+        await Assert.That(errors)
+            .Contains("AWD Checker requires the Docker or Kubernetes provider.");
+    }
+
+    [Test]
     public async Task Awdp_target_rejects_public_ports_and_urls()
     {
         var runtime = new ChallengeRuntimeTemplate(
