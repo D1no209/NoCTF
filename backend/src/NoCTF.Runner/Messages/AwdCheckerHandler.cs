@@ -159,9 +159,9 @@ public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
             environment,
             new Dictionary<string, string>
             {
-                ["noctf.managed"] = "true",
-                ["noctf.runtime-instance-id"] = work.RuntimeInstanceId.ToString("D"),
-                ["noctf.purpose"] = "awd-checker"
+                ["noctf.io/managed"] = "true",
+                ["noctf.io/runtime-instance-id"] = work.RuntimeInstanceId.ToString("D"),
+                ["noctf.io/purpose"] = "awd-checker"
             },
             new Dictionary<int, int>(),
             new ContainerResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
