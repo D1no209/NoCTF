@@ -239,6 +239,52 @@ public sealed class AwdpLeaderboardProjectorTests
     }
 
     [Test]
+    public async Task Earlier_last_fix_submission_wins_even_when_evaluation_finishes_later()
+    {
+        var earlier = Guid.NewGuid();
+        var later = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var at = DateTimeOffset.Parse("2026-07-25T00:00:00Z");
+        var competition = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            300,
+            new(AchievementSettlement.Milestone, 0),
+            new(AchievementSettlement.Milestone, 0),
+            RequireBreakBeforeFix: false));
+        var input = new LeaderboardProjectionInput(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            [
+                new(earlier, "z", false, false, at),
+                new(later, "a", false, false, at)
+            ],
+            [
+                Submission(
+                    earlier,
+                    challengeId,
+                    SubmissionKind.Fix,
+                    at,
+                    occurredAt: at.AddSeconds(3)),
+                Submission(
+                    later,
+                    challengeId,
+                    SubmissionKind.Fix,
+                    at.AddSeconds(1),
+                    occurredAt: at.AddSeconds(2))
+            ],
+            [],
+            [new(challengeId, "Web", false)],
+            competition,
+            at);
+
+        var rows = new AwdpLeaderboardProjector().Project(input);
+
+        await Assert.That(rows[0].TeamId).IsEqualTo(earlier);
+        await Assert.That(rows[0].LastScoreAt).IsEqualTo(at);
+        await Assert.That(rows[1].TeamId).IsEqualTo(later);
+    }
+
+    [Test]
     public async Task Paused_time_does_not_split_per_round_achievements()
     {
         var teamId = Guid.NewGuid();
@@ -314,7 +360,8 @@ public sealed class AwdpLeaderboardProjectorTests
         SubmissionKind kind,
         DateTimeOffset at,
         ScoringResult result = ScoringResult.Correct,
-        ScoringFailureCode? failureCode = null) =>
+        ScoringFailureCode? failureCode = null,
+        DateTimeOffset? occurredAt = null) =>
         new(
             Guid.NewGuid(),
             teamId,
@@ -330,8 +377,8 @@ public sealed class AwdpLeaderboardProjectorTests
                 Kind = ScoringEventKind.SubmissionEvaluation,
                 Result = result,
                 FailureCode = failureCode,
-                OccurredAt = at,
-                CreatedAt = at
+                OccurredAt = occurredAt ?? at,
+                CreatedAt = occurredAt ?? at
             });
 
     private static CompetitionLifecycleAudit Lifecycle(

@@ -459,10 +459,12 @@ internal static class AwdpLeaderboardProjection
         var rows = teams.Values.Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
-            var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
+            var last = own.Select(item => item.Fact.ReceivedAt)
+                .OrderByDescending(value => value)
+                .FirstOrDefault();
             var lastFixAt = own
                 .Where(item => item.Fact.Kind == SubmissionKind.Fix)
-                .Select(item => (DateTimeOffset?)item.Fact.Event.OccurredAt)
+                .Select(item => (DateTimeOffset?)item.Fact.ReceivedAt)
                 .OrderByDescending(value => value)
                 .FirstOrDefault();
             var awardedScore = own.Aggregate(0L, (total, item) => checked(total + item.Points));
