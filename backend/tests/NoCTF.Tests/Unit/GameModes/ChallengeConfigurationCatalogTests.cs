@@ -374,6 +374,32 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Checker_environment_rejects_invalid_names_and_noctf_prefix()
+    {
+        var checker = new RunnerJobConfiguration(
+            RuntimeProvider.Docker,
+            "registry.example/checker:v1",
+            Environment: new Dictionary<string, string>
+            {
+                ["1INVALID"] = "value",
+                ["noctf_callback_url"] = "https://example.invalid"
+            });
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        foreach (var mode in new[] { GameMode.Awd, GameMode.Awdp })
+        {
+            var errors = catalog.Validate(
+                mode,
+                WithChecker(catalog.GetDefaultJson(mode), checker));
+
+            await Assert.That(errors)
+                .Contains("Checker environment variable '1INVALID' is invalid.");
+            await Assert.That(errors)
+                .Contains("Checker environment variables cannot use the NOCTF_ prefix.");
+        }
+    }
+
+    [Test]
     public async Task Runtime_environment_rejects_invalid_names_and_reserved_prefix()
     {
         var runtime = new ChallengeRuntimeTemplate(
