@@ -152,7 +152,7 @@ public sealed class EfChallengeHintStore(
         if (existing)
             return HintUnlockAttempt.Success(new(Map(hint), false));
 
-        var score = await AuthoritativeScoreAsync(competitionId, teamId.Value, ct);
+        var score = await AuthoritativeScoreAsync(competitionId, teamId.Value, now, ct);
         if (score < hint.Cost)
             return HintUnlockAttempt.Failed(HintUnlockFailure.InsufficientScore);
         var competition = await db.Competitions.SingleAsync(item => item.Id == competitionId, ct);
@@ -179,7 +179,11 @@ public sealed class EfChallengeHintStore(
         return HintUnlockAttempt.Success(new(Map(hint), true));
     }
 
-    private async Task<long> AuthoritativeScoreAsync(Guid competitionId, Guid teamId, CancellationToken ct)
+    private async Task<long> AuthoritativeScoreAsync(
+        Guid competitionId,
+        Guid teamId,
+        DateTimeOffset projectedAt,
+        CancellationToken ct)
     {
         var competition = await db.Competitions.AsNoTracking().SingleAsync(item => item.Id == competitionId, ct);
         var teams = await db.Teams.IgnoreQueryFilters().AsNoTracking()
@@ -219,9 +223,34 @@ public sealed class EfChallengeHintStore(
         var lifecycleAudits = await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
             .Where(audit => audit.CompetitionId == competitionId)
             .ToListAsync(ct);
+        IReadOnlyList<LeaderboardAwdRoundFact> awdRounds = [];
+        if (competition.Mode == GameMode.Awd)
+        {
+            awdRounds = await db.ChallengeFlags.AsNoTracking()
+                .Where(flag => flag.TeamId != null
+                    && flag.CompetitionChallengeId != null
+                    && flag.SpecificationKind == SpecificationKind.AwdRound
+                    && flag.SpecificationId != null
+                    && flag.ValidStart != null
+                    && flag.ValidUntil != null
+                    && flag.DeletedAt == null)
+                .Join(
+                    db.CompetitionChallenges.AsNoTracking()
+                        .Where(item => item.CompetitionId == competitionId),
+                    flag => flag.CompetitionChallengeId,
+                    item => (Guid?)item.Id,
+                    (flag, _) => new LeaderboardAwdRoundFact(
+                        flag.CompetitionChallengeId!.Value,
+                        flag.TeamId!.Value,
+                        flag.SpecificationId!.Value,
+                        flag.ValidStart!.Value,
+                        flag.ValidUntil!.Value))
+                .ToListAsync(ct);
+        }
         var result = projection.Project(new(
             competitionId, competition.Mode, teams, submissions, system, challenges,
-            competition.ConfigurationJson, competition.StartAt, lifecycleAudits));
+            competition.ConfigurationJson, competition.StartAt, lifecycleAudits,
+            awdRounds, projectedAt));
         return result.Entries.SingleOrDefault(item => item.TeamId == teamId)?.Score ?? 0;
     }
 

@@ -12,7 +12,9 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardChallengeFact>? Challenges = null,
     string? CompetitionConfigurationJson = null,
     DateTimeOffset? CompetitionStartTime = null,
-    IReadOnlyList<CompetitionLifecycleAudit>? LifecycleAudits = null);
+    IReadOnlyList<CompetitionLifecycleAudit>? LifecycleAudits = null,
+    IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds = null,
+    DateTimeOffset? ProjectedAt = null);
 
 public sealed record LeaderboardTeamFact(
     Guid Id,
@@ -32,6 +34,13 @@ public sealed record LeaderboardSubmissionFact(
     Guid? VictimTeamId = null);
 
 public sealed record LeaderboardSystemFact(ScoringEvent Event, long CurrentValue = 0);
+
+public sealed record LeaderboardAwdRoundFact(
+    Guid CompetitionChallengeId,
+    Guid TeamId,
+    Guid RoundId,
+    DateTimeOffset StartsAt,
+    DateTimeOffset EndsAt);
 
 public interface IGameModeLeaderboardProjector
 {
