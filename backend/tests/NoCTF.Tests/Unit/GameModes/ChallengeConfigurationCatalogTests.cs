@@ -337,6 +337,27 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Awdp_checker_rejects_runner_reserved_environment_variables()
+    {
+        var checker = new RunnerJobConfiguration(
+            RuntimeProvider.Docker,
+            "registry.example/checker:v1",
+            Environment: new Dictionary<string, string>
+            {
+                ["TARGET_HOST"] = "attacker-controlled",
+                ["NOCTF_CALLBACK_TOKEN"] = "attacker-controlled"
+            });
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Awdp,
+            WithChecker(catalog.GetDefaultJson(GameMode.Awdp), checker));
+
+        await Assert.That(errors)
+            .Contains("AWDP Checker environment cannot configure Runner-reserved variables.");
+    }
+
+    [Test]
     public async Task Runtime_environment_rejects_invalid_names_and_reserved_prefix()
     {
         var runtime = new ChallengeRuntimeTemplate(
@@ -547,6 +568,15 @@ public class ChallengeConfigurationCatalogTests
     {
         var root = JsonNode.Parse(json)!.AsObject();
         root["runtime"] = JsonSerializer.SerializeToNode(runtime, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return root.ToJsonString();
+    }
+
+    private static string WithChecker(string json, RunnerJobConfiguration checker)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        root["checker"] = JsonSerializer.SerializeToNode(
+            checker,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
         return root.ToJsonString();
     }
 
