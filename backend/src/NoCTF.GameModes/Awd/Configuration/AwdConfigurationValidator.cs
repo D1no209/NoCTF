@@ -38,6 +38,13 @@ public static class AwdConfigurationValidator
         if (configuration.Runtime is { RuntimeKind: not (RuntimeKind.Container or RuntimeKind.Compose) })
             errors.Add("AWD runtimes only support Container or Compose.");
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(configuration.Checker, "Checker"));
+        if (configuration.Checker is
+            {
+                Provider: not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes)
+            })
+        {
+            errors.Add("AWD Checker requires the Docker or Kubernetes provider.");
+        }
         if (configuration.Runtime is not null && configuration.FlagInjection is null)
             errors.Add("FlagInjection is required when Runtime is configured.");
         if (configuration.FlagInjection is { } injection)
