@@ -39,6 +39,16 @@ internal static class ChallengeRuntimeTemplateValidator
         if (!Enum.IsDefined(runtime.FlagSource)) errors.Add("Runtime flag source is invalid.");
         if (string.IsNullOrWhiteSpace(runtime.RunnerPool) || runtime.RunnerPool.Length > 256)
             errors.Add("Runtime RunnerPool must contain 1..256 characters.");
+        var hasReservedEnvironmentVariable = false;
+        foreach (var variable in runtime.Environment ?? new Dictionary<string, string>())
+        {
+            if (!IsEnvironmentVariableName(variable.Key))
+                errors.Add($"Runtime environment variable '{variable.Key}' is invalid.");
+            if (variable.Key.StartsWith("NOCTF_", StringComparison.OrdinalIgnoreCase))
+                hasReservedEnvironmentVariable = true;
+        }
+        if (hasReservedEnvironmentVariable)
+            errors.Add("Runtime environment variables cannot use the NOCTF_ prefix.");
         if (runtime.RuntimeKind == RuntimeKind.OvaVm)
         {
             if (runtime.Provider != RuntimeProvider.Libvirt)
@@ -107,4 +117,16 @@ internal static class ChallengeRuntimeTemplateValidator
         }
         return errors;
     }
+
+    private static bool IsEnvironmentVariableName(string name)
+    {
+        if (string.IsNullOrEmpty(name)
+            || !(IsAsciiLetter(name[0]) || name[0] == '_'))
+            return false;
+        return name.Skip(1).All(character =>
+            IsAsciiLetter(character) || char.IsAsciiDigit(character) || character == '_');
+    }
+
+    private static bool IsAsciiLetter(char character) =>
+        character is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 }
