@@ -147,7 +147,7 @@ public sealed class EfCompetitionLifecycleStore(
         }
         competition.Status = to;
         competition.UpdatedAt = now;
-        competition.LifecycleAudits.Add(new CompetitionLifecycleAudit
+        var lifecycleAudit = new CompetitionLifecycleAudit
         {
             Id = Guid.CreateVersion7(now),
             From = from,
@@ -156,7 +156,9 @@ public sealed class EfCompetitionLifecycleStore(
             Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
             Automatic = automatic,
             OccurredAt = now
-        });
+        };
+        competition.LifecycleAudits.Add(lifecycleAudit);
+        db.Entry(lifecycleAudit).State = EntityState.Added;
         competition.LeaderboardRevision = checked(competition.LeaderboardRevision + 1);
         if (effects.HasFlag(CompetitionLifecycleEffects.ProjectLeaderboard))
             await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
