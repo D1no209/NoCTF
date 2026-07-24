@@ -9,7 +9,8 @@ public static class RunnerJobConfigurationValidator
         if (configuration is null) return [];
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(configuration.Image)) errors.Add($"{name}.Image is required.");
-        if (configuration.Image.Length > 512) errors.Add($"{name}.Image cannot exceed 512 characters.");
+        else if (configuration.Image.Length > 512)
+            errors.Add($"{name}.Image cannot exceed 512 characters.");
         if (configuration.Command?.Any(string.IsNullOrWhiteSpace) == true)
             errors.Add($"{name}.Command cannot contain blank arguments.");
         if (configuration.TimeoutSeconds is < 1 or > 1800)

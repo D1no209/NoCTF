@@ -400,6 +400,24 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Checker_null_image_returns_validation_error()
+    {
+        var checker = new RunnerJobConfiguration(
+            RuntimeProvider.Docker,
+            null!);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        foreach (var mode in new[] { GameMode.Awd, GameMode.Awdp })
+        {
+            var errors = catalog.Validate(
+                mode,
+                WithChecker(catalog.GetDefaultJson(mode), checker));
+
+            await Assert.That(errors).Contains("Checker.Image is required.");
+        }
+    }
+
+    [Test]
     public async Task Runtime_environment_rejects_invalid_names_and_reserved_prefix()
     {
         var runtime = new ChallengeRuntimeTemplate(
