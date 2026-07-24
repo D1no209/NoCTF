@@ -88,6 +88,9 @@ internal static class ChallengeRuntimeTemplateValidator
         {
             if (!security.RunAsNonRoot) errors.Add("Runtime security must require a non-root user.");
             if (!security.NoNewPrivileges) errors.Add("Runtime security must disable privilege escalation.");
+            if (security.CapDrop is null
+                || !security.CapDrop.Contains("ALL", StringComparer.OrdinalIgnoreCase))
+                errors.Add("Runtime security must drop all capabilities.");
         }
         var urlBindings = (runtime.UrlBindings ?? [])
             .Append(runtime.ControlCheckUrlBinding)

@@ -190,6 +190,35 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task RuntimeTemplate_ExplicitSecurityMustDropAllCapabilities()
+    {
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            Limits: new(268_435_456, 500_000_000, 128),
+            Security: new(true, true, true, [], []));
+
+        foreach (var mode in Enum.GetValues<GameMode>())
+        {
+            var allocation = mode == GameMode.Koh
+                ? RuntimeAllocation.Shared
+                : RuntimeAllocation.PerTeam;
+            var json = WithRuntime(
+                configurations.GetDefaultJson(mode),
+                runtime with { Allocation = allocation });
+            if (mode == GameMode.Awd)
+                json = WithAwdFlagInjection(json);
+
+            var errors = configurations.Validate(mode, json);
+
+            await Assert.That(errors)
+                .Contains("Runtime security must drop all capabilities.");
+        }
+    }
+
+    [Test]
     public async Task Container_runtime_rejects_libvirt_provider()
     {
         var runtime = new ChallengeRuntimeTemplate(
