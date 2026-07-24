@@ -11,7 +11,8 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardSystemFact> SystemEvents,
     IReadOnlyList<LeaderboardChallengeFact>? Challenges = null,
     string? CompetitionConfigurationJson = null,
-    DateTimeOffset? CompetitionStartTime = null);
+    DateTimeOffset? CompetitionStartTime = null,
+    IReadOnlyList<CompetitionLifecycleAudit>? LifecycleAudits = null);
 
 public sealed record LeaderboardTeamFact(
     Guid Id,

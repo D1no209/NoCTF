@@ -216,9 +216,12 @@ public sealed class EfChallengeHintStore(
                         .SingleOrDefault()
                     : 0))
             .ToListAsync(ct);
+        var lifecycleAudits = await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
+            .Where(audit => audit.CompetitionId == competitionId)
+            .ToListAsync(ct);
         var result = projection.Project(new(
             competitionId, competition.Mode, teams, submissions, system, challenges,
-            competition.ConfigurationJson, competition.StartAt));
+            competition.ConfigurationJson, competition.StartAt, lifecycleAudits));
         return result.Entries.SingleOrDefault(item => item.TeamId == teamId)?.Score ?? 0;
     }
 
