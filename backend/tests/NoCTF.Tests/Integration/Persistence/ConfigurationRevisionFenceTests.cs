@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Competitions.Configuration;
@@ -98,10 +99,14 @@ public sealed class ConfigurationRevisionFenceTests
             await using var verifyDb = new NoCtfDbContext(options);
             var persisted = await verifyDb.CompetitionChallenges.AsNoTracking()
                 .SingleAsync(challenge => challenge.Id == ids.CompetitionChallengeId, cancellationToken);
-            await Assert.That(persisted.ConfigurationJson).IsEqualTo("""{"schemaVersion":1}""");
+            await Assert.That(JsonNode.DeepEquals(
+                JsonNode.Parse(persisted.ConfigurationJson),
+                JsonNode.Parse("""{"schemaVersion":1}"""))).IsTrue();
             var persistedCompetition = await verifyDb.Competitions.AsNoTracking()
                 .SingleAsync(competition => competition.Id == ids.CompetitionId, cancellationToken);
-            await Assert.That(persistedCompetition.ConfigurationJson).IsEqualTo("""{"schemaVersion":1}""");
+            await Assert.That(JsonNode.DeepEquals(
+                JsonNode.Parse(persistedCompetition.ConfigurationJson),
+                JsonNode.Parse("""{"schemaVersion":1}"""))).IsTrue();
         });
     }
 
