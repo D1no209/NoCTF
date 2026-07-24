@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
@@ -5,6 +6,7 @@ using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Platform;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
@@ -59,7 +61,10 @@ public sealed class RunnerAssignmentReconciliationTests
                     .SingleAsync(instance => instance.Id == fixture.RetainReceiptId, cancellationToken);
                 await Assert.That(retained.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(retained.RunnerId).IsEqualTo("runner-c");
-                await Assert.That(retained.ProviderReceiptJson).IsEqualTo("{\"id\":\"local\"}");
+                await Assert.That(retained.ProviderReceiptJson).IsNotNull();
+                await Assert.That(JsonNode.DeepEquals(
+                    JsonNode.Parse(retained.ProviderReceiptJson!),
+                    JsonNode.Parse("""{"id":"local"}"""))).IsTrue();
                 await Assert.That(retained.FailureCode).IsNull();
                 await Assert.That(retained.RunnerUnavailableAt).IsEqualTo(fixture.Now);
                 await Assert.That(retained.ProcessingVersion).IsEqualTo(8);
@@ -148,8 +153,10 @@ public sealed class RunnerAssignmentReconciliationTests
             await Assert.That(unchanged.State).IsEqualTo(RuntimeState.Provisioning);
             await Assert.That(unchanged.RunnerId).IsEqualTo("runner-a");
             await Assert.That(unchanged.ProcessingVersion).IsEqualTo(7);
-            var schedule = await verify.DurableMaintenanceSchedules.AsNoTracking().SingleAsync(
-                cancellationToken);
+            var schedule = await verify.DurableMaintenanceSchedules.AsNoTracking()
+                .SingleAsync(
+                    item => item.Kind == MaintenanceChainKind.RunnerAssignmentReconciliation,
+                    cancellationToken);
             await Assert.That(schedule.ProcessingVersion).IsEqualTo(2);
             await Assert.That(outbox.Published).IsEmpty();
             await Assert.That(outbox.RunnerNodeMessages).IsEmpty();
@@ -301,7 +308,9 @@ public sealed class RunnerAssignmentReconciliationTests
     {
         await using var db = new NoCtfDbContext(options);
         await db.Database.MigrateAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var observedAt = DateTimeOffset.UtcNow;
+        var now = observedAt.AddTicks(
+            -(observedAt.Ticks % TimeSpan.TicksPerMicrosecond));
         var ownerId = Guid.CreateVersion7();
         var competitionId = Guid.CreateVersion7();
         db.Users.Add(new User
@@ -352,6 +361,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 Id = competitionChallengeId,
                 CompetitionId = competitionId,
                 ChallengeId = challengeId,
+                Order = index,
                 UpdatedAt = now
             });
             db.RuntimeInstances.Add(new RuntimeInstance
