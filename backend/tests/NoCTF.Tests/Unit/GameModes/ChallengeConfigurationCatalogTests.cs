@@ -53,7 +53,7 @@ public class ChallengeConfigurationCatalogTests
     [Test]
     [Arguments(GameMode.Ctf, "{\"schemaVersion\":1,\"points\":{\"initialPoints\":0,\"minimumPoints\":0,\"decayFactor\":1},\"bloodRewards\":[]}")]
     [Arguments(GameMode.Awd, "{\"schemaVersion\":1,\"flagFormat\":\"\"}")]
-    [Arguments(GameMode.Awdp, "{\"schemaVersion\":1,\"break\":null,\"fix\":null,\"requireBreakBeforeFix\":false,\"maxBreakAttempts\":0,\"maxFixAttempts\":0}")]
+    [Arguments(GameMode.Awdp, "{\"schemaVersion\":1,\"break\":null,\"fix\":null,\"requireBreakBeforeFix\":false,\"maxBreakSubmissions\":0,\"maxFixSubmissions\":0,\"violationPenalty\":-1}")]
     [Arguments(GameMode.Koh, "{\"schemaVersion\":1,\"agentUrl\":\"file:///secret\"}")]
     public async Task Validate_InvalidModeSpecificConfiguration_ReturnsErrors(GameMode mode, string json)
     {

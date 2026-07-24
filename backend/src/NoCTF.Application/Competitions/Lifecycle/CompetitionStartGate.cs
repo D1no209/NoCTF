@@ -47,8 +47,15 @@ public sealed class CompetitionStartGate(
                 "competition_not_published",
                 null,
                 "The competition must be Published before it can start."));
-        foreach (var message in competitionConfigurations.Validate(
-                     snapshot.Mode, snapshot.ConfigurationJson, snapshot.ApprovedTeamCount, []))
+        var publishedChallengeConfigurations = snapshot.Challenges
+            .Where(challenge => challenge.Published)
+            .Select(challenge => challenge.ConfigurationJson)
+            .ToArray();
+        foreach (var message in competitionConfigurations.ValidateForStart(
+                     snapshot.Mode,
+                     snapshot.ConfigurationJson,
+                     snapshot.ApprovedTeamCount,
+                     publishedChallengeConfigurations))
             errors.Add(new("competition_configuration_invalid", null, message));
         if (!snapshot.Challenges.Any(challenge => challenge.Published))
             errors.Add(new(

@@ -392,7 +392,9 @@ public static class BackendMessageHandlers
             return;
 
         if (target.Instance.Purpose == RuntimePurpose.AwdpTarget
-            && target.Instance.ConfigurationRevision != target.Challenge.Revision)
+            && (target.Instance.ConfigurationRevision != target.Challenge.Revision
+                || target.Instance.CompetitionConfigurationRevision
+                    != target.Competition.ConfigurationRevision))
         {
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
@@ -402,7 +404,13 @@ public static class BackendMessageHandlers
             return;
         }
 
-        var template = templates.Get(target.Competition.Mode, target.Challenge.ConfigurationJson);
+        var awdpConfiguration = target.Instance.Purpose == RuntimePurpose.AwdpTarget
+            ? AwdpConfigurationResolver.Resolve(
+                target.Competition.ConfigurationJson,
+                target.Challenge.ConfigurationJson)
+            : null;
+        var template = awdpConfiguration?.Runtime
+            ?? templates.Get(target.Competition.Mode, target.Challenge.ConfigurationJson);
         if (template is null || template.Provider == RuntimeProvider.Libvirt)
         {
             target.Instance.State = RuntimeState.Failed;
@@ -418,12 +426,11 @@ public static class BackendMessageHandlers
         {
             if (target.Instance.Purpose == RuntimePurpose.AwdpTarget)
             {
-                var awdp = AwdpConfigurationParser.ParseChallenge(target.Challenge.ConfigurationJson);
                 definition = AwdpTargetDefinitionFactory.Create(
                     target.Instance.Id,
                     target.Instance.Generation,
                     template,
-                    awdp.TargetPort,
+                    awdpConfiguration!.TargetPort,
                     DateTimeOffset.UtcNow);
             }
             else

@@ -132,19 +132,37 @@ public sealed class AwdpFixWorkReader(
                 challenge => challenge.Id,
                 (item, challenge) => new
                 {
+                    item.Submission,
                     item.Upload,
                     item.Runtime,
-                    challenge.ConfigurationJson,
+                    ChallengeConfigurationJson = challenge.ConfigurationJson,
                     challenge.Revision
+                })
+            .Join(
+                db.Competitions.AsNoTracking(),
+                item => item.Submission.CompetitionId,
+                competition => competition.Id,
+                (item, competition) => new
+                {
+                    item.Upload,
+                    item.Runtime,
+                    item.ChallengeConfigurationJson,
+                    CompetitionConfigurationJson = competition.ConfigurationJson,
+                    CompetitionConfigurationRevision = competition.ConfigurationRevision,
+                    item.Revision
                 })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || target.Runtime.ConfigurationRevision != target.Revision
+            || target.Runtime.CompetitionConfigurationRevision
+                != target.CompetitionConfigurationRevision
             || timeProvider.GetUtcNow() >= message.Deadline
             || string.IsNullOrWhiteSpace(target.Runtime.ProviderReceiptJson))
             return null;
 
-        var settings = AwdpConfigurationParser.ParseChallenge(target.ConfigurationJson);
+        var settings = AwdpConfigurationResolver.Resolve(
+            target.CompetitionConfigurationJson,
+            target.ChallengeConfigurationJson);
         if (settings.Checker is not { } checker
             || settings.TargetPort is < 1 or > 65535)
             return null;

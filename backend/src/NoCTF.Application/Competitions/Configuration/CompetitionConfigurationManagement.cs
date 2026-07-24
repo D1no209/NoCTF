@@ -24,6 +24,13 @@ public interface ICompetitionConfigurationValidator
         string json,
         int eligibleTeamCount,
         IReadOnlyList<string> challengeConfigurationJsons);
+
+    IReadOnlyList<string> ValidateForStart(
+        GameMode mode,
+        string json,
+        int eligibleTeamCount,
+        IReadOnlyList<string> challengeConfigurationJsons) =>
+        Validate(mode, json, eligibleTeamCount, challengeConfigurationJsons);
 }
 
 public interface ICompetitionConfigurationStore

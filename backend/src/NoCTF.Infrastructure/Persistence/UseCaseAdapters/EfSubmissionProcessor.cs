@@ -167,12 +167,21 @@ public sealed class EfSubmissionProcessor(
         {
             if (submission.Kind == SubmissionKind.Fix)
             {
-                var challenge = await db.CompetitionChallenges.AsNoTracking()
-                    .SingleAsync(
-                        item => item.Id == submission.CompetitionChallengeId,
-                        cancellationToken);
-                var configuration = AwdpConfigurationParser.ParseChallenge(
-                    challenge.ConfigurationJson);
+                var configurationJson = await db.CompetitionChallenges.AsNoTracking()
+                    .Where(challenge => challenge.Id == submission.CompetitionChallengeId)
+                    .Join(
+                        db.Competitions.AsNoTracking(),
+                        challenge => challenge.CompetitionId,
+                        competition => competition.Id,
+                        (challenge, competition) => new
+                        {
+                            Competition = competition.ConfigurationJson,
+                            Challenge = challenge.ConfigurationJson
+                        })
+                    .SingleAsync(cancellationToken);
+                var configuration = AwdpConfigurationResolver.Resolve(
+                    configurationJson.Competition,
+                    configurationJson.Challenge);
                 if (configuration.Runtime is { } template
                     && submission.PatchUploadId is not null)
                 {
@@ -201,6 +210,7 @@ public sealed class EfSubmissionProcessor(
                             template,
                             generation,
                             submission.ProcessingVersion,
+                            evaluation.CompetitionRevision,
                             evaluation.CompetitionChallengeRevision,
                             now);
                         db.RuntimeInstances.Add(target);
