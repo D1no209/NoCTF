@@ -247,6 +247,61 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Runtime_url_bindings_require_kind_specific_locator_fields()
+    {
+        var catalog = new GameModeChallengeConfigurationCatalog();
+        var container = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            UrlBindings:
+            [
+                new(
+                    "http://{HOST}:{PORT}",
+                    RuntimeExposure.OwnerOnly,
+                    ContainerPort: 8080,
+                    ServiceName: "web")
+            ]);
+        var compose = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "services:\n  web:\n    image: registry.example/challenge:v1",
+            RuntimeKind: RuntimeKind.Compose,
+            UrlBindings:
+            [
+                new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 8080)
+            ]);
+        var ova = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Libvirt,
+            RuntimeAllocation.PerTeam,
+            string.Empty,
+            RuntimeKind: RuntimeKind.OvaVm,
+            UrlBindings:
+            [
+                new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, VmId: "web")
+            ],
+            OvaSourceUrl: "file:///var/lib/noctf/challenge.ova");
+
+        var containerErrors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), container));
+        var composeErrors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), compose));
+        var ovaErrors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), ova));
+
+        await Assert.That(containerErrors)
+            .Contains("Container URL bindings cannot specify ServiceName, VmId, or GuestPort.");
+        await Assert.That(composeErrors)
+            .Contains("Compose URL bindings require ServiceName and ContainerPort.");
+        await Assert.That(ovaErrors)
+            .Contains("OVA URL bindings cannot use PORT without GuestPort.");
+    }
+
+    [Test]
     public async Task Koh_start_requires_shared_runtime_and_control_check_binding()
     {
         var competition = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Koh);
