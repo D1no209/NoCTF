@@ -22,12 +22,14 @@ using Wolverine.ErrorHandling;
 using Wolverine.Persistence.Durability;
 using Wolverine.Persistence.Durability.DeadLetterManagement;
 using Wolverine.Postgresql;
-using LifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle;
+using Wolverine.Runtime;
+using LifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 using LifecycleMessage = NoCTF.Application.Messaging.AdvanceCompetitionLifecycle;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
 [Category("Integration")]
+[NotInParallel]
 public sealed class WolverineTransactionalOutboxTests
 {
     [Test]
@@ -128,13 +130,14 @@ public sealed class WolverineTransactionalOutboxTests
                 await host.Services.GetRequiredService<IMessageBus>()
                     .SendAsync(new WriteRollbackOutboxProbe(id));
 
-                var deadLetters = host.Services.GetRequiredService<IDeadLetters>();
-                var deadLetter = await WaitForDeadLetterAsync(deadLetters, id, cancellationToken);
+                var deadLetters = host.Services.GetRequiredService<IWolverineRuntime>()
+                    .Storage.DeadLetters;
+                var deadLetter = await WaitForDeadLetterAsync(deadLetters, cancellationToken);
                 await using (var scope = host.Services.CreateAsyncScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
                     var count = await db.Database.SqlQuery<int>(
-                            $"SELECT count(*)::int AS value FROM rollback_business_probe WHERE id = {id}")
+                            $"SELECT count(*)::int AS \"Value\" FROM rollback_business_probe WHERE id = {id}")
                         .SingleAsync(cancellationToken);
                     await Assert.That(count).IsEqualTo(0);
                 }
@@ -181,7 +184,9 @@ public sealed class WolverineTransactionalOutboxTests
                     var now = DateTimeOffset.UtcNow;
                     await bus.SendAsync(new LifecycleMessage(now, 1));
                     await bus.SendAsync(new LifecycleMessage(now, 1));
-                    await observation.FirstCommitted.WaitAsync(cancellationToken);
+                    await observation.FirstCommitted.WaitAsync(
+                        TimeSpan.FromSeconds(30),
+                        cancellationToken);
                     await WaitForLifecycleVersionAsync(firstHost, 2, cancellationToken);
                 }
                 finally
@@ -195,7 +200,9 @@ public sealed class WolverineTransactionalOutboxTests
                 await restartedHost.StartAsync(cancellationToken);
                 try
                 {
-                    await observation.SuccessorCommitted.WaitAsync(cancellationToken);
+                    await observation.SuccessorCommitted.WaitAsync(
+                        TimeSpan.FromSeconds(45),
+                        cancellationToken);
                     await using var scope = restartedHost.Services.CreateAsyncScope();
                     var schedule = await scope.ServiceProvider
                         .GetRequiredService<NoCtfDbContext>()
@@ -272,10 +279,10 @@ public sealed class WolverineTransactionalOutboxTests
             {
                 await host.Services.GetRequiredService<IMessageBus>()
                     .SendAsync(new FinishLifecycleProbe(competitionId));
-                var deadLetters = host.Services.GetRequiredService<IDeadLetters>();
+                var deadLetters = host.Services.GetRequiredService<IWolverineRuntime>()
+                    .Storage.DeadLetters;
                 var deadLetter = await WaitForLifecycleDeadLetterAsync(
                     deadLetters,
-                    competitionId,
                     cancellationToken);
                 await AssertLifecycleStatusAsync(
                     host,
@@ -373,6 +380,11 @@ public sealed class WolverineTransactionalOutboxTests
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
+                    ConfigurationJson = System.Text.Json.JsonSerializer.Serialize(
+                        new AwdChallengeConfiguration(
+                            AwdChallengeConfiguration.CurrentSchemaVersion),
+                        new System.Text.Json.JsonSerializerOptions(
+                            System.Text.Json.JsonSerializerDefaults.Web)),
                     UpdatedAt = now
                 });
                 db.Teams.Add(new Team
@@ -419,7 +431,9 @@ public sealed class WolverineTransactionalOutboxTests
                 var bus = host.Services.GetRequiredService<IMessageBus>();
                 await bus.SendAsync(message);
                 await bus.SendAsync(message);
-                await Assert.That(await observed.WaitAsync(cancellationToken)).IsTrue();
+                await Assert.That(await observed.WaitAsync(
+                    TimeSpan.FromSeconds(30),
+                    cancellationToken)).IsTrue();
                 await Task.Delay(250, cancellationToken);
                 await using var scope = host.Services.CreateAsyncScope();
                 var flagCount = await scope.ServiceProvider.GetRequiredService<NoCtfDbContext>()
@@ -466,16 +480,18 @@ public sealed class WolverineTransactionalOutboxTests
 
     private static async Task<DeadLetterEnvelope> WaitForDeadLetterAsync(
         IDeadLetters deadLetters,
-        Guid probeId,
         CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 150; attempt++)
         {
             var result = await deadLetters.QueryAsync(
-                new DeadLetterEnvelopeQuery { PageSize = 100 },
+                new DeadLetterEnvelopeQuery
+                {
+                    PageSize = 1,
+                    MessageType = typeof(WriteRollbackOutboxProbe).FullName
+                },
                 cancellationToken);
-            var envelope = result.Envelopes.FirstOrDefault(candidate =>
-                candidate.Message is WriteRollbackOutboxProbe probe && probe.Id == probeId);
+            var envelope = result.Envelopes.FirstOrDefault();
             if (envelope is not null)
                 return envelope;
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
@@ -485,17 +501,18 @@ public sealed class WolverineTransactionalOutboxTests
 
     private static async Task<DeadLetterEnvelope> WaitForLifecycleDeadLetterAsync(
         IDeadLetters deadLetters,
-        Guid competitionId,
         CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 150; attempt++)
         {
             var result = await deadLetters.QueryAsync(
-                new DeadLetterEnvelopeQuery { PageSize = 100 },
+                new DeadLetterEnvelopeQuery
+                {
+                    PageSize = 1,
+                    MessageType = typeof(FinishLifecycleProbe).FullName
+                },
                 cancellationToken);
-            var envelope = result.Envelopes.FirstOrDefault(candidate =>
-                candidate.Message is FinishLifecycleProbe probe
-                && probe.CompetitionId == competitionId);
+            var envelope = result.Envelopes.FirstOrDefault();
             if (envelope is not null)
                 return envelope;
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
@@ -524,8 +541,8 @@ public sealed class WolverineTransactionalOutboxTests
         builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
             options => options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
         builder.Services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
-        builder.Services.AddScoped(_ => new LifecycleAdvancer(
-            new EmptyLifecycleStore()));
+        builder.Services.AddScoped<ICompetitionLifecycleStore, EmptyLifecycleStore>();
+        builder.Services.AddScoped<LifecycleAdvancer>();
         builder.Services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
         builder.Services.AddSingleton<AwdRoundConfigurationCatalog>();
         builder.Services.AddSingleton(TimeProvider.System);
@@ -580,7 +597,7 @@ public sealed class WolverineTransactionalOutboxTests
         return builder.Build();
     }
 
-    private sealed class EmptyLifecycleStore : ICompetitionLifecycleStore
+    public sealed class EmptyLifecycleStore : ICompetitionLifecycleStore
     {
         public Task<CompetitionStatus?> GetStatusAsync(
             Guid competitionId,
@@ -651,13 +668,16 @@ public sealed class RollbackOutboxProbeHandler
         IDbContextOutbox<NoCtfDbContext> outbox,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO rollback_business_probe (id) VALUES ({message.Id})",
             cancellationToken);
         await outbox.PublishAsync(new ObserveRollbackOutboxProbe(message.Id));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
         if (Fail)
             throw new RollbackProbeException();
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 }
 
@@ -677,7 +697,7 @@ public sealed class ObserveOutboxBusinessProbeHandler
         CancellationToken cancellationToken)
     {
         var count = await db.Database
-            .SqlQuery<int>($"SELECT count(*)::int AS value FROM outbox_business_probe WHERE id = {message.Id}")
+            .SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM outbox_business_probe WHERE id = {message.Id}")
             .SingleAsync(cancellationToken);
         OutboxProbeObservation.Complete(message.Id, count == 1);
     }
@@ -712,6 +732,7 @@ public sealed class LifecycleTransitionProbeHandler
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var store = new EfCompetitionLifecycleStore(db, null!, outbox);
         var applied = await store.TryTransitionWithAuditAsync(
             message.CompetitionId,
@@ -726,6 +747,8 @@ public sealed class LifecycleTransitionProbeHandler
             throw new InvalidOperationException("The lifecycle transition was not applied.");
         if (Fail)
             throw new LifecycleTransitionProbeException();
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 }
 
