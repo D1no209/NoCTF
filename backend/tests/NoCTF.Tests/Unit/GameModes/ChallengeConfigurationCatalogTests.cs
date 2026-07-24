@@ -127,9 +127,16 @@ public class ChallengeConfigurationCatalogTests
             var expectedAllocation = mode == GameMode.Koh
                 ? RuntimeAllocation.Shared
                 : RuntimeAllocation.PerTeam;
+            var modeTemplate = template with
+            {
+                Allocation = expectedAllocation,
+                PortMappings = mode == GameMode.Awdp
+                    ? new Dictionary<int, int>()
+                    : template.PortMappings
+            };
             var json = WithRuntime(
                 configurations.GetDefaultJson(mode),
-                template with { Allocation = expectedAllocation });
+                modeTemplate);
             if (mode == GameMode.Awd)
                 json = WithAwdFlagInjection(json);
             var parsed = runtimes.Get(mode, json);
@@ -301,6 +308,32 @@ public class ChallengeConfigurationCatalogTests
         await Assert.That(sharedErrors).Contains("AWD runtimes must use PerTeam allocation.");
         await Assert.That(ovaErrors)
             .Contains("AWD runtimes only support Container or Compose.");
+    }
+
+    [Test]
+    public async Task Awdp_target_rejects_public_ports_and_urls()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/target:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            Limits: new(268_435_456, 500_000_000, 128),
+            UrlBindings:
+            [
+                new(
+                    "http://{HOST}:{PORT}",
+                    RuntimeExposure.OwnerOnly,
+                    ContainerPort: 8080)
+            ]);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Awdp,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Awdp), runtime));
+
+        await Assert.That(errors)
+            .Contains("AWDP disposable targets cannot configure public ports or URLs.");
     }
 
     [Test]
