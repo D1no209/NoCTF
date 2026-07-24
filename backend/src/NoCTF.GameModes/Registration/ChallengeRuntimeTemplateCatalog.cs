@@ -99,9 +99,35 @@ internal static class ChallengeRuntimeTemplateValidator
             if (binding.ContainerPort is < 1 or > 65535
                 || binding.GuestPort is < 1 or > 65535)
                 errors.Add("Runtime URL binding ports must be between 1 and 65535.");
-            if (runtime.RuntimeKind == RuntimeKind.Container
-                && binding.ContainerPort is null)
-                errors.Add("Container URL bindings require ContainerPort.");
+            switch (runtime.RuntimeKind)
+            {
+                case RuntimeKind.Container:
+                    if (binding.ContainerPort is null)
+                        errors.Add("Container URL bindings require ContainerPort.");
+                    if (binding.ServiceName is not null
+                        || binding.VmId is not null
+                        || binding.GuestPort is not null)
+                        errors.Add(
+                            "Container URL bindings cannot specify ServiceName, VmId, or GuestPort.");
+                    break;
+                case RuntimeKind.Compose:
+                    if (string.IsNullOrWhiteSpace(binding.ServiceName)
+                        || binding.ContainerPort is null)
+                        errors.Add("Compose URL bindings require ServiceName and ContainerPort.");
+                    if (binding.VmId is not null || binding.GuestPort is not null)
+                        errors.Add("Compose URL bindings cannot specify VmId or GuestPort.");
+                    break;
+                case RuntimeKind.OvaVm:
+                    if (string.IsNullOrWhiteSpace(binding.VmId))
+                        errors.Add("OVA URL bindings require VmId.");
+                    if (binding.ContainerPort is not null || binding.ServiceName is not null)
+                        errors.Add(
+                            "OVA URL bindings cannot specify ContainerPort or ServiceName.");
+                    if (binding.GuestPort is null
+                        && binding.UrlTemplate.Contains("{PORT}", StringComparison.Ordinal))
+                        errors.Add("OVA URL bindings cannot use PORT without GuestPort.");
+                    break;
+            }
         }
         if (runtime.RuntimeKind == RuntimeKind.Container)
         {
