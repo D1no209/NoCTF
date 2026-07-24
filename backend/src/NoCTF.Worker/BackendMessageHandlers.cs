@@ -903,12 +903,15 @@ public static class BackendMessageHandlers
         var labels = configured is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(configured, StringComparer.Ordinal);
-        labels["noctf.runtime-id"] = instance.Id.ToString("N");
-        labels["noctf.competition-id"] = instance.CompetitionId.ToString("N");
-        labels["noctf.competition-challenge-id"] = instance.CompetitionChallengeId.ToString("N");
-        labels["noctf.generation"] = instance.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        labels["noctf.io/managed"] = "true";
+        labels["noctf.io/runtime-instance-id"] = instance.Id.ToString("D");
+        labels["noctf.io/competition-id"] = instance.CompetitionId.ToString("D");
+        labels["noctf.io/competition-challenge-id"] =
+            instance.CompetitionChallengeId.ToString("D");
+        labels["noctf.io/generation"] = instance.Generation.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
         if (instance.TeamId is Guid teamId)
-            labels["noctf.team-id"] = teamId.ToString("N");
+            labels["noctf.io/team-id"] = teamId.ToString("D");
         return labels;
     }
 }
