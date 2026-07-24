@@ -228,7 +228,9 @@ public sealed class AwdRoundCoordinationTests
     {
         await using var db = new NoCtfDbContext(options);
         await db.Database.MigrateAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var observedAt = DateTimeOffset.UtcNow;
+        var now = observedAt.AddTicks(
+            -(observedAt.Ticks % TimeSpan.TicksPerMicrosecond) + 1);
         var ownerId = Guid.CreateVersion7();
         var competitionId = Guid.CreateVersion7();
         var challengeId = Guid.CreateVersion7();
@@ -281,6 +283,9 @@ public sealed class AwdRoundCoordinationTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
+            ConfigurationJson = JsonSerializer.Serialize(
+                new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = now
         });
         db.Teams.Add(new Team
