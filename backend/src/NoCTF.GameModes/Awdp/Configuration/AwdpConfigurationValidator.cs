@@ -167,8 +167,7 @@ public static class AwdpConfigurationValidator
                 or NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes))
             errors.Add("AWDP Checker requires the Docker or Kubernetes provider.");
         if (checker?.Environment?.Keys.Any(name =>
-                name.StartsWith("NOCTF_", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("TARGET_HOST", StringComparison.OrdinalIgnoreCase)
+                name.Equals("TARGET_HOST", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("TARGET_PORT", StringComparison.OrdinalIgnoreCase)
                 || name.Equals(
                     "TARGET_READY_TIMEOUT_SECONDS",
