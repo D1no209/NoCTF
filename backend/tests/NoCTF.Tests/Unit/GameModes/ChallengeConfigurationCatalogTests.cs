@@ -352,6 +352,33 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Control_check_url_binding_is_reserved_for_KoH()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            ControlCheckUrlBinding: new(
+                "http://{HOST}:{PORT}/control",
+                RuntimeExposure.OwnerOnly,
+                ContainerPort: 8080));
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        foreach (var mode in new[] { GameMode.Ctf, GameMode.Awd, GameMode.Awdp })
+        {
+            var json = WithRuntime(catalog.GetDefaultJson(mode), runtime);
+            if (mode == GameMode.Awd)
+                json = WithAwdFlagInjection(json);
+
+            var errors = catalog.Validate(mode, json);
+
+            await Assert.That(errors)
+                .Contains("ControlCheckUrlBinding is only supported for KoH runtimes.");
+        }
+    }
+
+    [Test]
     public async Task Koh_start_requires_shared_runtime_and_control_check_binding()
     {
         var competition = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Koh);

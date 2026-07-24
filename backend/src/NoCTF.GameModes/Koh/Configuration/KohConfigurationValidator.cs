@@ -19,7 +19,9 @@ public static class KohConfigurationValidator
             errors.Add("PollIntervalSeconds must be positive when configured.");
         if (configuration.ControlPointsPerInterval is < 0)
             errors.Add("ControlPointsPerInterval cannot be negative when configured.");
-        errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
+        errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(
+            configuration.Runtime,
+            allowControlCheckUrlBinding: true));
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.Shared })
             errors.Add("KoH Hill runtime allocation must be Shared.");
         return errors;

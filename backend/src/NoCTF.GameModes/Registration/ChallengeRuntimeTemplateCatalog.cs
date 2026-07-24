@@ -29,10 +29,14 @@ public sealed class ChallengeRuntimeTemplateCatalog : IChallengeRuntimeTemplateC
 
 internal static class ChallengeRuntimeTemplateValidator
 {
-    public static IReadOnlyList<string> Validate(ChallengeRuntimeTemplate? runtime)
+    public static IReadOnlyList<string> Validate(
+        ChallengeRuntimeTemplate? runtime,
+        bool allowControlCheckUrlBinding = false)
     {
         if (runtime is null) return [];
         var errors = new List<string>();
+        if (!allowControlCheckUrlBinding && runtime.ControlCheckUrlBinding is not null)
+            errors.Add("ControlCheckUrlBinding is only supported for KoH runtimes.");
         if (!Enum.IsDefined(runtime.Provider)) errors.Add("Runtime provider is invalid.");
         if (!Enum.IsDefined(runtime.Allocation)) errors.Add("Runtime allocation is invalid.");
         if (!Enum.IsDefined(runtime.RuntimeKind)) errors.Add("Runtime kind is invalid.");
