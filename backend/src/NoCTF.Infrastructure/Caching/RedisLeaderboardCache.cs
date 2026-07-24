@@ -44,6 +44,7 @@ public sealed class RedisLeaderboardCache(
         if (redis is null) return;
         var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == competitionId, ct);
         if (competition is null) return;
+        var projectedAt = DateTimeOffset.UtcNow;
         try
         {
         var teams = await db.Teams.AsNoTracking().Where(x => x.CompetitionId == competitionId)
@@ -81,6 +82,30 @@ public sealed class RedisLeaderboardCache(
         var lifecycleAudits = await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
             .Where(audit => audit.CompetitionId == competitionId)
             .ToListAsync(ct);
+        IReadOnlyList<LeaderboardAwdRoundFact> awdRounds = [];
+        if (competition.Mode == GameMode.Awd)
+        {
+            awdRounds = await db.ChallengeFlags.AsNoTracking()
+                .Where(flag => flag.TeamId != null
+                    && flag.CompetitionChallengeId != null
+                    && flag.SpecificationKind == SpecificationKind.AwdRound
+                    && flag.SpecificationId != null
+                    && flag.ValidStart != null
+                    && flag.ValidUntil != null
+                    && flag.DeletedAt == null)
+                .Join(
+                    db.CompetitionChallenges.AsNoTracking()
+                        .Where(challenge => challenge.CompetitionId == competitionId),
+                    flag => flag.CompetitionChallengeId,
+                    challenge => (Guid?)challenge.Id,
+                    (flag, _) => new LeaderboardAwdRoundFact(
+                        flag.CompetitionChallengeId!.Value,
+                        flag.TeamId!.Value,
+                        flag.SpecificationId!.Value,
+                        flag.ValidStart!.Value,
+                        flag.ValidUntil!.Value))
+                .ToListAsync(ct);
+        }
         var projection = projectionEngine.Project(
             new(
                 competitionId,
@@ -91,8 +116,10 @@ public sealed class RedisLeaderboardCache(
                 challenges,
                 competitionConfiguration,
                 competition.StartAt,
-                lifecycleAudits));
-        var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, projection.Entries)
+                lifecycleAudits,
+                awdRounds,
+                projectedAt));
+        var response = new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
         {
             Subjects = projection.Subjects,
             FirstBloods = projection.FirstBloods,

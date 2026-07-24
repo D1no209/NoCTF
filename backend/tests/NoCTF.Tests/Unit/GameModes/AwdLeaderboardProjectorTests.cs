@@ -50,6 +50,81 @@ public sealed class AwdLeaderboardProjectorTests
         await Assert.That(rows[victim].Score).IsEqualTo(-101);
     }
 
+    [Test]
+    public async Task Service_score_uses_only_complete_rounds_and_state_before_round_end()
+    {
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
+        var start = DateTimeOffset.Parse("2026-07-25T00:00:00Z");
+        var configuration = JsonSerializer.Serialize(new AwdConfiguration(
+            AwdConfiguration.CurrentSchemaVersion,
+            HardeningDurationSeconds: 0,
+            RoundDurationSeconds: 10,
+            AttackRewardMode.FixedPerAttack,
+            AttackPoints: 0,
+            VictimDefensePoolPoints: 0,
+            CheckerIntervalSeconds: 5,
+            ServiceHealthyPoints: 10,
+            ServiceUnhealthyPenalty: 5));
+        var events = new[]
+        {
+            ServiceState(teamId, challengeId, competitionId, ScoringResult.Wrong, start.AddSeconds(15)),
+            ServiceState(teamId, challengeId, competitionId, ScoringResult.Correct, start.AddSeconds(20))
+        };
+        var rounds = new[]
+        {
+            Round(teamId, challengeId, start, start.AddSeconds(10)),
+            Round(teamId, challengeId, start.AddSeconds(10), start.AddSeconds(20)),
+            Round(teamId, challengeId, start.AddSeconds(20), start.AddSeconds(30))
+        };
+        var input = new LeaderboardProjectionInput(
+            competitionId,
+            GameMode.Awd,
+            [new(teamId, "team", false, false, start)],
+            [],
+            events,
+            [new(challengeId, "Pwn", false)],
+            configuration,
+            start,
+            AwdRounds: rounds,
+            ProjectedAt: start.AddSeconds(25));
+
+        var row = new AwdLeaderboardProjector().Project(input).Single();
+
+        await Assert.That(row.Score).IsEqualTo(5);
+    }
+
+    private static LeaderboardSystemFact ServiceState(
+        Guid teamId,
+        Guid challengeId,
+        Guid competitionId,
+        ScoringResult result,
+        DateTimeOffset at) =>
+        new(new ScoringEvent
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competitionId,
+            CompetitionChallengeId = challengeId,
+            TeamId = teamId,
+            Kind = ScoringEventKind.AwdServiceStatus,
+            Result = result,
+            OccurredAt = at,
+            CreatedAt = at
+        });
+
+    private static LeaderboardAwdRoundFact Round(
+        Guid teamId,
+        Guid challengeId,
+        DateTimeOffset startsAt,
+        DateTimeOffset endsAt) =>
+        new(
+            challengeId,
+            teamId,
+            AwdRoundSpecificationId.FromRound((int)(startsAt.ToUnixTimeSeconds() % 10_000)).Value,
+            startsAt,
+            endsAt);
+
     private static LeaderboardSubmissionFact Attack(
         Guid attacker,
         Guid victim,

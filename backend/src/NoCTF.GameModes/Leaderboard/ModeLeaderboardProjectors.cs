@@ -245,8 +245,44 @@ internal static class AwdLeaderboardProjection
             values[pool.Key.VictimId] = checked(
                 values[pool.Key.VictimId] - settings.VictimDefensePoolPoints);
         }
-        // AwdServiceStatus is a state-change fact, not a score delta. Service points are
-        // projected only after complete round windows are supplied to the projection input.
+        var serviceStates = input.SystemEvents
+            .Where(fact => fact.Event is
+            {
+                DeletedAt: null,
+                Kind: ScoringEventKind.AwdServiceStatus,
+                TeamId: not null,
+                CompetitionChallengeId: not null,
+                Result: ScoringResult.Correct or ScoringResult.Wrong
+            })
+            .OrderBy(fact => fact.Event.OccurredAt)
+            .ThenBy(fact => fact.Event.Id)
+            .ToList();
+        var projectedAt = input.ProjectedAt ?? DateTimeOffset.UtcNow;
+        foreach (var round in (input.AwdRounds ?? [])
+                     .Where(round => teams.ContainsKey(round.TeamId)
+                         && challenges.ContainsKey(round.CompetitionChallengeId)
+                         && round.StartsAt < round.EndsAt
+                         && round.EndsAt <= projectedAt)
+                     .GroupBy(round => new
+                     {
+                         round.TeamId,
+                         round.CompetitionChallengeId,
+                         round.RoundId
+                     })
+                     .Select(group => group.First()))
+        {
+            var latestState = serviceStates
+                .Where(fact => fact.Event.TeamId == round.TeamId
+                    && fact.Event.CompetitionChallengeId == round.CompetitionChallengeId
+                    && fact.Event.OccurredAt < round.EndsAt)
+                .LastOrDefault();
+            var settings = Effective(
+                configuration,
+                challenges[round.CompetitionChallengeId].ConfigurationJson);
+            values[round.TeamId] = latestState?.Event.Result == ScoringResult.Wrong
+                ? checked(values[round.TeamId] - settings.ServiceUnhealthyPenalty)
+                : checked(values[round.TeamId] + settings.ServiceHealthyPoints);
+        }
         foreach (var hint in ProjectionPenalties.HintCosts(input, teams.Keys))
             values[hint.Key] = checked(values[hint.Key] - hint.Value);
         var rows = teams.Values.Select(team => new LeaderboardEntry(
