@@ -37,7 +37,8 @@ public static class KohConfigurationValidator
             if (configuration.Runtime.ControlCheckUrlBinding is null)
                 errors.Add("ControlCheckUrlBinding is required before a KoH competition can start.");
             if (!(configuration.Runtime.UrlBindings ?? [])
-                .Any(binding => binding.Exposure == RuntimeExposure.Participants))
+                .Any(binding => binding is not null
+                    && binding.Exposure == RuntimeExposure.Participants))
                 errors.Add("KoH runtime requires at least one Participants URL binding.");
         }
         return errors;

@@ -92,6 +92,8 @@ internal static class ChallengeRuntimeTemplateValidator
                 || !security.CapDrop.Contains("ALL", StringComparer.OrdinalIgnoreCase))
                 errors.Add("Runtime security must drop all capabilities.");
         }
+        if (runtime.UrlBindings?.Any(binding => binding is null) == true)
+            errors.Add("Runtime URL bindings cannot contain null entries.");
         var urlBindings = (runtime.UrlBindings ?? [])
             .Append(runtime.ControlCheckUrlBinding)
             .Where(binding => binding is not null)
