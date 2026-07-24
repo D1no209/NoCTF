@@ -88,10 +88,12 @@ internal static class ChallengeRuntimeTemplateValidator
             if (!security.RunAsNonRoot) errors.Add("Runtime security must require a non-root user.");
             if (!security.NoNewPrivileges) errors.Add("Runtime security must disable privilege escalation.");
         }
-        foreach (var binding in (runtime.UrlBindings ?? [])
-                     .Append(runtime.ControlCheckUrlBinding)
-                     .Where(binding => binding is not null)
-                     .Select(binding => binding!))
+        var urlBindings = (runtime.UrlBindings ?? [])
+            .Append(runtime.ControlCheckUrlBinding)
+            .Where(binding => binding is not null)
+            .Select(binding => binding!)
+            .ToArray();
+        foreach (var binding in urlBindings)
         {
             if (!Enum.IsDefined(binding.Exposure) || string.IsNullOrWhiteSpace(binding.UrlTemplate))
                 errors.Add("Runtime URL bindings require a valid exposure and template.");
@@ -140,14 +142,14 @@ internal static class ChallengeRuntimeTemplateValidator
         }
         if (runtime.RuntimeKind == RuntimeKind.Container)
         {
-            foreach (var binding in runtime.UrlBindings ?? [])
+            foreach (var binding in urlBindings)
             {
                 if (binding.ContainerPort is not int containerPort)
                     continue;
                 if (!(runtime.PortMappings ?? new Dictionary<int, int>())
                     .TryGetValue(containerPort, out var hostPort)
                     || hostPort != 0)
-                    errors.Add("Container public URL bindings require a dynamic port mapping.");
+                    errors.Add("Container URL bindings require a dynamic port mapping.");
             }
         }
         return errors;

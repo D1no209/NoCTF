@@ -379,6 +379,35 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Koh_container_control_check_requires_dynamic_port_mapping()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.Shared,
+            "registry.example/hill:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            UrlBindings:
+            [
+                new(
+                    "http://{HOST}:{PORT}",
+                    RuntimeExposure.Participants,
+                    ContainerPort: 8080)
+            ],
+            ControlCheckUrlBinding: new(
+                "http://{HOST}:{PORT}/control",
+                RuntimeExposure.OwnerOnly,
+                ContainerPort: 8081));
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Koh,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Koh), runtime));
+
+        await Assert.That(errors)
+            .Contains("Container URL bindings require a dynamic port mapping.");
+    }
+
+    [Test]
     public async Task Koh_start_requires_shared_runtime_and_control_check_binding()
     {
         var competition = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Koh);
