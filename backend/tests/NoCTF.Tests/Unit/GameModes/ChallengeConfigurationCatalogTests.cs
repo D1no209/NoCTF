@@ -302,6 +302,31 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Runtime_url_binding_must_expand_to_absolute_uri()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            UrlBindings:
+            [
+                new(
+                    "relative/{HOST}/{PORT}",
+                    RuntimeExposure.OwnerOnly,
+                    ContainerPort: 8080)
+            ]);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("Runtime URL bindings must expand to an absolute URI.");
+    }
+
+    [Test]
     public async Task Koh_start_requires_shared_runtime_and_control_check_binding()
     {
         var competition = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Koh);

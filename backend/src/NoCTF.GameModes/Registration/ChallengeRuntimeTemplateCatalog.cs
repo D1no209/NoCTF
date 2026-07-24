@@ -96,6 +96,11 @@ internal static class ChallengeRuntimeTemplateValidator
                 .Replace("{PORT}", string.Empty, StringComparison.Ordinal);
             if (remainingTemplate.Contains('{') || remainingTemplate.Contains('}'))
                 errors.Add("Runtime URL bindings only allow HOST and PORT placeholders.");
+            var expandedTemplate = binding.UrlTemplate
+                .Replace("{HOST}", "runtime.invalid", StringComparison.Ordinal)
+                .Replace("{PORT}", "1", StringComparison.Ordinal);
+            if (!Uri.TryCreate(expandedTemplate, UriKind.Absolute, out _))
+                errors.Add("Runtime URL bindings must expand to an absolute URI.");
             if (binding.ContainerPort is < 1 or > 65535
                 || binding.GuestPort is < 1 or > 65535)
                 errors.Add("Runtime URL binding ports must be between 1 and 65535.");
