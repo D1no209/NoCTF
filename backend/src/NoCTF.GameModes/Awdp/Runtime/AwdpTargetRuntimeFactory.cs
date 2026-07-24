@@ -13,7 +13,8 @@ public static class AwdpTargetRuntimeFactory
         ChallengeRuntimeTemplate template,
         int generation,
         long submissionProcessingVersion,
-        int configurationRevision,
+        int competitionConfigurationRevision,
+        int challengeConfigurationRevision,
         DateTimeOffset now)
     {
         if (template.RuntimeKind != RuntimeKind.Container
@@ -37,7 +38,8 @@ public static class AwdpTargetRuntimeFactory
             RuntimeProvider = template.Provider,
             RunnerPool = template.RunnerPool,
             State = RuntimeState.Queued,
-            ConfigurationRevision = configurationRevision,
+            ConfigurationRevision = challengeConfigurationRevision,
+            CompetitionConfigurationRevision = competitionConfigurationRevision,
             CreatedAt = now
         };
     }

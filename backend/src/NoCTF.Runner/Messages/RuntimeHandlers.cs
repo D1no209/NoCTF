@@ -149,14 +149,23 @@ public static class RuntimeWriteBackHandler
         {
             var submission = await db.Submissions
                 .SingleOrDefaultAsync(item => item.Id == submissionId, cancellationToken);
-            var currentChallengeRevision = await db.CompetitionChallenges.AsNoTracking()
+            var currentRevisions = await db.CompetitionChallenges.AsNoTracking()
                 .Where(challenge => challenge.Id == instance.CompetitionChallengeId)
-                .Select(challenge => (int?)challenge.Revision)
+                .Join(
+                    db.Competitions.AsNoTracking(),
+                    challenge => challenge.CompetitionId,
+                    competition => competition.Id,
+                    (challenge, competition) => new
+                    {
+                        Challenge = (int?)challenge.Revision,
+                        Competition = (int?)competition.ConfigurationRevision
+                    })
                 .SingleOrDefaultAsync(cancellationToken);
             if (submission is null
                 || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
                 || submission.ProcessingVersion != instance.SubmissionProcessingVersion
-                || currentChallengeRevision != instance.ConfigurationRevision)
+                || currentRevisions?.Challenge != instance.ConfigurationRevision
+                || currentRevisions?.Competition != instance.CompetitionConfigurationRevision)
             {
                 if (submission is not null
                     && submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing

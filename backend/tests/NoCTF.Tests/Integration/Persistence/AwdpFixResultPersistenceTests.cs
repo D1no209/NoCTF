@@ -20,6 +20,57 @@ public sealed class AwdpFixResultPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Competition_revision_change_supersedes_inflight_fix(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_awdp_revision")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var mutation = new NoCtfDbContext(options))
+                await mutation.Competitions
+                    .Where(competition => competition.Id == fixture.CompetitionId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(
+                        competition => competition.ConfigurationRevision,
+                        competition => competition.ConfigurationRevision + 1),
+                        cancellationToken);
+
+            var result = AwdpFixResult.Create(
+                fixture.SubmissionId,
+                fixture.RuntimeId,
+                generation: 1,
+                processingVersion: 7,
+                runtimeProcessingVersion: 3,
+                AwdpFixOutcome.Fixed,
+                fixture.Now);
+            var outbox = new RecordingOutbox();
+            InternalResultDisposition disposition;
+            await using (var db = new NoCtfDbContext(options))
+                disposition = await new EfInternalResultStore(db, outbox)
+                    .RecordAwdpAsync(result, cancellationToken);
+
+            await Assert.That(disposition).IsEqualTo(InternalResultDisposition.Superseded);
+            await using var verify = new NoCtfDbContext(options);
+            var submission = await verify.Submissions.SingleAsync(cancellationToken);
+            var runtime = await verify.RuntimeInstances.SingleAsync(cancellationToken);
+            await Assert.That(submission.EvaluationState)
+                .IsEqualTo(SubmissionEvaluationState.PlatformFailed);
+            await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(await verify.ScoringEvents.AnyAsync(cancellationToken)).IsFalse();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Typed_result_is_idempotent_and_schedules_target_cleanup(
         CancellationToken cancellationToken)
     {
@@ -125,6 +176,23 @@ public sealed class AwdpFixResultPersistenceTests
             .SingleAsync(item => item.Id == fixture.SubmissionId, cancellationToken);
         var submissionId = Guid.NewGuid();
         var runtimeId = Guid.NewGuid();
+        var patchUploadId = Guid.NewGuid();
+        db.PatchUploads.Add(new PatchUpload
+        {
+            Id = patchUploadId,
+            CompetitionId = original.CompetitionId,
+            CompetitionChallengeId = original.CompetitionChallengeId,
+            TeamId = original.TeamId,
+            UploadedByUserId = original.SubmittedByUserId,
+            ObjectKey = $"patches/{patchUploadId:N}",
+            OriginalFileName = "fix.tar.gz",
+            ContentType = "application/gzip",
+            ByteLength = 1,
+            Sha256 = new byte[32],
+            UploadedAt = fixture.Now,
+            ConsumedAt = fixture.Now,
+            SubmissionId = submissionId
+        });
         db.Submissions.Add(new Submission
         {
             Id = submissionId,
@@ -134,6 +202,7 @@ public sealed class AwdpFixResultPersistenceTests
             SubmittedByUserId = original.SubmittedByUserId,
             Kind = SubmissionKind.Fix,
             ReceivedAt = fixture.Now,
+            PatchUploadId = patchUploadId,
             EvaluationState = SubmissionEvaluationState.Processing,
             EvaluationUpdatedAt = fixture.Now,
             ProcessingVersion = 8
@@ -154,6 +223,7 @@ public sealed class AwdpFixResultPersistenceTests
             State = RuntimeState.Running,
             ProcessingVersion = 5,
             ConfigurationRevision = 2,
+            CompetitionConfigurationRevision = 0,
             ProviderReceiptJson = "{}",
             CreatedAt = fixture.Now,
             RunningAt = fixture.Now
@@ -177,6 +247,7 @@ public sealed class AwdpFixResultPersistenceTests
         var competitionChallengeId = Guid.NewGuid();
         var submissionId = Guid.NewGuid();
         var runtimeId = Guid.NewGuid();
+        var patchUploadId = Guid.NewGuid();
         db.Users.AddRange(
             NewUser(ownerId, "owner", now),
             NewUser(memberId, "member", now));
@@ -226,6 +297,22 @@ public sealed class AwdpFixResultPersistenceTests
             ConfigurationJson = "{}",
             UpdatedAt = now
         });
+        db.PatchUploads.Add(new PatchUpload
+        {
+            Id = patchUploadId,
+            CompetitionId = competitionId,
+            CompetitionChallengeId = competitionChallengeId,
+            TeamId = teamId,
+            UploadedByUserId = memberId,
+            ObjectKey = $"patches/{patchUploadId:N}",
+            OriginalFileName = "fix.tar.gz",
+            ContentType = "application/gzip",
+            ByteLength = 1,
+            Sha256 = new byte[32],
+            UploadedAt = now,
+            ConsumedAt = now,
+            SubmissionId = submissionId
+        });
         db.Submissions.Add(new Submission
         {
             Id = submissionId,
@@ -235,6 +322,7 @@ public sealed class AwdpFixResultPersistenceTests
             SubmittedByUserId = memberId,
             Kind = SubmissionKind.Fix,
             ReceivedAt = now,
+            PatchUploadId = patchUploadId,
             EvaluationState = SubmissionEvaluationState.Processing,
             EvaluationUpdatedAt = now,
             ProcessingVersion = 7
@@ -255,12 +343,13 @@ public sealed class AwdpFixResultPersistenceTests
             State = RuntimeState.Running,
             ProcessingVersion = 3,
             ConfigurationRevision = 2,
+            CompetitionConfigurationRevision = 0,
             ProviderReceiptJson = "{}",
             CreatedAt = now,
             RunningAt = now
         });
         await db.SaveChangesAsync(cancellationToken);
-        return new(now, submissionId, runtimeId);
+        return new(now, competitionId, submissionId, runtimeId);
     }
 
     private static User NewUser(Guid id, string name, DateTimeOffset now) => new()
@@ -277,6 +366,7 @@ public sealed class AwdpFixResultPersistenceTests
 
     private sealed record Fixture(
         DateTimeOffset Now,
+        Guid CompetitionId,
         Guid SubmissionId,
         Guid RuntimeId);
 

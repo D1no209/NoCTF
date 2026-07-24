@@ -212,11 +212,11 @@ internal static class AwdLeaderboardProjection
             .Select(group => group.First())
             .ToList();
         foreach (var pool in attacks.GroupBy(fact => new
-                 {
-                     ChallengeId = fact.CompetitionChallengeId!.Value,
-                     RoundId = fact.Event.SpecificationId!.Value,
-                     VictimId = fact.VictimTeamId!.Value
-                 }))
+        {
+            ChallengeId = fact.CompetitionChallengeId!.Value,
+            RoundId = fact.Event.SpecificationId!.Value,
+            VictimId = fact.VictimTeamId!.Value
+        }))
         {
             var settings = Effective(configuration, challenges.GetValueOrDefault(pool.Key.ChallengeId)?.ConfigurationJson);
             var attackers = pool.Select(fact => fact.TeamId).Distinct().ToList();
@@ -324,14 +324,16 @@ internal static class AwdpLeaderboardProjection
         foreach (var fact in facts)
         {
             var challengeId = fact.CompetitionChallengeId!.Value;
-            var challenge = ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
+            var configuration = Effective(
+                competition,
+                challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
             if (fact.Kind == SubmissionKind.Fix
-                && (challenge.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix)
+                && configuration.RequireBreakBeforeFix
                 && !correctBreaks.Contains((fact.TeamId, challengeId)))
                 continue;
             var achievement = fact.Kind == SubmissionKind.Break
-                ? challenge.Break ?? competition.Break
-                : challenge.Fix ?? competition.Fix;
+                ? configuration.Break
+                : configuration.Fix;
             var round = achievement.Settlement == AchievementSettlement.Milestone
                 ? 0
                 : Round(fact.ReceivedAt, input.CompetitionStartTime, competition.RoundDurationSeconds);
@@ -348,15 +350,13 @@ internal static class AwdpLeaderboardProjection
             .ToDictionary(
                 group => group.Key,
                 group => group.Aggregate(0L, (total, fact) => checked(total +
-                    fact.Event switch
-                    {
-                        { Result: ScoringResult.Rejected, FailureCode: ScoringFailureCode.AwdpViolation
-                            or ScoringFailureCode.AwdpPatchFailed or ScoringFailureCode.AwdpPatchTimeout }
-                            => competition.ViolationPenalty,
-                        { Result: ScoringResult.Wrong, FailureCode: ScoringFailureCode.AwdpServiceDown }
-                            => competition.ServiceDownPenalty,
-                        _ => 0L
-                    })));
+                    PenaltyFor(
+                        fact,
+                        Effective(
+                            competition,
+                            fact.CompetitionChallengeId is { } challengeId
+                                ? challenges.GetValueOrDefault(challengeId)?.ConfigurationJson
+                                : null)))));
         var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
         var rows = teams.Values.Select(team =>
         {
@@ -385,11 +385,31 @@ internal static class AwdpLeaderboardProjection
     private static AwdpConfiguration ParseCompetition(string? json) =>
         TryParse<AwdpConfiguration>(json)
         ?? new(AwdpConfiguration.CurrentSchemaVersion, 300, new(AchievementSettlement.PerRound, 50),
-            new(AchievementSettlement.PerRound, 50), 0, 0);
+            new(AchievementSettlement.PerRound, 50), 100, 50);
 
     private static AwdpChallengeConfiguration ParseChallenge(string? json) =>
         TryParse<AwdpChallengeConfiguration>(json)
-        ?? new(AwdpChallengeConfiguration.CurrentSchemaVersion, null, null, null, 10, 10);
+        ?? new(AwdpChallengeConfiguration.CurrentSchemaVersion, null, null, null, null, null);
+
+    private static AwdpEffectiveConfiguration Effective(
+        AwdpConfiguration competition,
+        string? challengeJson) =>
+        AwdpConfigurationResolver.Resolve(competition, ParseChallenge(challengeJson));
+
+    private static long PenaltyFor(
+        LeaderboardSubmissionFact fact,
+        AwdpEffectiveConfiguration configuration) =>
+        fact.Event switch
+        {
+            {
+                Result: ScoringResult.Rejected, FailureCode: ScoringFailureCode.AwdpViolation
+                or ScoringFailureCode.AwdpPatchFailed or ScoringFailureCode.AwdpPatchTimeout
+            }
+                => configuration.ViolationPenalty,
+            { Result: ScoringResult.Wrong, FailureCode: ScoringFailureCode.AwdpServiceDown }
+                => configuration.ServiceDownPenalty,
+            _ => 0L
+        };
 
     private static T? TryParse<T>(string? json) where T : class
     {

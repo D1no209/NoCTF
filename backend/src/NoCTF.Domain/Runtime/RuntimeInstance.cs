@@ -58,6 +58,7 @@ public sealed class RuntimeInstance
     public DateTimeOffset? RunnerUnavailableAt { get; set; }
     public long ProcessingVersion { get; set; }
     public int ConfigurationRevision { get; set; }
+    public int? CompetitionConfigurationRevision { get; set; }
     public Guid? ReplacesRuntimeInstanceId { get; set; }
     public string? ProviderReceiptJson { get; set; }
     public string[] Urls { get; set; } = [];

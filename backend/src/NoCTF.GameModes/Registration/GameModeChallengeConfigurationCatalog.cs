@@ -23,11 +23,11 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         GameMode.Awdp => JsonSerializer.Serialize(
             new AwdpChallengeConfiguration(
                 AwdpChallengeConfiguration.CurrentSchemaVersion,
-                new(AchievementSettlement.PerRound, 50),
                 null,
                 null,
-                10,
-                10),
+                null,
+                null,
+                null),
             JsonOptions),
         GameMode.Koh => JsonSerializer.Serialize(
             new KohChallengeConfiguration(KohChallengeConfiguration.CurrentSchemaVersion, "http://localhost"),
@@ -53,7 +53,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     CtfConfigurationUpgrader.ParseCompetition(competitionConfigurationJson),
                     eligibleTeamCount),
                 GameMode.Awd => AwdConfigurationValidator.Validate(AwdConfigurationUpgrader.ParseChallenge(json)),
-                GameMode.Awdp => AwdpConfigurationValidator.Validate(AwdpConfigurationParser.ParseChallenge(json)),
+                GameMode.Awdp => ValidateAwdp(json, competitionConfigurationJson),
                 GameMode.Koh => KohConfigurationValidator.Validate(KohConfigurationUpgrader.ParseChallenge(json)),
                 _ => ["Unsupported game mode."]
             };
@@ -62,5 +62,23 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         {
             return [exception.Message];
         }
+    }
+
+    private static IReadOnlyList<string> ValidateAwdp(
+        string json,
+        string competitionConfigurationJson)
+    {
+        var competition = AwdpConfigurationParser.ParseCompetition(
+            competitionConfigurationJson);
+        var challenge = AwdpConfigurationParser.ParseChallenge(json);
+        var competitionErrors = AwdpConfigurationValidator.Validate(competition);
+        if (competitionErrors.Count > 0)
+            return competitionErrors;
+        return
+        [
+            .. AwdpConfigurationValidator.Validate(challenge),
+            .. AwdpConfigurationValidator.Validate(
+                AwdpConfigurationResolver.Resolve(competition, challenge))
+        ];
     }
 }

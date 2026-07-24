@@ -35,15 +35,14 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
         string competitionJson,
         string challengeJson)
     {
-        var competition = Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(
-            competitionJson);
-        var challenge = Awdp.Configuration.AwdpConfigurationParser.ParseChallenge(
+        var configuration = Awdp.Configuration.AwdpConfigurationResolver.Resolve(
+            competitionJson,
             challengeJson);
         return new(
-            challenge.Break is not null,
-            challenge.Fix is not null,
-            challenge.Break is null ? null : challenge.MaxBreakAttempts,
-            challenge.Fix is null ? null : challenge.MaxFixAttempts,
-            challenge.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix);
+            true,
+            true,
+            configuration.MaxBreakSubmissions,
+            configuration.MaxFixSubmissions,
+            configuration.RequireBreakBeforeFix);
     }
 }

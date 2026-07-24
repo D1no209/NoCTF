@@ -136,7 +136,9 @@ public sealed class EfInternalResultStore(
             .SingleAsync(ct);
         if (context.Competition.Mode != GameMode.Awdp || submission.Kind != SubmissionKind.Fix)
             return InternalResultDisposition.NotFound;
-        if (runtime.ConfigurationRevision != context.Challenge.Revision)
+        if (runtime.ConfigurationRevision != context.Challenge.Revision
+            || runtime.CompetitionConfigurationRevision
+                != context.Competition.ConfigurationRevision)
         {
             submission.EvaluationState = SubmissionEvaluationState.PlatformFailed;
             submission.EvaluationFailureCode = ScoringFailureCode.CheckerPlatformError;

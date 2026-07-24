@@ -191,7 +191,7 @@ public sealed class AwdpFixAdmissionPersistenceTests
             ChallengeId = challengeId,
             IsPublished = true,
             ConfigurationJson =
-                """{"schemaVersion":1,"break":{"settlement":0,"points":10},"fix":{"settlement":0,"points":20},"requireBreakBeforeFix":true,"maxBreakAttempts":10,"maxFixAttempts":10}""",
+                """{"schemaVersion":1,"break":{"settlement":0,"points":10},"fix":{"settlement":0,"points":20},"requireBreakBeforeFix":true,"maxBreakSubmissions":10,"maxFixSubmissions":10}""",
             UpdatedAt = now
         });
         db.PatchUploads.Add(new PatchUpload
