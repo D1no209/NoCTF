@@ -197,6 +197,31 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Ctf_runtime_rejects_participant_url_exposure()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            UrlBindings:
+            [
+                new(
+                    "http://{HOST}:{PORT}",
+                    RuntimeExposure.Participants,
+                    ContainerPort: 8080)
+            ]);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("CTF runtime URL bindings must use OwnerOnly exposure.");
+    }
+
+    [Test]
     public async Task Awd_runtime_rejects_shared_allocation_and_ova()
     {
         var catalog = new GameModeChallengeConfigurationCatalog();

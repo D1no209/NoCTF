@@ -57,6 +57,11 @@ public static class CtfConfigurationValidator
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
             errors.Add("CTF runtimes must use PerTeam allocation.");
+        if ((configuration.Runtime?.UrlBindings ?? [])
+            .Any(binding => binding.Exposure != RuntimeExposure.OwnerOnly))
+        {
+            errors.Add("CTF runtime URL bindings must use OwnerOnly exposure.");
+        }
         var effectivePoints = configuration.Points ?? competitionConfiguration?.DefaultPoints;
         var effectiveExpression = configuration.ScoreExpression ?? competitionConfiguration?.ScoreExpression;
         if (effectivePoints is not null)
