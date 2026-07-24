@@ -8,6 +8,7 @@ using StackExchange.Redis;
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Infrastructure.Caching;
 
@@ -77,8 +78,20 @@ public sealed class RedisLeaderboardCache(
                         .SingleOrDefault()
                     : 0))
             .ToListAsync(ct);
+        var lifecycleAudits = await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
+            .Where(audit => audit.CompetitionId == competitionId)
+            .ToListAsync(ct);
         var projection = projectionEngine.Project(
-            new(competitionId, competition.Mode, teams, submissions, system, challenges, competitionConfiguration, competition.StartAt));
+            new(
+                competitionId,
+                competition.Mode,
+                teams,
+                submissions,
+                system,
+                challenges,
+                competitionConfiguration,
+                competition.StartAt,
+                lifecycleAudits));
         var response = new LeaderboardResponse(competitionId, DateTimeOffset.UtcNow, projection.Entries)
         {
             Subjects = projection.Subjects,

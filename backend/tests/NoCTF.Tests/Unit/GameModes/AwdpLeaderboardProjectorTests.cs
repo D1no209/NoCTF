@@ -238,6 +238,43 @@ public sealed class AwdpLeaderboardProjectorTests
         await Assert.That(rows[2].TeamId).IsEqualTo(later);
     }
 
+    [Test]
+    public async Task Paused_time_does_not_split_per_round_achievements()
+    {
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var start = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var competition = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            300,
+            new(AchievementSettlement.PerRound, 50),
+            new(AchievementSettlement.PerRound, 0),
+            RequireBreakBeforeFix: false), options);
+        var input = new LeaderboardProjectionInput(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            [new(teamId, "red", false, false)],
+            [
+                Submission(teamId, challengeId, SubmissionKind.Break, start.AddMinutes(14.5)),
+                Submission(teamId, challengeId, SubmissionKind.Break, start.AddMinutes(15.5))
+            ],
+            [],
+            [new(challengeId, "Web", false)],
+            competition,
+            start,
+            [
+                Lifecycle(CompetitionStatus.Published, CompetitionStatus.Running, start),
+                Lifecycle(CompetitionStatus.Running, CompetitionStatus.Paused, start.AddMinutes(2)),
+                Lifecycle(CompetitionStatus.Paused, CompetitionStatus.Running, start.AddMinutes(10))
+            ]);
+
+        var row = new AwdpLeaderboardProjector().Project(input).Single();
+
+        await Assert.That(row.Score).IsEqualTo(50);
+        await Assert.That(row.SolveCount).IsEqualTo(1);
+    }
+
     private static LeaderboardEntry Project(
         Guid teamId,
         Guid challengeId,
@@ -296,4 +333,16 @@ public sealed class AwdpLeaderboardProjectorTests
                 OccurredAt = at,
                 CreatedAt = at
             });
+
+    private static CompetitionLifecycleAudit Lifecycle(
+        CompetitionStatus from,
+        CompetitionStatus to,
+        DateTimeOffset at) => new()
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = Guid.NewGuid(),
+            From = from,
+            To = to,
+            OccurredAt = at
+        };
 }

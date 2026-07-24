@@ -4,6 +4,7 @@ using NoCTF.Domain.Submissions;
 using System.Text.Json;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Ctf.Scoring;
@@ -336,7 +337,11 @@ internal static class AwdpLeaderboardProjection
                 : configuration.Fix;
             var round = achievement.Settlement == AchievementSettlement.Milestone
                 ? 0
-                : Round(fact.ReceivedAt, input.CompetitionStartTime, competition.RoundDurationSeconds);
+                : Round(
+                    fact.ReceivedAt,
+                    input.LifecycleAudits,
+                    input.CompetitionStartTime,
+                    competition.RoundDurationSeconds);
             if (!milestones.Add((fact.TeamId, challengeId, fact.Kind, round)))
                 continue;
             if (!awarded.TryGetValue(fact.TeamId, out var teamFacts))
@@ -398,10 +403,19 @@ internal static class AwdpLeaderboardProjection
             .ToList();
     }
 
-    private static int Round(DateTimeOffset occurredAt, DateTimeOffset? start, int durationSeconds)
+    private static int Round(
+        DateTimeOffset occurredAt,
+        IReadOnlyList<CompetitionLifecycleAudit>? lifecycleAudits,
+        DateTimeOffset? start,
+        int durationSeconds)
     {
-        if (start is null || durationSeconds <= 0) return 1;
-        var seconds = Math.Max(0, (occurredAt - start.Value).TotalSeconds);
+        if (durationSeconds <= 0) return 1;
+        var elapsed = lifecycleAudits is not null
+            ? AwdEffectiveRunningClock.Calculate(lifecycleAudits, occurredAt)
+            : start is { } startedAt
+                ? occurredAt - startedAt
+                : TimeSpan.Zero;
+        var seconds = Math.Max(0, elapsed.TotalSeconds);
         return checked((int)(seconds / durationSeconds) + 1);
     }
 
