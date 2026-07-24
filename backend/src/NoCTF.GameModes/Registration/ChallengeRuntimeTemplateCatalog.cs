@@ -54,9 +54,9 @@ internal static class ChallengeRuntimeTemplateValidator
         else if (runtime.Image.Length > 512) errors.Add("Runtime image cannot exceed 512 characters.");
         if (runtime.RuntimeKind == RuntimeKind.Compose && runtime.Provider == RuntimeProvider.Libvirt)
             errors.Add("Compose runtimes are not supported by Libvirt.");
-        if (runtime.RuntimeKind == RuntimeKind.Container && runtime.Provider == RuntimeProvider.Libvirt
-            && runtime.FlagSource == RuntimeFlagSource.AwdRotation)
-            errors.Add("Libvirt runtimes cannot use AWD flag rotation.");
+        if (runtime.RuntimeKind == RuntimeKind.Container
+            && runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
+            errors.Add("Container runtimes require the Docker or Kubernetes provider.");
         if (runtime.TtlSeconds is <= 0 or > 604800)
             errors.Add("Runtime TtlSeconds must be between 1 and 604800 when configured.");
         if (runtime.OperationTimeoutSeconds is <= 0 or > 300)

@@ -1,5 +1,6 @@
 using NoCTF.GameModes.Ctf.Scoring;
 using DynamicExpresso.Exceptions;
+using NoCTF.Application.Runtime.Ports;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
 
@@ -54,6 +55,8 @@ public static class CtfConfigurationValidator
         }
         ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
+        if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
+            errors.Add("CTF runtimes must use PerTeam allocation.");
         var effectivePoints = configuration.Points ?? competitionConfiguration?.DefaultPoints;
         var effectiveExpression = configuration.ScoreExpression ?? competitionConfiguration?.ScoreExpression;
         if (effectivePoints is not null)
