@@ -1,5 +1,7 @@
 namespace NoCTF.GameModes.Awd.Configuration;
 
+using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Flags;
 
 public static class AwdConfigurationValidator
@@ -31,6 +33,10 @@ public static class AwdConfigurationValidator
             && !PerTeamFlagGenerator.IsValidTemplate(flagTemplate))
             errors.Add("FlagTemplate is invalid.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
+        if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
+            errors.Add("AWD runtimes must use PerTeam allocation.");
+        if (configuration.Runtime is { RuntimeKind: not (RuntimeKind.Container or RuntimeKind.Compose) })
+            errors.Add("AWD runtimes only support Container or Compose.");
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(configuration.Checker, "Checker"));
         if (configuration.Runtime is not null && configuration.FlagInjection is null)
             errors.Add("FlagInjection is required when Runtime is configured.");

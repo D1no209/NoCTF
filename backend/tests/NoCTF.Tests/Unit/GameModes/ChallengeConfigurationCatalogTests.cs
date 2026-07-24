@@ -164,6 +164,66 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Container_runtime_rejects_libvirt_provider()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Libvirt,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1");
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("Container runtimes require the Docker or Kubernetes provider.");
+    }
+
+    [Test]
+    public async Task Ctf_runtime_rejects_shared_allocation()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.Shared,
+            "registry.example/challenge:v1");
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors).Contains("CTF runtimes must use PerTeam allocation.");
+    }
+
+    [Test]
+    public async Task Awd_runtime_rejects_shared_allocation_and_ova()
+    {
+        var catalog = new GameModeChallengeConfigurationCatalog();
+        var shared = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.Shared,
+            "registry.example/challenge:v1");
+        var ova = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Libvirt,
+            RuntimeAllocation.PerTeam,
+            string.Empty,
+            RuntimeKind: RuntimeKind.OvaVm,
+            OvaSourceUrl: "file:///var/lib/noctf/challenge.ova");
+
+        var sharedErrors = catalog.Validate(
+            GameMode.Awd,
+            WithAwdFlagInjection(WithRuntime(catalog.GetDefaultJson(GameMode.Awd), shared)));
+        var ovaErrors = catalog.Validate(
+            GameMode.Awd,
+            WithAwdFlagInjection(WithRuntime(catalog.GetDefaultJson(GameMode.Awd), ova)));
+
+        await Assert.That(sharedErrors).Contains("AWD runtimes must use PerTeam allocation.");
+        await Assert.That(ovaErrors)
+            .Contains("AWD runtimes only support Container or Compose.");
+    }
+
+    [Test]
     public async Task Koh_start_requires_shared_runtime_and_control_check_binding()
     {
         var competition = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Koh);
