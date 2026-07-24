@@ -80,8 +80,9 @@ internal static class ChallengeRuntimeTemplateValidator
             if (port.Key is < 1 or > 65535) errors.Add($"Runtime container port {port.Key} is invalid.");
             if (port.Value is < 0 or > 65535) errors.Add($"Runtime host port {port.Value} is invalid.");
         }
-        if (runtime.Limits is { } limits
-            && (limits.MemoryBytes <= 0 || limits.NanoCpus <= 0 || limits.PidsLimit <= 0))
+        if (runtime.Limits is not { } limits)
+            errors.Add("Runtime resource limits are required.");
+        else if (limits.MemoryBytes <= 0 || limits.NanoCpus <= 0 || limits.PidsLimit <= 0)
             errors.Add("Runtime resource limits must be positive.");
         if (runtime.Security is { } security)
         {

@@ -164,6 +164,32 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task RuntimeTemplate_RequiresResourceLimitsForEveryMode()
+    {
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1");
+
+        foreach (var mode in Enum.GetValues<GameMode>())
+        {
+            var allocation = mode == GameMode.Koh
+                ? RuntimeAllocation.Shared
+                : RuntimeAllocation.PerTeam;
+            var json = WithRuntime(
+                configurations.GetDefaultJson(mode),
+                runtime with { Allocation = allocation });
+            if (mode == GameMode.Awd)
+                json = WithAwdFlagInjection(json);
+
+            var errors = configurations.Validate(mode, json);
+
+            await Assert.That(errors).Contains("Runtime resource limits are required.");
+        }
+    }
+
+    [Test]
     public async Task Container_runtime_rejects_libvirt_provider()
     {
         var runtime = new ChallengeRuntimeTemplate(
