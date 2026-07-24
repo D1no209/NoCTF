@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260723222052_InitialBaseline")]
+    [Migration("20260724124250_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -757,6 +757,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("competition_challenge_id");
 
+                    b.Property<int?>("CompetitionConfigurationRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("competition_configuration_revision");
+
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
@@ -910,6 +914,8 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.ToTable("runtime_instances", null, t =>
                         {
+                            t.HasCheckConstraint("ck_runtime_instances_awdp_competition_revision", "(purpose = 1) = (competition_configuration_revision IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");

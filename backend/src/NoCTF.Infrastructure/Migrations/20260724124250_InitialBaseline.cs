@@ -432,6 +432,7 @@ namespace NoCTF.Infrastructure.Migrations
                     runner_unavailable_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     processing_version = table.Column<long>(type: "bigint", nullable: false),
                     configuration_revision = table.Column<int>(type: "integer", nullable: false),
+                    competition_configuration_revision = table.Column<int>(type: "integer", nullable: true),
                     replaces_runtime_instance_id = table.Column<Guid>(type: "uuid", nullable: true),
                     provider_receipt_json = table.Column<string>(type: "jsonb", nullable: true),
                     urls = table.Column<string[]>(type: "text[]", nullable: false),
@@ -450,6 +451,7 @@ namespace NoCTF.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_runtime_instances", x => x.id);
+                    table.CheckConstraint("ck_runtime_instances_awdp_competition_revision", "(purpose = 1) = (competition_configuration_revision IS NOT NULL)");
                     table.CheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
                     table.CheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
                     table.CheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
