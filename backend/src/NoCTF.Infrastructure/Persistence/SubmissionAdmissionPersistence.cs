@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Submissions.Intake;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 
@@ -46,6 +47,22 @@ internal static class SubmissionAdmissionPersistence
             .Select(group => new { Kind = group.Key, Count = group.Count() })
             .ToDictionaryAsync(item => item.Kind, item => item.Count, cancellationToken);
 
+        var hasCorrectBreak = scope.Competition.Mode == GameMode.Awdp
+            && await db.ScoringEvents.AsNoTracking()
+                .Where(scoringEvent =>
+                    scoringEvent.CompetitionId == competitionId
+                    && scoringEvent.TeamId == scope.Team.Id
+                    && scoringEvent.CompetitionChallengeId == competitionChallengeId
+                    && scoringEvent.Result == ScoringResult.Correct
+                    && scoringEvent.SubmissionId != null)
+                .Join(
+                    db.Submissions.AsNoTracking()
+                        .Where(submission => submission.Kind == SubmissionKind.Break),
+                    scoringEvent => scoringEvent.SubmissionId,
+                    submission => (Guid?)submission.Id,
+                    (_, _) => true)
+                .AnyAsync(cancellationToken);
+
         return new(
             competitionId,
             scope.Team.Id,
@@ -67,7 +84,8 @@ internal static class SubmissionAdmissionPersistence
             scope.Team.DeletedAt is not null,
             scope.Team.IsBanned,
             scope.Team.RegistrationStatus == TeamRegistrationStatus.Approved,
-            true);
+            true,
+            hasCorrectBreak);
     }
 
     public static bool Matches(
@@ -86,5 +104,6 @@ internal static class SubmissionAdmissionPersistence
         && current.TeamDeleted == expected.TeamDeleted
         && current.TeamBanned == expected.TeamBanned
         && current.TeamApproved == expected.TeamApproved
-        && current.UserBelongsToTeam == expected.UserBelongsToTeam;
+        && current.UserBelongsToTeam == expected.UserBelongsToTeam
+        && current.HasCorrectBreak == expected.HasCorrectBreak;
 }

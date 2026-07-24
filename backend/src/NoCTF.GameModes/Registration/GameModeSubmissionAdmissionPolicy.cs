@@ -36,6 +36,7 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
             configuration.Break is not null,
             configuration.Fix is not null,
             configuration.Break is null ? null : configuration.MaxBreakAttempts,
-            configuration.Fix is null ? null : configuration.MaxFixAttempts);
+            configuration.Fix is null ? null : configuration.MaxFixAttempts,
+            configuration.RequireBreakBeforeFix);
     }
 }

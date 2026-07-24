@@ -1,10 +1,8 @@
-using System.Text.Json;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Awd.Configuration;
-using NoCTF.GameModes.Awdp.Configuration;
 using SubmissionEntity = NoCTF.Domain.Submissions.Submission;
 
 namespace NoCTF.GameModes.Submission;
@@ -89,18 +87,11 @@ public sealed class AwdSubmissionEvaluator : ISubmissionEvaluator
 
 public sealed class AwdpSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmissionEvaluator
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public ScoringEventDecision Evaluate(SubmissionProcessingContext context)
     {
-        var configuration = Parse(context.ChallengeConfigurationJson);
         var submission = context.Submission;
         if (submission.Kind == SubmissionKind.Flag)
             return ModeSubmissionEvaluatorRules.Reject(submission, ScoringFailureCode.FlagNotSupported);
-        if (submission.Kind == SubmissionKind.Fix
-            && configuration.RequireBreakBeforeFix
-            && !HasCorrectPrior(context, SubmissionKind.Break))
-            return ModeSubmissionEvaluatorRules.Reject(submission, ScoringFailureCode.BreakRequired);
         if (HasCorrectPrior(context, submission.Kind))
             return new(ScoringEventKind.SubmissionEvaluation, ScoringResult.Duplicate,
                 ScoringFailureCode.DuplicateAchievement, submission.ReceivedAt, "awdp-evaluator-v2");
@@ -121,20 +112,6 @@ public sealed class AwdpSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmi
             && ids.Contains(submissionId)
             && item.Result == ScoringResult.Correct);
     }
-
-    private static AwdpChallengeConfiguration Parse(string json)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<AwdpChallengeConfiguration>(json, JsonOptions) ?? Default();
-        }
-        catch (JsonException)
-        {
-            return Default();
-        }
-    }
-
-    private static AwdpChallengeConfiguration Default() => new(1, null, null, true, 10, 10);
 }
 
 public sealed class KohSubmissionEvaluator : ISubmissionEvaluator
