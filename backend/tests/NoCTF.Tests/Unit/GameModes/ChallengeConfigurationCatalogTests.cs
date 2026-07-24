@@ -521,6 +521,32 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Runtime_url_binding_null_template_returns_validation_error()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            Limits: new(268_435_456, 500_000_000, 128),
+            UrlBindings:
+            [
+                new(
+                    null!,
+                    RuntimeExposure.OwnerOnly,
+                    ContainerPort: 8080)
+            ]);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("Runtime URL bindings require a valid exposure and template.");
+    }
+
+    [Test]
     public async Task Control_check_url_binding_is_reserved_for_KoH()
     {
         var runtime = new ChallengeRuntimeTemplate(
