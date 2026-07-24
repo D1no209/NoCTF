@@ -12,7 +12,9 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
         {
             GameMode.Ctf => CtfRules(challengeConfigurationJson),
             GameMode.Awd => AwdRules(challengeConfigurationJson),
-            GameMode.Awdp => AwdpRules(challengeConfigurationJson),
+            GameMode.Awdp => AwdpRules(
+                competitionConfigurationJson,
+                challengeConfigurationJson),
             GameMode.Koh => new(false, false, null, null),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
         };
@@ -29,14 +31,19 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
         return new(true, false, null, null);
     }
 
-    private static SubmissionAdmissionRules AwdpRules(string json)
+    private static SubmissionAdmissionRules AwdpRules(
+        string competitionJson,
+        string challengeJson)
     {
-        var configuration = Awdp.Configuration.AwdpConfigurationParser.ParseChallenge(json);
+        var competition = Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(
+            competitionJson);
+        var challenge = Awdp.Configuration.AwdpConfigurationParser.ParseChallenge(
+            challengeJson);
         return new(
-            configuration.Break is not null,
-            configuration.Fix is not null,
-            configuration.Break is null ? null : configuration.MaxBreakAttempts,
-            configuration.Fix is null ? null : configuration.MaxFixAttempts,
-            configuration.RequireBreakBeforeFix);
+            challenge.Break is not null,
+            challenge.Fix is not null,
+            challenge.Break is null ? null : challenge.MaxBreakAttempts,
+            challenge.Fix is null ? null : challenge.MaxFixAttempts,
+            challenge.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix);
     }
 }

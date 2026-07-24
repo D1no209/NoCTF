@@ -2,12 +2,6 @@ using NoCTF.Application.Runtime.Instances;
 
 namespace NoCTF.Application.Messaging;
 
-public sealed record CreateAwdpTarget(
-    Guid SubmissionId,
-    Guid CompetitionChallengeId,
-    int Generation,
-    long ProcessingVersion);
-
 public sealed record RunAwdpFixVerification(
     Guid SubmissionId,
     Guid CompetitionChallengeId,

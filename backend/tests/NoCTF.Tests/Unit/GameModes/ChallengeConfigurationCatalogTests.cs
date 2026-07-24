@@ -35,6 +35,22 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Awdp_defaults_put_break_requirement_at_competition_scope()
+    {
+        using var competition = JsonDocument.Parse(
+            GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp));
+        using var challenge = JsonDocument.Parse(
+            new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awdp));
+
+        await Assert.That(
+                competition.RootElement.GetProperty("requireBreakBeforeFix").GetBoolean())
+            .IsTrue();
+        await Assert.That(
+                challenge.RootElement.GetProperty("requireBreakBeforeFix").ValueKind)
+            .IsEqualTo(JsonValueKind.Null);
+    }
+
+    [Test]
     [Arguments(GameMode.Ctf, "{\"schemaVersion\":1,\"points\":{\"initialPoints\":0,\"minimumPoints\":0,\"decayFactor\":1},\"bloodRewards\":[]}")]
     [Arguments(GameMode.Awd, "{\"schemaVersion\":1,\"flagFormat\":\"\"}")]
     [Arguments(GameMode.Awdp, "{\"schemaVersion\":1,\"break\":null,\"fix\":null,\"requireBreakBeforeFix\":false,\"maxBreakAttempts\":0,\"maxFixAttempts\":0}")]

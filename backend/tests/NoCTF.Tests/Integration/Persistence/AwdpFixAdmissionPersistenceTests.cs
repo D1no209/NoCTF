@@ -155,7 +155,7 @@ public sealed class AwdpFixAdmissionPersistenceTests
             OwnerId = ownerId,
             Mode = GameMode.Awdp,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             RunningSince = now.AddMinutes(-1),
