@@ -224,6 +224,29 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Runtime_environment_rejects_invalid_names_and_reserved_prefix()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            "registry.example/challenge:v1",
+            Environment: new Dictionary<string, string>
+            {
+                ["1INVALID"] = "value",
+                ["noctf_callback_url"] = "https://example.invalid"
+            });
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors).Contains("Runtime environment variable '1INVALID' is invalid.");
+        await Assert.That(errors)
+            .Contains("Runtime environment variables cannot use the NOCTF_ prefix.");
+    }
+
+    [Test]
     public async Task Koh_start_requires_shared_runtime_and_control_check_binding()
     {
         var competition = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Koh);
