@@ -23,6 +23,9 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class AwdCheckerPersistenceTests
 {
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     [Test]
     [Timeout(300_000)]
     public async Task Dispatcher_and_callbacks_keep_one_inflight_checker_and_only_persist_state_changes(
@@ -149,7 +152,7 @@ public sealed class AwdCheckerPersistenceTests
                             RuntimeProvider.Docker,
                             "checker:v2",
                             ["/checker"],
-                            TimeoutSeconds: 10))),
+                            TimeoutSeconds: 10)), JsonOptions),
                     configurationUpdatedAt,
                     cancellationToken);
                 await Assert.That(update.Failure).IsNull();
@@ -205,7 +208,7 @@ public sealed class AwdCheckerPersistenceTests
             OwnerId = ownerId,
             Mode = GameMode.Awd,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = JsonSerializer.Serialize(AwdConfiguration.Default),
+            ConfigurationJson = JsonSerializer.Serialize(AwdConfiguration.Default, JsonOptions),
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             RunningSince = now.AddMinutes(-1),
@@ -246,7 +249,7 @@ public sealed class AwdCheckerPersistenceTests
                     RuntimeProvider.Docker,
                     "checker:latest",
                     ["/checker"],
-                    TimeoutSeconds: 10))),
+                    TimeoutSeconds: 10)), JsonOptions),
             UpdatedAt = now
         });
         db.RuntimeInstances.Add(new RuntimeInstance
