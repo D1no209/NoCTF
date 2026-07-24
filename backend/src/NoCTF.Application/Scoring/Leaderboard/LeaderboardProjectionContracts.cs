@@ -13,7 +13,12 @@ public sealed record LeaderboardProjectionInput(
     string? CompetitionConfigurationJson = null,
     DateTimeOffset? CompetitionStartTime = null);
 
-public sealed record LeaderboardTeamFact(Guid Id, string Name, bool IsBanned, bool IsDeleted);
+public sealed record LeaderboardTeamFact(
+    Guid Id,
+    string Name,
+    bool IsBanned,
+    bool IsDeleted,
+    DateTimeOffset RegisteredAt = default);
 public sealed record LeaderboardChallengeFact(Guid Id, string Direction, bool IsDeleted, string? ConfigurationJson = null);
 
 public sealed record LeaderboardSubmissionFact(

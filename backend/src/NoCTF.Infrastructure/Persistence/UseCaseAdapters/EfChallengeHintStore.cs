@@ -184,7 +184,12 @@ public sealed class EfChallengeHintStore(
         var competition = await db.Competitions.AsNoTracking().SingleAsync(item => item.Id == competitionId, ct);
         var teams = await db.Teams.IgnoreQueryFilters().AsNoTracking()
             .Where(item => item.CompetitionId == competitionId)
-            .Select(item => new LeaderboardTeamFact(item.Id, item.Name, item.IsBanned, item.DeletedAt != null))
+            .Select(item => new LeaderboardTeamFact(
+                item.Id,
+                item.Name,
+                item.IsBanned,
+                item.DeletedAt != null,
+                item.RegisteredAt))
             .ToListAsync(ct);
         var challenges = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
             .Where(item => item.CompetitionId == competitionId)

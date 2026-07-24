@@ -344,8 +344,11 @@ internal static class AwdpLeaderboardProjection
             teamFacts.Add((fact, achievement.Points));
         }
         var penalties = input.Submissions
-            .Where(fact => fact.Kind == SubmissionKind.Fix
-                           && fact.Event.DeletedAt is null)
+            .Where(fact => teams.ContainsKey(fact.TeamId)
+                           && fact.Kind is SubmissionKind.Break or SubmissionKind.Fix
+                           && fact.Event.DeletedAt is null
+                           && fact.CompetitionChallengeId is not null
+                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .GroupBy(fact => fact.TeamId)
             .ToDictionary(
                 group => group.Key,
@@ -362,16 +365,36 @@ internal static class AwdpLeaderboardProjection
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
             var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
+            var lastFixAt = own
+                .Where(item => item.Fact.Kind == SubmissionKind.Fix)
+                .Select(item => (DateTimeOffset?)item.Fact.Event.OccurredAt)
+                .OrderByDescending(value => value)
+                .FirstOrDefault();
             var awardedScore = own.Aggregate(0L, (total, item) => checked(total + item.Points));
-            return new LeaderboardEntry(0, team.Id, team.Name,
-                checked(awardedScore - penalties.GetValueOrDefault(team.Id)
-                    - hintCosts.GetValueOrDefault(team.Id)), own.Count,
-                last == default ? null : last, []);
+            var penalty = penalties.GetValueOrDefault(team.Id);
+            return new AwdpRankedEntry(
+                new LeaderboardEntry(
+                    0,
+                    team.Id,
+                    team.Name,
+                    checked(awardedScore - penalty - hintCosts.GetValueOrDefault(team.Id)),
+                    own.Count,
+                    last == default ? null : last,
+                    []),
+                own.Count(item => item.Fact.Kind == SubmissionKind.Fix),
+                own.Count(item => item.Fact.Kind == SubmissionKind.Break),
+                penalty,
+                lastFixAt,
+                team.RegisteredAt);
         });
-        return rows.OrderByDescending(row => row.Score)
-            .ThenBy(row => row.LastScoreAt ?? DateTimeOffset.MaxValue)
-            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
-            .Select((row, index) => row with { Rank = index + 1 })
+        return rows.OrderByDescending(row => row.Entry.Score)
+            .ThenByDescending(row => row.FixCount)
+            .ThenByDescending(row => row.BreakCount)
+            .ThenBy(row => row.Penalty)
+            .ThenBy(row => row.LastFixAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(row => row.RegisteredAt)
+            .ThenBy(row => row.Entry.TeamId)
+            .Select((row, index) => row.Entry with { Rank = index + 1 })
             .ToList();
     }
 
@@ -399,17 +422,27 @@ internal static class AwdpLeaderboardProjection
     private static long PenaltyFor(
         LeaderboardSubmissionFact fact,
         AwdpEffectiveConfiguration configuration) =>
-        fact.Event switch
+        (fact.Kind, fact.Event.Result, fact.Event.FailureCode) switch
         {
-            {
-                Result: ScoringResult.Rejected, FailureCode: ScoringFailureCode.AwdpViolation
-                or ScoringFailureCode.AwdpPatchFailed or ScoringFailureCode.AwdpPatchTimeout
-            }
+            (SubmissionKind.Break, ScoringResult.Wrong, _)
+                => configuration.BreakWrongPenalty,
+            (SubmissionKind.Fix, ScoringResult.Wrong, ScoringFailureCode.AwdpFixFailed
+                or ScoringFailureCode.AwdpPatchFailed or ScoringFailureCode.AwdpPatchTimeout)
+                => configuration.FixFailurePenalty,
+            (SubmissionKind.Fix, ScoringResult.Rejected, ScoringFailureCode.AwdpViolation)
                 => configuration.ViolationPenalty,
-            { Result: ScoringResult.Wrong, FailureCode: ScoringFailureCode.AwdpServiceDown }
+            (SubmissionKind.Fix, ScoringResult.Wrong, ScoringFailureCode.AwdpServiceDown)
                 => configuration.ServiceDownPenalty,
             _ => 0L
         };
+
+    private sealed record AwdpRankedEntry(
+        LeaderboardEntry Entry,
+        int FixCount,
+        int BreakCount,
+        long Penalty,
+        DateTimeOffset? LastFixAt,
+        DateTimeOffset RegisteredAt);
 
     private static T? TryParse<T>(string? json) where T : class
     {

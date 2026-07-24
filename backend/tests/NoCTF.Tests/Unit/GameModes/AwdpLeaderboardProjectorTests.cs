@@ -124,6 +124,120 @@ public sealed class AwdpLeaderboardProjectorTests
         await Assert.That(row.SolveCount).IsEqualTo(1);
     }
 
+    [Test]
+    public async Task Penalties_use_their_configured_business_outcomes()
+    {
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var competition = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            300,
+            new(AchievementSettlement.Milestone, 0),
+            new(AchievementSettlement.Milestone, 0),
+            ViolationPenalty: 7,
+            ServiceDownPenalty: 11,
+            RequireBreakBeforeFix: false,
+            BreakWrongPenalty: 3,
+            FixFailurePenalty: 5), options);
+        var input = new LeaderboardProjectionInput(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            [new(teamId, "red", false, false)],
+            [
+                Submission(teamId, challengeId, SubmissionKind.Break, now,
+                    ScoringResult.Wrong, ScoringFailureCode.FlagExpired),
+                Submission(teamId, challengeId, SubmissionKind.Fix, now.AddSeconds(1),
+                    ScoringResult.Wrong, ScoringFailureCode.AwdpFixFailed),
+                Submission(teamId, challengeId, SubmissionKind.Fix, now.AddSeconds(2),
+                    ScoringResult.Wrong, ScoringFailureCode.AwdpPatchFailed),
+                Submission(teamId, challengeId, SubmissionKind.Fix, now.AddSeconds(3),
+                    ScoringResult.Wrong, ScoringFailureCode.AwdpPatchTimeout),
+                Submission(teamId, challengeId, SubmissionKind.Fix, now.AddSeconds(4),
+                    ScoringResult.Rejected, ScoringFailureCode.AwdpViolation),
+                Submission(teamId, challengeId, SubmissionKind.Fix, now.AddSeconds(5),
+                    ScoringResult.Wrong, ScoringFailureCode.AwdpServiceDown),
+                Submission(teamId, challengeId, SubmissionKind.Fix, now.AddSeconds(6),
+                    ScoringResult.PlatformFailed, ScoringFailureCode.CheckerPlatformError)
+            ],
+            [],
+            [new(challengeId, "Web", false)],
+            competition,
+            now);
+
+        var row = new AwdpLeaderboardProjector().Project(input).Single();
+
+        await Assert.That(row.Score).IsEqualTo(-36);
+    }
+
+    [Test]
+    public async Task Equal_scores_rank_more_fix_achievements_before_break_achievements()
+    {
+        var moreFixes = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var moreBreaks = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var firstChallenge = Guid.NewGuid();
+        var secondChallenge = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var competition = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            300,
+            new(AchievementSettlement.Milestone, 0),
+            new(AchievementSettlement.Milestone, 0),
+            RequireBreakBeforeFix: false), options);
+        var input = new LeaderboardProjectionInput(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            [
+                new(moreFixes, "zeta", false, false),
+                new(moreBreaks, "alpha", false, false)
+            ],
+            [
+                Submission(moreFixes, firstChallenge, SubmissionKind.Fix, now),
+                Submission(moreFixes, secondChallenge, SubmissionKind.Fix, now),
+                Submission(moreBreaks, firstChallenge, SubmissionKind.Fix, now),
+                Submission(moreBreaks, secondChallenge, SubmissionKind.Break, now)
+            ],
+            [],
+            [
+                new(firstChallenge, "Web", false),
+                new(secondChallenge, "Pwn", false)
+            ],
+            competition,
+            now);
+
+        var rows = new AwdpLeaderboardProjector().Project(input);
+
+        await Assert.That(rows[0].TeamId).IsEqualTo(moreFixes);
+        await Assert.That(rows[1].TeamId).IsEqualTo(moreBreaks);
+    }
+
+    [Test]
+    public async Task Remaining_ties_use_registration_time_then_team_id()
+    {
+        var lowerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var higherId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var later = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var registeredAt = DateTimeOffset.UtcNow;
+        var input = new LeaderboardProjectionInput(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            [
+                new(later, "alpha", false, false, registeredAt.AddSeconds(1)),
+                new(higherId, "beta", false, false, registeredAt),
+                new(lowerId, "zeta", false, false, registeredAt)
+            ],
+            [],
+            []);
+
+        var rows = new AwdpLeaderboardProjector().Project(input);
+
+        await Assert.That(rows[0].TeamId).IsEqualTo(lowerId);
+        await Assert.That(rows[1].TeamId).IsEqualTo(higherId);
+        await Assert.That(rows[2].TeamId).IsEqualTo(later);
+    }
+
     private static LeaderboardEntry Project(
         Guid teamId,
         Guid challengeId,
@@ -162,7 +276,8 @@ public sealed class AwdpLeaderboardProjectorTests
         Guid challengeId,
         SubmissionKind kind,
         DateTimeOffset at,
-        ScoringResult result = ScoringResult.Correct) =>
+        ScoringResult result = ScoringResult.Correct,
+        ScoringFailureCode? failureCode = null) =>
         new(
             Guid.NewGuid(),
             teamId,
@@ -177,6 +292,7 @@ public sealed class AwdpLeaderboardProjectorTests
                 CompetitionChallengeId = challengeId,
                 Kind = ScoringEventKind.SubmissionEvaluation,
                 Result = result,
+                FailureCode = failureCode,
                 OccurredAt = at,
                 CreatedAt = at
             });
