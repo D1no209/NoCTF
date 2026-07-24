@@ -46,7 +46,9 @@ public sealed class RedisLeaderboardCache(
         try
         {
         var teams = await db.Teams.AsNoTracking().Where(x => x.CompetitionId == competitionId)
-            .Select(x => new LeaderboardTeamFact(x.Id, x.Name, x.IsBanned, x.DeletedAt != null)).ToListAsync(ct);
+            .Select(x => new LeaderboardTeamFact(
+                x.Id, x.Name, x.IsBanned, x.DeletedAt != null, x.RegisteredAt))
+            .ToListAsync(ct);
         var challenges = await db.CompetitionChallenges.AsNoTracking()
             .Where(instance => instance.CompetitionId == competitionId)
             .Join(db.Challenges.AsNoTracking(), instance => instance.ChallengeId, template => template.Id,
