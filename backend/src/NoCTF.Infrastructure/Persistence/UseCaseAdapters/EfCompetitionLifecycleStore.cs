@@ -80,7 +80,10 @@ public sealed class EfCompetitionLifecycleStore(
             competition.RunningSince = null;
         }
         if (to == CompetitionStatus.Running)
-            competition.RunningSince = now;
+        {
+            competition.RunningSince = now.AddTicks(
+                -(now.Ticks % TimeSpan.TicksPerMicrosecond));
+        }
         if (competition.Mode == GameMode.Awd)
         {
             if (from == CompetitionStatus.Running && to == CompetitionStatus.Paused)
@@ -182,6 +185,25 @@ public sealed class EfCompetitionLifecycleStore(
                     now,
                     competition.ConfigurationRevision,
                     challenge.Revision));
+            }
+        }
+        if (competition.Mode == GameMode.Koh && to == CompetitionStatus.Running)
+        {
+            var challenges = await db.CompetitionChallenges.AsNoTracking()
+                .Where(challenge => challenge.CompetitionId == competitionId
+                    && challenge.IsPublished
+                    && challenge.DeletedAt == null)
+                .Select(challenge => new { challenge.Id, challenge.Revision })
+                .ToListAsync(cancellationToken);
+            foreach (var challenge in challenges)
+            {
+                await outbox.PublishAsync(new PollKohChallenge(
+                    competitionId,
+                    challenge.Id,
+                    competition.ConfigurationRevision,
+                    challenge.Revision,
+                    competition.RunningSince!.Value,
+                    now));
             }
         }
         await db.SaveChangesAsync(cancellationToken);

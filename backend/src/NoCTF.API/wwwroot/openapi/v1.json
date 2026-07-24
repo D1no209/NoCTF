@@ -6861,6 +6861,7 @@
           "InvalidObservation",
           "ProducerTimeout",
           "ProducerUnavailable",
+          "AmbiguousFlagMatch",
           "FlagExpired",
           "RoundOutOfRange",
           "HardeningActive",
@@ -6898,7 +6899,8 @@
           24,
           25,
           26,
-          27
+          27,
+          28
         ]
       },
       "NoCTFAPIEndpointsSubmissionsGetSubmissionStatusRequest": {

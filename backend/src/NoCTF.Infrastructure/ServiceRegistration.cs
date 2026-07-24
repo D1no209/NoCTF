@@ -48,6 +48,9 @@ using NoCTF.Application.Authentication;
 using NoCTF.Application.Administration;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.Application.Competitions.Koh;
+using NoCTF.Infrastructure.Competitions.Koh;
 
 namespace NoCTF.Infrastructure;
 
@@ -184,6 +187,12 @@ public static class ServiceRegistration
         services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
         services.AddSingleton<AwdRoundConfigurationCatalog>();
         services.AddSingleton<AwdCheckerConfigurationCatalog>();
+        services.AddSingleton<KohProducerConfigurationCatalog>();
+        services.AddHttpClient<IKohControlClient, HttpKohControlClient>()
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false
+            });
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICompetitionStartGateStore, EfCompetitionStartGateStore>();
         services.AddScoped<CompetitionStartGate>();
