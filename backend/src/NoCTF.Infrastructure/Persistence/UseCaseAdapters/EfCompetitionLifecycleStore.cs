@@ -185,9 +185,11 @@ public sealed class EfCompetitionLifecycleStore(
             }
         }
         await db.SaveChangesAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
         if (transaction is not null)
+        {
             await transaction.CommitAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
+        }
         return true;
     }
 }

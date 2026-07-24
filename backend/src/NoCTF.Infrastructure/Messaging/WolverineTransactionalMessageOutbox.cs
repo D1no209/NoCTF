@@ -1,6 +1,7 @@
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 
@@ -43,10 +44,16 @@ public sealed class WolverineTransactionalMessageOutbox(
             new DeliveryOptions { ScheduledTime = scheduledAt });
     }
 
-    public Task FlushOutgoingMessagesAsync() => outbox.FlushOutgoingMessagesAsync();
+    public Task FlushOutgoingMessagesAsync() =>
+        outbox.DbContext.Database.CurrentTransaction is null
+            ? outbox.FlushOutgoingMessagesAsync()
+            : Task.CompletedTask;
 
-    private static Uri ToPostgresqlQueueUri(string queueName) =>
-        new($"postgresql://{queueName}", UriKind.Absolute);
+    private static Uri ToPostgresqlQueueUri(string queueName)
+    {
+        var postgresQueueName = queueName.Replace('-', '_').ToLowerInvariant();
+        return new($"postgresql://{postgresQueueName}", UriKind.Absolute);
+    }
 }
 
 public sealed class OpenApiTransactionalMessageOutbox : ITransactionalMessageOutbox

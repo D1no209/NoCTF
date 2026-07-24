@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Messaging;
@@ -76,9 +77,8 @@ public sealed class PostgresAwdRoundCoordinator(
                 handledAt,
                 message.CompetitionConfigurationRevision,
                 message.ProcessingVersion));
-            await outbox.FlushOutgoingMessagesAsync();
-            if (transaction is not null)
-                await transaction.CommitAsync(cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
             return MessageExecutionOutcome.Superseded;
         }
 
@@ -185,9 +185,7 @@ public sealed class PostgresAwdRoundCoordinator(
         if (missing.Length == 0 && !scheduledSuccessor)
             return MessageExecutionOutcome.Idempotent;
         await db.SaveChangesAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
-        if (transaction is not null)
-            await transaction.CommitAsync(cancellationToken);
+        await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
         return MessageExecutionOutcome.Applied;
     }
 
@@ -232,17 +230,14 @@ public sealed class PostgresAwdRoundCoordinator(
 
         var handledAt = timeProvider.GetUtcNow();
         var settings = configurations.Get(target.Competition.ConfigurationJson);
-        var effectiveSeconds = target.Competition.AccumulatedRunningSeconds;
-        if (target.Competition.RunningSince is DateTimeOffset runningSince)
-        {
-            effectiveSeconds = checked(effectiveSeconds + Math.Max(
-                0,
-                (long)Math.Floor((handledAt - runningSince).TotalSeconds)));
-        }
+        var effectiveRunningTime = CalculateEffectiveRunningTime(
+            target.Competition.AccumulatedRunningSeconds,
+            target.Competition.RunningSince,
+            handledAt);
         var plan = AwdRoundScheduler.PlanCurrentRound(
             handledAt,
             target.Competition.EndAt,
-            TimeSpan.FromSeconds(effectiveSeconds),
+            effectiveRunningTime,
             TimeSpan.FromSeconds(settings.HardeningDurationSeconds),
             TimeSpan.FromSeconds(settings.RoundDurationSeconds),
             latest.Window);
@@ -250,8 +245,9 @@ public sealed class PostgresAwdRoundCoordinator(
         switch (plan.Kind)
         {
             case AwdRoundPlanKind.WaitingForHardening:
-                var dueAt = handledAt.AddSeconds(
-                    settings.HardeningDurationSeconds - effectiveSeconds);
+                var dueAt = handledAt
+                    + (TimeSpan.FromSeconds(settings.HardeningDurationSeconds)
+                        - effectiveRunningTime);
                 if (dueAt < target.Competition.EndAt)
                 {
                     var scheduled = await ScheduleAdvanceIfChangedAsync(
@@ -262,9 +258,7 @@ public sealed class PostgresAwdRoundCoordinator(
                     if (scheduled)
                     {
                         await db.SaveChangesAsync(cancellationToken);
-                        await outbox.FlushOutgoingMessagesAsync();
-                        if (transaction is not null)
-                            await transaction.CommitAsync(cancellationToken);
+                        await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
                     }
                 }
                 return MessageExecutionOutcome.DeferredSchedule;
@@ -280,9 +274,7 @@ public sealed class PostgresAwdRoundCoordinator(
                 if (!replacementScheduled)
                     return MessageExecutionOutcome.Idempotent;
                 await db.SaveChangesAsync(cancellationToken);
-                await outbox.FlushOutgoingMessagesAsync();
-                if (transaction is not null)
-                    await transaction.CommitAsync(cancellationToken);
+                await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
                 return MessageExecutionOutcome.DeferredSchedule;
             case AwdRoundPlanKind.Finished:
                 return MessageExecutionOutcome.RejectedBusiness;
@@ -296,9 +288,8 @@ public sealed class PostgresAwdRoundCoordinator(
                     window.ValidUntil,
                     message.CompetitionConfigurationRevision,
                     message.ProcessingVersion));
-                await outbox.FlushOutgoingMessagesAsync();
-                if (transaction is not null)
-                    await transaction.CommitAsync(cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
+                await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
                 return MessageExecutionOutcome.Applied;
             default:
                 throw new ArgumentOutOfRangeException(nameof(plan.Kind), plan.Kind, null);
@@ -359,15 +350,14 @@ public sealed class PostgresAwdRoundCoordinator(
         DateTimeOffset handledAt)
     {
         var settings = configurations.Get(competitionConfigurationJson);
-        var effectiveSeconds = accumulatedRunningSeconds;
-        if (runningSince is DateTimeOffset runningSinceAt)
-            effectiveSeconds = checked(effectiveSeconds + Math.Max(
-                0,
-                (long)Math.Floor((handledAt - runningSinceAt).TotalSeconds)));
+        var effectiveRunningTime = CalculateEffectiveRunningTime(
+            accumulatedRunningSeconds,
+            runningSince,
+            handledAt);
         var plan = AwdRoundScheduler.PlanCurrentRound(
             handledAt,
             competitionEndAt,
-            TimeSpan.FromSeconds(effectiveSeconds),
+            effectiveRunningTime,
             TimeSpan.FromSeconds(settings.HardeningDurationSeconds),
             TimeSpan.FromSeconds(settings.RoundDurationSeconds),
             latest);
@@ -381,6 +371,17 @@ public sealed class PostgresAwdRoundCoordinator(
         return window.Round == message.Round.Round
             && window.ValidStart == message.ValidStart
             && window.ValidUntil == message.ValidUntil;
+    }
+
+    private static TimeSpan CalculateEffectiveRunningTime(
+        long accumulatedRunningSeconds,
+        DateTimeOffset? runningSince,
+        DateTimeOffset now)
+    {
+        var effective = TimeSpan.FromSeconds(accumulatedRunningSeconds);
+        if (runningSince is DateTimeOffset startedAt && now > startedAt)
+            effective += now - startedAt;
+        return effective;
     }
 
     private static PerTeamFlagTemplate ResolveTemplate(string competitionJson, string challengeJson)
@@ -427,6 +428,16 @@ public sealed class PostgresAwdRoundCoordinator(
             message.ProcessingVersion);
         await outbox.ScheduleAsync(message with { At = dueAt }, dueAt);
         return true;
+    }
+
+    private async Task CommitAndFlushIfOwnedAsync(
+        IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        if (transaction is null)
+            return;
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
     private static bool ScheduleMatches(

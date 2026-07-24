@@ -39,7 +39,7 @@ public enum CompetitionLifecycleEffects
 }
 
 /// <summary>Advances published and running competitions using wall-clock deadlines without extending pauses.</summary>
-public sealed class AdvanceCompetitionLifecycle(
+public sealed class AdvanceCompetitionLifecycleUseCase(
     ICompetitionLifecycleStore store,
     CompetitionStartGate? startGate = null)
 {
@@ -133,7 +133,7 @@ public sealed class TransitionCompetitionLifecycle(
                 actorId,
                 reason,
                 false,
-                AdvanceCompetitionLifecycle.EffectsFor(target),
+                AdvanceCompetitionLifecycleUseCase.EffectsFor(target),
                 cancellationToken))
             return OperationResult.Failure("lifecycle_conflict", "Competition status changed concurrently.");
         await cache.InvalidateAsync(competitionId, cancellationToken);

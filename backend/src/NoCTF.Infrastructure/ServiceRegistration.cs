@@ -205,7 +205,7 @@ public static class ServiceRegistration
         services.AddScoped<UpdateCompetitionConfiguration>();
         services.AddScoped<ICompetitionPermissionStore, EfCompetitionPermissionStore>();
         services.AddScoped<UpdateCompetitionPermissions>();
-        services.AddScoped<NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle>();
+        services.AddScoped<NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase>();
         services.AddScoped<TransitionCompetitionLifecycle>();
         services.AddScoped<IUserAuthenticationStore, EfAuthenticationStore>();
         services.Configure<PasswordHasherOptions>(options =>

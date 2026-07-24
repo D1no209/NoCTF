@@ -17,7 +17,7 @@ public class CompetitionLifecycleUseCaseTests
             CompetitionStatus.Published,
             now.AddMinutes(-2),
             now.AddMinutes(-1)));
-        var transitions = await new NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycle(store)
+        var transitions = await new NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase(store)
             .ExecuteAsync(now);
 
         await Assert.That(transitions).HasSingleItem();

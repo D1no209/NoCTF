@@ -3,13 +3,16 @@ using NoCTF.Application.Administration;
 using NoCTF.Domain.Identity;
 using Wolverine.Persistence.Durability;
 using Wolverine.Persistence.Durability.DeadLetterManagement;
+using Wolverine.Runtime;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 public sealed class PlatformAdministrationStore(
     NoCtfDbContext db,
-    IDeadLetters deadLetters) : IPlatformAdministrationStore
+    IWolverineRuntime runtime) : IPlatformAdministrationStore
 {
+    private IDeadLetters DeadLetters => runtime.Storage.DeadLetters;
+
     public async Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken ct) =>
         await db.Users.AsNoTracking()
             .OrderBy(user => user.CreatedAt)
@@ -61,7 +64,7 @@ public sealed class PlatformAdministrationStore(
         int limit,
         CancellationToken ct)
     {
-        var result = await deadLetters.QueryAsync(new DeadLetterEnvelopeQuery
+        var result = await DeadLetters.QueryAsync(new DeadLetterEnvelopeQuery
         {
             PageNumber = 1,
             PageSize = limit
@@ -71,7 +74,7 @@ public sealed class PlatformAdministrationStore(
 
     public async Task<DeadLetterView?> FindDeadLetterAsync(Guid messageId, CancellationToken ct)
     {
-        var result = await deadLetters.QueryAsync(
+        var result = await DeadLetters.QueryAsync(
             new DeadLetterEnvelopeQuery([messageId]) { PageNumber = 1, PageSize = 1 },
             ct);
         return result.Envelopes.Count == 0 ? null : Map(result.Envelopes[0]);
@@ -81,7 +84,7 @@ public sealed class PlatformAdministrationStore(
     {
         if (await FindDeadLetterAsync(messageId, ct) is null)
             return false;
-        await deadLetters.ReplayAsync(new DeadLetterEnvelopeQuery([messageId]), ct);
+        await DeadLetters.ReplayAsync(new DeadLetterEnvelopeQuery([messageId]), ct);
         return true;
     }
 
