@@ -60,6 +60,18 @@ public sealed class KohPollingPersistenceTests
                 .Single();
             await Assert.That(claim.Definition.UrlBindings).Count().IsEqualTo(1);
             await Assert.That(claim.Definition.ControlCheckUrlBinding).IsNotNull();
+            await Assert.That(claim.Definition.Labels["noctf.io/managed"])
+                .IsEqualTo("true");
+            await Assert.That(claim.Definition.Labels["noctf.io/runtime-instance-id"])
+                .IsEqualTo(fixture.RuntimeId.ToString("D"));
+            await Assert.That(claim.Definition.Labels["noctf.io/competition-id"])
+                .IsEqualTo(fixture.CompetitionId.ToString("D"));
+            await Assert.That(claim.Definition.Labels["noctf.io/competition-challenge-id"])
+                .IsEqualTo(fixture.CompetitionChallengeId.ToString("D"));
+            await Assert.That(claim.Definition.Labels["noctf.io/generation"])
+                .IsEqualTo("1");
+            await Assert.That(claim.Definition.Labels)
+                .DoesNotContainKey("noctf.io/team-id");
             await using (var provisionDb = new NoCtfDbContext(options))
             {
                 var runtime = await provisionDb.RuntimeInstances.SingleAsync(cancellationToken);
