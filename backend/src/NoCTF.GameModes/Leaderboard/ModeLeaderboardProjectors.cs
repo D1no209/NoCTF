@@ -200,6 +200,8 @@ internal static class AwdLeaderboardProjection
             .ToDictionary(challenge => challenge.Id);
         var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
         var values = teams.Keys.ToDictionary(team => team, _ => 0L);
+        var attackPoints = teams.Keys.ToDictionary(team => team, _ => 0L);
+        var upRoundCounts = teams.Keys.ToDictionary(team => team, _ => 0);
         var solves = input.Submissions
             .Where(fact => teams.ContainsKey(fact.TeamId)
                           && fact.Kind == SubmissionKind.Flag
@@ -241,7 +243,10 @@ internal static class AwdLeaderboardProjection
                 ? settings.AttackPoints
                 : settings.VictimDefensePoolPoints / attackers.Count;
             foreach (var attacker in attackers)
+            {
                 values[attacker] = checked(values[attacker] + reward);
+                attackPoints[attacker] = checked(attackPoints[attacker] + reward);
+            }
             values[pool.Key.VictimId] = checked(
                 values[pool.Key.VictimId] - settings.VictimDefensePoolPoints);
         }
@@ -279,31 +284,56 @@ internal static class AwdLeaderboardProjection
             var settings = Effective(
                 configuration,
                 challenges[round.CompetitionChallengeId].ConfigurationJson);
-            values[round.TeamId] = latestState?.Event.Result == ScoringResult.Wrong
-                ? checked(values[round.TeamId] - settings.ServiceUnhealthyPenalty)
-                : checked(values[round.TeamId] + settings.ServiceHealthyPoints);
+            if (latestState?.Event.Result == ScoringResult.Wrong)
+            {
+                values[round.TeamId] = checked(
+                    values[round.TeamId] - settings.ServiceUnhealthyPenalty);
+            }
+            else
+            {
+                values[round.TeamId] = checked(
+                    values[round.TeamId] + settings.ServiceHealthyPoints);
+                upRoundCounts[round.TeamId] = checked(upRoundCounts[round.TeamId] + 1);
+            }
         }
         foreach (var hint in ProjectionPenalties.HintCosts(input, teams.Keys))
             values[hint.Key] = checked(values[hint.Key] - hint.Value);
-        var rows = teams.Values.Select(team => new LeaderboardEntry(
-            0,
-            team.Id,
-            team.Name,
-            values[team.Id],
-            attacks.Count(solve => solve.TeamId == team.Id),
-            LastSolve(attacks, team.Id),
-            []));
-        return rows.OrderByDescending(row => row.Score)
-            .ThenByDescending(row => row.LastScoreAt)
-            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
-            .Select((row, index) => row with { Rank = index + 1 })
+        var rows = teams.Values.Select(team =>
+        {
+            var attackCount = attacks.Count(attack => attack.TeamId == team.Id);
+            var lastAttackAt = LastAttackAt(attacks, team.Id);
+            return new AwdRankedEntry(
+                new LeaderboardEntry(
+                    0,
+                    team.Id,
+                    team.Name,
+                    values[team.Id],
+                    attackCount,
+                    lastAttackAt,
+                    []),
+                attackPoints[team.Id],
+                upRoundCounts[team.Id],
+                attackCount,
+                lastAttackAt,
+                team.RegisteredAt);
+        });
+        return rows.OrderByDescending(row => row.Entry.Score)
+            .ThenByDescending(row => row.AttackPoints)
+            .ThenByDescending(row => row.UpRoundCount)
+            .ThenByDescending(row => row.AttackCount)
+            .ThenBy(row => row.LastAttackAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(row => row.RegisteredAt)
+            .ThenBy(row => row.Entry.TeamId)
+            .Select((row, index) => row.Entry with { Rank = index + 1 })
             .ToList();
     }
 
-    private static DateTimeOffset? LastSolve(IReadOnlyList<LeaderboardSubmissionFact> solves, Guid teamId)
+    private static DateTimeOffset? LastAttackAt(
+        IReadOnlyList<LeaderboardSubmissionFact> attacks,
+        Guid teamId)
     {
-        var last = solves.Where(solve => solve.TeamId == teamId)
-            .Select(solve => solve.Event.OccurredAt)
+        var last = attacks.Where(attack => attack.TeamId == teamId)
+            .Select(attack => attack.ReceivedAt)
             .OrderByDescending(value => value)
             .FirstOrDefault();
         return last == default ? null : last;
@@ -340,6 +370,14 @@ internal static class AwdLeaderboardProjection
         long VictimDefensePoolPoints,
         long ServiceHealthyPoints,
         long ServiceUnhealthyPenalty);
+
+    private sealed record AwdRankedEntry(
+        LeaderboardEntry Entry,
+        long AttackPoints,
+        int UpRoundCount,
+        int AttackCount,
+        DateTimeOffset? LastAttackAt,
+        DateTimeOffset RegisteredAt);
 }
 
 public sealed class AwdpLeaderboardProjector : IGameModeLeaderboardProjector
