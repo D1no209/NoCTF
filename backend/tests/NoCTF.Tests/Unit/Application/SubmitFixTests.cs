@@ -45,7 +45,7 @@ public sealed class SubmitFixTests
                 GameMode.Awdp,
                 1,
                 1,
-                "{}",
+                GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
                 JsonSerializer.Serialize(
                     new AwdpChallengeConfiguration(
                         AwdpChallengeConfiguration.CurrentSchemaVersion,

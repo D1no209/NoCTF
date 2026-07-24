@@ -16,7 +16,8 @@ public sealed record AwdpConfiguration(
     AwdpAchievementConfiguration Break,
     AwdpAchievementConfiguration Fix,
     long ViolationPenalty = 0,
-    long ServiceDownPenalty = 0)
+    long ServiceDownPenalty = 0,
+    bool RequireBreakBeforeFix = true)
 {
     public const int CurrentSchemaVersion = 1;
 }
@@ -25,7 +26,7 @@ public sealed record AwdpChallengeConfiguration(
     int SchemaVersion,
     AwdpAchievementConfiguration? Break,
     AwdpAchievementConfiguration? Fix,
-    bool RequireBreakBeforeFix,
+    bool? RequireBreakBeforeFix,
     int MaxBreakAttempts,
     int MaxFixAttempts,
     ChallengeRuntimeTemplate? Runtime = null,

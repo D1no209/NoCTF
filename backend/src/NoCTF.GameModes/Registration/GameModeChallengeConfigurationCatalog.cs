@@ -25,7 +25,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                 AwdpChallengeConfiguration.CurrentSchemaVersion,
                 new(AchievementSettlement.PerRound, 50),
                 null,
-                true,
+                null,
                 10,
                 10),
             JsonOptions),
