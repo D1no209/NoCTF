@@ -149,6 +149,12 @@ public static class AwdpConfigurationValidator
                     or NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes)))
             errors.Add(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
+        if (runtime?.PortMappings is { Count: > 0 }
+            || runtime?.UrlBindings is { Count: > 0 })
+        {
+            errors.Add(
+                "AWDP disposable targets cannot configure public ports or URLs.");
+        }
     }
 
     private static void ValidateChecker(
