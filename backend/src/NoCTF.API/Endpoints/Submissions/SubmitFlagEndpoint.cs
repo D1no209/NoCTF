@@ -53,7 +53,8 @@ internal static class SubmissionProblemDetails
     public static int StatusFor(string? code) => code switch
     {
         "team_banned" or "team_forbidden" => StatusCodes.Status403Forbidden,
-        "competition_finished" or "competition_not_started" => StatusCodes.Status409Conflict,
+        "competition_finished" or "competition_not_started" or "break_required" =>
+            StatusCodes.Status409Conflict,
         "background_work_unavailable" => StatusCodes.Status503ServiceUnavailable,
         _ => StatusCodes.Status400BadRequest
     };

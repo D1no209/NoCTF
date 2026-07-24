@@ -37,6 +37,12 @@ public static class SubmissionAdmissionPolicy
             return OperationResult.Failure("competition_not_started", "The competition has not started.");
         if (receivedAt >= snapshot.EndAt)
             return OperationResult.Failure("competition_finished", "The submission arrived after the deadline.");
+        if (kind == SubmissionKind.Fix
+            && rules.RequireBreakBeforeFix
+            && !snapshot.HasCorrectBreak)
+            return OperationResult.Failure(
+                "break_required",
+                "A correct Break submission is required before submitting a Fix.");
         var maxAttempts = kind is SubmissionKind.Flag or SubmissionKind.Break ? rules.MaxFlagAttempts : rules.MaxFixAttempts;
         var acceptedAttempts = kind is SubmissionKind.Flag or SubmissionKind.Break
             ? snapshot.AcceptedFlagAttempts

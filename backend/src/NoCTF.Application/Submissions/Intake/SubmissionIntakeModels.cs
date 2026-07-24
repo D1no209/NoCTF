@@ -23,13 +23,15 @@ public sealed record SubmissionAdmissionSnapshot(
     bool TeamDeleted,
     bool TeamBanned,
     bool TeamApproved,
-    bool UserBelongsToTeam);
+    bool UserBelongsToTeam,
+    bool HasCorrectBreak = false);
 
 public sealed record SubmissionAdmissionRules(
     bool AllowsFlag,
     bool AllowsFix,
     int? MaxFlagAttempts,
-    int? MaxFixAttempts);
+    int? MaxFixAttempts,
+    bool RequireBreakBeforeFix = false);
 
 public interface ISubmissionAdmissionModePolicy
 {
