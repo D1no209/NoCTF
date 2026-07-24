@@ -480,16 +480,27 @@ internal static class KohLeaderboardProjection
 
     public static IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input)
     {
-        var configuration = Parse(input.CompetitionConfigurationJson);
+        var configuration = ParseCompetition(input.CompetitionConfigurationJson);
         var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var hasChallengeCatalog = input.Challenges is not null;
+        var challenges = (input.Challenges ?? [])
+            .Where(challenge => !challenge.IsDeleted)
+            .ToDictionary(challenge => challenge.Id);
+        var challengePoints = challenges.ToDictionary(
+            item => item.Key,
+            item => PointsFor(configuration, item.Value.ConfigurationJson));
         var observations = input.SystemEvents
             .Where(fact => fact.Event is
             {
                 DeletedAt: null,
                 Kind: ScoringEventKind.KohObservation,
                 Result: ScoringResult.Correct,
-                TeamId: not null
-            } && teams.ContainsKey(fact.Event.TeamId!.Value))
+                TeamId: not null,
+                CompetitionChallengeId: not null
+            }
+            && teams.ContainsKey(fact.Event.TeamId!.Value)
+            && (!hasChallengeCatalog
+                || challenges.ContainsKey(fact.Event.CompetitionChallengeId!.Value)))
             .OrderBy(fact => fact.Event.OccurredAt)
             .ThenBy(fact => fact.Event.Id)
             .ToList();
@@ -497,22 +508,49 @@ internal static class KohLeaderboardProjection
         var rows = teams.Values.Select(team =>
         {
             var own = observations.Where(fact => fact.Event.TeamId == team.Id).ToList();
+            var first = own.Select(fact => fact.Event.OccurredAt).FirstOrDefault();
             var last = own.Select(fact => fact.Event.OccurredAt).LastOrDefault();
-            return new LeaderboardEntry(0, team.Id, team.Name,
-                checked(own.Count * configuration.ControlPointsPerInterval
-                    - hintCosts.GetValueOrDefault(team.Id)),
-                0,
-                last == default ? null : last,
-                []);
+            var observationPoints = own.Aggregate(
+                0L,
+                (total, fact) => checked(total + PointsForObservation(
+                    configuration.ControlPointsPerInterval,
+                    challengePoints,
+                    fact.Event.CompetitionChallengeId!.Value)));
+            return new KohRankedEntry(
+                new LeaderboardEntry(
+                    0,
+                    team.Id,
+                    team.Name,
+                    checked(observationPoints - hintCosts.GetValueOrDefault(team.Id)),
+                    own.Count,
+                    last == default ? null : last,
+                    []),
+                own.Count,
+                own.Select(fact => fact.Event.CompetitionChallengeId!.Value).Distinct().Count(),
+                first == default ? null : first,
+                team.RegisteredAt);
         });
-        return rows.OrderByDescending(row => row.Score)
-            .ThenBy(row => row.LastScoreAt ?? DateTimeOffset.MaxValue)
-            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
-            .Select((row, index) => row with { Rank = index + 1 })
+        return rows.OrderByDescending(row => row.Entry.Score)
+            .ThenByDescending(row => row.ControlledObservationCount)
+            .ThenByDescending(row => row.ControlledChallengeCount)
+            .ThenBy(row => row.FirstControlAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(row => row.RegisteredAt)
+            .ThenBy(row => row.Entry.TeamId)
+            .Select((row, index) => row.Entry with { Rank = index + 1 })
             .ToList();
     }
 
-    private static KohConfiguration Parse(string? json)
+    private static long PointsFor(KohConfiguration competition, string? challengeJson) =>
+        ParseChallenge(challengeJson).ControlPointsPerInterval
+        ?? competition.ControlPointsPerInterval;
+
+    private static long PointsForObservation(
+        long competitionDefault,
+        IReadOnlyDictionary<Guid, long> challengePoints,
+        Guid challengeId) =>
+        challengePoints.GetValueOrDefault(challengeId, competitionDefault);
+
+    private static KohConfiguration ParseCompetition(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return new(1, 5, 10);
         try
@@ -525,6 +563,28 @@ internal static class KohLeaderboardProjection
             return new(1, 5, 10);
         }
     }
+
+    private static KohChallengeConfiguration ParseChallenge(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new(KohChallengeConfiguration.CurrentSchemaVersion);
+        try
+        {
+            return JsonSerializer.Deserialize<KohChallengeConfiguration>(json, JsonOptions)
+                ?? new(KohChallengeConfiguration.CurrentSchemaVersion);
+        }
+        catch (JsonException)
+        {
+            return new(KohChallengeConfiguration.CurrentSchemaVersion);
+        }
+    }
+
+    private sealed record KohRankedEntry(
+        LeaderboardEntry Entry,
+        int ControlledObservationCount,
+        int ControlledChallengeCount,
+        DateTimeOffset? FirstControlAt,
+        DateTimeOffset RegisteredAt);
 }
 
 internal static class ProjectionPenalties
