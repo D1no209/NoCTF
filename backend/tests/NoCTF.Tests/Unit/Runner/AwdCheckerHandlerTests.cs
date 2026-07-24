@@ -50,6 +50,11 @@ public sealed class AwdCheckerHandlerTests
             .IsEqualTo("https://api.example/api/internal/v1/awd/check-results");
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"])
             .IsEqualTo("claim-bound-token");
+        await Assert.That(request.Labels["noctf.io/managed"]).IsEqualTo("true");
+        await Assert.That(request.Labels["noctf.io/runtime-instance-id"])
+            .IsEqualTo(work.RuntimeInstanceId.ToString("D"));
+        await Assert.That(request.Labels["noctf.io/purpose"])
+            .IsEqualTo("awd-checker");
         await Assert.That(request.OperationTimeout).IsEqualTo(TimeSpan.FromMinutes(1));
     }
 
