@@ -21,6 +21,11 @@ public sealed class PostgresAwdRoundCoordinator(
         GenerateAwdFlags message,
         CancellationToken cancellationToken)
     {
+        message = message with
+        {
+            ValidStart = ToPostgresTimestamp(message.ValidStart),
+            ValidUntil = ToPostgresTimestamp(message.ValidUntil)
+        };
         if (message.ValidStart >= message.ValidUntil)
             return MessageExecutionOutcome.RejectedBusiness;
         var ownsTransaction = db.Database.CurrentTransaction is null;
@@ -282,7 +287,7 @@ public sealed class PostgresAwdRoundCoordinator(
             case AwdRoundPlanKind.Finished:
                 return MessageExecutionOutcome.RejectedBusiness;
             case AwdRoundPlanKind.Create:
-                var window = plan.Window!.Value;
+                var window = ToPostgresTimestamp(plan.Window!.Value);
                 await outbox.PublishAsync(new GenerateAwdFlags(
                     message.CompetitionId,
                     message.CompetitionChallengeId,
@@ -366,8 +371,14 @@ public sealed class PostgresAwdRoundCoordinator(
             TimeSpan.FromSeconds(settings.HardeningDurationSeconds),
             TimeSpan.FromSeconds(settings.RoundDurationSeconds),
             latest);
-        return plan is { Kind: AwdRoundPlanKind.Create or AwdRoundPlanKind.Current, Window: { } window }
-            && window.Round == message.Round.Round
+        if (plan is not
+            {
+                Kind: AwdRoundPlanKind.Create or AwdRoundPlanKind.Current,
+                Window: { } window
+            })
+            return false;
+        window = ToPostgresTimestamp(window);
+        return window.Round == message.Round.Round
             && window.ValidStart == message.ValidStart
             && window.ValidUntil == message.ValidUntil;
     }
@@ -400,6 +411,7 @@ public sealed class PostgresAwdRoundCoordinator(
         DateTimeOffset dueAt,
         AdvanceAwdRound message)
     {
+        dueAt = ToPostgresTimestamp(dueAt);
         if (ScheduleMatches(
                 challenge,
                 round,
@@ -424,7 +436,8 @@ public sealed class PostgresAwdRoundCoordinator(
         int competitionRevision,
         long challengeRevision) =>
         challenge.LastScheduledAwdRound == round
-        && challenge.AwdScheduleDueAt == dueAt
+        && challenge.AwdScheduleDueAt is { } scheduledAt
+        && ToPostgresTimestamp(scheduledAt) == ToPostgresTimestamp(dueAt)
         && challenge.AwdScheduleCompetitionRevision == competitionRevision
         && challenge.AwdScheduleChallengeRevision == challengeRevision;
 
@@ -436,8 +449,24 @@ public sealed class PostgresAwdRoundCoordinator(
         long challengeRevision)
     {
         challenge.LastScheduledAwdRound = round;
-        challenge.AwdScheduleDueAt = dueAt;
+        challenge.AwdScheduleDueAt = ToPostgresTimestamp(dueAt);
         challenge.AwdScheduleCompetitionRevision = competitionRevision;
         challenge.AwdScheduleChallengeRevision = challengeRevision;
+    }
+
+    private static AwdPersistedRoundWindow ToPostgresTimestamp(
+        AwdPersistedRoundWindow window) =>
+        window with
+        {
+            ValidStart = ToPostgresTimestamp(window.ValidStart),
+            ValidUntil = ToPostgresTimestamp(window.ValidUntil)
+        };
+
+    private static DateTimeOffset ToPostgresTimestamp(DateTimeOffset value)
+    {
+        var utc = value.ToUniversalTime();
+        return new(
+            utc.Ticks - utc.Ticks % TimeSpan.TicksPerMicrosecond,
+            TimeSpan.Zero);
     }
 }
