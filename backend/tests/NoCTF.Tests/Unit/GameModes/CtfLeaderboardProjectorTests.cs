@@ -190,4 +190,150 @@ public sealed class CtfLeaderboardProjectorTests
 
         await Assert.That(rows.Count).IsEqualTo(3);
     }
+
+    [Test]
+    public async Task Earlier_last_submission_time_wins_even_when_evaluation_finishes_later()
+    {
+        var earlier = Guid.NewGuid();
+        var later = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
+        var at = DateTimeOffset.Parse("2026-07-25T00:00:00Z");
+        var input = Input(
+            competitionId,
+            [
+                new(earlier, "z", false, false, at),
+                new(later, "a", false, false, at)
+            ],
+            [
+                Fact(earlier, challengeId, at, at.AddSeconds(3), competitionId),
+                Fact(later, challengeId, at.AddSeconds(1), at.AddSeconds(2), competitionId)
+            ],
+            [],
+            [challengeId]);
+
+        var rows = new CtfLeaderboardProjector().Project(input);
+
+        await Assert.That(rows[0].TeamId).IsEqualTo(earlier);
+        await Assert.That(rows[0].LastScoreAt).IsEqualTo(at);
+        await Assert.That(rows[1].TeamId).IsEqualTo(later);
+    }
+
+    [Test]
+    public async Task More_solves_win_after_score_and_last_solve_time_tie()
+    {
+        var fewerSolves = Guid.NewGuid();
+        var moreSolves = Guid.NewGuid();
+        var firstChallengeId = Guid.NewGuid();
+        var secondChallengeId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
+        var at = DateTimeOffset.Parse("2026-07-25T00:00:00Z");
+        var input = Input(
+            competitionId,
+            [
+                new(fewerSolves, "a", false, false, at),
+                new(moreSolves, "z", false, false, at)
+            ],
+            [
+                Fact(fewerSolves, firstChallengeId, at.AddSeconds(1), at.AddSeconds(1), competitionId),
+                Fact(moreSolves, firstChallengeId, at, at, competitionId),
+                Fact(moreSolves, secondChallengeId, at.AddSeconds(1), at.AddSeconds(1), competitionId)
+            ],
+            [
+                new(new ScoringEvent
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = competitionId,
+                    TeamId = moreSolves,
+                    Kind = ScoringEventKind.HintUnlock,
+                    Result = ScoringResult.Correct,
+                    OccurredAt = at,
+                    CreatedAt = at
+                }, CurrentValue: 100)
+            ],
+            [firstChallengeId, secondChallengeId]);
+
+        var rows = new CtfLeaderboardProjector().Project(input);
+
+        await Assert.That(rows[0].TeamId).IsEqualTo(moreSolves);
+        await Assert.That(rows[0].Score).IsEqualTo(100);
+        await Assert.That(rows[0].SolveCount).IsEqualTo(2);
+        await Assert.That(rows[1].TeamId).IsEqualTo(fewerSolves);
+    }
+
+    [Test]
+    public async Task Registration_time_then_team_id_break_remaining_ties()
+    {
+        var earlyRegistration = Guid.Parse("00000000-0000-0000-0000-000000000003");
+        var lowerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var higherId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var competitionId = Guid.NewGuid();
+        var at = DateTimeOffset.Parse("2026-07-25T00:00:00Z");
+        var input = Input(
+            competitionId,
+            [
+                new(earlyRegistration, "z", false, false, at.AddMinutes(-1)),
+                new(lowerId, "z", false, false, at),
+                new(higherId, "a", false, false, at)
+            ],
+            [],
+            [],
+            []);
+
+        var rows = new CtfLeaderboardProjector().Project(input);
+
+        await Assert.That(rows[0].TeamId).IsEqualTo(earlyRegistration);
+        await Assert.That(rows[1].TeamId).IsEqualTo(lowerId);
+        await Assert.That(rows[2].TeamId).IsEqualTo(higherId);
+    }
+
+    private static LeaderboardProjectionInput Input(
+        Guid competitionId,
+        IReadOnlyList<LeaderboardTeamFact> teams,
+        IReadOnlyList<LeaderboardSubmissionFact> submissions,
+        IReadOnlyList<LeaderboardSystemFact> systemEvents,
+        IReadOnlyList<Guid> challengeIds) =>
+        new(
+            competitionId,
+            GameMode.Ctf,
+            teams,
+            submissions,
+            systemEvents,
+            challengeIds.Select(challengeId => new LeaderboardChallengeFact(
+                challengeId,
+                "Web",
+                false,
+                JsonSerializer.Serialize(new CtfChallengeConfiguration(
+                    CtfChallengeConfiguration.CurrentSchemaVersion,
+                    new(100, 100, 10),
+                    []))))
+                .ToList(),
+            JsonSerializer.Serialize(new CtfConfiguration(
+                CtfConfiguration.CurrentSchemaVersion,
+                new(100, 100, 10),
+                [])));
+
+    private static LeaderboardSubmissionFact Fact(
+        Guid teamId,
+        Guid challengeId,
+        DateTimeOffset receivedAt,
+        DateTimeOffset occurredAt,
+        Guid competitionId) =>
+        new(
+            Guid.NewGuid(),
+            teamId,
+            challengeId,
+            SubmissionKind.Flag,
+            receivedAt,
+            new ScoringEvent
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                CompetitionChallengeId = challengeId,
+                TeamId = teamId,
+                Kind = ScoringEventKind.SubmissionEvaluation,
+                Result = ScoringResult.Correct,
+                OccurredAt = occurredAt,
+                CreatedAt = occurredAt
+            });
 }

@@ -113,18 +113,30 @@ internal static class CtfLeaderboardProjection
                     group.Count()))
                 .OrderBy(summary => summary.CompetitionChallengeId)
                 .ToList();
-            var last = own.Select(item => item.Fact.Event.OccurredAt).OrderByDescending(value => value).FirstOrDefault();
+            var last = own.Select(item => item.Fact.ReceivedAt)
+                .OrderByDescending(value => value)
+                .FirstOrDefault();
             var total = checked(own.Aggregate(0L, (sum, item) => checked(sum + item.Points))
                 - wrongPenalties.GetValueOrDefault(team.Id)
                 - hintCosts.GetValueOrDefault(team.Id));
-            return new LeaderboardEntry(0, team.Id, team.Name, total, own.Count,
-                last == default ? null : last, summaries);
+            return new CtfRankedEntry(
+                new LeaderboardEntry(
+                    0,
+                    team.Id,
+                    team.Name,
+                    total,
+                    own.Count,
+                    last == default ? null : last,
+                    summaries),
+                team.RegisteredAt);
         });
         return rows
-            .OrderByDescending(row => row.Score)
-            .ThenBy(row => row.LastScoreAt ?? DateTimeOffset.MaxValue)
-            .ThenBy(row => row.TeamName, StringComparer.Ordinal)
-            .Select((row, index) => row with { Rank = index + 1 })
+            .OrderByDescending(row => row.Entry.Score)
+            .ThenBy(row => row.Entry.LastScoreAt ?? DateTimeOffset.MaxValue)
+            .ThenByDescending(row => row.Entry.SolveCount)
+            .ThenBy(row => row.RegisteredAt)
+            .ThenBy(row => row.Entry.TeamId)
+            .Select((row, index) => row.Entry with { Rank = index + 1 })
             .ToList();
     }
 
@@ -161,6 +173,10 @@ internal static class CtfLeaderboardProjection
         try { return JsonSerializer.Deserialize<T>(json, JsonOptions); }
         catch (JsonException) { return null; }
     }
+
+    private sealed record CtfRankedEntry(
+        LeaderboardEntry Entry,
+        DateTimeOffset RegisteredAt);
 }
 
 public sealed class AwdLeaderboardProjector : IGameModeLeaderboardProjector
