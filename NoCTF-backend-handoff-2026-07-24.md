@@ -1,6 +1,6 @@
 # NoCTF 后端目标架构交接
 
-> 创建于 2026-07-24，最后核验于 2026-07-26。文件名保留原日期，本文内容以最后核验日期为准。
+> 创建于 2026-07-24，最后核验于 2026-07-27。文件名保留原日期，本文内容以最后核验日期为准。
 
 ## 1. 下一会话目标
 
@@ -12,7 +12,9 @@ Frontend、仓库外 CI 或用户的本地辅助文件。
 
 Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径已经接通，
 OVA/Libvirt lifecycle、orphan reconciliation 与 CTF PerTeam Runtime Flag 注入也已闭环。
-下一主线是增加 EgressPolicy 强类型模型及 Docker/Kubernetes enforcement。
+EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 与 Kubernetes
+`DenyAll | InternetOnly` enforcement 已接通。下一主线是当前 Kubernetes 策略的真实集群
+复测、Docker/Kubernetes 持久网络与 ingress proxy orphan reconciliation，以及部署 smoke。
 
 ## 2. Git 基线与工作树保护
 
@@ -20,7 +22,7 @@ OVA/Libvirt lifecycle、orphan reconciliation 与 CTF PerTeam Runtime Flag 注�
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`a53aa11 feat(backend): inject CTF per-team runtime flags`。
+- 当前代码实现 HEAD：`4dfbf90 feat(backend): enforce runtime egress policies`。
 - 本轮实现只做本地提交，尚未获准推送。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -65,8 +67,17 @@ git log --oneline 003b75c..2c6b4ce -- backend
 9. 如果出现真正会改变产品语义的歧义，使用 `$grill-me` 向用户确认；不要静默选择。
 10. Compose 使用强类型逐服务资源配置；每个 YAML service 必须有一条正资源上限，
     顶层 Runtime limits 是整个 Compose instance 的总预算，逐服务总和不得超过它。
+11. 当前威胁模型信任办赛管理员、管理员维护的题目配置、Runner Pool 配置和平台托管镜像，
+    不防管理员内鬼；选手、题目业务容器及其网络输入仍按不可信处理。
+12. `EgressPolicy` 只属于 Container/Compose，OVA 首版不增加该字段。Docker 首版只支持
+    `DenyAll`，`InternetOnly` 直接拒绝；Kubernetes 支持两者。
+13. Docker 的 `internal` network 不提供可用的直接 published port。公开 Runtime 使用
+    用户确认的 1A：平台托管可信 HAProxy ingress，同时连接题目内部 network 与
+    `noctf-network`，只转发已声明的 TCP URL Binding；题目容器不连接平台网络。
+14. Kubernetes `InternetOnly` 只放行公网 IPv4；IPv6 不放行。特殊/私有地址使用内建
+    deny ranges，并要求 Runner Pool 额外声明非空 `ProtectedCidrs`。
 
-## 4. 2026-07-26 当前 HEAD 的实测门禁
+## 4. 2026-07-27 当前 HEAD 的实测门禁
 
 所有命令均在 `E:\SourceCode\NoCTF` 发起，通过 WSL 在
 `/mnt/e/SourceCode/NoCTF/backend` 执行。
@@ -88,7 +99,7 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 327/327 passed。
+- 334/334 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -98,9 +109,9 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -- --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 1"
 ```
 
-- 本轮 WSL 回归为 31 passed、0 failed、1 skipped；唯一 skip 是未设置
+- 本轮 WSL 回归为 32 passed、0 failed、1 skipped；唯一 skip 是未设置
   `NOCTF_KUBERNETES_INTEGRATION` 的真实 Kubernetes Compose 测试。
-- 不分组整套回归为 359 total、358 passed、0 failed、1 skipped。
+- 分组总计 367 total、366 passed、0 failed、1 skipped。
 - 本轮修改前同一 HEAD 基线已用临时 k3d 完成 29/29 passed，0 failed，0 skipped；
   OVA 修改未触碰 Kubernetes Provider。
 - Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
@@ -117,6 +128,11 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   routed subnet、Guest Agent address、stable identity、URL expansion 与幂等 cleanup。
 - 新增真实 PostgreSQL CTF PerTeam Runtime Flag 生命周期测试，覆盖 Start 原子生成、
   Worker dispatch 环境覆盖、批量生成、Static 排除和 Reset 固定 Flag 复用。
+- 新增真实 Docker Container/Compose ingress proxy 测试，证明题目容器不连接平台网络、
+  proxy 双网络、公开端口可访问、同 Runtime DNS/互通、幂等 replay 与精确 cleanup。
+- `deploy/docker-compose.yml` 已通过 `docker compose config --quiet` 静态解析。
+- 当前 EgressPolicy 的 Kubernetes manifest/unit 测试已通过；本轮没有可用 k3d/k3s
+  context，因此新的 `InternetOnly` ipBlock/except 尚未在真实 CNI 上复测。
 
 ### EF Core 模型
 
@@ -330,19 +346,57 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   service 不接收 Flag。
 - OVA 不存在注入字段，仍永远不注入动态 Flag。
 
-### 6.4 Egress 与网络模型仍不完整
+### 6.4 Egress 与网络模型已接通首版，部署状态必须区分
 
-`docs/runtime.md` 定义 `EgressPolicy: DenyAll | InternetOnly`，但
-`ChallengeRuntimeTemplate` 当前没有对应强类型字段，也没有完整的 Docker/Kubernetes
-enforcement。
+代码与部署清单已完成：
 
-需要区分：
+- `ContainerRuntimeDefinition`、`ComposeRuntimeDefinition` 使用强类型
+  `RuntimeEgressPolicy.DenyAll | InternetOnly`，默认 `DenyAll`；OVA 没有该字段。
+- Worker 把策略传入 Container/Compose request；普通 Container 不再使用 Runner shared
+  network，而是创建不可变 RuntimeInstanceId+Generation 的独立 sandbox。
+- Docker Container/Compose 只接受 `DenyAll`。所有题目 network 强制
+  `internal: true`；`InternetOnly` 在保存校验和 provider 执行边界双重拒绝。
+- Docker 公开 URL 使用一个平台托管 HAProxy ingress。proxy 同时连接 Runtime 内部
+  network 与 `noctf-network`，题目容器不连接平台网络；proxy 只监听声明的 TCP Binding。
+  Container receipt 保存 proxy resource id；Compose 保存本地 ingress 映射 metadata，
+  status 把 proxy host port 映射回原 service/target port。
+- proxy 使用 `read_only`、drop ALL capabilities、no-new-privileges、固定内存/CPU/PID
+  limits；其资源开销计入 Runner capacity。创建重放、失败回滚、Stop/Reset cleanup 已覆盖。
+- Kubernetes Container/Compose 每 Runtime 创建 NetworkPolicy。`DenyAll` 只允许同
+  Runtime、DNS 和平台声明入站；`InternetOnly` 额外允许 `0.0.0.0/0`，通过 `except`
+  排除内建特殊/私有 IPv4 与 Pool `ProtectedCidrs`，不生成 IPv6 allow。
+- Kubernetes Pool 启动时强制非空、合法 IPv4 `ProtectedCidrs`；Docker/Libvirt Pool
+  不被无关 Kubernetes 配置阻塞。
+- `deploy/docker-compose.yml` 将默认平台网络命名为 `noctf-network`，并加入新的
+  Runtime Docker/proxy/Runner 配置；`deploy/k8s/configmap.yaml` 加入
+  `ProtectedCidrs` 示例。
 
-- 题目 Runtime 的长期隔离与 EgressPolicy：仍是目标架构交付项。
-- 可信 Checker 的双网络部署：用户已明确允许。
-- TargetPort ACL/callback-only gateway：后期加固，不阻塞当前 Runtime 迁移。
+当前实际部署状态：
 
-不得把 JWT 约束、label 或独立 network 等同于底层网络 ACL 已完成。
+- 本轮只修改、验证并本地提交了代码和部署清单，没有重启或替换用户正在运行的服务。
+- 2026-07-27 检查时，本机仍运行已有 `deploy-*` 容器，实际网络仍是
+  `deploy_default`；`noctf-network` 尚不存在。新的 `deploy/docker-compose.yml` 只完成
+  `config --quiet` 验证，尚未 `up` 应用。
+- 本轮没有连接真实 Kubernetes cluster；`deploy/k8s` 变更尚未 apply。旧基线曾在临时
+  k3d/k3s+CNI 上通过 DNS/NetworkPolicy 测试，但本轮新增 `InternetOnly` 规则只经过
+  manifest/unit 测试。
+- 没有任何生产环境部署，也没有推送远程分支。
+
+明确尚未实现：
+
+- Docker `InternetOnly`；没有 `DOCKER-USER` 宿主防火墙方案和 Egress Gateway。
+- OVA/Libvirt EgressPolicy。
+- IPv6 公网 egress、域名/FQDN allowlist、目的端口 allowlist。
+- CNI NetworkPolicy 能力自动探测；`NetworkPolicyRequired=true` 仍是运维声明。
+- Pod/Service/node/management CIDR 自动发现；Pool 运维必须维护 `ProtectedCidrs`。
+- 单 Container proxy 镜像的自动 registry 拉取/鉴权；节点须预拉取受信任镜像。Compose
+  路径由 Compose pull policy 处理。
+- 持久 Container sandbox、ingress proxy 与 Compose appliance 在 Runner 进程崩溃且
+  receipt 尚未持久化时的完整 orphan reconciliation。普通 Stop/Reset/失败回滚已完成，
+  但不能把它等同于 crash orphan audit。
+- Docker TargetPort ACL 与 callback-only gateway；它们仍是后期加固，不阻塞当前迁移。
+
+不得把可信管理员假设、JWT、label、DNS 名称或独立 network 单独描述成完整安全边界。
 
 ### 6.5 Runner capacity、reconciliation 与 orphan cleanup 需要最终闭环审计
 
@@ -354,6 +408,9 @@ enforcement。
 - receipt 已存在的 Failed 仍由原节点清理；
 - Docker/Kubernetes reaper 只按 managed + RuntimeInstanceId + Generation 精确匹配；
 - Compose appliance/OVA 多资源 cleanup 不使用宽泛 Competition/Team 标签。
+- 新增的 Docker ingress proxy、持久 Container sandbox NetworkPolicy/network 与
+  Compose proxy 必须纳入 crash orphan audit；持久资源不能使用从 Provider create 时刻
+  开始的业务 TTL 提前回收。
 
 ### 6.6 API、DI 与交付项
 
@@ -372,9 +429,14 @@ enforcement。
 
 每一项必须独立 commit：
 
-1. 增加 EgressPolicy 模型及 Docker/Kubernetes enforcement。
-2. 重新跑 Provider contract、全部 Integration 与四模式 E2E。
-3. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+1. 在临时 k3d/k3s+CNI 上复测当前 Kubernetes `DenyAll`、`InternetOnly`、
+   `ProtectedCidrs`、IPv6 deny、跨 Runtime deny 与 cleanup。
+2. 完成 Docker/Kubernetes 持久 sandbox、ingress proxy、Compose appliance 的 crash
+   orphan reconciliation，并重新审计 capacity claim/release。
+3. 使用新清单执行受控 Docker Compose/Kubernetes deployment smoke；不得自行重启用户
+   当前运行的本地栈。
+4. 重新跑四模式 E2E。
+5. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
