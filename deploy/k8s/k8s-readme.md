@@ -119,10 +119,15 @@ Important ConfigMap values:
 - `Runtime__Kubernetes__ClusterDomain`: actual cluster DNS domain
 - `Runtime__Kubernetes__PodPidsLimit`: must equal the kubelet Pool-wide value
 - `Runtime__Kubernetes__NetworkPolicyRequired`: must be `true`
+- `Runtime__Kubernetes__ProtectedCidrs__*`: every Pod, Service, node-management,
+  platform-infrastructure, and other non-public IPv4 CIDR that challenge workloads
+  must never reach
 
 The Runner image contains Kompose `v1.38.0` at `/usr/local/bin/kompose`.
 The cluster CNI must enforce NetworkPolicy; the configuration flag is an
-operator attestation, not a capability probe.
+operator attestation, not a capability probe. `ProtectedCidrs` is required even
+though the runtime also blocks common private and special-use IPv4 ranges; add
+all cluster-specific ranges that are not covered by those built-ins.
 
 Smoke test:
 

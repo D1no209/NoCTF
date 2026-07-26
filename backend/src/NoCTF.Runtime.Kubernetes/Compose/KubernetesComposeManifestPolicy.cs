@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Runtime.Kubernetes.Configuration;
+using NoCTF.Runtime.Kubernetes.Networking;
 
 namespace NoCTF.Runtime.Kubernetes.Compose;
 
@@ -272,50 +273,10 @@ public static class KubernetesComposeManifestPolicy
                 PodSelector = new V1LabelSelector { MatchLabels = runtimeSelector },
                 PolicyTypes = ["Ingress", "Egress"],
                 Ingress = ingress,
-                Egress =
-                [
-                    new V1NetworkPolicyEgressRule
-                    {
-                        To =
-                        [
-                            new V1NetworkPolicyPeer
-                            {
-                                PodSelector = new V1LabelSelector
-                                {
-                                    MatchLabels = runtimeSelector
-                                }
-                            }
-                        ]
-                    },
-                    new V1NetworkPolicyEgressRule
-                    {
-                        To =
-                        [
-                            new V1NetworkPolicyPeer
-                            {
-                                NamespaceSelector = new V1LabelSelector
-                                {
-                                    MatchLabels = new Dictionary<string, string>
-                                    {
-                                        ["kubernetes.io/metadata.name"] = "kube-system"
-                                    }
-                                },
-                                PodSelector = new V1LabelSelector
-                                {
-                                    MatchLabels = new Dictionary<string, string>
-                                    {
-                                        ["k8s-app"] = "kube-dns"
-                                    }
-                                }
-                            }
-                        ],
-                        Ports =
-                        [
-                            new V1NetworkPolicyPort { Protocol = "UDP", Port = 53 },
-                            new V1NetworkPolicyPort { Protocol = "TCP", Port = 53 }
-                        ]
-                    }
-                ]
+                Egress = KubernetesEgressPolicy.Build(
+                    request.EgressPolicy,
+                    new V1LabelSelector { MatchLabels = runtimeSelector },
+                    options).ToList()
             }
         };
         return new(runtimeName, deployments, services, networkPolicy);

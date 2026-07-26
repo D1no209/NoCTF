@@ -170,6 +170,8 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8080
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
+      Runner__Pool: ${RUNNER_POOL:-default}
+      Runner__Id: ${RUNNER_ID:-docker-runner-1}
       Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
       Runner__AllowedRegistries: ${RUNNER_ALLOWED_REGISTRIES:-docker.io,ghcr.io,quay.io,registry.k8s.io,localhost}
       Runner__AllowedNetworks: ${RUNNER_ALLOWED_NETWORKS:-deploy_default}
@@ -179,6 +181,17 @@ services:
       Runner__OperationReceiptLimit: ${RUNNER_RECEIPT_LIMIT:-512}
       Runner__MaxOperationSeconds: ${RUNNER_MAX_OPERATION_SECONDS:-1800}
       Runner__MaxRequestBodyBytes: ${RUNNER_MAX_REQUEST_BODY_BYTES:-4194304}
+      ConnectionStrings__PostgreSql: >-
+        Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET}}
+      Runtime__Docker__Endpoint: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      Runtime__Docker__Network: noctf-network
+      Runtime__Docker__PublicHost: ${DOCKER_PUBLISHED_HOST:-host.docker.internal}
+      Runtime__Docker__IngressProxyImage: ${DOCKER_INGRESS_PROXY_IMAGE:-haproxy:3.1-alpine}
+      Runtime__Docker__IngressProxyMemoryBytes: ${DOCKER_INGRESS_PROXY_MEMORY_BYTES:-67108864}
+      Runtime__Docker__IngressProxyNanoCpus: ${DOCKER_INGRESS_PROXY_NANO_CPUS:-100000000}
+      Runtime__Docker__IngressProxyPidsLimit: ${DOCKER_INGRESS_PROXY_PIDS_LIMIT:-64}
       Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       Docker__PublishedHost: ${DOCKER_PUBLISHED_HOST:-host.docker.internal}
       Docker__RuntimeOrphanGraceHours: ${DOCKER_RUNTIME_ORPHAN_GRACE_HOURS:-168}
@@ -202,3 +215,7 @@ volumes:
   redis_data:
   minio_data:
   backend_uploads:
+
+networks:
+  default:
+    name: noctf-network

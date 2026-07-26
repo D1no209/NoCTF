@@ -20,10 +20,16 @@ public static class IsolatedContainerProvisioner
                 cancellationToken);
 
         var networkId = await sandbox.CreateIsolatedNetworkAsync(
-            new RuntimeResourceIdentity(
-                request.RuntimeInstanceId ?? request.OperationId,
-                request.Generation,
-                request.InternalPorts?.SingleOrDefault() ?? 0),
+            new ContainerNetworkPolicyRequest(
+                new RuntimeResourceIdentity(
+                    request.RuntimeInstanceId ?? request.OperationId,
+                    request.Generation),
+                request.NetworkPurpose,
+                request.EgressPolicy,
+                request.PortMappings.Keys.Order().ToArray(),
+                request.NetworkPurpose == ContainerNetworkPurpose.AwdpVerification
+                    ? request.InternalPorts?.SingleOrDefault()
+                    : null),
             now.Add(request.Ttl ?? TimeSpan.FromMinutes(15)),
             cancellationToken);
         try

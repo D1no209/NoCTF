@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Builders;
 using Docker.DotNet;
+using Docker.DotNet.Models;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Docker.Compose;
@@ -23,11 +24,23 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 .Build();
             await dockerProbe.StartAsync(cancellationToken);
             var operationId = Guid.NewGuid();
+            var platformNetworkName = $"noctf-platform-it-{operationId:N}";
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var platformNetwork = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters
+                {
+                    Name = platformNetworkName
+                },
+                cancellationToken);
             var workRoot = Path.Combine(
                 Path.GetTempPath(),
                 $"noctf-compose-it-{operationId:N}");
             var runtime = new DockerComposeRuntime(
-                new DockerRuntimeOptions(PublicHost: "localhost"),
+                new DockerRuntimeOptions(
+                    PublicHost: "localhost",
+                    NetworkName: platformNetworkName),
                 workDirectory: workRoot);
             ComposeReceipt? receipt = null;
             try
@@ -43,6 +56,12 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 var web = status.Services.Single(service => service.Name == "web");
                 await Assert.That(web.PublishedPorts.ContainsKey(8080)).IsTrue();
                 await Assert.That(web.PublishedPorts[8080]).IsGreaterThan(0);
+                using var http = new HttpClient();
+                var publicResponse = await GetEventuallyAsync(
+                    http,
+                    $"http://localhost:{web.PublishedPorts[8080]}",
+                    cancellationToken);
+                await Assert.That(publicResponse.Trim()).IsEqualTo("web");
                 var sameRuntime = await runtime.ExecAsync(
                     receipt,
                     "web",
@@ -55,6 +74,34 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     cancellationToken);
                 await Assert.That(sameRuntime)
                     .IsEqualTo(new ContainerExecResult(0, false));
+                var composeContainers = await docker.Containers.ListContainersAsync(
+                    new ContainersListParameters
+                    {
+                        All = true,
+                        Filters = new Dictionary<string, IDictionary<string, bool>>
+                        {
+                            ["label"] = new Dictionary<string, bool>
+                            {
+                                [$"com.docker.compose.project={receipt.ProjectName}"] = true
+                            }
+                        }
+                    },
+                    cancellationToken);
+                var ingress = composeContainers.Single(container =>
+                    container.Labels.TryGetValue(
+                        "com.docker.compose.service",
+                        out var service)
+                    && service == DockerComposeIngressProxyPolicy.ProxyServiceName);
+                var ingressInspect = await docker.Containers.InspectContainerAsync(
+                    ingress.ID,
+                    cancellationToken);
+                await Assert.That(ingressInspect.NetworkSettings!.Networks.Keys)
+                    .Contains(platformNetworkName);
+                var webInspect = await docker.Containers.InspectContainerAsync(
+                    web.ResourceId,
+                    cancellationToken);
+                await Assert.That(webInspect.NetworkSettings!.Networks.Keys)
+                    .DoesNotContain(platformNetworkName);
 
                 var resourceIds = status.Services
                     .Select(service => service.ResourceId)
@@ -63,9 +110,6 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 await runtime.DownAsync(receipt, cancellationToken);
                 receipt = null;
 
-                using var docker = new DockerClientBuilder()
-                    .WithEndpoint(new Uri(DockerEndpoint()))
-                    .Build();
                 foreach (var resourceId in resourceIds)
                 {
                     Func<Task> inspect = async () =>
@@ -87,6 +131,9 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     await runtime.DownAsync(receipt, CancellationToken.None);
                 if (Directory.Exists(workRoot))
                     Directory.Delete(workRoot, recursive: true);
+                await docker.Networks.DeleteNetworkAsync(
+                    platformNetwork.ID,
+                    CancellationToken.None);
             }
         });
     }
@@ -96,6 +143,29 @@ public sealed class DockerComposeRuntimeIntegrationTests
         ?? (OperatingSystem.IsWindows()
             ? "npipe://./pipe/docker_engine"
             : "unix:///var/run/docker.sock");
+
+    private static async Task<string> GetEventuallyAsync(
+        HttpClient client,
+        string url,
+        CancellationToken cancellationToken)
+    {
+        Exception? lastFailure = null;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            try
+            {
+                return await client.GetStringAsync(url, cancellationToken);
+            }
+            catch (HttpRequestException exception)
+            {
+                lastFailure = exception;
+                await Task.Delay(250, cancellationToken);
+            }
+        }
+        throw new InvalidOperationException(
+            $"Docker Compose ingress proxy did not become reachable at '{url}'.",
+            lastFailure);
+    }
 
     private static ComposeRequest Request(Guid operationId) => new(
         operationId,

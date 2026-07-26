@@ -15,6 +15,7 @@ using NoCTF.Runner.Messages;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Application.Authentication;
 using NoCTF.Infrastructure.Authentication;
+using NoCTF.Runtime.Kubernetes.Networking;
 
 namespace NoCTF.Runner.Composition;
 
@@ -25,13 +26,35 @@ public static class ServiceRegistration
     public static IServiceCollection AddNoCtfRunner(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddHttpClient();
+        var configuredProvider = configuration["Runner:Provider"];
+        var isKubernetesPool = string.Equals(
+            configuredProvider,
+            nameof(NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes),
+            StringComparison.OrdinalIgnoreCase);
+        var isLibvirtPool = string.Equals(
+            configuredProvider,
+            nameof(NoCTF.Domain.Runtime.RuntimeProvider.Libvirt),
+            StringComparison.OrdinalIgnoreCase);
         var options = new DockerRuntimeOptions(
             configuration["Runtime:Docker:Endpoint"] ?? "npipe://./pipe/docker_engine",
             configuration["Runtime:Docker:Network"] ?? "noctf",
             configuration["Runtime:Docker:PublicHost"] ?? "localhost",
             configuration["Runtime:Docker:CallbackContainer"] ?? "noctf-awdp-callback",
             configuration["Runtime:Docker:CallbackContainerLabelKey"] ?? "noctf.io/internal-role",
-            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback-gateway");
+            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback-gateway",
+            configuration["Runtime:Docker:IngressProxyImage"] ?? "haproxy:3.1-alpine",
+            ReadPositiveLongOrDefault(
+                configuration,
+                "Runtime:Docker:IngressProxyMemoryBytes",
+                67_108_864),
+            ReadPositiveLongOrDefault(
+                configuration,
+                "Runtime:Docker:IngressProxyNanoCpus",
+                100_000_000),
+            ReadPositiveLongOrDefault(
+                configuration,
+                "Runtime:Docker:IngressProxyPidsLimit",
+                64));
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
         services.AddSingleton<IRuntimeResourceReaper>(provider =>
@@ -43,9 +66,20 @@ public static class ServiceRegistration
             configuration["Runtime:Kubernetes:ImagePullPolicy"] ?? "IfNotPresent",
             configuration["Runtime:Kubernetes:CallbackPodLabelKey"] ?? "noctf.io/internal-role",
             configuration["Runtime:Kubernetes:CallbackPodLabelValue"] ?? "awdp-callback",
-            ReadRequiredPositiveLong(configuration, "Runtime:Kubernetes:PodPidsLimit"),
-            ReadRequiredString(configuration, "Runtime:Kubernetes:ClusterDomain"),
-            ReadRequiredTrue(configuration, "Runtime:Kubernetes:NetworkPolicyRequired")));
+            isKubernetesPool
+                ? ReadRequiredPositiveLong(configuration, "Runtime:Kubernetes:PodPidsLimit")
+                : 0,
+            isKubernetesPool
+                ? ReadRequiredString(configuration, "Runtime:Kubernetes:ClusterDomain")
+                : string.Empty,
+            isKubernetesPool
+                && ReadRequiredTrue(configuration, "Runtime:Kubernetes:NetworkPolicyRequired"),
+            isKubernetesPool
+                ? KubernetesEgressPolicy.ValidateAndNormalizeProtectedCidrs(
+                    configuration.GetSection("Runtime:Kubernetes:ProtectedCidrs")
+                        .GetChildren()
+                        .Select(section => section.Value ?? string.Empty))
+                : null));
         services.AddSingleton<IKubernetes>(_ =>
             new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig()));
         services.AddSingleton<KubernetesContainerLifecycle>();
@@ -53,10 +87,6 @@ public static class ServiceRegistration
             provider.GetRequiredService<KubernetesContainerLifecycle>());
         services.AddSingleton<IKomposeConverter>(new KomposeConverter());
         services.AddSingleton<KubernetesComposeRuntime>();
-        var isLibvirtPool = string.Equals(
-            configuration["Runner:Provider"],
-            nameof(NoCTF.Domain.Runtime.RuntimeProvider.Libvirt),
-            StringComparison.OrdinalIgnoreCase);
         var hasLibvirtConfiguration =
             !string.IsNullOrWhiteSpace(configuration["Runtime:Libvirt:PoolRoutedNetworkCidr"]);
         if (isLibvirtPool || hasLibvirtConfiguration)
@@ -104,6 +134,25 @@ public static class ServiceRegistration
         string key)
     {
         var value = configuration[key];
+        if (!long.TryParse(
+                value,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed)
+            || parsed <= 0)
+            throw new InvalidOperationException(
+                $"{key} must be configured as a positive integer.");
+        return parsed;
+    }
+
+    private static long ReadPositiveLongOrDefault(
+        IConfiguration configuration,
+        string key,
+        long defaultValue)
+    {
+        var value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+            return defaultValue;
         if (!long.TryParse(
                 value,
                 System.Globalization.NumberStyles.None,

@@ -138,7 +138,8 @@ public sealed class KubernetesContainerLifecycleTests
                                 ["noctf.io/managed"] = "true",
                                 ["noctf.io/runtime-instance-id"] =
                                     "019be6f7-882e-7cae-9389-898a98fbfe22",
-                                ["noctf.io/generation"] = "3"
+                                ["noctf.io/generation"] = "3",
+                                ["noctf.io/network-purpose"] = "awdp-verification"
                             }
                         }
                     }
@@ -153,8 +154,13 @@ public sealed class KubernetesContainerLifecycleTests
         var lifecycle = new KubernetesContainerLifecycle(client, new KubernetesRuntimeOptions());
 
         Func<Task> action = () => lifecycle.CreateIsolatedNetworkAsync(
-            new RuntimeResourceIdentity(
-                Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3, 8080),
+            new ContainerNetworkPolicyRequest(
+                new RuntimeResourceIdentity(
+                    Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3),
+                ContainerNetworkPurpose.AwdpVerification,
+                RuntimeEgressPolicy.DenyAll,
+                [],
+                8080),
             DateTimeOffset.UtcNow.AddMinutes(1),
             CancellationToken.None);
 
@@ -162,6 +168,55 @@ public sealed class KubernetesContainerLifecycleTests
         await Assert.That(networking.ReceivedCalls().Any(call =>
             call.GetMethodInfo().Name == "DeleteNamespacedNetworkPolicyWithHttpMessagesAsync"))
             .IsTrue();
+    }
+
+    [Test]
+    public async Task Persistent_runtime_policy_applies_public_ingress_and_InternetOnly_egress()
+    {
+        var (client, _, networking) = CreateClient();
+        networking.ReadNamespacedNetworkPolicyWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(NotFound()));
+        V1NetworkPolicy? createdPolicy = null;
+        networking.CreateNamespacedNetworkPolicyWithHttpMessagesAsync(
+                Arg.Do<V1NetworkPolicy>(policy => createdPolicy = policy),
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<bool?>(), Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1NetworkPolicy>
+            {
+                Body = new V1NetworkPolicy()
+            }));
+        var lifecycle = new KubernetesContainerLifecycle(
+            client,
+            new KubernetesRuntimeOptions(ProtectedCidrs: ["172.30.0.0/16"]));
+
+        var name = await lifecycle.CreateIsolatedNetworkAsync(
+            new ContainerNetworkPolicyRequest(
+                new RuntimeResourceIdentity(
+                    Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3),
+                ContainerNetworkPurpose.PersistentRuntime,
+                RuntimeEgressPolicy.InternetOnly,
+                [8080]),
+            DateTimeOffset.UtcNow.AddMinutes(1),
+            CancellationToken.None);
+
+        await Assert.That(name)
+            .IsEqualTo("noctf-rt-019be6f7882e7cae9389898a98fbfe22-3");
+        await Assert.That(createdPolicy).IsNotNull();
+        await Assert.That(createdPolicy!.Metadata.Labels.ContainsKey("noctf.io/expires-at"))
+            .IsFalse();
+        await Assert.That(createdPolicy.Spec.Ingress).Count().IsEqualTo(2);
+        var publicIngress = createdPolicy.Spec.Ingress.Single(rule =>
+            rule.FromProperty is null || rule.FromProperty.Count == 0);
+        await Assert.That(publicIngress.Ports.Single().Port.Value).IsEqualTo("8080");
+        await Assert.That(createdPolicy.Spec.Egress).Count().IsEqualTo(3);
+        await Assert.That(createdPolicy.Spec.Egress.Single(rule =>
+                rule.To.Any(peer => peer.IpBlock is not null))
+            .To.Single().IpBlock!.Except)
+            .Contains("172.30.0.0/16");
     }
 
     private static (IKubernetes Client, ICoreV1Operations Core, INetworkingV1Operations Networking)

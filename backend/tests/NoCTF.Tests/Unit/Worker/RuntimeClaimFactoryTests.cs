@@ -17,7 +17,8 @@ public sealed class RuntimeClaimFactoryTests
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:v1",
-                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
+                PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                EgressPolicy: RuntimeEgressPolicy.DenyAll),
             Limits: new(268_435_456, 500_000_000, 128));
 
         var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
@@ -27,6 +28,10 @@ public sealed class RuntimeClaimFactoryTests
         await Assert.That(container.Definition.Image).IsEqualTo("challenge:v1");
         await Assert.That(container.Definition.RuntimeInstanceId).IsEqualTo(instance.Id);
         await Assert.That(container.Definition.Generation).IsEqualTo(instance.Generation);
+        await Assert.That(container.Definition.NetworkIsolation)
+            .IsEqualTo(ContainerNetworkIsolation.Isolated);
+        await Assert.That(container.Definition.EgressPolicy)
+            .IsEqualTo(RuntimeEgressPolicy.DenyAll);
     }
 
     [Test]
@@ -64,7 +69,8 @@ public sealed class RuntimeClaimFactoryTests
                 new Dictionary<string, RuntimeResourceLimits>
                 {
                     ["web"] = new(268_435_456, 500_000_000, 128)
-                }),
+                },
+                EgressPolicy: RuntimeEgressPolicy.DenyAll),
             Limits: new(268_435_456, 500_000_000, 128));
 
         var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
@@ -75,6 +81,8 @@ public sealed class RuntimeClaimFactoryTests
             .IsEqualTo("services:\n  web:\n    image: challenge:v1");
         await Assert.That(compose.Definition.ProjectName)
             .IsEqualTo($"noctf-{instance.Id:N}-{instance.Generation}");
+        await Assert.That(compose.Definition.EgressPolicy)
+            .IsEqualTo(RuntimeEgressPolicy.DenyAll);
     }
 
     [Test]

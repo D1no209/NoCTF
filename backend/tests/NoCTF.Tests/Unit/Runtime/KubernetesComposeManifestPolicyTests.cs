@@ -218,6 +218,54 @@ public sealed class KubernetesComposeManifestPolicyTests
         await Assert.That(exception!.Message).Contains("requires NetworkPolicy enforcement");
     }
 
+    [Test]
+    public async Task InternetOnly_allows_public_IPv4_except_built_in_and_pool_ranges()
+    {
+        var manifests = KubernetesComposeManifestPolicy.ParseAndValidate(
+            SafeManifests,
+            new HashSet<string>(["web"], StringComparer.Ordinal));
+
+        var plan = KubernetesComposeManifestPolicy.ApplyPlatformPolicy(
+            manifests,
+            Request() with { EgressPolicy = RuntimeEgressPolicy.InternetOnly },
+            new KubernetesRuntimeOptions(
+                Namespace: "runtime",
+                PodPidsLimit: 512,
+                ClusterDomain: "cluster.local",
+                NetworkPolicyRequired: true,
+                ProtectedCidrs: ["172.30.0.0/16"]));
+
+        await Assert.That(plan.NetworkPolicy.Spec.Egress).Count().IsEqualTo(3);
+        var internet = plan.NetworkPolicy.Spec.Egress.Single(rule =>
+            rule.To?.Any(peer => peer.IpBlock is not null) == true);
+        await Assert.That(internet.To).Count().IsEqualTo(1);
+        await Assert.That(internet.To.Single().IpBlock!.Cidr).IsEqualTo("0.0.0.0/0");
+        await Assert.That(internet.To.Single().IpBlock!.Except)
+            .Contains("172.30.0.0/16");
+        await Assert.That(internet.To.Single().IpBlock!.Except)
+            .Contains("169.254.0.0/16");
+        await Assert.That(internet.To.Single().IpBlock!.Except.Any(cidr =>
+            cidr.Contains(':'))).IsFalse();
+    }
+
+    [Test]
+    public async Task InternetOnly_refuses_a_pool_without_protected_CIDRs()
+    {
+        var manifests = KubernetesComposeManifestPolicy.ParseAndValidate(
+            SafeManifests,
+            new HashSet<string>(["web"], StringComparer.Ordinal));
+
+        var action = () => KubernetesComposeManifestPolicy.ApplyPlatformPolicy(
+            manifests,
+            Request() with { EgressPolicy = RuntimeEgressPolicy.InternetOnly },
+            new KubernetesRuntimeOptions(
+                PodPidsLimit: 512,
+                ClusterDomain: "cluster.local"));
+
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("ProtectedCidrs");
+    }
+
     private static ComposeRequest Request() => new(
         Guid.Parse("11111111-1111-1111-1111-111111111111"),
         RuntimeProvider.Kubernetes,

@@ -24,11 +24,14 @@ Runner 管理端口只在内部网络。Checker callback API 可达，但严格 
 
 ## Provider 前置条件
 
-- Docker Pool：Docker daemon，禁止把 socket 暴露给题目 Container。
+- Docker Pool：Docker daemon，禁止把 socket 暴露给题目 Container。平台网络统一命名为
+  `noctf-network`；Runner 必须配置 `Runtime__Docker__Network=noctf-network` 和可信
+  `IngressProxyImage` 及其固定内存/CPU/PID 开销。
 - Kubernetes Pool：统一 Runtime Namespace、支持 NetworkPolicy 的 CNI、固定 Kompose
   `v1.38.0` 与最小 Kubernetes API 权限。Pool 必须显式声明
   `Runtime__Kubernetes__Namespace`、`ClusterDomain`、`PodPidsLimit` 和
-  `NetworkPolicyRequired=true`。
+  `NetworkPolicyRequired=true`，并以 `ProtectedCidrs` 数组声明不得由题目访问的
+  Pod、Service、节点管理面及平台基础设施 IPv4 网段。
 - Libvirt Pool：QEMU/KVM/Libvirt、`qemu-img`、`virt-install`，Runner 可访问
   `OvaSourceUrl`；需要 URL 的 VM 具备 QEMU Guest Agent。Pool 必须声明
   `Runtime__Libvirt__CacheDirectory`、`WorkDirectory`、`PoolRoutedNetworkCidr`、
@@ -49,6 +52,9 @@ durable 审计。不要通过复用 RunnerId 把同一 node CIDR 同时交给两
 `Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
 kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。
 `NetworkPolicyRequired=true` 是部署契约，运维仍必须确认 CNI 实际执行 NetworkPolicy。
+`Runtime__Kubernetes__ProtectedCidrs` 至少包含一项；平台会额外内建拒绝 RFC1918、
+link-local、loopback、共享地址和其他特殊用途 IPv4 空间。Pool 必须补充所有不属于这些
+内建范围的集群/管理网段，应用不会自动发现 CNI、Service 或节点 CIDR。
 Runtime Namespace 只放置 `rt-*` Runtime 资源；如确需平台资源，名称必须使用
 `platform-*` 保留前缀。
 
@@ -56,7 +62,17 @@ Runtime Namespace 只放置 `rt-*` Runtime 资源；如确需平台资源，名�
 
 外部 TLS 在可信代理终止或进程端到端 TLS。ForwardedHeaders 只信任明确代理。API CORS 精确 Origin+credentials；Refresh Cookie Secure/SameSite Strict。
 
+当前威胁模型信任办赛管理员、管理员维护的题目配置、Runner Pool 配置及平台托管镜像，
+不防御管理员内鬼。选手、题目业务容器及其网络输入仍是不可信边界。
+
 Runtime 网段与平台数据网隔离；默认拒绝横向访问和云元数据。Runner 仅允许必要 PostgreSQL/Redis/Provider/内部 API 流量；Patch archive 通过绑定单 Submission 的内部 API 读取，不开放对象存储通用网络/凭据。
+
+Docker 公开 Runtime 不把题目容器直接接入 `noctf-network`。每个 Runtime 的题目容器只在
+独立 `internal` network；平台托管的 HAProxy ingress 容器同时连接该 network 与
+`noctf-network`，并只转发配置中声明的 TCP URL Binding。代理开销计入 Runner capacity，
+receipt 保存其资源 ID，Stop/Reset/失败回滚会一并删除。生产节点必须预先准备受信任的
+`Runtime__Docker__IngressProxyImage`，或确保 Docker Compose/daemon 可从受信任 registry
+拉取该镜像。
 
 ## 请求大小
 

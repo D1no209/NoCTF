@@ -4,6 +4,7 @@ using Docker.DotNet.Models;
 using DotNet.Testcontainers.Builders;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
+using NoCTF.Runner.Messages;
 using NoCTF.Runtime.Docker.Containers;
 
 namespace NoCTF.Tests.Integration.Runtime;
@@ -26,12 +27,12 @@ public sealed class DockerContainerLifecycleTests
             using var lifecycle = CreateLifecycle();
             var operationId = Guid.NewGuid();
             var first = await lifecycle.CreateIsolatedNetworkAsync(
-                new RuntimeResourceIdentity(operationId, 1, 8080),
+                SandboxRequest(operationId),
                 DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             try
             {
                 var replay = await lifecycle.CreateIsolatedNetworkAsync(
-                    new RuntimeResourceIdentity(operationId, 1, 8080),
+                    SandboxRequest(operationId),
                     DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
 
                 await Assert.That(replay).IsEqualTo(first);
@@ -39,6 +40,118 @@ public sealed class DockerContainerLifecycleTests
             finally
             {
                 await lifecycle.DeleteIsolatedNetworkAsync(first, cancellationToken);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Persistent_runtime_uses_a_dual_network_ingress_proxy(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var targetImage = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await targetImage.StartAsync(cancellationToken);
+            await using var proxyImage = new ContainerBuilder("haproxy:3.1-alpine")
+                .WithCommand("haproxy", "-v")
+                .Build();
+            await proxyImage.StartAsync(cancellationToken);
+            var operationId = Guid.NewGuid();
+            var platformNetworkName = $"noctf-platform-it-{operationId:N}";
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var platformNetwork = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters { Name = platformNetworkName },
+                cancellationToken);
+            using var lifecycle = new DockerContainerLifecycle(
+                new DockerRuntimeOptions(
+                    DockerEndpoint(),
+                    platformNetworkName,
+                    "localhost"));
+            ContainerReceipt? receipt = null;
+            try
+            {
+                var request = new ContainerRequest(
+                    operationId,
+                    RuntimeProvider.Docker,
+                    "busybox:1.36.1",
+                    ["/bin/sh", "-c", "mkdir -p /www && echo target > /www/index.html && exec httpd -f -p 8080 -h /www"],
+                    new Dictionary<string, string>(),
+                    new Dictionary<string, string>
+                    {
+                        ["noctf.io/managed"] = "true",
+                        ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
+                        ["noctf.io/generation"] = "1"
+                    },
+                    new Dictionary<int, int> { [8080] = 0 },
+                    new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                    new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                    TimeSpan.FromMinutes(5),
+                    NetworkIsolation: ContainerNetworkIsolation.Isolated,
+                    Generation: 1,
+                    RuntimeInstanceId: operationId);
+
+                receipt = await IsolatedContainerProvisioner.ProvisionAsync(
+                    lifecycle,
+                    lifecycle,
+                    request,
+                    DateTimeOffset.UtcNow,
+                    cancellationToken);
+                var replay = await IsolatedContainerProvisioner.ProvisionAsync(
+                    lifecycle,
+                    lifecycle,
+                    request,
+                    DateTimeOffset.UtcNow,
+                    cancellationToken);
+
+                await Assert.That(receipt.IngressResourceId).IsNotNull();
+                await Assert.That(receipt.PortMappings[8080]).IsGreaterThan(0);
+                await Assert.That(replay.ResourceId).IsEqualTo(receipt.ResourceId);
+                await Assert.That(replay.IngressResourceId)
+                    .IsEqualTo(receipt.IngressResourceId);
+                await Assert.That(replay.PortMappings[8080])
+                    .IsEqualTo(receipt.PortMappings[8080]);
+                using var http = new HttpClient();
+                var response = await GetEventuallyAsync(
+                    http,
+                    $"http://localhost:{receipt.PortMappings[8080]}",
+                    cancellationToken);
+                await Assert.That(response.Trim()).IsEqualTo("target");
+                var target = await docker.Containers.InspectContainerAsync(
+                    receipt.ResourceId,
+                    cancellationToken);
+                var ingress = await docker.Containers.InspectContainerAsync(
+                    receipt.IngressResourceId!,
+                    cancellationToken);
+                var runtimeNetwork = await docker.Networks.InspectNetworkAsync(
+                    receipt.NetworkId!,
+                    cancellationToken);
+                await Assert.That(runtimeNetwork.Internal).IsTrue();
+                await Assert.That(runtimeNetwork.Labels.ContainsKey("noctf.io/expires-at"))
+                    .IsFalse();
+                await Assert.That(target.NetworkSettings!.Networks.Keys)
+                    .DoesNotContain(platformNetworkName);
+                await Assert.That(ingress.NetworkSettings!.Networks.Keys)
+                    .Contains(platformNetworkName);
+                await Assert.That(ingress.NetworkSettings.Networks).Count().IsEqualTo(2);
+            }
+            finally
+            {
+                if (receipt is not null)
+                {
+                    await IsolatedContainerProvisioner.DestroyAsync(
+                        lifecycle,
+                        lifecycle,
+                        receipt,
+                        CancellationToken.None);
+                }
+                await docker.Networks.DeleteNetworkAsync(
+                    platformNetwork.ID,
+                    CancellationToken.None);
             }
         });
     }
@@ -109,10 +222,10 @@ public sealed class DockerContainerLifecycleTests
             var firstOperationId = Guid.NewGuid();
             var secondOperationId = Guid.NewGuid();
             var firstSandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                new RuntimeResourceIdentity(firstOperationId, 1, 8080),
+                SandboxRequest(firstOperationId),
                 DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             var secondSandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                new RuntimeResourceIdentity(secondOperationId, 1, 8080),
+                SandboxRequest(secondOperationId),
                 DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             ContainerReceipt? first = null;
             ContainerReceipt? second = null;
@@ -164,7 +277,7 @@ public sealed class DockerContainerLifecycleTests
             using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
                 DockerEndpoint(), "noctf-platform", "localhost", $"missing-{Guid.NewGuid():N}"));
             var sandbox = await lifecycle.CreateIsolatedNetworkAsync(
-                new RuntimeResourceIdentity(operationId, 1, 8080),
+                SandboxRequest(operationId),
                 DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
             Func<Task> action = () => lifecycle.CreateAsync(
                 CheckerRequest(operationId, sandbox), cancellationToken);
@@ -184,6 +297,37 @@ public sealed class DockerContainerLifecycleTests
     }
 
     private static DockerContainerLifecycle CreateLifecycle() => new(new DockerRuntimeOptions(DockerEndpoint()));
+
+    private static async Task<string> GetEventuallyAsync(
+        HttpClient client,
+        string url,
+        CancellationToken cancellationToken)
+    {
+        Exception? lastFailure = null;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            try
+            {
+                return await client.GetStringAsync(url, cancellationToken);
+            }
+            catch (HttpRequestException exception)
+            {
+                lastFailure = exception;
+                await Task.Delay(250, cancellationToken);
+            }
+        }
+        throw new InvalidOperationException(
+            $"Docker ingress proxy did not become reachable at '{url}'.",
+            lastFailure);
+    }
+
+    private static ContainerNetworkPolicyRequest SandboxRequest(Guid operationId) =>
+        new(
+            new RuntimeResourceIdentity(operationId, 1),
+            ContainerNetworkPurpose.AwdpVerification,
+            RuntimeEgressPolicy.DenyAll,
+            [],
+            8080);
 
     private static string DockerEndpoint() => Environment.GetEnvironmentVariable("DOCKER_HOST") ??
         (OperatingSystem.IsWindows() ? "npipe://./pipe/docker_engine" : "unix:///var/run/docker.sock");

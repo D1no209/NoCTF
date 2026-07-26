@@ -13,6 +13,7 @@ public sealed class DockerComposeRuntime(
     string dockerExecutable = "docker",
     string? workDirectory = null) : IComposeRuntime
 {
+    private const string IngressMetadataFileName = "noctf-ingress.json";
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
     private readonly string dockerExecutable = dockerExecutable;
@@ -24,10 +25,19 @@ public sealed class DockerComposeRuntime(
         Directory.CreateDirectory(workDirectory);
         var directory = Path.Combine(workDirectory, request.OperationId.ToString("N"));
         Directory.CreateDirectory(directory);
-        var composeYaml = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+        var ingress = DockerComposeIngressProxyPolicy.Apply(prepared, request, options);
         await File.WriteAllTextAsync(
             Path.Combine(directory, "compose.yaml"),
-            composeYaml,
+            ingress.ComposeYaml,
+            cancellationToken);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, IngressMetadataFileName),
+            JsonSerializer.Serialize(
+                new DockerComposeIngressMetadata(
+                    ingress.ProxyServiceName,
+                    ingress.Bindings),
+                JsonOptions),
             cancellationToken);
         try
         {
@@ -84,7 +94,19 @@ public sealed class DockerComposeRuntime(
             "--format",
             "json");
         var entries = ParseProcesses(result);
+        var ingress = await ReadIngressMetadataAsync(directory, cancellationToken);
+        var proxy = ingress.ProxyServiceName is null
+            ? null
+            : entries.SingleOrDefault(entry =>
+                string.Equals(
+                    entry.Service,
+                    ingress.ProxyServiceName,
+                    StringComparison.Ordinal));
         var services = entries
+            .Where(entry => !string.Equals(
+                entry.Service,
+                ingress.ProxyServiceName,
+                StringComparison.Ordinal))
             .Select(entry => new ComposeServiceStatus(
                 entry.Service,
                 entry.Id,
@@ -92,17 +114,27 @@ public sealed class DockerComposeRuntime(
                 (entry.Publishers ?? [])
                     .Where(publisher => publisher.TargetPort is > 0
                         && publisher.PublishedPort is > 0)
+                    .Select(publisher => new
+                        MappedPublishedPort(publisher.TargetPort, publisher.PublishedPort))
+                    .Concat(PublishedIngressPorts(ingress, proxy, entry.Service))
                     .GroupBy(publisher => publisher.TargetPort)
                     .ToDictionary(
                         group => group.Key,
                         group => group.First().PublishedPort),
                 entry.Service))
             .ToArray();
+        var resourceStatuses = entries
+            .Select(entry => ToRuntimeStatus(entry.State))
+            .ToArray();
         var status = services.Length == 0
             ? RuntimeStatus.Stopped
-            : services.All(service => service.Status == RuntimeStatus.Running)
+            : ingress.ProxyServiceName is not null && proxy is null
+                ? RuntimeStatus.Failed
+                : resourceStatuses.All(resourceStatus =>
+                    resourceStatus == RuntimeStatus.Running)
                 ? RuntimeStatus.Running
-                : services.Any(service => service.Status == RuntimeStatus.Failed)
+                : resourceStatuses.Any(resourceStatus =>
+                    resourceStatus == RuntimeStatus.Failed)
                     ? RuntimeStatus.Failed
                     : RuntimeStatus.Starting;
         return new(receipt.ProjectName, status, services);
@@ -250,6 +282,44 @@ public sealed class DockerComposeRuntime(
             .ToArray();
     }
 
+    private async Task<DockerComposeIngressMetadata> ReadIngressMetadataAsync(
+        string directory,
+        CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(directory, IngressMetadataFileName);
+        if (!File.Exists(path))
+            return new(null, []);
+        var json = await File.ReadAllTextAsync(path, cancellationToken);
+        return JsonSerializer.Deserialize<DockerComposeIngressMetadata>(json, JsonOptions)
+            ?? throw new InvalidOperationException(
+                "Docker Compose ingress metadata is invalid.");
+    }
+
+    private static IEnumerable<MappedPublishedPort> PublishedIngressPorts(
+        DockerComposeIngressMetadata ingress,
+        DockerComposeProcess? proxy,
+        string targetService)
+    {
+        if (proxy?.Publishers is null)
+            return [];
+        var publishedByListener = proxy.Publishers
+            .Where(publisher => publisher.TargetPort is > 0
+                && publisher.PublishedPort is > 0)
+            .GroupBy(publisher => publisher.TargetPort)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().PublishedPort);
+        return ingress.Bindings
+            .Where(binding => string.Equals(
+                binding.TargetService,
+                targetService,
+                StringComparison.Ordinal))
+            .Where(binding => publishedByListener.ContainsKey(binding.ListenerPort))
+            .Select(binding => new MappedPublishedPort(
+                binding.TargetPort,
+                publishedByListener[binding.ListenerPort]));
+    }
+
     private sealed record DockerComposeProcess(
         string Id,
         string Service,
@@ -257,6 +327,10 @@ public sealed class DockerComposeRuntime(
         IReadOnlyList<DockerComposePublisher>? Publishers);
 
     private sealed record DockerComposePublisher(int TargetPort, int PublishedPort);
+    private sealed record MappedPublishedPort(int TargetPort, int PublishedPort);
+    private sealed record DockerComposeIngressMetadata(
+        string? ProxyServiceName,
+        IReadOnlyList<DockerComposeIngressBinding> Bindings);
 }
 
 public sealed class ComposeCommandFailedException(int exitCode, string message)
