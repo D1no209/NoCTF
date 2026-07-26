@@ -10,6 +10,20 @@ public sealed record ClaimContainerRuntime(
     string RunnerPool,
     ContainerRequest Definition) : IRunnerPoolMessage;
 
+public sealed record ClaimComposeRuntime(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    int Generation,
+    string RunnerPool,
+    ComposeRequest Definition) : IRunnerPoolMessage;
+
+public sealed record ClaimOvaRuntime(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    int Generation,
+    string RunnerPool,
+    OvaRuntimeRequest Definition) : IRunnerPoolMessage;
+
 public sealed record ProvisionContainerRuntime(
     Guid RuntimeInstanceId,
     long ProcessingVersion,

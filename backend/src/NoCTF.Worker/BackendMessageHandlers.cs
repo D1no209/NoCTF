@@ -16,6 +16,7 @@ using System.Security.Cryptography;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
+using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 
 namespace NoCTF.Worker;
@@ -412,7 +413,7 @@ public static class BackendMessageHandlers
             : null;
         var template = awdpConfiguration?.Runtime
             ?? templates.Get(target.Competition.Mode, target.Challenge.ConfigurationJson);
-        if (template is null || template.Definition is not ContainerRuntimeDefinition containerDefinition)
+        if (template is null)
         {
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
@@ -422,45 +423,30 @@ public static class BackendMessageHandlers
             return;
         }
 
-        ContainerRequest definition;
+        IRunnerPoolMessage claim;
         try
         {
             if (target.Instance.Purpose == RuntimePurpose.AwdpTarget)
             {
-                definition = AwdpTargetDefinitionFactory.Create(
+                var definition = AwdpTargetDefinitionFactory.Create(
                     target.Instance.Id,
                     target.Instance.Generation,
                     template,
                     awdpConfiguration!.TargetPort,
                     DateTimeOffset.UtcNow);
+                claim = new ClaimContainerRuntime(
+                    target.Instance.Id,
+                    target.Instance.ProcessingVersion,
+                    target.Instance.Generation,
+                    target.Instance.RunnerPool,
+                    definition);
             }
             else
             {
-                var limits = template.Limits
-                    ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
-                definition = new ContainerRequest(
-                    target.Instance.Id,
-                    template.Provider,
-                    containerDefinition.Image,
-                    containerDefinition.Command ?? [],
-                    containerDefinition.Environment ?? new Dictionary<string, string>(),
-                    MergeLabels(containerDefinition.Labels, target.Instance),
-                    containerDefinition.PortMappings ?? new Dictionary<int, int>(),
-                    limits,
-                    containerDefinition.Security
-                        ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
-                    template.TtlSeconds is > 0 ? TimeSpan.FromSeconds(template.TtlSeconds.Value) : null,
-                    OperationTimeout: template.OperationTimeoutSeconds is > 0
-                        ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
-                        : TimeSpan.FromMinutes(2),
-                    InternalPorts: target.Competition.Mode == GameMode.Koh
-                        && template.ControlCheckUrlBinding?.ContainerPort is int controlPort
-                            ? [controlPort]
-                            : null,
-                    UrlBindings: template.UrlBindings,
-                    ControlCheckUrlBinding: target.Competition.Mode == GameMode.Koh
-                        ? template.ControlCheckUrlBinding
-                        : null);
+                claim = RuntimeClaimFactory.Create(
+                    target.Instance,
+                    target.Competition.Mode,
+                    template);
             }
         }
         catch (InvalidOperationException)
@@ -472,12 +458,7 @@ public static class BackendMessageHandlers
             await db.SaveChangesAsync(cancellationToken);
             return;
         }
-        await outbox.PublishToRunnerPoolAsync(new ClaimContainerRuntime(
-            target.Instance.Id,
-            target.Instance.ProcessingVersion,
-            target.Instance.Generation,
-            target.Instance.RunnerPool,
-            definition));
+        await PublishRuntimeClaimAsync(outbox, claim);
         await outbox.FlushOutgoingMessagesAsync();
     }
 
@@ -897,22 +878,15 @@ public static class BackendMessageHandlers
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    private static IReadOnlyDictionary<string, string> MergeLabels(
-        IReadOnlyDictionary<string, string>? configured,
-        RuntimeInstance instance)
-    {
-        var labels = configured is null
-            ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : new Dictionary<string, string>(configured, StringComparer.Ordinal);
-        labels["noctf.io/managed"] = "true";
-        labels["noctf.io/runtime-instance-id"] = instance.Id.ToString("D");
-        labels["noctf.io/competition-id"] = instance.CompetitionId.ToString("D");
-        labels["noctf.io/competition-challenge-id"] =
-            instance.CompetitionChallengeId.ToString("D");
-        labels["noctf.io/generation"] = instance.Generation.ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
-        if (instance.TeamId is Guid teamId)
-            labels["noctf.io/team-id"] = teamId.ToString("D");
-        return labels;
-    }
+    private static ValueTask PublishRuntimeClaimAsync(
+        ITransactionalMessageOutbox outbox,
+        IRunnerPoolMessage claim) =>
+        claim switch
+        {
+            ClaimContainerRuntime message => outbox.PublishToRunnerPoolAsync(message),
+            ClaimComposeRuntime message => outbox.PublishToRunnerPoolAsync(message),
+            ClaimOvaRuntime message => outbox.PublishToRunnerPoolAsync(message),
+            _ => throw new InvalidOperationException(
+                $"Unsupported runtime claim type '{claim.GetType().Name}'.")
+        };
 }
