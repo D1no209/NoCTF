@@ -60,7 +60,8 @@ public sealed record ContainerRuntimeDefinition(
     IReadOnlyDictionary<string, string>? Environment = null,
     IReadOnlyDictionary<string, string>? Labels = null,
     IReadOnlyDictionary<int, int>? PortMappings = null,
-    ContainerSecurityPolicy? Security = null) : ChallengeRuntimeDefinition
+    ContainerSecurityPolicy? Security = null,
+    string? FlagEnvironmentVariableName = null) : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.Container;
 }
@@ -69,7 +70,9 @@ public sealed record ComposeRuntimeDefinition(
     string ComposeYaml,
     IReadOnlyDictionary<string, RuntimeResourceLimits> ServiceResources,
     IReadOnlyDictionary<string, string>? Environment = null,
-    IReadOnlyDictionary<string, string>? Labels = null) : ChallengeRuntimeDefinition
+    IReadOnlyDictionary<string, string>? Labels = null,
+    IReadOnlyDictionary<string, string>? FlagEnvironmentVariables = null)
+    : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.Compose;
 }

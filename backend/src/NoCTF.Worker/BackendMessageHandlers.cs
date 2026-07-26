@@ -8,6 +8,7 @@ using NoCTF.Application.Runtime.Ports;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Notifications;
 using System.Text.Json;
@@ -423,6 +424,32 @@ public static class BackendMessageHandlers
             return;
         }
 
+        string? perTeamFlag = null;
+        if (target.Competition.Mode == GameMode.Ctf
+            && template.FlagSource == RuntimeFlagSource.PerTeam)
+        {
+            if (target.Instance.TeamId is Guid teamId)
+            {
+                perTeamFlag = await db.ChallengeFlags.AsNoTracking()
+                    .Where(flag =>
+                        flag.CompetitionChallengeId == target.Challenge.Id
+                        && flag.TeamId == teamId
+                        && flag.SpecificationKind == SpecificationKind.RuntimeDefinition
+                        && flag.SpecificationId == target.Challenge.Id)
+                    .Select(flag => flag.Flag)
+                    .SingleOrDefaultAsync(cancellationToken);
+            }
+            if (perTeamFlag is null)
+            {
+                target.Instance.State = RuntimeState.Failed;
+                target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
+                target.Instance.ProcessingVersion =
+                    checked(target.Instance.ProcessingVersion + 1);
+                await db.SaveChangesAsync(cancellationToken);
+                return;
+            }
+        }
+
         IRunnerPoolMessage claim;
         try
         {
@@ -446,7 +473,8 @@ public static class BackendMessageHandlers
                 claim = RuntimeClaimFactory.Create(
                     target.Instance,
                     target.Competition.Mode,
-                    template);
+                    template,
+                    perTeamFlag);
             }
         }
         catch (InvalidOperationException)

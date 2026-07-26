@@ -61,6 +61,7 @@ internal static class ChallengeRuntimeTemplateValidator
         }
         if (hasReservedEnvironmentVariable)
             errors.Add("Runtime environment variables cannot use the NOCTF_ prefix.");
+        ValidateFlagEnvironment(runtime, errors);
         switch (runtime.Definition)
         {
             case ContainerRuntimeDefinition container:
@@ -198,6 +199,69 @@ internal static class ChallengeRuntimeTemplateValidator
             }
         }
         return errors;
+    }
+
+    private static void ValidateFlagEnvironment(
+        ChallengeRuntimeTemplate runtime,
+        ICollection<string> errors)
+    {
+        switch (runtime.Definition)
+        {
+            case ContainerRuntimeDefinition container:
+                if (runtime.FlagSource == RuntimeFlagSource.PerTeam
+                    && string.IsNullOrWhiteSpace(container.FlagEnvironmentVariableName))
+                {
+                    errors.Add(
+                        "PerTeam Container runtimes require FlagEnvironmentVariableName.");
+                }
+                if (runtime.FlagSource != RuntimeFlagSource.PerTeam
+                    && container.FlagEnvironmentVariableName is not null)
+                {
+                    errors.Add(
+                        "FlagEnvironmentVariableName is only supported for PerTeam runtimes.");
+                }
+                ValidateFlagEnvironmentVariableName(
+                    container.FlagEnvironmentVariableName,
+                    errors);
+                break;
+            case ComposeRuntimeDefinition compose:
+                var targets = compose.FlagEnvironmentVariables
+                    ?? new Dictionary<string, string>();
+                if (runtime.FlagSource == RuntimeFlagSource.PerTeam && targets.Count == 0)
+                {
+                    errors.Add(
+                        "PerTeam Compose runtimes require FlagEnvironmentVariables.");
+                }
+                if (runtime.FlagSource != RuntimeFlagSource.PerTeam && targets.Count > 0)
+                {
+                    errors.Add(
+                        "FlagEnvironmentVariables are only supported for PerTeam runtimes.");
+                }
+                foreach (var target in targets)
+                {
+                    if (!compose.ServiceResources.ContainsKey(target.Key))
+                    {
+                        errors.Add(
+                            $"Flag environment target service '{target.Key}' is not defined.");
+                    }
+                    ValidateFlagEnvironmentVariableName(target.Value, errors);
+                }
+                break;
+        }
+    }
+
+    private static void ValidateFlagEnvironmentVariableName(
+        string? name,
+        ICollection<string> errors)
+    {
+        if (name is null)
+            return;
+        if (!IsEnvironmentVariableName(name))
+            errors.Add($"Flag environment variable '{name}' is invalid.");
+        if (name.StartsWith("NOCTF_", StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add("Flag environment variables cannot use the NOCTF_ prefix.");
+        }
     }
 
     private static bool IsEnvironmentVariableName(string name)

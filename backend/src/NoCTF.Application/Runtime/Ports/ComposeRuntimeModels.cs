@@ -15,7 +15,8 @@ public sealed record ComposeRequest(
     TimeSpan? Ttl,
     TimeSpan OperationTimeout,
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
-    RuntimeUrlBinding? ControlCheckUrlBinding = null);
+    RuntimeUrlBinding? ControlCheckUrlBinding = null,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? ServiceEnvironment = null);
 
 public sealed record ComposeServiceStatus(
     string Name,

@@ -355,6 +355,94 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Ctf_per_team_container_requires_a_flag_environment_variable()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"),
+            FlagSource: RuntimeFlagSource.PerTeam);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("PerTeam Container runtimes require FlagEnvironmentVariableName.");
+    }
+
+    [Test]
+    public async Task Ctf_per_team_compose_validates_flag_target_services_and_variables()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ComposeRuntimeDefinition(
+                "services:\n  web:\n    image: registry.example/challenge:v1",
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["web"] = new(268_435_456, 500_000_000, 128)
+                },
+                FlagEnvironmentVariables: new Dictionary<string, string>
+                {
+                    ["missing"] = "1FLAG",
+                    ["web"] = "NOCTF_FLAG"
+                }),
+            Limits: new(268_435_456, 500_000_000, 128),
+            FlagSource: RuntimeFlagSource.PerTeam);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("Flag environment target service 'missing' is not defined.");
+        await Assert.That(errors).Contains("Flag environment variable '1FLAG' is invalid.");
+        await Assert.That(errors)
+            .Contains("Flag environment variables cannot use the NOCTF_ prefix.");
+    }
+
+    [Test]
+    public async Task Ctf_static_runtime_rejects_flag_injection_configuration()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                FlagEnvironmentVariableName: "FLAG"));
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains(
+                "FlagEnvironmentVariableName is only supported for PerTeam runtimes.");
+    }
+
+    [Test]
+    public async Task Ctf_runtime_rejects_awd_rotation_flag_source()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"),
+            FlagSource: RuntimeFlagSource.AwdRotation);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("CTF runtimes only support Static or PerTeam flags.");
+    }
+
+    [Test]
     public async Task Ctf_runtime_rejects_participant_url_exposure()
     {
         var runtime = new ChallengeRuntimeTemplate(

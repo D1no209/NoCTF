@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
@@ -10,6 +11,7 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 public sealed class EfAdminRuntimeStore(
     NoCtfDbContext db,
     IChallengeRuntimeTemplateCatalog templates,
+    IPerTeamRuntimeFlagStore runtimeFlags,
     ITransactionalMessageOutbox outbox) : IAdminRuntimeStore
 {
     public async Task<IReadOnlyList<RuntimeInstanceView>> ListAsync(
@@ -128,6 +130,24 @@ public sealed class EfAdminRuntimeStore(
             var template = templates.Get(scope.Competition.Mode, scope.Challenge.ConfigurationJson);
             if (template is null)
                 return new(null, RuntimeMutationFailure.ConfigurationInvalid);
+            if (scope.Competition.Mode == GameMode.Ctf
+                && template.FlagSource == RuntimeFlagSource.PerTeam
+                && teamId is Guid runtimeTeamId)
+            {
+                try
+                {
+                    _ = await runtimeFlags.EnsureAsync(
+                        competitionId,
+                        competitionChallengeId,
+                        runtimeTeamId,
+                        now,
+                        ct);
+                }
+                catch (InvalidOperationException)
+                {
+                    return new(null, RuntimeMutationFailure.ConfigurationInvalid);
+                }
+            }
             entity = new RuntimeInstance
             {
                 Id = Guid.CreateVersion7(now),

@@ -205,6 +205,7 @@ public static class ComposeRuntimeDefinitionPolicy
             SetSequence(service, "cap_drop", ["ALL"]);
             SetSequence(service, "security_opt", ["no-new-privileges:true"]);
             MergeMappingValues(service, "environment", request.Environment);
+            MergeServiceEnvironment(serviceName, service, request.ServiceEnvironment);
             MergeMappingValues(service, "labels", request.Labels);
 
             Remove(service, "ports");
@@ -241,6 +242,7 @@ public static class ComposeRuntimeDefinitionPolicy
             Remove(service, "pids_limit");
             Remove(service, "deploy");
             MergeMappingValues(service, "environment", request.Environment);
+            MergeServiceEnvironment(serviceName, service, request.ServiceEnvironment);
             MergeMappingValues(service, "labels", request.Labels);
             Remove(service, "ports");
             Remove(service, "expose");
@@ -592,6 +594,15 @@ public static class ComposeRuntimeDefinitionPolicy
         foreach (var pair in values.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             mapping.Add(pair.Key, pair.Value);
         Set(service, fieldName, mapping);
+    }
+
+    private static void MergeServiceEnvironment(
+        string serviceName,
+        YamlMappingNode service,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? serviceEnvironment)
+    {
+        if (serviceEnvironment?.TryGetValue(serviceName, out var overrides) == true)
+            MergeMappingValues(service, "environment", overrides);
     }
 
     private static void ApplyNetworkLabels(

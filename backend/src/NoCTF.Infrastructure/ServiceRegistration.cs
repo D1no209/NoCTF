@@ -51,6 +51,7 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Infrastructure.Competitions.Koh;
+using NoCTF.Infrastructure.Persistence.Challenges.Flags;
 
 namespace NoCTF.Infrastructure;
 
@@ -114,6 +115,7 @@ public static class ServiceRegistration
         services.AddSingleton<ISubmissionEvaluatorCatalog, GameModeSubmissionEvaluatorCatalog>();
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
         services.AddSingleton<IChallengeRuntimeTemplateCatalog, ChallengeRuntimeTemplateCatalog>();
+        services.AddScoped<IPerTeamRuntimeFlagStore, PostgresPerTeamRuntimeFlagStore>();
         services.AddScoped<IRuntimeInstanceStore, EfRuntimeInstanceStore>();
         services.AddScoped<GetPlayerRuntime>();
         services.AddScoped<MutatePlayerRuntime>();

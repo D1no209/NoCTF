@@ -5,11 +5,11 @@
 Competition 配置提供 `MinimumPoints`、`DecayParameter`、`DecayExpression`、`WrongSubmissionPenalty` 和三个血位 Reward 默认值。CompetitionChallenge 配置可用 nullable 字段逐项覆盖，并另外必须定义：
 
 ```text
-FlagSource: Static | PerTeam
 FlagSelectionPolicy: All | RandomOnePerTeam
 EvaluationDispatchMode: Automatic | ManualBatch
 MaxFlagSubmissions: int                 // <=0 无限
-RuntimeDefinition?                     // PerTeam 时必需
+Runtime?                               // 按队 Runtime 配置
+Runtime.FlagSource: Static | PerTeam
 ```
 
 数值约束：MinimumPoints 0..BaseScore，DecayParameter>1，Penalty/Reward 非负，百分比 0..100。覆盖值为 0 时就是显式 0，不表示继承；只有 null 表示继承。所有配置对象带 `schemaVersion`，未知版本拒绝保存。
@@ -21,7 +21,9 @@ CTF CompetitionChallenge 可为：
 - Static：题面、Attachment、外部链接；
 - PerTeamRuntime：Container、Compose 或 OVA；按队按需启动，没有多阶段语义。
 
-FlagSource：Static 或 PerTeam。OVA 只能 Static；Container/Compose PerTeam 在创建时用环境变量注入固定队伍 Flag。
+Runtime.FlagSource：Static 或 PerTeam。OVA 只能 Static；Container PerTeam 使用
+`FlagEnvironmentVariableName`，Compose PerTeam 使用
+`FlagEnvironmentVariables[serviceName]`，在创建时注入固定队伍 Flag。
 
 ## Flag 与附件
 

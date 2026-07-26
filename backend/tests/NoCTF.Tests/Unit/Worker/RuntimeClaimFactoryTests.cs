@@ -30,6 +30,29 @@ public sealed class RuntimeClaimFactoryTests
     }
 
     [Test]
+    public async Task Ctf_per_team_container_overrides_the_configured_flag_value()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "challenge:v1",
+                Environment: new Dictionary<string, string> { ["FLAG"] = "author-value" },
+                FlagEnvironmentVariableName: "FLAG"),
+            FlagSource: RuntimeFlagSource.PerTeam);
+
+        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+            instance,
+            GameMode.Ctf,
+            template,
+            "flag{fixed-team}");
+
+        await Assert.That(claim.Definition.Environment["FLAG"])
+            .IsEqualTo("flag{fixed-team}");
+    }
+
+    [Test]
     public async Task Compose_definition_creates_only_a_compose_claim()
     {
         var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Docker);
@@ -52,6 +75,62 @@ public sealed class RuntimeClaimFactoryTests
             .IsEqualTo("services:\n  web:\n    image: challenge:v1");
         await Assert.That(compose.Definition.ProjectName)
             .IsEqualTo($"noctf-{instance.Id:N}-{instance.Generation}");
+    }
+
+    [Test]
+    public async Task Ctf_per_team_compose_targets_only_configured_services()
+    {
+        var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Docker);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ComposeRuntimeDefinition(
+                """
+                services:
+                  web:
+                    image: challenge:v1
+                  worker:
+                    image: worker:v1
+                """,
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["web"] = new(134_217_728, 250_000_000, 64),
+                    ["worker"] = new(134_217_728, 250_000_000, 64)
+                },
+                FlagEnvironmentVariables: new Dictionary<string, string>
+                {
+                    ["web"] = "CHALLENGE_FLAG"
+                }),
+            FlagSource: RuntimeFlagSource.PerTeam);
+
+        var claim = (ClaimComposeRuntime)RuntimeClaimFactory.Create(
+            instance,
+            GameMode.Ctf,
+            template,
+            "flag{fixed-team}");
+
+        await Assert.That(claim.Definition.ServiceEnvironment).IsNotNull();
+        await Assert.That(claim.Definition.ServiceEnvironment!.Keys)
+            .IsEquivalentTo(["web"]);
+        await Assert.That(claim.Definition.ServiceEnvironment["web"]["CHALLENGE_FLAG"])
+            .IsEqualTo("flag{fixed-team}");
+    }
+
+    [Test]
+    public async Task Ctf_per_team_runtime_rejects_a_missing_fixed_flag()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "challenge:v1",
+                FlagEnvironmentVariableName: "FLAG"),
+            FlagSource: RuntimeFlagSource.PerTeam);
+
+        var action = () => RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
+
+        await Assert.That(action).Throws<InvalidOperationException>();
     }
 
     [Test]
