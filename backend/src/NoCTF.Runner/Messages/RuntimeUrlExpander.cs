@@ -31,6 +31,61 @@ public static class RuntimeUrlExpander
         return new(urls, participantIndexes, controlCheckUrl);
     }
 
+    public static ExpandedRuntimeUrls ExpandCompose(
+        ComposeReceipt receipt,
+        ComposeStatus status,
+        IReadOnlyList<RuntimeUrlBinding>? bindings,
+        RuntimeUrlBinding? controlCheckBinding)
+    {
+        var urls = new List<string>();
+        var participantIndexes = new List<int>();
+        foreach (var binding in bindings ?? [])
+        {
+            var service = FindComposeService(status, binding);
+            var containerPort = binding.ContainerPort
+                ?? throw new InvalidOperationException(
+                    "Compose URL binding requires ContainerPort.");
+            if (!service.PublishedPorts.TryGetValue(containerPort, out var publicPort)
+                || publicPort is < 1 or > 65535)
+                throw new InvalidOperationException(
+                    "Compose URL binding has no dynamic public port.");
+            var url = Expand(binding.UrlTemplate, receipt.PublicHost, publicPort);
+            if (binding.Exposure == RuntimeExposure.Participants)
+                participantIndexes.Add(urls.Count);
+            urls.Add(url);
+        }
+
+        string? controlCheckUrl = null;
+        if (controlCheckBinding is not null)
+        {
+            var service = FindComposeService(status, controlCheckBinding);
+            var containerPort = controlCheckBinding.ContainerPort
+                ?? throw new InvalidOperationException(
+                    "Compose control URL binding requires ContainerPort.");
+            controlCheckUrl = Expand(
+                controlCheckBinding.UrlTemplate,
+                service.InternalHost,
+                containerPort);
+        }
+        return new(urls, participantIndexes, controlCheckUrl);
+    }
+
+    private static ComposeServiceStatus FindComposeService(
+        ComposeStatus status,
+        RuntimeUrlBinding binding)
+    {
+        if (string.IsNullOrWhiteSpace(binding.ServiceName))
+            throw new InvalidOperationException(
+                "Compose URL binding requires ServiceName.");
+        return status.Services.SingleOrDefault(service =>
+                   string.Equals(
+                       service.Name,
+                       binding.ServiceName,
+                       StringComparison.Ordinal))
+               ?? throw new InvalidOperationException(
+                   $"Compose service '{binding.ServiceName}' was not found.");
+    }
+
     private static string ExpandPublicContainerBinding(
         ContainerReceipt receipt,
         RuntimeUrlBinding binding)

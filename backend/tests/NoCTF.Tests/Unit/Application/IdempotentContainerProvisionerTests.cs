@@ -60,7 +60,7 @@ public sealed class IdempotentContainerProvisionerTests
         new Dictionary<string, string>(),
         new Dictionary<string, string>(),
         new Dictionary<int, int> { [8080] = 31000 },
-        new ContainerResourceLimits(1024, 100, 10),
+        new RuntimeResourceLimits(1024, 100, 10),
         new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
         null);
 }

@@ -47,7 +47,11 @@ public sealed class AwdpTargetDefinitionFactoryTests
         {
             RuntimeKind.Container => new ContainerRuntimeDefinition("target:latest"),
             RuntimeKind.Compose => new ComposeRuntimeDefinition(
-                "services:\n  target:\n    image: target:latest"),
+                "services:\n  target:\n    image: target:latest",
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["target"] = new(268_435_456, 500_000_000, 128)
+                }),
             RuntimeKind.OvaVm => new OvaRuntimeDefinition("file:///var/lib/noctf/target.ova"),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };

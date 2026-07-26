@@ -10,7 +10,8 @@ public sealed record ComposeRequest(
     string ComposeYaml,
     IReadOnlyDictionary<string, string> Environment,
     IReadOnlyDictionary<string, string> Labels,
-    ContainerResourceLimits Limits,
+    IReadOnlyDictionary<string, RuntimeResourceLimits> ServiceResources,
+    RuntimeResourceLimits Limits,
     TimeSpan? Ttl,
     TimeSpan OperationTimeout,
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
@@ -23,7 +24,14 @@ public sealed record ComposeServiceStatus(
     IReadOnlyDictionary<int, int> PublishedPorts,
     string? InternalHost);
 
-public sealed record ComposeReceipt(Guid OperationId, RuntimeProvider Provider, string ProjectName, string Namespace, DateTimeOffset CreatedAt);
+public sealed record ComposeReceipt(
+    Guid OperationId,
+    RuntimeProvider Provider,
+    string ProjectName,
+    string Namespace,
+    string PublicHost,
+    int Generation,
+    DateTimeOffset CreatedAt);
 public sealed record ComposeStatus(string ProjectName, RuntimeStatus Status, IReadOnlyList<ComposeServiceStatus> Services);
 
 public interface IComposeRuntime

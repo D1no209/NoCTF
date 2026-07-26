@@ -54,4 +54,53 @@ public sealed class RuntimeUrlExpanderTests
                 null))
             .Throws<InvalidOperationException>();
     }
+
+    [Test]
+    public async Task Compose_bindings_resolve_the_named_service()
+    {
+        var receipt = new ComposeReceipt(
+            Guid.CreateVersion7(),
+            RuntimeProvider.Docker,
+            "noctf-runtime",
+            "/tmp/noctf-runtime",
+            "runner.example",
+            2,
+            DateTimeOffset.UtcNow);
+        var status = new ComposeStatus(
+            receipt.ProjectName,
+            RuntimeStatus.Running,
+            [
+                new(
+                    "web",
+                    "container-web",
+                    RuntimeStatus.Running,
+                    new Dictionary<int, int> { [8080] = 32000 },
+                    "web")
+            ]);
+        RuntimeUrlBinding[] bindings =
+        [
+            new(
+                "http://{HOST}:{PORT}/play",
+                RuntimeExposure.Participants,
+                ContainerPort: 8080,
+                ServiceName: "web")
+        ];
+        var control = new RuntimeUrlBinding(
+            "http://{HOST}:{PORT}/control",
+            RuntimeExposure.OwnerOnly,
+            ContainerPort: 8080,
+            ServiceName: "web");
+
+        var expanded = RuntimeUrlExpander.ExpandCompose(
+            receipt,
+            status,
+            bindings,
+            control);
+
+        await Assert.That(expanded.Urls)
+            .IsEquivalentTo(["http://runner.example:32000/play"]);
+        await Assert.That(expanded.ParticipantUrlIndexes).IsEquivalentTo([0]);
+        await Assert.That(expanded.ControlCheckUrl)
+            .IsEqualTo("http://web:8080/control");
+    }
 }

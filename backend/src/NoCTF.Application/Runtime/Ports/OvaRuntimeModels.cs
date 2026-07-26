@@ -5,7 +5,7 @@ public sealed record OvaRuntimeRequest(
     int Generation,
     Uri OvaSource,
     string NetworkName,
-    ContainerResourceLimits Limits,
+    RuntimeResourceLimits Limits,
     TimeSpan? Ttl,
     TimeSpan OperationTimeout,
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null);

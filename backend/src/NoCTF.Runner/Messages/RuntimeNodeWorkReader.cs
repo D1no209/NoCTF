@@ -8,7 +8,7 @@ namespace NoCTF.Runner.Messages;
 public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntimeNodeWorkReader
 {
     public async Task<RuntimeProvisionWorkStatus> ReadProvisionStatusAsync(
-        ProvisionContainerRuntime message,
+        IRuntimeProvisionMessage message,
         CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
@@ -36,7 +36,7 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
     }
 
     public async Task<RuntimeStopWork?> ReadStopAsync(
-        StopContainerRuntime message,
+        IRuntimeStopMessage message,
         CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();

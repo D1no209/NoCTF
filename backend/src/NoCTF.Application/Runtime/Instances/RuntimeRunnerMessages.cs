@@ -30,13 +30,46 @@ public sealed record ProvisionContainerRuntime(
     int Generation,
     string RunnerPool,
     string RunnerId,
-    ContainerRequest Definition) : IRunnerNodeMessage;
+    ContainerRequest Definition) : IRuntimeProvisionMessage;
+
+public sealed record ProvisionComposeRuntime(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    int Generation,
+    string RunnerPool,
+    string RunnerId,
+    ComposeRequest Definition) : IRuntimeProvisionMessage;
 
 public sealed record StopContainerRuntime(
     Guid RuntimeInstanceId,
     long ProcessingVersion,
     string RunnerPool,
-    string RunnerId) : IRunnerNodeMessage;
+    string RunnerId) : IRuntimeStopMessage;
+
+public sealed record StopComposeRuntime(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    string RunnerPool,
+    string RunnerId) : IRuntimeStopMessage;
+
+public sealed record StopOvaRuntime(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    string RunnerPool,
+    string RunnerId) : IRuntimeStopMessage;
+
+public interface IRuntimeProvisionMessage : IRunnerNodeMessage
+{
+    Guid RuntimeInstanceId { get; }
+    long ProcessingVersion { get; }
+    int Generation { get; }
+}
+
+public interface IRuntimeStopMessage : IRunnerNodeMessage
+{
+    Guid RuntimeInstanceId { get; }
+    long ProcessingVersion { get; }
+}
 
 public sealed record RuntimeStopWork(
     RuntimeProvider Provider,
@@ -52,11 +85,11 @@ public enum RuntimeProvisionWorkStatus
 public interface IRuntimeNodeWorkReader
 {
     Task<RuntimeProvisionWorkStatus> ReadProvisionStatusAsync(
-        ProvisionContainerRuntime message,
+        IRuntimeProvisionMessage message,
         CancellationToken cancellationToken);
 
     Task<RuntimeStopWork?> ReadStopAsync(
-        StopContainerRuntime message,
+        IRuntimeStopMessage message,
         CancellationToken cancellationToken);
 }
 

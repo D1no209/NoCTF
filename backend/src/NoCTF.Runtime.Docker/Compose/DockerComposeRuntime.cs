@@ -1,43 +1,112 @@
 using System.Diagnostics;
+using System.Text.Json;
+using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
+using NoCTF.Runtime.Docker.Containers;
 
 namespace NoCTF.Runtime.Docker.Compose;
 
 /// <summary>Owns Compose lifecycle as one adapter, keeping process invocation out of use cases.</summary>
-public sealed class DockerComposeRuntime : IComposeRuntime
+public sealed class DockerComposeRuntime(
+    DockerRuntimeOptions options,
+    string dockerExecutable = "docker",
+    string? workDirectory = null) : IComposeRuntime
 {
-    private readonly string dockerExecutable;
-    private readonly string workDirectory;
-
-    public DockerComposeRuntime(string dockerExecutable = "docker", string? workDirectory = null)
-    {
-        this.dockerExecutable = dockerExecutable;
-        this.workDirectory = workDirectory ?? Path.Combine(Path.GetTempPath(), "noctf-compose");
-        Directory.CreateDirectory(this.workDirectory);
-    }
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+    private readonly string dockerExecutable = dockerExecutable;
+    private readonly string workDirectory = workDirectory
+        ?? Path.Combine(Path.GetTempPath(), "noctf-compose");
 
     public async Task<ComposeReceipt> UpAsync(ComposeRequest request, CancellationToken cancellationToken)
     {
+        Directory.CreateDirectory(workDirectory);
         var directory = Path.Combine(workDirectory, request.OperationId.ToString("N"));
         Directory.CreateDirectory(directory);
-        await File.WriteAllTextAsync(Path.Combine(directory, "compose.yaml"), request.ComposeYaml, cancellationToken);
-        await RunDockerAsync(directory, request.ProjectName, "up", cancellationToken, "-d");
-        return new(request.OperationId, RuntimeProvider.Docker, request.ProjectName, directory, DateTimeOffset.UtcNow);
+        var composeYaml = ComposeRuntimeDefinitionPolicy.Prepare(request);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "compose.yaml"),
+            composeYaml,
+            cancellationToken);
+        try
+        {
+            await RunDockerAsync(
+                directory,
+                request.ProjectName,
+                "up",
+                cancellationToken,
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                Math.Max(1, (int)Math.Ceiling(request.OperationTimeout.TotalSeconds)).ToString(
+                    System.Globalization.CultureInfo.InvariantCulture));
+        }
+        catch (Exception exception)
+        {
+            if (!await TryCleanUpFailedProvisionAsync(directory, request.ProjectName))
+                throw new ComposeCleanupFailedException(
+                    "Docker Compose provision failed and its partial resources could not be removed.",
+                    exception);
+            throw;
+        }
+        return new(
+            request.OperationId,
+            RuntimeProvider.Docker,
+            request.ProjectName,
+            directory,
+            options.PublicHost,
+            request.Generation,
+            DateTimeOffset.UtcNow);
     }
 
-    public Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken) =>
-        RunDockerAsync(receipt.Namespace, receipt.ProjectName, "down", cancellationToken, "--remove-orphans");
+    public async Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken)
+    {
+        var directory = ResolveOwnedDirectory(receipt.Namespace);
+        await RunDockerAsync(
+            directory,
+            receipt.ProjectName,
+            "down",
+            cancellationToken,
+            "--remove-orphans");
+        if (Directory.Exists(directory))
+            Directory.Delete(directory, recursive: true);
+    }
 
     public async Task<ComposeStatus?> GetStatusAsync(ComposeReceipt receipt, CancellationToken cancellationToken)
     {
-        var result = await RunDockerAsync(receipt.Namespace, receipt.ProjectName, "ps", cancellationToken, "--format", "{{.Service}}|{{.State}}");
-        var services = result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => line.Split('|', 2))
-            .Where(parts => parts.Length == 2)
-            .Select(parts => new ComposeServiceStatus(parts[0], parts[0], ToRuntimeStatus(parts[1]), new Dictionary<int, int>(), null))
-            .ToList();
-        return new(receipt.ProjectName, services.Count == 0 ? RuntimeStatus.Stopped : RuntimeStatus.Running, services);
+        var directory = ResolveOwnedDirectory(receipt.Namespace);
+        var result = await RunDockerAsync(
+            directory,
+            receipt.ProjectName,
+            "ps",
+            cancellationToken,
+            "--format",
+            "json");
+        var entries = JsonSerializer.Deserialize<IReadOnlyList<DockerComposeProcess>>(result, JsonOptions)
+            ?? [];
+        var services = entries
+            .Select(entry => new ComposeServiceStatus(
+                entry.Service,
+                entry.Id,
+                ToRuntimeStatus(entry.State),
+                (entry.Publishers ?? [])
+                    .Where(publisher => publisher.TargetPort is > 0
+                        && publisher.PublishedPort is > 0)
+                    .GroupBy(publisher => publisher.TargetPort)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.First().PublishedPort),
+                entry.Service))
+            .ToArray();
+        var status = services.Length == 0
+            ? RuntimeStatus.Stopped
+            : services.All(service => service.Status == RuntimeStatus.Running)
+                ? RuntimeStatus.Running
+                : services.Any(service => service.Status == RuntimeStatus.Failed)
+                    ? RuntimeStatus.Failed
+                    : RuntimeStatus.Starting;
+        return new(receipt.ProjectName, status, services);
     }
 
     public async Task<ContainerExecResult> ExecAsync(
@@ -98,13 +167,62 @@ public sealed class DockerComposeRuntime : IComposeRuntime
         foreach (var argument in arguments)
             process.StartInfo.ArgumentList.Add(argument);
         process.Start();
-        await process.WaitForExitAsync(cancellationToken);
-        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var standardOutput = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        var standardError = process.StandardError.ReadToEndAsync(CancellationToken.None);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(CancellationToken.None);
+            throw;
+        }
+        var output = await standardOutput;
+        var error = await standardError;
         if (process.ExitCode != 0)
             throw new ComposeCommandFailedException(
                 process.ExitCode,
-                await process.StandardError.ReadToEndAsync(cancellationToken));
+                error);
         return output;
+    }
+
+    private string ResolveOwnedDirectory(string directory)
+    {
+        var root = Path.GetFullPath(workDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        var resolved = Path.GetFullPath(directory);
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (!resolved.StartsWith(root, comparison))
+            throw new InvalidOperationException("Compose receipt does not belong to this Runner.");
+        return resolved;
+    }
+
+    private async Task<bool> TryCleanUpFailedProvisionAsync(string directory, string project)
+    {
+        try
+        {
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await RunDockerAsync(
+                directory,
+                project,
+                "down",
+                cleanup.Token,
+                "--remove-orphans");
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+            return true;
+        }
+        catch
+        {
+            // Preserve the Compose definition for operator cleanup when Docker cleanup fails.
+            return false;
+        }
     }
 
     private static RuntimeStatus ToRuntimeStatus(string status) => status.ToLowerInvariant() switch
@@ -115,9 +233,21 @@ public sealed class DockerComposeRuntime : IComposeRuntime
         "exited" or "dead" => RuntimeStatus.Stopped,
         _ => RuntimeStatus.Failed
     };
+
+    private sealed record DockerComposeProcess(
+        string Id,
+        string Service,
+        string State,
+        IReadOnlyList<DockerComposePublisher>? Publishers);
+
+    private sealed record DockerComposePublisher(int TargetPort, int PublishedPort);
 }
 
-public sealed class ComposeCommandFailedException(int exitCode, string message) : Exception(message)
+public sealed class ComposeCommandFailedException(int exitCode, string message)
+    : InvalidOperationException(message)
 {
     public int ExitCode { get; } = exitCode;
 }
+
+public sealed class ComposeCleanupFailedException(string message, Exception innerException)
+    : Exception(message, innerException);

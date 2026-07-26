@@ -80,7 +80,7 @@ public sealed class IsolatedContainerProvisionerTests
         new Dictionary<string, string>(),
         new Dictionary<string, string>(),
         new Dictionary<int, int>(),
-        new ContainerResourceLimits(1, 1, 1),
+        new RuntimeResourceLimits(1, 1, 1),
         new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
         null,
         NetworkIsolation: ContainerNetworkIsolation.Isolated,

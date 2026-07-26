@@ -41,7 +41,7 @@ public static class AwdpTargetDefinitionFactory
             definition.Environment ?? new Dictionary<string, string>(),
             labels,
             new Dictionary<int, int>(),
-            template.Limits ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256),
+            template.Limits ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256),
             new ContainerSecurityPolicy(true, false, true, ["ALL"], []),
             Ttl: ttl,
             OperationTimeout: template.OperationTimeoutSeconds is > 0

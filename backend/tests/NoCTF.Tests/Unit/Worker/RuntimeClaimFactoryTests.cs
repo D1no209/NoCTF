@@ -37,7 +37,11 @@ public sealed class RuntimeClaimFactoryTests
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
-                "services:\n  web:\n    image: challenge:v1"),
+                "services:\n  web:\n    image: challenge:v1",
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["web"] = new(268_435_456, 500_000_000, 128)
+                }),
             Limits: new(268_435_456, 500_000_000, 128));
 
         var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
@@ -78,7 +82,11 @@ public sealed class RuntimeClaimFactoryTests
             RuntimeProvider.Libvirt,
             RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
-                "services:\n  web:\n    image: challenge:v1"),
+                "services:\n  web:\n    image: challenge:v1",
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["web"] = new(268_435_456, 500_000_000, 128)
+                }),
             Limits: new(268_435_456, 500_000_000, 128));
 
         var action = () => RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);

@@ -253,7 +253,7 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
                 ["noctf.io/purpose"] = "awdp-checker"
             },
             new Dictionary<int, int>(),
-            new ContainerResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
+            new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
             new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
             work.Timeout,
             NetworkName: work.NetworkId,

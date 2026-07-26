@@ -13,7 +13,7 @@ public static class RuntimeClaimFactory
         ChallengeRuntimeTemplate template)
     {
         var limits = template.Limits
-            ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
+            ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
         TimeSpan? ttl = template.TtlSeconds is > 0
             ? TimeSpan.FromSeconds(template.TtlSeconds.Value)
             : null;
@@ -67,6 +67,7 @@ public static class RuntimeClaimFactory
                         definition.ComposeYaml,
                         definition.Environment ?? new Dictionary<string, string>(),
                         MergeLabels(definition.Labels, instance),
+                        definition.ServiceResources,
                         limits,
                         ttl,
                         operationTimeout,

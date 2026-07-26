@@ -192,7 +192,11 @@ public class ChallengeConfigurationCatalogTests
                 RuntimeProvider.Docker,
                 RuntimeAllocation.PerTeam,
                 new ComposeRuntimeDefinition(
-                    "services:\n  web:\n    image: registry.example/challenge:v1")),
+                    "services:\n  web:\n    image: registry.example/challenge:v1",
+                    new Dictionary<string, RuntimeResourceLimits>
+                    {
+                        ["web"] = new(268_435_456, 500_000_000, 128)
+                    })),
             new(
                 RuntimeProvider.Libvirt,
                 RuntimeAllocation.PerTeam,
@@ -235,6 +239,34 @@ public class ChallengeConfigurationCatalogTests
 
             await Assert.That(errors).Contains("Runtime resource limits are required.");
         }
+    }
+
+    [Test]
+    public async Task Compose_runtime_rejects_unsafe_yaml_during_configuration_validation()
+    {
+        var catalog = new GameModeChallengeConfigurationCatalog();
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ComposeRuntimeDefinition(
+                """
+                services:
+                  web:
+                    image: registry.example/challenge:v1
+                    network_mode: host
+                """,
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["web"] = new(268_435_456, 500_000_000, 128)
+                }),
+            Limits: new(268_435_456, 500_000_000, 128));
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("Compose service 'web' field 'network_mode' is not supported.");
     }
 
     [Test]
@@ -505,7 +537,11 @@ public class ChallengeConfigurationCatalogTests
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
-                "services:\n  web:\n    image: registry.example/challenge:v1"),
+                "services:\n  web:\n    image: registry.example/challenge:v1",
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["web"] = new(268_435_456, 500_000_000, 128)
+                }),
             UrlBindings:
             [
                 new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 8080)

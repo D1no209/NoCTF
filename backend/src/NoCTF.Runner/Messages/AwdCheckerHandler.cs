@@ -164,7 +164,7 @@ public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
                 ["noctf.io/purpose"] = "awd-checker"
             },
             new Dictionary<int, int>(),
-            new ContainerResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
+            new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
             new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
             work.Timeout,
             OperationTimeout: work.Timeout);

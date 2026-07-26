@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
@@ -90,8 +91,11 @@ internal static class ChallengeRuntimeTemplateValidator
             case ComposeRuntimeDefinition compose:
                 if (runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
                     errors.Add("Compose runtimes require the Docker or Kubernetes provider.");
-                if (string.IsNullOrWhiteSpace(compose.ComposeYaml))
-                    errors.Add("Compose runtimes require ComposeYaml.");
+                errors.AddRange(ComposeRuntimeDefinitionPolicy.Validate(
+                    compose,
+                    runtime.Limits ?? new(long.MaxValue, long.MaxValue, long.MaxValue),
+                    runtime.UrlBindings,
+                    runtime.ControlCheckUrlBinding));
                 break;
             case OvaRuntimeDefinition ova:
                 if (runtime.Provider != RuntimeProvider.Libvirt)

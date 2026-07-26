@@ -2,4 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
 </Project>

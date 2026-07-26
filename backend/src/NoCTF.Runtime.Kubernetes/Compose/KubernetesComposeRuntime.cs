@@ -12,7 +12,14 @@ public sealed class KubernetesComposeRuntime(IKubernetes client, KubernetesRunti
     public Task<ComposeReceipt> UpAsync(ComposeRequest request, CancellationToken cancellationToken)
     {
         _ = client;
-        return Task.FromResult(new ComposeReceipt(request.OperationId, RuntimeProvider.Kubernetes, request.ProjectName, options.Namespace, DateTimeOffset.UtcNow));
+        return Task.FromResult(new ComposeReceipt(
+            request.OperationId,
+            RuntimeProvider.Kubernetes,
+            request.ProjectName,
+            options.Namespace,
+            options.PublicHost,
+            request.Generation,
+            DateTimeOffset.UtcNow));
     }
 
     public Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken) => Task.CompletedTask;
