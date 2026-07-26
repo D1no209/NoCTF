@@ -54,6 +54,8 @@ public sealed class LibvirtOvaRuntimeTests
                 .IsTrue();
             await Assert.That(adapter.CreatedDomains.Count).IsEqualTo(2);
             await Assert.That(adapter.NetworkExists).IsTrue();
+            await Assert.That(await runtime.ListManagedAsync(CancellationToken.None))
+                .IsEquivalentTo([new OvaManagedRuntimeResource(operationId, 3)]);
 
             var unsafeCleanup = () => runtime.DestroyAsync(
                 receipt with { NetworkId = "default" },
@@ -61,6 +63,9 @@ public sealed class LibvirtOvaRuntimeTests
             await Assert.That(unsafeCleanup).Throws<InvalidOperationException>();
             await Assert.That(adapter.NetworkExists).IsTrue();
 
+            await runtime.DestroyByIdentityAsync(
+                new(operationId, 3),
+                CancellationToken.None);
             await runtime.DestroyAsync(receipt, CancellationToken.None);
             await runtime.DestroyAsync(receipt, CancellationToken.None);
 

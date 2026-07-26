@@ -88,7 +88,7 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 318/318 passed。
+- 319/319 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -98,7 +98,7 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -- --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 1"
 ```
 
-- 本轮 OVA 修改后的 WSL 回归为 28 passed、0 failed、1 skipped；唯一 skip 是未设置
+- 本轮 OVA 修改后的 WSL 回归为 30 passed、0 failed、1 skipped；唯一 skip 是未设置
   `NOCTF_KUBERNETES_INTEGRATION` 的真实 Kubernetes Compose 测试。
 - 本轮修改前同一 HEAD 基线已用临时 k3d 完成 29/29 passed，0 failed，0 skipped；
   OVA 修改未触碰 Kubernetes Provider。
@@ -282,7 +282,7 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 生产 Pool 仍须由运维核对 kubelet 实际 `PodPidsLimit` 与 Runner 配置相等；应用配置不能
 替代 kubelet 配置。
 
-### 6.2 OVA/Libvirt 已接入首版 durable lifecycle，仍需真实 Provider 验证与 reaper
+### 6.2 OVA/Libvirt 已接入首版 durable lifecycle 与 orphan reconciliation
 
 当前已有：
 
@@ -297,14 +297,15 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - Pool/Node routed CIDR、每 Runtime 子网、Guest Agent IPv4 discovery
 - OVA public/KoH control URL expansion、receipt 持久化与幂等 stop cleanup
 - 任一 VM 导入/地址发现失败时的 appliance 整组回滚
+- Worker 复用 durable Runner assignment reconciliation，从 Redis Pool inventory 向在线
+  Libvirt 节点投递审计；节点结合 PostgreSQL 当前 assignment，只删除精确
+  RuntimeInstanceId+Generation orphan domain/network/workdir
 
 仍缺：
 
 - 在 Linux KVM/Libvirt 节点用真实 OVA 验证 import、Guest Agent、routed network、
   URL 可达性和 stop/reset/expire；当前开发机只有 `/dev/kvm`，未安装
   `virsh`/`qemu-img`/`virt-install`。
-- 增加 Libvirt orphan reaper；必须按稳定 RuntimeInstanceId+Generation domain/network
-  名称精确清理，不能使用 Competition/Team 宽泛匹配。
 - 为 Pool/Node CIDR 的非重叠委派增加部署期审计。
 
 ### 6.3 CTF PerTeam Runtime Flag 注入未闭环
@@ -343,7 +344,7 @@ enforcement。
 - replacement 只占一个槽；
 - Runner 失联与 Redis TTL；
 - receipt 已存在的 Failed 仍由原节点清理；
-- reaper 只按 managed + RuntimeInstanceId + Generation 精确匹配；
+- Docker/Kubernetes reaper 只按 managed + RuntimeInstanceId + Generation 精确匹配；
 - Compose appliance/OVA 多资源 cleanup 不使用宽泛 Competition/Team 标签。
 
 ### 6.6 API、DI 与交付项

@@ -163,6 +163,15 @@ public sealed class OvaRuntimeHandlerTests
             return Task.CompletedTask;
         }
 
+        public Task<IReadOnlyList<OvaManagedRuntimeResource>> ListManagedAsync(
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<OvaManagedRuntimeResource>>([]);
+
+        public Task DestroyByIdentityAsync(
+            OvaManagedRuntimeResource identity,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
         public OvaRuntimeReceipt CreateReceipt(
             Guid? operationId = null,
             int generation = 3) =>
@@ -218,6 +227,13 @@ public sealed class OvaRuntimeHandlerTests
             string runnerId,
             CancellationToken cancellationToken) =>
             Task.FromResult(RunnerHeartbeatStatus.Online);
+
+        public Task<RunnerPoolInventory> GetPoolInventoryAsync(
+            string runnerPool,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new RunnerPoolInventory(
+                RunnerPoolInventoryAvailability.Available,
+                []));
 
         public Task<RunnerCapacityClaim> TryClaimAsync(
             RunnerCapacityRequest request,

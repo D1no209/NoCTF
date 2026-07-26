@@ -27,6 +27,16 @@ public enum RunnerCapacityReleaseOutcome
     OwnerMismatch
 }
 
+public enum RunnerPoolInventoryAvailability
+{
+    Available,
+    Unavailable
+}
+
+public sealed record RunnerPoolInventory(
+    RunnerPoolInventoryAvailability Availability,
+    IReadOnlyList<string> RunnerIds);
+
 public sealed record RunnerCapacityRequest(
     Guid RuntimeInstanceId,
     string Pool,
@@ -44,6 +54,10 @@ public interface IRunnerCapacityGate
     Task<RunnerHeartbeatStatus> GetHeartbeatAsync(
         string runnerPool,
         string runnerId,
+        CancellationToken cancellationToken);
+
+    Task<RunnerPoolInventory> GetPoolInventoryAsync(
+        string runnerPool,
         CancellationToken cancellationToken);
 
     Task<RunnerCapacityClaim> TryClaimAsync(

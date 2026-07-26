@@ -95,6 +95,17 @@ public sealed class LibvirtRoutedNetworkManager(
             throw new InvalidOperationException("Libvirt network cleanup failed.");
     }
 
+    internal async Task<IReadOnlyList<string>> ListManagedNetworkNamesAsync(
+        CancellationToken cancellationToken)
+    {
+        var names = await ListNetworkNamesAsync(
+            includeInactive: true,
+            cancellationToken);
+        return names.Where(name => name.StartsWith("noctf-", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+    }
+
     private async Task<HashSet<Ipv4Cidr>> ReadOccupiedSubnetsAsync(
         IReadOnlySet<string> networkNames,
         CancellationToken cancellationToken)

@@ -642,6 +642,69 @@ public static class BackendMessageHandlers
             }
         }
 
+        var pageIsFull = assignments.Count == 500;
+        var libvirtAudits = new List<ReconcileLibvirtResources>();
+        if (!pageIsFull)
+        {
+            var libvirtPools = await db.RuntimeInstances.AsNoTracking()
+                .Where(instance => instance.RuntimeProvider == RuntimeProvider.Libvirt)
+                .Select(instance => instance.RunnerPool)
+                .Distinct()
+                .OrderBy(pool => pool)
+                .ToListAsync(cancellationToken);
+            foreach (var pool in libvirtPools)
+            {
+                var inventory = await capacity.GetPoolInventoryAsync(
+                    pool,
+                    cancellationToken);
+                if (inventory.Availability == RunnerPoolInventoryAvailability.Unavailable)
+                {
+                    var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+                    AdvanceMaintenanceSchedule(schedule, retryAt);
+                    await outbox.ScheduleAsync(
+                        message with
+                        {
+                            At = retryAt,
+                            ProcessingVersion = schedule.ProcessingVersion
+                        },
+                        retryAt);
+                    await db.SaveChangesAsync(cancellationToken);
+                    await outbox.FlushOutgoingMessagesAsync();
+                    return MessageExecutionOutcome.DeferredCapacity;
+                }
+
+                foreach (var inventoryRunnerId in inventory.RunnerIds)
+                {
+                    var heartbeat = await capacity.GetHeartbeatAsync(
+                        pool,
+                        inventoryRunnerId,
+                        cancellationToken);
+                    if (heartbeat == RunnerHeartbeatStatus.Unavailable)
+                    {
+                        var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+                        AdvanceMaintenanceSchedule(schedule, retryAt);
+                        await outbox.ScheduleAsync(
+                            message with
+                            {
+                                At = retryAt,
+                                ProcessingVersion = schedule.ProcessingVersion
+                            },
+                            retryAt);
+                        await db.SaveChangesAsync(cancellationToken);
+                        await outbox.FlushOutgoingMessagesAsync();
+                        return MessageExecutionOutcome.DeferredCapacity;
+                    }
+                    if (heartbeat == RunnerHeartbeatStatus.Online)
+                    {
+                        libvirtAudits.Add(new(
+                            pool,
+                            inventoryRunnerId,
+                            message.At));
+                    }
+                }
+            }
+        }
+
         for (var index = 0; index < assignments.Count; index++)
         {
             var instance = assignments[index];
@@ -694,7 +757,9 @@ public static class BackendMessageHandlers
             }
         }
 
-        var pageIsFull = assignments.Count == 500;
+        foreach (var audit in libvirtAudits)
+            await outbox.PublishToRunnerNodeAsync(audit);
+        applied |= libvirtAudits.Count > 0;
         var nextAt = pageIsFull
             ? DateTimeOffset.UtcNow
             : DateTimeOffset.UtcNow.Add(RunnerReconciliationInterval);

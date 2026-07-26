@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
@@ -9,6 +10,8 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Runner.Composition;
+using NoCTF.Runner.Messages;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
@@ -289,6 +292,109 @@ public sealed class RunnerAssignmentReconciliationTests
         });
     }
 
+    [Test]
+    [Timeout(300_000)]
+    public async Task Online_libvirt_pool_members_receive_exact_resource_reconciliation(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                var runtime = await seed.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                runtime.RuntimeKind = RuntimeKind.OvaVm;
+                runtime.RuntimeProvider = RuntimeProvider.Libvirt;
+                await seed.SaveChangesAsync(cancellationToken);
+            }
+            var capacity = new ReconciliationCapacityGate(
+                _ => RunnerHeartbeatStatus.Online,
+                pool => new(
+                    RunnerPoolInventoryAvailability.Available,
+                    pool == "pool-a" ? ["runner-a"] : []));
+            var outbox = new RecordingTransactionalOutbox();
+
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    db,
+                    capacity,
+                    outbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
+            }
+
+            var audit = outbox.RunnerNodeMessages
+                .OfType<ReconcileLibvirtResources>()
+                .Single();
+            await Assert.That(audit.RunnerPool).IsEqualTo("pool-a");
+            await Assert.That(audit.RunnerId).IsEqualTo("runner-a");
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Libvirt_reconciliation_preserves_only_the_current_node_assignment(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                var runtime = await seed.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                runtime.RuntimeKind = RuntimeKind.OvaVm;
+                runtime.RuntimeProvider = RuntimeProvider.Libvirt;
+                await seed.SaveChangesAsync(cancellationToken);
+            }
+
+            var orphanId = Guid.CreateVersion7();
+            var provider = new RecordingOvaRuntime(
+                [
+                    new(fixture.RedispatchId, 1),
+                    new(fixture.RedispatchId, 2),
+                    new(orphanId, 1)
+                ]);
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Runner:Pool"] = "pool-a",
+                    ["Runner:Id"] = "runner-a"
+                })
+                .Build();
+            await using var db = new NoCtfDbContext(options);
+            var handler = new LibvirtResourceReconciliationHandler(
+                db,
+                new OvaProviderCatalog(provider),
+                configuration);
+
+            await handler.Handle(
+                new ReconcileLibvirtResources(
+                    "pool-a",
+                    "runner-a",
+                    fixture.Now),
+                cancellationToken);
+
+            await Assert.That(provider.Destroyed)
+                .IsEquivalentTo(
+                [
+                    new OvaManagedRuntimeResource(fixture.RedispatchId, 2),
+                    new OvaManagedRuntimeResource(orphanId, 1)
+                ]);
+        });
+    }
+
     private static PostgreSqlContainer CreatePostgres() =>
         new PostgreSqlBuilder("postgres:17-alpine")
             .WithDatabase("noctf_runner_reconciliation")
@@ -391,7 +497,8 @@ public sealed class RunnerAssignmentReconciliationTests
         Guid RetainReceiptId);
 
     private sealed class ReconciliationCapacityGate(
-        Func<string, RunnerHeartbeatStatus> heartbeat) : IRunnerCapacityGate
+        Func<string, RunnerHeartbeatStatus> heartbeat,
+        Func<string, RunnerPoolInventory>? inventory = null) : IRunnerCapacityGate
     {
         public List<Guid> ReleasedRuntimeIds { get; } = [];
 
@@ -399,6 +506,14 @@ public sealed class RunnerAssignmentReconciliationTests
             string runnerPool,
             string runnerId,
             CancellationToken cancellationToken) => Task.FromResult(heartbeat(runnerId));
+
+        public Task<RunnerPoolInventory> GetPoolInventoryAsync(
+            string runnerPool,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(inventory?.Invoke(runnerPool)
+                ?? new RunnerPoolInventory(
+                    RunnerPoolInventoryAvailability.Available,
+                    []));
 
         public Task<RunnerCapacityClaim> TryClaimAsync(
             RunnerCapacityRequest request,
@@ -458,5 +573,48 @@ public sealed class RunnerAssignmentReconciliationTests
         }
 
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+    }
+
+    private sealed class RecordingOvaRuntime(
+        IReadOnlyList<OvaManagedRuntimeResource> managed) : IOvaRuntime
+    {
+        public List<OvaManagedRuntimeResource> Destroyed { get; } = [];
+
+        public Task<OvaRuntimeReceipt> ImportAsync(
+            OvaRuntimeRequest request,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task DestroyAsync(
+            OvaRuntimeReceipt receipt,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<OvaManagedRuntimeResource>> ListManagedAsync(
+            CancellationToken cancellationToken) =>
+            Task.FromResult(managed);
+
+        public Task DestroyByIdentityAsync(
+            OvaManagedRuntimeResource identity,
+            CancellationToken cancellationToken)
+        {
+            Destroyed.Add(identity);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class OvaProviderCatalog(IOvaRuntime runtime)
+        : IRuntimeProviderCatalog
+    {
+        public IContainerLifecycle Containers(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+
+        public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+
+        public IComposeRuntime Compose(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+
+        public IOvaRuntime Appliance(RuntimeProvider provider) => runtime;
     }
 }

@@ -28,6 +28,10 @@ public sealed record OvaRuntimeReceipt(
     IReadOnlyList<OvaVirtualMachineReceipt> VirtualMachines,
     DateTimeOffset CreatedAt);
 
+public readonly record struct OvaManagedRuntimeResource(
+    Guid OperationId,
+    int Generation);
+
 public interface IOvaRuntime
 {
     Task<OvaRuntimeReceipt> ImportAsync(
@@ -36,5 +40,12 @@ public interface IOvaRuntime
 
     Task DestroyAsync(
         OvaRuntimeReceipt receipt,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<OvaManagedRuntimeResource>> ListManagedAsync(
+        CancellationToken cancellationToken);
+
+    Task DestroyByIdentityAsync(
+        OvaManagedRuntimeResource identity,
         CancellationToken cancellationToken);
 }

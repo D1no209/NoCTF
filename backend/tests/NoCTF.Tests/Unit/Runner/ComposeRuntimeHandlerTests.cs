@@ -242,6 +242,13 @@ public sealed class ComposeRuntimeHandlerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(RunnerHeartbeatStatus.Online);
 
+        public Task<RunnerPoolInventory> GetPoolInventoryAsync(
+            string runnerPool,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new RunnerPoolInventory(
+                RunnerPoolInventoryAvailability.Available,
+                []));
+
         public Task<RunnerCapacityClaim> TryClaimAsync(
             RunnerCapacityRequest request,
             CancellationToken cancellationToken) =>
