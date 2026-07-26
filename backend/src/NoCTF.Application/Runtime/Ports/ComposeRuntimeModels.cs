@@ -4,11 +4,17 @@ namespace NoCTF.Application.Runtime.Ports;
 
 public sealed record ComposeRequest(
     Guid OperationId,
+    RuntimeProvider Provider,
+    int Generation,
     string ProjectName,
     string ComposeYaml,
     IReadOnlyDictionary<string, string> Environment,
     IReadOnlyDictionary<string, string> Labels,
-    TimeSpan? Ttl);
+    ContainerResourceLimits Limits,
+    TimeSpan? Ttl,
+    TimeSpan OperationTimeout,
+    IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
+    RuntimeUrlBinding? ControlCheckUrlBinding = null);
 
 public sealed record ComposeServiceStatus(
     string Name,
