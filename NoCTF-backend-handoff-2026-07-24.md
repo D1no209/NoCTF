@@ -20,8 +20,8 @@ Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前实现 HEAD：以本地分支最新提交为准；本次 Kubernetes Compose 纵切只做本地提交，
-  尚未获准推送。
+- 当前实现 HEAD：`af73a27 feat(backend): provision Kubernetes Compose runtimes`。
+- 本次 Kubernetes Compose 纵切只做本地提交，尚未获准推送。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
 - 创建交接分支前，`main` 相对 `origin/main`：ahead 186。
@@ -237,6 +237,7 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - `b8b58e9 refactor(backend): split runtime definitions by kind`
 - `9c43083 feat(backend): dispatch runtime claims by kind`
 - `fbd092c feat(backend): provision Docker Compose runtimes`
+- `af73a27 feat(backend): provision Kubernetes Compose runtimes`
 
 ## 6. 当前最重要的剩余缺口
 
