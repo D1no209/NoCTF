@@ -13,8 +13,9 @@ Frontend、仓库外 CI 或用户的本地辅助文件。
 Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径已经接通，
 OVA/Libvirt lifecycle、orphan reconciliation 与 CTF PerTeam Runtime Flag 注入也已闭环。
 EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 与 Kubernetes
-`DenyAll | InternetOnly` enforcement 已接通。下一主线是当前 Kubernetes 策略的真实集群
-复测、Docker/Kubernetes 持久网络与 ingress proxy orphan reconciliation，以及部署 smoke。
+`DenyAll | InternetOnly` enforcement 已接通，并已在 Cilium `always` 模式的临时集群
+完成真实复测。下一主线是 Docker/Kubernetes 持久网络、ingress proxy 与 Compose
+appliance 的 crash orphan reconciliation，以及后续受控部署 smoke。
 
 ## 2. Git 基线与工作树保护
 
@@ -22,7 +23,7 @@ EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`4dfbf90 feat(backend): enforce runtime egress policies`。
+- 当前代码实现 HEAD：`091b153 feat(backend): require fail-closed Cilium runtime pools`。
 - 本轮实现只做本地提交，尚未获准推送。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -76,6 +77,14 @@ git log --oneline 003b75c..2c6b4ce -- backend
     `noctf-network`，只转发已声明的 TCP URL Binding；题目容器不连接平台网络。
 14. Kubernetes `InternetOnly` 只放行公网 IPv4；IPv6 不放行。特殊/私有地址使用内建
     deny ranges，并要求 Runner Pool 额外声明非空 `ProtectedCidrs`。
+15. 生产 Kubernetes Runner Pool 必须使用 Cilium
+    `policyEnforcementMode=always`。k3s 内置 NetworkPolicy controller 只允许开发使用，
+    不作为生产 fail-closed 安全边界。
+16. Runtime Namespace 的全选 Pod default-deny NetworkPolicy 由部署负责创建；Runner
+    只在启动时验证 Cilium 配置、基线策略和 `kube-system/kube-dns`，不得自行修改。
+17. Kubernetes Runner Pool 必填 `ClusterDnsServiceAddress`。Runner 启动时校验它等于
+    `kube-dns` ClusterIP，并在每 Runtime policy 中仅向该地址的 TCP/UDP 53 放行；
+    题目 Compose 不承担集群 DNS 地址。
 
 ## 4. 2026-07-27 当前 HEAD 的实测门禁
 
@@ -99,29 +108,35 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 334/334 passed。
+- 340/340 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
 
 ```powershell
-wsl -d Ubuntu-22.04 -- bash -lc `
-  "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -- --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 1"
+wsl bash -lc `
+  "cd /mnt/e/SourceCode/NoCTF/backend && NOCTF_KUBERNETES_INTEGRATION=true NOCTF_KOMPOSE_PATH=/tmp/noctf-cilium-it-20260727/kompose /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 33"
 ```
 
-- 本轮 WSL 回归为 32 passed、0 failed、1 skipped；唯一 skip 是未设置
-  `NOCTF_KUBERNETES_INTEGRATION` 的真实 Kubernetes Compose 测试。
-- 分组总计 367 total、366 passed、0 failed、1 skipped。
-- 本轮修改前同一 HEAD 基线已用临时 k3d 完成 29/29 passed，0 failed，0 skipped；
-  OVA 修改未触碰 Kubernetes Provider。
+- 本轮 WSL 回归为 33/33 passed、0 failed、0 skipped。
+- 非 Integration 与 Integration 分组总计 373 passed、0 failed、0 skipped。
 - Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
-- Kubernetes 使用临时 k3d `v5.9.0` / k3s `v1.35.5+k3s1`，其内建
-  NetworkPolicy controller 已启用，kubelet 以 `--pod-max-pids=512` 启动并与测试
-  Runner Pool 配置一致。
+- Kubernetes 使用一次性 k3d `v5.9.0` / k3s `v1.35.5+k3s1` /
+  Cilium `v1.19.6`。k3s 以 `--flannel-backend=none --disable-network-policy`
+  启动，kubelet 使用 `--pod-max-pids=512`；Cilium
+  `enable-policy=always`，内建 NetworkPolicy controller 未参与。
+- 临时集群实测部署了 Runtime Namespace baseline default-deny、Cilium 非 Runtime
+  兼容策略、Runner RBAC 和 ConfigMap；验证结束后集群、Docker network/volume、
+  kubeconfig context 与 `/tmp/noctf-cilium-it-20260727` 工具目录均已删除。
 - 新增真实 Docker Compose lifecycle，覆盖 dynamic port、Compose DNS、exec、
   container/network/workdir cleanup。
 - 新增真实 Kubernetes Compose lifecycle，覆盖固定 Kompose、短名 DNS、
-  未 Ready Pod DNS、同 Runtime 互通、跨 Runtime 拒绝、NodePort 与精确 cleanup。
+  未 Ready Pod DNS、同 Runtime 互通、`DenyAll` 外网拒绝、`InternetOnly` 公网放行、
+  `ProtectedCidrs` 拒绝、跨 Runtime 拒绝、NodePort 与两个 Runtime 的精确 cleanup。
+- 真实 Cilium 测试发现并修复 Kubernetes exec error stream 不响应取消、导致策略丢包
+  时调用永久等待的问题；Compose 与 Container exec 现在都有调用侧 timeout 边界。
+- Cilium 数据路径对 kube-dns ClusterIP 的策略判定不能只依赖 CoreDNS Pod selector；
+  当前每 Runtime policy 同时使用 selector 和 Pool 配置的精确 DNS Service `/32`。
 - 测试发现并修复 Docker Compose `ps --format json` 在当前 CLI 返回 JSON Lines、
   旧适配器只接受 JSON array 的兼容问题。
 - 新增 OVA contract 测试，覆盖 SHA-256、tar traversal、OVF 多 VM/资源预算、
@@ -131,8 +146,8 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - 新增真实 Docker Container/Compose ingress proxy 测试，证明题目容器不连接平台网络、
   proxy 双网络、公开端口可访问、同 Runtime DNS/互通、幂等 replay 与精确 cleanup。
 - `deploy/docker-compose.yml` 已通过 `docker compose config --quiet` 静态解析。
-- 当前 EgressPolicy 的 Kubernetes manifest/unit 测试已通过；本轮没有可用 k3d/k3s
-  context，因此新的 `InternetOnly` ipBlock/except 尚未在真实 CNI 上复测。
+- Kubernetes EgressPolicy 已在真实 Cilium dataplane 上复测，不再只是 manifest/unit
+  证明。
 
 ### EF Core 模型
 
@@ -284,6 +299,8 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - 每 Runtime 创建唯一 `rt-<runtime-id>` headless Service，注入 Pod hostname/subdomain、
   Pool `ClusterDomain` search domain 与 `publishNotReadyAddresses=true`。
 - 每 Runtime 创建 NetworkPolicy；DNS 仅承担命名隔离，不作为安全边界。
+- Pool 必填 `ClusterDnsServiceAddress`；每 Runtime DNS egress 同时匹配 CoreDNS Pod
+  与精确 Service `/32`，Runner 启动时核对实际 `kube-dns` ClusterIP。
 - 公开 URL 由平台动态创建 NodePort；status 读取实际 NodePort 与完整内部 FQDN。
 - Up 等待 Deployment 可用，Down 精确匹配 managed+RuntimeInstanceId+Generation；
   部分创建失败执行确定性清理，清理失败保留容量供 durable retry。
@@ -295,11 +312,15 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - 固定 Kompose 与 Kubernetes API 可完整执行；
 - Compose 短名与 FQDN 可解析，未 Ready endpoint 也会发布；
 - 同 Runtime 互通，其他 Runtime 无法访问非公开服务；
+- `DenyAll` 无法访问公网；`InternetOnly` 可访问公网但不能访问 `ProtectedCidrs`；
 - 平台动态 NodePort 可访问；
-- managed+RuntimeInstanceId+Generation 资源删除收敛。
+- managed+RuntimeInstanceId+Generation 资源删除收敛；
+- deployment-owned baseline default-deny 在 workload 创建前生效，Cilium `always`
+  对初始化 endpoint fail-closed。
 
 生产 Pool 仍须由运维核对 kubelet 实际 `PodPidsLimit` 与 Runner 配置相等；应用配置不能
-替代 kubelet 配置。
+替代 kubelet 配置。Runner 只验证 Cilium ConfigMap、kube-dns Service 与 Runtime
+baseline policy 的静态状态，不执行启动时 dataplane 探测。
 
 ### 6.2 OVA/Libvirt 已接入首版 durable lifecycle 与 orphan reconciliation
 
@@ -365,11 +386,13 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - Kubernetes Container/Compose 每 Runtime 创建 NetworkPolicy。`DenyAll` 只允许同
   Runtime、DNS 和平台声明入站；`InternetOnly` 额外允许 `0.0.0.0/0`，通过 `except`
   排除内建特殊/私有 IPv4 与 Pool `ProtectedCidrs`，不生成 IPv6 allow。
-- Kubernetes Pool 启动时强制非空、合法 IPv4 `ProtectedCidrs`；Docker/Libvirt Pool
-  不被无关 Kubernetes 配置阻塞。
+- Kubernetes Pool 启动时强制非空、合法 IPv4 `ProtectedCidrs` 与精确
+  `ClusterDnsServiceAddress`；Runner 校验 Cilium `enable-policy=always`、
+  deployment-owned Namespace baseline default-deny 与实际 kube-dns ClusterIP。
+  Docker/Libvirt Pool 不被无关 Kubernetes 配置阻塞。
 - `deploy/docker-compose.yml` 将默认平台网络命名为 `noctf-network`，并加入新的
   Runtime Docker/proxy/Runner 配置；`deploy/k8s/configmap.yaml` 加入
-  `ProtectedCidrs` 示例。
+  `ProtectedCidrs` 与 k3s 默认 `ClusterDnsServiceAddress` 示例。
 
 当前实际部署状态：
 
@@ -377,9 +400,8 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - 2026-07-27 检查时，本机仍运行已有 `deploy-*` 容器，实际网络仍是
   `deploy_default`；`noctf-network` 尚不存在。新的 `deploy/docker-compose.yml` 只完成
   `config --quiet` 验证，尚未 `up` 应用。
-- 本轮没有连接真实 Kubernetes cluster；`deploy/k8s` 变更尚未 apply。旧基线曾在临时
-  k3d/k3s+CNI 上通过 DNS/NetworkPolicy 测试，但本轮新增 `InternetOnly` 规则只经过
-  manifest/unit 测试。
+- `deploy/k8s` 与 `deploy/cilium` 只 apply 到一次性本地 k3d/k3s+Cilium 集群完成验证；
+  该集群现已删除。这不代表任何用户集群或生产集群已经部署。
 - 没有任何生产环境部署，也没有推送远程分支。
 
 明确尚未实现：
@@ -387,7 +409,8 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - Docker `InternetOnly`；没有 `DOCKER-USER` 宿主防火墙方案和 Egress Gateway。
 - OVA/Libvirt EgressPolicy。
 - IPv6 公网 egress、域名/FQDN allowlist、目的端口 allowlist。
-- CNI NetworkPolicy 能力自动探测；`NetworkPolicyRequired=true` 仍是运维声明。
+- Runner 不做持续 dataplane/Cilium 健康探测；启动检查只证明指定配置和基线资源存在，
+  `NetworkPolicyRequired=true` 仍保留运维声明语义。
 - Pod/Service/node/management CIDR 自动发现；Pool 运维必须维护 `ProtectedCidrs`。
 - 单 Container proxy 镜像的自动 registry 拉取/鉴权；节点须预拉取受信任镜像。Compose
   路径由 Compose pull policy 处理。
@@ -429,12 +452,11 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 
 每一项必须独立 commit：
 
-1. 在临时 k3d/k3s+CNI 上复测当前 Kubernetes `DenyAll`、`InternetOnly`、
-   `ProtectedCidrs`、IPv6 deny、跨 Runtime deny 与 cleanup。
-2. 完成 Docker/Kubernetes 持久 sandbox、ingress proxy、Compose appliance 的 crash
+1. 完成 Docker/Kubernetes 持久 sandbox、ingress proxy、Compose appliance 的 crash
    orphan reconciliation，并重新审计 capacity claim/release。
-3. 使用新清单执行受控 Docker Compose/Kubernetes deployment smoke；不得自行重启用户
+2. 使用新清单执行受控 Docker Compose/Kubernetes deployment smoke；不得自行重启用户
    当前运行的本地栈。
+3. 在真实双栈集群补做 IPv6 deny 验证；当前一次性集群是 IPv4 single-stack。
 4. 重新跑四模式 E2E。
 5. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
@@ -461,8 +483,9 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从 OVA durable lifecycle 开始；不要重做已完成的 RuntimeKind dispatch、
-   Docker/Kubernetes Compose handler 或 Compose Provider 集成。
+4. 从持久 Runtime crash orphan reconciliation 开始；不要重做已完成的
+   RuntimeKind dispatch、Docker/Kubernetes Compose handler、OVA lifecycle 或 Cilium
+   egress 验证。
 5. 每个纵切固定执行：
    - 失败测试；
    - 最小实现；
