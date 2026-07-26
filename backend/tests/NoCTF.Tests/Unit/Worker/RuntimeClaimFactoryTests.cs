@@ -32,6 +32,8 @@ public sealed class RuntimeClaimFactoryTests
             .IsEqualTo(ContainerNetworkIsolation.Isolated);
         await Assert.That(container.Definition.EgressPolicy)
             .IsEqualTo(RuntimeEgressPolicy.DenyAll);
+        await Assert.That(container.Definition.Labels["noctf.io/job-kind"])
+            .IsEqualTo("persistent-runtime");
     }
 
     [Test]
@@ -83,6 +85,8 @@ public sealed class RuntimeClaimFactoryTests
             .IsEqualTo($"noctf-{instance.Id:N}-{instance.Generation}");
         await Assert.That(compose.Definition.EgressPolicy)
             .IsEqualTo(RuntimeEgressPolicy.DenyAll);
+        await Assert.That(compose.Definition.Labels["noctf.io/job-kind"])
+            .IsEqualTo("persistent-runtime");
     }
 
     [Test]

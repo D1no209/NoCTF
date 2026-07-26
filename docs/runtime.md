@@ -197,12 +197,19 @@ OVA 的 `PidsLimit` 只参与 Runner 容量预留，不表示或尝试限制 Gue
 不注入 PerTeam Flag。
 
 Worker 的 durable Runner assignment reconciliation 同时读取 Redis Pool membership，并向
-在线 Libvirt 节点投递资源审计。节点只接受自己的 Pool/RunnerId，枚举名称严格匹配
-`noctf-<runtime-id>-<generation>` 的 network、带三位 VM suffix 的 domain，以及对应工作
-目录；只有数据库中相同 RuntimeInstanceId+Generation 仍处于
-Provisioning/Running/Stopping、Provider=Libvirt 且仍归属该节点时才保留。Redis/数据库
-不可用时不清理；旧 Generation、已改派节点、终态或无业务事实的资源按完整 appliance
-精确删除。
+所有在线节点投递资源审计。节点只接受自己的 Pool/RunnerId，并按本节点配置的强类型
+Provider 枚举 `noctf.io/managed=true`、`noctf.io/job-kind=persistent-runtime`、
+RuntimeInstanceId 与 Generation 完整匹配的资源。只有数据库中相同
+RuntimeInstanceId+Generation 仍处于 Provisioning/Running/Stopping、Provider 相同且仍
+归属该节点时才保留；Redis/数据库不可用时不清理。旧 Generation、已改派节点、终态或
+无业务事实的 Docker Container/ingress/network、Docker Compose project/workdir、
+Kubernetes Pod/Deployment/Service/NetworkPolicy 和 Libvirt appliance 均按完整 identity
+精确删除。持久资源不使用 Provider 创建时刻推导的业务 TTL；TTL reaper 只处理带
+`expires-at` 的 disposable 资源，并由同一节点审计消息驱动。
+
+资源审计不释放 Runner capacity。容量 claim/release 仍只由 RuntimeInstance assignment、
+ProcessingVersion 与 release token 的 durable 状态机处理，避免资源清理与容量账本发生
+双重释放。
 
 ## Flag 注入
 

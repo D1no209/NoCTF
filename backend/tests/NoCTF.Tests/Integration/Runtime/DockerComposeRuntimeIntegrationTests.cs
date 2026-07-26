@@ -3,6 +3,7 @@ using Docker.DotNet;
 using Docker.DotNet.Models;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
+using NoCTF.Runtime.Docker;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
 
@@ -37,11 +38,16 @@ public sealed class DockerComposeRuntimeIntegrationTests
             var workRoot = Path.Combine(
                 Path.GetTempPath(),
                 $"noctf-compose-it-{operationId:N}");
+            var runtimeOptions = new DockerRuntimeOptions(
+                Endpoint: DockerEndpoint(),
+                PublicHost: "localhost",
+                NetworkName: platformNetworkName);
             var runtime = new DockerComposeRuntime(
-                new DockerRuntimeOptions(
-                    PublicHost: "localhost",
-                    NetworkName: platformNetworkName),
+                runtimeOptions,
                 workDirectory: workRoot);
+            using var reconciler = new DockerRuntimeResourceReconciler(
+                runtimeOptions,
+                runtime);
             ComposeReceipt? receipt = null;
             try
             {
@@ -107,7 +113,11 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     .Select(service => service.ResourceId)
                     .ToArray();
                 var operationDirectory = receipt.Namespace;
-                await runtime.DownAsync(receipt, cancellationToken);
+                await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
+                    .Contains(new RuntimeResourceIdentity(operationId, 1));
+                await reconciler.DestroyByIdentityAsync(
+                    new(operationId, 1),
+                    cancellationToken);
                 receipt = null;
 
                 foreach (var resourceId in resourceIds)
@@ -191,6 +201,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
         new Dictionary<string, string>
         {
             ["noctf.io/managed"] = "true",
+            ["noctf.io/job-kind"] = "persistent-runtime",
             ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
             ["noctf.io/generation"] = "1"
         },

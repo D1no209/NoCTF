@@ -66,7 +66,7 @@ public sealed record StopOvaRuntime(
     string RunnerPool,
     string RunnerId) : IRuntimeStopMessage;
 
-public sealed record ReconcileLibvirtResources(
+public sealed record ReconcileRuntimeResources(
     string RunnerPool,
     string RunnerId,
     DateTimeOffset RequestedAt) : IRunnerNodeMessage;

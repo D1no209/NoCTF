@@ -12,6 +12,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     private readonly DockerClient client;
     private readonly DockerRuntimeOptions options;
 
+    public RuntimeProvider Provider => RuntimeProvider.Docker;
+
     public DockerContainerLifecycle(DockerRuntimeOptions options)
     {
         this.options = options;

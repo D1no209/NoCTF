@@ -4,8 +4,11 @@ using k8s.Models;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runner.Composition;
+using NoCTF.Runner.Messages;
+using NoCTF.Runtime.Kubernetes;
 using NoCTF.Runtime.Kubernetes.Compose;
 using NoCTF.Runtime.Kubernetes.Configuration;
+using NoCTF.Runtime.Kubernetes.Containers;
 
 namespace NoCTF.Tests.Integration.Runtime;
 
@@ -337,8 +340,51 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             cancellationToken);
         await Assert.That(publicIngress.ExitCode).IsEqualTo(0);
 
-        await runtime.DownAsync(receipt, cancellationToken);
-        await runtime.DownAsync(internetReceipt, cancellationToken);
+        var reconciler = new KubernetesRuntimeResourceReconciler(client, options);
+        var containerOperationId = Guid.NewGuid();
+        var containerLifecycle = new KubernetesContainerLifecycle(client, options);
+        var containerRequest = new ContainerRequest(
+            containerOperationId,
+            RuntimeProvider.Kubernetes,
+            "busybox:1.36.1",
+            [
+                "/bin/sh",
+                "-c",
+                "mkdir -p /www && echo container > /www/index.html "
+                + "&& exec httpd -f -p 8080 -h /www"
+            ],
+            new Dictionary<string, string>(),
+            OwnershipLabels(containerOperationId, 1, "container"),
+            new Dictionary<int, int> { [8080] = 0 },
+            new RuntimeResourceLimits(67_108_864, 100_000_000, 512),
+            new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+            TimeSpan.FromMinutes(5),
+            OperationTimeout: TimeSpan.FromMinutes(2),
+            NetworkIsolation: ContainerNetworkIsolation.Isolated,
+            Generation: 1,
+            RuntimeInstanceId: containerOperationId);
+        _ = await IsolatedContainerProvisioner.ProvisionAsync(
+            containerLifecycle,
+            containerLifecycle,
+            containerRequest,
+            DateTimeOffset.UtcNow,
+            cancellationToken);
+        var managed = await reconciler.ListManagedAsync(cancellationToken);
+        await Assert.That(managed)
+            .Contains(new RuntimeResourceIdentity(operationId, 1));
+        await Assert.That(managed)
+            .Contains(new RuntimeResourceIdentity(internetOperationId, 1));
+        await Assert.That(managed)
+            .Contains(new RuntimeResourceIdentity(containerOperationId, 1));
+        await reconciler.DestroyByIdentityAsync(
+            new(operationId, 1),
+            cancellationToken);
+        await reconciler.DestroyByIdentityAsync(
+            new(internetOperationId, 1),
+            cancellationToken);
+        await reconciler.DestroyByIdentityAsync(
+            new(containerOperationId, 1),
+            cancellationToken);
         await AssertRuntimeResourcesDeletedAsync(
             client,
             namespaceName,
@@ -348,6 +394,11 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             client,
             namespaceName,
             internetOperationId,
+            cancellationToken);
+        await AssertRuntimeResourcesDeletedAsync(
+            client,
+            namespaceName,
+            containerOperationId,
             cancellationToken);
     }
 
@@ -364,6 +415,10 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             namespaceName,
             labelSelector: selector,
             cancellationToken: cancellationToken);
+        var pods = await client.CoreV1.ListNamespacedPodAsync(
+            namespaceName,
+            labelSelector: selector,
+            cancellationToken: cancellationToken);
         var services = await client.CoreV1.ListNamespacedServiceAsync(
             namespaceName,
             labelSelector: selector,
@@ -373,6 +428,7 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             labelSelector: selector,
             cancellationToken: cancellationToken);
         await Assert.That(deployments.Items).IsEmpty();
+        await Assert.That(pods.Items).IsEmpty();
         await Assert.That(services.Items).IsEmpty();
         await Assert.That(policies.Items).IsEmpty();
     }
@@ -546,6 +602,7 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
         new(StringComparer.Ordinal)
         {
             ["noctf.io/managed"] = "true",
+            ["noctf.io/job-kind"] = "persistent-runtime",
             ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
             ["noctf.io/generation"] = generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture),
@@ -577,7 +634,10 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
               - "9090"
         """,
         new Dictionary<string, string>(),
-        new Dictionary<string, string>(),
+        new Dictionary<string, string>
+        {
+            ["noctf.io/job-kind"] = "persistent-runtime"
+        },
         new Dictionary<string, RuntimeResourceLimits>
         {
             ["web"] = new(67_108_864, 100_000_000, 0),

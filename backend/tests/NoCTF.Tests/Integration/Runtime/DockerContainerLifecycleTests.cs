@@ -5,6 +5,8 @@ using DotNet.Testcontainers.Builders;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runner.Messages;
+using NoCTF.Runtime.Docker;
+using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
 
 namespace NoCTF.Tests.Integration.Runtime;
@@ -67,11 +69,17 @@ public sealed class DockerContainerLifecycleTests
             var platformNetwork = await docker.Networks.CreateNetworkAsync(
                 new NetworksCreateParameters { Name = platformNetworkName },
                 cancellationToken);
-            using var lifecycle = new DockerContainerLifecycle(
-                new DockerRuntimeOptions(
-                    DockerEndpoint(),
-                    platformNetworkName,
-                    "localhost"));
+            var options = new DockerRuntimeOptions(
+                DockerEndpoint(),
+                platformNetworkName,
+                "localhost");
+            using var lifecycle = new DockerContainerLifecycle(options);
+            var composeWorkRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-compose-reconcile-{operationId:N}");
+            using var reconciler = new DockerRuntimeResourceReconciler(
+                options,
+                new DockerComposeRuntime(options, workDirectory: composeWorkRoot));
             ContainerReceipt? receipt = null;
             try
             {
@@ -84,6 +92,7 @@ public sealed class DockerContainerLifecycleTests
                     new Dictionary<string, string>
                     {
                         ["noctf.io/managed"] = "true",
+                        ["noctf.io/job-kind"] = "persistent-runtime",
                         ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
                         ["noctf.io/generation"] = "1"
                     },
@@ -138,6 +147,30 @@ public sealed class DockerContainerLifecycleTests
                 await Assert.That(ingress.NetworkSettings!.Networks.Keys)
                     .Contains(platformNetworkName);
                 await Assert.That(ingress.NetworkSettings.Networks).Count().IsEqualTo(2);
+
+                await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
+                    .Contains(new RuntimeResourceIdentity(operationId, 1));
+                var targetId = receipt.ResourceId;
+                var ingressId = receipt.IngressResourceId!;
+                var networkId = receipt.NetworkId!;
+                await reconciler.DestroyByIdentityAsync(
+                    new(operationId, 1),
+                    cancellationToken);
+                receipt = null;
+                await Assert.That(await lifecycle.GetAsync(
+                    RuntimeProvider.Docker,
+                    targetId,
+                    cancellationToken)).IsNull();
+                Func<Task> inspectIngress = async () =>
+                    _ = await docker.Containers.InspectContainerAsync(
+                        ingressId,
+                        cancellationToken);
+                await Assert.That(inspectIngress).ThrowsException();
+                Func<Task> inspectSandbox = async () =>
+                    _ = await docker.Networks.InspectNetworkAsync(
+                        networkId,
+                        cancellationToken);
+                await Assert.That(inspectSandbox).ThrowsException();
             }
             finally
             {
@@ -152,6 +185,8 @@ public sealed class DockerContainerLifecycleTests
                 await docker.Networks.DeleteNetworkAsync(
                     platformNetwork.ID,
                     CancellationToken.None);
+                if (Directory.Exists(composeWorkRoot))
+                    Directory.Delete(composeWorkRoot, recursive: true);
             }
         });
     }

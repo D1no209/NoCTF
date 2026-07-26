@@ -174,6 +174,7 @@ public static class RuntimeClaimFactory
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(configured, StringComparer.Ordinal);
         labels["noctf.io/managed"] = "true";
+        labels["noctf.io/job-kind"] = "persistent-runtime";
         labels["noctf.io/runtime-instance-id"] = instance.Id.ToString("D");
         labels["noctf.io/competition-id"] = instance.CompetitionId.ToString("D");
         labels["noctf.io/competition-challenge-id"] =

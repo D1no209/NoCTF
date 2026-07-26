@@ -6,9 +6,11 @@ using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
+using NoCTF.Runtime.Docker;
 using NoCTF.Runtime.Kubernetes.Compose;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Containers;
+using NoCTF.Runtime.Kubernetes;
 using NoCTF.Runtime.Libvirt;
 using k8s;
 using NoCTF.Runner.Messages;
@@ -60,6 +62,9 @@ public static class ServiceRegistration
         services.AddSingleton<IRuntimeResourceReaper>(provider =>
             provider.GetRequiredService<DockerContainerLifecycle>());
         services.AddSingleton<DockerComposeRuntime>();
+        services.AddSingleton<DockerRuntimeResourceReconciler>();
+        services.AddSingleton<IRuntimeManagedResourceReconciler>(provider =>
+            provider.GetRequiredService<DockerRuntimeResourceReconciler>());
         services.AddSingleton(new KubernetesRuntimeOptions(
             configuration["Runtime:Kubernetes:Namespace"] ?? "noctf",
             configuration["Runtime:Kubernetes:PublicHost"] ?? "localhost",
@@ -95,6 +100,9 @@ public static class ServiceRegistration
             provider.GetRequiredService<KubernetesContainerLifecycle>());
         services.AddSingleton<IKomposeConverter>(new KomposeConverter());
         services.AddSingleton<KubernetesComposeRuntime>();
+        services.AddSingleton<KubernetesRuntimeResourceReconciler>();
+        services.AddSingleton<IRuntimeManagedResourceReconciler>(provider =>
+            provider.GetRequiredService<KubernetesRuntimeResourceReconciler>());
         var hasLibvirtConfiguration =
             !string.IsNullOrWhiteSpace(configuration["Runtime:Libvirt:PoolRoutedNetworkCidr"]);
         if (isLibvirtPool || hasLibvirtConfiguration)
@@ -113,6 +121,9 @@ public static class ServiceRegistration
             services.AddSingleton<LibvirtApplianceLifecycle>();
             services.AddSingleton<IOvaRuntime>(provider =>
                 provider.GetRequiredService<LibvirtApplianceLifecycle>());
+            services.AddSingleton<LibvirtRuntimeResourceReconciler>();
+            services.AddSingleton<IRuntimeManagedResourceReconciler>(provider =>
+                provider.GetRequiredService<LibvirtRuntimeResourceReconciler>());
         }
         services.AddSingleton<RuntimeProviderCatalog>();
         services.AddSingleton<IOneShotRuntimeProviderCatalog>(provider =>

@@ -14,6 +14,7 @@ public sealed class DockerComposeRuntime(
     string? workDirectory = null) : IComposeRuntime
 {
     private const string IngressMetadataFileName = "noctf-ingress.json";
+    private const string RuntimeMetadataFileName = "noctf-runtime.json";
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
     private readonly string dockerExecutable = dockerExecutable;
@@ -27,6 +28,13 @@ public sealed class DockerComposeRuntime(
         Directory.CreateDirectory(directory);
         var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
         var ingress = DockerComposeIngressProxyPolicy.Apply(prepared, request, options);
+        await WriteRuntimeMetadataAsync(
+            directory,
+            new DockerComposeRuntimeMetadata(
+                request.OperationId,
+                request.Generation,
+                request.ProjectName),
+            cancellationToken);
         await File.WriteAllTextAsync(
             Path.Combine(directory, "compose.yaml"),
             ingress.ComposeYaml,
@@ -256,6 +264,53 @@ public sealed class DockerComposeRuntime(
         }
     }
 
+    public async Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(workDirectory))
+            return [];
+        var identities = new List<RuntimeResourceIdentity>();
+        foreach (var directory in Directory.EnumerateDirectories(workDirectory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var metadata = await TryReadRuntimeMetadataAsync(directory, cancellationToken);
+            if (metadata is not null)
+                identities.Add(new(metadata.OperationId, metadata.Generation));
+        }
+        return identities.Distinct().ToArray();
+    }
+
+    public async Task DestroyByIdentityAsync(
+        RuntimeResourceIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+            throw new ArgumentOutOfRangeException(nameof(identity));
+        if (!Directory.Exists(workDirectory))
+            return;
+        foreach (var directory in Directory.EnumerateDirectories(workDirectory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var metadata = await TryReadRuntimeMetadataAsync(directory, cancellationToken);
+            if (metadata is null
+                || metadata.OperationId != identity.RuntimeInstanceId
+                || metadata.Generation != identity.Generation)
+                continue;
+            var composePath = Path.Combine(directory, "compose.yaml");
+            if (File.Exists(composePath))
+            {
+                await RunDockerAsync(
+                    directory,
+                    metadata.ProjectName,
+                    "down",
+                    cancellationToken,
+                    "--remove-orphans");
+            }
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static RuntimeStatus ToRuntimeStatus(string status) => status.ToLowerInvariant() switch
     {
         "running" => RuntimeStatus.Running,
@@ -295,6 +350,45 @@ public sealed class DockerComposeRuntime(
                 "Docker Compose ingress metadata is invalid.");
     }
 
+    private static async Task WriteRuntimeMetadataAsync(
+        string directory,
+        DockerComposeRuntimeMetadata metadata,
+        CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(directory, RuntimeMetadataFileName);
+        var temporaryPath = path + ".tmp";
+        await File.WriteAllTextAsync(
+            temporaryPath,
+            JsonSerializer.Serialize(metadata, JsonOptions),
+            cancellationToken);
+        File.Move(temporaryPath, path, overwrite: true);
+    }
+
+    private static async Task<DockerComposeRuntimeMetadata?> TryReadRuntimeMetadataAsync(
+        string directory,
+        CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(directory, RuntimeMetadataFileName);
+        if (!File.Exists(path))
+            return null;
+        try
+        {
+            var json = await File.ReadAllTextAsync(path, cancellationToken);
+            var metadata = JsonSerializer.Deserialize<DockerComposeRuntimeMetadata>(
+                json,
+                JsonOptions);
+            return metadata is { OperationId: var operationId, Generation: > 0 }
+                && operationId != Guid.Empty
+                && !string.IsNullOrWhiteSpace(metadata.ProjectName)
+                    ? metadata
+                    : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private static IEnumerable<MappedPublishedPort> PublishedIngressPorts(
         DockerComposeIngressMetadata ingress,
         DockerComposeProcess? proxy,
@@ -331,6 +425,10 @@ public sealed class DockerComposeRuntime(
     private sealed record DockerComposeIngressMetadata(
         string? ProxyServiceName,
         IReadOnlyList<DockerComposeIngressBinding> Bindings);
+    private sealed record DockerComposeRuntimeMetadata(
+        Guid OperationId,
+        int Generation,
+        string ProjectName);
 }
 
 public sealed class ComposeCommandFailedException(int exitCode, string message)
