@@ -73,7 +73,13 @@ public sealed class AwdFlagInjectionHandlerTests
         var catalog = new StubProviderCatalog(compose);
         var executor = new AwdFlagInjectionExecutor(catalog);
         var receipt = new ComposeReceipt(
-            Guid.NewGuid(), RuntimeProvider.Docker, "project", "namespace", DateTimeOffset.UtcNow);
+            Guid.NewGuid(),
+            RuntimeProvider.Docker,
+            "project",
+            "namespace",
+            "localhost",
+            1,
+            DateTimeOffset.UtcNow);
         var work = CreateWork() with
         {
             RuntimeKind = RuntimeKind.Compose,

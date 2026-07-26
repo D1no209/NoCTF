@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace NoCTF.Application.Runtime.Ports;
 
-public sealed record ContainerResourceLimits(long MemoryBytes, long NanoCpus, long PidsLimit);
+public sealed record RuntimeResourceLimits(long MemoryBytes, long NanoCpus, long PidsLimit);
 public sealed record ContainerSecurityPolicy(
     bool NoNewPrivileges,
     bool ReadonlyRootfs,
@@ -67,6 +67,7 @@ public sealed record ContainerRuntimeDefinition(
 
 public sealed record ComposeRuntimeDefinition(
     string ComposeYaml,
+    IReadOnlyDictionary<string, RuntimeResourceLimits> ServiceResources,
     IReadOnlyDictionary<string, string>? Environment = null,
     IReadOnlyDictionary<string, string>? Labels = null) : ChallengeRuntimeDefinition
 {
@@ -82,7 +83,7 @@ public sealed record ChallengeRuntimeTemplate(
     RuntimeProvider Provider,
     RuntimeAllocation Allocation,
     ChallengeRuntimeDefinition Definition,
-    ContainerResourceLimits? Limits = null,
+    RuntimeResourceLimits? Limits = null,
     int? TtlSeconds = null,
     int? OperationTimeoutSeconds = null,
     string RunnerPool = "default",
@@ -108,7 +109,7 @@ public sealed record ContainerRequest(
     IReadOnlyDictionary<string, string> Environment,
     IReadOnlyDictionary<string, string> Labels,
     IReadOnlyDictionary<int, int> PortMappings,
-    ContainerResourceLimits Limits,
+    RuntimeResourceLimits Limits,
     ContainerSecurityPolicy Security,
     TimeSpan? Ttl,
     RunnerScoringCallback? ScoringCallback = null,

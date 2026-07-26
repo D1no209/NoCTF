@@ -513,12 +513,11 @@ public static class BackendMessageHandlers
             await outbox.FlushOutgoingMessagesAsync();
             return;
         }
-        await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
-            instance.Id,
-            instance.ProcessingVersion,
-            instance.RunnerPool,
+        await PublishRuntimeStopAsync(
+            outbox,
+            instance,
             instance.RunnerId
-                ?? throw new InvalidOperationException("Runtime receipt has no owning Runner.")));
+                ?? throw new InvalidOperationException("Runtime receipt has no owning Runner."));
         await outbox.FlushOutgoingMessagesAsync();
     }
 
@@ -688,11 +687,7 @@ public static class BackendMessageHandlers
                 case RunnerAssignmentRecoveryAction.AwaitOwnerCleanup:
                     instance.State = RuntimeState.Stopping;
                     instance.RunnerUnavailableAt = message.At;
-                    await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
-                        instance.Id,
-                        instance.ProcessingVersion,
-                        instance.RunnerPool,
-                        runnerId));
+                    await PublishRuntimeStopAsync(outbox, instance, runnerId);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(action), action, null);
@@ -888,5 +883,33 @@ public static class BackendMessageHandlers
             ClaimOvaRuntime message => outbox.PublishToRunnerPoolAsync(message),
             _ => throw new InvalidOperationException(
                 $"Unsupported runtime claim type '{claim.GetType().Name}'.")
+        };
+
+    private static ValueTask PublishRuntimeStopAsync(
+        ITransactionalMessageOutbox outbox,
+        RuntimeInstance instance,
+        string runnerId) =>
+        instance.RuntimeKind switch
+        {
+            RuntimeKind.Container => outbox.PublishToRunnerNodeAsync(
+                new StopContainerRuntime(
+                    instance.Id,
+                    instance.ProcessingVersion,
+                    instance.RunnerPool,
+                    runnerId)),
+            RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
+                new StopComposeRuntime(
+                    instance.Id,
+                    instance.ProcessingVersion,
+                    instance.RunnerPool,
+                    runnerId)),
+            RuntimeKind.OvaVm => outbox.PublishToRunnerNodeAsync(
+                new StopOvaRuntime(
+                    instance.Id,
+                    instance.ProcessingVersion,
+                    instance.RunnerPool,
+                    runnerId)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported runtime kind '{instance.RuntimeKind}'.")
         };
 }

@@ -192,7 +192,7 @@ public sealed class KubernetesContainerLifecycleTests
         },
         new Dictionary<string, string> { ["noctf.io/purpose"] = "awdp-checker" },
         new Dictionary<int, int>(),
-        new ContainerResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+        new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
         new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
         TimeSpan.FromMinutes(1),
         NetworkName: "sandbox-a",

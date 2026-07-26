@@ -7,7 +7,10 @@ public sealed class RunnerNodeMessageContractTests
 {
     [Test]
     [Arguments(typeof(ProvisionContainerRuntime))]
+    [Arguments(typeof(ProvisionComposeRuntime))]
     [Arguments(typeof(StopContainerRuntime))]
+    [Arguments(typeof(StopComposeRuntime))]
+    [Arguments(typeof(StopOvaRuntime))]
     [Arguments(typeof(InjectAwdFlag))]
     [Arguments(typeof(RunAwdChecker))]
     [Arguments(typeof(RunAwdpFixVerification))]
@@ -20,8 +23,11 @@ public sealed class RunnerNodeMessageContractTests
     }
 
     [Test]
-    public async Task Stop_work_does_not_persist_the_provider_receipt()
+    [Arguments(typeof(StopContainerRuntime))]
+    [Arguments(typeof(StopComposeRuntime))]
+    [Arguments(typeof(StopOvaRuntime))]
+    public async Task Stop_work_does_not_persist_the_provider_receipt(Type messageType)
     {
-        await Assert.That(typeof(StopContainerRuntime).GetProperty("ProviderReceiptJson")).IsNull();
+        await Assert.That(messageType.GetProperty("ProviderReceiptJson")).IsNull();
     }
 }

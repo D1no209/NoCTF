@@ -12,7 +12,7 @@ public sealed class ContainerRequestTests
             Guid.NewGuid(), RuntimeProvider.Docker, "target:latest", [],
             new Dictionary<string, string>(), new Dictionary<string, string>(),
             new Dictionary<int, int> { [8080] = 18080 },
-            new ContainerResourceLimits(1, 1, 1),
+            new RuntimeResourceLimits(1, 1, 1),
             new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
             null,
             InternalPorts: [8080, 9090]);
