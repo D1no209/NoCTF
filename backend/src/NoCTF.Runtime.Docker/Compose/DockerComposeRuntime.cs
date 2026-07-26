@@ -83,8 +83,7 @@ public sealed class DockerComposeRuntime(
             cancellationToken,
             "--format",
             "json");
-        var entries = JsonSerializer.Deserialize<IReadOnlyList<DockerComposeProcess>>(result, JsonOptions)
-            ?? [];
+        var entries = ParseProcesses(result);
         var services = entries
             .Select(entry => new ComposeServiceStatus(
                 entry.Service,
@@ -233,6 +232,23 @@ public sealed class DockerComposeRuntime(
         "exited" or "dead" => RuntimeStatus.Stopped,
         _ => RuntimeStatus.Failed
     };
+
+    private static IReadOnlyList<DockerComposeProcess> ParseProcesses(string output)
+    {
+        var value = output.Trim();
+        if (value.Length == 0)
+            return [];
+        if (value[0] == '[')
+            return JsonSerializer.Deserialize<IReadOnlyList<DockerComposeProcess>>(
+                value,
+                JsonOptions) ?? [];
+        return value
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(line => JsonSerializer.Deserialize<DockerComposeProcess>(line, JsonOptions)
+                ?? throw new InvalidOperationException(
+                    "Docker Compose returned an empty process entry."))
+            .ToArray();
+    }
 
     private sealed record DockerComposeProcess(
         string Id,
