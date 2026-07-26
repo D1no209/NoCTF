@@ -10,9 +10,9 @@
 默认只修改 `backend`、Runtime 部署清单与本交接文档。除非用户明确扩大范围，不修改
 Frontend、仓库外 CI 或用户的本地辅助文件。
 
-Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径已经接通。
-下一主线是在可用 Kubernetes+CNI 环境完成真实隔离验证，然后接入 OVA/Libvirt，并用
-真实依赖证明生命周期、隔离、回写和清理。
+Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径已经接通，
+Docker/Kubernetes Compose 真实 Provider 集成也已通过。下一主线是接入 OVA/Libvirt，
+并用真实依赖证明生命周期、隔离、回写和清理。
 
 ## 2. Git 基线与工作树保护
 
@@ -20,7 +20,7 @@ Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前实现 HEAD：`af73a27 feat(backend): provision Kubernetes Compose runtimes`。
+- 当前实现 HEAD：`7277323 fix(backend): parse Docker Compose JSON lines status`。
 - 本次 Kubernetes Compose 纵切只做本地提交，尚未获准推送。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -98,11 +98,17 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -- --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 1"
 ```
 
-- 2026-07-25 的上一个完整门禁为 27/27 passed，0 failed，0 skipped。
-- 2026-07-26 完成 Docker Compose 纵切后尚未重跑：当前 Windows Docker Desktop
-  Linux Engine pipe 不存在，WSL 也未暴露 `docker` CLI。
-- 因此不得声称 `fbd092c` 已通过真实 Docker Compose lifecycle；Docker 恢复后必须
-  增加/运行对应 Integration test。
+- 2026-07-26 当前门禁为 29/29 passed，0 failed，0 skipped。
+- Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
+- Kubernetes 使用临时 k3d `v5.9.0` / k3s `v1.35.5+k3s1`，其内建
+  NetworkPolicy controller 已启用，kubelet 以 `--pod-max-pids=512` 启动并与测试
+  Runner Pool 配置一致。
+- 新增真实 Docker Compose lifecycle，覆盖 dynamic port、Compose DNS、exec、
+  container/network/workdir cleanup。
+- 新增真实 Kubernetes Compose lifecycle，覆盖固定 Kompose、短名 DNS、
+  未 Ready Pod DNS、同 Runtime 互通、跨 Runtime 拒绝、NodePort 与精确 cleanup。
+- 测试发现并修复 Docker Compose `ps --format json` 在当前 CLI 返回 JSON Lines、
+  旧适配器只接受 JSON array 的兼容问题。
 
 ### EF Core 模型
 
@@ -238,10 +244,11 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - `9c43083 feat(backend): dispatch runtime claims by kind`
 - `fbd092c feat(backend): provision Docker Compose runtimes`
 - `af73a27 feat(backend): provision Kubernetes Compose runtimes`
+- `7277323 fix(backend): parse Docker Compose JSON lines status`
 
 ## 6. 当前最重要的剩余缺口
 
-### 6.1 Kubernetes Compose/Kompose 生命周期已接入，真实集群验证待补
+### 6.1 Kubernetes Compose/Kompose 生命周期与真实集群验证已完成
 
 当前已完成：
 
@@ -259,12 +266,16 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - 默认 Kubernetes 部署改为共享 `runtime` Namespace 的 namespace-scoped RBAC，
   Runner 镜像包含固定 Kompose。
 
-仍需在可用 Kubernetes+CNI 环境补一条真实集成：
+真实 k3s+CNI 集成已证明：
 
-- 真实执行 Kompose 与 Kubernetes API；
-- 证明短名 DNS、未 Ready endpoint 发布、跨 Runtime ingress/egress 拒绝、
-  动态 NodePort 与删除收敛；
-- 核对 Pool kubelet 的实际 `PodPidsLimit` 与 Runner 配置相等。
+- 固定 Kompose 与 Kubernetes API 可完整执行；
+- Compose 短名与 FQDN 可解析，未 Ready endpoint 也会发布；
+- 同 Runtime 互通，其他 Runtime 无法访问非公开服务；
+- 平台动态 NodePort 可访问；
+- managed+RuntimeInstanceId+Generation 资源删除收敛。
+
+生产 Pool 仍须由运维核对 kubelet 实际 `PodPidsLimit` 与 Runner 配置相等；应用配置不能
+替代 kubelet 配置。
 
 ### 6.2 OVA/Libvirt 尚未接入业务生命周期
 
@@ -338,13 +349,11 @@ enforcement。
 
 每一项必须独立 commit：
 
-1. 在真实 Kubernetes+CNI 环境补 Kubernetes Compose 集成验证。
-2. 接入 Libvirt OVA durable lifecycle。
-3. 完成 CTF PerTeam Flag 环境注入。
-4. 增加 EgressPolicy 模型及 Docker/Kubernetes enforcement。
-5. Docker 恢复后补跑 Docker Compose lifecycle Integration。
-6. 重新跑 Provider contract、全部 Integration 与四模式 E2E。
-7. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+1. 接入 Libvirt OVA durable lifecycle。
+2. 完成 CTF PerTeam Flag 环境注入。
+3. 增加 EgressPolicy 模型及 Docker/Kubernetes enforcement。
+4. 重新跑 Provider contract、全部 Integration 与四模式 E2E。
+5. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
@@ -369,8 +378,8 @@ enforcement。
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从 Kubernetes Compose 的真实集群验证或 OVA durable lifecycle 开始；不要重做已完成的
-   RuntimeKind dispatch、Docker Compose handler 或 Kubernetes Compose 单元生命周期。
+4. 从 OVA durable lifecycle 开始；不要重做已完成的 RuntimeKind dispatch、
+   Docker/Kubernetes Compose handler 或 Compose Provider 集成。
 5. 每个纵切固定执行：
    - 失败测试；
    - 最小实现；
