@@ -51,3 +51,36 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: noctf-runner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: noctf-runner-cilium-policy-check
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: noctf
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["cilium-config"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: ["kube-dns"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: noctf-runner-cilium-policy-check
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: noctf
+subjects:
+  - kind: ServiceAccount
+    name: noctf-runner
+    namespace: noctf
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: noctf-runner-cilium-policy-check

@@ -47,7 +47,7 @@ public static class KubernetesEgressPolicy
                     }
                 ]
             },
-            DnsRule()
+            DnsRule(options.ClusterDnsServiceAddress)
         };
         if (policy == RuntimeEgressPolicy.InternetOnly)
         {
@@ -101,7 +101,18 @@ public static class KubernetesEgressPolicy
         return values;
     }
 
-    private static V1NetworkPolicyEgressRule DnsRule() =>
+    public static string ValidateClusterDnsServiceAddress(string address)
+    {
+        if (!IPAddress.TryParse(address, out var parsed)
+            || parsed.AddressFamily != AddressFamily.InterNetwork)
+        {
+            throw new InvalidOperationException(
+                "Runtime:Kubernetes:ClusterDnsServiceAddress must be an IPv4 address.");
+        }
+        return parsed.ToString();
+    }
+
+    private static V1NetworkPolicyEgressRule DnsRule(string clusterDnsServiceAddress) =>
         new()
         {
             To =
@@ -121,6 +132,13 @@ public static class KubernetesEgressPolicy
                         {
                             ["k8s-app"] = "kube-dns"
                         }
+                    }
+                },
+                new V1NetworkPolicyPeer
+                {
+                    IpBlock = new V1IPBlock
+                    {
+                        Cidr = $"{ValidateClusterDnsServiceAddress(clusterDnsServiceAddress)}/32"
                     }
                 }
             ],

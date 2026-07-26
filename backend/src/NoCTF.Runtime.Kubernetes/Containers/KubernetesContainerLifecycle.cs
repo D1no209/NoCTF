@@ -483,7 +483,7 @@ public sealed class KubernetesContainerLifecycle(
                 await input.WriteAsync(inputMemory, timeoutSource.Token);
                 await input.FlushAsync(timeoutSource.Token);
             }
-            var exitCode = await statusTask;
+            var exitCode = await statusTask.WaitAsync(timeoutSource.Token);
             if (exitCode != ExecTimeoutExitCode) return new(exitCode, false);
             await StopPodAfterExecTimeoutAsync(receipt);
             return new(-1, true);

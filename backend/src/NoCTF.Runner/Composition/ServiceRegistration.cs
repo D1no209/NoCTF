@@ -73,6 +73,12 @@ public static class ServiceRegistration
                 ? ReadRequiredString(configuration, "Runtime:Kubernetes:ClusterDomain")
                 : string.Empty,
             isKubernetesPool
+                ? KubernetesEgressPolicy.ValidateClusterDnsServiceAddress(
+                    ReadRequiredString(
+                        configuration,
+                        "Runtime:Kubernetes:ClusterDnsServiceAddress"))
+                : string.Empty,
+            isKubernetesPool
                 && ReadRequiredTrue(configuration, "Runtime:Kubernetes:NetworkPolicyRequired"),
             isKubernetesPool
                 ? KubernetesEgressPolicy.ValidateAndNormalizeProtectedCidrs(
@@ -82,6 +88,8 @@ public static class ServiceRegistration
                 : null));
         services.AddSingleton<IKubernetes>(_ =>
             new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig()));
+        if (isKubernetesPool)
+            services.AddHostedService<KubernetesRuntimePoolStartupCheck>();
         services.AddSingleton<KubernetesContainerLifecycle>();
         services.AddSingleton<IRuntimeResourceReaper>(provider =>
             provider.GetRequiredService<KubernetesContainerLifecycle>());

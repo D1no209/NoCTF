@@ -46,6 +46,7 @@ data:
   Runtime__Kubernetes__PublicHost: "noctf.local"
   Runtime__Kubernetes__PodPidsLimit: "512"
   Runtime__Kubernetes__ClusterDomain: "cluster.local"
+  Runtime__Kubernetes__ClusterDnsServiceAddress: "10.43.0.10"
   Runtime__Kubernetes__NetworkPolicyRequired: "true"
   Runtime__Kubernetes__ProtectedCidrs__0: "10.0.0.0/8"
   Runtime__Kubernetes__ProtectedCidrs__1: "172.16.0.0/12"

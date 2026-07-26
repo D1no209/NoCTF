@@ -260,7 +260,10 @@ public sealed class KubernetesComposeRuntime(
                 cancellationToken: timeoutSource.Token);
             demuxer.Start();
             using var error = demuxer.GetStream(ChannelIndex.Error, null);
-            return new(await ReadExitCodeAsync(error, timeoutSource.Token), false);
+            return new(
+                await ReadExitCodeAsync(error, timeoutSource.Token)
+                    .WaitAsync(timeoutSource.Token),
+                false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

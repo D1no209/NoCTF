@@ -163,6 +163,7 @@ public sealed class KubernetesComposeManifestPolicyTests
                 Namespace: "runtime",
                 PodPidsLimit: 512,
                 ClusterDomain: "internal.example",
+                ClusterDnsServiceAddress: "10.96.0.10",
                 NetworkPolicyRequired: true));
 
         await Assert.That(plan.RuntimeName)
@@ -200,6 +201,10 @@ public sealed class KubernetesComposeManifestPolicyTests
         await Assert.That(plan.NetworkPolicy.Spec.Egress.Single(rule =>
                 rule.Ports?.Any(port => port.Port.Value == "53") == true).Ports)
             .Count().IsEqualTo(2);
+        var dns = plan.NetworkPolicy.Spec.Egress.Single(rule =>
+            rule.Ports?.Any(port => port.Port.Value == "53") == true);
+        await Assert.That(dns.To.Single(peer => peer.IpBlock is not null).IpBlock!.Cidr)
+            .IsEqualTo("10.96.0.10/32");
     }
 
     [Test]
@@ -219,6 +224,24 @@ public sealed class KubernetesComposeManifestPolicyTests
     }
 
     [Test]
+    public async Task Platform_policy_refuses_a_pool_without_cluster_DNS_address()
+    {
+        var manifests = KubernetesComposeManifestPolicy.ParseAndValidate(
+            SafeManifests,
+            new HashSet<string>(["web"], StringComparer.Ordinal));
+
+        var action = () => KubernetesComposeManifestPolicy.ApplyPlatformPolicy(
+            manifests,
+            Request(),
+            new KubernetesRuntimeOptions(
+                PodPidsLimit: 512,
+                ClusterDomain: "cluster.local"));
+
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("ClusterDnsServiceAddress");
+    }
+
+    [Test]
     public async Task InternetOnly_allows_public_IPv4_except_built_in_and_pool_ranges()
     {
         var manifests = KubernetesComposeManifestPolicy.ParseAndValidate(
@@ -232,12 +255,13 @@ public sealed class KubernetesComposeManifestPolicyTests
                 Namespace: "runtime",
                 PodPidsLimit: 512,
                 ClusterDomain: "cluster.local",
+                ClusterDnsServiceAddress: "10.96.0.10",
                 NetworkPolicyRequired: true,
                 ProtectedCidrs: ["172.30.0.0/16"]));
 
         await Assert.That(plan.NetworkPolicy.Spec.Egress).Count().IsEqualTo(3);
         var internet = plan.NetworkPolicy.Spec.Egress.Single(rule =>
-            rule.To?.Any(peer => peer.IpBlock is not null) == true);
+            rule.To?.Any(peer => peer.IpBlock?.Cidr == "0.0.0.0/0") == true);
         await Assert.That(internet.To).Count().IsEqualTo(1);
         await Assert.That(internet.To.Single().IpBlock!.Cidr).IsEqualTo("0.0.0.0/0");
         await Assert.That(internet.To.Single().IpBlock!.Except)
@@ -260,7 +284,8 @@ public sealed class KubernetesComposeManifestPolicyTests
             Request() with { EgressPolicy = RuntimeEgressPolicy.InternetOnly },
             new KubernetesRuntimeOptions(
                 PodPidsLimit: 512,
-                ClusterDomain: "cluster.local"));
+                ClusterDomain: "cluster.local",
+                ClusterDnsServiceAddress: "10.96.0.10"));
 
         var exception = await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(exception!.Message).Contains("ProtectedCidrs");
