@@ -294,7 +294,7 @@ public sealed class RunnerAssignmentReconciliationTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Online_libvirt_pool_members_receive_exact_resource_reconciliation(
+    public async Task Online_pool_members_receive_exact_resource_reconciliation(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -331,7 +331,7 @@ public sealed class RunnerAssignmentReconciliationTests
             }
 
             var audit = outbox.RunnerNodeMessages
-                .OfType<ReconcileLibvirtResources>()
+                .OfType<ReconcileRuntimeResources>()
                 .Single();
             await Assert.That(audit.RunnerPool).IsEqualTo("pool-a");
             await Assert.That(audit.RunnerId).IsEqualTo("runner-a");
@@ -340,7 +340,7 @@ public sealed class RunnerAssignmentReconciliationTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Libvirt_reconciliation_preserves_only_the_current_node_assignment(
+    public async Task Resource_reconciliation_preserves_only_the_current_node_assignment(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -360,7 +360,8 @@ public sealed class RunnerAssignmentReconciliationTests
             }
 
             var orphanId = Guid.CreateVersion7();
-            var provider = new RecordingOvaRuntime(
+            var provider = new RecordingResourceReconciler(
+                RuntimeProvider.Libvirt,
                 [
                     new(fixture.RedispatchId, 1),
                     new(fixture.RedispatchId, 2),
@@ -370,17 +371,20 @@ public sealed class RunnerAssignmentReconciliationTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["Runner:Pool"] = "pool-a",
-                    ["Runner:Id"] = "runner-a"
+                    ["Runner:Id"] = "runner-a",
+                    ["Runner:Provider"] = nameof(RuntimeProvider.Libvirt)
                 })
                 .Build();
+            var reaper = new RecordingResourceReaper(RuntimeProvider.Libvirt);
             await using var db = new NoCtfDbContext(options);
-            var handler = new LibvirtResourceReconciliationHandler(
+            var handler = new RuntimeResourceReconciliationHandler(
                 db,
-                new OvaProviderCatalog(provider),
+                [provider],
+                [reaper],
                 configuration);
 
             await handler.Handle(
-                new ReconcileLibvirtResources(
+                new ReconcileRuntimeResources(
                     "pool-a",
                     "runner-a",
                     fixture.Now),
@@ -389,9 +393,10 @@ public sealed class RunnerAssignmentReconciliationTests
             await Assert.That(provider.Destroyed)
                 .IsEquivalentTo(
                 [
-                    new OvaManagedRuntimeResource(fixture.RedispatchId, 2),
-                    new OvaManagedRuntimeResource(orphanId, 1)
+                    new RuntimeResourceIdentity(fixture.RedispatchId, 2),
+                    new RuntimeResourceIdentity(orphanId, 1)
                 ]);
+            await Assert.That(reaper.RequestedAt).IsEqualTo(fixture.Now);
         });
     }
 
@@ -575,27 +580,21 @@ public sealed class RunnerAssignmentReconciliationTests
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
     }
 
-    private sealed class RecordingOvaRuntime(
-        IReadOnlyList<OvaManagedRuntimeResource> managed) : IOvaRuntime
+    private sealed class RecordingResourceReconciler(
+        RuntimeProvider provider,
+        IReadOnlyList<RuntimeResourceIdentity> managed)
+        : IRuntimeManagedResourceReconciler
     {
-        public List<OvaManagedRuntimeResource> Destroyed { get; } = [];
+        public RuntimeProvider Provider { get; } = provider;
 
-        public Task<OvaRuntimeReceipt> ImportAsync(
-            OvaRuntimeRequest request,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+        public List<RuntimeResourceIdentity> Destroyed { get; } = [];
 
-        public Task DestroyAsync(
-            OvaRuntimeReceipt receipt,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<OvaManagedRuntimeResource>> ListManagedAsync(
+        public Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
             CancellationToken cancellationToken) =>
             Task.FromResult(managed);
 
         public Task DestroyByIdentityAsync(
-            OvaManagedRuntimeResource identity,
+            RuntimeResourceIdentity identity,
             CancellationToken cancellationToken)
         {
             Destroyed.Add(identity);
@@ -603,18 +602,18 @@ public sealed class RunnerAssignmentReconciliationTests
         }
     }
 
-    private sealed class OvaProviderCatalog(IOvaRuntime runtime)
-        : IRuntimeProviderCatalog
+    private sealed class RecordingResourceReaper(RuntimeProvider provider)
+        : IRuntimeResourceReaper
     {
-        public IContainerLifecycle Containers(RuntimeProvider provider) =>
-            throw new NotSupportedException();
+        public RuntimeProvider Provider { get; } = provider;
+        public DateTimeOffset? RequestedAt { get; private set; }
 
-        public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) =>
-            throw new NotSupportedException();
-
-        public IComposeRuntime Compose(RuntimeProvider provider) =>
-            throw new NotSupportedException();
-
-        public IOvaRuntime Appliance(RuntimeProvider provider) => runtime;
+        public Task<RuntimeResourceReapResult> ReapExpiredAsync(
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            RequestedAt = now;
+            return Task.FromResult(new RuntimeResourceReapResult(0, 0));
+        }
     }
 }

@@ -12,7 +12,7 @@ public sealed class RunnerNodeMessageContractTests
     [Arguments(typeof(StopContainerRuntime))]
     [Arguments(typeof(StopComposeRuntime))]
     [Arguments(typeof(StopOvaRuntime))]
-    [Arguments(typeof(ReconcileLibvirtResources))]
+    [Arguments(typeof(ReconcileRuntimeResources))]
     [Arguments(typeof(InjectAwdFlag))]
     [Arguments(typeof(RunAwdChecker))]
     [Arguments(typeof(RunAwdpFixVerification))]

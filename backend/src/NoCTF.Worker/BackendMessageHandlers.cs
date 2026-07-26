@@ -671,16 +671,15 @@ public static class BackendMessageHandlers
         }
 
         var pageIsFull = assignments.Count == 500;
-        var libvirtAudits = new List<ReconcileLibvirtResources>();
+        var resourceAudits = new List<ReconcileRuntimeResources>();
         if (!pageIsFull)
         {
-            var libvirtPools = await db.RuntimeInstances.AsNoTracking()
-                .Where(instance => instance.RuntimeProvider == RuntimeProvider.Libvirt)
+            var runtimePools = await db.RuntimeInstances.AsNoTracking()
                 .Select(instance => instance.RunnerPool)
                 .Distinct()
                 .OrderBy(pool => pool)
                 .ToListAsync(cancellationToken);
-            foreach (var pool in libvirtPools)
+            foreach (var pool in runtimePools)
             {
                 var inventory = await capacity.GetPoolInventoryAsync(
                     pool,
@@ -724,7 +723,7 @@ public static class BackendMessageHandlers
                     }
                     if (heartbeat == RunnerHeartbeatStatus.Online)
                     {
-                        libvirtAudits.Add(new(
+                        resourceAudits.Add(new(
                             pool,
                             inventoryRunnerId,
                             message.At));
@@ -785,9 +784,9 @@ public static class BackendMessageHandlers
             }
         }
 
-        foreach (var audit in libvirtAudits)
+        foreach (var audit in resourceAudits)
             await outbox.PublishToRunnerNodeAsync(audit);
-        applied |= libvirtAudits.Count > 0;
+        applied |= resourceAudits.Count > 0;
         var nextAt = pageIsFull
             ? DateTimeOffset.UtcNow
             : DateTimeOffset.UtcNow.Add(RunnerReconciliationInterval);

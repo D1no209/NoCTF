@@ -225,6 +225,20 @@ public sealed record RuntimeResourceReapResult(int RemovedCount, int FailedCount
 
 public interface IRuntimeResourceReaper
 {
+    RuntimeProvider Provider { get; }
+
     Task<RuntimeResourceReapResult> ReapExpiredAsync(
         DateTimeOffset now, CancellationToken cancellationToken);
+}
+
+public interface IRuntimeManagedResourceReconciler
+{
+    RuntimeProvider Provider { get; }
+
+    Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
+        CancellationToken cancellationToken);
+
+    Task DestroyByIdentityAsync(
+        RuntimeResourceIdentity identity,
+        CancellationToken cancellationToken);
 }

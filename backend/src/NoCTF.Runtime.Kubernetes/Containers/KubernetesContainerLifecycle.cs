@@ -14,6 +14,7 @@ public sealed class KubernetesContainerLifecycle(
     KubernetesRuntimeOptions options) : IContainerLifecycle, IOneShotJobRunner,
     IContainerSandboxLifecycle, IRuntimeResourceReaper
 {
+    public RuntimeProvider Provider => RuntimeProvider.Kubernetes;
     private const int ExecTimeoutExitCode = 124;
     private const string ExecTimeoutScript = """
         duration=$1
