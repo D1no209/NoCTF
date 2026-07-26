@@ -200,7 +200,9 @@ public class ChallengeConfigurationCatalogTests
             new(
                 RuntimeProvider.Libvirt,
                 RuntimeAllocation.PerTeam,
-                new OvaRuntimeDefinition("file:///var/lib/noctf/challenge.ova"))
+                new OvaRuntimeDefinition(
+                    "file:///var/lib/noctf/challenge.ova",
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
         ];
 
         foreach (var template in templates)
@@ -239,6 +241,26 @@ public class ChallengeConfigurationCatalogTests
 
             await Assert.That(errors).Contains("Runtime resource limits are required.");
         }
+    }
+
+    [Test]
+    public async Task Ova_runtime_requires_a_sha256_digest()
+    {
+        var catalog = new GameModeChallengeConfigurationCatalog();
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Libvirt,
+            RuntimeAllocation.PerTeam,
+            new OvaRuntimeDefinition(
+                "https://runtime.example/challenge.ova",
+                "not-a-digest"),
+            Limits: new(1_073_741_824, 1_000_000_000, 256));
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("OvaVm runtimes require a 64-character SHA-256 digest.");
     }
 
     [Test]
@@ -369,7 +391,9 @@ public class ChallengeConfigurationCatalogTests
         var ova = new ChallengeRuntimeTemplate(
             RuntimeProvider.Libvirt,
             RuntimeAllocation.PerTeam,
-            new OvaRuntimeDefinition("file:///var/lib/noctf/challenge.ova"));
+            new OvaRuntimeDefinition(
+                "file:///var/lib/noctf/challenge.ova",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
 
         var sharedErrors = catalog.Validate(
             GameMode.Awd,
@@ -549,7 +573,9 @@ public class ChallengeConfigurationCatalogTests
         var ova = new ChallengeRuntimeTemplate(
             RuntimeProvider.Libvirt,
             RuntimeAllocation.PerTeam,
-            new OvaRuntimeDefinition("file:///var/lib/noctf/challenge.ova"),
+            new OvaRuntimeDefinition(
+                "file:///var/lib/noctf/challenge.ova",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
             UrlBindings:
             [
                 new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, VmId: "web")

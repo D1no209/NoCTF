@@ -52,7 +52,9 @@ public sealed class AwdpTargetDefinitionFactoryTests
                 {
                     ["target"] = new(268_435_456, 500_000_000, 128)
                 }),
-            RuntimeKind.OvaVm => new OvaRuntimeDefinition("file:///var/lib/noctf/target.ova"),
+            RuntimeKind.OvaVm => new OvaRuntimeDefinition(
+                "file:///var/lib/noctf/target.ova",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
         var template = new ChallengeRuntimeTemplate(

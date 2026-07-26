@@ -55,7 +55,9 @@ API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务�
 
 Runner 配置 RunnerId、RunnerPool 与支持 Provider。Runtime 配置引用 Provider 与开放文本 RunnerPool；同 Pool 多节点竞争同一 durable queue。节点通过 Redis TTL heartbeat 发布版本与容量。RuntimeInstance 持久化实际 RunnerId、RunnerPool、ProviderReceiptJson 与展开 URL。
 
-`file://` OVA URL 必须在 Pool 所有候选节点可访问。平台 API 不下载、校验或管理 OVA；Libvirt Provider 自行处理导入与多 VM Appliance。
+`file://` OVA URL 必须在 Pool 所有候选节点可访问。平台 API 不下载或管理 OVA；配置固定
+预期 SHA-256，Libvirt Provider 负责读取/下载、校验、内容寻址缓存以及多 VM Appliance
+导入。
 
 ## 内部 JWT
 

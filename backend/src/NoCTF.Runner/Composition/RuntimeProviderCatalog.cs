@@ -21,6 +21,7 @@ public interface IRuntimeProviderCatalog : IContainerRuntimeProviderCatalog
 {
     IContainerSandboxLifecycle Sandbox(RuntimeProvider provider);
     IComposeRuntime Compose(RuntimeProvider provider);
+    IOvaRuntime Appliance(RuntimeProvider provider);
 }
 
 public sealed class RuntimeProviderCatalog(IServiceProvider services)
@@ -37,6 +38,13 @@ public sealed class RuntimeProviderCatalog(IServiceProvider services)
     {
         RuntimeProvider.Docker => services.GetRequiredService<DockerComposeRuntime>(),
         RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesComposeRuntime>(),
+        _ => throw new UnsupportedRuntimeProviderException(provider)
+    };
+
+    public IOvaRuntime Appliance(RuntimeProvider provider) => provider switch
+    {
+        RuntimeProvider.Libvirt => services.GetService<IOvaRuntime>()
+            ?? throw new UnsupportedRuntimeProviderException(provider),
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 

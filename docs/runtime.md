@@ -138,9 +138,26 @@ limit 时直接接受；历史 Compose 中 `pids_limit` 或
 
 ## OVA/Libvirt
 
-平台不上传、存储、校验或管理 OVA。配置只保存 `OvaSourceUrl`，允许 Provider 支持的绝对 URI（包括 https/file）。Runner Pool 节点自行保证可访问、导入、缓存与校验；失败使 RuntimeInstance Failed。
+平台不上传、存储或管理 OVA。配置保存 `OvaSourceUrl` 与必填的 64 位十六进制
+`Sha256`，允许 Provider 支持的绝对 `https`/`file` URI。Runner 下载或读取后必须先校验
+SHA-256，再以摘要作为内容寻址缓存键；摘要不匹配时不得解包或启动 VM。`file://`
+路径必须在同 Pool 候选节点保持一致挂载。
 
-一个 OVA 可含多 VM，整体作为 Appliance：Start/Stop/Reset/Expire 原子作用于全部 VM，不允许选手单独操作。VmId 来自 Provider/OVF 稳定标识；各 VM 位于该 Team/题独立虚拟网络并可互通。需要 URL 的 VM 使用 QEMU Guest Agent 获取地址；超时则整个实例失败。OVA 只允许 Static Flag，不注入 PerTeam Flag。
+首版接受包含且仅包含一个 OVF descriptor 的未压缩 OVA tar。descriptor 可以直接包含
+一个 `VirtualSystem`，也可以包含一个由多个直接子 `VirtualSystem` 组成的
+`VirtualSystemCollection`；每台 VM 必须具有唯一、非空的 `ovf:id`，该值原样作为
+`VmId`。嵌套 collection、ScaleOut、DeploymentOption、archive link/path traversal、
+缺失资源和 `qemu-img` 不支持的磁盘格式均拒绝，不进行名称归一化或工具猜测。
+
+每台 VM 使用 OVF 声明的 CPU 与内存；两者的 appliance 合计不得超过 Runtime 总预算。
+OVA 的 `PidsLimit` 只参与 Runner 容量预留，不表示或尝试限制 Guest 内部进程。每台 VM
+的磁盘转换为节点工作目录下独立的 qcow2。
+
+一个 OVA 可含多 VM，整体作为 Appliance：Start/Stop/Reset/Expire 原子作用于全部 VM，
+不允许选手单独操作。每个 Runtime 创建独立 routed Libvirt network，各 VM 可互通。
+需要 URL 的 VM 使用 QEMU Guest Agent 获取该 Runtime 子网内的唯一 IPv4 地址；任一 VM
+停止、地址重复或发现超时都会使整个实例失败并触发整组清理。OVA 只允许 Static Flag，
+不注入 PerTeam Flag。
 
 ## Flag 注入
 

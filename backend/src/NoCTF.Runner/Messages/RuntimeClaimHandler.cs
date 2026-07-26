@@ -71,6 +71,31 @@ public sealed class RuntimeClaimHandler(
                     message.Definition)),
             cancellationToken);
 
+    public async Task Handle(
+        ClaimOvaRuntime message,
+        CancellationToken cancellationToken) =>
+        _ = await ExecuteAsync(message, cancellationToken);
+
+    public Task<MessageExecutionOutcome> ExecuteAsync(
+        ClaimOvaRuntime message,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            message.RuntimeInstanceId,
+            message.ProcessingVersion,
+            message.Generation,
+            message.RunnerPool,
+            message.Definition.Limits,
+            scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
+            (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
+                new ProvisionOvaRuntime(
+                    message.RuntimeInstanceId,
+                    nextVersion,
+                    message.Generation,
+                    message.RunnerPool,
+                    runnerId,
+                    message.Definition)),
+            cancellationToken);
+
     private RuntimeResourceLimits CapacityLimits(
         RuntimeProvider provider,
         RuntimeResourceLimits configured,

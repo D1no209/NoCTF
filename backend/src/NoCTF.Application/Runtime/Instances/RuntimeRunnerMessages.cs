@@ -40,6 +40,14 @@ public sealed record ProvisionComposeRuntime(
     string RunnerId,
     ComposeRequest Definition) : IRuntimeProvisionMessage;
 
+public sealed record ProvisionOvaRuntime(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    int Generation,
+    string RunnerPool,
+    string RunnerId,
+    OvaRuntimeRequest Definition) : IRuntimeProvisionMessage;
+
 public sealed record StopContainerRuntime(
     Guid RuntimeInstanceId,
     long ProcessingVersion,

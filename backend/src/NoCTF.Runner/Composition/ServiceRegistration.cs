@@ -53,8 +53,29 @@ public static class ServiceRegistration
             provider.GetRequiredService<KubernetesContainerLifecycle>());
         services.AddSingleton<IKomposeConverter>(new KomposeConverter());
         services.AddSingleton<KubernetesComposeRuntime>();
-        services.AddSingleton<ILibvirtProcessAdapter, LibvirtProcessAdapter>();
-        services.AddSingleton<LibvirtApplianceLifecycle>();
+        var isLibvirtPool = string.Equals(
+            configuration["Runner:Provider"],
+            nameof(NoCTF.Domain.Runtime.RuntimeProvider.Libvirt),
+            StringComparison.OrdinalIgnoreCase);
+        var hasLibvirtConfiguration =
+            !string.IsNullOrWhiteSpace(configuration["Runtime:Libvirt:PoolRoutedNetworkCidr"]);
+        if (isLibvirtPool || hasLibvirtConfiguration)
+        {
+            services.AddSingleton(new LibvirtRuntimeOptions(
+                ReadRequiredString(configuration, "Runtime:Libvirt:CacheDirectory"),
+                ReadRequiredString(configuration, "Runtime:Libvirt:WorkDirectory"),
+                ReadRequiredString(configuration, "Runtime:Libvirt:PoolRoutedNetworkCidr"),
+                ReadRequiredString(configuration, "Runtime:Libvirt:NodeRoutedNetworkCidr"),
+                ReadRequiredPositiveInt(
+                    configuration,
+                    "Runtime:Libvirt:RuntimeSubnetPrefixLength")));
+            services.AddSingleton<ILibvirtProcessAdapter, LibvirtProcessAdapter>();
+            services.AddHttpClient<OvaArtifactCache>();
+            services.AddSingleton<LibvirtRoutedNetworkManager>();
+            services.AddSingleton<LibvirtApplianceLifecycle>();
+            services.AddSingleton<IOvaRuntime>(provider =>
+                provider.GetRequiredService<LibvirtApplianceLifecycle>());
+        }
         services.AddSingleton<RuntimeProviderCatalog>();
         services.AddSingleton<IOneShotRuntimeProviderCatalog>(provider =>
             provider.GetRequiredService<RuntimeProviderCatalog>());
@@ -84,6 +105,22 @@ public static class ServiceRegistration
     {
         var value = configuration[key];
         if (!long.TryParse(
+                value,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed)
+            || parsed <= 0)
+            throw new InvalidOperationException(
+                $"{key} must be configured as a positive integer.");
+        return parsed;
+    }
+
+    private static int ReadRequiredPositiveInt(
+        IConfiguration configuration,
+        string key)
+    {
+        var value = configuration[key];
+        if (!int.TryParse(
                 value,
                 System.Globalization.NumberStyles.None,
                 System.Globalization.CultureInfo.InvariantCulture,

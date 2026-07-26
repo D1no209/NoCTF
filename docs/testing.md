@@ -38,7 +38,8 @@
 
 - Docker/Kubernetes Container lifecycle/labels/security/resources/URL mapping；
 - Compose YAML 拒绝项、Docker Compose 与 Kompose manifests 后置验证；
-- Libvirt Provider OVA URL/多 VM/Guest Agent/cleanup；
+- Libvirt Provider OVA SHA-256、tar traversal、OVF 多 VM/资源总预算、routed subnet、
+  Guest Agent、VmId URL expansion 与幂等 cleanup；
 - 网络隔离与 orphan reaper；
 - AWDP target/checker callback、timeout、清理；
 - AWD raw command injection 与轮次截止重试。

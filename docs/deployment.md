@@ -29,9 +29,18 @@ Runner 管理端口只在内部网络。Checker callback API 可达，但严格 
   `v1.38.0` 与最小 Kubernetes API 权限。Pool 必须显式声明
   `Runtime__Kubernetes__Namespace`、`ClusterDomain`、`PodPidsLimit` 和
   `NetworkPolicyRequired=true`。
-- Libvirt Pool：QEMU/KVM/Libvirt、Runner 可访问 OvaSourceUrl；需要 URL 的 VM 具备 QEMU Guest Agent。
+- Libvirt Pool：QEMU/KVM/Libvirt、`qemu-img`、`virt-install`，Runner 可访问
+  `OvaSourceUrl`；需要 URL 的 VM 具备 QEMU Guest Agent。Pool 必须声明
+  `Runtime__Libvirt__CacheDirectory`、`WorkDirectory`、`PoolRoutedNetworkCidr`、
+  `NodeRoutedNetworkCidr` 与 `RuntimeSubnetPrefixLength`。
 
 同 Pool 节点对 file:// OVA 路径必须有一致挂载。Provider/Pool 不可用会阻止新 Runtime 派发，不影响静态 API。
+
+`PoolRoutedNetworkCidr` 是基础设施向玩家入口发布路由的 Pool 总 IPv4 地址池。部署层必须
+从中为每个 Runner 节点分配互不重叠的 `NodeRoutedNetworkCidr`；节点只在自己的切片内
+通过确定性起点加空闲探测分配 Runtime 子网。`RuntimeSubnetPrefixLength` 在同 Pool
+保持一致且不得大于 `/28`。若多个节点复用同一个 node CIDR，节点本地 Libvirt 无法发现
+另一节点的占用，平台不保证避免地址冲突，因此部署必须拒绝该配置。
 
 `Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
 kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。

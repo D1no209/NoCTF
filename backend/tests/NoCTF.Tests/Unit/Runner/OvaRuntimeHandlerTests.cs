@@ -7,12 +7,12 @@ using NoCTF.Runner.Messages;
 
 namespace NoCTF.Tests.Unit.Runner;
 
-public sealed class ComposeRuntimeHandlerTests
+public sealed class OvaRuntimeHandlerTests
 {
     [Test]
-    public async Task Provision_persists_receipt_and_expands_compose_urls()
+    public async Task Provision_persists_multi_vm_receipt_and_expands_guest_url()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingOvaRuntime();
         var capacity = new RecordingCapacity();
         var handler = CreateHandler(
             runtime,
@@ -24,35 +24,36 @@ public sealed class ComposeRuntimeHandlerTests
 
         await Assert.That(result).IsTypeOf<RuntimeProvisioned>();
         var provisioned = (RuntimeProvisioned)result;
-        await Assert.That(provisioned.Provider).IsEqualTo(RuntimeProvider.Docker);
+        await Assert.That(provisioned.Provider).IsEqualTo(RuntimeProvider.Libvirt);
         await Assert.That(provisioned.Urls)
-            .IsEquivalentTo(["http://runner.example:32000/play"]);
+            .IsEquivalentTo(["http://10.90.0.2:8080/play"]);
         await Assert.That(provisioned.ParticipantUrlIndexes).IsEquivalentTo([0]);
-        await Assert.That(runtime.UpCount).IsEqualTo(1);
-        await Assert.That(runtime.DownCount).IsEqualTo(0);
+        await Assert.That(runtime.ImportCount).IsEqualTo(1);
+        await Assert.That(runtime.DestroyCount).IsEqualTo(0);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
     }
 
     [Test]
-    public async Task Invalid_compose_url_cleans_up_and_releases_capacity()
+    public async Task Missing_vm_binding_cleans_up_and_releases_capacity()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingOvaRuntime();
         var capacity = new RecordingCapacity();
         var handler = CreateHandler(
             runtime,
             capacity,
             new FixedWorkReader(RuntimeProvisionWorkStatus.Current));
-        var message = CreateProvisionMessage() with
+        var original = CreateProvisionMessage();
+        var message = original with
         {
-            Definition = CreateProvisionMessage().Definition with
+            Definition = original.Definition with
             {
                 UrlBindings =
                 [
                     new(
                         "http://{HOST}:{PORT}",
                         RuntimeExposure.Participants,
-                        ContainerPort: 8080,
-                        ServiceName: "missing")
+                        VmId: "missing",
+                        GuestPort: 8080)
                 ]
             }
         };
@@ -62,15 +63,15 @@ public sealed class ComposeRuntimeHandlerTests
         await Assert.That(result).IsTypeOf<RuntimeProvisionFailed>();
         await Assert.That(((RuntimeProvisionFailed)result).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
-        await Assert.That(runtime.DownCount).IsEqualTo(1);
+        await Assert.That(runtime.DestroyCount).IsEqualTo(1);
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
 
     [Test]
-    public async Task Stop_uses_the_persisted_compose_receipt()
+    public async Task Stop_uses_persisted_appliance_receipt_and_is_idempotent()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingOvaRuntime();
         var capacity = new RecordingCapacity();
         var receipt = runtime.CreateReceipt();
         var handler = CreateHandler(
@@ -78,8 +79,10 @@ public sealed class ComposeRuntimeHandlerTests
             capacity,
             new FixedWorkReader(
                 RuntimeProvisionWorkStatus.Current,
-                new(RuntimeProvider.Docker, System.Text.Json.JsonSerializer.Serialize(receipt))));
-        var message = new StopComposeRuntime(
+                new(
+                    RuntimeProvider.Libvirt,
+                    System.Text.Json.JsonSerializer.Serialize(receipt))));
+        var message = new StopOvaRuntime(
             receipt.OperationId,
             8,
             "default",
@@ -88,13 +91,13 @@ public sealed class ComposeRuntimeHandlerTests
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopped>();
-        await Assert.That(runtime.DownCount).IsEqualTo(1);
+        await Assert.That(runtime.DestroyCount).IsEqualTo(1);
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
 
     private static RuntimeProviderHandler CreateHandler(
-        IComposeRuntime runtime,
+        IOvaRuntime runtime,
         IRunnerCapacityGate capacity,
         IRuntimeNodeWorkReader reader)
     {
@@ -112,7 +115,7 @@ public sealed class ComposeRuntimeHandlerTests
             reader);
     }
 
-    private static ProvisionComposeRuntime CreateProvisionMessage()
+    private static ProvisionOvaRuntime CreateProvisionMessage()
     {
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         return new(
@@ -121,88 +124,62 @@ public sealed class ComposeRuntimeHandlerTests
             3,
             "default",
             "runner-a",
-            new ComposeRequest(
+            new OvaRuntimeRequest(
                 runtimeInstanceId,
-                RuntimeProvider.Docker,
                 3,
-                "noctf-runtime",
-                "services:\n  web:\n    image: challenge:v1",
-                new Dictionary<string, string>(),
-                new Dictionary<string, string>(),
-                new Dictionary<string, RuntimeResourceLimits>
-                {
-                    ["web"] = new(268_435_456, 500_000_000, 128)
-                },
-                new(268_435_456, 500_000_000, 128),
+                new Uri("file:///var/lib/noctf/challenge.ova"),
+                new string('a', 64),
+                $"noctf-{runtimeInstanceId:N}-3",
+                new(268_435_456, 2_000_000_000, 256),
                 TimeSpan.FromHours(1),
                 TimeSpan.FromMinutes(2),
                 [
                     new(
                         "http://{HOST}:{PORT}/play",
                         RuntimeExposure.Participants,
-                        ContainerPort: 8080,
-                        ServiceName: "web")
+                        VmId: "web",
+                        GuestPort: 8080)
                 ]));
     }
 
-    private sealed class RecordingComposeRuntime : IComposeRuntime
+    private sealed class RecordingOvaRuntime : IOvaRuntime
     {
-        public int UpCount { get; private set; }
-        public int DownCount { get; private set; }
+        public int ImportCount { get; private set; }
+        public int DestroyCount { get; private set; }
 
-        public Task<ComposeReceipt> UpAsync(
-            ComposeRequest request,
+        public Task<OvaRuntimeReceipt> ImportAsync(
+            OvaRuntimeRequest request,
             CancellationToken cancellationToken)
         {
-            UpCount++;
+            ImportCount++;
             return Task.FromResult(CreateReceipt(request.OperationId, request.Generation));
         }
 
-        public Task DownAsync(
-            ComposeReceipt receipt,
+        public Task DestroyAsync(
+            OvaRuntimeReceipt receipt,
             CancellationToken cancellationToken)
         {
-            DownCount++;
+            DestroyCount++;
             return Task.CompletedTask;
         }
 
-        public Task<ComposeStatus?> GetStatusAsync(
-            ComposeReceipt receipt,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<ComposeStatus?>(new(
-                receipt.ProjectName,
-                RuntimeStatus.Running,
-                [
-                    new(
-                        "web",
-                        "container-web",
-                        RuntimeStatus.Running,
-                        new Dictionary<int, int> { [8080] = 32000 },
-                        "web")
-                ]));
-
-        public Task<ContainerExecResult> ExecAsync(
-            ComposeReceipt receipt,
-            string serviceName,
-            IReadOnlyList<string> command,
-            TimeSpan timeout,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public ComposeReceipt CreateReceipt(
+        public OvaRuntimeReceipt CreateReceipt(
             Guid? operationId = null,
             int generation = 3) =>
             new(
                 operationId ?? Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                RuntimeProvider.Docker,
-                "noctf-runtime",
-                "/tmp/noctf-runtime",
-                "runner.example",
+                RuntimeProvider.Libvirt,
                 generation,
+                "noctf-network",
+                "10.90.0.0/28",
+                [
+                    new("web", "noctf-web", "10.90.0.2"),
+                    new("db", "noctf-db", "10.90.0.3")
+                ],
                 DateTimeOffset.UtcNow);
     }
 
-    private sealed class RecordingProviderCatalog(IComposeRuntime runtime)
+    private sealed class RecordingProviderCatalog(IOvaRuntime runtime)
         : IRuntimeProviderCatalog
     {
         public IContainerLifecycle Containers(RuntimeProvider provider) =>
@@ -211,10 +188,10 @@ public sealed class ComposeRuntimeHandlerTests
         public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) =>
             throw new NotSupportedException();
 
-        public IComposeRuntime Compose(RuntimeProvider provider) => runtime;
-
-        public IOvaRuntime Appliance(RuntimeProvider provider) =>
+        public IComposeRuntime Compose(RuntimeProvider provider) =>
             throw new NotSupportedException();
+
+        public IOvaRuntime Appliance(RuntimeProvider provider) => runtime;
     }
 
     private sealed class FixedWorkReader(

@@ -74,7 +74,9 @@ public sealed record ComposeRuntimeDefinition(
     public override RuntimeKind RuntimeKind => RuntimeKind.Compose;
 }
 
-public sealed record OvaRuntimeDefinition(string OvaSourceUrl) : ChallengeRuntimeDefinition
+public sealed record OvaRuntimeDefinition(
+    string OvaSourceUrl,
+    string Sha256) : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.OvaVm;
 }

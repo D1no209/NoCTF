@@ -106,6 +106,10 @@ internal static class ChallengeRuntimeTemplateValidator
                     || !Uri.TryCreate(ova.OvaSourceUrl, UriKind.Absolute, out var source)
                     || source.Scheme is not ("https" or "file"))
                     errors.Add("OvaVm runtimes require an absolute https or file OVA source URL.");
+                if (string.IsNullOrWhiteSpace(ova.Sha256)
+                    || ova.Sha256.Length != 64
+                    || !ova.Sha256.All(Uri.IsHexDigit))
+                    errors.Add("OvaVm runtimes require a 64-character SHA-256 digest.");
                 if (runtime.FlagSource != RuntimeFlagSource.Static)
                     errors.Add("OvaVm runtimes only support static flags.");
                 break;
