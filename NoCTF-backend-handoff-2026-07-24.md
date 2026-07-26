@@ -11,8 +11,8 @@
 Frontend、仓库外 CI 或用户的本地辅助文件。
 
 Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径已经接通，
-Docker/Kubernetes Compose 真实 Provider 集成也已通过。下一主线是接入 OVA/Libvirt，
-并用真实依赖证明生命周期、隔离、回写和清理。
+OVA/Libvirt lifecycle、orphan reconciliation 与 CTF PerTeam Runtime Flag 注入也已闭环。
+下一主线是增加 EgressPolicy 强类型模型及 Docker/Kubernetes enforcement。
 
 ## 2. Git 基线与工作树保护
 
@@ -20,8 +20,8 @@ Docker/Kubernetes Compose 真实 Provider 集成也已通过。下一主线是�
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前实现 HEAD：`7277323 fix(backend): parse Docker Compose JSON lines status`。
-- 本次 Kubernetes Compose 纵切只做本地提交，尚未获准推送。
+- 当前代码实现 HEAD：`a53aa11 feat(backend): inject CTF per-team runtime flags`。
+- 本轮实现只做本地提交，尚未获准推送。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
 - 创建交接分支前，`main` 相对 `origin/main`：ahead 186。
@@ -88,7 +88,7 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 319/319 passed。
+- 327/327 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -98,8 +98,9 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -- --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 1"
 ```
 
-- 本轮 OVA 修改后的 WSL 回归为 30 passed、0 failed、1 skipped；唯一 skip 是未设置
+- 本轮 WSL 回归为 31 passed、0 failed、1 skipped；唯一 skip 是未设置
   `NOCTF_KUBERNETES_INTEGRATION` 的真实 Kubernetes Compose 测试。
+- 不分组整套回归为 359 total、358 passed、0 failed、1 skipped。
 - 本轮修改前同一 HEAD 基线已用临时 k3d 完成 29/29 passed，0 failed，0 skipped；
   OVA 修改未触碰 Kubernetes Provider。
 - Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
@@ -114,6 +115,8 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   旧适配器只接受 JSON array 的兼容问题。
 - 新增 OVA contract 测试，覆盖 SHA-256、tar traversal、OVF 多 VM/资源预算、
   routed subnet、Guest Agent address、stable identity、URL expansion 与幂等 cleanup。
+- 新增真实 PostgreSQL CTF PerTeam Runtime Flag 生命周期测试，覆盖 Start 原子生成、
+  Worker dispatch 环境覆盖、批量生成、Static 排除和 Reset 固定 Flag 复用。
 
 ### EF Core 模型
 
@@ -308,19 +311,24 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   `virsh`/`qemu-img`/`virt-install`。
 - 为 Pool/Node CIDR 的非重叠委派增加部署期审计。
 
-### 6.3 CTF PerTeam Runtime Flag 注入未闭环
+### 6.3 CTF PerTeam Runtime Flag 注入已闭环
 
-当前 `RuntimeFlagSource` 有 `Static | PerTeam | AwdRotation`，MissingFlagGenerator 能识别
-`flagSource=PerTeam`，但 Runtime 配置尚无完整的 `FlagEnvironmentVariableName` 协议，
-Worker 也未在新 Container/Compose Generation 创建时注入对应团队固定 Flag。
+已完成：
 
-需要完成：
-
-- CTF Static/PerTeam 与 RuntimeKind 的模式校验。
-- Container/Compose 的显式 Flag 环境变量配置。
-- Start 前保证 team-scoped ChallengeFlag 存在。
-- Worker 在创建该 Generation 时注入；Reset 复用同一固定 Flag。
-- OVA 永远不注入动态 Flag。
+- CTF Runtime 只允许 `Static | PerTeam`；OVA 仍只允许 Static。
+- Container 以 `FlagEnvironmentVariableName` 声明唯一变量；Compose 以
+  `FlagEnvironmentVariables[serviceName]` 声明一个或多个目标 service。
+- PerTeam 必须声明注入目标，Static 必须省略；变量名和 service 引用在保存时校验，
+  `NOCTF_` 保留前缀仍禁止使用。
+- 玩家或管理员 Start/Reset 在 RuntimeInstance 同一 PostgreSQL 事务中保证团队固定
+  ChallengeFlag 存在；使用 `SpecificationKind.RuntimeDefinition` 和
+  `SpecificationId=CompetitionChallengeId` 精确标识，Reset 不重新生成。
+- MissingFlagGenerator 改走强类型 Runtime catalog，不再错误读取根级字符串
+  `flagSource`，因此兼容真实的嵌套配置和 enum JSON 表示。
+- Worker dispatch 只读取相同 CompetitionChallenge、Team 和 RuntimeDefinition scope 的
+  Flag。Container 直接覆盖镜像环境；Compose 只覆盖映射中列出的 service，未列出的
+  service 不接收 Flag。
+- OVA 不存在注入字段，仍永远不注入动态 Flag。
 
 ### 6.4 Egress 与网络模型仍不完整
 
@@ -364,11 +372,9 @@ enforcement。
 
 每一项必须独立 commit：
 
-1. 接入 Libvirt OVA durable lifecycle。
-2. 完成 CTF PerTeam Flag 环境注入。
-3. 增加 EgressPolicy 模型及 Docker/Kubernetes enforcement。
-4. 重新跑 Provider contract、全部 Integration 与四模式 E2E。
-5. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+1. 增加 EgressPolicy 模型及 Docker/Kubernetes enforcement。
+2. 重新跑 Provider contract、全部 Integration 与四模式 E2E。
+3. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
