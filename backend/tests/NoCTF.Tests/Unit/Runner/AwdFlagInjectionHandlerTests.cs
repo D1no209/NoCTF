@@ -234,6 +234,9 @@ public sealed class AwdFlagInjectionHandlerTests
         public IContainerLifecycle Containers(RuntimeProvider provider) => throw new NotSupportedException();
         public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) => throw new NotSupportedException();
         public IComposeRuntime Compose(RuntimeProvider provider) => compose;
+
+        public IOvaRuntime Appliance(RuntimeProvider provider) =>
+            throw new NotSupportedException();
     }
 
     private sealed class RecordingComposeRuntime : IComposeRuntime

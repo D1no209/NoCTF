@@ -1,11 +1,40 @@
+using NoCTF.Domain.Runtime;
+
 namespace NoCTF.Application.Runtime.Ports;
 
 public sealed record OvaRuntimeRequest(
     Guid OperationId,
     int Generation,
     Uri OvaSource,
+    string Sha256,
     string NetworkName,
     RuntimeResourceLimits Limits,
     TimeSpan? Ttl,
     TimeSpan OperationTimeout,
-    IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null);
+    IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
+    RuntimeUrlBinding? ControlCheckUrlBinding = null);
+
+public sealed record OvaVirtualMachineReceipt(
+    string VmId,
+    string ResourceId,
+    string Address);
+
+public sealed record OvaRuntimeReceipt(
+    Guid OperationId,
+    RuntimeProvider Provider,
+    int Generation,
+    string NetworkId,
+    string NetworkCidr,
+    IReadOnlyList<OvaVirtualMachineReceipt> VirtualMachines,
+    DateTimeOffset CreatedAt);
+
+public interface IOvaRuntime
+{
+    Task<OvaRuntimeReceipt> ImportAsync(
+        OvaRuntimeRequest request,
+        CancellationToken cancellationToken);
+
+    Task DestroyAsync(
+        OvaRuntimeReceipt receipt,
+        CancellationToken cancellationToken);
+}

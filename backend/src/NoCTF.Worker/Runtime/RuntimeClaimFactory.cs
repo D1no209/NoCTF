@@ -83,11 +83,15 @@ public static class RuntimeClaimFactory
                         instance.Id,
                         instance.Generation,
                         ParseOvaSource(definition.OvaSourceUrl),
+                        definition.Sha256.ToLowerInvariant(),
                         ResourceName(instance),
                         limits,
                         ttl,
                         operationTimeout,
-                        template.UrlBindings)),
+                        template.UrlBindings,
+                        mode == GameMode.Koh
+                            ? template.ControlCheckUrlBinding
+                            : null)),
             _ => throw new InvalidOperationException(
                 "Runtime definition and provider are incompatible.")
         };

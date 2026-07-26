@@ -252,6 +252,142 @@ public sealed class RuntimeProviderHandler(
         }
     }
 
+    public async Task<object> Handle(
+        ProvisionOvaRuntime message,
+        CancellationToken cancellationToken)
+    {
+        ValidateAssignment(message);
+        var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
+        if (workStatus != RuntimeProvisionWorkStatus.Current)
+        {
+            if (workStatus == RuntimeProvisionWorkStatus.AssignmentAbsent)
+            {
+                await capacity.ReleaseAsync(
+                    message.RuntimeInstanceId,
+                    message.RunnerId,
+                    cancellationToken);
+            }
+            return new RuntimeProvisionFailed(
+                message.RuntimeInstanceId,
+                message.ProcessingVersion,
+                RuntimeFailureCode.RunnerUnavailable,
+                message.RunnerId);
+        }
+
+        OvaRuntimeReceipt? receipt = null;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(message.Definition.OperationTimeout);
+        try
+        {
+            var runtime = providers.Appliance(RuntimeProvider.Libvirt);
+            receipt = await runtime.ImportAsync(message.Definition, timeout.Token);
+            ExpandedRuntimeUrls expanded;
+            try
+            {
+                expanded = RuntimeUrlExpander.ExpandOva(
+                    receipt,
+                    message.Definition.UrlBindings,
+                    message.Definition.ControlCheckUrlBinding);
+            }
+            catch (InvalidOperationException)
+            {
+                await runtime.DestroyAsync(receipt, cancellationToken);
+                receipt = null;
+                await ReleaseCapacityAsync(message, cancellationToken);
+                return new RuntimeProvisionFailed(
+                    message.RuntimeInstanceId,
+                    message.ProcessingVersion,
+                    RuntimeFailureCode.UrlExpansionFailed,
+                    message.RunnerId);
+            }
+
+            return new RuntimeProvisioned(
+                message.RuntimeInstanceId,
+                message.ProcessingVersion,
+                ReadRunnerId(),
+                receipt.Provider,
+                JsonSerializer.Serialize(receipt),
+                expanded.Urls,
+                expanded.ParticipantUrlIndexes,
+                message.Definition.Ttl is { } ttl
+                    ? DateTimeOffset.UtcNow.Add(ttl)
+                    : null,
+                expanded.ControlCheckUrl);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            if (receipt is not null)
+            {
+                await providers.Appliance(RuntimeProvider.Libvirt)
+                    .DestroyAsync(receipt, cancellationToken);
+            }
+            await ReleaseCapacityAsync(message, cancellationToken);
+            return new RuntimeProvisionFailed(
+                message.RuntimeInstanceId,
+                message.ProcessingVersion,
+                RuntimeFailureCode.ProvisionTimeout,
+                message.RunnerId);
+        }
+        catch (TimeoutException)
+        {
+            if (receipt is not null)
+            {
+                await providers.Appliance(RuntimeProvider.Libvirt)
+                    .DestroyAsync(receipt, cancellationToken);
+            }
+            await ReleaseCapacityAsync(message, cancellationToken);
+            return new RuntimeProvisionFailed(
+                message.RuntimeInstanceId,
+                message.ProcessingVersion,
+                RuntimeFailureCode.ProvisionTimeout,
+                message.RunnerId);
+        }
+        catch (InvalidOperationException)
+        {
+            if (receipt is not null)
+            {
+                await providers.Appliance(RuntimeProvider.Libvirt)
+                    .DestroyAsync(receipt, cancellationToken);
+            }
+            await ReleaseCapacityAsync(message, cancellationToken);
+            return new RuntimeProvisionFailed(
+                message.RuntimeInstanceId,
+                message.ProcessingVersion,
+                RuntimeFailureCode.ProviderRejected,
+                message.RunnerId);
+        }
+    }
+
+    public async Task<object> Handle(
+        StopOvaRuntime message,
+        CancellationToken cancellationToken)
+    {
+        ValidateAssignment(message);
+        try
+        {
+            var work = await workReader.ReadStopAsync(message, cancellationToken);
+            if (work is null)
+                return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+            if (work.Provider != RuntimeProvider.Libvirt)
+                throw new InvalidOperationException("OVA Runtime receipt provider is invalid.");
+            var receipt = JsonSerializer.Deserialize<OvaRuntimeReceipt>(work.ProviderReceiptJson)
+                ?? throw new InvalidOperationException("Provider receipt is invalid.");
+            await providers.Appliance(work.Provider).DestroyAsync(receipt, cancellationToken);
+            await capacity.ReleaseAsync(
+                message.RuntimeInstanceId,
+                ReadRunnerId(),
+                cancellationToken);
+            return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+        }
+        catch (InvalidOperationException)
+        {
+            return new RuntimeStopFailed(
+                message.RuntimeInstanceId,
+                message.ProcessingVersion,
+                RuntimeFailureCode.CleanupFailed);
+        }
+    }
+
     private void ValidateAssignment(IRunnerNodeMessage message)
     {
         var configuredPool = configuration["Runner:Pool"] ?? "default";

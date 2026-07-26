@@ -70,6 +70,30 @@ public static class RuntimeUrlExpander
         return new(urls, participantIndexes, controlCheckUrl);
     }
 
+    public static ExpandedRuntimeUrls ExpandOva(
+        OvaRuntimeReceipt receipt,
+        IReadOnlyList<RuntimeUrlBinding>? bindings,
+        RuntimeUrlBinding? controlCheckBinding)
+    {
+        var urls = new List<string>();
+        var participantIndexes = new List<int>();
+        foreach (var binding in bindings ?? [])
+        {
+            var machine = FindOvaVirtualMachine(receipt, binding);
+            var url = ExpandOvaBinding(machine, binding);
+            if (binding.Exposure == RuntimeExposure.Participants)
+                participantIndexes.Add(urls.Count);
+            urls.Add(url);
+        }
+
+        var controlCheckUrl = controlCheckBinding is null
+            ? null
+            : ExpandOvaBinding(
+                FindOvaVirtualMachine(receipt, controlCheckBinding),
+                controlCheckBinding);
+        return new(urls, participantIndexes, controlCheckUrl);
+    }
+
     private static ComposeServiceStatus FindComposeService(
         ComposeStatus status,
         RuntimeUrlBinding binding)
@@ -84,6 +108,46 @@ public static class RuntimeUrlExpander
                        StringComparison.Ordinal))
                ?? throw new InvalidOperationException(
                    $"Compose service '{binding.ServiceName}' was not found.");
+    }
+
+    private static OvaVirtualMachineReceipt FindOvaVirtualMachine(
+        OvaRuntimeReceipt receipt,
+        RuntimeUrlBinding binding)
+    {
+        if (string.IsNullOrWhiteSpace(binding.VmId))
+            throw new InvalidOperationException("OVA URL binding requires VmId.");
+        return receipt.VirtualMachines.SingleOrDefault(machine =>
+                   string.Equals(machine.VmId, binding.VmId, StringComparison.Ordinal))
+               ?? throw new InvalidOperationException(
+                   $"OVA virtual machine '{binding.VmId}' was not found.");
+    }
+
+    private static string ExpandOvaBinding(
+        OvaVirtualMachineReceipt machine,
+        RuntimeUrlBinding binding)
+    {
+        if (string.IsNullOrWhiteSpace(machine.Address))
+            throw new InvalidOperationException(
+                "OVA virtual machine receipt does not contain an address.");
+        if (binding.GuestPort is null
+            && binding.UrlTemplate.Contains("{PORT}", StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "OVA URL binding cannot expand PORT without GuestPort.");
+        var expanded = binding.UrlTemplate.Replace(
+            "{HOST}",
+            machine.Address,
+            StringComparison.Ordinal);
+        if (binding.GuestPort is int guestPort)
+        {
+            expanded = expanded.Replace(
+                "{PORT}",
+                guestPort.ToString(CultureInfo.InvariantCulture),
+                StringComparison.Ordinal);
+        }
+        if (!Uri.TryCreate(expanded, UriKind.Absolute, out _))
+            throw new InvalidOperationException(
+                "OVA URL binding did not expand to an absolute URI.");
+        return expanded;
     }
 
     private static string ExpandPublicContainerBinding(

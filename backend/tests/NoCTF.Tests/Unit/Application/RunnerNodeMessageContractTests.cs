@@ -8,6 +8,7 @@ public sealed class RunnerNodeMessageContractTests
     [Test]
     [Arguments(typeof(ProvisionContainerRuntime))]
     [Arguments(typeof(ProvisionComposeRuntime))]
+    [Arguments(typeof(ProvisionOvaRuntime))]
     [Arguments(typeof(StopContainerRuntime))]
     [Arguments(typeof(StopComposeRuntime))]
     [Arguments(typeof(StopOvaRuntime))]

@@ -61,7 +61,9 @@ public sealed class RuntimeClaimFactoryTests
         var template = new ChallengeRuntimeTemplate(
             RuntimeProvider.Libvirt,
             RuntimeAllocation.PerTeam,
-            new OvaRuntimeDefinition("file:///var/lib/noctf/challenge.ova"),
+            new OvaRuntimeDefinition(
+                "file:///var/lib/noctf/challenge.ova",
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
             Limits: new(1_073_741_824, 1_000_000_000, 256));
 
         var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
@@ -70,6 +72,8 @@ public sealed class RuntimeClaimFactoryTests
         var ova = (ClaimOvaRuntime)claim;
         await Assert.That(ova.Definition.OvaSource)
             .IsEqualTo(new Uri("file:///var/lib/noctf/challenge.ova"));
+        await Assert.That(ova.Definition.Sha256)
+            .IsEqualTo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         await Assert.That(ova.Definition.NetworkName)
             .IsEqualTo($"noctf-{instance.Id:N}-{instance.Generation}");
     }

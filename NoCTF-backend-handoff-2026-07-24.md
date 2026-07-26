@@ -88,7 +88,7 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 309/309 passed。
+- 318/318 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -98,7 +98,10 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -- --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 1"
 ```
 
-- 2026-07-26 当前门禁为 29/29 passed，0 failed，0 skipped。
+- 本轮 OVA 修改后的 WSL 回归为 28 passed、0 failed、1 skipped；唯一 skip 是未设置
+  `NOCTF_KUBERNETES_INTEGRATION` 的真实 Kubernetes Compose 测试。
+- 本轮修改前同一 HEAD 基线已用临时 k3d 完成 29/29 passed，0 failed，0 skipped；
+  OVA 修改未触碰 Kubernetes Provider。
 - Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
 - Kubernetes 使用临时 k3d `v5.9.0` / k3s `v1.35.5+k3s1`，其内建
   NetworkPolicy controller 已启用，kubelet 以 `--pod-max-pids=512` 启动并与测试
@@ -109,6 +112,8 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   未 Ready Pod DNS、同 Runtime 互通、跨 Runtime 拒绝、NodePort 与精确 cleanup。
 - 测试发现并修复 Docker Compose `ps --format json` 在当前 CLI 返回 JSON Lines、
   旧适配器只接受 JSON array 的兼容问题。
+- 新增 OVA contract 测试，覆盖 SHA-256、tar traversal、OVF 多 VM/资源预算、
+  routed subnet、Guest Agent address、stable identity、URL expansion 与幂等 cleanup。
 
 ### EF Core 模型
 
@@ -277,21 +282,30 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 生产 Pool 仍须由运维核对 kubelet 实际 `PodPidsLimit` 与 Runner 配置相等；应用配置不能
 替代 kubelet 配置。
 
-### 6.2 OVA/Libvirt 尚未接入业务生命周期
+### 6.2 OVA/Libvirt 已接入首版 durable lifecycle，仍需真实 Provider 验证与 reaper
 
 当前已有：
 
 - `LibvirtProcessAdapter`
-- `LibvirtApplianceLifecycle`
-- OVA source URL、Provider、Static Flag 的保存校验
+- `ClaimOvaRuntime -> ProvisionOvaRuntime -> RuntimeProvisioned/Failed` 的 Pool claim、
+  node ownership 与 ProcessingVersion fence
+- `StopOvaRuntime` 从持久 receipt 清理，不在消息中复制 receipt
+- OVA source URL、必填 SHA-256、Provider、Static Flag 的保存校验
+- 安全 tar 解包、单 descriptor、OVF 单/多 VM、稳定 `ovf:id` VmId
+- OVF CPU/内存合计预算校验；PidsLimit 仅作为 Runner 容量预留
+- SHA-256 内容寻址缓存、逐磁盘 qcow2 转换、逐 VM Libvirt domain
+- Pool/Node routed CIDR、每 Runtime 子网、Guest Agent IPv4 discovery
+- OVA public/KoH control URL expansion、receipt 持久化与幂等 stop cleanup
+- 任一 VM 导入/地址发现失败时的 appliance 整组回滚
 
 仍缺：
 
-- Worker/Runner durable claim 与 node ownership。
-- import/cache/hash、OVF 多 VM、稳定 VmId。
-- 独立网络、Guest Agent address、GuestPort URL expansion。
-- start/stop/reset/expire 的 appliance 原子生命周期。
-- receipt 持久化、迟到回写 fence、幂等 cleanup/reaper。
+- 在 Linux KVM/Libvirt 节点用真实 OVA 验证 import、Guest Agent、routed network、
+  URL 可达性和 stop/reset/expire；当前开发机只有 `/dev/kvm`，未安装
+  `virsh`/`qemu-img`/`virt-install`。
+- 增加 Libvirt orphan reaper；必须按稳定 RuntimeInstanceId+Generation domain/network
+  名称精确清理，不能使用 Competition/Team 宽泛匹配。
+- 为 Pool/Node CIDR 的非重叠委派增加部署期审计。
 
 ### 6.3 CTF PerTeam Runtime Flag 注入未闭环
 
