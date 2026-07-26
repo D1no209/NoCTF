@@ -40,9 +40,9 @@ public sealed partial class LibvirtApplianceLifecycle(
             plans = appliance.VirtualMachines;
             var maximumGuests =
                 (1L << (32 - options.RuntimeSubnetPrefixLength)) - 3;
-            if (plans.Count > maximumGuests)
+            if (plans.Count > Math.Min(maximumGuests, 1000))
                 throw new InvalidOperationException(
-                    "OVA contains more virtual machines than the Runtime subnet can address.");
+                    "OVA contains more virtual machines than the Runtime identity or subnet can address.");
             network = await networks.EnsureAsync(
                 request.OperationId,
                 request.Generation,
@@ -137,6 +137,57 @@ public sealed partial class LibvirtApplianceLifecycle(
         await DestroyDomainsAsync(receipt.VirtualMachines, cancellationToken);
         await networks.DestroyAsync(receipt.NetworkId, cancellationToken);
         DeleteDirectoryIfPresent(RuntimeDirectory(receipt.OperationId, receipt.Generation));
+    }
+
+    public async Task<IReadOnlyList<OvaManagedRuntimeResource>> ListManagedAsync(
+        CancellationToken cancellationToken)
+    {
+        var identities = new HashSet<OvaManagedRuntimeResource>();
+        foreach (var domainName in await ListDomainNamesAsync(cancellationToken))
+        {
+            if (TryParseResourceName(domainName, expectDomain: true, out var identity))
+                identities.Add(identity);
+        }
+        foreach (var networkName in await networks.ListManagedNetworkNamesAsync(cancellationToken))
+        {
+            if (TryParseResourceName(networkName, expectDomain: false, out var identity))
+                identities.Add(identity);
+        }
+        if (Directory.Exists(options.WorkDirectory))
+        {
+            foreach (var directory in Directory.EnumerateDirectories(
+                         options.WorkDirectory,
+                         "*",
+                         SearchOption.TopDirectoryOnly))
+            {
+                var name = Path.GetFileName(directory);
+                if (TryParseWorkDirectoryName(name, out var identity))
+                    identities.Add(identity);
+            }
+        }
+        return identities.OrderBy(identity => identity.OperationId)
+            .ThenBy(identity => identity.Generation)
+            .ToArray();
+    }
+
+    public async Task DestroyByIdentityAsync(
+        OvaManagedRuntimeResource identity,
+        CancellationToken cancellationToken)
+    {
+        if (identity.OperationId == Guid.Empty || identity.Generation < 0)
+            throw new InvalidOperationException("OVA managed resource identity is invalid.");
+        var domains = (await ListDomainNamesAsync(cancellationToken))
+            .Where(name => TryParseResourceName(name, expectDomain: true, out var parsed)
+                && parsed == identity)
+            .Order(StringComparer.Ordinal)
+            .Select(name => new OvaVirtualMachineReceipt(string.Empty, name, string.Empty))
+            .ToArray();
+        await DestroyDomainsAsync(domains, cancellationToken);
+        await networks.DestroyAsync(
+            NetworkName(identity.OperationId, identity.Generation),
+            cancellationToken);
+        DeleteDirectoryIfPresent(
+            RuntimeDirectory(identity.OperationId, identity.Generation));
     }
 
     private async Task EnsureDomainAsync(
@@ -373,6 +424,36 @@ public sealed partial class LibvirtApplianceLifecycle(
             Directory.Delete(path, recursive: true);
     }
 
+    private static bool TryParseResourceName(
+        string name,
+        bool expectDomain,
+        out OvaManagedRuntimeResource identity)
+    {
+        identity = default;
+        var match = ManagedResourceNameRegex().Match(name);
+        if (!match.Success || match.Groups["index"].Success != expectDomain)
+            return false;
+        if (!Guid.TryParseExact(match.Groups["id"].Value, "N", out var operationId)
+            || !int.TryParse(
+                match.Groups["generation"].Value,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var generation))
+            return false;
+        identity = new(operationId, generation);
+        return true;
+    }
+
+    private static bool TryParseWorkDirectoryName(
+        string name,
+        out OvaManagedRuntimeResource identity) =>
+        TryParseResourceName($"noctf-{name}", expectDomain: false, out identity);
+
     [GeneratedRegex(@"(?<![\d.])(?<address>(?:\d{1,3}\.){3}\d{1,3})/\d{1,2}(?![\d.])")]
     private static partial Regex Ipv4AddressRegex();
+
+    [GeneratedRegex(
+        @"\Anoctf-(?<id>[0-9a-f]{32})-(?<generation>0|[1-9][0-9]*)(?:-(?<index>[0-9]{3}))?\z",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex ManagedResourceNameRegex();
 }

@@ -26,6 +26,10 @@ public sealed class RedisRunnerCapacityGateTests
                 $"runner:{runner}:heartbeat", "alive", TimeSpan.FromMinutes(1));
             var gate = new RedisRunnerCapacityGate(redis);
 
+            var inventory = await gate.GetPoolInventoryAsync(pool, cancellationToken);
+            await Assert.That(inventory.Availability)
+                .IsEqualTo(RunnerPoolInventoryAvailability.Available);
+            await Assert.That(inventory.RunnerIds).IsEquivalentTo([runner]);
             await Assert.That(await gate.GetHeartbeatAsync(pool, runner, cancellationToken))
                 .IsEqualTo(RunnerHeartbeatStatus.Online);
             await database.KeyDeleteAsync($"runner:{runner}:heartbeat");

@@ -71,6 +71,32 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         }
     }
 
+    public async Task<RunnerPoolInventory> GetPoolInventoryAsync(
+        string runnerPool,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(runnerPool);
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var members = await redis.GetDatabase()
+                .SetMembersAsync($"runner-pool:{runnerPool}:members");
+            return new(
+                RunnerPoolInventoryAvailability.Available,
+                members.Select(member => member.ToString())
+                    .Where(member => !string.IsNullOrWhiteSpace(member))
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray());
+        }
+        catch (RedisException)
+        {
+            return new(
+                RunnerPoolInventoryAvailability.Unavailable,
+                []);
+        }
+    }
+
     public async Task<RunnerCapacityClaim> TryClaimAsync(
         RunnerCapacityRequest request,
         CancellationToken cancellationToken)

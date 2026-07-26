@@ -159,6 +159,14 @@ OVA 的 `PidsLimit` 只参与 Runner 容量预留，不表示或尝试限制 Gue
 停止、地址重复或发现超时都会使整个实例失败并触发整组清理。OVA 只允许 Static Flag，
 不注入 PerTeam Flag。
 
+Worker 的 durable Runner assignment reconciliation 同时读取 Redis Pool membership，并向
+在线 Libvirt 节点投递资源审计。节点只接受自己的 Pool/RunnerId，枚举名称严格匹配
+`noctf-<runtime-id>-<generation>` 的 network、带三位 VM suffix 的 domain，以及对应工作
+目录；只有数据库中相同 RuntimeInstanceId+Generation 仍处于
+Provisioning/Running/Stopping、Provider=Libvirt 且仍归属该节点时才保留。Redis/数据库
+不可用时不清理；旧 Generation、已改派节点、终态或无业务事实的资源按完整 appliance
+精确删除。
+
 ## Flag 注入
 
 ### CTF Container/Compose

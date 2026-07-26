@@ -42,6 +42,10 @@ Runner 管理端口只在内部网络。Checker callback API 可达，但严格 
 保持一致且不得大于 `/28`。若多个节点复用同一个 node CIDR，节点本地 Libvirt 无法发现
 另一节点的占用，平台不保证避免地址冲突，因此部署必须拒绝该配置。
 
+Libvirt orphan audit 依赖 `runner-pool:<pool>:members` 保留稳定 RunnerId membership；
+heartbeat 过期的节点不会收到新审计，节点以相同 RunnerId 恢复并重新上线后会收到下一次
+durable 审计。不要通过复用 RunnerId 把同一 node CIDR 同时交给两个宿主。
+
 `Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
 kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。
 `NetworkPolicyRequired=true` 是部署契约，运维仍必须确认 CNI 实际执行 NetworkPolicy。
