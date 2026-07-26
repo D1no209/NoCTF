@@ -1,6 +1,6 @@
 # NoCTF 后端目标架构交接
 
-> 创建于 2026-07-24，最后核验于 2026-07-25。文件名保留原日期，本文内容以最后核验日期为准。
+> 创建于 2026-07-24，最后核验于 2026-07-26。文件名保留原日期，本文内容以最后核验日期为准。
 
 ## 1. 下一会话目标
 
@@ -10,8 +10,8 @@
 默认只修改 `backend` 与本交接文档。除非用户明确扩大范围，不修改 Frontend、
 `backend/Dockerfile`、`deploy`、仓库外 CI 或用户的本地辅助文件。
 
-下一主线不是继续堆配置校验，而是把已存在的 Runtime 配置模型真正接到
-Container、Compose、OVA 三条 Provider 执行路径，并用真实依赖证明生命周期、
+Container 与 Docker Compose 的持久 Runtime 执行路径已经接通。下一主线是完成
+Kubernetes Compose/Kompose，然后接入 OVA/Libvirt，并用真实依赖证明生命周期、
 隔离、回写和清理。
 
 ## 2. Git 基线与工作树保护
@@ -20,7 +20,9 @@ Container、Compose、OVA 三条 Provider 执行路径，并用真实依赖证�
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 本交接分支从上述 `main` HEAD 创建，只额外提交本文件。
+- 当前实现 HEAD：`fbd092c feat(backend): provision Docker Compose runtimes`
+- 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
+  Docker Compose 纵切。
 - 创建交接分支前，`main` 相对 `origin/main`：ahead 186。
 - 原目标架构远程分支：`origin/codex/backend-target-architecture`。
 - 从旧交接 HEAD `003b75c` 到当前代码基线共有 38 个 backend 提交：
@@ -60,8 +62,10 @@ git log --oneline 003b75c..2c6b4ce -- backend
    - 管理员需要显式 rejudge。
 8. Docker Desktop 已启动；WSL `Ubuntu-22.04` 有完整 .NET/Testcontainers 工具链。
 9. 如果出现真正会改变产品语义的歧义，使用 `$grill-me` 向用户确认；不要静默选择。
+10. Compose 使用强类型逐服务资源配置；每个 YAML service 必须有一条正资源上限，
+    顶层 Runtime limits 是整个 Compose instance 的总预算，逐服务总和不得超过它。
 
-## 4. 2026-07-25 当前 HEAD 的实测门禁
+## 4. 2026-07-26 当前 HEAD 的实测门禁
 
 所有命令均在 `E:\SourceCode\NoCTF` 发起，通过 WSL 在
 `/mnt/e/SourceCode/NoCTF/backend` 执行。
@@ -69,7 +73,7 @@ git log --oneline 003b75c..2c6b4ce -- backend
 ### Build
 
 ```powershell
-wsl -d Ubuntu-22.04 -- bash -lc `
+wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet build NoCTF.slnx --no-restore"
 ```
 
@@ -79,11 +83,11 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 ### 非 Integration 测试
 
 ```powershell
-wsl -d Ubuntu-22.04 -- bash -lc `
-  "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -- --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
+wsl bash -lc `
+  "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 271/271 passed。
+- 292/292 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -93,9 +97,11 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -- --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 1"
 ```
 
-- 27/27 passed。
-- 0 failed，0 skipped。
-- 当前 Docker/Testcontainers 可用；本结果不是 mock 或 skipped。
+- 2026-07-25 的上一个完整门禁为 27/27 passed，0 failed，0 skipped。
+- 2026-07-26 完成 Docker Compose 纵切后尚未重跑：当前 Windows Docker Desktop
+  Linux Engine pipe 不存在，WSL 也未暴露 `docker` CLI。
+- 因此不得声称 `fbd092c` 已通过真实 Docker Compose lifecycle；Docker 恢复后必须
+  增加/运行对应 Integration test。
 
 ### EF Core 模型
 
@@ -202,46 +208,55 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 
 后续不得重新使用旧的 `noctf.*` 键。
 
+### 5.6 RuntimeKind dispatch 与 Docker Compose
+
+以下已完成：
+
+- `ChallengeRuntimeDefinition` 按 `container | compose | ova` JSON discriminator
+  拆为强类型 definition，不再借用 Container `Image`。
+- Worker 分别发布 `ClaimContainerRuntime`、`ClaimComposeRuntime`、
+  `ClaimOvaRuntime`；Compose/OVA 不再进入 Container claim。
+- stop dispatch 按 RuntimeKind 使用独立消息；receipt 仍从持久
+  `RuntimeInstance` 读取，不塞入 stop 消息。
+- Compose 配置明确包含原始 `ComposeYaml` 与逐服务 `ServiceResources`；
+  顶层 `RuntimeResourceLimits` 作为容量 claim 和总预算。
+- 保存与 Docker 执行前均解析 YAML，服务集合必须与资源映射完全一致，逐服务总和
+  不得超过总预算。
+- 永久拒绝文档列出的 privileged/host namespace/volume/device/socket/
+  capability/external network 等危险面；平台覆盖 service/network labels、
+  environment、动态端口、CPU/内存/PID 上限、drop ALL 与
+  no-new-privileges。
+- Docker Compose 已接入 durable claim、node ownership、provision、
+  `up --wait`、status、receipt、URL expansion、stop 与失败清理。
+- 部分创建后清理失败不会释放容量；保留本地 Compose definition 并由 durable
+  消息重试，避免仍存活资源造成过量调度。
+
+相关提交：
+
+- `b8b58e9 refactor(backend): split runtime definitions by kind`
+- `9c43083 feat(backend): dispatch runtime claims by kind`
+- `fbd092c feat(backend): provision Docker Compose runtimes`
+
 ## 6. 当前最重要的剩余缺口
 
-### 6.1 Runtime dispatch 仍只真正执行 Container
+### 6.1 Kubernetes Compose/Kompose 尚未执行
 
 这是下一主线的首要缺口。
 
-当前证据：
+当前 `KubernetesComposeRuntime.UpAsync` 仍只构造 receipt，未执行固定版本 Kompose
+转换与 Kubernetes apply；`GetStatusAsync` 固定返回 Failed，`DownAsync` 是空实现。
 
-- `backend/src/NoCTF.Worker/BackendMessageHandlers.cs` 的 `DispatchRuntime`：
-  - 遇到 Libvirt 直接把 Runtime 标成 `InvalidConfiguration`；
-  - 对其他 RuntimeKind 一律构造 `ContainerRequest`；
-  - 一律发布 `ClaimContainerRuntime`。
-- `backend/src/NoCTF.Runner/Messages/RuntimeHandlers.cs` 只处理 Container provision/stop。
-- 因此配置层虽然接受 Compose/OVA，持久 Runtime 执行层尚未按 RuntimeKind 分派。
+需要完成：
 
-下一步应先写失败测试证明：
+- 复用同一 Compose YAML 执行前安全策略。
+- 以固定版本 Kompose 转换，不接受题目指定 Namespace。
+- 转换后解析全部 manifests，拒绝 Namespace、Ingress、NodePort、
+  LoadBalancer、hostPath/volume/config/secret/device 与越权 security context。
+- 平台覆盖统一 Namespace、不可覆盖 labels、资源限制、NetworkPolicy 与清理选择器。
+- durable provision/status/receipt/URL/stop/reset/expire 与幂等 cleanup。
+- 使用真实 Kubernetes/Testcontainers 或项目既定真实测试环境证明，而不是只测 stub。
 
-1. Compose 不得发布 `ClaimContainerRuntime`。
-2. OVA/Libvirt 不得在 Worker 被直接判为 InvalidConfiguration。
-3. 每个 RuntimeKind 的 provision、stop、reset cleanup、receipt、URL 展开使用自己的强类型消息和 Provider receipt。
-
-不要通过在 ContainerRequest 中塞 Compose YAML 或 OVA URL 来绕过类型边界。
-
-### 6.2 Compose 配置与执行未闭环
-
-当前证据：
-
-- `ChallengeRuntimeTemplate` 没有明确的 `ComposeYaml` 字段。
-- 现有测试曾把原始 YAML 放进 `Image`，这不是目标协议。
-- `DockerComposeRuntime` 有基础 CLI adapter，但未接入持久 Runtime dispatch。
-- `KubernetesComposeRuntime.UpAsync` 当前只返回 receipt，未执行 Kompose/deploy；
-  `GetStatusAsync` 固定返回 Failed，`DownAsync` 是空实现。
-- 尚未实现保存前与执行前的 YAML/manifests 安全解析：
-  privileged、host namespace、volume、device、Docker socket、高危 capability、
-  Namespace、Ingress、NodePort、LoadBalancer 等拒绝规则。
-
-需要先按 `docs/runtime.md` 固化 Compose 配置协议。若 `ComposeYaml` 的具体模型归属仍有
-多种合理解释，使用 `$grill-me` 询问，不要继续借用 `Image`。
-
-### 6.3 OVA/Libvirt 尚未接入业务生命周期
+### 6.2 OVA/Libvirt 尚未接入业务生命周期
 
 当前已有：
 
@@ -257,7 +272,7 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - start/stop/reset/expire 的 appliance 原子生命周期。
 - receipt 持久化、迟到回写 fence、幂等 cleanup/reaper。
 
-### 6.4 CTF PerTeam Runtime Flag 注入未闭环
+### 6.3 CTF PerTeam Runtime Flag 注入未闭环
 
 当前 `RuntimeFlagSource` 有 `Static | PerTeam | AwdRotation`，MissingFlagGenerator 能识别
 `flagSource=PerTeam`，但 Runtime 配置尚无完整的 `FlagEnvironmentVariableName` 协议，
@@ -271,7 +286,7 @@ Worker 也未在新 Container/Compose Generation 创建时注入对应团队固�
 - Worker 在创建该 Generation 时注入；Reset 复用同一固定 Flag。
 - OVA 永远不注入动态 Flag。
 
-### 6.5 Egress 与网络模型仍不完整
+### 6.4 Egress 与网络模型仍不完整
 
 `docs/runtime.md` 定义 `EgressPolicy: DenyAll | InternetOnly`，但
 `ChallengeRuntimeTemplate` 当前没有对应强类型字段，也没有完整的 Docker/Kubernetes
@@ -285,7 +300,7 @@ enforcement。
 
 不得把 JWT 约束、label 或独立 network 等同于底层网络 ACL 已完成。
 
-### 6.6 Runner capacity、reconciliation 与 orphan cleanup 需要最终闭环审计
+### 6.5 Runner capacity、reconciliation 与 orphan cleanup 需要最终闭环审计
 
 基础实现和测试已经存在，但在 Compose/OVA 接入后必须重新证明：
 
@@ -296,7 +311,7 @@ enforcement。
 - reaper 只按 managed + RuntimeInstanceId + Generation 精确匹配；
 - Compose appliance/OVA 多资源 cleanup 不使用宽泛 Competition/Team 标签。
 
-### 6.7 API、DI 与交付项
+### 6.6 API、DI 与交付项
 
 功能稳定后再做，不与 Provider 业务变化混在一个提交：
 
@@ -313,15 +328,13 @@ enforcement。
 
 每一项必须独立 commit：
 
-1. 为 RuntimeKind dispatch 写失败测试，证明 Compose/OVA 不走 Container 消息。
-2. 固化 Compose 配置协议；如模型归属不明确，先 `$grill-me`。
-3. 接入 Docker Compose 的 provision/stop/status/receipt/URL/cleanup。
-4. 接入 Kubernetes Kompose/deploy/security validation/cleanup。
-5. 接入 Libvirt OVA durable lifecycle。
-6. 完成 CTF PerTeam Flag 环境注入。
-7. 增加 EgressPolicy 模型及 Docker/Kubernetes enforcement。
-8. 重新跑 Provider contract、全部 Integration 与四模式 E2E。
-9. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+1. 接入 Kubernetes Kompose/deploy/manifest security validation/cleanup。
+2. 接入 Libvirt OVA durable lifecycle。
+3. 完成 CTF PerTeam Flag 环境注入。
+4. 增加 EgressPolicy 模型及 Docker/Kubernetes enforcement。
+5. Docker 恢复后补跑 Docker Compose lifecycle Integration。
+6. 重新跑 Provider contract、全部 Integration 与四模式 E2E。
+7. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
@@ -346,7 +359,8 @@ enforcement。
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从 RuntimeKind dispatch 的失败测试开始。
+4. 从 Kubernetes Compose/Kompose 的失败测试开始；不要重做已完成的 RuntimeKind dispatch
+   或 Docker Compose durable handler。
 5. 每个纵切固定执行：
    - 失败测试；
    - 最小实现；
