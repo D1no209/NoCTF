@@ -154,7 +154,8 @@ public sealed class KubernetesComposeRuntimeTests
                 Namespace: "runtime",
                 PublicHost: "node.example",
                 PodPidsLimit: 512,
-                ClusterDomain: "internal.example"),
+                ClusterDomain: "internal.example",
+                ClusterDnsServiceAddress: "10.96.0.10"),
             converter);
         var request = Request();
 

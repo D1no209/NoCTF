@@ -36,7 +36,8 @@ public sealed class KubernetesContainerLifecycleTests
             client,
             new KubernetesRuntimeOptions(
                 CallbackPodLabelKey: "noctf.io/internal-role",
-                CallbackPodLabelValue: "awdp-callback"));
+                CallbackPodLabelValue: "awdp-callback",
+                ClusterDnsServiceAddress: "10.96.0.10"));
 
         _ = await lifecycle.CreateAsync(CheckerRequest(), CancellationToken.None);
 
@@ -69,7 +70,9 @@ public sealed class KubernetesContainerLifecycleTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(
                 new InvalidOperationException("policy failed")));
-        var lifecycle = new KubernetesContainerLifecycle(client, new KubernetesRuntimeOptions());
+        var lifecycle = new KubernetesContainerLifecycle(
+            client,
+            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
 
         Func<Task> action = () => lifecycle.CreateAsync(CheckerRequest(), CancellationToken.None);
 
@@ -89,7 +92,9 @@ public sealed class KubernetesContainerLifecycleTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromException<HttpOperationResponse<V1Pod>>(
                 new TimeoutException("response lost")));
-        var lifecycle = new KubernetesContainerLifecycle(client, new KubernetesRuntimeOptions());
+        var lifecycle = new KubernetesContainerLifecycle(
+            client,
+            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
 
         Func<Task> action = () => lifecycle.CreateAsync(CheckerRequest(), CancellationToken.None);
 
@@ -109,7 +114,9 @@ public sealed class KubernetesContainerLifecycleTests
                 Arg.Any<bool?>(), Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HttpOperationResponse<V1Pod> { Body = new V1Pod() }));
-        var lifecycle = new KubernetesContainerLifecycle(client, new KubernetesRuntimeOptions());
+        var lifecycle = new KubernetesContainerLifecycle(
+            client,
+            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
 
         _ = await lifecycle.CreateAsync(
             CheckerRequest() with { AllowInternalCallback = false }, CancellationToken.None);
@@ -151,7 +158,9 @@ public sealed class KubernetesContainerLifecycleTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(
                 new TimeoutException("response lost")));
-        var lifecycle = new KubernetesContainerLifecycle(client, new KubernetesRuntimeOptions());
+        var lifecycle = new KubernetesContainerLifecycle(
+            client,
+            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
 
         Func<Task> action = () => lifecycle.CreateIsolatedNetworkAsync(
             new ContainerNetworkPolicyRequest(
@@ -191,7 +200,9 @@ public sealed class KubernetesContainerLifecycleTests
             }));
         var lifecycle = new KubernetesContainerLifecycle(
             client,
-            new KubernetesRuntimeOptions(ProtectedCidrs: ["172.30.0.0/16"]));
+            new KubernetesRuntimeOptions(
+                ClusterDnsServiceAddress: "10.96.0.10",
+                ProtectedCidrs: ["172.30.0.0/16"]));
 
         var name = await lifecycle.CreateIsolatedNetworkAsync(
             new ContainerNetworkPolicyRequest(
@@ -214,7 +225,7 @@ public sealed class KubernetesContainerLifecycleTests
         await Assert.That(publicIngress.Ports.Single().Port.Value).IsEqualTo("8080");
         await Assert.That(createdPolicy.Spec.Egress).Count().IsEqualTo(3);
         await Assert.That(createdPolicy.Spec.Egress.Single(rule =>
-                rule.To.Any(peer => peer.IpBlock is not null))
+                rule.To.Any(peer => peer.IpBlock?.Cidr == "0.0.0.0/0"))
             .To.Single().IpBlock!.Except)
             .Contains("172.30.0.0/16");
     }

@@ -3,6 +3,7 @@ using k8s.Autorest;
 using k8s.Models;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
+using NoCTF.Runner.Composition;
 using NoCTF.Runtime.Kubernetes.Compose;
 using NoCTF.Runtime.Kubernetes.Configuration;
 
@@ -33,7 +34,14 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
         await client.CoreV1.CreateNamespaceAsync(
             new V1Namespace
             {
-                Metadata = new V1ObjectMeta { Name = namespaceName }
+                Metadata = new V1ObjectMeta
+                {
+                    Name = namespaceName,
+                    Labels = new Dictionary<string, string>
+                    {
+                        ["noctf.io/purpose"] = "challenge-runtime"
+                    }
+                }
             },
             cancellationToken: cancellationToken);
         try
@@ -73,17 +81,30 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
         CancellationToken cancellationToken)
     {
         var operationId = Guid.NewGuid();
+        var kubeDns = await client.CoreV1.ReadNamespacedServiceAsync(
+            KubernetesRuntimePoolStartupCheck.KubeDnsServiceName,
+            KubernetesRuntimePoolStartupCheck.KubeDnsServiceNamespace,
+            cancellationToken: cancellationToken);
+        var clusterDnsServiceAddress = kubeDns.Spec.ClusterIP
+            ?? throw new InvalidOperationException("kube-dns Service has no ClusterIP.");
         var options = new KubernetesRuntimeOptions(
             Namespace: namespaceName,
             PublicHost: "node.test",
             ImagePullPolicy: "IfNotPresent",
             PodPidsLimit: 512,
             ClusterDomain: "cluster.local",
-            NetworkPolicyRequired: true);
+            ClusterDnsServiceAddress: clusterDnsServiceAddress,
+            NetworkPolicyRequired: true,
+            ProtectedCidrs: ["1.1.1.1/32"]);
         var runtime = new KubernetesComposeRuntime(
             client,
             options,
             new KomposeConverter(komposePath));
+        await EnsureBaselinePolicyEnforcedAsync(
+            client,
+            runtime,
+            options,
+            cancellationToken);
         var request = Request(operationId);
 
         var receipt = await runtime.UpAsync(request, cancellationToken);
@@ -122,6 +143,47 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             TimeSpan.FromSeconds(10),
             cancellationToken);
         await Assert.That(sameRuntime.ExitCode).IsEqualTo(0);
+        var deniedInternet = await runtime.ExecAsync(
+            receipt,
+            "web",
+            [
+                "/bin/sh",
+                "-c",
+                "timeout 5 wget -q -O /dev/null http://example.com"
+            ],
+            TimeSpan.FromSeconds(10),
+            cancellationToken);
+        await Assert.That(deniedInternet.ExitCode).IsNotEqualTo(0);
+
+        var internetOperationId = Guid.NewGuid();
+        var internetReceipt = await runtime.UpAsync(
+            Request(internetOperationId) with
+            {
+                EgressPolicy = RuntimeEgressPolicy.InternetOnly
+            },
+            cancellationToken);
+        var allowedInternet = await runtime.ExecAsync(
+            internetReceipt,
+            "web",
+            [
+                "/bin/sh",
+                "-c",
+                "wget -T 10 -q -O /dev/null http://example.com"
+            ],
+            TimeSpan.FromSeconds(20),
+            cancellationToken);
+        await Assert.That(allowedInternet.ExitCode).IsEqualTo(0);
+        var protectedInternet = await runtime.ExecAsync(
+            internetReceipt,
+            "web",
+            [
+                "/bin/sh",
+                "-c",
+                "timeout 5 wget -q -O /dev/null http://1.1.1.1"
+            ],
+            TimeSpan.FromSeconds(10),
+            cancellationToken);
+        await Assert.That(protectedInternet.ExitCode).IsNotEqualTo(0);
 
         var runtimeLabels = OwnershipLabels(operationId, 1);
         var runtimeName = $"rt-{operationId:N}";
@@ -155,12 +217,33 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
 
         var attackerId = Guid.NewGuid();
         var attackerName = $"attacker-{attackerId:N}"[..40];
+        var attackerLabels = OwnershipLabels(attackerId, 1);
+        await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(
+            new V1NetworkPolicy
+            {
+                Metadata = new V1ObjectMeta
+                {
+                    Name = $"{attackerName}-egress",
+                    NamespaceProperty = namespaceName
+                },
+                Spec = new V1NetworkPolicySpec
+                {
+                    PodSelector = new V1LabelSelector
+                    {
+                        MatchLabels = attackerLabels
+                    },
+                    PolicyTypes = ["Egress"],
+                    Egress = [new V1NetworkPolicyEgressRule()]
+                }
+            },
+            namespaceName,
+            cancellationToken: cancellationToken);
         await client.CoreV1.CreateNamespacedPodAsync(
             ProbePod(
                 attackerName,
                 "attacker",
                 null,
-                OwnershipLabels(attackerId, 1),
+                attackerLabels,
                 neverReady: false),
             namespaceName,
             cancellationToken: cancellationToken);
@@ -183,7 +266,7 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             [
                 "/bin/sh",
                 "-c",
-                $"sleep 2; wget -T 3 -q -O- "
+                $"sleep 2; timeout 5 wget -q -O- "
                 + $"http://db.{runtimeName}.{namespaceName}.svc.cluster.local:9090"
             ],
             TimeSpan.FromSeconds(10),
@@ -197,9 +280,54 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             .First(address => address.Type == "InternalIP")
             .Address;
         var nodePort = web.PublishedPorts[8080];
+        var publicClientId = Guid.NewGuid();
+        var publicClientName = $"public-{publicClientId:N}"[..38];
+        var publicClientLabels = OwnershipLabels(publicClientId, 1, "public");
+        await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(
+            new V1NetworkPolicy
+            {
+                Metadata = new V1ObjectMeta
+                {
+                    Name = $"{publicClientName}-egress",
+                    NamespaceProperty = namespaceName
+                },
+                Spec = new V1NetworkPolicySpec
+                {
+                    PodSelector = new V1LabelSelector
+                    {
+                        MatchLabels = publicClientLabels
+                    },
+                    PolicyTypes = ["Egress"],
+                    Egress = [new V1NetworkPolicyEgressRule()]
+                }
+            },
+            namespaceName,
+            cancellationToken: cancellationToken);
+        await client.CoreV1.CreateNamespacedPodAsync(
+            ProbePod(
+                publicClientName,
+                "public",
+                null,
+                publicClientLabels,
+                neverReady: false),
+            namespaceName,
+            cancellationToken: cancellationToken);
+        await WaitUntilPodRunningAsync(
+            client,
+            namespaceName,
+            publicClientName,
+            cancellationToken);
+        var publicClientReceipt = new ComposeReceipt(
+            publicClientId,
+            RuntimeProvider.Kubernetes,
+            "public",
+            namespaceName,
+            "node.test",
+            1,
+            DateTimeOffset.UtcNow);
         var publicIngress = await runtime.ExecAsync(
-            attackerReceipt,
-            "attacker",
+            publicClientReceipt,
+            "public",
             [
                 "/bin/sh",
                 "-c",
@@ -210,6 +338,25 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
         await Assert.That(publicIngress.ExitCode).IsEqualTo(0);
 
         await runtime.DownAsync(receipt, cancellationToken);
+        await runtime.DownAsync(internetReceipt, cancellationToken);
+        await AssertRuntimeResourcesDeletedAsync(
+            client,
+            namespaceName,
+            operationId,
+            cancellationToken);
+        await AssertRuntimeResourcesDeletedAsync(
+            client,
+            namespaceName,
+            internetOperationId,
+            cancellationToken);
+    }
+
+    private static async Task AssertRuntimeResourcesDeletedAsync(
+        IKubernetes client,
+        string namespaceName,
+        Guid operationId,
+        CancellationToken cancellationToken)
+    {
         var selector = $"noctf.io/managed=true,"
             + $"noctf.io/runtime-instance-id={operationId:D},"
             + "noctf.io/generation=1";
@@ -228,6 +375,84 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
         await Assert.That(deployments.Items).IsEmpty();
         await Assert.That(services.Items).IsEmpty();
         await Assert.That(policies.Items).IsEmpty();
+    }
+
+    private static async Task EnsureBaselinePolicyEnforcedAsync(
+        IKubernetes client,
+        KubernetesComposeRuntime runtime,
+        KubernetesRuntimeOptions options,
+        CancellationToken cancellationToken)
+    {
+        await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(
+            new V1NetworkPolicy
+            {
+                Metadata = new V1ObjectMeta
+                {
+                    Name = KubernetesRuntimePoolStartupCheck.PolicyName,
+                    NamespaceProperty = options.Namespace,
+                    Labels = new Dictionary<string, string>
+                    {
+                        ["noctf.io/purpose"] =
+                            KubernetesRuntimePoolStartupCheck.PurposeLabel
+                    }
+                },
+                Spec = new V1NetworkPolicySpec
+                {
+                    PodSelector = new V1LabelSelector(),
+                    PolicyTypes = ["Ingress", "Egress"],
+                    Ingress = [],
+                    Egress = []
+                }
+            },
+            options.Namespace,
+            cancellationToken: cancellationToken);
+        var startupCheck = new KubernetesRuntimePoolStartupCheck(client, options);
+        await startupCheck.StartAsync(cancellationToken);
+
+        var probeId = Guid.NewGuid();
+        var probeName = $"baseline-{probeId:N}"[..40];
+        await client.CoreV1.CreateNamespacedPodAsync(
+            ProbePod(
+                probeName,
+                "baseline",
+                null,
+                OwnershipLabels(probeId, 1, "baseline"),
+                neverReady: false),
+            options.Namespace,
+            cancellationToken: cancellationToken);
+        await WaitUntilPodRunningAsync(
+            client,
+            options.Namespace,
+            probeName,
+            cancellationToken);
+        var receipt = new ComposeReceipt(
+            probeId,
+            RuntimeProvider.Kubernetes,
+            "baseline",
+            options.Namespace,
+            options.PublicHost,
+            1,
+            DateTimeOffset.UtcNow);
+        using var convergence = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken);
+        convergence.CancelAfter(TimeSpan.FromSeconds(30));
+        while (true)
+        {
+            var result = await runtime.ExecAsync(
+                receipt,
+                "baseline",
+                ["/bin/sh", "-c", "timeout 5 wget -q -O /dev/null http://1.1.1.1"],
+                TimeSpan.FromSeconds(5),
+                convergence.Token);
+            if (result.ExitCode != 0)
+                break;
+            await Task.Delay(250, convergence.Token);
+        }
+        await client.CoreV1.DeleteNamespacedPodAsync(
+            probeName,
+            options.Namespace,
+            body: new V1DeleteOptions(),
+            cancellationToken: cancellationToken);
     }
 
     private static V1Pod ProbePod(
@@ -316,14 +541,15 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
 
     private static Dictionary<string, string> OwnershipLabels(
         Guid operationId,
-        int generation) =>
+        int generation,
+        string serviceName = "attacker") =>
         new(StringComparer.Ordinal)
         {
             ["noctf.io/managed"] = "true",
             ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
             ["noctf.io/generation"] = generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture),
-            [KubernetesComposeManifestPolicy.ComposeServiceLabel] = "attacker"
+            [KubernetesComposeManifestPolicy.ComposeServiceLabel] = serviceName
         };
 
     private static ComposeRequest Request(Guid operationId) => new(

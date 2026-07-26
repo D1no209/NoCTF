@@ -2,10 +2,37 @@
 
 ## Prerequisites
 
-- Kubernetes cluster (v1.25+)
+- Kubernetes cluster (v1.25+) with Cilium `1.19.6`
 - `kubectl` configured to point at your cluster
+- Helm configured with the Cilium chart repository
 - NGINX Ingress Controller installed
 - `/etc/hosts` entry: `<ingress-ip> noctf.local minio.noctf.local`
+
+Kubernetes Runner Pools require Cilium with policy enforcement enabled for every
+endpoint, including initializing endpoints. For k3s, disable Flannel and its
+built-in NetworkPolicy controller when creating the cluster, then install the
+pinned Cilium version:
+
+```bash
+# k3s server flags:
+# --flannel-backend=none --disable-network-policy
+
+helm repo add cilium https://helm.cilium.io/
+helm upgrade --install cilium cilium/cilium \
+  --version 1.19.6 \
+  --namespace kube-system \
+  --values ../cilium/values.yaml
+kubectl apply -f ../cilium/non-runtime-allow.yaml
+```
+
+The checked-in values use k3s's default `10.42.0.0/16` Pod CIDR. Override that
+value for clusters with a different Pool CIDR. They retain k3s kube-proxy; if the
+cluster disables kube-proxy, configure and validate Cilium's replacement mode
+separately. Do not start the NoCTF Runner until Cilium reports Ready.
+The clusterwide policy preserves existing network behavior for endpoints with a
+resolved Namespace identity outside Namespaces labeled
+`noctf.io/purpose=challenge-runtime`; it deliberately does not select
+`reserved:init` or any Runtime Pool endpoint.
 
 ## Creating Real Secrets
 
@@ -56,8 +83,10 @@ minikube image load noctf-runner:latest
 Apply manifests in this order to satisfy dependencies:
 
 ```bash
-# 1. Namespace first
+# 1. Namespaces and the Runtime baseline policy first
 kubectl apply -f namespace.yaml
+kubectl apply -f 00-runtime-namespace.yaml
+kubectl apply -f 01-runtime-networkpolicy.yaml
 
 # 2. Config and secrets
 kubectl apply -f secret.yaml
@@ -91,11 +120,10 @@ kubectl apply -f ingress.yaml
 kubectl apply -f networkpolicy.yaml
 ```
 
-Or apply everything at once (order is handled by K8s):
-
-```bash
-kubectl apply -f deploy/k8s/
-```
+Do not replace the staged sequence with a single directory-wide apply when this
+cluster hosts Kubernetes Runner Pools. The `runtime` Namespace and
+`noctf-runtime-baseline-deny` policy must exist before the Runner starts and before
+any challenge workload is created.
 
 ## Verify Deployment
 
@@ -112,11 +140,24 @@ immutable `rt-*` resources, a headless DNS Service, a NetworkPolicy, Deployments
 and platform-owned dynamic NodePort Services. Challenge definitions cannot create
 namespaces, Ingresses, NodePorts, or LoadBalancers.
 
+The deployment-owned `noctf-runtime-baseline-deny` NetworkPolicy selects every Pod
+in `runtime` and denies ingress and egress before per-Runtime allow policies are
+added. A Kubernetes Runner validates this policy and the
+`kube-system/cilium-config` `enable-policy=always` setting at startup. It also
+checks that `Runtime__Kubernetes__ClusterDnsServiceAddress` matches the actual
+`kube-system/kube-dns` ClusterIP. The Runner never creates or modifies any of
+these deployment-owned resources. Cilium `always` enforcement is required so
+initializing endpoints are fail-closed; the k3s built-in NetworkPolicy controller
+is not a supported production security boundary for Runtime Pools.
+
 Important ConfigMap values:
 
 - `Runtime__Kubernetes__Namespace`: shared challenge namespace
 - `Runtime__Kubernetes__PublicHost`: host/IP used in dynamic NodePort URLs
 - `Runtime__Kubernetes__ClusterDomain`: actual cluster DNS domain
+- `Runtime__Kubernetes__ClusterDnsServiceAddress`: exact IPv4 ClusterIP of
+  `kube-system/kube-dns`; the checked-in `10.43.0.10` is the k3s default and must
+  be changed for clusters that use another Service CIDR
 - `Runtime__Kubernetes__PodPidsLimit`: must equal the kubelet Pool-wide value
 - `Runtime__Kubernetes__NetworkPolicyRequired`: must be `true`
 - `Runtime__Kubernetes__ProtectedCidrs__*`: every Pod, Service, node-management,
@@ -124,10 +165,16 @@ Important ConfigMap values:
   must never reach
 
 The Runner image contains Kompose `v1.38.0` at `/usr/local/bin/kompose`.
-The cluster CNI must enforce NetworkPolicy; the configuration flag is an
-operator attestation, not a capability probe. `ProtectedCidrs` is required even
-though the runtime also blocks common private and special-use IPv4 ranges; add
-all cluster-specific ranges that are not covered by those built-ins.
+The cluster must use Cilium with `policyEnforcementMode=always`; the Runner checks
+the resulting Cilium ConfigMap and kube-dns Service through read-only,
+resource-name-scoped RBAC grants.
+`NetworkPolicyRequired` remains an operator attestation rather than a dataplane
+probe. `ProtectedCidrs` is required even though the runtime also blocks common
+private and special-use IPv4 ranges; add all cluster-specific ranges that are not
+covered by those built-ins. Each Runtime policy allows DNS through both the
+CoreDNS Pod selector and the configured kube-dns ClusterIP `/32`; the explicit
+Service address is required because Service NAT and NetworkPolicy evaluation
+order is dataplane-dependent.
 
 Smoke test:
 
