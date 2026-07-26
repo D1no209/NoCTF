@@ -5,4 +5,7 @@ public sealed record KubernetesRuntimeOptions(
     string PublicHost = "localhost",
     string ImagePullPolicy = "IfNotPresent",
     string CallbackPodLabelKey = "noctf.io/internal-role",
-    string CallbackPodLabelValue = "awdp-callback");
+    string CallbackPodLabelValue = "awdp-callback",
+    long PodPidsLimit = 0,
+    string ClusterDomain = "",
+    bool NetworkPolicyRequired = true);

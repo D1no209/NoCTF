@@ -103,6 +103,39 @@ Command null 使用镜像默认。环境变量名合法且不能使用 `NOCTF_`�
 
 Compose URL Binding 通过 ServiceName+ContainerPort 定位；配置顺序决定返回顺序。
 
+Kubernetes Compose 固定使用 Kompose `v1.38.0`，题目不得创建 Kubernetes Service。
+平台为公开 URL Binding 创建动态 NodePort Service；题目转换出的 Service 只用于检查端口语义，
+不会直接部署。首版每个 Compose service 只允许一个副本。
+
+Kubernetes Compose service 名必须满足
+`^[a-z]([-a-z0-9]*[a-z0-9])?$` 且长度为 1～63。平台不做 `_`、`.`、
+大写字母等归一化，非法名称直接拒绝。
+
+每个 Runtime 使用不可变 RuntimeInstance Id 生成唯一 `rt-<runtime-id>` 名称，并创建一个
+`clusterIP: None`、`publishNotReadyAddresses: true` 的 headless Service。每个业务 Pod 的
+`hostname` 是 Compose service 名，`subdomain` 是该 Runtime 名，DNS search domain 是
+`<runtime>.<namespace>.svc.<clusterDomain>`。`ClusterDomain` 由 Runner Pool 显式配置，
+不得在代码中假定为 `cluster.local`。Compose project name 只作为展示 annotation，
+不参与 Kubernetes 资源唯一性或 selector。
+
+在 `dnsPolicy: ClusterFirst` 下，自定义 search domain 会追加在 kubelet 的基础搜索路径之后。
+因此 Runtime Namespace 内的平台资源只能使用保留的 `platform-*` 前缀，Runtime 资源统一使用
+`rt-*`，不得创建 `web`、`db`、`redis` 等可能遮蔽 Compose 短名称的公共 Service。
+
+本方案解决共享 Namespace 中不同 Runtime 的 Compose 服务名称冲突；Runtime 之间的网络安全
+隔离由 NetworkPolicy 提供，DNS 命名本身不作为安全边界。
+
+每个 Runtime 的 NetworkPolicy 只允许同一不可变 runtime-id 的 Pod 互通、访问集群 DNS，
+以及对公开 URL/平台内部检查端口的入站访问；其他 Runtime 的 ingress/egress 均不放行。
+`publishNotReadyAddresses` 只保证初始化阶段可以解析名称，Runtime 进入 Running 仍以
+Deployment 可用状态（包含 Pod readiness）为准。
+
+Kubernetes PID 预算由 Runner Pool 的 kubelet `PodPidsLimit` 统一执行。题目未声明 PID
+limit 时直接接受；历史 Compose 中 `pids_limit` 或
+`deploy.resources.limits.pids` 与 Pool 值相等时接受并在转换前移除，不同则拒绝。题目不必
+重复 Pool 数值，Kubernetes manifests 也不携带题目级 PID limit。容量按
+`service 数 × PodPidsLimit` 预留。
+
 ## OVA/Libvirt
 
 平台不上传、存储、校验或管理 OVA。配置只保存 `OvaSourceUrl`，允许 Provider 支持的绝对 URI（包括 https/file）。Runner Pool 节点自行保证可访问、导入、缓存与校验；失败使 RuntimeInstance Failed。
@@ -139,7 +172,10 @@ Kubernetes 使用统一 Namespace，平台注入不可覆盖标签：`noctf.io/r
 
 ## 资源与容量
 
-部署配置各 Provider/Pool 最大 CPU、内存、PID、临时磁盘。题目必须声明正请求值；Compose 声明服务与总额度；Runner 创建前验证并强制应用。无法落实配额则失败；容量不足保持 Queued且 TTL 未开始。
+部署配置各 Provider/Pool 最大 CPU、内存、PID、临时磁盘。题目必须声明正 CPU/内存请求；
+Docker Compose 声明逐服务 PID，Kubernetes Compose 的 PID 由 Pool 统一提供。Compose
+声明服务与总额度；Runner 创建前验证并强制应用。无法落实配额则失败；容量不足保持 Queued
+且 TTL 未开始。
 
 Runner heartbeat/capacity 存 Redis TTL；实际 RunnerId/Pool 与 receipt 存 RuntimeInstance。Redis 故障不派发新实例。
 

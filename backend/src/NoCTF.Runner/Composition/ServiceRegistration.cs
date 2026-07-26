@@ -42,11 +42,16 @@ public static class ServiceRegistration
             configuration["Runtime:Kubernetes:PublicHost"] ?? "localhost",
             configuration["Runtime:Kubernetes:ImagePullPolicy"] ?? "IfNotPresent",
             configuration["Runtime:Kubernetes:CallbackPodLabelKey"] ?? "noctf.io/internal-role",
-            configuration["Runtime:Kubernetes:CallbackPodLabelValue"] ?? "awdp-callback"));
-        services.AddSingleton<IKubernetes>(_ => new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile()));
+            configuration["Runtime:Kubernetes:CallbackPodLabelValue"] ?? "awdp-callback",
+            ReadRequiredPositiveLong(configuration, "Runtime:Kubernetes:PodPidsLimit"),
+            ReadRequiredString(configuration, "Runtime:Kubernetes:ClusterDomain"),
+            ReadRequiredTrue(configuration, "Runtime:Kubernetes:NetworkPolicyRequired")));
+        services.AddSingleton<IKubernetes>(_ =>
+            new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig()));
         services.AddSingleton<KubernetesContainerLifecycle>();
         services.AddSingleton<IRuntimeResourceReaper>(provider =>
             provider.GetRequiredService<KubernetesContainerLifecycle>());
+        services.AddSingleton<IKomposeConverter>(new KomposeConverter());
         services.AddSingleton<KubernetesComposeRuntime>();
         services.AddSingleton<ILibvirtProcessAdapter, LibvirtProcessAdapter>();
         services.AddSingleton<LibvirtApplianceLifecycle>();
@@ -71,5 +76,40 @@ public static class ServiceRegistration
         services.AddSingleton<IObjectStorage, LocalObjectStorage>();
         services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();
         return services;
+    }
+
+    private static long ReadRequiredPositiveLong(
+        IConfiguration configuration,
+        string key)
+    {
+        var value = configuration[key];
+        if (!long.TryParse(
+                value,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed)
+            || parsed <= 0)
+            throw new InvalidOperationException(
+                $"{key} must be configured as a positive integer.");
+        return parsed;
+    }
+
+    private static string ReadRequiredString(
+        IConfiguration configuration,
+        string key)
+    {
+        var value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+            throw new InvalidOperationException($"{key} must be configured.");
+        return value;
+    }
+
+    private static bool ReadRequiredTrue(
+        IConfiguration configuration,
+        string key)
+    {
+        if (!bool.TryParse(configuration[key], out var value) || !value)
+            throw new InvalidOperationException($"{key} must be configured as true.");
+        return true;
     }
 }

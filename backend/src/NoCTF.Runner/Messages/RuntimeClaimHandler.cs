@@ -28,7 +28,10 @@ public sealed class RuntimeClaimHandler(
             message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
-            message.Definition.Limits,
+            CapacityLimits(
+                message.Definition.Provider,
+                message.Definition.Limits,
+                podCount: 1),
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
             (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
                 new ProvisionContainerRuntime(
@@ -53,7 +56,10 @@ public sealed class RuntimeClaimHandler(
             message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
-            message.Definition.Limits,
+            CapacityLimits(
+                message.Definition.Provider,
+                message.Definition.Limits,
+                message.Definition.ServiceResources.Count),
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
             (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
                 new ProvisionComposeRuntime(
@@ -64,6 +70,28 @@ public sealed class RuntimeClaimHandler(
                     runnerId,
                     message.Definition)),
             cancellationToken);
+
+    private RuntimeResourceLimits CapacityLimits(
+        RuntimeProvider provider,
+        RuntimeResourceLimits configured,
+        int podCount)
+    {
+        if (provider != RuntimeProvider.Kubernetes)
+            return configured;
+        var text = configuration["Runtime:Kubernetes:PodPidsLimit"];
+        if (!long.TryParse(
+                text,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var podPidsLimit)
+            || podPidsLimit <= 0)
+            throw new InvalidOperationException(
+                "Runtime:Kubernetes:PodPidsLimit must be configured as a positive integer.");
+        return configured with
+        {
+            PidsLimit = checked(podPidsLimit * podCount)
+        };
+    }
 
     private async Task<MessageExecutionOutcome> ExecuteAsync(
         Guid runtimeInstanceId,

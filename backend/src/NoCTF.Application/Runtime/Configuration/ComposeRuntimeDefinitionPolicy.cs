@@ -48,6 +48,9 @@ public static class ComposeRuntimeDefinitionPolicy
         "sysctls",
         "external_links",
         "extra_hosts",
+        "dns",
+        "dns_opt",
+        "dns_search",
         "cgroup",
         "cgroup_parent",
         "credential_spec",
@@ -56,7 +59,6 @@ public static class ComposeRuntimeDefinitionPolicy
         "profiles",
         "provider",
         "use_api_socket",
-        "deploy",
         "mem_limit",
         "mem_reservation",
         "mem_swappiness",
@@ -69,7 +71,6 @@ public static class ComposeRuntimeDefinitionPolicy
         "cpu_rt_period",
         "cpu_rt_runtime",
         "cpuset",
-        "pids_limit",
         "ulimits",
         "shm_size",
         "oom_kill_disable",
@@ -80,20 +81,26 @@ public static class ComposeRuntimeDefinitionPolicy
         ComposeRuntimeDefinition definition,
         RuntimeResourceLimits totalLimits,
         IReadOnlyList<RuntimeUrlBinding>? urlBindings = null,
-        RuntimeUrlBinding? controlCheckUrlBinding = null) =>
+        RuntimeUrlBinding? controlCheckUrlBinding = null,
+        bool requireServicePids = true,
+        bool requireDnsServiceNames = false) =>
         Validate(
             definition.ComposeYaml,
             definition.ServiceResources,
             totalLimits,
             urlBindings,
-            controlCheckUrlBinding);
+            controlCheckUrlBinding,
+            requireServicePids,
+            requireDnsServiceNames);
 
     public static IReadOnlyList<string> Validate(
         string composeYaml,
         IReadOnlyDictionary<string, RuntimeResourceLimits>? serviceResources,
         RuntimeResourceLimits totalLimits,
         IReadOnlyList<RuntimeUrlBinding>? urlBindings = null,
-        RuntimeUrlBinding? controlCheckUrlBinding = null)
+        RuntimeUrlBinding? controlCheckUrlBinding = null,
+        bool requireServicePids = true,
+        bool requireDnsServiceNames = false)
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(composeYaml))
@@ -142,6 +149,9 @@ public static class ComposeRuntimeDefinitionPolicy
             }
             if (!IsServiceName(serviceName))
                 errors.Add($"Compose service name '{serviceName}' is invalid.");
+            else if (requireDnsServiceNames && !IsDnsLabel(serviceName))
+                errors.Add(
+                    $"Kubernetes Compose service name '{serviceName}' must be a DNS-1123 label.");
             if (!serviceNames.Add(serviceName))
                 errors.Add($"Compose service name '{serviceName}' is duplicated.");
             if (entry.Value is not YamlMappingNode service)
@@ -153,7 +163,12 @@ public static class ComposeRuntimeDefinitionPolicy
             ValidateService(serviceName, service, errors);
         }
 
-        ValidateResources(serviceNames, serviceResources, totalLimits, errors);
+        ValidateResources(
+            serviceNames,
+            serviceResources,
+            totalLimits,
+            requireServicePids,
+            errors);
         ValidateBindings(
             serviceNames,
             (urlBindings ?? []).Append(controlCheckUrlBinding),
@@ -161,38 +176,23 @@ public static class ComposeRuntimeDefinitionPolicy
         return errors;
     }
 
-    public static string Prepare(ComposeRequest request)
+    public static string PrepareForDocker(ComposeRequest request)
     {
-        var errors = Validate(
-            request.ComposeYaml,
-            request.ServiceResources,
-            request.Limits,
-            request.UrlBindings,
-            request.ControlCheckUrlBinding);
-        if (errors.Count > 0)
-            throw new InvalidOperationException(string.Join(" ", errors));
-
-        var document = LoadRequired(request.ComposeYaml);
+        var document = LoadValidated(
+            request,
+            requireServicePids: true,
+            requireDnsServiceNames: false);
         var services = GetRequiredMapping(document, "services");
-        var bindingsByService = (request.UrlBindings ?? [])
-            .Append(request.ControlCheckUrlBinding)
-            .Where(binding => binding is not null)
-            .Select(binding => binding!)
-            .GroupBy(binding => binding.ServiceName!, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group
-                    .Select(binding => binding.ContainerPort!.Value)
-                    .Distinct()
-                    .Order()
-                    .ToArray(),
-                StringComparer.Ordinal);
+        var bindingsByService = BindingsByService(request);
 
         foreach (var entry in services.Children)
         {
             var serviceName = ((YamlScalarNode)entry.Key).Value!;
             var service = (YamlMappingNode)entry.Value;
             var limits = request.ServiceResources[serviceName];
+            EnsureDeclaredPidsMatch(serviceName, service, limits.PidsLimit);
+            Remove(service, "pids_limit");
+            Remove(service, "deploy");
             SetScalar(service, "mem_limit", limits.MemoryBytes.ToString(CultureInfo.InvariantCulture));
             SetScalar(
                 service,
@@ -220,6 +220,75 @@ public static class ComposeRuntimeDefinitionPolicy
         new YamlStream(new YamlDocument(document)).Save(writer, assignAnchors: false);
         return writer.ToString();
     }
+
+    public static string PrepareForKubernetes(
+        ComposeRequest request,
+        long podPidsLimit)
+    {
+        if (podPidsLimit <= 0)
+            throw new ArgumentOutOfRangeException(nameof(podPidsLimit));
+        var document = LoadValidated(
+            request,
+            requireServicePids: false,
+            requireDnsServiceNames: true);
+        var services = GetRequiredMapping(document, "services");
+        var bindingsByService = BindingsByService(request);
+        foreach (var entry in services.Children)
+        {
+            var serviceName = ((YamlScalarNode)entry.Key).Value!;
+            var service = (YamlMappingNode)entry.Value;
+            EnsureDeclaredPidsMatch(serviceName, service, podPidsLimit);
+            Remove(service, "pids_limit");
+            Remove(service, "deploy");
+            MergeMappingValues(service, "environment", request.Environment);
+            MergeMappingValues(service, "labels", request.Labels);
+            Remove(service, "ports");
+            Remove(service, "expose");
+            if (bindingsByService.TryGetValue(serviceName, out var ports))
+                SetSequence(
+                    service,
+                    "expose",
+                    ports.Select(port => port.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+        new YamlStream(new YamlDocument(document)).Save(writer, assignAnchors: false);
+        return writer.ToString();
+    }
+
+    private static YamlMappingNode LoadValidated(
+        ComposeRequest request,
+        bool requireServicePids,
+        bool requireDnsServiceNames)
+    {
+        var errors = Validate(
+            request.ComposeYaml,
+            request.ServiceResources,
+            request.Limits,
+            request.UrlBindings,
+            request.ControlCheckUrlBinding,
+            requireServicePids,
+            requireDnsServiceNames);
+        if (errors.Count > 0)
+            throw new InvalidOperationException(string.Join(" ", errors));
+        return LoadRequired(request.ComposeYaml);
+    }
+
+    private static IReadOnlyDictionary<string, int[]> BindingsByService(
+        ComposeRequest request) =>
+        (request.UrlBindings ?? [])
+        .Append(request.ControlCheckUrlBinding)
+        .Where(binding => binding is not null)
+        .Select(binding => binding!)
+        .GroupBy(binding => binding.ServiceName!, StringComparer.Ordinal)
+        .ToDictionary(
+            group => group.Key,
+            group => group
+                .Select(binding => binding.ContainerPort!.Value)
+                .Distinct()
+                .Order()
+                .ToArray(),
+            StringComparer.Ordinal);
 
     private static YamlMappingNode? Load(string yaml, ICollection<string> errors)
     {
@@ -303,12 +372,14 @@ public static class ComposeRuntimeDefinitionPolicy
             ValidateKeyValues(serviceName, "environment", environment, "NOCTF_", errors);
         if (TryGet(service, "labels", out var labels))
             ValidateKeyValues(serviceName, "labels", labels, "noctf.io/", errors);
+        _ = ReadDeclaredPids(serviceName, service, errors);
     }
 
     private static void ValidateResources(
         IReadOnlySet<string> serviceNames,
         IReadOnlyDictionary<string, RuntimeResourceLimits>? resources,
         RuntimeResourceLimits total,
+        bool requireServicePids,
         ICollection<string> errors)
     {
         if (resources is null || resources.Count == 0)
@@ -324,7 +395,11 @@ public static class ComposeRuntimeDefinitionPolicy
                 errors.Add($"Compose service '{serviceName}' requires resource limits.");
                 continue;
             }
-            if (limits.MemoryBytes <= 0 || limits.NanoCpus <= 0 || limits.PidsLimit <= 0)
+            if (limits.MemoryBytes <= 0
+                || limits.NanoCpus <= 0
+                || (requireServicePids
+                    ? limits.PidsLimit <= 0
+                    : limits.PidsLimit < 0))
                 errors.Add($"Compose service '{serviceName}' resource limits must be positive.");
         }
         foreach (var resourceName in resources.Keys)
@@ -337,8 +412,12 @@ public static class ComposeRuntimeDefinitionPolicy
         {
             var memory = resources.Values.Sum(limits => checked(limits.MemoryBytes));
             var cpus = resources.Values.Sum(limits => checked(limits.NanoCpus));
-            var pids = resources.Values.Sum(limits => checked(limits.PidsLimit));
-            if (memory > total.MemoryBytes || cpus > total.NanoCpus || pids > total.PidsLimit)
+            var pids = requireServicePids
+                ? resources.Values.Sum(limits => checked(limits.PidsLimit))
+                : 0;
+            if (memory > total.MemoryBytes
+                || cpus > total.NanoCpus
+                || (requireServicePids && pids > total.PidsLimit))
                 errors.Add("Compose service resource limits exceed the runtime total limits.");
         }
         catch (OverflowException)
@@ -378,6 +457,80 @@ public static class ComposeRuntimeDefinitionPolicy
                 errors.Add(
                     $"Compose service '{serviceName}' field '{fieldName}' cannot use reserved key '{key}'.");
         }
+    }
+
+    private static void EnsureDeclaredPidsMatch(
+        string serviceName,
+        YamlMappingNode service,
+        long platformPidsLimit)
+    {
+        var errors = new List<string>();
+        var declared = ReadDeclaredPids(serviceName, service, errors);
+        if (errors.Count > 0)
+            throw new InvalidOperationException(string.Join(" ", errors));
+        if (declared.Any(value => value != platformPidsLimit))
+            throw new InvalidOperationException(
+                $"Compose service '{serviceName}' declares a PID limit that differs from the platform limit.");
+    }
+
+    private static IReadOnlyList<long> ReadDeclaredPids(
+        string serviceName,
+        YamlMappingNode service,
+        ICollection<string> errors)
+    {
+        var values = new List<long>();
+        if (TryGet(service, "pids_limit", out var direct))
+        {
+            if (!TryReadPositiveLong(direct, out var value))
+                errors.Add(
+                    $"Compose service '{serviceName}' pids_limit must be a positive integer.");
+            else
+                values.Add(value);
+        }
+
+        if (!TryGet(service, "deploy", out var deployNode))
+            return values;
+        if (deployNode is not YamlMappingNode deploy)
+        {
+            errors.Add(
+                $"Compose service '{serviceName}' deploy must be a mapping.");
+            return values;
+        }
+        if (deploy.Children.Keys.Any(key =>
+                key is not YamlScalarNode { Value: "replicas" or "resources" }))
+            errors.Add(
+                $"Compose service '{serviceName}' deploy may only declare replicas and resources.limits.pids.");
+        if (TryGet(deploy, "replicas", out var replicas)
+            && (!TryReadPositiveLong(replicas, out var replicaCount) || replicaCount != 1))
+            errors.Add($"Compose service '{serviceName}' must use exactly one replica.");
+        if (TryGet(deploy, "resources", out _))
+        {
+            if (!TryGetMapping(deploy, "resources", out var resources)
+                || resources.Children.Count != 1
+                || !TryGetMapping(resources, "limits", out var limits)
+                || limits.Children.Count != 1
+                || !TryGet(limits, "pids", out var pids)
+                || !TryReadPositiveLong(pids, out var deployedValue))
+                errors.Add(
+                    $"Compose service '{serviceName}' deploy resources may only declare limits.pids.");
+            else
+                values.Add(deployedValue);
+        }
+        if (values.Distinct().Count() > 1)
+            errors.Add($"Compose service '{serviceName}' declares conflicting PID limits.");
+        return values;
+    }
+
+    private static bool TryReadPositiveLong(YamlNode node, out long value)
+    {
+        value = 0;
+        return node is YamlScalarNode { Value: { } scalar }
+            && long.TryParse(
+                scalar,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out value)
+            && value > 0;
     }
 
     private static bool TryReadKeyValues(
@@ -464,6 +617,13 @@ public static class ComposeRuntimeDefinitionPolicy
         && value.All(character =>
             char.IsAsciiLetterOrDigit(character)
             || character is '_' or '-' or '.');
+
+    private static bool IsDnsLabel(string value) =>
+        value.Length <= 63
+        && value[0] is >= 'a' and <= 'z'
+        && value[^1] is >= 'a' and <= 'z' or >= '0' and <= '9'
+        && value.All(character =>
+            character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
 
     private static bool IsFalse(YamlNode node) =>
         node is YamlScalarNode { Value: { } value }

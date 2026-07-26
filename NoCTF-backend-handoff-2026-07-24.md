@@ -7,12 +7,12 @@
 继续完成 `E:\SourceCode\NoCTF\backend` 的目标架构迁移，架构基线以远程
 `codex/backend-target-architecture` 及仓库 `AGENTS.md`、`docs/` 为准。
 
-默认只修改 `backend` 与本交接文档。除非用户明确扩大范围，不修改 Frontend、
-`backend/Dockerfile`、`deploy`、仓库外 CI 或用户的本地辅助文件。
+默认只修改 `backend`、Runtime 部署清单与本交接文档。除非用户明确扩大范围，不修改
+Frontend、仓库外 CI 或用户的本地辅助文件。
 
-Container 与 Docker Compose 的持久 Runtime 执行路径已经接通。下一主线是完成
-Kubernetes Compose/Kompose，然后接入 OVA/Libvirt，并用真实依赖证明生命周期、
-隔离、回写和清理。
+Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径已经接通。
+下一主线是在可用 Kubernetes+CNI 环境完成真实隔离验证，然后接入 OVA/Libvirt，并用
+真实依赖证明生命周期、隔离、回写和清理。
 
 ## 2. Git 基线与工作树保护
 
@@ -20,7 +20,8 @@ Kubernetes Compose/Kompose，然后接入 OVA/Libvirt，并用真实依赖证明
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前实现 HEAD：`fbd092c feat(backend): provision Docker Compose runtimes`
+- 当前实现 HEAD：以本地分支最新提交为准；本次 Kubernetes Compose 纵切只做本地提交，
+  尚未获准推送。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
 - 创建交接分支前，`main` 相对 `origin/main`：ahead 186。
@@ -87,7 +88,7 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 292/292 passed。
+- 309/309 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -239,22 +240,30 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 
 ## 6. 当前最重要的剩余缺口
 
-### 6.1 Kubernetes Compose/Kompose 尚未执行
+### 6.1 Kubernetes Compose/Kompose 生命周期已接入，真实集群验证待补
 
-这是下一主线的首要缺口。
+当前已完成：
 
-当前 `KubernetesComposeRuntime.UpAsync` 仍只构造 receipt，未执行固定版本 Kompose
-转换与 Kubernetes apply；`GetStatusAsync` 固定返回 Failed，`DownAsync` 是空实现。
+- 复用 Compose YAML 安全策略；Kubernetes Pool 统一 PID，不要求题目逐 service 重复。
+- 固定 `/usr/local/bin/kompose` `v1.38.0`，隔离临时目录并受 operation timeout 约束。
+- 转换后严格解析 manifests；只接受安全的 Deployment/ClusterIP Service 中间结果，
+  拒绝题目 Namespace、Ingress、NodePort、LoadBalancer、volume 与越权 workload 字段。
+- 平台重写统一 Namespace、不可变 ownership labels、CPU/内存、安全上下文与单副本。
+- 每 Runtime 创建唯一 `rt-<runtime-id>` headless Service，注入 Pod hostname/subdomain、
+  Pool `ClusterDomain` search domain 与 `publishNotReadyAddresses=true`。
+- 每 Runtime 创建 NetworkPolicy；DNS 仅承担命名隔离，不作为安全边界。
+- 公开 URL 由平台动态创建 NodePort；status 读取实际 NodePort 与完整内部 FQDN。
+- Up 等待 Deployment 可用，Down 精确匹配 managed+RuntimeInstanceId+Generation；
+  部分创建失败执行确定性清理，清理失败保留容量供 durable retry。
+- 默认 Kubernetes 部署改为共享 `runtime` Namespace 的 namespace-scoped RBAC，
+  Runner 镜像包含固定 Kompose。
 
-需要完成：
+仍需在可用 Kubernetes+CNI 环境补一条真实集成：
 
-- 复用同一 Compose YAML 执行前安全策略。
-- 以固定版本 Kompose 转换，不接受题目指定 Namespace。
-- 转换后解析全部 manifests，拒绝 Namespace、Ingress、NodePort、
-  LoadBalancer、hostPath/volume/config/secret/device 与越权 security context。
-- 平台覆盖统一 Namespace、不可覆盖 labels、资源限制、NetworkPolicy 与清理选择器。
-- durable provision/status/receipt/URL/stop/reset/expire 与幂等 cleanup。
-- 使用真实 Kubernetes/Testcontainers 或项目既定真实测试环境证明，而不是只测 stub。
+- 真实执行 Kompose 与 Kubernetes API；
+- 证明短名 DNS、未 Ready endpoint 发布、跨 Runtime ingress/egress 拒绝、
+  动态 NodePort 与删除收敛；
+- 核对 Pool kubelet 的实际 `PodPidsLimit` 与 Runner 配置相等。
 
 ### 6.2 OVA/Libvirt 尚未接入业务生命周期
 
@@ -328,7 +337,7 @@ enforcement。
 
 每一项必须独立 commit：
 
-1. 接入 Kubernetes Kompose/deploy/manifest security validation/cleanup。
+1. 在真实 Kubernetes+CNI 环境补 Kubernetes Compose 集成验证。
 2. 接入 Libvirt OVA durable lifecycle。
 3. 完成 CTF PerTeam Flag 环境注入。
 4. 增加 EgressPolicy 模型及 Docker/Kubernetes enforcement。
@@ -359,8 +368,8 @@ enforcement。
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从 Kubernetes Compose/Kompose 的失败测试开始；不要重做已完成的 RuntimeKind dispatch
-   或 Docker Compose durable handler。
+4. 从 Kubernetes Compose 的真实集群验证或 OVA durable lifecycle 开始；不要重做已完成的
+   RuntimeKind dispatch、Docker Compose handler 或 Kubernetes Compose 单元生命周期。
 5. 每个纵切固定执行：
    - 失败测试；
    - 最小实现；

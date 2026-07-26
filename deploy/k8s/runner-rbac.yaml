@@ -7,44 +7,40 @@ metadata:
     app.kubernetes.io/part-of: noctf
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: noctf-runner
+  namespace: runtime
   labels:
     app.kubernetes.io/part-of: noctf
 rules:
   - apiGroups: [""]
-    resources: ["namespaces"]
-    verbs: ["get", "list", "create", "patch", "delete"]
-  - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
   - apiGroups: [""]
     resources: ["services"]
-    verbs: ["get", "list", "create"]
-  - apiGroups: [""]
-    resources: ["secrets", "resourcequotas", "limitranges", "configmaps"]
-    verbs: ["get", "create"]
+    verbs: ["get", "list", "create", "delete"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    verbs: ["get", "create"]
+    verbs: ["get", "list", "create", "delete"]
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["get", "list", "watch", "create", "delete"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
-    verbs: ["get", "create"]
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses"]
-    verbs: ["get", "list", "create"]
+    verbs: ["get", "list", "create", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: noctf-runner
+  namespace: runtime
   labels:
     app.kubernetes.io/part-of: noctf
 subjects:
@@ -53,5 +49,5 @@ subjects:
     namespace: noctf
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: noctf-runner

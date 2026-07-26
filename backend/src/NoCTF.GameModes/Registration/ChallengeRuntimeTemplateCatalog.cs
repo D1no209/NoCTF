@@ -95,7 +95,9 @@ internal static class ChallengeRuntimeTemplateValidator
                     compose,
                     runtime.Limits ?? new(long.MaxValue, long.MaxValue, long.MaxValue),
                     runtime.UrlBindings,
-                    runtime.ControlCheckUrlBinding));
+                    runtime.ControlCheckUrlBinding,
+                    requireServicePids: runtime.Provider != RuntimeProvider.Kubernetes,
+                    requireDnsServiceNames: runtime.Provider == RuntimeProvider.Kubernetes));
                 break;
             case OvaRuntimeDefinition ova:
                 if (runtime.Provider != RuntimeProvider.Libvirt)
@@ -114,7 +116,11 @@ internal static class ChallengeRuntimeTemplateValidator
             errors.Add("Runtime OperationTimeoutSeconds must be between 1 and 300 when configured.");
         if (runtime.Limits is not { } limits)
             errors.Add("Runtime resource limits are required.");
-        else if (limits.MemoryBytes <= 0 || limits.NanoCpus <= 0 || limits.PidsLimit <= 0)
+        else if (limits.MemoryBytes <= 0
+            || limits.NanoCpus <= 0
+            || (runtime.Provider == RuntimeProvider.Kubernetes
+                ? limits.PidsLimit < 0
+                : limits.PidsLimit <= 0))
             errors.Add("Runtime resource limits must be positive.");
         if (runtime.UrlBindings?.Any(binding => binding is null) == true)
             errors.Add("Runtime URL bindings cannot contain null entries.");
