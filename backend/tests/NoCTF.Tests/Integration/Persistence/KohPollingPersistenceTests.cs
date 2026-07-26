@@ -208,10 +208,11 @@ public sealed class KohPollingPersistenceTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.Shared,
-            "registry.example/hill:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/hill:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                Security: new(true, true, true, ["ALL"], [])),
             Limits: new(268_435_456, 500_000_000, 128),
-            Security: new(true, true, true, ["ALL"], []),
             UrlBindings:
             [
                 new("http://{HOST}:{PORT}/play", RuntimeExposure.Participants, ContainerPort: 8080)

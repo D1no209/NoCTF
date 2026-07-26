@@ -13,8 +13,7 @@ public sealed class AwdpTargetDefinitionFactoryTests
         var template = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "target:latest",
-            RuntimeKind: RuntimeKind.Container,
+            new ContainerRuntimeDefinition("target:latest"),
             RunnerPool: "awdp");
 
         var definition = AwdpTargetDefinitionFactory.Create(
@@ -44,11 +43,18 @@ public sealed class AwdpTargetDefinitionFactoryTests
         RuntimeProvider provider,
         RuntimeKind kind)
     {
+        ChallengeRuntimeDefinition definition = kind switch
+        {
+            RuntimeKind.Container => new ContainerRuntimeDefinition("target:latest"),
+            RuntimeKind.Compose => new ComposeRuntimeDefinition(
+                "services:\n  target:\n    image: target:latest"),
+            RuntimeKind.OvaVm => new OvaRuntimeDefinition("file:///var/lib/noctf/target.ova"),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
+        };
         var template = new ChallengeRuntimeTemplate(
             provider,
             RuntimeAllocation.PerTeam,
-            "target:latest",
-            RuntimeKind: kind);
+            definition);
 
         var action = () => AwdpTargetDefinitionFactory.Create(
             Guid.NewGuid(), 1, template, 8080, DateTimeOffset.UtcNow);
