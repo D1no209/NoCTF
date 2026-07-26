@@ -14,8 +14,8 @@ Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径
 OVA/Libvirt lifecycle、orphan reconciliation 与 CTF PerTeam Runtime Flag 注入也已闭环。
 EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 与 Kubernetes
 `DenyAll | InternetOnly` enforcement 已接通，并已在 Cilium `always` 模式的临时集群
-完成真实复测。下一主线是 Docker/Kubernetes 持久网络、ingress proxy 与 Compose
-appliance 的 crash orphan reconciliation，以及后续受控部署 smoke。
+完成真实复测。Docker/Kubernetes 持久 Container sandbox、可信 ingress proxy 与
+Compose appliance 的 crash orphan reconciliation 也已闭环。下一主线是受控部署 smoke。
 
 ## 2. Git 基线与工作树保护
 
@@ -23,7 +23,7 @@ appliance 的 crash orphan reconciliation，以及后续受控部署 smoke。
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`091b153 feat(backend): require fail-closed Cilium runtime pools`。
+- 当前代码实现 HEAD：`adc2908 feat(backend): reconcile persistent runtime resources`。
 - 本轮实现只做本地提交，尚未获准推送。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -115,7 +115,7 @@ wsl bash -lc `
 
 ```powershell
 wsl bash -lc `
-  "cd /mnt/e/SourceCode/NoCTF/backend && NOCTF_KUBERNETES_INTEGRATION=true NOCTF_KOMPOSE_PATH=/tmp/noctf-cilium-it-20260727/kompose /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 33"
+  "cd /mnt/e/SourceCode/NoCTF/backend && NOCTF_KUBERNETES_INTEGRATION=true NOCTF_KOMPOSE_PATH=/tmp/noctf-runtime-reconcile-it-20260727/kompose-linux-amd64 /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 33"
 ```
 
 - 本轮 WSL 回归为 33/33 passed、0 failed、0 skipped。
@@ -123,16 +123,24 @@ wsl bash -lc `
 - Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
 - Kubernetes 使用一次性 k3d `v5.9.0` / k3s `v1.35.5+k3s1` /
   Cilium `v1.19.6`。k3s 以 `--flannel-backend=none --disable-network-policy`
-  启动，kubelet 使用 `--pod-max-pids=512`；Cilium
-  `enable-policy=always`，内建 NetworkPolicy controller 未参与。
-- 临时集群实测部署了 Runtime Namespace baseline default-deny、Cilium 非 Runtime
-  兼容策略、Runner RBAC 和 ConfigMap；验证结束后集群、Docker network/volume、
-  kubeconfig context 与 `/tmp/noctf-cilium-it-20260727` 工具目录均已删除。
+  启动；Cilium `enable-policy=always`，内建 NetworkPolicy controller 未参与。本轮
+  lifecycle/reconciliation 集群没有部署 Runner Pod，也没有修改 kubelet；统一
+  `PodPidsLimit=512` 的 Pool/kubelet 契约已由前一轮启动检查与清单验证覆盖。
+- 临时集群实测部署了 Cilium 非 Runtime 兼容策略；Runtime Integration 在独立测试
+  Namespace 内创建并验证 default-deny 与逐 Runtime policy。验证结束后集群、Docker
+  network/volume、kubeconfig context 与
+  `/tmp/noctf-runtime-reconcile-it-20260727` 工具目录均已删除。
 - 新增真实 Docker Compose lifecycle，覆盖 dynamic port、Compose DNS、exec、
   container/network/workdir cleanup。
 - 新增真实 Kubernetes Compose lifecycle，覆盖固定 Kompose、短名 DNS、
   未 Ready Pod DNS、同 Runtime 互通、`DenyAll` 外网拒绝、`InternetOnly` 公网放行、
   `ProtectedCidrs` 拒绝、跨 Runtime 拒绝、NodePort 与两个 Runtime 的精确 cleanup。
+- 同一真实 Kubernetes 用例新增持久单 Container，证明 Pod、Service、NetworkPolicy
+  与 Compose Deployment/Pod/Service/NetworkPolicy 都能按
+  RuntimeInstanceId+Generation 枚举和删除。
+- Docker 单 Container 与 Compose 实测新增 crash orphan adapter 路径，覆盖题目
+  container、可信 ingress proxy、内部 sandbox network、Compose project/network 和
+  本地 operation workdir；平台 `noctf-network` 不在删除 selector 内。
 - 真实 Cilium 测试发现并修复 Kubernetes exec error stream 不响应取消、导致策略丢包
   时调用永久等待的问题；Compose 与 Container exec 现在都有调用侧 timeout 边界。
 - Cilium 数据路径对 kube-dns ClusterIP 的策略判定不能只依赖 CoreDNS Pod selector；
@@ -414,26 +422,30 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 - Pod/Service/node/management CIDR 自动发现；Pool 运维必须维护 `ProtectedCidrs`。
 - 单 Container proxy 镜像的自动 registry 拉取/鉴权；节点须预拉取受信任镜像。Compose
   路径由 Compose pull policy 处理。
-- 持久 Container sandbox、ingress proxy 与 Compose appliance 在 Runner 进程崩溃且
-  receipt 尚未持久化时的完整 orphan reconciliation。普通 Stop/Reset/失败回滚已完成，
-  但不能把它等同于 crash orphan audit。
 - Docker TargetPort ACL 与 callback-only gateway；它们仍是后期加固，不阻塞当前迁移。
 
 不得把可信管理员假设、JWT、label、DNS 名称或独立 network 单独描述成完整安全边界。
 
-### 6.5 Runner capacity、reconciliation 与 orphan cleanup 需要最终闭环审计
+### 6.5 Runner capacity、reconciliation 与 orphan cleanup 已闭环
 
-基础实现和测试已经存在，但在 Compose/OVA 接入后必须重新证明：
-
-- claim/release 幂等；
-- replacement 只占一个槽；
-- Runner 失联与 Redis TTL；
-- receipt 已存在的 Failed 仍由原节点清理；
-- Docker/Kubernetes reaper 只按 managed + RuntimeInstanceId + Generation 精确匹配；
-- Compose appliance/OVA 多资源 cleanup 不使用宽泛 Competition/Team 标签。
-- 新增的 Docker ingress proxy、持久 Container sandbox NetworkPolicy/network 与
-  Compose proxy 必须纳入 crash orphan audit；持久资源不能使用从 Provider create 时刻
-  开始的业务 TTL 提前回收。
+- Worker 的 durable assignment reconciliation 现在向所有有历史 Runtime 的 Pool 在线
+  成员投递统一 `ReconcileRuntimeResources`，不再只审计 Libvirt。
+- Runner 只接受自己的 Pool/RunnerId，并按节点配置的强类型 Provider 选择 reconciler。
+  只有数据库中相同 RuntimeInstanceId+Generation、Provider、Pool、RunnerId 且状态仍为
+  Provisioning/Running/Stopping 的资源会保留。
+- Docker 只枚举完整匹配 `managed=true + job-kind=persistent-runtime +
+  RuntimeInstanceId + Generation` 的 container/network；Compose 额外持久化原子 runtime
+  metadata，审计会执行 project down 并删除 operation workdir。题目 container、可信
+  ingress proxy、内部 sandbox/Compose network 都被覆盖。
+- Kubernetes 使用同一完整 selector 枚举并删除 Pod、Deployment、Service 和
+  NetworkPolicy，等待这些资源实际消失后才完成审计。
+- Libvirt 通过薄 adapter 接入同一个节点审计协议，保留原有 appliance 精确枚举/销毁。
+- 已注册但此前没有调度入口的 Docker/Kubernetes disposable TTL reaper 现在由同一
+  durable 节点审计消息驱动；持久资源不带 `expires-at`，不会按 Provider 创建时刻提前
+  回收。
+- orphan cleanup 不释放 capacity。claim/release、replacement 单槽、Runner 失联、
+  receipt cleanup 与 release token 仍由 RuntimeInstance assignment durable 状态机负责，
+  避免双重释放；相关 PostgreSQL/Redis/Wolverine Integration 全量通过。
 
 ### 6.6 API、DI 与交付项
 
@@ -452,13 +464,11 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 
 每一项必须独立 commit：
 
-1. 完成 Docker/Kubernetes 持久 sandbox、ingress proxy、Compose appliance 的 crash
-   orphan reconciliation，并重新审计 capacity claim/release。
-2. 使用新清单执行受控 Docker Compose/Kubernetes deployment smoke；不得自行重启用户
+1. 使用新清单执行受控 Docker Compose/Kubernetes deployment smoke；不得自行重启用户
    当前运行的本地栈。
-3. 在真实双栈集群补做 IPv6 deny 验证；当前一次性集群是 IPv4 single-stack。
-4. 重新跑四模式 E2E。
-5. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+2. 在真实双栈集群补做 IPv6 deny 验证；当前一次性集群是 IPv4 single-stack。
+3. 重新跑四模式 E2E。
+4. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
@@ -483,9 +493,9 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从持久 Runtime crash orphan reconciliation 开始；不要重做已完成的
-   RuntimeKind dispatch、Docker/Kubernetes Compose handler、OVA lifecycle 或 Cilium
-   egress 验证。
+4. 从受控 deployment smoke 开始；不要重做已完成的 RuntimeKind dispatch、
+   Docker/Kubernetes Compose handler、三 Provider crash orphan reconciliation 或
+   Cilium egress 验证。
 5. 每个纵切固定执行：
    - 失败测试；
    - 最小实现；
