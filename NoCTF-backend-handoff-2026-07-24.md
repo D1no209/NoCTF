@@ -17,6 +17,22 @@ EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 
 完成真实复测。Docker/Kubernetes 持久 Container sandbox、可信 ingress proxy 与
 Compose appliance 的 crash orphan reconciliation 也已闭环。下一主线是受控部署 smoke。
 
+### 当前完成度
+
+后端目标架构迁移当前完成度估算为 **86%**。这是按剩余交付里程碑计算的工程进度，
+不是测试覆盖率或生产可用性承诺。剩余 14 个百分点固定分配为：
+
+- 受控 Docker Compose/Kubernetes deployment smoke：4%；
+- 真实双栈集群 IPv6 deny 验证：2%；
+- CTF、AWD、AWDP、KoH 四模式真实 E2E：5%；
+- capability/DI 机械整理与最终 `Verify-Backend.ps1`：3%。
+
+已完成的 86% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
+三类 Runtime Provider lifecycle、容量状态机、CTF PerTeam Flag、AWDP 即时 target、
+DNS 命名隔离、Docker/Kubernetes 网络策略、Cilium fail-closed 前提和三 Provider
+crash orphan reconciliation。未完成项仍可能在真实部署验证中暴露返工，因此百分比只用于
+交接排期。
+
 ## 2. Git 基线与工作树保护
 
 - 仓库：`E:\SourceCode\NoCTF`
@@ -24,11 +40,14 @@ Compose appliance 的 crash orphan reconciliation 也已闭环。下一主线是
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
 - 当前代码实现 HEAD：`adc2908 feat(backend): reconcile persistent runtime resources`。
-- 本轮实现只做本地提交，尚未获准推送。
+- 前序实现均先做本地提交；用户已于 2026-07-27 明确授权完善本文后推送当前分支。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
 - 创建交接分支前，`main` 相对 `origin/main`：ahead 186。
 - 原目标架构远程分支：`origin/codex/backend-target-architecture`。
+- 2026-07-27 推送前通过 GitHub CLI 认证的 HTTPS fetch 复核：
+  `origin/codex/backend-target-architecture-handoff` 为 `0ca38b6`，本地包含该提交；
+  文档提交前为 ahead 14、behind 0，没有协作者的 remote-only 分叉需要合并。
 - 从旧交接 HEAD `003b75c` 到当前代码基线共有 38 个 backend 提交：
 
 ```powershell
@@ -405,12 +424,13 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 当前实际部署状态：
 
 - 本轮只修改、验证并本地提交了代码和部署清单，没有重启或替换用户正在运行的服务。
-- 2026-07-27 检查时，本机仍运行已有 `deploy-*` 容器，实际网络仍是
+- 2026-07-27 推送前再次检查时，本机仍运行已有 `deploy-*` 容器，实际网络仍是
   `deploy_default`；`noctf-network` 尚不存在。新的 `deploy/docker-compose.yml` 只完成
   `config --quiet` 验证，尚未 `up` 应用。
 - `deploy/k8s` 与 `deploy/cilium` 只 apply 到一次性本地 k3d/k3s+Cilium 集群完成验证；
   该集群现已删除。这不代表任何用户集群或生产集群已经部署。
-- 没有任何生产环境部署，也没有推送远程分支。
+- 没有任何生产环境部署。本轮交接最终状态为当前分支已推送至同名远端分支，未创建 PR；
+  Git 推送不代表部署清单已应用。
 
 明确尚未实现：
 
