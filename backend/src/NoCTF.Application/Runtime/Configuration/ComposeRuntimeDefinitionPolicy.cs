@@ -149,6 +149,11 @@ public static class ComposeRuntimeDefinitionPolicy
             }
             if (!IsServiceName(serviceName))
                 errors.Add($"Compose service name '{serviceName}' is invalid.");
+            else if (string.Equals(
+                serviceName,
+                "noctf-ingress",
+                StringComparison.Ordinal))
+                errors.Add($"Compose service name '{serviceName}' is reserved by the platform.");
             else if (requireDnsServiceNames && !IsDnsLabel(serviceName))
                 errors.Add(
                     $"Kubernetes Compose service name '{serviceName}' must be a DNS-1123 label.");
@@ -178,6 +183,9 @@ public static class ComposeRuntimeDefinitionPolicy
 
     public static string PrepareForDocker(ComposeRequest request)
     {
+        if (request.EgressPolicy != RuntimeEgressPolicy.DenyAll)
+            throw new InvalidOperationException(
+                "Docker Compose does not support InternetOnly egress.");
         var document = LoadValidated(
             request,
             requireServicePids: true,
@@ -216,7 +224,7 @@ public static class ComposeRuntimeDefinitionPolicy
                     ports.Select(port => port.ToString(CultureInfo.InvariantCulture)));
         }
 
-        ApplyNetworkLabels(document, request.Labels);
+        ApplyInternalNetworkPolicy(document, request.Labels);
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
         new YamlStream(new YamlDocument(document)).Save(writer, assignAnchors: false);
         return writer.ToString();
@@ -343,6 +351,8 @@ public static class ComposeRuntimeDefinitionPolicy
                 errors.Add("Compose networks must use mapping definitions.");
                 continue;
             }
+            if (string.Equals(networkName, "noctf-platform", StringComparison.Ordinal))
+                errors.Add($"Compose network '{networkName}' is reserved by the platform.");
             if ((TryGet(network, "external", out var external)
                     && !IsFalse(external))
                 || ContainsKey(network, "name")
@@ -605,7 +615,7 @@ public static class ComposeRuntimeDefinitionPolicy
             MergeMappingValues(service, "environment", overrides);
     }
 
-    private static void ApplyNetworkLabels(
+    private static void ApplyInternalNetworkPolicy(
         YamlMappingNode document,
         IReadOnlyDictionary<string, string> labels)
     {
@@ -613,13 +623,17 @@ public static class ComposeRuntimeDefinitionPolicy
         {
             var defaultNetwork = new YamlMappingNode();
             MergeMappingValues(defaultNetwork, "labels", labels);
+            SetScalar(defaultNetwork, "internal", "true");
             Set(document, "networks", new YamlMappingNode("default", defaultNetwork));
             return;
         }
 
         var networks = (YamlMappingNode)networksNode;
         foreach (var network in networks.Children.Values.Cast<YamlMappingNode>())
+        {
             MergeMappingValues(network, "labels", labels);
+            SetScalar(network, "internal", "true");
+        }
     }
 
     private static bool IsServiceName(string value) =>

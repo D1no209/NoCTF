@@ -44,6 +44,7 @@ public static class RuntimeClaimFactory
                             ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
                         ttl,
                         OperationTimeout: operationTimeout,
+                        NetworkIsolation: ContainerNetworkIsolation.Isolated,
                         InternalPorts: mode == GameMode.Koh
                             && template.ControlCheckUrlBinding?.ContainerPort is int controlPort
                                 ? [controlPort]
@@ -53,7 +54,8 @@ public static class RuntimeClaimFactory
                         UrlBindings: template.UrlBindings,
                         ControlCheckUrlBinding: mode == GameMode.Koh
                             ? template.ControlCheckUrlBinding
-                            : null)),
+                            : null,
+                        EgressPolicy: definition.EgressPolicy)),
             ComposeRuntimeDefinition definition
                 when template.Provider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
                 new ClaimComposeRuntime(
@@ -75,7 +77,8 @@ public static class RuntimeClaimFactory
                         operationTimeout,
                         template.UrlBindings,
                         mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
-                        ServiceEnvironment(definition, fixedFlag))),
+                        ServiceEnvironment(definition, fixedFlag),
+                        definition.EgressPolicy)),
             OvaRuntimeDefinition definition when template.Provider == RuntimeProvider.Libvirt =>
                 new ClaimOvaRuntime(
                     instance.Id,

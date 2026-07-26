@@ -19,6 +19,9 @@ public sealed class IsolatedContainerProvisionerTests
         await Assert.That(lifecycle.Request!.NetworkName).IsEqualTo("network-1");
         await Assert.That(receipt.NetworkId).IsEqualTo("network-1");
         await Assert.That(sandbox.DeletedNetworks).IsEmpty();
+        await Assert.That(sandbox.Request!.Purpose)
+            .IsEqualTo(ContainerNetworkPurpose.PersistentRuntime);
+        await Assert.That(sandbox.Request.PublicIngressPorts).IsEquivalentTo([8080]);
     }
 
     [Test]
@@ -79,12 +82,13 @@ public sealed class IsolatedContainerProvisionerTests
         [],
         new Dictionary<string, string>(),
         new Dictionary<string, string>(),
-        new Dictionary<int, int>(),
+        new Dictionary<int, int> { [8080] = 0 },
         new RuntimeResourceLimits(1, 1, 1),
         new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
         null,
-        NetworkIsolation: ContainerNetworkIsolation.Isolated,
-        InternalPorts: [8080]);
+        Generation: 3,
+        RuntimeInstanceId: Guid.Parse("11111111-1111-1111-1111-111111111111"),
+        NetworkIsolation: ContainerNetworkIsolation.Isolated);
 
     private sealed class RecordingLifecycle : IContainerLifecycle
     {
@@ -118,10 +122,15 @@ public sealed class IsolatedContainerProvisionerTests
     {
         public List<string> DeletedNetworks { get; } = [];
         public bool CleanupTokenWasCancelled { get; private set; }
+        public ContainerNetworkPolicyRequest? Request { get; private set; }
         public Task<string> CreateIsolatedNetworkAsync(
-            RuntimeResourceIdentity identity,
+            ContainerNetworkPolicyRequest request,
             DateTimeOffset expiresAt,
-            CancellationToken cancellationToken) => Task.FromResult("network-1");
+            CancellationToken cancellationToken)
+        {
+            Request = request;
+            return Task.FromResult("network-1");
+        }
         public Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken)
         {
             CleanupTokenWasCancelled = cancellationToken.IsCancellationRequested;

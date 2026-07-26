@@ -181,6 +181,33 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
             Mapping(Mapping(root, "networks"), "challenge"),
             "labels");
         await Assert.That(Scalar(networkLabels, "noctf.io/managed")).IsEqualTo("true");
+        await Assert.That(Scalar(
+                Mapping(Mapping(root, "networks"), "challenge"),
+                "internal"))
+            .IsEqualTo("true");
+    }
+
+    [Test]
+    public async Task Docker_preparation_rejects_InternetOnly_egress()
+    {
+        var request = new ComposeRequest(
+            Guid.NewGuid(),
+            RuntimeProvider.Docker,
+            1,
+            "noctf-runtime",
+            "services:\n  web:\n    image: registry.example/web:v1",
+            new Dictionary<string, string>(),
+            new Dictionary<string, string>(),
+            new Dictionary<string, RuntimeResourceLimits> { ["web"] = ServiceLimits },
+            ServiceLimits,
+            TimeSpan.FromHours(1),
+            TimeSpan.FromMinutes(2),
+            EgressPolicy: RuntimeEgressPolicy.InternetOnly);
+
+        var action = () => ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("does not support InternetOnly");
     }
 
     [Test]

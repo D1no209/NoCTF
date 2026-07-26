@@ -36,6 +36,18 @@ public enum ContainerNetworkIsolation
     Isolated
 }
 
+public enum RuntimeEgressPolicy
+{
+    DenyAll,
+    InternetOnly
+}
+
+public enum ContainerNetworkPurpose
+{
+    PersistentRuntime,
+    AwdpVerification
+}
+
 public sealed record RuntimeUrlBinding(
     string UrlTemplate,
     RuntimeExposure Exposure,
@@ -61,7 +73,8 @@ public sealed record ContainerRuntimeDefinition(
     IReadOnlyDictionary<string, string>? Labels = null,
     IReadOnlyDictionary<int, int>? PortMappings = null,
     ContainerSecurityPolicy? Security = null,
-    string? FlagEnvironmentVariableName = null) : ChallengeRuntimeDefinition
+    string? FlagEnvironmentVariableName = null,
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll) : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.Container;
 }
@@ -71,7 +84,8 @@ public sealed record ComposeRuntimeDefinition(
     IReadOnlyDictionary<string, RuntimeResourceLimits> ServiceResources,
     IReadOnlyDictionary<string, string>? Environment = null,
     IReadOnlyDictionary<string, string>? Labels = null,
-    IReadOnlyDictionary<string, string>? FlagEnvironmentVariables = null)
+    IReadOnlyDictionary<string, string>? FlagEnvironmentVariables = null,
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll)
     : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.Compose;
@@ -126,7 +140,9 @@ public sealed record ContainerRequest(
     int Generation = 0,
     Guid? RuntimeInstanceId = null,
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
-    RuntimeUrlBinding? ControlCheckUrlBinding = null)
+    RuntimeUrlBinding? ControlCheckUrlBinding = null,
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll,
+    ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];
@@ -148,7 +164,8 @@ public sealed record ContainerReceipt(
     string? InternalHost,
     string? NetworkId = null,
     Guid? RuntimeInstanceId = null,
-    int Generation = 0);
+    int Generation = 0,
+    string? IngressResourceId = null);
 
 public sealed record OneShotResult(
     string ResourceId,
@@ -178,7 +195,7 @@ public sealed record ContainerExecResult(int ExitCode, bool TimedOut);
 public interface IContainerSandboxLifecycle
 {
     Task<string> CreateIsolatedNetworkAsync(
-        RuntimeResourceIdentity identity,
+        ContainerNetworkPolicyRequest request,
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken);
     Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken);
@@ -195,8 +212,14 @@ public interface IContainerSandboxLifecycle
 
 public readonly record struct RuntimeResourceIdentity(
     Guid RuntimeInstanceId,
-    int Generation,
-    int TargetPort);
+    int Generation);
+
+public sealed record ContainerNetworkPolicyRequest(
+    RuntimeResourceIdentity Identity,
+    ContainerNetworkPurpose Purpose,
+    RuntimeEgressPolicy EgressPolicy,
+    IReadOnlyList<int> PublicIngressPorts,
+    int? TargetPort = null);
 
 public sealed record RuntimeResourceReapResult(int RemovedCount, int FailedCount);
 

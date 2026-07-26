@@ -8,4 +8,5 @@ public sealed record KubernetesRuntimeOptions(
     string CallbackPodLabelValue = "awdp-callback",
     long PodPidsLimit = 0,
     string ClusterDomain = "",
-    bool NetworkPolicyRequired = true);
+    bool NetworkPolicyRequired = true,
+    IReadOnlyList<string>? ProtectedCidrs = null);

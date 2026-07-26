@@ -178,6 +178,60 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Docker_runtime_definitions_reject_InternetOnly_egress()
+    {
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        ChallengeRuntimeDefinition[] definitions =
+        [
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                EgressPolicy: RuntimeEgressPolicy.InternetOnly),
+            new ComposeRuntimeDefinition(
+                "services:\n  web:\n    image: registry.example/challenge:v1",
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["web"] = new(268_435_456, 500_000_000, 128)
+                },
+                EgressPolicy: RuntimeEgressPolicy.InternetOnly)
+        ];
+
+        foreach (var definition in definitions)
+        {
+            var template = new ChallengeRuntimeTemplate(
+                RuntimeProvider.Docker,
+                RuntimeAllocation.PerTeam,
+                definition,
+                Limits: new(268_435_456, 500_000_000, 128));
+
+            var errors = configurations.Validate(
+                GameMode.Ctf,
+                WithRuntime(configurations.GetDefaultJson(GameMode.Ctf), template));
+
+            await Assert.That(errors).Contains(
+                "Docker runtimes do not support InternetOnly egress; use DenyAll or a Kubernetes Runner Pool.");
+        }
+    }
+
+    [Test]
+    public async Task Kubernetes_runtime_definition_accepts_InternetOnly_egress()
+    {
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Kubernetes,
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                EgressPolicy: RuntimeEgressPolicy.InternetOnly),
+            Limits: new(268_435_456, 500_000_000, 0));
+
+        var errors = configurations.Validate(
+            GameMode.Ctf,
+            WithRuntime(configurations.GetDefaultJson(GameMode.Ctf), template));
+
+        await Assert.That(errors).IsEmpty();
+    }
+
+    [Test]
     public async Task RuntimeTemplate_ParsesKindSpecificDefinitions()
     {
         var configurations = new GameModeChallengeConfigurationCatalog();

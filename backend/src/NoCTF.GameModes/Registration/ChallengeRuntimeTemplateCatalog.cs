@@ -67,6 +67,7 @@ internal static class ChallengeRuntimeTemplateValidator
             case ContainerRuntimeDefinition container:
                 if (runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
                     errors.Add("Container runtimes require the Docker or Kubernetes provider.");
+                ValidateEgressPolicy(runtime.Provider, container.EgressPolicy, errors);
                 if (string.IsNullOrWhiteSpace(container.Image))
                     errors.Add("Runtime image is required.");
                 else if (container.Image.Length > 512)
@@ -92,6 +93,7 @@ internal static class ChallengeRuntimeTemplateValidator
             case ComposeRuntimeDefinition compose:
                 if (runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
                     errors.Add("Compose runtimes require the Docker or Kubernetes provider.");
+                ValidateEgressPolicy(runtime.Provider, compose.EgressPolicy, errors);
                 errors.AddRange(ComposeRuntimeDefinitionPolicy.Validate(
                     compose,
                     runtime.Limits ?? new(long.MaxValue, long.MaxValue, long.MaxValue),
@@ -199,6 +201,24 @@ internal static class ChallengeRuntimeTemplateValidator
             }
         }
         return errors;
+    }
+
+    private static void ValidateEgressPolicy(
+        RuntimeProvider provider,
+        RuntimeEgressPolicy egressPolicy,
+        ICollection<string> errors)
+    {
+        if (!Enum.IsDefined(egressPolicy))
+        {
+            errors.Add("Runtime egress policy is invalid.");
+            return;
+        }
+        if (provider == RuntimeProvider.Docker
+            && egressPolicy == RuntimeEgressPolicy.InternetOnly)
+        {
+            errors.Add(
+                "Docker runtimes do not support InternetOnly egress; use DenyAll or a Kubernetes Runner Pool.");
+        }
     }
 
     private static void ValidateFlagEnvironment(

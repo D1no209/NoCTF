@@ -96,6 +96,36 @@ Command null 使用镜像默认。`FlagSource=PerTeam` 时
 `FlagEnvironmentVariableName` 必填；Static 时必须省略。环境变量名合法且不能使用
 `NOCTF_`。Image 可为 tag/digest，不强制 pin；配置变化只影响新 Generation。
 
+## EgressPolicy 与 Runtime 网络
+
+`ContainerRuntimeDefinition` 与 `ComposeRuntimeDefinition` 使用强类型
+`EgressPolicy: DenyAll | InternetOnly`，省略时为 `DenyAll`。OVA/Libvirt 首版不接受该字段。
+
+- Docker Container/Compose：首版只支持 `DenyAll`。每个长期 Runtime 使用独立
+  `internal` bridge network；Compose 中所有题目 network（包括平台补出的 default
+  network）都会被强制设为 `internal: true`。题目容器不连接平台网络。同一 Runtime 内
+  仍可互通；若存在公开 URL Binding，平台额外创建一个可信 HAProxy ingress，代理同时
+  连接 Runtime 内部网络与 `noctf-network`，只把声明的 TCP 端口转发回目标
+  service/container。代理的固定资源开销计入 Runner capacity，并随 Runtime receipt
+  幂等创建、回滚和删除。`InternetOnly` 在保存校验和 Runner 执行边界均直接拒绝；当前
+  没有通过 `DOCKER-USER` 修改宿主防火墙，也没有部署 Egress Gateway。
+- Kubernetes Container/Compose：每 Runtime 创建 NetworkPolicy。`DenyAll` 只放行同一
+  不可变 Runtime selector 的 Pod 互通、集群 DNS，以及平台声明的公开/内部检查端口入站。
+  `InternetOnly` 在此基础上只增加 `0.0.0.0/0` IPv4 egress，并通过 `except` 排除平台
+  内建特殊/私有地址和 Runner Pool 的 `ProtectedCidrs`；不生成 IPv6 放行规则。
+
+`Runtime__Kubernetes__ProtectedCidrs` 是 Runner Pool 必填数组，必须覆盖 Pod、Service、
+节点管理面、平台基础设施及其他不可由题目访问的非公网 IPv4 网段。平台会拒绝空数组和
+非法/IPv6 CIDR，但不会自动发现集群网络。`NetworkPolicyRequired=true` 只是运维声明，
+不是 CNI 能力探测；CNI 必须实际执行 NetworkPolicy。
+
+该策略只表达地址级的 `DenyAll`/公网 IPv4 二选一，不提供域名、FQDN、目的端口白名单，
+也不把 DNS 命名隔离视为安全边界。
+
+本阶段威胁模型信任平台管理员、管理员配置与平台托管 ingress 镜像，不防管理员内鬼；
+题目业务容器和选手输入仍按不可信处理。可信入口代理不改变 Checker 可由管理员配置并
+同时连接题目网络和 `noctf-network` 的既定模型。
+
 ## Compose
 
 题目保存原始 compose.yaml，允许自定义内部 network。Docker Runner 直接运行 Compose；Kubernetes Runner 使用固定版本 Kompose 转换后部署到平台统一配置的 Namespace。

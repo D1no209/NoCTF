@@ -4,6 +4,7 @@ using System.Text.Json;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Kubernetes.Configuration;
+using NoCTF.Runtime.Kubernetes.Networking;
 
 namespace NoCTF.Runtime.Kubernetes.Containers;
 
@@ -281,24 +282,40 @@ public sealed class KubernetesContainerLifecycle(
     }
 
     public async Task<string> CreateIsolatedNetworkAsync(
-        RuntimeResourceIdentity identity,
+        ContainerNetworkPolicyRequest request,
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken)
     {
+        var identity = request.Identity;
         if (identity.RuntimeInstanceId == Guid.Empty
-            || identity.Generation <= 0
-            || identity.TargetPort is < 1 or > 65535)
-            throw new ArgumentOutOfRangeException(nameof(identity));
-        var name = $"noctf-awdp-{identity.RuntimeInstanceId:N}";
+            || identity.Generation <= 0)
+            throw new ArgumentOutOfRangeException(nameof(request));
+        if (!Enum.IsDefined(request.Purpose)
+            || !Enum.IsDefined(request.EgressPolicy)
+            || request.PublicIngressPorts.Any(port => port is < 1 or > 65535))
+            throw new ArgumentOutOfRangeException(nameof(request));
+        if (request.Purpose == ContainerNetworkPurpose.AwdpVerification
+            && request.TargetPort is not (>= 1 and <= 65535))
+            throw new ArgumentOutOfRangeException(nameof(request));
+        if (!options.NetworkPolicyRequired)
+            throw new InvalidOperationException(
+                "Kubernetes container runtimes require NetworkPolicy enforcement.");
+        var name = request.Purpose == ContainerNetworkPurpose.AwdpVerification
+            ? $"noctf-awdp-{identity.RuntimeInstanceId:N}"
+            : $"noctf-rt-{identity.RuntimeInstanceId:N}-{identity.Generation}";
+        var purpose = request.Purpose == ContainerNetworkPurpose.AwdpVerification
+            ? "awdp-verification"
+            : "persistent-runtime";
         try
         {
             var existing = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
                 name,
                 options.Namespace,
                 cancellationToken: cancellationToken);
-            if (!HasResourceIdentity(existing.Metadata.Labels, identity))
+            if (!HasResourceIdentity(existing.Metadata.Labels, identity)
+                || !HasNetworkPurpose(existing.Metadata.Labels, purpose))
                 throw new InvalidOperationException(
-                    "The existing AWDP sandbox policy has a different ownership identity.");
+                    "The existing runtime policy has a different ownership identity or purpose.");
             return name;
         }
         catch (k8s.Autorest.HttpOperationException exception)
@@ -308,18 +325,48 @@ public sealed class KubernetesContainerLifecycle(
         }
         var labels = new Dictionary<string, string>
         {
-            ["noctf.io/job-kind"] = "awdp-verification",
+            ["noctf.io/job-kind"] = purpose,
+            ["noctf.io/network-purpose"] = purpose,
             ["noctf.io/managed"] = "true",
             ["noctf.io/runtime-instance-id"] = identity.RuntimeInstanceId.ToString("D"),
             ["noctf.io/generation"] = identity.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture),
-            ["noctf.io/expires-at"] = expiresAt.ToUnixTimeSeconds().ToString(
                 System.Globalization.CultureInfo.InvariantCulture)
         };
+        if (request.Purpose == ContainerNetworkPurpose.AwdpVerification)
+        {
+            labels["noctf.io/expires-at"] = expiresAt.ToUnixTimeSeconds().ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
         var selector = new V1LabelSelector
         {
             MatchLabels = new Dictionary<string, string> { ["noctf.io/sandbox"] = name }
         };
+        var ingress = new List<V1NetworkPolicyIngressRule>
+        {
+            new()
+            {
+                FromProperty = [new V1NetworkPolicyPeer { PodSelector = selector }],
+                Ports = request.Purpose == ContainerNetworkPurpose.AwdpVerification
+                    ? [new V1NetworkPolicyPort { Protocol = "TCP", Port = request.TargetPort!.Value }]
+                    : null
+            }
+        };
+        if (request.Purpose == ContainerNetworkPurpose.PersistentRuntime
+            && request.PublicIngressPorts.Count > 0)
+        {
+            ingress.Add(new V1NetworkPolicyIngressRule
+            {
+                Ports = request.PublicIngressPorts
+                    .Distinct()
+                    .Order()
+                    .Select(port => new V1NetworkPolicyPort
+                    {
+                        Protocol = "TCP",
+                        Port = port
+                    })
+                    .ToList()
+            });
+        }
         try
         {
             await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(new V1NetworkPolicy
@@ -329,36 +376,11 @@ public sealed class KubernetesContainerLifecycle(
                 {
                     PodSelector = selector,
                     PolicyTypes = ["Ingress", "Egress"],
-                    Ingress =
-                    [
-                        new V1NetworkPolicyIngressRule
-                        {
-                            FromProperty = [new V1NetworkPolicyPeer { PodSelector = selector }],
-                            Ports =
-                            [
-                                new V1NetworkPolicyPort
-                                {
-                                    Protocol = "TCP",
-                                    Port = identity.TargetPort
-                                }
-                            ]
-                        }
-                    ],
-                    Egress =
-                    [
-                        new V1NetworkPolicyEgressRule
-                        {
-                            To = [new V1NetworkPolicyPeer { PodSelector = selector }],
-                            Ports =
-                            [
-                                new V1NetworkPolicyPort
-                                {
-                                    Protocol = "TCP",
-                                    Port = identity.TargetPort
-                                }
-                            ]
-                        }
-                    ]
+                    Ingress = ingress,
+                    Egress = KubernetesEgressPolicy.Build(
+                        request.EgressPolicy,
+                        selector,
+                        options).ToList()
                 }
             }, options.Namespace, cancellationToken: cancellationToken);
             return name;
@@ -373,7 +395,8 @@ public sealed class KubernetesContainerLifecycle(
                     name,
                     options.Namespace,
                     cancellationToken: cleanup.Token);
-                if (HasResourceIdentity(ambiguous.Metadata.Labels, identity))
+                if (HasResourceIdentity(ambiguous.Metadata.Labels, identity)
+                    && HasNetworkPurpose(ambiguous.Metadata.Labels, purpose))
                     await DeleteIsolatedNetworkAsync(name, cleanup.Token);
             }
             catch (k8s.Autorest.HttpOperationException exception)
@@ -489,8 +512,7 @@ public sealed class KubernetesContainerLifecycle(
     public async Task<RuntimeResourceReapResult> ReapExpiredAsync(
         DateTimeOffset now, CancellationToken cancellationToken)
     {
-        const string selector =
-            "noctf.io/managed=true,noctf.io/job-kind=awdp-verification,noctf.io/expires-at";
+        const string selector = "noctf.io/managed=true,noctf.io/expires-at";
         var removed = 0;
         var failed = 0;
         var pods = await client.CoreV1.ListNamespacedPodAsync(
@@ -784,7 +806,7 @@ public sealed class KubernetesContainerLifecycle(
         && labels.TryGetValue("noctf.io/managed", out var managed)
         && string.Equals(managed, "true", StringComparison.Ordinal)
         && labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-        && string.Equals(jobKind, "awdp-verification", StringComparison.Ordinal)
+        && jobKind is "awdp-verification" or "persistent-runtime"
         && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
         && Guid.TryParse(runtimeText, out var runtimeId)
         && runtimeId != Guid.Empty
@@ -810,4 +832,11 @@ public sealed class KubernetesContainerLifecycle(
         && int.TryParse(generationText, System.Globalization.NumberStyles.None,
             System.Globalization.CultureInfo.InvariantCulture, out var generation)
         && generation == identity.Generation;
+
+    private static bool HasNetworkPurpose(
+        IDictionary<string, string>? labels,
+        string purpose) =>
+        labels is not null
+        && labels.TryGetValue("noctf.io/network-purpose", out var value)
+        && string.Equals(value, purpose, StringComparison.Ordinal);
 }

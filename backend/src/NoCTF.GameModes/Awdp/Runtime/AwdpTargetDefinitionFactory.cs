@@ -50,6 +50,8 @@ public static class AwdpTargetDefinitionFactory
             NetworkIsolation: ContainerNetworkIsolation.Isolated,
             InternalPorts: [targetPort],
             Generation: generation,
-            RuntimeInstanceId: operationId);
+            RuntimeInstanceId: operationId,
+            EgressPolicy: definition.EgressPolicy,
+            NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
     }
 }

@@ -31,7 +31,14 @@ public sealed class RuntimeClaimHandler(
             CapacityLimits(
                 message.Definition.Provider,
                 message.Definition.Limits,
-                podCount: 1),
+                podCount: 1,
+                requiresDockerIngressProxy:
+                    message.Definition.Provider == RuntimeProvider.Docker
+                    && message.Definition.NetworkIsolation
+                        == ContainerNetworkIsolation.Isolated
+                    && message.Definition.NetworkPurpose
+                        == ContainerNetworkPurpose.PersistentRuntime
+                    && message.Definition.PortMappings.Count > 0),
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
             (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
                 new ProvisionContainerRuntime(
@@ -59,7 +66,10 @@ public sealed class RuntimeClaimHandler(
             CapacityLimits(
                 message.Definition.Provider,
                 message.Definition.Limits,
-                message.Definition.ServiceResources.Count),
+                message.Definition.ServiceResources.Count,
+                requiresDockerIngressProxy:
+                    message.Definition.Provider == RuntimeProvider.Docker
+                    && message.Definition.UrlBindings?.Count > 0),
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
             (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
                 new ProvisionComposeRuntime(
@@ -99,23 +109,55 @@ public sealed class RuntimeClaimHandler(
     private RuntimeResourceLimits CapacityLimits(
         RuntimeProvider provider,
         RuntimeResourceLimits configured,
-        int podCount)
+        int podCount,
+        bool requiresDockerIngressProxy = false)
     {
+        if (requiresDockerIngressProxy)
+        {
+            return configured with
+            {
+                MemoryBytes = checked(
+                    configured.MemoryBytes
+                    + ReadPositiveLong(
+                        "Runtime:Docker:IngressProxyMemoryBytes",
+                        67_108_864)),
+                NanoCpus = checked(
+                    configured.NanoCpus
+                    + ReadPositiveLong(
+                        "Runtime:Docker:IngressProxyNanoCpus",
+                        100_000_000)),
+                PidsLimit = checked(
+                    configured.PidsLimit
+                    + ReadPositiveLong(
+                        "Runtime:Docker:IngressProxyPidsLimit",
+                        64))
+            };
+        }
         if (provider != RuntimeProvider.Kubernetes)
             return configured;
-        var text = configuration["Runtime:Kubernetes:PodPidsLimit"];
-        if (!long.TryParse(
-                text,
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var podPidsLimit)
-            || podPidsLimit <= 0)
-            throw new InvalidOperationException(
-                "Runtime:Kubernetes:PodPidsLimit must be configured as a positive integer.");
+        var podPidsLimit = ReadPositiveLong(
+            "Runtime:Kubernetes:PodPidsLimit",
+            defaultValue: null);
         return configured with
         {
             PidsLimit = checked(podPidsLimit * podCount)
         };
+    }
+
+    private long ReadPositiveLong(string key, long? defaultValue)
+    {
+        var text = configuration[key];
+        if (string.IsNullOrWhiteSpace(text) && defaultValue is long fallback)
+            return fallback;
+        if (!long.TryParse(
+                text,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed)
+            || parsed <= 0)
+            throw new InvalidOperationException(
+                $"{key} must be configured as a positive integer.");
+        return parsed;
     }
 
     private async Task<MessageExecutionOutcome> ExecuteAsync(
