@@ -1,4 +1,5 @@
 using NoCTF.Domain.Runtime;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.Application.Runtime.Ports;
 
@@ -43,24 +44,56 @@ public sealed record RuntimeUrlBinding(
     string? VmId = null,
     int? GuestPort = null);
 
-public sealed record ChallengeRuntimeTemplate(
-    RuntimeProvider Provider,
-    RuntimeAllocation Allocation,
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(ContainerRuntimeDefinition), "container")]
+[JsonDerivedType(typeof(ComposeRuntimeDefinition), "compose")]
+[JsonDerivedType(typeof(OvaRuntimeDefinition), "ova")]
+public abstract record ChallengeRuntimeDefinition
+{
+    [JsonIgnore]
+    public abstract RuntimeKind RuntimeKind { get; }
+}
+
+public sealed record ContainerRuntimeDefinition(
     string Image,
     IReadOnlyList<string>? Command = null,
     IReadOnlyDictionary<string, string>? Environment = null,
     IReadOnlyDictionary<string, string>? Labels = null,
     IReadOnlyDictionary<int, int>? PortMappings = null,
+    ContainerSecurityPolicy? Security = null) : ChallengeRuntimeDefinition
+{
+    public override RuntimeKind RuntimeKind => RuntimeKind.Container;
+}
+
+public sealed record ComposeRuntimeDefinition(
+    string ComposeYaml,
+    IReadOnlyDictionary<string, string>? Environment = null,
+    IReadOnlyDictionary<string, string>? Labels = null) : ChallengeRuntimeDefinition
+{
+    public override RuntimeKind RuntimeKind => RuntimeKind.Compose;
+}
+
+public sealed record OvaRuntimeDefinition(string OvaSourceUrl) : ChallengeRuntimeDefinition
+{
+    public override RuntimeKind RuntimeKind => RuntimeKind.OvaVm;
+}
+
+public sealed record ChallengeRuntimeTemplate(
+    RuntimeProvider Provider,
+    RuntimeAllocation Allocation,
+    ChallengeRuntimeDefinition Definition,
     ContainerResourceLimits? Limits = null,
-    ContainerSecurityPolicy? Security = null,
     int? TtlSeconds = null,
     int? OperationTimeoutSeconds = null,
-    RuntimeKind RuntimeKind = RuntimeKind.Container,
     string RunnerPool = "default",
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
     RuntimeFlagSource FlagSource = RuntimeFlagSource.Static,
-    string? OvaSourceUrl = null,
-    RuntimeUrlBinding? ControlCheckUrlBinding = null);
+    RuntimeUrlBinding? ControlCheckUrlBinding = null)
+{
+    [JsonIgnore]
+    public RuntimeKind RuntimeKind => Definition?.RuntimeKind
+        ?? throw new InvalidOperationException("Runtime definition is required.");
+}
 
 public interface IChallengeRuntimeTemplateCatalog
 {

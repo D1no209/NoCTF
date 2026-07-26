@@ -39,12 +39,19 @@ internal static class ChallengeRuntimeTemplateValidator
             errors.Add("ControlCheckUrlBinding is only supported for KoH runtimes.");
         if (!Enum.IsDefined(runtime.Provider)) errors.Add("Runtime provider is invalid.");
         if (!Enum.IsDefined(runtime.Allocation)) errors.Add("Runtime allocation is invalid.");
-        if (!Enum.IsDefined(runtime.RuntimeKind)) errors.Add("Runtime kind is invalid.");
         if (!Enum.IsDefined(runtime.FlagSource)) errors.Add("Runtime flag source is invalid.");
         if (string.IsNullOrWhiteSpace(runtime.RunnerPool) || runtime.RunnerPool.Length > 256)
             errors.Add("Runtime RunnerPool must contain 1..256 characters.");
+        if (runtime.Definition is null)
+            errors.Add("Runtime definition is required.");
         var hasReservedEnvironmentVariable = false;
-        foreach (var variable in runtime.Environment ?? new Dictionary<string, string>())
+        var environment = runtime.Definition switch
+        {
+            ContainerRuntimeDefinition container => container.Environment,
+            ComposeRuntimeDefinition compose => compose.Environment,
+            _ => null
+        };
+        foreach (var variable in environment ?? new Dictionary<string, string>())
         {
             if (!IsEnvironmentVariableName(variable.Key))
                 errors.Add($"Runtime environment variable '{variable.Key}' is invalid.");
@@ -53,45 +60,58 @@ internal static class ChallengeRuntimeTemplateValidator
         }
         if (hasReservedEnvironmentVariable)
             errors.Add("Runtime environment variables cannot use the NOCTF_ prefix.");
-        if (runtime.RuntimeKind == RuntimeKind.OvaVm)
+        switch (runtime.Definition)
         {
-            if (runtime.Provider != RuntimeProvider.Libvirt)
-                errors.Add("OvaVm runtimes require the Libvirt provider.");
-            if (string.IsNullOrWhiteSpace(runtime.OvaSourceUrl)
-                || !Uri.TryCreate(runtime.OvaSourceUrl, UriKind.Absolute, out var source)
-                || source.Scheme is not ("https" or "file"))
-                errors.Add("OvaVm runtimes require an absolute https or file OVA source URL.");
-            if (runtime.FlagSource != RuntimeFlagSource.Static)
-                errors.Add("OvaVm runtimes only support static flags.");
+            case ContainerRuntimeDefinition container:
+                if (runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
+                    errors.Add("Container runtimes require the Docker or Kubernetes provider.");
+                if (string.IsNullOrWhiteSpace(container.Image))
+                    errors.Add("Runtime image is required.");
+                else if (container.Image.Length > 512)
+                    errors.Add("Runtime image cannot exceed 512 characters.");
+                foreach (var port in container.PortMappings ?? new Dictionary<int, int>())
+                {
+                    if (port.Key is < 1 or > 65535)
+                        errors.Add($"Runtime container port {port.Key} is invalid.");
+                    if (port.Value is < 0 or > 65535)
+                        errors.Add($"Runtime host port {port.Value} is invalid.");
+                }
+                if (container.Security is { } security)
+                {
+                    if (!security.RunAsNonRoot)
+                        errors.Add("Runtime security must require a non-root user.");
+                    if (!security.NoNewPrivileges)
+                        errors.Add("Runtime security must disable privilege escalation.");
+                    if (security.CapDrop is null
+                        || !security.CapDrop.Contains("ALL", StringComparer.OrdinalIgnoreCase))
+                        errors.Add("Runtime security must drop all capabilities.");
+                }
+                break;
+            case ComposeRuntimeDefinition compose:
+                if (runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
+                    errors.Add("Compose runtimes require the Docker or Kubernetes provider.");
+                if (string.IsNullOrWhiteSpace(compose.ComposeYaml))
+                    errors.Add("Compose runtimes require ComposeYaml.");
+                break;
+            case OvaRuntimeDefinition ova:
+                if (runtime.Provider != RuntimeProvider.Libvirt)
+                    errors.Add("OvaVm runtimes require the Libvirt provider.");
+                if (string.IsNullOrWhiteSpace(ova.OvaSourceUrl)
+                    || !Uri.TryCreate(ova.OvaSourceUrl, UriKind.Absolute, out var source)
+                    || source.Scheme is not ("https" or "file"))
+                    errors.Add("OvaVm runtimes require an absolute https or file OVA source URL.");
+                if (runtime.FlagSource != RuntimeFlagSource.Static)
+                    errors.Add("OvaVm runtimes only support static flags.");
+                break;
         }
-        else if (string.IsNullOrWhiteSpace(runtime.Image)) errors.Add("Runtime image is required.");
-        else if (runtime.Image.Length > 512) errors.Add("Runtime image cannot exceed 512 characters.");
-        if (runtime.RuntimeKind == RuntimeKind.Compose && runtime.Provider == RuntimeProvider.Libvirt)
-            errors.Add("Compose runtimes are not supported by Libvirt.");
-        if (runtime.RuntimeKind == RuntimeKind.Container
-            && runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
-            errors.Add("Container runtimes require the Docker or Kubernetes provider.");
         if (runtime.TtlSeconds is <= 0 or > 604800)
             errors.Add("Runtime TtlSeconds must be between 1 and 604800 when configured.");
         if (runtime.OperationTimeoutSeconds is <= 0 or > 300)
             errors.Add("Runtime OperationTimeoutSeconds must be between 1 and 300 when configured.");
-        foreach (var port in runtime.PortMappings ?? new Dictionary<int, int>())
-        {
-            if (port.Key is < 1 or > 65535) errors.Add($"Runtime container port {port.Key} is invalid.");
-            if (port.Value is < 0 or > 65535) errors.Add($"Runtime host port {port.Value} is invalid.");
-        }
         if (runtime.Limits is not { } limits)
             errors.Add("Runtime resource limits are required.");
         else if (limits.MemoryBytes <= 0 || limits.NanoCpus <= 0 || limits.PidsLimit <= 0)
             errors.Add("Runtime resource limits must be positive.");
-        if (runtime.Security is { } security)
-        {
-            if (!security.RunAsNonRoot) errors.Add("Runtime security must require a non-root user.");
-            if (!security.NoNewPrivileges) errors.Add("Runtime security must disable privilege escalation.");
-            if (security.CapDrop is null
-                || !security.CapDrop.Contains("ALL", StringComparer.OrdinalIgnoreCase))
-                errors.Add("Runtime security must drop all capabilities.");
-        }
         if (runtime.UrlBindings?.Any(binding => binding is null) == true)
             errors.Add("Runtime URL bindings cannot contain null entries.");
         var urlBindings = (runtime.UrlBindings ?? [])
@@ -119,7 +139,7 @@ internal static class ChallengeRuntimeTemplateValidator
             if (binding.ContainerPort is < 1 or > 65535
                 || binding.GuestPort is < 1 or > 65535)
                 errors.Add("Runtime URL binding ports must be between 1 and 65535.");
-            switch (runtime.RuntimeKind)
+            switch (runtime.Definition?.RuntimeKind)
             {
                 case RuntimeKind.Container:
                     if (binding.ContainerPort is null)
@@ -151,13 +171,13 @@ internal static class ChallengeRuntimeTemplateValidator
                     break;
             }
         }
-        if (runtime.RuntimeKind == RuntimeKind.Container)
+        if (runtime.Definition is ContainerRuntimeDefinition containerDefinition)
         {
             foreach (var binding in urlBindings)
             {
                 if (binding.ContainerPort is not int containerPort)
                     continue;
-                if (!(runtime.PortMappings ?? new Dictionary<int, int>())
+                if (!(containerDefinition.PortMappings ?? new Dictionary<int, int>())
                     .TryGetValue(containerPort, out var hostPort)
                     || hostPort != 0)
                     errors.Add("Container URL bindings require a dynamic port mapping.");

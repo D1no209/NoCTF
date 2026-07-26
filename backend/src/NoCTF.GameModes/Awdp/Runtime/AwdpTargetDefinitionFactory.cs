@@ -12,7 +12,7 @@ public static class AwdpTargetDefinitionFactory
         int targetPort,
         DateTimeOffset now)
     {
-        if (template.RuntimeKind != RuntimeKind.Container
+        if (template.Definition is not ContainerRuntimeDefinition definition
             || template.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
             throw new InvalidOperationException(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
@@ -22,9 +22,9 @@ public static class AwdpTargetDefinitionFactory
         var ttl = template.TtlSeconds is > 0
             ? TimeSpan.FromSeconds(template.TtlSeconds.Value)
             : TimeSpan.FromMinutes(15);
-        var labels = template.Labels is null
+        var labels = definition.Labels is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : new Dictionary<string, string>(template.Labels, StringComparer.Ordinal);
+            : new Dictionary<string, string>(definition.Labels, StringComparer.Ordinal);
         labels["noctf.io/managed"] = "true";
         labels["noctf.io/runtime-instance-id"] = operationId.ToString("D");
         labels["noctf.io/generation"] = generation.ToString(
@@ -36,9 +36,9 @@ public static class AwdpTargetDefinitionFactory
         return new ContainerRequest(
             operationId,
             template.Provider,
-            template.Image,
-            template.Command ?? [],
-            template.Environment ?? new Dictionary<string, string>(),
+            definition.Image,
+            definition.Command ?? [],
+            definition.Environment ?? new Dictionary<string, string>(),
             labels,
             new Dictionary<int, int>(),
             template.Limits ?? new ContainerResourceLimits(512 * 1024 * 1024, 500_000_000, 256),

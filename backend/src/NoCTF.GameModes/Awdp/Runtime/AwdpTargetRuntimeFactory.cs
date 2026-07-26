@@ -17,7 +17,7 @@ public static class AwdpTargetRuntimeFactory
         int challengeConfigurationRevision,
         DateTimeOffset now)
     {
-        if (template.RuntimeKind != RuntimeKind.Container
+        if (template.Definition is not ContainerRuntimeDefinition
             || template.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
             throw new InvalidOperationException(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");

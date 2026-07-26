@@ -412,7 +412,7 @@ public static class BackendMessageHandlers
             : null;
         var template = awdpConfiguration?.Runtime
             ?? templates.Get(target.Competition.Mode, target.Challenge.ConfigurationJson);
-        if (template is null || template.Provider == RuntimeProvider.Libvirt)
+        if (template is null || template.Definition is not ContainerRuntimeDefinition containerDefinition)
         {
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
@@ -441,13 +441,14 @@ public static class BackendMessageHandlers
                 definition = new ContainerRequest(
                     target.Instance.Id,
                     template.Provider,
-                    template.Image,
-                    template.Command ?? [],
-                    template.Environment ?? new Dictionary<string, string>(),
-                    MergeLabels(template.Labels, target.Instance),
-                    template.PortMappings ?? new Dictionary<int, int>(),
+                    containerDefinition.Image,
+                    containerDefinition.Command ?? [],
+                    containerDefinition.Environment ?? new Dictionary<string, string>(),
+                    MergeLabels(containerDefinition.Labels, target.Instance),
+                    containerDefinition.PortMappings ?? new Dictionary<int, int>(),
                     limits,
-                    template.Security ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
+                    containerDefinition.Security
+                        ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
                     template.TtlSeconds is > 0 ? TimeSpan.FromSeconds(template.TtlSeconds.Value) : null,
                     OperationTimeout: template.OperationTimeoutSeconds is > 0
                         ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)

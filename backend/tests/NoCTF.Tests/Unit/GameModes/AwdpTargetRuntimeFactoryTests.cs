@@ -13,8 +13,7 @@ public sealed class AwdpTargetRuntimeFactoryTests
         var template = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "target:latest",
-            RuntimeKind: RuntimeKind.Container,
+            new ContainerRuntimeDefinition("target:latest"),
             RunnerPool: "awdp");
 
         var target = AwdpTargetRuntimeFactory.Create(

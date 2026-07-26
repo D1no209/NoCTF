@@ -143,13 +143,16 @@ public static class AwdpConfigurationValidator
         List<string> errors)
     {
         if (runtime is not null
-            && (runtime.RuntimeKind != NoCTF.Domain.Runtime.RuntimeKind.Container
+            && (runtime.Definition is not NoCTF.Application.Runtime.Ports.ContainerRuntimeDefinition
                 || runtime.Provider is not (
                     NoCTF.Domain.Runtime.RuntimeProvider.Docker
                     or NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes)))
             errors.Add(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
-        if (runtime?.PortMappings is { Count: > 0 }
+        if (runtime?.Definition is NoCTF.Application.Runtime.Ports.ContainerRuntimeDefinition
+            {
+                PortMappings: { Count: > 0 }
+            }
             || runtime?.UrlBindings is { Count: > 0 })
         {
             errors.Add(

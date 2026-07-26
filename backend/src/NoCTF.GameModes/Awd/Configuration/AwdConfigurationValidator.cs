@@ -35,7 +35,8 @@ public static class AwdConfigurationValidator
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
             errors.Add("AWD runtimes must use PerTeam allocation.");
-        if (configuration.Runtime is { RuntimeKind: not (RuntimeKind.Container or RuntimeKind.Compose) })
+        if (configuration.Runtime?.Definition is not null
+            and not (ContainerRuntimeDefinition or ComposeRuntimeDefinition))
             errors.Add("AWD runtimes only support Container or Compose.");
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(configuration.Checker, "Checker"));
         if (configuration.Checker is
@@ -54,7 +55,7 @@ public static class AwdConfigurationValidator
                 errors.Add("FlagInjection.Command must be a non-empty raw template containing ${FLAG}.");
             if (injection.TimeoutSeconds <= 0)
                 errors.Add("FlagInjection.TimeoutSeconds must be positive.");
-            if (configuration.Runtime?.RuntimeKind == NoCTF.Domain.Runtime.RuntimeKind.Compose
+            if (configuration.Runtime?.Definition is ComposeRuntimeDefinition
                 && string.IsNullOrWhiteSpace(injection.ServiceName))
                 errors.Add("FlagInjection.ServiceName is required for Compose runtimes.");
         }

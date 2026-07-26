@@ -113,13 +113,14 @@ public class ChallengeConfigurationCatalogTests
         var template = new ChallengeRuntimeTemplate(
             RuntimeProvider.Kubernetes,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
-            ["/app/challenge"],
-            new Dictionary<string, string> { ["MODE"] = "competition" },
-            new Dictionary<string, string> { ["purpose"] = "challenge" },
-            new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                ["/app/challenge"],
+                new Dictionary<string, string> { ["MODE"] = "competition" },
+                new Dictionary<string, string> { ["purpose"] = "challenge" },
+                new Dictionary<int, int> { [8080] = 0 },
+                new(true, true, true, ["ALL"], [])),
             new(268_435_456, 500_000_000, 128),
-            new(true, true, true, ["ALL"], []),
             3600);
 
         foreach (var mode in Enum.GetValues<GameMode>())
@@ -130,9 +131,12 @@ public class ChallengeConfigurationCatalogTests
             var modeTemplate = template with
             {
                 Allocation = expectedAllocation,
-                PortMappings = mode == GameMode.Awdp
-                    ? new Dictionary<int, int>()
-                    : template.PortMappings
+                Definition = ((ContainerRuntimeDefinition)template.Definition) with
+                {
+                    PortMappings = mode == GameMode.Awdp
+                        ? new Dictionary<int, int>()
+                        : ((ContainerRuntimeDefinition)template.Definition).PortMappings
+                }
             };
             var json = WithRuntime(
                 configurations.GetDefaultJson(mode),
@@ -144,7 +148,9 @@ public class ChallengeConfigurationCatalogTests
             await Assert.That(parsed).IsNotNull();
             await Assert.That(parsed!.Provider).IsEqualTo(RuntimeProvider.Kubernetes);
             await Assert.That(parsed.Allocation).IsEqualTo(expectedAllocation);
-            await Assert.That(parsed.Image).IsEqualTo(template.Image);
+            await Assert.That(parsed.Definition).IsTypeOf<ContainerRuntimeDefinition>();
+            await Assert.That(((ContainerRuntimeDefinition)parsed.Definition).Image)
+                .IsEqualTo(((ContainerRuntimeDefinition)template.Definition).Image);
             await Assert.That(configurations.Validate(mode, json)).IsEmpty();
         }
     }
@@ -156,9 +162,10 @@ public class ChallengeConfigurationCatalogTests
         var invalid = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.Shared,
-            string.Empty,
+            new ContainerRuntimeDefinition(
+                string.Empty,
+                Security: new(false, false, false, [], [])),
             Limits: new(0, 0, 0),
-            Security: new(false, false, false, [], []),
             TtlSeconds: -1);
 
         foreach (var mode in Enum.GetValues<GameMode>())
@@ -171,13 +178,47 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task RuntimeTemplate_ParsesKindSpecificDefinitions()
+    {
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        var runtimes = new ChallengeRuntimeTemplateCatalog();
+        ChallengeRuntimeTemplate[] templates =
+        [
+            new(
+                RuntimeProvider.Docker,
+                RuntimeAllocation.PerTeam,
+                new ContainerRuntimeDefinition("registry.example/challenge:v1")),
+            new(
+                RuntimeProvider.Docker,
+                RuntimeAllocation.PerTeam,
+                new ComposeRuntimeDefinition(
+                    "services:\n  web:\n    image: registry.example/challenge:v1")),
+            new(
+                RuntimeProvider.Libvirt,
+                RuntimeAllocation.PerTeam,
+                new OvaRuntimeDefinition("file:///var/lib/noctf/challenge.ova"))
+        ];
+
+        foreach (var template in templates)
+        {
+            var json = WithRuntime(configurations.GetDefaultJson(GameMode.Ctf), template);
+            var parsed = runtimes.Get(GameMode.Ctf, json);
+
+            await Assert.That(parsed).IsNotNull();
+            await Assert.That(parsed!.Definition.GetType())
+                .IsEqualTo(template.Definition.GetType());
+            await Assert.That(parsed.RuntimeKind).IsEqualTo(template.RuntimeKind);
+        }
+    }
+
+    [Test]
     public async Task RuntimeTemplate_RequiresResourceLimitsForEveryMode()
     {
         var configurations = new GameModeChallengeConfigurationCatalog();
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1");
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"));
 
         foreach (var mode in Enum.GetValues<GameMode>())
         {
@@ -203,9 +244,10 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
-            Limits: new(268_435_456, 500_000_000, 128),
-            Security: new(true, true, true, [], []));
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                Security: new(true, true, true, [], [])),
+            Limits: new(268_435_456, 500_000_000, 128));
 
         foreach (var mode in Enum.GetValues<GameMode>())
         {
@@ -231,7 +273,7 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Libvirt,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1");
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"));
         var catalog = new GameModeChallengeConfigurationCatalog();
 
         var errors = catalog.Validate(
@@ -248,7 +290,7 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.Shared,
-            "registry.example/challenge:v1");
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"));
         var catalog = new GameModeChallengeConfigurationCatalog();
 
         var errors = catalog.Validate(
@@ -264,8 +306,9 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
             UrlBindings:
             [
                 new(
@@ -290,13 +333,11 @@ public class ChallengeConfigurationCatalogTests
         var shared = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.Shared,
-            "registry.example/challenge:v1");
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"));
         var ova = new ChallengeRuntimeTemplate(
             RuntimeProvider.Libvirt,
             RuntimeAllocation.PerTeam,
-            string.Empty,
-            RuntimeKind: RuntimeKind.OvaVm,
-            OvaSourceUrl: "file:///var/lib/noctf/challenge.ova");
+            new OvaRuntimeDefinition("file:///var/lib/noctf/challenge.ova"));
 
         var sharedErrors = catalog.Validate(
             GameMode.Awd,
@@ -332,8 +373,9 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/target:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/target:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
             Limits: new(268_435_456, 500_000_000, 128),
             UrlBindings:
             [
@@ -423,12 +465,13 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
-            Environment: new Dictionary<string, string>
-            {
-                ["1INVALID"] = "value",
-                ["noctf_callback_url"] = "https://example.invalid"
-            });
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                Environment: new Dictionary<string, string>
+                {
+                    ["1INVALID"] = "value",
+                    ["noctf_callback_url"] = "https://example.invalid"
+                }));
         var catalog = new GameModeChallengeConfigurationCatalog();
 
         var errors = catalog.Validate(
@@ -447,8 +490,9 @@ public class ChallengeConfigurationCatalogTests
         var container = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
             UrlBindings:
             [
                 new(
@@ -460,8 +504,8 @@ public class ChallengeConfigurationCatalogTests
         var compose = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "services:\n  web:\n    image: registry.example/challenge:v1",
-            RuntimeKind: RuntimeKind.Compose,
+            new ComposeRuntimeDefinition(
+                "services:\n  web:\n    image: registry.example/challenge:v1"),
             UrlBindings:
             [
                 new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 8080)
@@ -469,13 +513,11 @@ public class ChallengeConfigurationCatalogTests
         var ova = new ChallengeRuntimeTemplate(
             RuntimeProvider.Libvirt,
             RuntimeAllocation.PerTeam,
-            string.Empty,
-            RuntimeKind: RuntimeKind.OvaVm,
+            new OvaRuntimeDefinition("file:///var/lib/noctf/challenge.ova"),
             UrlBindings:
             [
                 new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, VmId: "web")
-            ],
-            OvaSourceUrl: "file:///var/lib/noctf/challenge.ova");
+            ]);
 
         var containerErrors = catalog.Validate(
             GameMode.Ctf,
@@ -501,8 +543,9 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
             UrlBindings:
             [
                 new(
@@ -526,8 +569,9 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
             Limits: new(268_435_456, 500_000_000, 128),
             UrlBindings:
             [
@@ -552,7 +596,7 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"),
             Limits: new(268_435_456, 500_000_000, 128),
             UrlBindings: [null!]);
         var catalog = new GameModeChallengeConfigurationCatalog();
@@ -571,8 +615,9 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            "registry.example/challenge:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
             ControlCheckUrlBinding: new(
                 "http://{HOST}:{PORT}/control",
                 RuntimeExposure.OwnerOnly,
@@ -598,8 +643,9 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.Shared,
-            "registry.example/hill:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/hill:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
             UrlBindings:
             [
                 new(
@@ -644,10 +690,11 @@ public class ChallengeConfigurationCatalogTests
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeProvider.Docker,
             RuntimeAllocation.Shared,
-            "registry.example/hill:v1",
-            PortMappings: new Dictionary<int, int> { [8080] = 0 },
+            new ContainerRuntimeDefinition(
+                "registry.example/hill:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                Security: new(true, true, true, ["ALL"], [])),
             Limits: new(268_435_456, 500_000_000, 128),
-            Security: new(true, true, true, ["ALL"], []),
             UrlBindings:
             [
                 new("http://{HOST}:{PORT}", RuntimeExposure.Participants, ContainerPort: 8080)
