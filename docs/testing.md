@@ -45,6 +45,22 @@
 
 Provider 测试可按环境标记，但 Release 流水线必须至少在受控 Runner 环境执行。
 
+Docker Integration 默认在 Docker 不可用时明确 skipped；发布门禁必须设置
+`NOCTF_REQUIRE_DOCKER_INTEGRATION=true`，使不可用直接失败。
+
+Kubernetes Compose 真实集成要求一个启用 CoreDNS 与 NetworkPolicy enforcement 的测试
+集群，并设置：
+
+```text
+NOCTF_KUBERNETES_INTEGRATION=true
+NOCTF_KOMPOSE_PATH=/usr/local/bin/kompose
+```
+
+测试会创建唯一临时 Namespace，真实执行 Kompose 与 Kubernetes API，验证 Compose
+短名 DNS、`publishNotReadyAddresses`、同 Runtime 互通、跨 Runtime 拒绝、动态 NodePort
+和删除收敛，然后删除该 Namespace。若 API endpoint 是本机地址，还必须将它加入
+`NO_PROXY`，避免 kubectl/.NET Kubernetes client 经 HTTP proxy 访问。
+
 ## 端到端
 
 每种模式至少一条真实依赖流程：
