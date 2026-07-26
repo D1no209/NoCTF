@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: runtime
+  labels:
+    app.kubernetes.io/part-of: noctf
+    noctf.io/purpose: challenge-runtime

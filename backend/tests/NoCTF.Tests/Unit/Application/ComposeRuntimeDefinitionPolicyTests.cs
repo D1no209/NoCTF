@@ -151,7 +151,7 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
                     ServiceName: "web")
             ]);
 
-        var prepared = ComposeRuntimeDefinitionPolicy.Prepare(request);
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
         var root = Load(prepared);
         var services = Mapping(root, "services");
         var web = Mapping(services, "web");
@@ -183,6 +183,170 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         await Assert.That(Scalar(networkLabels, "noctf.io/managed")).IsEqualTo("true");
     }
 
+    [Test]
+    public async Task Kubernetes_preparation_omits_Docker_fields_and_exposes_bound_ports()
+    {
+        var request = new ComposeRequest(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            RuntimeProvider.Kubernetes,
+            3,
+            "noctf-runtime",
+            """
+            services:
+              web:
+                image: registry.example/web:v1
+                ports:
+                  - "127.0.0.1:9000:9000"
+            """,
+            new Dictionary<string, string> { ["FLAG"] = "flag-value" },
+            new Dictionary<string, string> { ["noctf.io/managed"] = "true" },
+            new Dictionary<string, RuntimeResourceLimits>
+            {
+                ["web"] = new(268_435_456, 500_000_000, 0)
+            },
+            new(268_435_456, 500_000_000, 0),
+            TimeSpan.FromHours(1),
+            TimeSpan.FromMinutes(2),
+            [
+                new(
+                    "http://{HOST}:{PORT}",
+                    RuntimeExposure.Participants,
+                    ContainerPort: 8080,
+                    ServiceName: "web")
+            ]);
+
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
+            request,
+            podPidsLimit: 512);
+        var web = Mapping(Mapping(Load(prepared), "services"), "web");
+
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("ports"))).IsFalse();
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("mem_limit"))).IsFalse();
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("cpus"))).IsFalse();
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("pids_limit"))).IsFalse();
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("security_opt"))).IsFalse();
+        await Assert.That(
+                Sequence(web, "expose").Children.Cast<YamlScalarNode>().Single().Value)
+            .IsEqualTo("8080");
+        await Assert.That(Scalar(Mapping(web, "environment"), "FLAG"))
+            .IsEqualTo("flag-value");
+        await Assert.That(Scalar(Mapping(web, "labels"), "noctf.io/managed"))
+            .IsEqualTo("true");
+    }
+
+    [Test]
+    public async Task Kubernetes_accepts_legacy_matching_PID_fields_and_removes_them()
+    {
+        var request = KubernetesRequest(
+            """
+            services:
+              web:
+                image: registry.example/web:v1
+                pids_limit: 512
+                deploy:
+                  resources:
+                    limits:
+                      pids: 512
+            """);
+
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
+            request,
+            podPidsLimit: 512);
+        var web = Mapping(Mapping(Load(prepared), "services"), "web");
+
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("pids_limit"))).IsFalse();
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("deploy"))).IsFalse();
+    }
+
+    [Test]
+    public async Task Kubernetes_accepts_one_replica_and_removes_the_deploy_field()
+    {
+        var request = KubernetesRequest(
+            """
+            services:
+              web:
+                image: registry.example/web:v1
+                deploy:
+                  replicas: 1
+            """);
+
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
+            request,
+            podPidsLimit: 512);
+        var web = Mapping(Mapping(Load(prepared), "services"), "web");
+
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("deploy"))).IsFalse();
+    }
+
+    [Test]
+    public async Task Kubernetes_rejects_more_than_one_replica()
+    {
+        var request = KubernetesRequest(
+            """
+            services:
+              web:
+                image: registry.example/web:v1
+                deploy:
+                  replicas: 2
+            """);
+
+        var action = () => ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
+            request,
+            podPidsLimit: 512);
+
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("must use exactly one replica");
+    }
+
+    [Test]
+    public async Task Kubernetes_rejects_a_legacy_PID_field_that_differs_from_the_pool()
+    {
+        var request = KubernetesRequest(
+            """
+            services:
+              web:
+                image: registry.example/web:v1
+                pids_limit: 256
+            """);
+
+        var action = () => ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
+            request,
+            podPidsLimit: 512);
+
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message)
+            .Contains("declares a PID limit that differs from the platform limit");
+    }
+
+    [Arguments("web_api")]
+    [Arguments("Web")]
+    [Arguments("1web")]
+    [Arguments("web.")]
+    [Arguments("web-")]
+    [Test]
+    public async Task Kubernetes_rejects_non_portable_DNS_service_names(string serviceName)
+    {
+        var request = KubernetesRequest(
+            $$"""
+            services:
+              {{serviceName}}:
+                image: registry.example/web:v1
+            """) with
+        {
+            ServiceResources = new Dictionary<string, RuntimeResourceLimits>
+            {
+                [serviceName] = new(268_435_456, 500_000_000, 0)
+            }
+        };
+
+        var action = () => ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
+            request,
+            podPidsLimit: 512);
+
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("DNS-1123 label");
+    }
+
     private static YamlMappingNode Load(string yaml)
     {
         var stream = new YamlStream();
@@ -198,4 +362,21 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
 
     private static string? Scalar(YamlMappingNode parent, string key) =>
         ((YamlScalarNode)parent.Children[new YamlScalarNode(key)]).Value;
+
+    private static ComposeRequest KubernetesRequest(string composeYaml) =>
+        new(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            RuntimeProvider.Kubernetes,
+            3,
+            "noctf-runtime",
+            composeYaml,
+            new Dictionary<string, string>(),
+            new Dictionary<string, string>(),
+            new Dictionary<string, RuntimeResourceLimits>
+            {
+                ["web"] = new(268_435_456, 500_000_000, 0)
+            },
+            new(268_435_456, 500_000_000, 0),
+            TimeSpan.FromHours(1),
+            TimeSpan.FromMinutes(2));
 }

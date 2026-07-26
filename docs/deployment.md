@@ -25,10 +25,19 @@ Runner 管理端口只在内部网络。Checker callback API 可达，但严格 
 ## Provider 前置条件
 
 - Docker Pool：Docker daemon，禁止把 socket 暴露给题目 Container。
-- Kubernetes Pool：统一 Namespace、NetworkPolicy 能力、固定 Kompose 版本与 kubectl/API 权限。
+- Kubernetes Pool：统一 Runtime Namespace、支持 NetworkPolicy 的 CNI、固定 Kompose
+  `v1.38.0` 与最小 Kubernetes API 权限。Pool 必须显式声明
+  `Runtime__Kubernetes__Namespace`、`ClusterDomain`、`PodPidsLimit` 和
+  `NetworkPolicyRequired=true`。
 - Libvirt Pool：QEMU/KVM/Libvirt、Runner 可访问 OvaSourceUrl；需要 URL 的 VM 具备 QEMU Guest Agent。
 
 同 Pool 节点对 file:// OVA 路径必须有一致挂载。Provider/Pool 不可用会阻止新 Runtime 派发，不影响静态 API。
+
+`Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
+kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。
+`NetworkPolicyRequired=true` 是部署契约，运维仍必须确认 CNI 实际执行 NetworkPolicy。
+Runtime Namespace 只放置 `rt-*` Runtime 资源；如确需平台资源，名称必须使用
+`platform-*` 保留前缀。
 
 ## 网络
 

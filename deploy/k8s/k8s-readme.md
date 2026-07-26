@@ -106,26 +106,35 @@ kubectl get ingress -n noctf
 
 ## Kubernetes Runner
 
-The default manifests run `Runner__Provider=Kubernetes`. The runner uses its ServiceAccount to create one namespace per dynamic challenge instance, then applies ResourceQuota, LimitRange, NetworkPolicy, Deployments/Jobs, Services, and optional Ingress objects.
+The default manifests run the Runner in `noctf` and grant its ServiceAccount a
+namespace-scoped Role in the shared `runtime` namespace. Each Compose runtime gets
+immutable `rt-*` resources, a headless DNS Service, a NetworkPolicy, Deployments,
+and platform-owned dynamic NodePort Services. Challenge definitions cannot create
+namespaces, Ingresses, NodePorts, or LoadBalancers.
 
 Important ConfigMap values:
 
-- `K8s__PublicEntry`: host/IP shown for NodePort entries
-- `K8s__IngressBaseDomain`: wildcard domain for generated Ingress hosts
-- `K8s__DefaultExposure`: `NodePort`, `Ingress`, or `ClusterIP`
-- `K8s__NetworkMode`: `Isolated` or `Open`
+- `Runtime__Kubernetes__Namespace`: shared challenge namespace
+- `Runtime__Kubernetes__PublicHost`: host/IP used in dynamic NodePort URLs
+- `Runtime__Kubernetes__ClusterDomain`: actual cluster DNS domain
+- `Runtime__Kubernetes__PodPidsLimit`: must equal the kubelet Pool-wide value
+- `Runtime__Kubernetes__NetworkPolicyRequired`: must be `true`
 
-For private registries, add `K8s__Registries__0__Registry`, `K8s__Registries__0__UserName`, and `K8s__Registries__0__Password` through a Secret or deployment environment override.
+The Runner image contains Kompose `v1.38.0` at `/usr/local/bin/kompose`.
+The cluster CNI must enforce NetworkPolicy; the configuration flag is an
+operator attestation, not a capability probe.
 
 Smoke test:
 
 ```bash
 kubectl get pods -n noctf
 kubectl logs -n noctf deploy/runner
-kubectl get ns | grep noctf-inst
+kubectl get deployment,service,networkpolicy -n runtime
 ```
 
-Start and stop a dynamic challenge from the UI, then verify that a `noctf-inst-*` namespace appears and is deleted.
+Start and stop a Compose challenge from the UI, then verify that only resources
+with the exact RuntimeInstanceId and Generation appear and are removed from
+`runtime`.
 
 ## Docker Runner / AWD Privileged Node Mode
 
