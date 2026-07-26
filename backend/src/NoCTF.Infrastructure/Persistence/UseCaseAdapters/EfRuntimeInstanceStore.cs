@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
@@ -11,6 +12,7 @@ namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 public sealed class EfRuntimeInstanceStore(
     NoCtfDbContext db,
     IChallengeRuntimeTemplateCatalog templates,
+    IPerTeamRuntimeFlagStore runtimeFlags,
     ITransactionalMessageOutbox outbox) : IRuntimeInstanceStore
 {
     public async Task<RuntimeInstanceView?> FindPlayerRuntimeAsync(
@@ -76,7 +78,15 @@ public sealed class EfRuntimeInstanceStore(
                     current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                     await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
                 }
-                try { entity = Create(scope, command, checked((current?.Generation ?? 0) + 1), replacesFailed ? current!.Id : null); }
+                try
+                {
+                    entity = await CreateAsync(
+                        scope,
+                        command,
+                        checked((current?.Generation ?? 0) + 1),
+                        replacesFailed ? current!.Id : null,
+                        ct);
+                }
                 catch (InvalidOperationException) { return new(null, RuntimeMutationFailure.ConfigurationInvalid); }
                 db.RuntimeInstances.Add(entity);
                 if (!replacesFailed)
@@ -88,7 +98,15 @@ public sealed class EfRuntimeInstanceStore(
                 current.State = RuntimeState.Stopping;
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
-                try { entity = Create(scope, command, checked(current.Generation + 1), current.Id); }
+                try
+                {
+                    entity = await CreateAsync(
+                        scope,
+                        command,
+                        checked(current.Generation + 1),
+                        current.Id,
+                        ct);
+                }
                 catch (InvalidOperationException) { return new(null, RuntimeMutationFailure.ConfigurationInvalid); }
                 db.RuntimeInstances.Add(entity);
                 break;
@@ -135,14 +153,25 @@ public sealed class EfRuntimeInstanceStore(
         }
     }
 
-    private RuntimeInstance Create(
+    private async Task<RuntimeInstance> CreateAsync(
         RuntimeScope scope,
         RuntimeMutationCommand command,
         int generation,
-        Guid? replaces)
+        Guid? replaces,
+        CancellationToken cancellationToken)
     {
         var template = templates.Get(scope.Mode, scope.ConfigurationJson)
             ?? throw new InvalidOperationException("The challenge does not define a runtime template.");
+        if (scope.Mode == GameMode.Ctf
+            && template.FlagSource == RuntimeFlagSource.PerTeam)
+        {
+            _ = await runtimeFlags.EnsureAsync(
+                command.CompetitionId,
+                command.CompetitionChallengeId,
+                scope.TeamId,
+                command.Now,
+                cancellationToken);
+        }
         return new RuntimeInstance
         {
             Id = Guid.CreateVersion7(command.Now),

@@ -83,15 +83,18 @@ RunnerPool
 Image
 Command: string[]?
 Environment: map<string,string>
+FlagEnvironmentVariableName: string?     // PerTeam 时必填
 UrlBindings[]
 Resources: CpuCores, MemoryBytes, PidsLimit, EphemeralStorageBytes
 EgressPolicy: DenyAll | InternetOnly
 RuntimeLifetimeSeconds
 OperationTimeoutSeconds
-FlagSource / FlagEnvironmentVariableName?
+FlagSource: Static | PerTeam
 ```
 
-Command null 使用镜像默认。环境变量名合法且不能使用 `NOCTF_`。Image 可为 tag/digest，不强制 pin；配置变化只影响新 Generation。
+Command null 使用镜像默认。`FlagSource=PerTeam` 时
+`FlagEnvironmentVariableName` 必填；Static 时必须省略。环境变量名合法且不能使用
+`NOCTF_`。Image 可为 tag/digest，不强制 pin；配置变化只影响新 Generation。
 
 ## Compose
 
@@ -102,6 +105,10 @@ Command null 使用镜像默认。环境变量名合法且不能使用 `NOCTF_`�
 不支持任何目录/卷挂载；只使用镜像自身可写层。Kompose 不支持字段、转换失败或危险资源使实例 Failed。
 
 Compose URL Binding 通过 ServiceName+ContainerPort 定位；配置顺序决定返回顺序。
+
+Compose 的 `FlagEnvironmentVariables` 是 `serviceName -> environmentVariableName` 映射。
+`FlagSource=PerTeam` 时至少配置一个目标 service，且只能引用 Compose 中真实存在的
+service；Static 时必须省略。未列出的 service 不接收 Flag。
 
 Kubernetes Compose 固定使用 Kompose `v1.38.0`，题目不得创建 Kubernetes Service。
 平台为公开 URL Binding 创建动态 NodePort Service；题目转换出的 Service 只用于检查端口语义，
@@ -171,7 +178,14 @@ Provisioning/Running/Stopping、Provider=Libvirt 且仍归属该节点时才保�
 
 ### CTF Container/Compose
 
-PerTeam Flag 仅以环境变量在创建时注入。每个目标服务配置一个合法变量名；Compose 可指定多个服务；Runner 覆盖 YAML/镜像同名值。需要文件的镜像由自身 ENTRYPOINT 写入。平台不挂载 Flag 文件/Secret。
+PerTeam Flag 仅以环境变量在创建时注入。Container 使用单个
+`FlagEnvironmentVariableName`；Compose 使用 `FlagEnvironmentVariables` 为每个目标
+service 配置一个合法变量名，可指定多个 service。Runner 覆盖 YAML/镜像同名值。
+需要文件的镜像由自身 ENTRYPOINT 写入。平台不挂载 Flag 文件/Secret。
+
+Start 在创建 RuntimeInstance 的同一事务内保证团队固定 Flag 存在。该事实使用
+`SpecificationKind.RuntimeDefinition`，且 `SpecificationId=CompetitionChallengeId`；
+Worker 只读取这个精确 scope。Reset 创建新 Generation，但继续复用同一 Flag。
 
 ### AWD 热轮换
 

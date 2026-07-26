@@ -10,8 +10,10 @@ public static class RuntimeClaimFactory
     public static IRunnerPoolMessage Create(
         RuntimeInstance instance,
         GameMode mode,
-        ChallengeRuntimeTemplate template)
+        ChallengeRuntimeTemplate template,
+        string? perTeamFlag = null)
     {
+        var fixedFlag = ResolvePerTeamFlag(mode, template, perTeamFlag);
         var limits = template.Limits
             ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
         TimeSpan? ttl = template.TtlSeconds is > 0
@@ -34,7 +36,7 @@ public static class RuntimeClaimFactory
                         template.Provider,
                         definition.Image,
                         definition.Command ?? [],
-                        definition.Environment ?? new Dictionary<string, string>(),
+                        ContainerEnvironment(definition, fixedFlag),
                         MergeLabels(definition.Labels, instance),
                         definition.PortMappings ?? new Dictionary<int, int>(),
                         limits,
@@ -72,7 +74,8 @@ public static class RuntimeClaimFactory
                         ttl,
                         operationTimeout,
                         template.UrlBindings,
-                        mode == GameMode.Koh ? template.ControlCheckUrlBinding : null)),
+                        mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
+                        ServiceEnvironment(definition, fixedFlag))),
             OvaRuntimeDefinition definition when template.Provider == RuntimeProvider.Libvirt =>
                 new ClaimOvaRuntime(
                     instance.Id,
@@ -95,6 +98,59 @@ public static class RuntimeClaimFactory
             _ => throw new InvalidOperationException(
                 "Runtime definition and provider are incompatible.")
         };
+    }
+
+    private static string? ResolvePerTeamFlag(
+        GameMode mode,
+        ChallengeRuntimeTemplate template,
+        string? perTeamFlag)
+    {
+        if (mode != GameMode.Ctf || template.FlagSource != RuntimeFlagSource.PerTeam)
+            return null;
+        return !string.IsNullOrEmpty(perTeamFlag)
+            ? perTeamFlag
+            : throw new InvalidOperationException(
+                "A CTF PerTeam runtime requires its fixed team flag.");
+    }
+
+    private static IReadOnlyDictionary<string, string> ContainerEnvironment(
+        ContainerRuntimeDefinition definition,
+        string? fixedFlag)
+    {
+        var environment = definition.Environment is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : new Dictionary<string, string>(definition.Environment, StringComparer.Ordinal);
+        if (fixedFlag is not null)
+        {
+            var variable = definition.FlagEnvironmentVariableName
+                ?? throw new InvalidOperationException(
+                    "A PerTeam Container runtime requires a flag environment variable.");
+            environment[variable] = fixedFlag;
+        }
+        return environment;
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>?
+        ServiceEnvironment(
+            ComposeRuntimeDefinition definition,
+            string? fixedFlag)
+    {
+        if (fixedFlag is null)
+            return null;
+        var targets = definition.FlagEnvironmentVariables;
+        if (targets is null || targets.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "A PerTeam Compose runtime requires flag environment variables.");
+        }
+        return targets.ToDictionary(
+            target => target.Key,
+            target => (IReadOnlyDictionary<string, string>)new Dictionary<string, string>(
+                StringComparer.Ordinal)
+            {
+                [target.Value] = fixedFlag
+            },
+            StringComparer.Ordinal);
     }
 
     private static Uri ParseOvaSource(string source)

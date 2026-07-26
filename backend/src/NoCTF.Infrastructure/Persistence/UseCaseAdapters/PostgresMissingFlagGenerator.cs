@@ -1,15 +1,17 @@
 using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Flags;
+using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
-public sealed class PostgresMissingFlagGenerator(NoCtfDbContext db) : IMissingFlagGenerator
+public sealed class PostgresMissingFlagGenerator(
+    NoCtfDbContext db,
+    IChallengeRuntimeTemplateCatalog templates,
+    IPerTeamRuntimeFlagStore runtimeFlags) : IMissingFlagGenerator
 {
     public async Task<IReadOnlyList<MissingFlagGenerationFailure>> GenerateAsync(
         Guid competitionId,
@@ -41,10 +43,38 @@ public sealed class PostgresMissingFlagGenerator(NoCtfDbContext db) : IMissingFl
         var failures = new List<MissingFlagGenerationFailure>();
         foreach (var challenge in challenges)
         {
-            if (competition.Mode == GameMode.Ctf && !UsesPerTeamFlag(challenge.ConfigurationJson))
+            var usesPerTeamRuntimeFlag = competition.Mode == GameMode.Ctf
+                && templates.Get(competition.Mode, challenge.ConfigurationJson)?.FlagSource
+                    == RuntimeFlagSource.PerTeam;
+            if (competition.Mode == GameMode.Ctf && !usesPerTeamRuntimeFlag)
                 continue;
             foreach (var teamId in teams)
             {
+                if (usesPerTeamRuntimeFlag)
+                {
+                    try
+                    {
+                        _ = await runtimeFlags.EnsureAsync(
+                            competitionId,
+                            challenge.Id,
+                            teamId,
+                            now,
+                            ct);
+                    }
+                    catch (Exception exception)
+                        when (exception is CryptographicException
+                            or InvalidOperationException
+                            or OverflowException)
+                    {
+                        failures.Add(new(
+                            challenge.Id,
+                            teamId,
+                            "flag_generation_failed",
+                            "The flag could not be derived."));
+                    }
+                    continue;
+                }
+
                 var exists = await db.ChallengeFlags.AnyAsync(flag =>
                     flag.CompetitionChallengeId == challenge.Id &&
                     flag.TeamId == teamId &&
@@ -53,7 +83,7 @@ public sealed class PostgresMissingFlagGenerator(NoCtfDbContext db) : IMissingFl
                     continue;
                 try
                 {
-                    var flag = Derive(
+                    var flag = PerTeamRuntimeFlagDerivation.Derive(
                         competition.FlagDerivationSecret,
                         competitionId,
                         challenge.Id,
@@ -81,26 +111,5 @@ public sealed class PostgresMissingFlagGenerator(NoCtfDbContext db) : IMissingFl
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return failures;
-    }
-
-    private static bool UsesPerTeamFlag(string json)
-    {
-        using var document = JsonDocument.Parse(json);
-        if (!document.RootElement.TryGetProperty("flagSource", out var value) &&
-            !document.RootElement.TryGetProperty("FlagSource", out value))
-            return false;
-        return string.Equals(value.GetString(), "PerTeam", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string Derive(
-        byte[] secret,
-        Guid competitionId,
-        Guid competitionChallengeId,
-        Guid teamId)
-    {
-        var message = Encoding.UTF8.GetBytes(
-            $"noctf:teamhash:v1:{competitionId:D}:{competitionChallengeId:D}:{teamId:D}");
-        var hash = HMACSHA256.HashData(secret, message);
-        return $"flag{{{Convert.ToHexStringLower(hash)[..32]}}}";
     }
 }

@@ -235,6 +235,55 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
     }
 
     [Test]
+    public async Task Preparation_applies_service_environment_only_to_the_target_service()
+    {
+        var request = new ComposeRequest(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            RuntimeProvider.Docker,
+            1,
+            "noctf-runtime",
+            """
+            services:
+              web:
+                image: registry.example/web:v1
+                environment:
+                  FLAG: author-value
+              worker:
+                image: registry.example/worker:v1
+            """,
+            new Dictionary<string, string>(),
+            new Dictionary<string, string>(),
+            new Dictionary<string, RuntimeResourceLimits>
+            {
+                ["web"] = ServiceLimits,
+                ["worker"] = ServiceLimits
+            },
+            new(536_870_912, 1_000_000_000, 256),
+            TimeSpan.FromHours(1),
+            TimeSpan.FromMinutes(2),
+            ServiceEnvironment:
+                new Dictionary<string, IReadOnlyDictionary<string, string>>
+                {
+                    ["web"] = new Dictionary<string, string>
+                    {
+                        ["FLAG"] = "flag{fixed-team}"
+                    }
+                });
+
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+        var services = Mapping(Load(prepared), "services");
+        var web = Mapping(services, "web");
+        var worker = Mapping(services, "worker");
+
+        await Assert.That(Scalar(Mapping(web, "environment"), "FLAG"))
+            .IsEqualTo("flag{fixed-team}");
+        await Assert.That(
+                Mapping(worker, "environment").Children.ContainsKey(
+                    new YamlScalarNode("FLAG")))
+            .IsFalse();
+    }
+
+    [Test]
     public async Task Kubernetes_accepts_legacy_matching_PID_fields_and_removes_them()
     {
         var request = KubernetesRequest(
