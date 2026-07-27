@@ -23,6 +23,18 @@ public sealed class DeploymentTopologyTests
         await Assert.That(File.Exists(workerDeployment)).IsTrue();
         await Assert.That(workerProgram)
             .Contains("options.Discovery.IncludeType(typeof(BackendMessageHandlers));");
+        foreach (var runnerAvailabilitySetting in new[]
+                 {
+                     "Runner__Capacity__MemoryBytes",
+                     "Runner__Capacity__NanoCpus",
+                     "Runner__Capacity__PidsLimit",
+                     "Runner__Heartbeat__IntervalSeconds",
+                     "Runner__Heartbeat__TtlSeconds"
+                 })
+        {
+            await Assert.That(compose).Contains(runnerAvailabilitySetting);
+            await Assert.That(kubernetesConfig).Contains(runnerAvailabilitySetting);
+        }
 
         foreach (var legacySetting in new[]
                  {

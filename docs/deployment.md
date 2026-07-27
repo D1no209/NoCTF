@@ -51,6 +51,13 @@ membership；heartbeat 过期的节点不会收到新审计，节点以相同 Ru
 `Runner__Provider` 必须与该 Pool 的 Runtime 配置一致。不要通过复用 RunnerId 把同一
 Docker/Kubernetes 节点或 Libvirt node CIDR 同时交给两个宿主。
 
+每个 Runner 节点必须配置 `Runner__Capacity__MemoryBytes`、
+`Runner__Capacity__NanoCpus`、`Runner__Capacity__PidsLimit`、
+`Runner__Heartbeat__IntervalSeconds` 和 `Runner__Heartbeat__TtlSeconds`。所有容量值和心跳周期
+必须为正，TTL 必须大于刷新周期。Runner 只刷新已初始化的可用容量，不会覆盖已扣减值；
+Redis 容量状态丢失且 PostgreSQL 仍有该节点活跃 assignment 时，节点保持离线，直到
+assignment 收敛后才从部署配置重建容量。
+
 `Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
 kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。
 `NetworkPolicyRequired=true` 是部署契约，运维仍必须确认 CNI 实际执行 NetworkPolicy。

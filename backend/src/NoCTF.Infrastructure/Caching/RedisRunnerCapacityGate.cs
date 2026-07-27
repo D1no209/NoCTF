@@ -38,9 +38,22 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         local cpu = redis.call('HGET', KEYS[2], 'nanoCpus')
         local pids = redis.call('HGET', KEYS[2], 'pidsLimit')
         if not memory or not cpu or not pids then return 0 end
-        redis.call('HINCRBY', KEYS[1], 'availableMemoryBytes', tonumber(memory))
-        redis.call('HINCRBY', KEYS[1], 'availableNanoCpus', tonumber(cpu))
-        redis.call('HINCRBY', KEYS[1], 'availablePids', tonumber(pids))
+        local availableMemory = tonumber(redis.call('HGET', KEYS[1], 'availableMemoryBytes') or '0')
+        local availableCpu = tonumber(redis.call('HGET', KEYS[1], 'availableNanoCpus') or '0')
+        local availablePids = tonumber(redis.call('HGET', KEYS[1], 'availablePids') or '0')
+        local totalMemory = tonumber(redis.call('HGET', KEYS[1], 'totalMemoryBytes') or '-1')
+        local totalCpu = tonumber(redis.call('HGET', KEYS[1], 'totalNanoCpus') or '-1')
+        local totalPids = tonumber(redis.call('HGET', KEYS[1], 'totalPids') or '-1')
+        local restoredMemory = availableMemory + tonumber(memory)
+        local restoredCpu = availableCpu + tonumber(cpu)
+        local restoredPids = availablePids + tonumber(pids)
+        if totalMemory >= 0 and restoredMemory > totalMemory then restoredMemory = totalMemory end
+        if totalCpu >= 0 and restoredCpu > totalCpu then restoredCpu = totalCpu end
+        if totalPids >= 0 and restoredPids > totalPids then restoredPids = totalPids end
+        redis.call('HSET', KEYS[1],
+            'availableMemoryBytes', restoredMemory,
+            'availableNanoCpus', restoredCpu,
+            'availablePids', restoredPids)
         redis.call('DEL', KEYS[2])
         return 1
         """;

@@ -17,7 +17,11 @@ using NoCTF.Runner.Messages;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Application.Authentication;
 using NoCTF.Infrastructure.Authentication;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Runtime.Kubernetes.Networking;
+using Microsoft.Extensions.Options;
+using StackExchange.Redis;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Composition;
 
@@ -29,6 +33,61 @@ public static class ServiceRegistration
     {
         services.AddHttpClient();
         var configuredProvider = configuration["Runner:Provider"];
+        var provider = Enum.TryParse<RuntimeProvider>(
+            configuredProvider,
+            ignoreCase: true,
+            out var parsedProvider)
+            ? parsedProvider
+            : (RuntimeProvider?)null;
+        services.AddOptions<RunnerAvailabilityOptions>()
+            .Configure(options =>
+            {
+                options.RunnerId = configuration["Runner:Id"] ?? string.Empty;
+                options.RunnerPool = configuration["Runner:Pool"] ?? string.Empty;
+                options.Provider = provider;
+                options.MemoryBytes = ReadLongOrZero(configuration, "Runner:Capacity:MemoryBytes");
+                options.NanoCpus = ReadLongOrZero(configuration, "Runner:Capacity:NanoCpus");
+                options.PidsLimit = ReadLongOrZero(configuration, "Runner:Capacity:PidsLimit");
+                options.HeartbeatIntervalSeconds = ReadIntOrZero(
+                    configuration,
+                    "Runner:Heartbeat:IntervalSeconds");
+                options.HeartbeatTtlSeconds = ReadIntOrZero(
+                    configuration,
+                    "Runner:Heartbeat:TtlSeconds");
+            })
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.RunnerId)
+                    && options.RunnerId.Length <= 128,
+                "Runner:Id must contain 1..128 characters.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.RunnerPool)
+                    && options.RunnerPool.Length <= 256,
+                "Runner:Pool must contain 1..256 characters.")
+            .Validate(
+                options => options.Provider is not null,
+                "Runner:Provider must be Docker, Kubernetes, or Libvirt.")
+            .Validate(
+                options => options.MemoryBytes > 0
+                    && options.NanoCpus > 0
+                    && options.PidsLimit > 0,
+                "Runner capacity values must be positive integers.")
+            .Validate(
+                options => options.HeartbeatIntervalSeconds > 0
+                    && options.HeartbeatTtlSeconds > options.HeartbeatIntervalSeconds,
+                "Runner heartbeat TTL must be greater than its positive interval.")
+            .ValidateOnStart();
+        var redis = configuration.GetConnectionString("Redis");
+        if (string.IsNullOrWhiteSpace(redis))
+            throw new InvalidOperationException("ConnectionStrings:Redis is required for the Runner host.");
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+        {
+            var redisOptions = ConfigurationOptions.Parse(redis);
+            redisOptions.AbortOnConnectFail = false;
+            return ConnectionMultiplexer.Connect(redisOptions);
+        });
+        services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
+        services.AddSingleton<RedisRunnerAvailabilityRegistry>();
+        services.AddHostedService<RunnerAvailabilityPublisher>();
         var isKubernetesPool = string.Equals(
             configuredProvider,
             nameof(NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes),
@@ -217,4 +276,22 @@ public static class ServiceRegistration
             throw new InvalidOperationException($"{key} must be configured as true.");
         return true;
     }
+
+    private static long ReadLongOrZero(IConfiguration configuration, string key) =>
+        long.TryParse(
+            configuration[key],
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : 0;
+
+    private static int ReadIntOrZero(IConfiguration configuration, string key) =>
+        int.TryParse(
+            configuration[key],
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : 0;
 }

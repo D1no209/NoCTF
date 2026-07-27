@@ -193,6 +193,11 @@ services:
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
       Runner__Pool: ${RUNNER_POOL:-default}
       Runner__Id: ${RUNNER_ID:-docker-runner-1}
+      Runner__Capacity__MemoryBytes: ${RUNNER_CAPACITY_MEMORY_BYTES:-4294967296}
+      Runner__Capacity__NanoCpus: ${RUNNER_CAPACITY_NANO_CPUS:-2000000000}
+      Runner__Capacity__PidsLimit: ${RUNNER_CAPACITY_PIDS_LIMIT:-2048}
+      Runner__Heartbeat__IntervalSeconds: ${RUNNER_HEARTBEAT_INTERVAL_SECONDS:-5}
+      Runner__Heartbeat__TtlSeconds: ${RUNNER_HEARTBEAT_TTL_SECONDS:-15}
       ConnectionStrings__PostgreSql: >-
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
