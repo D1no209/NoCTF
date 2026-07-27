@@ -32,6 +32,8 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
 
         var komposePath = Environment.GetEnvironmentVariable("NOCTF_KOMPOSE_PATH")
             ?? "/usr/local/bin/kompose";
+        var ipv6ProbeUrl = Environment.GetEnvironmentVariable(
+            "NOCTF_KUBERNETES_IPV6_PROBE_URL");
         using var client = new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig());
         var namespaceName = $"noctf-it-{Guid.NewGuid():N}";
         await client.CoreV1.CreateNamespaceAsync(
@@ -53,6 +55,7 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
                 client,
                 namespaceName,
                 komposePath,
+                ipv6ProbeUrl,
                 cancellationToken);
         }
         finally
@@ -81,6 +84,7 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
         IKubernetes client,
         string namespaceName,
         string komposePath,
+        string? ipv6ProbeUrl,
         CancellationToken cancellationToken)
     {
         var operationId = Guid.NewGuid();
@@ -187,6 +191,16 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             TimeSpan.FromSeconds(10),
             cancellationToken);
         await Assert.That(protectedInternet.ExitCode).IsNotEqualTo(0);
+        if (!string.IsNullOrWhiteSpace(ipv6ProbeUrl))
+        {
+            await VerifyIpv6EgressPolicyAsync(
+                client,
+                runtime,
+                namespaceName,
+                internetReceipt,
+                ipv6ProbeUrl,
+                cancellationToken);
+        }
 
         var runtimeLabels = OwnershipLabels(operationId, 1);
         var runtimeName = $"rt-{operationId:N}";
@@ -431,6 +445,84 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
         await Assert.That(pods.Items).IsEmpty();
         await Assert.That(services.Items).IsEmpty();
         await Assert.That(policies.Items).IsEmpty();
+    }
+
+    private static async Task VerifyIpv6EgressPolicyAsync(
+        IKubernetes client,
+        KubernetesComposeRuntime runtime,
+        string namespaceName,
+        ComposeReceipt internetReceipt,
+        string probeUrl,
+        CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(probeUrl, UriKind.Absolute, out var uri)
+            || !System.Net.IPAddress.TryParse(uri.Host, out var address)
+            || address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            throw new InvalidOperationException(
+                "NOCTF_KUBERNETES_IPV6_PROBE_URL must use an IPv6 address host.");
+        }
+
+        var controlId = Guid.NewGuid();
+        var controlName = $"ipv6-control-{controlId:N}"[..45];
+        var controlLabels = OwnershipLabels(controlId, 1, "ipv6-control");
+        await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(
+            new V1NetworkPolicy
+            {
+                Metadata = new V1ObjectMeta
+                {
+                    Name = $"{controlName}-egress",
+                    NamespaceProperty = namespaceName
+                },
+                Spec = new V1NetworkPolicySpec
+                {
+                    PodSelector = new V1LabelSelector
+                    {
+                        MatchLabels = controlLabels
+                    },
+                    PolicyTypes = ["Egress"],
+                    Egress = [new V1NetworkPolicyEgressRule()]
+                }
+            },
+            namespaceName,
+            cancellationToken: cancellationToken);
+        await client.CoreV1.CreateNamespacedPodAsync(
+            ProbePod(
+                controlName,
+                "ipv6-control",
+                null,
+                controlLabels,
+                neverReady: false),
+            namespaceName,
+            cancellationToken: cancellationToken);
+        await WaitUntilPodRunningAsync(
+            client,
+            namespaceName,
+            controlName,
+            cancellationToken);
+        var controlReceipt = new ComposeReceipt(
+            controlId,
+            RuntimeProvider.Kubernetes,
+            "ipv6-control",
+            namespaceName,
+            "node.test",
+            1,
+            DateTimeOffset.UtcNow);
+        var allowedControl = await runtime.ExecAsync(
+            controlReceipt,
+            "ipv6-control",
+            ["wget", "-T", "10", "-q", "-O", "/dev/null", probeUrl],
+            TimeSpan.FromSeconds(15),
+            cancellationToken);
+        await Assert.That(allowedControl.ExitCode).IsEqualTo(0);
+
+        var deniedRuntime = await runtime.ExecAsync(
+            internetReceipt,
+            "web",
+            ["wget", "-T", "5", "-q", "-O", "/dev/null", probeUrl],
+            TimeSpan.FromSeconds(10),
+            cancellationToken);
+        await Assert.That(deniedRuntime.ExitCode).IsNotEqualTo(0);
     }
 
     private static async Task EnsureBaselinePolicyEnforcedAsync(
