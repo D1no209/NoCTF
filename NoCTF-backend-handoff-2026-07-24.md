@@ -15,23 +15,24 @@ OVA/Libvirt lifecycle、orphan reconciliation 与 CTF PerTeam Runtime Flag 注�
 EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 与 Kubernetes
 `DenyAll | InternetOnly` enforcement 已接通，并已在 Cilium `always` 模式的临时集群
 完成真实复测。Docker/Kubernetes 持久 Container sandbox、可信 ingress proxy 与
-Compose appliance 的 crash orphan reconciliation 也已闭环。下一主线是受控部署 smoke。
+Compose appliance 的 crash orphan reconciliation 也已闭环。受控 Docker Compose 与
+Kubernetes 三进程 deployment smoke 已完成并清理；下一主线是
+真实双栈集群 IPv6 deny 验证。
 
 ### 当前完成度
 
-后端目标架构迁移当前完成度估算为 **86%**。这是按剩余交付里程碑计算的工程进度，
-不是测试覆盖率或生产可用性承诺。剩余 14 个百分点固定分配为：
+后端目标架构迁移当前完成度估算为 **90%**。这是按剩余交付里程碑计算的工程进度，
+不是测试覆盖率或生产可用性承诺。剩余 10 个百分点固定分配为：
 
-- 受控 Docker Compose/Kubernetes deployment smoke：4%；
 - 真实双栈集群 IPv6 deny 验证：2%；
 - CTF、AWD、AWDP、KoH 四模式真实 E2E：5%；
 - capability/DI 机械整理与最终 `Verify-Backend.ps1`：3%。
 
-已完成的 86% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
+已完成的 90% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
 三类 Runtime Provider lifecycle、容量状态机、CTF PerTeam Flag、AWDP 即时 target、
 DNS 命名隔离、Docker/Kubernetes 网络策略、Cilium fail-closed 前提和三 Provider
-crash orphan reconciliation。未完成项仍可能在真实部署验证中暴露返工，因此百分比只用于
-交接排期。
+crash orphan reconciliation，以及三进程 Docker/Kubernetes deployment smoke。未完成项
+仍可能在真实验证中暴露返工，因此百分比只用于交接排期。
 
 ## 2. Git 基线与工作树保护
 
@@ -39,7 +40,8 @@ crash orphan reconciliation。未完成项仍可能在真实部署验证中暴�
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`adc2908 feat(backend): reconcile persistent runtime resources`。
+- 当前代码实现 HEAD：`3227370 fix(deploy): run the three production processes`。
+- `3227370` 尚未推送；本交接文档更新完成后仍需保留为独立本地 docs 提交。
 - 前序实现均先做本地提交；用户已于 2026-07-27 明确授权完善本文后推送当前分支。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -127,7 +129,7 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 340/340 passed。
+- 341/341 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -139,6 +141,9 @@ wsl bash -lc `
 
 - 本轮 WSL 回归为 33/33 passed、0 failed、0 skipped。
 - 非 Integration 与 Integration 分组总计 373 passed、0 failed、0 skipped。
+- `3227370` 后再次执行 Integration：32 passed、0 failed、1 skipped；唯一 skip 是未设置
+  `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例。本阶段另以完整部署清单完成
+  独立 Kubernetes smoke，不把该 skip 伪装为 passed。
 - Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
 - Kubernetes 使用一次性 k3d `v5.9.0` / k3s `v1.35.5+k3s1` /
   Cilium `v1.19.6`。k3s 以 `--flannel-backend=none --disable-network-policy`
@@ -201,6 +206,28 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 
 - `git diff --check` 在每个已提交纵切前均成功。
 - `backend/Verify-Backend.ps1` 仍不存在，是明确交付项。
+
+### 三进程 deployment smoke（`3227370`）
+
+- 新增独立 Worker image target、Compose service 与 Kubernetes Deployment；API、Worker、
+  Runner 均在 migration 成功后启动。部署层旧 Runner HTTP/API-key、QQBot 与 plugin-agent
+  残留已删除，Domain/Application/Wolverine/Provider 架构未改变。
+- 首次隔离 Compose 启动复现 Worker 收到三条维护消息后报告 `No known handler`。根因是
+  static `BackendMessageHandlers` 不属于 Wolverine 的 concrete-type conventional discovery；
+  Worker 入口使用 `Discovery.IncludeType(typeof(BackendMessageHandlers))` 显式注册现有类型，
+  没有重写 handler 或消息拓扑。
+- Docker smoke 使用隔离 project `noctf-smoke-20260727` 和独立 host ports。migration exit 0，
+  API `/health`、Runner `/health/ready` 正常；Worker 实际执行并重新排程 Runner assignment、
+  Competition lifecycle、AWD checker 三条 durable maintenance chain，0 restart，日志无
+  `No known handler`。
+- Kubernetes smoke 使用一次性 k3d `v5.9.0` / k3s `v1.35.5+k3s1` / Cilium `v1.19.6`；
+  Flannel 与内建 NetworkPolicy controller 关闭，Cilium `enable-policy=always`。严格按
+  Runtime baseline、配置/Secret、存储、migration、三进程、network policy 的顺序 apply。
+- 最终 API、Worker、Runner 与三项依赖均 Ready、0 restart；Runner 通过 Cilium、baseline、
+  kube-dns 启动校验，Worker 在最终 default-deny 后继续更新三条 schedule。数据库最终观察到
+  processing version `2/4/3`，证明不是只检查 Pod Running。
+- 一次性 k3d 集群、隔离 Compose project/network/volumes、临时镜像标签与工具文件均已删除。
+  用户原有 `deploy-*` 六个容器全程未重启，最终仍保持运行；没有应用到生产环境。
 
 ## 5. 已完成且不要重做
 
@@ -423,14 +450,13 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 
 当前实际部署状态：
 
-- 本轮只修改、验证并本地提交了代码和部署清单，没有重启或替换用户正在运行的服务。
-- 2026-07-27 推送前再次检查时，本机仍运行已有 `deploy-*` 容器，实际网络仍是
-  `deploy_default`；`noctf-network` 尚不存在。新的 `deploy/docker-compose.yml` 只完成
-  `config --quiet` 验证，尚未 `up` 应用。
-- `deploy/k8s` 与 `deploy/cilium` 只 apply 到一次性本地 k3d/k3s+Cilium 集群完成验证；
-  该集群现已删除。这不代表任何用户集群或生产集群已经部署。
-- 没有任何生产环境部署。本轮交接最终状态为当前分支已推送至同名远端分支，未创建 PR；
-  Git 推送不代表部署清单已应用。
+- 新清单只应用到隔离 Compose project `noctf-smoke-20260727` 和一次性本地
+  k3d/k3s+Cilium 集群完成 smoke；两套测试环境及其 network、volume、临时镜像和工具
+  均已删除。
+- 用户原有 `deploy-*` 栈没有执行 `up`、`down`、`restart` 或替换；最终六个容器仍运行在
+  原有 `deploy_default`。受控 smoke 创建的 `noctf-network` 已随隔离 project 删除。
+- 没有任何生产环境部署。本轮 `3227370` 与后续 handoff docs 提交仅保留在本地，尚未推送，
+  未创建 PR；Git 提交和临时集群 smoke 都不代表生产部署。
 
 明确尚未实现：
 
@@ -484,11 +510,9 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 
 每一项必须独立 commit：
 
-1. 使用新清单执行受控 Docker Compose/Kubernetes deployment smoke；不得自行重启用户
-   当前运行的本地栈。
-2. 在真实双栈集群补做 IPv6 deny 验证；当前一次性集群是 IPv4 single-stack。
-3. 重新跑四模式 E2E。
-4. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+1. 在真实双栈集群补做 IPv6 deny 验证；当前一次性集群是 IPv4 single-stack。
+2. 重新跑四模式 E2E。
+3. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
@@ -513,9 +537,9 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从受控 deployment smoke 开始；不要重做已完成的 RuntimeKind dispatch、
-   Docker/Kubernetes Compose handler、三 Provider crash orphan reconciliation 或
-   Cilium egress 验证。
+4. 从真实双栈集群 IPv6 deny 验证开始；不要重做已完成的 deployment smoke、
+   RuntimeKind dispatch、Docker/Kubernetes Compose handler、三 Provider crash orphan
+   reconciliation 或 IPv4 Cilium egress 验证。
 5. 每个纵切固定执行：
    - 失败测试；
    - 最小实现；
