@@ -17,21 +17,23 @@ EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 
 完成真实复测。Docker/Kubernetes 持久 Container sandbox、可信 ingress proxy 与
 Compose appliance 的 crash orphan reconciliation 也已闭环。受控 Docker Compose 与
 Kubernetes 三进程 deployment smoke、真实双栈 Cilium IPv6 deny 验证均已完成并清理；
-下一主线是 CTF、AWD、AWDP、KoH 四模式真实 E2E。
+Admin API 传输层、协议测试、OpenAPI 与文档重构也已完成。下一主线是 CTF、AWD、
+AWDP、KoH 四模式真实 E2E。
 
 ### 当前完成度
 
-后端目标架构迁移当前完成度估算为 **92%**。这是按剩余交付里程碑计算的工程进度，
-不是测试覆盖率或生产可用性承诺。剩余 8 个百分点固定分配为：
+后端目标架构迁移当前完成度估算为 **93%**。这是按剩余交付里程碑计算的工程进度，
+不是测试覆盖率或生产可用性承诺。剩余 7 个百分点固定分配为：
 
 - CTF、AWD、AWDP、KoH 四模式真实 E2E：5%；
-- capability/DI 机械整理与最终 `Verify-Backend.ps1`：3%。
+- capability/DI 机械整理与最终 `Verify-Backend.ps1`：2%。
 
-已完成的 92% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
+已完成的 93% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
 三类 Runtime Provider lifecycle、容量状态机、CTF PerTeam Flag、AWDP 即时 target、
 DNS 命名隔离、Docker/Kubernetes 网络策略、Cilium fail-closed 前提和三 Provider
-crash orphan reconciliation、三进程 Docker/Kubernetes deployment smoke，以及真实双栈
-IPv6 deny 验证。未完成项仍可能在真实验证中暴露返工，因此百分比只用于交接排期。
+crash orphan reconciliation、三进程 Docker/Kubernetes deployment smoke、真实双栈
+IPv6 deny 验证，以及 Admin API 传输契约重构。未完成项仍可能在真实验证中暴露返工，
+因此百分比只用于交接排期。
 
 ## 2. Git 基线与工作树保护
 
@@ -39,8 +41,8 @@ IPv6 deny 验证。未完成项仍可能在真实验证中暴露返工，因此�
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`adce710 test(backend): verify Kubernetes IPv6 egress deny`。
-- `3227370`、`9011c2e` 与 `adce710` 尚未推送；本交接文档更新完成后仍需保留为
+- 当前代码实现 HEAD：`db3cd5e refactor(api): complete admin endpoint contracts`。
+- `3227370` 到 `db3cd5e` 的 5 个提交尚未推送；本交接文档更新完成后仍需保留为
   独立本地 docs 提交。
 - 前序实现均先做本地提交；用户已于 2026-07-27 明确授权完善本文后推送当前分支。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
@@ -106,6 +108,13 @@ git log --oneline 003b75c..2c6b4ce -- backend
 17. Kubernetes Runner Pool 必填 `ClusterDnsServiceAddress`。Runner 启动时校验它等于
     `kube-dns` ClusterIP，并在每 Runtime policy 中仅向该地址的 TCP/UDP 53 放行；
     题目 Compose 不承担集群 DNS 地址。
+18. 四模式 E2E 使用完整边界：HTTP + 独立 API/Worker/Runner + 真实 PostgreSQL、Redis、
+    MinIO 与 Docker；不得用进程内捷径替代。Admin 重构期间暂缓执行，Admin 完成后再继续。
+19. Admin 重构采用方案 2：只完整收口 API transport、protocol tests、OpenAPI 与 docs；
+    本纵切不重组 Application/Infrastructure capability 或 DI 架构。
+20. Competition 普通更新继续使用 lifecycle status concurrency fence，不增加通用
+    `Competition.Revision`；模式配置使用 `ConfigurationRevision`。
+21. CompetitionChallenge 普通更新与模式配置更新继续使用各自现有 revision。
 
 ## 4. 2026-07-27 当前 HEAD 的实测门禁
 
@@ -129,7 +138,7 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 341/341 passed。
+- 343/343 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -229,12 +238,18 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 ```
 
 - 成功。
-- FastEndpoints 注册 122 endpoints。
+- FastEndpoints 注册 126 endpoints，其中 80 个位于 `/api/v1/admin/*`。
+- 80 个 Admin operations 全部具有唯一 `Admin*` OperationId、Summary、Description、
+  Bearer security 与 tags；无 Admin 422 response，全部 Admin 400/409 使用
+  `application/problem+json`。
+- `backend/artifacts/openapi/swagger.json` 与
+  `backend/src/NoCTF.API/wwwroot/openapi/v1.json` SHA-256 一致。
 
 ### 其他
 
 - `git diff --check` 在每个已提交纵切前均成功。
-- `backend/Verify-Backend.ps1` 仍不存在，是明确交付项。
+- `backend/scripts/Verify-Backend.ps1` 已存在，但尚未按非 Integration/Integration 分组报告，
+  仍是明确交付项。
 
 ### 三进程 deployment smoke（`3227370`）
 
@@ -524,22 +539,38 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 
 ### 6.6 API、DI 与交付项
 
-功能稳定后再做，不与 Provider 业务变化混在一个提交：
+Admin API 传输层已由 `db3cd5e` 独立完成：
 
-- 按 capability 拆 Application/Infrastructure dumping ground。
-- API 不引用 Provider；Domain 不依赖 EF/HTTP/Redis/Wolverine/Provider SDK。
-- 审计 122 endpoints 的 TypedResults union、OperationId、auth、Produces。
-- 创建 `backend/Verify-Backend.ps1`：
+- 80 个 Admin endpoint 均为 strongly typed FastEndpoints、`ExecuteAsync` 与最小可达
+  TypedResults union；空体 Conflict 已改为结构化 Problem Details。
+- 4 条 Competition/CompetitionChallenge configuration GET/PUT 路由恢复为独立强类型端点。
+- Competition 与 CompetitionChallenge 的 Admin-only Create/Update DTO 和 Validator 已回到
+  最接近的 owning endpoint 文件；没有新建共享 DTO dumping ground。
+- Competition 创建限制为 Organizer/Administrator；Admin 读取统一允许 Observer/Judge，
+  rejudge/evaluation 写入允许 Judge，管理写入要求 Manager/Owner/Administrator；Owner/Admin-only
+  所有权和权限变更仍由 Application/Store 条件保证。
+- 错误码与 HTTP 状态已核对：输入/字段错误为 400，状态/revision 冲突为 409，Admin 不再
+  暴露 422；400/409 均声明 `application/problem+json`。
+- 所有 Admin endpoint 具有唯一稳定 OperationId、Summary、Description、Bearer security；
+  `AdminOpenApiRulesTests` 固定 80 个 operation 和上述协议规则。
+- `BanTeamRequest.Reason` 增加所属端点 Validator，并由单元测试覆盖。
+- `docs/api.md`、`docs/api-conventions.md`、路由漂移测试和两份 OpenAPI artifact 已同步。
+
+仍待完成，且不得与 Provider 业务变化混在一个提交：
+
+- 按 capability 拆 Application/Infrastructure dumping ground，并保持 API 不引用 Provider、
+  Domain 不依赖 EF/HTTP/Redis/Wolverine/Provider SDK。
+- `backend/scripts/Verify-Backend.ps1` 已存在，但仍需按目标要求重构：
   - 分开报告非 Integration 与 Integration；
   - Docker 不可用必须明确 skipped/failure，不能伪装 passed；
-  - 包含 build、test、EF pending model、OpenAPI、`git diff --check`。
-- 四条真实 E2E：CTF、AWD、AWDP、KoH。
+  - 保持 build、test、EF pending model、OpenAPI、`git diff --check` 门禁。
+- 四条完整边界真实 E2E：CTF、AWD、AWDP、KoH。
 
 ## 7. 建议的下一实施顺序
 
 每一项必须独立 commit：
 
-1. 重新跑四模式 E2E。
+1. 按完整边界重新跑四模式 E2E；Admin API 重构已经完成，不要重复审计。
 2. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
@@ -567,7 +598,7 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
 4. 从 CTF、AWD、AWDP、KoH 四模式真实 E2E 开始；不要重做已完成的 deployment smoke、
    双栈 IPv6 deny、RuntimeKind dispatch、Docker/Kubernetes Compose handler、三 Provider
-   crash orphan reconciliation 或 IPv4 Cilium egress 验证。
+   crash orphan reconciliation、IPv4 Cilium egress 验证或 Admin API 传输层重构。
 5. 每个纵切固定执行：
    - 失败测试；
    - 最小实现；
