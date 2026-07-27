@@ -1,4 +1,5 @@
 using NoCTF.Application.Runtime.Ports;
+using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Caching;
 using StackExchange.Redis;
 using Testcontainers.Redis;
@@ -8,6 +9,128 @@ namespace NoCTF.Tests.Integration.Runtime;
 [Category("Integration")]
 public sealed class RedisRunnerCapacityGateTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Runner_registration_initializes_and_renews_capacity_without_overwriting_claims(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await container.StartAsync(cancellationToken);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var database = redis.GetDatabase();
+            const string pool = "integration";
+            const string runner = "runner-registration";
+            var registry = new RedisRunnerAvailabilityRegistry(redis);
+            var registration = new RunnerAvailabilityRegistration(
+                pool,
+                runner,
+                RuntimeProvider.Docker,
+                "test-version",
+                new RuntimeResourceLimits(1024, 100, 10),
+                TimeSpan.FromSeconds(2),
+                HasActiveAssignments: false);
+
+            var initialized = await registry.RegisterAsync(registration, cancellationToken);
+
+            await Assert.That(initialized).IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
+            await Assert.That(await database.SetContainsAsync($"runner-pool:{pool}:members", runner)).IsTrue();
+            await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsTrue();
+            await Assert.That((long)(await database.HashGetAsync(
+                $"runner:{runner}:capacity", "availableMemoryBytes"))!).IsEqualTo(1024);
+            await Assert.That(await database.KeyTimeToLiveAsync($"runner:{runner}:capacity")).IsNotNull();
+
+            var gate = new RedisRunnerCapacityGate(redis);
+            var request = new RunnerCapacityRequest(Guid.CreateVersion7(), pool, 512, 40, 2);
+            await gate.TryClaimAsync(request, cancellationToken);
+            var renewed = await registry.RegisterAsync(
+                registration with { HasActiveAssignments = true },
+                cancellationToken);
+
+            await Assert.That(renewed).IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
+            await Assert.That((long)(await database.HashGetAsync(
+                $"runner:{runner}:capacity", "availableMemoryBytes"))!).IsEqualTo(512);
+
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+
+            await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsFalse();
+            await Assert.That(await database.KeyExistsAsync($"runner:{runner}:capacity")).IsFalse();
+            await Assert.That(await database.SetContainsAsync($"runner-pool:{pool}:members", runner)).IsTrue();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Runner_registration_stays_offline_when_capacity_is_missing_with_active_assignments(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await container.StartAsync(cancellationToken);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var database = redis.GetDatabase();
+            const string pool = "integration";
+            const string runner = "runner-active";
+            var registry = new RedisRunnerAvailabilityRegistry(redis);
+
+            var outcome = await registry.RegisterAsync(
+                new RunnerAvailabilityRegistration(
+                    pool,
+                    runner,
+                    RuntimeProvider.Docker,
+                    "test-version",
+                    new RuntimeResourceLimits(1024, 100, 10),
+                    TimeSpan.FromMinutes(1),
+                    HasActiveAssignments: true),
+                cancellationToken);
+
+            await Assert.That(outcome)
+                .IsEqualTo(RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted);
+            await Assert.That(await database.SetContainsAsync($"runner-pool:{pool}:members", runner)).IsTrue();
+            await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsFalse();
+            await Assert.That(await database.KeyExistsAsync($"runner:{runner}:capacity")).IsFalse();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Runner_registration_clears_a_stale_heartbeat_before_rebuilding_untrusted_capacity(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await container.StartAsync(cancellationToken);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var database = redis.GetDatabase();
+            const string pool = "integration";
+            const string runner = "runner-stale";
+            await database.StringSetAsync($"runner:{runner}:heartbeat", "stale", TimeSpan.FromMinutes(1));
+            await database.HashSetAsync($"runner:{runner}:capacity", Capacity(memory: 128));
+            var registry = new RedisRunnerAvailabilityRegistry(redis);
+            var registration = new RunnerAvailabilityRegistration(
+                pool,
+                runner,
+                RuntimeProvider.Docker,
+                "test-version",
+                new RuntimeResourceLimits(1024, 100, 10),
+                TimeSpan.FromMinutes(1),
+                HasActiveAssignments: false);
+
+            var first = await registry.RegisterAsync(registration, cancellationToken);
+            var second = await registry.RegisterAsync(registration, cancellationToken);
+
+            await Assert.That(first)
+                .IsEqualTo(RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted);
+            await Assert.That(second).IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
+            await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsTrue();
+            await Assert.That((long)(await database.HashGetAsync(
+                $"runner:{runner}:capacity", "availableMemoryBytes"))!).IsEqualTo(1024);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Heartbeat_status_requires_pool_membership_and_a_live_key(
@@ -110,6 +233,29 @@ public sealed class RedisRunnerCapacityGateTests
             await Assert.That(release).IsEqualTo(RunnerCapacityReleaseOutcome.Released);
             var remaining = await database.HashGetAsync($"runner:{runner}:capacity", "availableMemoryBytes");
             await Assert.That((long)remaining!).IsEqualTo(1024);
+
+            await database.HashSetAsync($"runner:{runner}:capacity", new HashEntry[]
+            {
+                new("availableMemoryBytes", 1024),
+                new("availableNanoCpus", 100),
+                new("availablePids", 10),
+                new("totalMemoryBytes", 1024),
+                new("totalNanoCpus", 100),
+                new("totalPids", 10)
+            });
+            var lateRuntimeId = Guid.CreateVersion7();
+            await database.HashSetAsync($"runner-claim:{lateRuntimeId:N}", new HashEntry[]
+            {
+                new("runnerId", runner),
+                new("memoryBytes", 512),
+                new("nanoCpus", 40),
+                new("pidsLimit", 2)
+            });
+
+            await gate.ReleaseAsync(lateRuntimeId, runner, cancellationToken);
+
+            await Assert.That((long)(await database.HashGetAsync(
+                $"runner:{runner}:capacity", "availableMemoryBytes"))!).IsEqualTo(1024);
         });
     }
 

@@ -254,6 +254,9 @@ Docker Compose 声明逐服务 PID，Kubernetes Compose 的 PID 由 Pool 统一�
 且 TTL 未开始。
 
 Runner heartbeat/capacity 存 Redis TTL；实际 RunnerId/Pool 与 receipt 存 RuntimeInstance。Redis 故障不派发新实例。
+Runner 使用部署配置的 CPU、内存和 PID 总额度初始化容量，刷新 TTL 时保留当前扣减值。
+Redis 容量丢失但该节点仍有 `Provisioning | Running | Stopping` assignment 时保持离线，
+不会根据可能已经变化的题目配置推算占用；assignment 收敛后才按部署总额度安全重建。
 
 ## Checker 调度字段
 
