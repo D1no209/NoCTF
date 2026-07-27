@@ -44,7 +44,6 @@ kubectl create secret generic noctf-secrets \
   --from-literal=jwt-secret='your-jwt-secret-at-least-32-chars' \
   --from-literal=db-password='your-db-password' \
   --from-literal=seed-admin-password='your-initial-admin-password' \
-  --from-literal=runner-api-key='your-runner-internal-api-key' \
   --from-literal=runner-scoring-key='your-runner-scoring-jwt-key-at-least-32-chars' \
   --from-literal=minio-access-key='your-minio-access-key' \
   --from-literal=minio-secret-key='your-minio-secret-key'
@@ -63,6 +62,7 @@ kubectl create secret tls noctf-tls --namespace noctf --cert=tls.crt --key=tls.k
 ```bash
 # From repo root
 docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
+docker build -f backend/Dockerfile --target worker -t noctf-worker:latest .
 docker build -f backend/Dockerfile --target runner -t noctf-runner:latest .
 ```
 
@@ -71,10 +71,12 @@ For local clusters (kind/minikube), load images:
 ```bash
 # kind
 kind load docker-image noctf-backend:latest
+kind load docker-image noctf-worker:latest
 kind load docker-image noctf-runner:latest
 
 # minikube
 minikube image load noctf-backend:latest
+minikube image load noctf-worker:latest
 minikube image load noctf-runner:latest
 ```
 
@@ -105,17 +107,19 @@ kubectl apply -f redis-service.yaml
 kubectl apply -f minio-deployment.yaml
 kubectl apply -f minio-service.yaml
 kubectl apply -f minio-init-job.yaml
-kubectl apply -f runner-rbac.yaml
-kubectl apply -f runner-deployment.yaml
-kubectl apply -f runner-service.yaml
 
-# 5. Database migration and application
+# 5. Database migration
 kubectl apply -f migration-job.yaml
 kubectl wait --for=condition=complete job/noctf-db-migrate -n noctf --timeout=300s
+
+# 6. The three independent application processes
 kubectl apply -f backend-deployment.yaml
 kubectl apply -f backend-service.yaml
+kubectl apply -f worker-deployment.yaml
+kubectl apply -f runner-rbac.yaml
+kubectl apply -f runner-deployment.yaml
 
-# 6. Networking
+# 7. Networking
 kubectl apply -f ingress.yaml
 kubectl apply -f networkpolicy.yaml
 ```
@@ -180,6 +184,7 @@ Smoke test:
 
 ```bash
 kubectl get pods -n noctf
+kubectl logs -n noctf deploy/worker
 kubectl logs -n noctf deploy/runner
 kubectl get deployment,service,networkpolicy -n runtime
 ```
@@ -211,9 +216,11 @@ Do not mount the Docker socket into backend pods. Consider using a dedicated nod
 
 The `networkpolicy.yaml` enforces a default-deny posture:
 - All ingress/egress is denied by default
-- Backend can reach postgres (5432), redis (6379), MinIO (9000), and runner (8080)
+- Backend can reach PostgreSQL (5432), Redis (6379), and MinIO (9000)
+- Worker can reach PostgreSQL (5432), Redis (6379), and MinIO (9000)
+- Runner can reach PostgreSQL (5432), Redis (6379), and the Kubernetes API
 - Backend accepts traffic only from the ingress-nginx namespace and serves both API and SPA static files
-- AWD challenge pods accept traffic only from pods labeled `app=noctf-checker`
+- Runtime workloads are isolated by the baseline and per-Runtime policies in the `runtime` namespace
 - DNS (port 53) egress is allowed for all pods
 
 The ingress-nginx namespace label `kubernetes.io/metadata.name: ingress-nginx` must exist. Verify with:

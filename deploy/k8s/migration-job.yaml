@@ -57,11 +57,6 @@ spec:
                 secretKeyRef:
                   name: noctf-secrets
                   key: seed-admin-password
-            - name: Runner__ApiKey
-              valueFrom:
-                secretKeyRef:
-                  name: noctf-secrets
-                  key: runner-api-key
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:

@@ -1,40 +1,37 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: runner
+  name: worker
   namespace: noctf
   labels:
-    app: runner
+    app: worker
     app.kubernetes.io/part-of: noctf
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: runner
+      app: worker
   template:
     metadata:
       labels:
-        app: runner
+        app: worker
     spec:
-      serviceAccountName: noctf-runner
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
+        runAsUser: 1654
+        runAsGroup: 1654
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: runner
-          image: noctf-runner:latest
+        - name: worker
+          image: noctf-worker:latest
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
-          ports:
-            - containerPort: 8080
           envFrom:
             - configMapRef:
                 name: noctf-config
@@ -46,11 +43,26 @@ spec:
                   key: db-password
             - name: ConnectionStrings__PostgreSql
               value: "Host=postgres;Port=5432;Database=noctf;Username=postgres;Password=$(DB_PASSWORD)"
+            - name: Authentication__SigningKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: jwt-secret
             - name: RunnerScoring__SigningKey
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets
                   key: runner-scoring-key
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: minio-access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: minio-secret-key
           resources:
             requests:
               cpu: "100m"
@@ -61,19 +73,7 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 20
       volumes:
         - name: tmp
           emptyDir:
-            sizeLimit: 256Mi
+            sizeLimit: 128Mi

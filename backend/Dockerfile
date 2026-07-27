@@ -18,8 +18,10 @@ WORKDIR /src
 COPY backend/ ./backend/
 WORKDIR /src/backend
 RUN dotnet restore src/NoCTF.API/NoCTF.API.csproj
+RUN dotnet restore src/NoCTF.Worker/NoCTF.Worker.csproj
 RUN dotnet restore src/NoCTF.Runner/NoCTF.Runner.csproj
 RUN dotnet publish src/NoCTF.API/NoCTF.API.csproj -c Release -o /app/api /p:BuildSpaOnPublish=false
+RUN dotnet publish src/NoCTF.Worker/NoCTF.Worker.csproj -c Release -o /app/worker
 RUN dotnet publish src/NoCTF.Runner/NoCTF.Runner.csproj -c Release -o /app/runner
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS api
@@ -30,6 +32,13 @@ RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
 USER 1654
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "NoCTF.API.dll"]
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS worker
+WORKDIR /app
+COPY --from=build /app/worker .
+RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
+USER 1654
+ENTRYPOINT ["dotnet", "NoCTF.Worker.dll"]
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runner
 WORKDIR /app

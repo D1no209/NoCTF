@@ -77,12 +77,6 @@ services:
       Storage__Provider: Local
       Storage__LocalRoot: /app/uploads
       Storage__PublicBaseUrl: ${NOCTF_STORAGE_PUBLIC_BASE_URL:-http://backend:8080}
-      Runner__BaseUrl: http://runner:8080
-      Runner__Provider: ${RUNNER_PROVIDER:-Docker}
-      Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
-      Runner__UtilityNetwork: ${RUNNER_UTILITY_NETWORK:-deploy_default}
-      InstanceAccess__PublicHost: ${NOCTF_PUBLIC_HOST:-}
-      QqBot__PublicBaseUrl: ${NOCTF_QQBOT_PUBLIC_BASE_URL:-}
       EmailVerification__Enabled: ${EMAIL_VERIFICATION_ENABLED:-false}
       EmailVerification__PublicBaseUrl: ${NOCTF_PUBLIC_BASE_URL:-http://localhost:5173}
       EmailVerification__TokenLifetimeMinutes: ${EMAIL_VERIFICATION_TOKEN_MINUTES:-1440}
@@ -111,8 +105,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      runner:
-        condition: service_started
       migration:
         condition: service_completed_successfully
     ports:
@@ -140,8 +132,6 @@ services:
       SeedAdmin__Password: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
       Storage__Provider: Local
       Storage__LocalRoot: /app/uploads
-      Runner__BaseUrl: http://runner:8080
-      Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -154,8 +144,39 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      runner:
-        condition: service_started
+
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: worker
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
+    restart: unless-stopped
+    environment:
+      ConnectionStrings__PostgreSql: >-
+        Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      Authentication__SigningKey: ${JWT_SECRET:?set JWT_SECRET}
+      RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET}}
+      RunnerScoring__Issuer: ${RUNNER_SCORING_ISSUER:-NoCTF.Runner}
+      RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}
+      Storage__Provider: Local
+      Storage__LocalRoot: /app/uploads
+    volumes:
+      - backend_uploads:/app/uploads
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    depends_on:
+      migration:
+        condition: service_completed_successfully
 
   runner:
     build:
@@ -172,19 +193,13 @@ services:
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
       Runner__Pool: ${RUNNER_POOL:-default}
       Runner__Id: ${RUNNER_ID:-docker-runner-1}
-      Runner__ApiKey: ${RUNNER_API_KEY:?set RUNNER_API_KEY}
-      Runner__AllowedRegistries: ${RUNNER_ALLOWED_REGISTRIES:-docker.io,ghcr.io,quay.io,registry.k8s.io,localhost}
-      Runner__AllowedNetworks: ${RUNNER_ALLOWED_NETWORKS:-deploy_default}
-      Runner__Concurrency__PermitLimit: ${RUNNER_CONCURRENCY_LIMIT:-8}
-      Runner__Concurrency__QueueLimit: ${RUNNER_QUEUE_LIMIT:-64}
-      Runner__OperationReceiptMinutes: ${RUNNER_RECEIPT_MINUTES:-30}
-      Runner__OperationReceiptLimit: ${RUNNER_RECEIPT_LIMIT:-512}
-      Runner__MaxOperationSeconds: ${RUNNER_MAX_OPERATION_SECONDS:-1800}
-      Runner__MaxRequestBodyBytes: ${RUNNER_MAX_REQUEST_BODY_BYTES:-4194304}
       ConnectionStrings__PostgreSql: >-
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
       RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET}}
+      RunnerScoring__Issuer: ${RUNNER_SCORING_ISSUER:-NoCTF.Runner}
+      RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}
+      RunnerScoring__CallbackBaseUrl: http://backend:8080
       Runtime__Docker__Endpoint: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       Runtime__Docker__Network: noctf-network
       Runtime__Docker__PublicHost: ${DOCKER_PUBLISHED_HOST:-host.docker.internal}
@@ -192,12 +207,6 @@ services:
       Runtime__Docker__IngressProxyMemoryBytes: ${DOCKER_INGRESS_PROXY_MEMORY_BYTES:-67108864}
       Runtime__Docker__IngressProxyNanoCpus: ${DOCKER_INGRESS_PROXY_NANO_CPUS:-100000000}
       Runtime__Docker__IngressProxyPidsLimit: ${DOCKER_INGRESS_PROXY_PIDS_LIMIT:-64}
-      Docker__Host: ${DOCKER_HOST:-unix:///var/run/docker.sock}
-      Docker__PublishedHost: ${DOCKER_PUBLISHED_HOST:-host.docker.internal}
-      Docker__RuntimeOrphanGraceHours: ${DOCKER_RUNTIME_ORPHAN_GRACE_HOURS:-168}
-      K8s__PublicEntry: ${K8S_PUBLIC_ENTRY:-}
-      K8s__IngressBaseDomain: ${K8S_INGRESS_BASE_DOMAIN:-}
-      K8s__RuntimeOrphanGraceSeconds: ${K8S_RUNTIME_ORPHAN_GRACE_SECONDS:-604800}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     security_opt:
@@ -209,6 +218,9 @@ services:
       - /tmp:size=256m,mode=1777
     expose:
       - "8080"
+    depends_on:
+      migration:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

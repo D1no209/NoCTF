@@ -133,6 +133,29 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: worker-to-minio
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: worker
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - port: 9000
+          protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: minio-init-to-minio
   namespace: noctf
   labels:
@@ -176,13 +199,103 @@ spec:
               app: backend
         - podSelector:
             matchLabels:
+              app: worker
+        - podSelector:
+            matchLabels:
               app: minio-init
       ports:
         - port: 9000
           protocol: TCP
 
 ---
-# 7. Allow ingress to postgres only from backend
+# 7. Allow application processes to reach PostgreSQL and Redis.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-to-postgres
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: worker
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-to-redis
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: worker
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - port: 6379
+          protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: runner-to-postgres
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: runner
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: runner-to-redis
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: runner
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - port: 6379
+          protocol: TCP
+
+---
+# Allow PostgreSQL ingress from all three application processes.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -201,12 +314,18 @@ spec:
         - podSelector:
             matchLabels:
               app: backend
+        - podSelector:
+            matchLabels:
+              app: worker
+        - podSelector:
+            matchLabels:
+              app: runner
       ports:
         - port: 5432
           protocol: TCP
 
 ---
-# 7. Allow ingress to redis only from backend
+# Allow Redis ingress from all three application processes.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -225,81 +344,18 @@ spec:
         - podSelector:
             matchLabels:
               app: backend
+        - podSelector:
+            matchLabels:
+              app: worker
+        - podSelector:
+            matchLabels:
+              app: runner
       ports:
         - port: 6379
           protocol: TCP
 
 ---
-# 8. Allow ingress to AWD challenge pods only from checker pods (label: app=noctf-checker)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-checker-to-awd-challenges
-  namespace: noctf
-  labels:
-    app.kubernetes.io/part-of: noctf
-spec:
-  podSelector:
-    matchLabels:
-      app: awd-challenge
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: noctf-checker
-
----
-# 9. Allow backend to reach runner
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: app-to-runner
-  namespace: noctf
-  labels:
-    app.kubernetes.io/part-of: noctf
-spec:
-  podSelector:
-    matchLabels:
-      app: backend
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: runner
-      ports:
-        - port: 8080
-          protocol: TCP
-
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ingress-to-runner
-  namespace: noctf
-  labels:
-    app.kubernetes.io/part-of: noctf
-spec:
-  podSelector:
-    matchLabels:
-      app: runner
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: backend
-      ports:
-        - port: 8080
-          protocol: TCP
-
----
----
-# 11. Allow runner to talk to the Kubernetes API server.
+# 8. Allow runner to talk to the Kubernetes API server.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -324,7 +380,7 @@ spec:
           protocol: TCP
 
 ---
-# 12. Allow the migration job to reach PostgreSQL.
+# 9. Allow the migration job to reach PostgreSQL.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -367,23 +423,3 @@ spec:
       ports:
         - port: 5432
           protocol: TCP
-
----
-# 13. Allow the backend to poll plugin agents in Runner-managed namespaces.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: backend-to-runner-namespaces
-  namespace: noctf
-  labels:
-    app.kubernetes.io/part-of: noctf
-spec:
-  podSelector:
-    matchLabels:
-      app: backend
-  policyTypes: ["Egress"]
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              app.kubernetes.io/managed-by: noctf-runner
