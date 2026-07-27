@@ -16,23 +16,22 @@ EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 
 `DenyAll | InternetOnly` enforcement 已接通，并已在 Cilium `always` 模式的临时集群
 完成真实复测。Docker/Kubernetes 持久 Container sandbox、可信 ingress proxy 与
 Compose appliance 的 crash orphan reconciliation 也已闭环。受控 Docker Compose 与
-Kubernetes 三进程 deployment smoke 已完成并清理；下一主线是
-真实双栈集群 IPv6 deny 验证。
+Kubernetes 三进程 deployment smoke、真实双栈 Cilium IPv6 deny 验证均已完成并清理；
+下一主线是 CTF、AWD、AWDP、KoH 四模式真实 E2E。
 
 ### 当前完成度
 
-后端目标架构迁移当前完成度估算为 **90%**。这是按剩余交付里程碑计算的工程进度，
-不是测试覆盖率或生产可用性承诺。剩余 10 个百分点固定分配为：
+后端目标架构迁移当前完成度估算为 **92%**。这是按剩余交付里程碑计算的工程进度，
+不是测试覆盖率或生产可用性承诺。剩余 8 个百分点固定分配为：
 
-- 真实双栈集群 IPv6 deny 验证：2%；
 - CTF、AWD、AWDP、KoH 四模式真实 E2E：5%；
 - capability/DI 机械整理与最终 `Verify-Backend.ps1`：3%。
 
-已完成的 90% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
+已完成的 92% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
 三类 Runtime Provider lifecycle、容量状态机、CTF PerTeam Flag、AWDP 即时 target、
 DNS 命名隔离、Docker/Kubernetes 网络策略、Cilium fail-closed 前提和三 Provider
-crash orphan reconciliation，以及三进程 Docker/Kubernetes deployment smoke。未完成项
-仍可能在真实验证中暴露返工，因此百分比只用于交接排期。
+crash orphan reconciliation、三进程 Docker/Kubernetes deployment smoke，以及真实双栈
+IPv6 deny 验证。未完成项仍可能在真实验证中暴露返工，因此百分比只用于交接排期。
 
 ## 2. Git 基线与工作树保护
 
@@ -40,8 +39,9 @@ crash orphan reconciliation，以及三进程 Docker/Kubernetes deployment smoke
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`3227370 fix(deploy): run the three production processes`。
-- `3227370` 尚未推送；本交接文档更新完成后仍需保留为独立本地 docs 提交。
+- 当前代码实现 HEAD：`adce710 test(backend): verify Kubernetes IPv6 egress deny`。
+- `3227370`、`9011c2e` 与 `adce710` 尚未推送；本交接文档更新完成后仍需保留为
+  独立本地 docs 提交。
 - 前序实现均先做本地提交；用户已于 2026-07-27 明确授权完善本文后推送当前分支。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -180,6 +180,35 @@ wsl bash -lc `
 - `deploy/docker-compose.yml` 已通过 `docker compose config --quiet` 静态解析。
 - Kubernetes EgressPolicy 已在真实 Cilium dataplane 上复测，不再只是 manifest/unit
   证明。
+
+### 真实双栈 IPv6 deny 验证（`adce710`）
+
+- 一次性 k3d `v5.9.0` / k3s `v1.35.5+k3s1` 集群使用
+  `10.42.0.0/16,fd00:42::/56` Pod CIDR 与
+  `10.43.0.0/16,fd00:43::/112` Service CIDR；节点实测同时报告
+  `10.250.0.4`、`fd00:29::3` InternalIP 和
+  `10.42.0.0/24`、`fd00:42::/64` PodCIDR。
+- `kubernetes` Service 以 `PreferDualStack` 实测获得
+  `10.43.0.1` 与 `fd00:43::aafe`；Cilium `v1.19.6` 使用
+  `enable-policy=always`、IPv4/IPv6 enabled 和 IPv6 `/64` node mask，Flannel 与
+  k3s 内建 NetworkPolicy controller 均未参与。
+- 外部探针是同一 Docker dual-stack network 上的 `fd00:29::10` nginx。无 Runtime
+  限制的控制 Pod 能读取该地址；同一个 URL 从 `InternetOnly` Runtime Pod 访问失败，
+  证明拒绝来自 Cilium policy，而不是宿主缺少 IPv6 连通性。
+- `KubernetesComposeRuntimeIntegrationTests` 新增可选
+  `NOCTF_KUBERNETES_IPV6_PROBE_URL`。设置为 IPv6 literal URL 时，同一真实用例会创建
+  显式全放行控制 Pod，并同时断言 control allow 与 `InternetOnly` deny；未设置时保留
+  原有 single-stack Integration 行为。
+- 更新后的 Kubernetes 真实用例 1/1 passed；非 Integration 341/341 passed；build
+  0 warnings、0 errors；EF 无 pending model；OpenAPI 仍注册 122 endpoints。
+- 宿主 Integration 全量执行为 32 passed、1 failed；唯一失败是 Docker 现存 18 个空
+  `noctf-callback-*` 网络耗尽默认地址池，发生在无关的 checker callback network 创建。
+  未删除这些既有网络；该唯一用例在临时独立 Docker daemon/独立地址池重跑为 1/1
+  passed。因此代码路径共 33 项均通过，但本轮不把受宿主地址池影响的单次 32/33
+  报告伪装成一次 33/33。
+- 集群、探针、Docker network/volume、临时 kubeconfig、k3d/Helm/Kompose、独立 Docker
+  daemon 与本轮镜像标签均已删除。用户原有 `deploy-*` 容器 ID/状态未变化，既有 18 个
+  callback network 未被修改。
 
 ### EF Core 模型
 
@@ -451,12 +480,12 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 当前实际部署状态：
 
 - 新清单只应用到隔离 Compose project `noctf-smoke-20260727` 和一次性本地
-  k3d/k3s+Cilium 集群完成 smoke；两套测试环境及其 network、volume、临时镜像和工具
-  均已删除。
+  k3d/k3s+Cilium 集群完成 deployment smoke；另一个一次性双栈 k3d/k3s+Cilium 集群只做
+  IPv6 deny Integration。三套测试环境及其 network、volume、临时镜像和工具均已删除。
 - 用户原有 `deploy-*` 栈没有执行 `up`、`down`、`restart` 或替换；最终六个容器仍运行在
   原有 `deploy_default`。受控 smoke 创建的 `noctf-network` 已随隔离 project 删除。
-- 没有任何生产环境部署。本轮 `3227370` 与后续 handoff docs 提交仅保留在本地，尚未推送，
-  未创建 PR；Git 提交和临时集群 smoke 都不代表生产部署。
+- 没有任何生产环境部署。本轮 `3227370`、`adce710` 与后续 handoff docs 提交仅保留在
+  本地，尚未推送，未创建 PR；Git 提交和临时集群 smoke 都不代表生产部署。
 
 明确尚未实现：
 
@@ -510,9 +539,8 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 
 每一项必须独立 commit：
 
-1. 在真实双栈集群补做 IPv6 deny 验证；当前一次性集群是 IPv4 single-stack。
-2. 重新跑四模式 E2E。
-3. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+1. 重新跑四模式 E2E。
+2. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
@@ -537,9 +565,9 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从真实双栈集群 IPv6 deny 验证开始；不要重做已完成的 deployment smoke、
-   RuntimeKind dispatch、Docker/Kubernetes Compose handler、三 Provider crash orphan
-   reconciliation 或 IPv4 Cilium egress 验证。
+4. 从 CTF、AWD、AWDP、KoH 四模式真实 E2E 开始；不要重做已完成的 deployment smoke、
+   双栈 IPv6 deny、RuntimeKind dispatch、Docker/Kubernetes Compose handler、三 Provider
+   crash orphan reconciliation 或 IPv4 Cilium egress 验证。
 5. 每个纵切固定执行：
    - 失败测试；
    - 最小实现；
