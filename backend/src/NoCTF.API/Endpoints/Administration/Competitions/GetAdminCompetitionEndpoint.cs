@@ -15,7 +15,12 @@ public sealed class GetAdminCompetitionEndpoint(
     {
         Get("/admin/competitions/{competitionId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Gets an administratively visible competition.");
+        Description(builder => builder.WithName("AdminGetCompetition"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets an administratively visible competition.";
+            summary.Description = "Returns draft or public competition metadata when the caller has resource access.";
+        });
     }
 
     public override async Task<Results<Ok<CompetitionResponse>, NotFound>> ExecuteAsync(

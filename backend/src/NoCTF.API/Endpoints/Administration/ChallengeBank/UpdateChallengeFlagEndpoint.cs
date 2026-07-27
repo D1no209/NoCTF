@@ -15,7 +15,12 @@ public sealed class UpdateChallengeFlagEndpoint(
     {
         Put("/admin/challenges/{challengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Updates a template-level static flag.");
+        Description(builder => builder.WithName("AdminChallengeBankUpdateFlag"));
+        Summary(summary =>
+        {
+            summary.Summary = "Updates a template-level static flag.";
+            summary.Description = "Replaces protected flag material and validity metadata within the template scope.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeFlagResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
@@ -36,7 +41,7 @@ public sealed class UpdateChallengeFlagEndpoint(
         return result.Succeeded
             ? TypedResults.Ok(ChallengeFlagMapping.ToResponse(result.Value!))
             : TypedResults.Problem(
-                statusCode: StatusCodes.Status422UnprocessableEntity,
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Flag was not updated.",
                 detail: result.ErrorMessage);
     }

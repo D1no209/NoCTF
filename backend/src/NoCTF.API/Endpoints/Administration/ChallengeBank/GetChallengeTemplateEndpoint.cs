@@ -14,7 +14,12 @@ public sealed class GetChallengeTemplateEndpoint(
     {
         Get("/admin/challenges/{challengeId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Gets a global challenge template.");
+        Description(builder => builder.WithName("AdminChallengeBankGetTemplate"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets a global challenge template.";
+            summary.Description = "Returns reusable template metadata according to challenge-bank visibility rules.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeTemplateResponse>, NotFound>> ExecuteAsync(

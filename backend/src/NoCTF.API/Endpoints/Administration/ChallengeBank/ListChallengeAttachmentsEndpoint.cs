@@ -31,7 +31,12 @@ public sealed class ListChallengeAttachmentsEndpoint(
     {
         Get("/admin/challenges/{challengeId}/attachments");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Lists global challenge template attachments.");
+        Description(builder => builder.WithName("AdminChallengeBankListAttachments"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists global challenge template attachments.";
+            summary.Description = "Returns protected attachment metadata to authorized template managers.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeAttachmentListResponse>, NotFound>> ExecuteAsync(

@@ -17,7 +17,12 @@ public sealed class ListAdminTeamsEndpoint(
     {
         Get("/admin/competitions/{competitionId}/teams");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Lists all competition teams for management.");
+        Description(builder => builder.WithName("AdminListTeams"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists all competition teams for management.";
+            summary.Description = "Returns registration and moderation state to authorized competition observers.";
+        });
     }
 
     public override async Task<Results<Ok<TeamListResponse>, ForbidHttpResult>> ExecuteAsync(

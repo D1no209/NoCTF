@@ -45,9 +45,11 @@ public sealed class UpdateCompetitionPermissionsEndpoint(
     {
         Put("/admin/competitions/{competitionId}/permissions");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminUpdateCompetitionPermissions")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>
         {
-            summary.Summary = "Replace competition permission assignments";
+            summary.Summary = "Replaces competition permission assignments.";
             summary.Description = "Assigns mutually exclusive manager, judge, and observer user arrays.";
         });
     }

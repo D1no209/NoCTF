@@ -16,7 +16,12 @@ public sealed class GetAdminRuntimeEndpoint(
     {
         Get("/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Gets runtime details including provider receipt.");
+        Description(builder => builder.WithName("AdminGetRuntime"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets an administrative runtime view.";
+            summary.Description = "Includes provider receipt and internal failure diagnostics hidden from players.";
+        });
     }
 
     public override async Task<Results<Ok<AdminRuntimeResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(

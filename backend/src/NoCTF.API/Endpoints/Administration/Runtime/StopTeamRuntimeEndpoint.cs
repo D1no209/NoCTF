@@ -11,16 +11,24 @@ public sealed class StopTeamRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>>
+    : EndpointWithoutRequest<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/stop");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Queues a team runtime stop.");
+        Description(builder => builder.WithName("AdminStopTeamRuntime")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Queues a team runtime stop.";
+            summary.Description = "Stops the selected team's runtime through durable provider cleanup.";
+        });
     }
 
-    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>> ExecuteAsync(
+    public override Task<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>> ExecuteAsync(
         CancellationToken ct) =>
         AdminRuntimeMutation.ExecuteTeamAsync(
             runtimes, authorizer, user, RuntimeAction.Stop,

@@ -31,12 +31,15 @@ public sealed class UpdateChallengeTemplateValidator : Validator<UpdateChallenge
 public sealed class UpdateChallengeTemplateEndpoint(
     UpdateChallengeTemplate update,
     IUserContext user)
-    : Endpoint<UpdateChallengeTemplateRequest, Results<Ok<ChallengeTemplateResponse>, NotFound, Conflict>>
+    : Endpoint<UpdateChallengeTemplateRequest,
+        Results<Ok<ChallengeTemplateResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Put("/admin/challenges/{challengeId}");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminChallengeBankUpdateTemplate")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>
         {
             summary.Summary = "Updates global challenge metadata.";
@@ -44,7 +47,7 @@ public sealed class UpdateChallengeTemplateEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeTemplateResponse>, NotFound, Conflict>> ExecuteAsync(
+    public override async Task<Results<Ok<ChallengeTemplateResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         UpdateChallengeTemplateRequest request,
         CancellationToken ct)
     {
@@ -61,7 +64,10 @@ public sealed class UpdateChallengeTemplateEndpoint(
         if (!current.Succeeded)
             return current.ErrorCode == "challenge_not_found"
                 ? TypedResults.NotFound()
-                : TypedResults.Conflict();
+                : TypedResults.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "Challenge template was not updated.",
+                    detail: current.ErrorMessage);
         return TypedResults.Ok(ChallengeTemplateMapper.ToResponse(current.Value!));
     }
 }

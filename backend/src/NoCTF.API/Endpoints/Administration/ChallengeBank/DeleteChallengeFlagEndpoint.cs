@@ -14,7 +14,12 @@ public sealed class DeleteChallengeFlagEndpoint(
     {
         Delete("/admin/challenges/{challengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Soft-deletes a template-level static flag.");
+        Description(builder => builder.WithName("AdminChallengeBankDeleteFlag"));
+        Summary(summary =>
+        {
+            summary.Summary = "Deletes a template-level static flag.";
+            summary.Description = "Soft-deletes protected static flag material from a global template.";
+        });
     }
 
     public override async Task<Results<NoContent, NotFound>> ExecuteAsync(CancellationToken ct)

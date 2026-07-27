@@ -35,7 +35,12 @@ public sealed class ListChallengeHintsEndpoint(
     {
         Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Lists competition challenge hints.");
+        Description(builder => builder.WithName("AdminListCompetitionChallengeHints"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists competition challenge hints.";
+            summary.Description = "Returns every hint and its publication metadata for one challenge instance.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeHintListResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(

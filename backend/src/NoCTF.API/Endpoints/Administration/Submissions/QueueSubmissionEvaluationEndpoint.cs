@@ -34,7 +34,12 @@ public sealed class QueueSubmissionEvaluationEndpoint(
     {
         Post("/admin/competitions/{competitionId}/submissions/queue-evaluation");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Queues pending ManualBatch submissions for evaluation.");
+        Description(builder => builder.WithName("AdminQueueSubmissionEvaluation"));
+        Summary(summary =>
+        {
+            summary.Summary = "Queues pending submissions for evaluation.";
+            summary.Description = "Creates cutoff-bounded durable work for eligible ManualBatch or first-failure submissions.";
+        });
     }
 
     public override async Task<Results<Accepted<QueueSubmissionWorkResponse>, ForbidHttpResult>> ExecuteAsync(

@@ -1,5 +1,6 @@
 using FastEndpoints;
 using FluentValidation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Bank;
@@ -25,16 +26,23 @@ public sealed class TransferChallengeTemplateOwnerValidator
 public sealed class TransferChallengeTemplateOwnerEndpoint(
     TransferChallengeTemplateOwner transfer,
     IUserContext user)
-    : Endpoint<TransferChallengeTemplateOwnerRequest, Results<Ok<ChallengeTemplateResponse>, NotFound, Conflict>>
+    : Endpoint<TransferChallengeTemplateOwnerRequest,
+        Results<Ok<ChallengeTemplateResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/challenges/{challengeId}/owner/transfer");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Transfers challenge template ownership.");
+        Description(builder => builder.WithName("AdminChallengeBankTransferOwner")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Transfers challenge template ownership.";
+            summary.Description = "Assigns an eligible new owner while preserving the previous owner as a manager.";
+        });
     }
 
-    public override async Task<Results<Ok<ChallengeTemplateResponse>, NotFound, Conflict>> ExecuteAsync(
+    public override async Task<Results<Ok<ChallengeTemplateResponse>, ProblemHttpResult>> ExecuteAsync(
         TransferChallengeTemplateOwnerRequest request,
         CancellationToken ct)
     {
@@ -48,6 +56,9 @@ public sealed class TransferChallengeTemplateOwnerEndpoint(
             ct);
         return result.Succeeded
             ? TypedResults.Ok(ChallengeTemplateMapper.ToResponse(result.Value!))
-            : TypedResults.Conflict();
+            : TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Challenge template ownership was not transferred.",
+                detail: result.ErrorMessage);
     }
 }

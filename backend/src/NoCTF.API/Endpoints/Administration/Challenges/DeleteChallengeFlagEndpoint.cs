@@ -16,7 +16,12 @@ public sealed class DeleteChallengeFlagEndpoint(
     {
         Delete("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Soft-deletes a competition-scoped flag.");
+        Description(builder => builder.WithName("AdminDeleteCompetitionChallengeFlag"));
+        Summary(summary =>
+        {
+            summary.Summary = "Deletes a competition-scoped flag.";
+            summary.Description = "Soft-deletes one protected flag from the CompetitionChallenge scope.";
+        });
     }
 
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult>> ExecuteAsync(

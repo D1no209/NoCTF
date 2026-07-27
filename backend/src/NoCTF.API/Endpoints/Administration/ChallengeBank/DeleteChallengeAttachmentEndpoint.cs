@@ -14,7 +14,12 @@ public sealed class DeleteChallengeAttachmentEndpoint(
     {
         Delete("/admin/challenges/{challengeId}/attachments/{attachmentId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Soft-deletes a challenge attachment.");
+        Description(builder => builder.WithName("AdminChallengeBankDeleteAttachment"));
+        Summary(summary =>
+        {
+            summary.Summary = "Deletes a challenge attachment.";
+            summary.Description = "Soft-deletes attachment metadata and schedules owned object cleanup.";
+        });
     }
 
     public override async Task<Results<NoContent, NotFound>> ExecuteAsync(CancellationToken ct)

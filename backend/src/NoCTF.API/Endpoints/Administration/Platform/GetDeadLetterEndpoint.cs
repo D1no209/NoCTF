@@ -12,7 +12,12 @@ public sealed class GetDeadLetterEndpoint(ManagePlatform platform)
         Get("/admin/platform/dead-letters/{messageId}");
         AuthSchemes("Bearer");
         Roles("Administrator");
-        Summary(summary => summary.Summary = "Gets redacted dead-letter metadata.");
+        Description(builder => builder.WithName("AdminPlatformGetDeadLetter"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets redacted dead-letter metadata.";
+            summary.Description = "Returns delivery metadata without message bodies, secrets, or exception text.";
+        });
     }
 
     public override async Task<Results<Ok<DeadLetterResponse>, NotFound>> ExecuteAsync(

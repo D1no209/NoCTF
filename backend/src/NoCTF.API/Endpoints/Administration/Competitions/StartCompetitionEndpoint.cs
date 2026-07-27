@@ -19,9 +19,11 @@ public sealed class StartCompetitionEndpoint(
     {
         Post("/admin/competitions/{competitionId}/start");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminStartCompetition")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>
         {
-            summary.Summary = "Start a published competition";
+            summary.Summary = "Starts a published competition.";
             summary.Description = "Transitions the competition to Running and queues runtime provisioning.";
         });
     }

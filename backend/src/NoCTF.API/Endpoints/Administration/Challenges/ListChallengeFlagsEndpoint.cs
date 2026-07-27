@@ -17,7 +17,12 @@ public sealed class ListChallengeFlagsEndpoint(
     {
         Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Lists competition-scoped flags.");
+        Description(builder => builder.WithName("AdminListCompetitionChallengeFlags"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists competition-scoped flags.";
+            summary.Description = "Returns protected flag records for one CompetitionChallenge to authorized observers.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeFlagListResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(

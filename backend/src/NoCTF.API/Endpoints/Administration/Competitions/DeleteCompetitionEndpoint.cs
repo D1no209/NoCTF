@@ -10,7 +10,18 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 public sealed class DeleteCompetitionEndpoint(DeleteCompetition delete, ICompetitionModerationAuthorizer authorizer, IUserContext user)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
-    public override void Configure() { Delete("/admin/competitions/{competitionId}"); AuthSchemes("Bearer"); }
+    public override void Configure()
+    {
+        Delete("/admin/competitions/{competitionId}");
+        AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminDeleteCompetition")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Deletes a competition.";
+            summary.Description = "Soft-deletes an inactive competition owned or managed by the caller.";
+        });
+    }
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var id = Route<Guid>("competitionId");

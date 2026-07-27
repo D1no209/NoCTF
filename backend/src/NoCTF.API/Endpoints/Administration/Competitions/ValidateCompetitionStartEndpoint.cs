@@ -19,9 +19,10 @@ public sealed class ValidateCompetitionStartEndpoint(
     {
         Get("/admin/competitions/{competitionId}/start-validation");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminValidateCompetitionStart"));
         Summary(summary =>
         {
-            summary.Summary = "Validate the competition start gate";
+            summary.Summary = "Validates the competition start gate.";
             summary.Description = "Returns every current stable, deduplicated start error without changing state.";
         });
     }

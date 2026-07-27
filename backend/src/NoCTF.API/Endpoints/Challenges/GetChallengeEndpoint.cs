@@ -5,24 +5,6 @@ using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
-public sealed class CreateChallengeRequest
-{
-    public Guid CompetitionId { get; set; }
-    public Guid ChallengeId { get; set; }
-    public long BaseScore { get; set; }
-    public int Order { get; set; }
-}
-
-public sealed class UpdateChallengeRequest
-{
-    public Guid CompetitionId { get; set; }
-    public Guid CompetitionChallengeId { get; set; }
-    public long BaseScore { get; set; }
-    public int Order { get; set; }
-    public bool IsPublished { get; set; }
-    public int ExpectedRevision { get; set; }
-}
-
 public sealed record ChallengeResponse(
     Guid Id,
     Guid CompetitionId,
@@ -44,12 +26,6 @@ public sealed record ChallengeListResponse(IReadOnlyList<ChallengeResponse> Item
     EnumMappingStrategy = EnumMappingStrategy.ByName)]
 internal static partial class ChallengeMapper
 {
-    public static partial CreateCompetitionChallengeCommand ToCommand(
-        CreateChallengeRequest request,
-        DateTimeOffset createdAt);
-    public static partial UpdateCompetitionChallengeCommand ToCommand(
-        UpdateChallengeRequest request,
-        DateTimeOffset updatedAt);
     public static partial ChallengeResponse ToResponse(ChallengeView view);
     private static partial IReadOnlyList<ChallengeResponse> ToResponses(
         IReadOnlyList<ChallengeView> views);

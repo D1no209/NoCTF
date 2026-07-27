@@ -30,7 +30,12 @@ public sealed class UpdateChallengeAttachmentEndpoint(
     {
         Put("/admin/challenges/{challengeId}/attachments/{attachmentId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Updates attachment display metadata.");
+        Description(builder => builder.WithName("AdminChallengeBankUpdateAttachment"));
+        Summary(summary =>
+        {
+            summary.Summary = "Updates attachment display metadata.";
+            summary.Description = "Updates the display name and MIME type without replacing the stored object.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeAttachmentResponse>, NotFound>> ExecuteAsync(

@@ -14,7 +14,12 @@ public sealed class GetChallengeFlagEndpoint(
     {
         Get("/admin/challenges/{challengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Gets a template-level static flag.");
+        Description(builder => builder.WithName("AdminChallengeBankGetFlag"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets a template-level static flag.";
+            summary.Description = "Returns protected static flag material to an authorized template manager.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeFlagResponse>, NotFound>> ExecuteAsync(

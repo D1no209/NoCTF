@@ -12,7 +12,12 @@ public sealed class GetPlatformUserEndpoint(ManagePlatform platform)
         Get("/admin/platform/users/{userId}");
         AuthSchemes("Bearer");
         Roles("Administrator");
-        Summary(summary => summary.Summary = "Gets one platform user.");
+        Description(builder => builder.WithName("AdminPlatformGetUser"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets one platform user.";
+            summary.Description = "Returns platform identity and token-version metadata to administrators only.";
+        });
     }
 
     public override async Task<Results<Ok<PlatformUserResponse>, NotFound>> ExecuteAsync(

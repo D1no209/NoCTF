@@ -17,7 +17,12 @@ public sealed class ListAdminChallengesEndpoint(
     {
         Get("/admin/competitions/{competitionId}/challenges");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Lists all competition challenges, including unpublished items.");
+        Description(builder => builder.WithName("AdminListCompetitionChallenges"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists all competition challenges.";
+            summary.Description = "Includes unpublished challenge instances for authorized competition observers.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeListResponse>, ForbidHttpResult>> ExecuteAsync(

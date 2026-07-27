@@ -51,7 +51,12 @@ public sealed class CreateChallengeFlagEndpoint(
     {
         Post("/admin/challenges/{challengeId}/flags");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Creates a template-level static flag.");
+        Description(builder => builder.WithName("AdminChallengeBankCreateFlag"));
+        Summary(summary =>
+        {
+            summary.Summary = "Creates a template-level static flag.";
+            summary.Description = "Adds protected static flag material to a global challenge template.";
+        });
     }
 
     public override async Task<Results<Created<ChallengeFlagResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
@@ -69,7 +74,7 @@ public sealed class CreateChallengeFlagEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status422UnprocessableEntity,
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Flag was not created.",
                 detail: result.ErrorMessage);
         var response = ChallengeFlagMapping.ToResponse(result.Value!);

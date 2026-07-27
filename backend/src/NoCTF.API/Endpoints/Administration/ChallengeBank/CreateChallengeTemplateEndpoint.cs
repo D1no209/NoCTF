@@ -63,6 +63,7 @@ public sealed class CreateChallengeTemplateEndpoint(
         Post("/admin/challenges");
         AuthSchemes("Bearer");
         Roles("Organizer", "Administrator");
+        Description(builder => builder.WithName("AdminChallengeBankCreateTemplate"));
         Summary(summary =>
         {
             summary.Summary = "Creates a global challenge template.";

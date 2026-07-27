@@ -11,7 +11,18 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 public sealed class PublishCompetitionEndpoint(TransitionCompetitionLifecycle transition, ICompetitionModerationAuthorizer authorizer, IUserContext user)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
-    public override void Configure() { Post("/admin/competitions/{competitionId}/publish"); AuthSchemes("Bearer"); Summary(s => s.Summary = "Publish a competition."); }
+    public override void Configure()
+    {
+        Post("/admin/competitions/{competitionId}/publish");
+        AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminPublishCompetition")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Publishes a competition.";
+            summary.Description = "Moves a competition through the documented publication lifecycle state machine.";
+        });
+    }
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var id = Route<Guid>("competitionId");

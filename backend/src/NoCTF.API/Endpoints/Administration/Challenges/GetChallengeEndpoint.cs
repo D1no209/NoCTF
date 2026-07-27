@@ -11,21 +11,25 @@ public sealed class GetChallengeEndpoint(
     GetChallenge get,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult>>
+    : EndpointWithoutRequest<Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
         Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Gets challenge details, including unpublished challenges.");
+        Description(builder => builder.WithName("AdminGetCompetitionChallenge"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets a competition challenge.";
+            summary.Description = "Returns management details for published or unpublished competition challenges.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
-        GetChallengeRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
+        if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
 
         var item = await get.ExecuteAsync(

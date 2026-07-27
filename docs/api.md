@@ -108,6 +108,8 @@ GET  /api/v1/admin/competitions
 POST /api/v1/admin/competitions
 GET  /api/v1/admin/competitions/{competitionId}
 PUT  /api/v1/admin/competitions/{competitionId}
+GET  /api/v1/admin/competitions/{competitionId}/configuration
+PUT  /api/v1/admin/competitions/{competitionId}/configuration
 DELETE /api/v1/admin/competitions/{competitionId}
 POST /api/v1/admin/competitions/{competitionId}/restore
 DELETE /api/v1/admin/competitions/{competitionId}/hard-delete
@@ -182,6 +184,8 @@ GET  /api/v1/admin/competitions/{competitionId}/challenges
 POST /api/v1/admin/competitions/{competitionId}/challenges
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}
 PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}
+GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration
+PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/restore
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints

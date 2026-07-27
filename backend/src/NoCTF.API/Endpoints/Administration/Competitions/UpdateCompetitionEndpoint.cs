@@ -1,4 +1,5 @@
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Competitions;
@@ -8,17 +9,77 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
-public sealed class UpdateCompetitionEndpoint(UpdateCompetition update, ICompetitionModerationAuthorizer authorizer, IUserContext user)
-    : Endpoint<UpdateCompetitionRequest, Results<Ok<CompetitionResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+public sealed class UpdateCompetitionRequest
 {
-    public override void Configure() { Put("/admin/competitions/{competitionId}"); AuthSchemes("Bearer"); }
-    public override async Task<Results<Ok<CompetitionResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(UpdateCompetitionRequest request, CancellationToken ct)
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public DateTimeOffset StartTime { get; set; }
+    public DateTimeOffset EndTime { get; set; }
+    public bool TeamRegistrationAutoApprove { get; set; }
+    public int MaxTeamMembers { get; set; }
+}
+
+public sealed class UpdateCompetitionValidator : Validator<UpdateCompetitionRequest>
+{
+    public UpdateCompetitionValidator()
     {
-        request.CompetitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanModerateAsync(user.UserId, request.CompetitionId, ct)) return TypedResults.Forbid();
-        var result = await update.ExecuteAsync(CompetitionMapper.ToCommand(request, user.UserId, DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode == "competition_not_found") return TypedResults.NotFound();
-        if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Competition was not updated.", detail: result.ErrorMessage);
+        RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
+        RuleFor(request => request.EndTime).GreaterThan(request => request.StartTime);
+        RuleFor(request => request.MaxTeamMembers).GreaterThan(0);
+    }
+}
+
+public sealed class UpdateCompetitionEndpoint(
+    UpdateCompetition update,
+    ICompetitionModerationAuthorizer authorizer,
+    IUserContext user)
+    : Endpoint<UpdateCompetitionRequest,
+        Results<Ok<CompetitionResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+{
+    public override void Configure()
+    {
+        Put("/admin/competitions/{competitionId}");
+        AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminUpdateCompetition")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Updates competition metadata.";
+            summary.Description = "Updates mutable competition metadata using the current lifecycle state as the concurrency fence.";
+        });
+    }
+
+    public override async Task<
+        Results<Ok<CompetitionResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+        UpdateCompetitionRequest request,
+        CancellationToken ct)
+    {
+        var competitionId = Route<Guid>("competitionId");
+        if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
+            return TypedResults.Forbid();
+
+        var result = await update.ExecuteAsync(new UpdateCompetitionCommand(
+            competitionId,
+            request.Title,
+            request.Description,
+            request.StartTime,
+            request.EndTime,
+            request.TeamRegistrationAutoApprove,
+            request.MaxTeamMembers,
+            user.UserId,
+            DateTimeOffset.UtcNow), ct);
+        if (result.ErrorCode == "competition_not_found")
+            return TypedResults.NotFound();
+        if (!result.Succeeded)
+        {
+            return TypedResults.Problem(
+                statusCode: result.ErrorCode == "competition_conflict"
+                    ? StatusCodes.Status409Conflict
+                    : StatusCodes.Status400BadRequest,
+                title: "Competition was not updated.",
+                detail: result.ErrorMessage);
+        }
+
         return TypedResults.Ok(CompetitionMapper.ToResponse(result.Value!));
     }
 }

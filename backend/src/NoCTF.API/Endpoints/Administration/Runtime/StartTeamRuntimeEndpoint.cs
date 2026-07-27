@@ -1,4 +1,5 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Runtime;
 using NoCTF.API.Security;
@@ -12,16 +13,23 @@ public sealed class StartTeamRuntimeEndpoint(
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
     : EndpointWithoutRequest<
-        Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>>
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/start");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Queues a team runtime start.");
+        Description(builder => builder.WithName("AdminStartTeamRuntime")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Queues a team runtime start.";
+            summary.Description = "Uses the normal mode, capacity, and runtime ownership policy for the selected team.";
+        });
     }
 
-    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>> ExecuteAsync(
+    public override Task<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>> ExecuteAsync(
         CancellationToken ct) =>
         AdminRuntimeMutation.ExecuteTeamAsync(
             runtimes, authorizer, user, RuntimeAction.Start,
@@ -31,7 +39,8 @@ public sealed class StartTeamRuntimeEndpoint(
 
 internal static class AdminRuntimeMutation
 {
-    public static async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>> ExecuteTeamAsync(
+    public static async Task<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>> ExecuteTeamAsync(
         ManageAdminRuntimes runtimes,
         ICompetitionModerationAuthorizer authorizer,
         IUserContext user,
@@ -50,7 +59,12 @@ internal static class AdminRuntimeMutation
         if (result.Failure is RuntimeMutationFailure.NotFound or RuntimeMutationFailure.Unsupported)
             return TypedResults.NotFound();
         if (result.Runtime is null)
-            return TypedResults.Conflict();
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Runtime action was rejected.",
+                detail: "The runtime state or competition policy does not allow this action.");
+        }
         var value = new RuntimeAcceptedResponse(
             result.Runtime.Id,
             $"/api/v1/admin/competitions/{competitionId}/runtimes/{result.Runtime.Id}");

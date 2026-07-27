@@ -11,16 +11,24 @@ public sealed class StartSharedRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>>
+    : EndpointWithoutRequest<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Queues a KoH shared runtime start.");
+        Description(builder => builder.WithName("AdminStartSharedRuntime")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Queues a KoH shared runtime start.";
+            summary.Description = "Starts the shared hill without fabricating a team owner.";
+        });
     }
 
-    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>> ExecuteAsync(
+    public override Task<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>> ExecuteAsync(
         CancellationToken ct) =>
         AdminRuntimeMutation.ExecuteTeamAsync(
             runtimes, authorizer, user, RuntimeAction.Start,

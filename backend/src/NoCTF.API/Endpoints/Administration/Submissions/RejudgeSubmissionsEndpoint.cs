@@ -17,7 +17,12 @@ public sealed class RejudgeSubmissionsEndpoint(
     {
         Post("/admin/competitions/{competitionId}/submissions/rejudge");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Queues a cutoff-bounded challenge rejudge.");
+        Description(builder => builder.WithName("AdminRejudgeSubmissions"));
+        Summary(summary =>
+        {
+            summary.Summary = "Queues a cutoff-bounded challenge rejudge.";
+            summary.Description = "Schedules durable filtered rejudging without creating a batch business entity.";
+        });
     }
 
     public override async Task<Results<Accepted<QueueSubmissionWorkResponse>, ForbidHttpResult>> ExecuteAsync(

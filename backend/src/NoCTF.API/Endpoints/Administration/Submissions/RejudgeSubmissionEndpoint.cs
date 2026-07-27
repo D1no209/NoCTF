@@ -21,7 +21,12 @@ public sealed class RejudgeSubmissionEndpoint(
     {
         Post("/admin/competitions/{competitionId}/submissions/{submissionId}/rejudge");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Queues one submission for exact rejudge.");
+        Description(builder => builder.WithName("AdminRejudgeSubmission"));
+        Summary(summary =>
+        {
+            summary.Summary = "Queues one submission for exact rejudge.";
+            summary.Description = "Reuses the original submission and archive without creating or consuming a new attempt.";
+        });
     }
 
     public override async Task<Results<Accepted<RejudgeSubmissionResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(

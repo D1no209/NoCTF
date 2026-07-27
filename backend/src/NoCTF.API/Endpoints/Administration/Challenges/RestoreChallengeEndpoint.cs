@@ -1,4 +1,5 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Management;
@@ -10,12 +11,15 @@ public sealed class RestoreChallengeEndpoint(
     DeleteChallenge restore,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, Conflict>>
+    : EndpointWithoutRequest<
+        Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/restore");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminRestoreCompetitionChallenge")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>
         {
             summary.Summary = "Restores a deleted competition challenge.";
@@ -23,7 +27,8 @@ public sealed class RestoreChallengeEndpoint(
         });
     }
 
-    public override async Task<Results<NoContent, NotFound, ForbidHttpResult, Conflict>> ExecuteAsync(
+    public override async Task<
+        Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
@@ -37,6 +42,11 @@ public sealed class RestoreChallengeEndpoint(
             ct);
         if (result.ErrorCode is "competition_not_found" or "competition_challenge_not_found")
             return TypedResults.NotFound();
-        return result.Succeeded ? TypedResults.NoContent() : TypedResults.Conflict();
+        return result.Succeeded
+            ? TypedResults.NoContent()
+            : TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Competition challenge was not restored.",
+                detail: result.ErrorMessage);
     }
 }

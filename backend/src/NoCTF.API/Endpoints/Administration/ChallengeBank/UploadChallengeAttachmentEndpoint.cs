@@ -28,6 +28,7 @@ public sealed class UploadChallengeAttachmentEndpoint(
         Post("/admin/challenges/{challengeId}/attachments");
         AuthSchemes("Bearer");
         AllowFileUploads();
+        Description(builder => builder.WithName("AdminChallengeBankUploadAttachment"));
         Summary(summary =>
         {
             summary.Summary = "Uploads a challenge template attachment.";
@@ -53,7 +54,7 @@ public sealed class UploadChallengeAttachmentEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status422UnprocessableEntity,
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Attachment was not uploaded.",
                 detail: result.ErrorMessage);
         var response = ChallengeAttachmentMapping.ToResponse(result.Value!);

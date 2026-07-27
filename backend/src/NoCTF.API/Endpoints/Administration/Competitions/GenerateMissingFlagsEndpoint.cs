@@ -19,6 +19,7 @@ public sealed class GenerateMissingFlagsEndpoint(
     {
         Post("/admin/competitions/{competitionId}/flags/generate-missing");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminGenerateMissingFlags"));
         Summary(summary =>
         {
             summary.Summary = "Synchronously generates missing CTF PerTeam and KoH flags.";

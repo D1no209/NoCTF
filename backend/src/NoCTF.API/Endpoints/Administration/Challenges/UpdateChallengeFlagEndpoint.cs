@@ -18,7 +18,12 @@ public sealed class UpdateChallengeFlagEndpoint(
     {
         Put("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Updates a competition-scoped flag.");
+        Description(builder => builder.WithName("AdminUpdateCompetitionChallengeFlag"));
+        Summary(summary =>
+        {
+            summary.Summary = "Updates a competition-scoped flag.";
+            summary.Description = "Replaces protected flag material and validity metadata within one CompetitionChallenge.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeFlagResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
@@ -42,7 +47,7 @@ public sealed class UpdateChallengeFlagEndpoint(
         return result.Succeeded
             ? TypedResults.Ok(ChallengeFlagMapping.ToResponse(result.Value!))
             : TypedResults.Problem(
-                statusCode: StatusCodes.Status422UnprocessableEntity,
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Flag was not updated.",
                 detail: result.ErrorMessage);
     }

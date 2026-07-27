@@ -1,4 +1,5 @@
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
@@ -13,6 +14,12 @@ public sealed class BanTeamRequest
     public string Reason { get; set; } = string.Empty;
 }
 
+public sealed class BanTeamValidator : Validator<BanTeamRequest>
+{
+    public BanTeamValidator() =>
+        RuleFor(request => request.Reason).NotEmpty();
+}
+
 public sealed class BanTeamEndpoint(
     ModerateTeam moderate,
     ICompetitionModerationAuthorizer authorizer,
@@ -23,8 +30,14 @@ public sealed class BanTeamEndpoint(
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/ban");
         AuthSchemes("Bearer");
-        Description(builder => builder.ProducesProblemFE(StatusCodes.Status404NotFound)
+        Description(builder => builder.WithName("AdminBanTeam")
+            .ProducesProblemFE(StatusCodes.Status404NotFound)
             .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Bans a competition team.";
+            summary.Description = "Excludes the team from private access and scoring and schedules runtime cleanup.";
+        });
     }
 
     public override async Task<Results<NoContent, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(

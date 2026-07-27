@@ -16,7 +16,12 @@ public sealed class GetChallengeHintEndpoint(
     {
         Get("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Gets a competition challenge hint.");
+        Description(builder => builder.WithName("AdminGetCompetitionChallengeHint"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets a competition challenge hint.";
+            summary.Description = "Returns full hint content and publication metadata to authorized observers.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeHintResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
