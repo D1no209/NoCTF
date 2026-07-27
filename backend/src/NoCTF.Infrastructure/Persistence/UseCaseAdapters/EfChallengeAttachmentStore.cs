@@ -36,11 +36,10 @@ public sealed class EfChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAt
         CancellationToken ct)
     {
         var challenge = await WriteAuthorized(actorId, isAdministrator)
-            .Include(item => item.Attachments)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
         if (challenge is null)
             return false;
-        challenge.Attachments.Add(new ChallengeAttachment
+        db.Set<ChallengeAttachment>().Add(new ChallengeAttachment
         {
             Id = attachmentId,
             ChallengeId = challengeId,

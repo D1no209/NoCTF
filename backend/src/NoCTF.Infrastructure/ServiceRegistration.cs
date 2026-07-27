@@ -62,6 +62,8 @@ public static class ServiceRegistration
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<Persistence.NoCtfDbContext>();
         await db.Database.MigrateAsync(cancellationToken);
+        await scope.ServiceProvider.GetRequiredService<AdministratorBootstrapper>()
+            .SeedAsync(cancellationToken);
     }
 
     public static IServiceCollection AddNoCtfInfrastructure(
@@ -127,6 +129,7 @@ public static class ServiceRegistration
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
         services.AddScoped<ILeaderboardCache, RedisLeaderboardCache>();
+        services.AddSingleton<ILeaderboardRefreshPublisher, RedisLeaderboardRefreshPublisher>();
         services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
         services.AddScoped<ITeamModerationStore, EfTeamModerationStore>();
         services.AddScoped<ICompetitionModerationAuthorizer, EfCompetitionModerationAuthorizer>();
@@ -222,6 +225,7 @@ public static class ServiceRegistration
         services.Configure<PasswordHasherOptions>(options =>
             options.IterationCount = 210_000);
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+        services.AddScoped<AdministratorBootstrapper>();
         services.AddScoped<RegisterUser>();
         services.AddScoped<GetCurrentUser>();
         services.AddScoped<ChangePassword>();

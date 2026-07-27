@@ -71,7 +71,7 @@ public sealed class EfChallengeHintStore(
                 CompetitionChallengeId = command.CompetitionChallengeId,
                 CreatedAt = command.Now
             };
-            challenge.Hints.Add(hint);
+            db.Set<CompetitionChallengeHint>().Add(hint);
         }
         hint.Content = command.Content;
         hint.Cost = command.Cost;
