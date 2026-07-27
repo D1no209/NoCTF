@@ -96,7 +96,6 @@ public static class ServiceRegistration
         var signalR = services.AddSignalR();
         services.AddScoped<ISubmissionResultPublisher, SignalRSubmissionResultPublisher>();
         services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
-        services.AddScoped<ILeaderboardRefreshPublisher, SignalRLeaderboardRefreshPublisher>();
         services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
         if (includeInfrastructure
             && !configuration.GetValue<bool>("OpenApi:Exporting")
@@ -104,6 +103,7 @@ public static class ServiceRegistration
         {
             signalR.AddStackExchangeRedis(redis);
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisSubmissionResultRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisLeaderboardRefreshRelay>();
         }
         services.AddRateLimiter(options =>
         {

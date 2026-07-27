@@ -1,0 +1,13 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY backend/ ./backend/
+WORKDIR /src/backend
+RUN dotnet restore src/NoCTF.Runner/NoCTF.Runner.csproj
+RUN dotnet publish src/NoCTF.Runner/NoCTF.Runner.csproj -c Release -o /app/runner
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --from=build /app/runner .
+USER $APP_UID
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "NoCTF.Runner.dll"]

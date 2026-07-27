@@ -26,10 +26,11 @@ public sealed class EfCompetitionManagementStore(NoCtfDbContext db) : ICompetiti
     }
 
     public async Task<CompetitionView?> FindAsync(Guid competitionId, bool includeDraft, CancellationToken ct) =>
-        await Query(includeDraft).SingleOrDefaultAsync(x => x.Id == competitionId, ct);
+        await Project(EntityQuery(includeDraft).Where(x => x.Id == competitionId))
+            .SingleOrDefaultAsync(ct);
 
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken ct) =>
-        await Query(includeDraft).OrderByDescending(x => x.StartTime).ToListAsync(ct);
+        await Project(EntityQuery(includeDraft)).OrderByDescending(x => x.StartTime).ToListAsync(ct);
 
     public async Task<CompetitionView?> UpdateAsync(
         UpdateCompetitionCommand command,
@@ -71,11 +72,13 @@ public sealed class EfCompetitionManagementStore(NoCtfDbContext db) : ICompetiti
         return affected == 1;
     }
 
-    private IQueryable<CompetitionView> Query(bool includeDraft) =>
+    private IQueryable<Competition> EntityQuery(bool includeDraft) =>
         db.Competitions.AsNoTracking()
-            .Where(x => x.DeletedAt == null && (includeDraft || x.Status != CompetitionStatus.Draft))
-            .Select(x => new CompetitionView(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt,
-                x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers, x.OwnerId));
+            .Where(x => x.DeletedAt == null && (includeDraft || x.Status != CompetitionStatus.Draft));
+
+    private static IQueryable<CompetitionView> Project(IQueryable<Competition> query) =>
+        query.Select(x => new CompetitionView(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt,
+            x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers, x.OwnerId));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,

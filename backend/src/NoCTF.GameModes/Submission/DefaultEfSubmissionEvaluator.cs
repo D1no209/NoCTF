@@ -14,7 +14,8 @@ public sealed class DefaultEfSubmissionEvaluator : ISubmissionEvaluator
         if (submission.Kind == SubmissionKind.Fix)
             return new(ScoringEventKind.SubmissionEvaluation, ScoringResult.PlatformFailed,
                 ScoringFailureCode.CheckerPlatformError, submission.ReceivedAt, "fix-runner-required-v1");
-        var duplicate = context.PriorEvents.Any(x => x.TeamId == submission.TeamId
+        var duplicate = context.PriorEvents.Any(x => x.Kind == ScoringEventKind.SubmissionEvaluation
+            && x.TeamId == submission.TeamId
             && x.CompetitionChallengeId == submission.CompetitionChallengeId
             && x.Result == ScoringResult.Correct
             && x.DeletedAt is null);

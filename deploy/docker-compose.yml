@@ -214,6 +214,8 @@ services:
       Runtime__Docker__IngressProxyPidsLimit: ${DOCKER_INGRESS_PROXY_PIDS_LIMIT:-64}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_SOCKET_GID:-0}"
     security_opt:
       - no-new-privileges:true
     cap_drop:
