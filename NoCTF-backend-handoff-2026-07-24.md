@@ -1,6 +1,6 @@
 # NoCTF 后端目标架构交接
 
-> 创建于 2026-07-24，最后核验于 2026-07-27。文件名保留原日期，本文内容以最后核验日期为准。
+> 创建于 2026-07-24，最后核验于 2026-07-28。文件名保留原日期，本文内容以最后核验日期为准。
 
 ## 1. 下一会话目标
 
@@ -17,23 +17,23 @@ EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 
 完成真实复测。Docker/Kubernetes 持久 Container sandbox、可信 ingress proxy 与
 Compose appliance 的 crash orphan reconciliation 也已闭环。受控 Docker Compose 与
 Kubernetes 三进程 deployment smoke、真实双栈 Cilium IPv6 deny 验证均已完成并清理；
-Admin API 传输层、协议测试、OpenAPI 与文档重构也已完成。下一主线是 CTF、AWD、
-AWDP、KoH 四模式真实 E2E。
+Admin API 传输层、协议测试、OpenAPI 与文档重构也已完成。CTF 完整边界 E2E 已通过，
+下一主线是 AWD、AWDP、KoH 三模式真实 E2E。
 
 ### 当前完成度
 
-后端目标架构迁移当前完成度估算为 **93%**。这是按剩余交付里程碑计算的工程进度，
-不是测试覆盖率或生产可用性承诺。剩余 7 个百分点固定分配为：
+后端目标架构迁移当前完成度估算为 **94%**。这是按剩余交付里程碑计算的工程进度，
+不是测试覆盖率或生产可用性承诺。剩余约 6 个百分点固定分配为：
 
-- CTF、AWD、AWDP、KoH 四模式真实 E2E：5%；
+- AWD、AWDP、KoH 三模式真实 E2E：约 4%；
 - capability/DI 机械整理与最终 `Verify-Backend.ps1`：2%。
 
-已完成的 93% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
+已完成的 94% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
 三类 Runtime Provider lifecycle、容量状态机、CTF PerTeam Flag、AWDP 即时 target、
 DNS 命名隔离、Docker/Kubernetes 网络策略、Cilium fail-closed 前提和三 Provider
 crash orphan reconciliation、三进程 Docker/Kubernetes deployment smoke、真实双栈
-IPv6 deny 验证，以及 Admin API 传输契约重构。未完成项仍可能在真实验证中暴露返工，
-因此百分比只用于交接排期。
+IPv6 deny 验证、Admin API 传输契约重构，以及 CTF 完整边界 E2E。未完成项仍可能在
+真实验证中暴露返工，因此百分比只用于交接排期。
 
 ## 2. Git 基线与工作树保护
 
@@ -41,9 +41,9 @@ IPv6 deny 验证，以及 Admin API 传输契约重构。未完成项仍可能�
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`db3cd5e refactor(api): complete admin endpoint contracts`。
-- `3227370` 到 `db3cd5e` 的 5 个提交尚未推送；本交接文档更新完成后仍需保留为
-  独立本地 docs 提交。
+- 当前代码实现 HEAD：`9c18118 test(backend): verify full-boundary CTF flow`。
+- 当前分支相对 `origin/codex/backend-target-architecture-handoff` ahead 8；本交接文档
+  更新完成后仍需保留为独立本地 docs 提交。
 - 前序实现均先做本地提交；用户已于 2026-07-27 明确授权完善本文后推送当前分支。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -116,7 +116,7 @@ git log --oneline 003b75c..2c6b4ce -- backend
     `Competition.Revision`；模式配置使用 `ConfigurationRevision`。
 21. CompetitionChallenge 普通更新与模式配置更新继续使用各自现有 revision。
 
-## 4. 2026-07-27 当前 HEAD 的实测门禁
+## 4. 2026-07-28 当前 HEAD 的实测门禁
 
 所有命令均在 `E:\SourceCode\NoCTF` 发起，通过 WSL 在
 `/mnt/e/SourceCode/NoCTF/backend` 执行。
@@ -138,18 +138,21 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 343/343 passed。
+- 347/347 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
 
 ```powershell
 wsl bash -lc `
-  "cd /mnt/e/SourceCode/NoCTF/backend && NOCTF_KUBERNETES_INTEGRATION=true NOCTF_KOMPOSE_PATH=/tmp/noctf-runtime-reconcile-it-20260727/kompose-linux-amd64 /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 33"
+  "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 38"
 ```
 
-- 本轮 WSL 回归为 33/33 passed、0 failed、0 skipped。
-- 非 Integration 与 Integration 分组总计 373 passed、0 failed、0 skipped。
+- 本轮 WSL 回归为 38 passed、0 failed、1 skipped；总计发现 39 项。
+- 唯一 skip 是未设置 `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例；此前
+  2026-07-27 已在一次性 Cilium 集群完成该路径的真实复测，不把本轮 skip 伪装为 passed。
+- 非 Integration 与本轮 Integration 分组总计 385 passed、0 failed、1 skipped。
+- 2026-07-27 启用临时 Kubernetes 集群的 WSL 回归为 33/33 passed、0 failed、0 skipped。
 - `3227370` 后再次执行 Integration：32 passed、0 failed、1 skipped；唯一 skip 是未设置
   `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例。本阶段另以完整部署清单完成
   独立 Kubernetes smoke，不把该 skip 伪装为 passed。
@@ -189,6 +192,31 @@ wsl bash -lc `
 - `deploy/docker-compose.yml` 已通过 `docker compose config --quiet` 静态解析。
 - Kubernetes EgressPolicy 已在真实 Cilium dataplane 上复测，不再只是 manifest/unit
   证明。
+
+### CTF 完整边界 E2E（`9c18118`）
+
+- `backend/scripts/Run-CtfE2E.ps1` 使用隔离 Compose project、动态 API 端口和唯一镜像/
+  network，启动独立 API、Worker、Runner、PostgreSQL、Redis、MinIO 与真实 Docker
+  Runtime；成功和失败路径都只清理本轮资源，不修改现有 `deploy-*` 容器。
+- HTTP 流程覆盖种子管理员登录、CTF 比赛/题库模板/附件/CompetitionChallenge/Runtime
+  配置/Hint、比赛发布和启动、玩家注册/自动批准团队、MinIO 附件下载、PerTeam Flag
+  Runtime、正确 Flag 提交、525 分与 first blood、Hint 扣分至 475、单项 rejudge 后仍为
+  475，以及 Runtime stop/容器网络清理。
+- 最终独立复跑 1/1 passed，43.293 秒；脚本随后删除全部隔离容器、网络、卷和本地镜像。
+- E2E 暴露并修复：迁移阶段首管理员初始化缺失；附件/Hint 新增实体 EF state 错误；
+  Worker 缺少跨进程 leaderboard refresh transport；Competition 单项读取在投影后过滤导致
+  EF 无法翻译；HintUnlock 被通用 evaluator 当作历史正确提交、使 rejudge 错判 Duplicate；
+  fixture 镜像缺少 `httpd`；Docker socket group 权限未传给非 root Runner。
+- 首管理员仅在 `SeedAdmin:Password` 配置时创建；已有管理员则幂等跳过、不重置密码，
+  不提升普通用户，配置身份被普通用户占用时启动失败。
+- leaderboard refresh 沿用现有 Redis Pub/Sub + API SignalR relay 架构；没有把 API-only
+  publisher 注入 Worker，也没有新增 fire-and-forget。生产 Compose Runner 继续非 root，
+  通过可配置 `DOCKER_SOCKET_GID` 加入宿主 socket group。
+- 同轮门禁：解决方案与 E2E 项目均 0 warning/0 error；347 non-Integration passed；
+  38 Integration passed、1 Kubernetes dataplane skipped；EF 无 pending model；OpenAPI
+  两份 artifact SHA-256 均为
+  `7E8B803FB6F368B4E02894488AF5EEF54093F4A889E3130F3A771417D761232A`；两份 Compose、
+  PowerShell parser 与 `git diff --check` 均通过。
 
 ### 真实双栈 IPv6 deny 验证（`adce710`）
 
@@ -556,6 +584,18 @@ Admin API 传输层已由 `db3cd5e` 独立完成：
 - `BanTeamRequest.Reason` 增加所属端点 Validator，并由单元测试覆盖。
 - `docs/api.md`、`docs/api-conventions.md`、路由漂移测试和两份 OpenAPI artifact 已同步。
 
+### 6.7 CTF 完整边界
+
+CTF 完整边界已由 `9c18118` 独立完成。不要退回进程内测试或只验证 API：
+
+- 标准入口是 `backend/scripts/Run-CtfE2E.ps1`；需要保留失败环境时使用
+  `-KeepEnvironment`，排查完必须按输出的唯一 project 精确清理。
+- 测试必须继续跨 HTTP、独立 API/Worker/Runner、真实 PostgreSQL/Redis/MinIO 与 Docker；
+  Runtime fixture 必须保持非 root、只读 rootfs 和平台 ingress proxy 路径。
+- CTF 已验证附件、PerTeam Runtime Flag、first blood、Hint 扣分、leaderboard projection、
+  rejudge 与 Runtime cleanup。后续模式可以复用脚本的隔离/清理方式，但不要把四模式压成
+  同一个巨型测试或共享可变数据库。
+
 仍待完成，且不得与 Provider 业务变化混在一个提交：
 
 - 按 capability 拆 Application/Infrastructure dumping ground，并保持 API 不引用 Provider、
@@ -564,14 +604,16 @@ Admin API 传输层已由 `db3cd5e` 独立完成：
   - 分开报告非 Integration 与 Integration；
   - Docker 不可用必须明确 skipped/failure，不能伪装 passed；
   - 保持 build、test、EF pending model、OpenAPI、`git diff --check` 门禁。
-- 四条完整边界真实 E2E：CTF、AWD、AWDP、KoH。
+- 三条完整边界真实 E2E：AWD、AWDP、KoH。
 
 ## 7. 建议的下一实施顺序
 
 每一项必须独立 commit：
 
-1. 按完整边界重新跑四模式 E2E；Admin API 重构已经完成，不要重复审计。
-2. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+1. 按相同完整边界完成 AWD E2E；不要重复 CTF 或 Admin 审计。
+2. 独立完成 AWDP E2E。
+3. 独立完成 KoH E2E。
+4. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
@@ -596,7 +638,7 @@ Admin API 传输层已由 `db3cd5e` 独立完成：
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从 CTF、AWD、AWDP、KoH 四模式真实 E2E 开始；不要重做已完成的 deployment smoke、
+4. 从 AWD 完整边界 E2E 开始，随后 AWDP、KoH；不要重做已完成的 CTF、deployment smoke、
    双栈 IPv6 deny、RuntimeKind dispatch、Docker/Kubernetes Compose handler、三 Provider
    crash orphan reconciliation、IPv4 Cilium egress 验证或 Admin API 传输层重构。
 5. 每个纵切固定执行：
