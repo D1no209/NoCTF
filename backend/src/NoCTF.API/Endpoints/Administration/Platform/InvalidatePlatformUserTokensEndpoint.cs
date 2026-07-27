@@ -12,7 +12,12 @@ public sealed class InvalidatePlatformUserTokensEndpoint(ManagePlatform platform
         Post("/admin/platform/users/{userId}/tokens/invalidate");
         AuthSchemes("Bearer");
         Roles("Administrator");
-        Summary(summary => summary.Summary = "Invalidates every access and refresh token for a user.");
+        Description(builder => builder.WithName("AdminPlatformInvalidateUserTokens"));
+        Summary(summary =>
+        {
+            summary.Summary = "Invalidates every access and refresh token for a user.";
+            summary.Description = "Atomically increments the user's global token version.";
+        });
     }
 
     public override async Task<Results<Ok<PlatformUserResponse>, NotFound>> ExecuteAsync(

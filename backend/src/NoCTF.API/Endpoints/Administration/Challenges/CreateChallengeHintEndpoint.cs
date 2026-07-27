@@ -35,7 +35,12 @@ public sealed class CreateChallengeHintEndpoint(
     {
         Post("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Creates a competition challenge hint.");
+        Description(builder => builder.WithName("AdminCreateCompetitionChallengeHint"));
+        Summary(summary =>
+        {
+            summary.Summary = "Creates a competition challenge hint.";
+            summary.Description = "Creates hint content, cost, and optional publication timing for one challenge instance.";
+        });
     }
 
     public override async Task<Results<Created<ChallengeHintResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
@@ -53,7 +58,7 @@ public sealed class CreateChallengeHintEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status422UnprocessableEntity,
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Hint was not created.",
                 detail: result.ErrorMessage);
         var response = ChallengeHintMapping.ToResponse(result.Value!);

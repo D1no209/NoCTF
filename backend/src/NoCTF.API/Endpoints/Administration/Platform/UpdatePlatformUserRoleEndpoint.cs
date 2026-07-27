@@ -25,7 +25,12 @@ public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
         Put("/admin/platform/users/{userId}/role");
         AuthSchemes("Bearer");
         Roles("Administrator");
-        Summary(summary => summary.Summary = "Updates a platform role and invalidates existing tokens.");
+        Description(builder => builder.WithName("AdminPlatformUpdateUserRole"));
+        Summary(summary =>
+        {
+            summary.Summary = "Updates a platform role and invalidates existing tokens.";
+            summary.Description = "Atomically changes the bounded user role and increments the token version.";
+        });
     }
 
     public override async Task<Results<Ok<PlatformUserResponse>, NotFound>> ExecuteAsync(

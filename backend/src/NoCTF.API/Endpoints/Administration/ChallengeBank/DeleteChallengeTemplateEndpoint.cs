@@ -14,7 +14,12 @@ public sealed class DeleteChallengeTemplateEndpoint(
     {
         Delete("/admin/challenges/{challengeId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Soft-deletes a global challenge template.");
+        Description(builder => builder.WithName("AdminChallengeBankDeleteTemplate"));
+        Summary(summary =>
+        {
+            summary.Summary = "Deletes a global challenge template.";
+            summary.Description = "Soft-deletes an unreferenced reusable challenge template.";
+        });
     }
 
     public override async Task<Results<NoContent, NotFound>> ExecuteAsync(CancellationToken ct)

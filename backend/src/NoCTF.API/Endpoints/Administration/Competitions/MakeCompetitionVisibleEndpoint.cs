@@ -19,9 +19,11 @@ public sealed class MakeCompetitionVisibleEndpoint(
     {
         Post("/admin/competitions/{competitionId}/make-visible");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminMakeCompetitionVisible")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>
         {
-            summary.Summary = "Make a competition visible";
+            summary.Summary = "Makes a competition visible.";
             summary.Description = "Moves a Draft or Published competition to Visible.";
         });
     }

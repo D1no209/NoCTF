@@ -18,7 +18,12 @@ public sealed class UpdateChallengeHintEndpoint(
     {
         Put("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Updates a competition challenge hint.");
+        Description(builder => builder.WithName("AdminUpdateCompetitionChallengeHint"));
+        Summary(summary =>
+        {
+            summary.Summary = "Updates a competition challenge hint.";
+            summary.Description = "Updates hint content, cost, and publication timing for one challenge instance.";
+        });
     }
 
     public override async Task<Results<Ok<ChallengeHintResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
@@ -41,7 +46,7 @@ public sealed class UpdateChallengeHintEndpoint(
         return result.Succeeded
             ? TypedResults.Ok(ChallengeHintMapping.ToResponse(result.Value!))
             : TypedResults.Problem(
-                statusCode: StatusCodes.Status422UnprocessableEntity,
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Hint was not updated.",
                 detail: result.ErrorMessage);
     }

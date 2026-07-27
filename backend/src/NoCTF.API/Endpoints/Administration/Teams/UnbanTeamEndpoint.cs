@@ -22,8 +22,14 @@ public sealed class UnbanTeamEndpoint(
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/unban");
         AuthSchemes("Bearer");
-        Description(builder => builder.ProducesProblemFE(StatusCodes.Status404NotFound)
+        Description(builder => builder.WithName("AdminUnbanTeam")
+            .ProducesProblemFE(StatusCodes.Status404NotFound)
             .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Unbans a competition team.";
+            summary.Description = "Restores the team's historical scoring eligibility and normal runtime lifecycle.";
+        });
     }
 
     public override async Task<Results<NoContent, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(

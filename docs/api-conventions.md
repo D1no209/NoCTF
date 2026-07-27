@@ -57,7 +57,7 @@
 
 ## Revision 并发
 
-Competition/CompetitionChallenge 更新 DTO 必须带 expectedRevision。数据库条件更新成功后 Revision+1；冲突返回 409 与当前 revision，不自动合并。子资源变更递增所属 Revision。
+CompetitionChallenge 普通更新 DTO 必须带 expectedRevision。Competition 普通元数据更新使用当前状态作为并发栅栏，不引入通用 Revision。Competition 与 CompetitionChallenge 的模式配置更新分别携带对应配置的 expectedRevision；数据库条件更新成功后对应 Revision+1。冲突返回 409，不自动合并；CompetitionChallenge 子资源变更递增所属 Revision。
 
 ## 限流
 

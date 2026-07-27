@@ -16,7 +16,12 @@ public sealed class DeleteChallengeHintEndpoint(
     {
         Delete("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Soft-deletes a competition challenge hint.");
+        Description(builder => builder.WithName("AdminDeleteCompetitionChallengeHint"));
+        Summary(summary =>
+        {
+            summary.Summary = "Deletes a competition challenge hint.";
+            summary.Description = "Soft-deletes one hint owned by the CompetitionChallenge.";
+        });
     }
 
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult>> ExecuteAsync(

@@ -11,16 +11,24 @@ public sealed class ResetTeamRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>>
+    : EndpointWithoutRequest<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/reset");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Queues an atomic team runtime replacement.");
+        Description(builder => builder.WithName("AdminResetTeamRuntime")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Queues an atomic team runtime replacement.";
+            summary.Description = "Uses the same generation and replacement invariants as the player runtime API.";
+        });
     }
 
-    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ForbidHttpResult>> ExecuteAsync(
+    public override Task<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>> ExecuteAsync(
         CancellationToken ct) =>
         AdminRuntimeMutation.ExecuteTeamAsync(
             runtimes, authorizer, user, RuntimeAction.Reset,

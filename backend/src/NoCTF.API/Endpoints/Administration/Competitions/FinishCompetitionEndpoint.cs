@@ -11,7 +11,18 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 public sealed class FinishCompetitionEndpoint(TransitionCompetitionLifecycle transition, ICompetitionModerationAuthorizer authorizer, IUserContext user)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
-    public override void Configure() { Post("/admin/competitions/{competitionId}/finish"); AuthSchemes("Bearer"); Summary(s => s.Summary = "Finish a competition and schedule runtime cleanup."); }
+    public override void Configure()
+    {
+        Post("/admin/competitions/{competitionId}/finish");
+        AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminFinishCompetition")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Finishes a competition.";
+            summary.Description = "Transitions an active competition to Finished and schedules runtime cleanup.";
+        });
+    }
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var id = Route<Guid>("competitionId");

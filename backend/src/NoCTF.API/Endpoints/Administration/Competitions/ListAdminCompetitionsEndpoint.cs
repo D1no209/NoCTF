@@ -17,6 +17,7 @@ public sealed class ListAdminCompetitionsEndpoint(
     {
         Get("/admin/competitions");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminListCompetitions"));
         Summary(summary =>
         {
             summary.Summary = "Lists competitions visible to the current administrator.";

@@ -2274,7 +2274,9 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationTeamsApproveTeamEndpoint",
+        "summary": "Approves a pending team.",
+        "description": "Approves team registration while the competition still permits review changes.",
+        "operationId": "AdminApproveTeam",
         "parameters": [
           {
             "name": "competitionId",
@@ -2297,14 +2299,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2319,7 +2331,9 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationTeamsBanTeamEndpoint",
+        "summary": "Bans a competition team.",
+        "description": "Excludes the team from private access and scoring and schedules runtime cleanup.",
+        "operationId": "AdminBanTeam",
         "parameters": [
           {
             "name": "competitionId",
@@ -2356,6 +2370,16 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -2397,7 +2421,8 @@
           "Admin"
         ],
         "summary": "Lists all competition teams for management.",
-        "operationId": "NoCTFAPIEndpointsAdministrationTeamsListAdminTeamsEndpoint",
+        "description": "Returns registration and moderation state to authorized competition observers.",
+        "operationId": "AdminListTeams",
         "parameters": [
           {
             "name": "competitionId",
@@ -2438,7 +2463,9 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationTeamsRejectTeamEndpoint",
+        "summary": "Rejects a pending team.",
+        "description": "Rejects team registration while the competition still permits review changes.",
+        "operationId": "AdminRejectTeam",
         "parameters": [
           {
             "name": "competitionId",
@@ -2461,14 +2488,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2483,7 +2520,9 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationTeamsUnbanTeamEndpoint",
+        "summary": "Unbans a competition team.",
+        "description": "Restores the team's historical scoring eligibility and normal runtime lifecycle.",
+        "operationId": "AdminUnbanTeam",
         "parameters": [
           {
             "name": "competitionId",
@@ -2547,8 +2586,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Read the current administrative submission status.",
-        "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsGetAdminSubmissionStatusEndpoint",
+        "summary": "Gets an administrative submission view.",
+        "description": "Returns protected submission content, current evaluation, and management diagnostics.",
+        "operationId": "AdminGetSubmission",
         "parameters": [
           {
             "name": "competitionId",
@@ -2603,7 +2643,8 @@
           "Admin"
         ],
         "summary": "Lists filtered competition submissions.",
-        "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsListAdminSubmissionsEndpoint",
+        "description": "Returns keyset-paged protected submission facts to authorized competition observers.",
+        "operationId": "AdminListSubmissions",
         "parameters": [
           {
             "name": "competitionId",
@@ -2780,8 +2821,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Queues pending ManualBatch submissions for evaluation.",
-        "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsQueueSubmissionEvaluationEndpoint",
+        "summary": "Queues pending submissions for evaluation.",
+        "description": "Creates cutoff-bounded durable work for eligible ManualBatch or first-failure submissions.",
+        "operationId": "AdminQueueSubmissionEvaluation",
         "parameters": [
           {
             "name": "competitionId",
@@ -2846,7 +2888,8 @@
           "Admin"
         ],
         "summary": "Queues one submission for exact rejudge.",
-        "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsRejudgeSubmissionEndpoint",
+        "description": "Reuses the original submission and archive without creating or consuming a new attempt.",
+        "operationId": "AdminRejudgeSubmission",
         "parameters": [
           {
             "name": "competitionId",
@@ -2899,7 +2942,8 @@
           "Admin"
         ],
         "summary": "Queues a cutoff-bounded challenge rejudge.",
-        "operationId": "NoCTFAPIEndpointsAdministrationSubmissionsRejudgeSubmissionsEndpoint",
+        "description": "Schedules durable filtered rejudging without creating a batch business entity.",
+        "operationId": "AdminRejudgeSubmissions",
         "parameters": [
           {
             "name": "competitionId",
@@ -2964,7 +3008,8 @@
           "Admin"
         ],
         "summary": "Extends a running team runtime.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeExtendTeamRuntimeEndpoint",
+        "description": "Uses the normal runtime state machine and does not bypass TTL or mode policy.",
+        "operationId": "AdminExtendTeamRuntime",
         "parameters": [
           {
             "name": "competitionId",
@@ -3035,7 +3080,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3050,8 +3102,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Gets runtime details including provider receipt.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeGetAdminRuntimeEndpoint",
+        "summary": "Gets an administrative runtime view.",
+        "description": "Includes provider receipt and internal failure diagnostics hidden from players.",
+        "operationId": "AdminGetRuntime",
         "parameters": [
           {
             "name": "competitionId",
@@ -3104,7 +3157,8 @@
           "Admin"
         ],
         "summary": "Lists filtered runtime instances.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeListAdminRuntimesEndpoint",
+        "description": "Returns keyset-paged runtime state and placement metadata to authorized observers.",
+        "operationId": "AdminListRuntimes",
         "parameters": [
           {
             "name": "competitionId",
@@ -3252,7 +3306,8 @@
           "Admin"
         ],
         "summary": "Queues a KoH shared runtime replacement.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeResetSharedRuntimeEndpoint",
+        "description": "Replaces the shared hill through the normal generation-fenced runtime state machine.",
+        "operationId": "AdminResetSharedRuntime",
         "parameters": [
           {
             "name": "competitionId",
@@ -3282,17 +3337,24 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3308,7 +3370,8 @@
           "Admin"
         ],
         "summary": "Queues an atomic team runtime replacement.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeResetTeamRuntimeEndpoint",
+        "description": "Uses the same generation and replacement invariants as the player runtime API.",
+        "operationId": "AdminResetTeamRuntime",
         "parameters": [
           {
             "name": "competitionId",
@@ -3346,17 +3409,24 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3372,7 +3442,8 @@
           "Admin"
         ],
         "summary": "Queues a KoH shared runtime start.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeStartSharedRuntimeEndpoint",
+        "description": "Starts the shared hill without fabricating a team owner.",
+        "operationId": "AdminStartSharedRuntime",
         "parameters": [
           {
             "name": "competitionId",
@@ -3402,17 +3473,24 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3428,7 +3506,8 @@
           "Admin"
         ],
         "summary": "Queues a team runtime start.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeStartTeamRuntimeEndpoint",
+        "description": "Uses the normal mode, capacity, and runtime ownership policy for the selected team.",
+        "operationId": "AdminStartTeamRuntime",
         "parameters": [
           {
             "name": "competitionId",
@@ -3466,17 +3545,24 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3492,7 +3578,8 @@
           "Admin"
         ],
         "summary": "Queues a KoH shared runtime stop.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeStopSharedRuntimeEndpoint",
+        "description": "Stops the shared hill through the durable runtime cleanup state machine.",
+        "operationId": "AdminStopSharedRuntime",
         "parameters": [
           {
             "name": "competitionId",
@@ -3522,17 +3609,24 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3548,7 +3642,8 @@
           "Admin"
         ],
         "summary": "Queues a team runtime stop.",
-        "operationId": "NoCTFAPIEndpointsAdministrationRuntimeStopTeamRuntimeEndpoint",
+        "description": "Stops the selected team's runtime through durable provider cleanup.",
+        "operationId": "AdminStopTeamRuntime",
         "parameters": [
           {
             "name": "competitionId",
@@ -3586,17 +3681,24 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3612,7 +3714,8 @@
           "Admin"
         ],
         "summary": "Gets redacted dead-letter metadata.",
-        "operationId": "NoCTFAPIEndpointsAdministrationPlatformGetDeadLetterEndpoint",
+        "description": "Returns delivery metadata without message bodies, secrets, or exception text.",
+        "operationId": "AdminPlatformGetDeadLetter",
         "parameters": [
           {
             "name": "messageId",
@@ -3659,7 +3762,8 @@
           "Admin"
         ],
         "summary": "Gets one platform user.",
-        "operationId": "NoCTFAPIEndpointsAdministrationPlatformGetPlatformUserEndpoint",
+        "description": "Returns platform identity and token-version metadata to administrators only.",
+        "operationId": "AdminPlatformGetUser",
         "parameters": [
           {
             "name": "userId",
@@ -3706,7 +3810,8 @@
           "Admin"
         ],
         "summary": "Invalidates every access and refresh token for a user.",
-        "operationId": "NoCTFAPIEndpointsAdministrationPlatformInvalidatePlatformUserTokensEndpoint",
+        "description": "Atomically increments the user's global token version.",
+        "operationId": "AdminPlatformInvalidateUserTokens",
         "parameters": [
           {
             "name": "userId",
@@ -3754,7 +3859,7 @@
         ],
         "summary": "Lists redacted Wolverine dead letters.",
         "description": "Message bodies and exception messages are deliberately omitted.",
-        "operationId": "NoCTFAPIEndpointsAdministrationPlatformListDeadLettersEndpoint",
+        "operationId": "AdminPlatformListDeadLetters",
         "parameters": [
           {
             "name": "limit",
@@ -3809,7 +3914,8 @@
           "Admin"
         ],
         "summary": "Lists platform users.",
-        "operationId": "NoCTFAPIEndpointsAdministrationPlatformListPlatformUsersEndpoint",
+        "description": "Returns platform role and token-version metadata to administrators only.",
+        "operationId": "AdminPlatformListUsers",
         "responses": {
           "200": {
             "description": "Success",
@@ -3842,8 +3948,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Marks one Wolverine dead letter for durable replay.",
-        "operationId": "NoCTFAPIEndpointsAdministrationPlatformRequeueDeadLetterEndpoint",
+        "summary": "Queues a Wolverine dead letter for durable replay.",
+        "description": "Creates a new delivery attempt while preserving the original failed record.",
+        "operationId": "AdminPlatformRequeueDeadLetter",
         "parameters": [
           {
             "name": "messageId",
@@ -3883,7 +3990,8 @@
           "Admin"
         ],
         "summary": "Updates a platform role and invalidates existing tokens.",
-        "operationId": "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleEndpoint",
+        "description": "Atomically changes the bounded user role and increments the token version.",
+        "operationId": "AdminPlatformUpdateUserRole",
         "parameters": [
           {
             "name": "userId",
@@ -3952,14 +4060,16 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionEndpoint",
+        "summary": "Creates a competition.",
+        "description": "Creates a draft competition owned by the current organizer or administrator.",
+        "operationId": "AdminCreateCompetition",
         "requestBody": {
           "x-name": "CreateCompetitionRequest",
           "description": "",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCreateCompetitionRequest"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionRequest"
               }
             }
           },
@@ -3977,6 +4087,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -3986,7 +4106,10 @@
         },
         "security": [
           {
-            "Bearer": []
+            "Bearer": [
+              "Organizer",
+              "Administrator"
+            ]
           }
         ]
       },
@@ -3996,7 +4119,7 @@
         ],
         "summary": "Lists competitions visible to the current administrator.",
         "description": "Resource permissions, not the /admin path alone, determine visibility.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsListAdminCompetitionsEndpoint",
+        "operationId": "AdminListCompetitions",
         "responses": {
           "200": {
             "description": "Success",
@@ -4027,7 +4150,9 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsDeleteCompetitionEndpoint",
+        "summary": "Deletes a competition.",
+        "description": "Soft-deletes an inactive competition owned or managed by the caller.",
+        "operationId": "AdminDeleteCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4042,14 +4167,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4063,7 +4198,8 @@
           "Admin"
         ],
         "summary": "Gets an administratively visible competition.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsGetAdminCompetitionEndpoint",
+        "description": "Returns draft or public competition metadata when the caller has resource access.",
+        "operationId": "AdminGetCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4105,15 +4241,16 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionEndpoint",
+        "summary": "Updates competition metadata.",
+        "description": "Updates mutable competition metadata using the current lifecycle state as the concurrency fence.",
+        "operationId": "AdminUpdateCompetition",
         "parameters": [
           {
             "name": "competitionId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "guid"
+              "type": "string"
             }
           }
         ],
@@ -4123,7 +4260,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsUpdateCompetitionRequest"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionRequest"
               }
             }
           },
@@ -4141,14 +4278,34 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4163,8 +4320,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Finish a competition and schedule runtime cleanup.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsFinishCompetitionEndpoint",
+        "summary": "Finishes a competition.",
+        "description": "Transitions an active competition to Finished and schedules runtime cleanup.",
+        "operationId": "AdminFinishCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4179,14 +4337,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4203,7 +4371,7 @@
         ],
         "summary": "Synchronously generates missing CTF PerTeam and KoH flags.",
         "description": "The response contains only stable failure metadata and never exposes flags or counts.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsGenerateMissingFlagsEndpoint",
+        "operationId": "AdminGenerateMissingFlags",
         "parameters": [
           {
             "name": "competitionId",
@@ -4239,6 +4407,129 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/configuration": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets a competition's game-mode configuration.",
+        "description": "Returns the versioned configuration JSON visible to competition administrators.",
+        "operationId": "AdminCompetitionConfiguration_Get",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionConfigurationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Updates a competition's game-mode configuration.",
+        "description": "Validates and replaces versioned configuration JSON using optimistic concurrency.",
+        "operationId": "AdminCompetitionConfiguration_Update",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateCompetitionConfigurationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionConfigurationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionConfigurationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/hard-delete": {
       "delete": {
         "tags": [
@@ -4246,7 +4537,7 @@
         ],
         "summary": "Permanently deletes an empty soft-deleted competition.",
         "description": "Restrict foreign keys prevent deleting a competition that owns durable facts.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsHardDeleteCompetitionEndpoint",
+        "operationId": "AdminHardDeleteCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4261,17 +4552,21 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4286,9 +4581,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Make a competition visible",
+        "summary": "Makes a competition visible.",
         "description": "Moves a Draft or Published competition to Visible.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsMakeCompetitionVisibleEndpoint",
+        "operationId": "AdminMakeCompetitionVisible",
         "parameters": [
           {
             "name": "competitionId",
@@ -4303,14 +4598,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4325,8 +4630,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Pause a running competition.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsPauseCompetitionEndpoint",
+        "summary": "Pauses a running competition.",
+        "description": "Freezes effective running time and mode scheduling until the competition resumes.",
+        "operationId": "AdminPauseCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4341,14 +4647,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4363,8 +4679,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Publish a competition.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsPublishCompetitionEndpoint",
+        "summary": "Publishes a competition.",
+        "description": "Moves a competition through the documented publication lifecycle state machine.",
+        "operationId": "AdminPublishCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4379,14 +4696,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4402,7 +4729,8 @@
           "Admin"
         ],
         "summary": "Restores a soft-deleted competition.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsRestoreCompetitionEndpoint",
+        "description": "Restores a competition when the caller is its owner or a platform administrator.",
+        "operationId": "AdminRestoreCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4439,8 +4767,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Resume a paused competition.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsResumeCompetitionEndpoint",
+        "summary": "Resumes a paused competition.",
+        "description": "Restarts effective running time and durable mode scheduling.",
+        "operationId": "AdminResumeCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4455,14 +4784,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4477,9 +4816,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Start a published competition",
+        "summary": "Starts a published competition.",
         "description": "Transitions the competition to Running and queues runtime provisioning.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsStartCompetitionEndpoint",
+        "operationId": "AdminStartCompetition",
         "parameters": [
           {
             "name": "competitionId",
@@ -4494,14 +4833,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4517,7 +4866,8 @@
           "Admin"
         ],
         "summary": "Transfers competition ownership.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsTransferCompetitionOwnerEndpoint",
+        "description": "Assigns a new eligible owner and moves the previous owner into the manager set.",
+        "operationId": "AdminTransferCompetitionOwner",
         "parameters": [
           {
             "name": "competitionId",
@@ -4570,9 +4920,6 @@
           },
           "404": {
             "description": "Not Found"
-          },
-          "409": {
-            "description": ""
           }
         },
         "security": [
@@ -4587,9 +4934,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Replace competition permission assignments",
+        "summary": "Replaces competition permission assignments.",
         "description": "Assigns mutually exclusive manager, judge, and observer user arrays.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsEndpoint",
+        "operationId": "AdminUpdateCompetitionPermissions",
         "parameters": [
           {
             "name": "competitionId",
@@ -4636,6 +4983,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4650,9 +5007,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Validate the competition start gate",
+        "summary": "Validates the competition start gate.",
         "description": "Returns every current stable, deduplicated start error without changing state.",
-        "operationId": "NoCTFAPIEndpointsAdministrationCompetitionsValidateCompetitionStartEndpoint",
+        "operationId": "AdminValidateCompetitionStart",
         "parameters": [
           {
             "name": "competitionId",
@@ -4698,15 +5055,14 @@
         ],
         "summary": "Links a global challenge template to a competition.",
         "description": "Creates a CompetitionChallenge without copying or mutating the global template.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesCreateChallengeEndpoint",
+        "operationId": "AdminCreateCompetitionChallenge",
         "parameters": [
           {
             "name": "competitionId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "guid"
+              "type": "string"
             }
           }
         ],
@@ -4716,7 +5072,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCreateChallengeRequest"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCreateChallengeRequest"
               }
             }
           },
@@ -4734,14 +5090,34 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4754,8 +5130,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Lists all competition challenges, including unpublished items.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesListAdminChallengesEndpoint",
+        "summary": "Lists all competition challenges.",
+        "description": "Includes unpublished challenge instances for authorized competition observers.",
+        "operationId": "AdminListCompetitionChallenges",
         "parameters": [
           {
             "name": "competitionId",
@@ -4797,7 +5174,8 @@
           "Admin"
         ],
         "summary": "Creates a competition-scoped flag.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesCreateChallengeFlagEndpoint",
+        "description": "Creates a protected flag answer scoped to one CompetitionChallenge.",
+        "operationId": "AdminCreateCompetitionChallengeFlag",
         "parameters": [
           {
             "name": "competitionId",
@@ -4871,7 +5249,8 @@
           "Admin"
         ],
         "summary": "Lists competition-scoped flags.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesListChallengeFlagsEndpoint",
+        "description": "Returns protected flag records for one CompetitionChallenge to authorized observers.",
+        "operationId": "AdminListCompetitionChallengeFlags",
         "parameters": [
           {
             "name": "competitionId",
@@ -4924,7 +5303,8 @@
           "Admin"
         ],
         "summary": "Creates a competition challenge hint.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesCreateChallengeHintEndpoint",
+        "description": "Creates hint content, cost, and optional publication timing for one challenge instance.",
+        "operationId": "AdminCreateCompetitionChallengeHint",
         "parameters": [
           {
             "name": "competitionId",
@@ -4998,7 +5378,8 @@
           "Admin"
         ],
         "summary": "Lists competition challenge hints.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesListChallengeHintsEndpoint",
+        "description": "Returns every hint and its publication metadata for one challenge instance.",
+        "operationId": "AdminListCompetitionChallengeHints",
         "parameters": [
           {
             "name": "competitionId",
@@ -5050,7 +5431,9 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesDeleteChallengeEndpoint",
+        "summary": "Deletes a competition challenge.",
+        "description": "Soft-deletes the competition link without changing the global challenge template.",
+        "operationId": "AdminDeleteCompetitionChallenge",
         "parameters": [
           {
             "name": "competitionId",
@@ -5073,14 +5456,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5093,16 +5486,16 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Gets challenge details, including unpublished challenges.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesGetChallengeEndpoint",
+        "summary": "Gets a competition challenge.",
+        "description": "Returns management details for published or unpublished competition challenges.",
+        "operationId": "AdminGetCompetitionChallenge",
         "parameters": [
           {
             "name": "competitionId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "guid"
+              "type": "string"
             }
           },
           {
@@ -5110,8 +5503,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "guid"
+              "type": "string"
             }
           }
         ],
@@ -5146,15 +5538,16 @@
         "tags": [
           "Admin"
         ],
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeEndpoint",
+        "summary": "Updates a competition challenge.",
+        "description": "Updates scoring, ordering, and publication state using optimistic concurrency.",
+        "operationId": "AdminUpdateCompetitionChallenge",
         "parameters": [
           {
             "name": "competitionId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "guid"
+              "type": "string"
             }
           },
           {
@@ -5162,8 +5555,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "guid"
+              "type": "string"
             }
           }
         ],
@@ -5173,7 +5565,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesUpdateChallengeRequest"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeRequest"
               }
             }
           },
@@ -5191,14 +5583,34 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5213,8 +5625,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Soft-deletes a competition-scoped flag.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesDeleteChallengeFlagEndpoint",
+        "summary": "Deletes a competition-scoped flag.",
+        "description": "Soft-deletes one protected flag from the CompetitionChallenge scope.",
+        "operationId": "AdminDeleteCompetitionChallengeFlag",
         "parameters": [
           {
             "name": "competitionId",
@@ -5266,7 +5679,8 @@
           "Admin"
         ],
         "summary": "Gets a competition-scoped flag.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesGetChallengeFlagEndpoint",
+        "description": "Returns protected flag material to authorized competition observers.",
+        "operationId": "AdminGetCompetitionChallengeFlag",
         "parameters": [
           {
             "name": "competitionId",
@@ -5325,7 +5739,8 @@
           "Admin"
         ],
         "summary": "Updates a competition-scoped flag.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeFlagEndpoint",
+        "description": "Replaces protected flag material and validity metadata within one CompetitionChallenge.",
+        "operationId": "AdminUpdateCompetitionChallengeFlag",
         "parameters": [
           {
             "name": "competitionId",
@@ -5408,8 +5823,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Soft-deletes a competition challenge hint.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesDeleteChallengeHintEndpoint",
+        "summary": "Deletes a competition challenge hint.",
+        "description": "Soft-deletes one hint owned by the CompetitionChallenge.",
+        "operationId": "AdminDeleteCompetitionChallengeHint",
         "parameters": [
           {
             "name": "competitionId",
@@ -5461,7 +5877,8 @@
           "Admin"
         ],
         "summary": "Gets a competition challenge hint.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesGetChallengeHintEndpoint",
+        "description": "Returns full hint content and publication metadata to authorized observers.",
+        "operationId": "AdminGetCompetitionChallengeHint",
         "parameters": [
           {
             "name": "competitionId",
@@ -5520,7 +5937,8 @@
           "Admin"
         ],
         "summary": "Updates a competition challenge hint.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeHintEndpoint",
+        "description": "Updates hint content, cost, and publication timing for one challenge instance.",
+        "operationId": "AdminUpdateCompetitionChallengeHint",
         "parameters": [
           {
             "name": "competitionId",
@@ -5598,6 +6016,145 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets a competition challenge's game-mode configuration.",
+        "description": "Returns the versioned challenge configuration JSON visible to competition administrators.",
+        "operationId": "AdminChallengeConfiguration_Get",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesChallengeConfigurationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Updates a competition challenge's game-mode configuration.",
+        "description": "Validates and replaces versioned challenge configuration JSON using optimistic concurrency.",
+        "operationId": "AdminChallengeConfiguration_Update",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateChallengeConfigurationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeConfigurationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesChallengeConfigurationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/restore": {
       "post": {
         "tags": [
@@ -5605,7 +6162,7 @@
         ],
         "summary": "Restores a deleted competition challenge.",
         "description": "Restores the competition link only; the global template is not modified.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengesRestoreChallengeEndpoint",
+        "operationId": "AdminRestoreCompetitionChallenge",
         "parameters": [
           {
             "name": "competitionId",
@@ -5628,17 +6185,24 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5654,7 +6218,8 @@
           "Admin"
         ],
         "summary": "Creates a template-level static flag.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankCreateChallengeFlagEndpoint",
+        "description": "Adds protected static flag material to a global challenge template.",
+        "operationId": "AdminChallengeBankCreateFlag",
         "parameters": [
           {
             "name": "challengeId",
@@ -5720,7 +6285,8 @@
           "Admin"
         ],
         "summary": "Lists template-level static flags.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankListChallengeFlagsEndpoint",
+        "description": "Returns protected static flag records to authorized template managers.",
+        "operationId": "AdminChallengeBankListFlags",
         "parameters": [
           {
             "name": "challengeId",
@@ -5766,7 +6332,7 @@
         ],
         "summary": "Creates a global challenge template.",
         "description": "Creates a reusable question-bank template independent of any competition.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankCreateChallengeTemplateEndpoint",
+        "operationId": "AdminChallengeBankCreateTemplate",
         "requestBody": {
           "x-name": "CreateChallengeTemplateRequest",
           "description": "",
@@ -5823,7 +6389,7 @@
         ],
         "summary": "Lists visible challenge templates.",
         "description": "Returns owned, managed, shared, or platform-administrator-visible templates.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankListChallengeTemplatesEndpoint",
+        "operationId": "AdminChallengeBankListTemplates",
         "responses": {
           "200": {
             "description": "Success",
@@ -5854,8 +6420,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Soft-deletes a challenge attachment.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankDeleteChallengeAttachmentEndpoint",
+        "summary": "Deletes a challenge attachment.",
+        "description": "Soft-deletes attachment metadata and schedules owned object cleanup.",
+        "operationId": "AdminChallengeBankDeleteAttachment",
         "parameters": [
           {
             "name": "challengeId",
@@ -5899,7 +6466,8 @@
           "Admin"
         ],
         "summary": "Updates attachment display metadata.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankUpdateChallengeAttachmentEndpoint",
+        "description": "Updates the display name and MIME type without replacing the stored object.",
+        "operationId": "AdminChallengeBankUpdateAttachment",
         "parameters": [
           {
             "name": "challengeId",
@@ -5974,8 +6542,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Soft-deletes a template-level static flag.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankDeleteChallengeFlagEndpoint",
+        "summary": "Deletes a template-level static flag.",
+        "description": "Soft-deletes protected static flag material from a global template.",
+        "operationId": "AdminChallengeBankDeleteFlag",
         "parameters": [
           {
             "name": "challengeId",
@@ -6019,7 +6588,8 @@
           "Admin"
         ],
         "summary": "Gets a template-level static flag.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeFlagEndpoint",
+        "description": "Returns protected static flag material to an authorized template manager.",
+        "operationId": "AdminChallengeBankGetFlag",
         "parameters": [
           {
             "name": "challengeId",
@@ -6070,7 +6640,8 @@
           "Admin"
         ],
         "summary": "Updates a template-level static flag.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankUpdateChallengeFlagEndpoint",
+        "description": "Replaces protected flag material and validity metadata within the template scope.",
+        "operationId": "AdminChallengeBankUpdateFlag",
         "parameters": [
           {
             "name": "challengeId",
@@ -6145,8 +6716,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Soft-deletes a global challenge template.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankDeleteChallengeTemplateEndpoint",
+        "summary": "Deletes a global challenge template.",
+        "description": "Soft-deletes an unreferenced reusable challenge template.",
+        "operationId": "AdminChallengeBankDeleteTemplate",
         "parameters": [
           {
             "name": "challengeId",
@@ -6182,7 +6754,8 @@
           "Admin"
         ],
         "summary": "Gets a global challenge template.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeTemplateEndpoint",
+        "description": "Returns reusable template metadata according to challenge-bank visibility rules.",
+        "operationId": "AdminChallengeBankGetTemplate",
         "parameters": [
           {
             "name": "challengeId",
@@ -6226,7 +6799,7 @@
         ],
         "summary": "Updates global challenge metadata.",
         "description": "Updates the reusable template and never changes competition-owned ordering or scoring.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankUpdateChallengeTemplateEndpoint",
+        "operationId": "AdminChallengeBankUpdateTemplate",
         "parameters": [
           {
             "name": "challengeId",
@@ -6281,7 +6854,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6297,7 +6877,8 @@
           "Admin"
         ],
         "summary": "Lists global challenge template attachments.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankListChallengeAttachmentsEndpoint",
+        "description": "Returns protected attachment metadata to authorized template managers.",
+        "operationId": "AdminChallengeBankListAttachments",
         "parameters": [
           {
             "name": "challengeId",
@@ -6341,7 +6922,7 @@
         ],
         "summary": "Uploads a challenge template attachment.",
         "description": "The server generates the object key and persists length and SHA-256 metadata.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankUploadChallengeAttachmentEndpoint",
+        "operationId": "AdminChallengeBankUploadAttachment",
         "parameters": [
           {
             "name": "challengeId",
@@ -6409,7 +6990,8 @@
           "Admin"
         ],
         "summary": "Restores a soft-deleted global challenge template.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankRestoreChallengeTemplateEndpoint",
+        "description": "Restores a reusable template for its owner or a platform administrator.",
+        "operationId": "AdminChallengeBankRestoreTemplate",
         "parameters": [
           {
             "name": "challengeId",
@@ -6447,7 +7029,8 @@
           "Admin"
         ],
         "summary": "Transfers challenge template ownership.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankTransferChallengeTemplateOwnerEndpoint",
+        "description": "Assigns an eligible new owner while preserving the previous owner as a manager.",
+        "operationId": "AdminChallengeBankTransferOwner",
         "parameters": [
           {
             "name": "challengeId",
@@ -6498,11 +7081,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6518,7 +7105,8 @@
           "Admin"
         ],
         "summary": "Replaces the challenge template manager set.",
-        "operationId": "NoCTFAPIEndpointsAdministrationChallengeBankUpdateChallengeTemplatePermissionsEndpoint",
+        "description": "Assigns the complete manager set while preserving the sole owner source of truth.",
+        "operationId": "AdminChallengeBankUpdatePermissions",
         "parameters": [
           {
             "name": "challengeId",
@@ -6569,11 +7157,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -8130,9 +8722,14 @@
       "NoCTFAPIEndpointsAdministrationTeamsBanTeamRequest": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
         "properties": {
           "reason": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "nullable": false
           }
         }
       },
@@ -8473,12 +9070,18 @@
           }
         }
       },
-      "NoCTFAPIEndpointsCompetitionsCreateCompetitionRequest": {
+      "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionRequest": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "title"
+        ],
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
           },
           "description": {
             "type": "string",
@@ -8500,7 +9103,9 @@
           },
           "maxTeamMembers": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
           }
         }
       },
@@ -8536,6 +9141,33 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionConfigurationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+          },
+          "json": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "competitionStatus": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionStatus"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsAdminCompetitionListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -8563,12 +9195,37 @@
           }
         }
       },
-      "NoCTFAPIEndpointsCompetitionsUpdateCompetitionRequest": {
+      "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionConfigurationRequest": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "json"
+        ],
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "json": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
           },
           "description": {
             "type": "string",
@@ -8587,7 +9244,9 @@
           },
           "maxTeamMembers": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
           }
         }
       },
@@ -8655,21 +9314,28 @@
           }
         }
       },
-      "NoCTFAPIEndpointsChallengesCreateChallengeRequest": {
+      "NoCTFAPIEndpointsAdministrationChallengesCreateChallengeRequest": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "challengeId"
+        ],
         "properties": {
           "challengeId": {
             "type": "string",
-            "format": "guid"
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
           },
           "baseScore": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "minimum": 0.0
           },
           "order": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "minimum": 0.0
           }
         }
       },
@@ -8811,6 +9477,37 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationChallengesChallengeConfigurationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+          },
+          "json": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "competitionStatus": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionStatus"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -8835,24 +9532,46 @@
           }
         }
       },
-      "NoCTFAPIEndpointsChallengesUpdateChallengeRequest": {
+      "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeConfigurationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "json"
+        ],
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "json": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeRequest": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "baseScore": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "minimum": 0.0
           },
           "order": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "minimum": 0.0
           },
           "isPublished": {
             "type": "boolean"
           },
           "expectedRevision": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "minimum": 0.0
           }
         }
       },

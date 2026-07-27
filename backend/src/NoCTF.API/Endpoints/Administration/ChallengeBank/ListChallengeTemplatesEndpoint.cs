@@ -16,6 +16,7 @@ public sealed class ListChallengeTemplatesEndpoint(
     {
         Get("/admin/challenges");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminChallengeBankListTemplates"));
         Summary(summary =>
         {
             summary.Summary = "Lists visible challenge templates.";

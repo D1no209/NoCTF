@@ -14,7 +14,12 @@ public sealed class RestoreCompetitionEndpoint(
     {
         Post("/admin/competitions/{competitionId}/restore");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Restores a soft-deleted competition.");
+        Description(builder => builder.WithName("AdminRestoreCompetition"));
+        Summary(summary =>
+        {
+            summary.Summary = "Restores a soft-deleted competition.";
+            summary.Description = "Restores a competition when the caller is its owner or a platform administrator.";
+        });
     }
 
     public override async Task<Results<NoContent, NotFound>> ExecuteAsync(CancellationToken ct)

@@ -10,7 +10,18 @@ namespace NoCTF.API.Endpoints.Administration.Teams;
 public sealed class ApproveTeamEndpoint(ReviewTeamRegistration review, ICompetitionModerationAuthorizer authorizer, IUserContext user)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
-    public override void Configure() { Post("/admin/competitions/{competitionId}/teams/{teamId}/approve"); AuthSchemes("Bearer"); }
+    public override void Configure()
+    {
+        Post("/admin/competitions/{competitionId}/teams/{teamId}/approve");
+        AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminApproveTeam")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Approves a pending team.";
+            summary.Description = "Approves team registration while the competition still permits review changes.";
+        });
+    }
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId"); var teamId = Route<Guid>("teamId");

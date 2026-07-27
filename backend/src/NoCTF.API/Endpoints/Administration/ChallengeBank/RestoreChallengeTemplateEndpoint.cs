@@ -14,7 +14,12 @@ public sealed class RestoreChallengeTemplateEndpoint(
     {
         Post("/admin/challenges/{challengeId}/restore");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Restores a soft-deleted global challenge template.");
+        Description(builder => builder.WithName("AdminChallengeBankRestoreTemplate"));
+        Summary(summary =>
+        {
+            summary.Summary = "Restores a soft-deleted global challenge template.";
+            summary.Description = "Restores a reusable template for its owner or a platform administrator.";
+        });
     }
 
     public override async Task<Results<NoContent, NotFound>> ExecuteAsync(CancellationToken ct)

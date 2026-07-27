@@ -81,7 +81,12 @@ public sealed class ListAdminRuntimesEndpoint(
     {
         Get("/admin/competitions/{competitionId}/runtimes");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Lists filtered runtime instances.");
+        Description(builder => builder.WithName("AdminListRuntimes"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists filtered runtime instances.";
+            summary.Description = "Returns keyset-paged runtime state and placement metadata to authorized observers.";
+        });
     }
 
     public override async Task<Results<Ok<AdminRuntimeListResponse>, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(

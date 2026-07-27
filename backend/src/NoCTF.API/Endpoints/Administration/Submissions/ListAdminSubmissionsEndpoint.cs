@@ -49,7 +49,12 @@ public sealed class ListAdminSubmissionsEndpoint(
     {
         Get("/admin/competitions/{competitionId}/submissions");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Lists filtered competition submissions.");
+        Description(builder => builder.WithName("AdminListSubmissions"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists filtered competition submissions.";
+            summary.Description = "Returns keyset-paged protected submission facts to authorized competition observers.";
+        });
     }
 
     public override async Task<Results<Ok<SubmissionListResponse>, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(

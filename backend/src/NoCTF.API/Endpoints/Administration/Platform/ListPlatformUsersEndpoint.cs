@@ -33,7 +33,12 @@ public sealed class ListPlatformUsersEndpoint(ManagePlatform platform)
         Get("/admin/platform/users");
         AuthSchemes("Bearer");
         Roles("Administrator");
-        Summary(summary => summary.Summary = "Lists platform users.");
+        Description(builder => builder.WithName("AdminPlatformListUsers"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists platform users.";
+            summary.Description = "Returns platform role and token-version metadata to administrators only.";
+        });
     }
 
     public override async Task<Ok<PlatformUserListResponse>> ExecuteAsync(CancellationToken ct) =>

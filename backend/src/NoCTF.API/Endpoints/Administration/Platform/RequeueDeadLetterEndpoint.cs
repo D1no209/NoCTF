@@ -12,7 +12,12 @@ public sealed class RequeueDeadLetterEndpoint(ManagePlatform platform)
         Post("/admin/platform/dead-letters/{messageId}/requeue");
         AuthSchemes("Bearer");
         Roles("Administrator");
-        Summary(summary => summary.Summary = "Marks one Wolverine dead letter for durable replay.");
+        Description(builder => builder.WithName("AdminPlatformRequeueDeadLetter"));
+        Summary(summary =>
+        {
+            summary.Summary = "Queues a Wolverine dead letter for durable replay.";
+            summary.Description = "Creates a new delivery attempt while preserving the original failed record.";
+        });
     }
 
     public override async Task<Results<Accepted, NotFound>> ExecuteAsync(CancellationToken ct) =>

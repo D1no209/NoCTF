@@ -23,7 +23,12 @@ public sealed class GetAdminSubmissionStatusEndpoint(
     {
         Get("/admin/competitions/{competitionId}/submissions/{submissionId}");
         AuthSchemes("Bearer");
-        Summary(s => s.Summary = "Read the current administrative submission status.");
+        Description(builder => builder.WithName("AdminGetSubmission"));
+        Summary(summary =>
+        {
+            summary.Summary = "Gets an administrative submission view.";
+            summary.Description = "Returns protected submission content, current evaluation, and management diagnostics.";
+        });
     }
 
     public override async Task<Results<Ok<AdminSubmissionStatusResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(

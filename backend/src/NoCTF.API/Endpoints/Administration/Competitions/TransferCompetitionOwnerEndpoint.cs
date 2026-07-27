@@ -21,16 +21,21 @@ public sealed class TransferCompetitionOwnerValidator : Validator<TransferCompet
 public sealed class TransferCompetitionOwnerEndpoint(
     TransferCompetitionOwner transfer,
     IUserContext user)
-    : Endpoint<TransferCompetitionOwnerRequest, Results<Ok<CompetitionResponse>, NotFound, Conflict>>
+    : Endpoint<TransferCompetitionOwnerRequest, Results<Ok<CompetitionResponse>, NotFound>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/owner/transfer");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Transfers competition ownership.");
+        Description(builder => builder.WithName("AdminTransferCompetitionOwner"));
+        Summary(summary =>
+        {
+            summary.Summary = "Transfers competition ownership.";
+            summary.Description = "Assigns a new eligible owner and moves the previous owner into the manager set.";
+        });
     }
 
-    public override async Task<Results<Ok<CompetitionResponse>, NotFound, Conflict>> ExecuteAsync(
+    public override async Task<Results<Ok<CompetitionResponse>, NotFound>> ExecuteAsync(
         TransferCompetitionOwnerRequest request,
         CancellationToken ct)
     {

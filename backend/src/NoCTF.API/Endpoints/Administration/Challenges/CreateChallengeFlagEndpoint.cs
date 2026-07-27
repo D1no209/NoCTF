@@ -18,7 +18,12 @@ public sealed class CreateChallengeFlagEndpoint(
     {
         Post("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags");
         AuthSchemes("Bearer");
-        Summary(summary => summary.Summary = "Creates a competition-scoped flag.");
+        Description(builder => builder.WithName("AdminCreateCompetitionChallengeFlag"));
+        Summary(summary =>
+        {
+            summary.Summary = "Creates a competition-scoped flag.";
+            summary.Description = "Creates a protected flag answer scoped to one CompetitionChallenge.";
+        });
     }
 
     public override async Task<Results<Created<ChallengeFlagResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
@@ -42,7 +47,7 @@ public sealed class CreateChallengeFlagEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status422UnprocessableEntity,
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Flag was not created.",
                 detail: result.ErrorMessage);
         var response = ChallengeFlagMapping.ToResponse(result.Value!);

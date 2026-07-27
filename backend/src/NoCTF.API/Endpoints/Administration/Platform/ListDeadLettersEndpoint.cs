@@ -43,6 +43,7 @@ public sealed class ListDeadLettersEndpoint(ManagePlatform platform)
         Get("/admin/platform/dead-letters");
         AuthSchemes("Bearer");
         Roles("Administrator");
+        Description(builder => builder.WithName("AdminPlatformListDeadLetters"));
         Summary(summary =>
         {
             summary.Summary = "Lists redacted Wolverine dead letters.";

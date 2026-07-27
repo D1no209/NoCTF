@@ -11,7 +11,18 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 public sealed class PauseCompetitionEndpoint(TransitionCompetitionLifecycle transition, ICompetitionModerationAuthorizer authorizer, IUserContext user)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
-    public override void Configure() { Post("/admin/competitions/{competitionId}/pause"); AuthSchemes("Bearer"); Summary(s => s.Summary = "Pause a running competition."); }
+    public override void Configure()
+    {
+        Post("/admin/competitions/{competitionId}/pause");
+        AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminPauseCompetition")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Summary(summary =>
+        {
+            summary.Summary = "Pauses a running competition.";
+            summary.Description = "Freezes effective running time and mode scheduling until the competition resumes.";
+        });
+    }
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var id = Route<Guid>("competitionId");
