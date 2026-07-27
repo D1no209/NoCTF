@@ -92,13 +92,13 @@ spec:
               memory: "1Gi"
           readinessProbe:
             httpGet:
-              path: /api/health/ready
+              path: /health
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /api/health/live
+              path: /health
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 15
