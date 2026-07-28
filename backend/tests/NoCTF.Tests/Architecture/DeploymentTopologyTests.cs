@@ -20,6 +20,9 @@ public sealed class DeploymentTopologyTests
         await Assert.That(dockerfile).Contains("AS worker");
         await Assert.That(dockerfile).Contains("NoCTF.Worker.dll");
         await Assert.That(compose).Contains("  worker:");
+        await Assert.That(compose).Contains("GET /health HTTP/1.1");
+        await Assert.That(compose).Contains("GET /health/ready HTTP/1.1");
+        await Assert.That(compose).Contains("[[ \"$$status\" == *\" 200 \"* ]]");
         await Assert.That(File.Exists(workerDeployment)).IsTrue();
         await Assert.That(workerProgram)
             .Contains("options.Discovery.IncludeType(typeof(BackendMessageHandlers));");
