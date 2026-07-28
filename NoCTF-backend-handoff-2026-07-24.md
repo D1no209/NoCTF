@@ -41,11 +41,11 @@ IPv6 deny 验证、Admin API 传输契约重构、四模式完整边界 E2E、ca
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`984d633 build(backend): separate verification gates`。
+- 当前代码实现 HEAD：`a1f158f fix(runtime): clean up Docker checker callback networks`。
 - 本交接文档提交前，当前分支相对
-  `origin/codex/backend-target-architecture-handoff` ahead 10、behind 0；本文独立提交后
-  应为 ahead 11、behind 0。
-- 前序实现均先做本地提交；用户已于 2026-07-27 明确授权完善本文后推送当前分支。
+  `origin/codex/backend-target-architecture-handoff` ahead 1、behind 0；本文独立提交后
+  应为 ahead 2、behind 0。
+- 前序实现均先做本地提交；当前用户规则是只有收到明确推送指令后才能推送远端。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
 - 创建交接分支前，`main` 相对 `origin/main`：ahead 186。
@@ -161,6 +161,12 @@ wsl bash -lc `
   `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例。本阶段另以完整部署清单完成
   独立 Kubernetes smoke，不把该 skip 伪装为 passed。
 - Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
+- `a1f158f` 后重新执行 Docker Container 专项和完整 Integration：单 Container
+  7/7 passed；完整 Integration 43 passed、0 failed、1 Kubernetes dataplane skipped。
+  专项测试发现无显式 `RuntimeInstanceId` 的一次性 checker receipt 会导致 callback
+  network 被遗漏。修复后销毁使用与创建一致的
+  `RuntimeInstanceId ?? OperationId` ownership identity，回归测试明确断言两个 callback
+  network 均已删除。
 - Kubernetes 使用一次性 k3d `v5.9.0` / k3s `v1.35.5+k3s1` /
   Cilium `v1.19.6`。k3s 以 `--flannel-backend=none --disable-network-policy`
   启动；Cilium `enable-policy=always`，内建 NetworkPolicy controller 未参与。本轮
@@ -731,6 +737,32 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   artifact SHA-256 均为
   `6B249693F0D3F5BAD075E4F51AF32DBEDDC51788ECD984E97062320F157C8098`；四模式与 deploy
   Compose、四份 PowerShell parser、`git diff --check` 均通过。
+
+### 6.11 Docker Container Provider 专项复测与 callback cleanup
+
+用户于 2026-07-28 要求先把 Docker Container 模式测试好。`a1f158f` 完成了本轮唯一代码
+修复并补充真实 Docker 回归：
+
+- `DockerContainerLifecycleTests` 7/7 passed，覆盖隔离网络幂等、持久 Runtime 双网络
+  HAProxy ingress、stdin exec、超时后终止容器进程树、AWDP checker 独立 callback
+  network、AWD checker 同时连接 Runtime 与 callback network，以及创建失败回滚。
+- 回归测试先证明原实现会残留 `noctf-callback-*`：checker 未显式传
+  `RuntimeInstanceId` 时，创建标签使用 `OperationId`，但销毁只接受非空
+  `RuntimeInstanceId`。修复后销毁使用相同的 effective identity，并断言两个 callback
+  network 均不可再查询。
+- 完整测试重新执行：solution build 0 warning/0 error；E2E project 在 WSL build
+  0 warning/0 error；359 non-Integration passed；43 Integration passed、0 failed、
+  1 Kubernetes dataplane skipped。
+- 四模式 Docker 完整边界重新执行并通过：CTF 1/1（54.2 秒）、AWD 1/1（1 分 37.1 秒）、
+  AWDP 1/1（1 分 26.4 秒）、KoH 1/1（1 分 09.8 秒）。AWD 首次构建遇到 Docker Hub
+  匿名 token 网络超时，预拉取 `python:3.13-alpine` 与 `curlimages/curl:8.14.1` 后业务
+  流程通过；不得把该外部拉取失败记为平台测试失败。
+- 四个本轮隔离 Compose project 的 container、network、volume 和项目镜像均已清理；
+  另清除了 12 个无容器引用、标签明确属于两个旧 AWD E2E project 的可重建残留镜像。
+  最终没有 E2E network、E2E project image 或 managed callback network。
+- 用户原有 `deploy-backend-1`、`deploy-worker-1`、`deploy-runner-1`、PostgreSQL、Redis、
+  MinIO 六个容器保持运行在 `deploy_default`；本轮没有对该栈执行 up、down、restart 或
+  替换，也没有生产部署。
 
 本次目标迁移没有剩余实现项。仍未完成的 Libvirt 真机验证、Pool/Node CIDR 部署期审计、
 Docker `InternetOnly` 和后期 TargetPort/callback gateway 加固，均已在前文明确边界；它们不是
