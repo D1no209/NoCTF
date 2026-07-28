@@ -4,8 +4,9 @@
 
 ## 1. 下一会话目标
 
-继续完成 `E:\SourceCode\NoCTF\backend` 的目标架构迁移，架构基线以远程
-`codex/backend-target-architecture` 及仓库 `AGENTS.md`、`docs/` 为准。
+后端目标架构迁移的既定交付项已经完成。下一会话以交接复核为主：审阅本分支提交，
+确认受保护工作树未被纳入，按用户指示推送或创建 PR；不要再把 capability/DI 或
+`Verify-Backend.ps1` 当作待实现项。
 
 默认只修改 `backend`、Runtime 部署清单与本交接文档。除非用户明确扩大范围，不修改
 Frontend、仓库外 CI 或用户的本地辅助文件。
@@ -18,22 +19,21 @@ EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 
 Compose appliance 的 crash orphan reconciliation 也已闭环。受控 Docker Compose 与
 Kubernetes 三进程 deployment smoke、真实双栈 Cilium IPv6 deny 验证均已完成并清理；
 Admin API 传输层、协议测试、OpenAPI 与文档重构也已完成。CTF、AWD、AWDP 与 KoH
-四模式完整边界 E2E 均已通过，下一主线是 capability/DI 机械整理与最终
-`Verify-Backend.ps1`。
+四模式完整边界 E2E 均已通过。Application/Infrastructure capability 归档、DI composition
+root 收口和最终 `Verify-Backend.ps1` 也分别由 `39ff3d3`、`984d633` 完成并通过全量门禁。
 
 ### 当前完成度
 
-后端目标架构迁移当前完成度估算为 **98%**。这是按剩余交付里程碑计算的工程进度，
-不是测试覆盖率或生产可用性承诺。剩余约 2 个百分点固定分配为：
+后端目标架构迁移的既定交付项完成度为 **100%**。这是本次目标迁移清单的完成度，
+不是测试覆盖率、生产部署状态或生产可用性承诺。
 
-- capability/DI 机械整理与最终 `Verify-Backend.ps1`：2%。
-
-已完成的 98% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
+已完成项包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
 三类 Runtime Provider lifecycle、容量状态机、CTF PerTeam Flag、AWDP 即时 target、
 DNS 命名隔离、Docker/Kubernetes 网络策略、Cilium fail-closed 前提和三 Provider
 crash orphan reconciliation、三进程 Docker/Kubernetes deployment smoke、真实双栈
-IPv6 deny 验证、Admin API 传输契约重构，以及四模式完整边界 E2E。未完成项仍可能
-在真实验证中暴露返工，因此百分比只用于交接排期。
+IPv6 deny 验证、Admin API 传输契约重构、四模式完整边界 E2E、capability/DI 整理与
+可区分测试门禁。第 6 节列出的真实环境验证和后续网络加固仍是独立非阻塞工作，
+不得据此把已完成的迁移交付项重新描述为未完成。
 
 ## 2. Git 基线与工作树保护
 
@@ -41,9 +41,10 @@ IPv6 deny 验证、Admin API 传输契约重构，以及四模式完整边界 E2
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`a953ae1 test(backend): verify full-boundary KoH flow`。
-- 本交接文档独立提交后，当前分支相对
-  `origin/codex/backend-target-architecture-handoff` ahead 8。
+- 当前代码实现 HEAD：`984d633 build(backend): separate verification gates`。
+- 本交接文档提交前，当前分支相对
+  `origin/codex/backend-target-architecture-handoff` ahead 10、behind 0；本文独立提交后
+  应为 ahead 11、behind 0。
 - 前序实现均先做本地提交；用户已于 2026-07-27 明确授权完善本文后推送当前分支。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -60,14 +61,7 @@ git log --oneline 003b75c..2c6b4ce -- backend
 
 以下工作树内容属于用户或仅为换行差异，未纳入后端提交；后续不得顺手清理或暂存：
 
-- `backend/src/NoCTF.Application/Messaging/ITransactionalMessageOutbox.cs`：仅换行状态。
 - `backend/src/NoCTF.Infrastructure/Messaging/WolverineTransactionalMessageOutbox.cs`：仅换行状态。
-- `backend/src/NoCTF.Runner/Messages/AwdCheckerHandler.cs`：仅换行状态。
-- `backend/src/NoCTF.Runner/Messages/RuntimeHandlers.cs`：仅换行状态。
-- `backend/tests/NoCTF.Tests/Integration/Persistence/AwdpFixResultPersistenceTests.cs`：仅换行状态。
-- `backend/tests/NoCTF.Tests/Integration/Persistence/CompetitionLifecyclePersistenceTests.cs`：仅换行状态。
-- `backend/tests/NoCTF.Tests/Integration/Runtime/RunnerAssignmentReconciliationTests.cs`：仅换行状态。
-- `backend/tests/NoCTF.Tests/Unit/Runner/AwdFlagInjectionHandlerTests.cs`：仅换行状态。
 - `backend/src/NoCTF.Runner/Properties/`
 - `deploy/docker-compose.local-ports.yml`
 - `frontend/src/composables/useInstanceOperationState.ts`
@@ -124,8 +118,12 @@ git log --oneline 003b75c..2c6b4ce -- backend
 
 ## 4. 2026-07-28 当前 HEAD 的实测门禁
 
-所有命令均在 `E:\SourceCode\NoCTF` 发起，通过 WSL 在
-`/mnt/e/SourceCode/NoCTF/backend` 执行。
+最终门禁在 Windows 直接执行 `backend/scripts/Verify-Backend.ps1`；下列 WSL 命令保留为
+前序专项回归记录。最终脚本摘要为：
+
+```text
+[SUMMARY] Non-Integration=PASSED; Integration=PASSED; EF=PASSED; OpenAPI=PASSED; Diff=PASSED
+```
 
 ### Build
 
@@ -144,7 +142,7 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category!=Integration]' --minimum-expected-tests 1"
 ```
 
-- 355/355 passed。
+- 最终 Windows 门禁 359/359 passed。
 - 0 failed，0 skipped。
 
 ### 真实依赖 Integration 测试
@@ -154,10 +152,10 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 38"
 ```
 
-- 本轮 WSL 回归为 43 passed、0 failed、1 skipped；总计发现 44 项。
+- 最终 Windows 门禁为 43 passed、0 failed、1 skipped；总计发现 44 项。
 - 唯一 skip 是未设置 `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例；此前
   2026-07-27 已在一次性 Cilium 集群完成该路径的真实复测，不把本轮 skip 伪装为 passed。
-- 非 Integration 与本轮 Integration 分组总计 398 passed、0 failed、1 skipped。
+- 非 Integration 与最终 Integration 分组总计 402 passed、0 failed、1 skipped。
 - 2026-07-27 启用临时 Kubernetes 集群的 WSL 回归为 33/33 passed、0 failed、0 skipped。
 - `3227370` 后再次执行 Integration：32 passed、0 failed、1 skipped；唯一 skip 是未设置
   `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例。本阶段另以完整部署清单完成
@@ -309,9 +307,15 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 
 ### 其他
 
-- `git diff --check` 在每个已提交纵切前均成功。
-- `backend/scripts/Verify-Backend.ps1` 已存在，但尚未按非 Integration/Integration 分组报告，
-  仍是明确交付项。
+- `git diff --check` 在每个已提交纵切前及最终门禁中均成功。
+- `backend/scripts/Verify-Backend.ps1` 已由 `984d633` 完成：Build、non-Integration、
+  Integration、EF pending model、OpenAPI export/artifact drift 与 `git diff --check` 分步输出
+  `[RUN]` / `[PASSED]` / `[SKIPPED]` 和最终摘要。
+- Docker 可用时，脚本强制设置 `NOCTF_REQUIRE_DOCKER_INTEGRATION=true` 并运行真实依赖测试；
+  Docker 不可用时默认明确报告 `Integration=SKIPPED`，使用 `-RequireDockerIntegration` 或
+  预设 require 环境变量时则明确失败。默认 skip 与 required failure 两条分支均已实测。
+- OpenAPI exporter 使用稳定 LF；导出后两份 artifact 的 SHA-256 保持一致，artifact drift
+  gate 成功。PowerShell parser 检查成功。
 
 ### 三进程 deployment smoke（`3227370`）
 
@@ -445,7 +449,7 @@ wsl -d Ubuntu-22.04 -- bash -lc `
 - `af73a27 feat(backend): provision Kubernetes Compose runtimes`
 - `7277323 fix(backend): parse Docker Compose JSON lines status`
 
-## 6. 当前最重要的剩余缺口
+## 6. 已完成能力与非阻塞后续限制
 
 ### 6.1 Kubernetes Compose/Kompose 生命周期与真实集群验证已完成
 
@@ -599,7 +603,7 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
   receipt cleanup 与 release token 仍由 RuntimeInstance assignment durable 状态机负责，
   避免双重释放；相关 PostgreSQL/Redis/Wolverine Integration 全量通过。
 
-### 6.6 API、DI 与交付项
+### 6.6 API、capability/DI 与交付门禁
 
 Admin API 传输层已由 `db3cd5e` 独立完成：
 
@@ -617,6 +621,25 @@ Admin API 传输层已由 `db3cd5e` 独立完成：
   `AdminOpenApiRulesTests` 固定 80 个 operation 和上述协议规则。
 - `BanTeamRequest.Reason` 增加所属端点 Validator，并由单元测试覆盖。
 - `docs/api.md`、`docs/api-conventions.md`、路由漂移测试和两份 OpenAPI artifact 已同步。
+
+Capability/DI 整理由 `39ff3d3` 独立完成，没有改变协议、业务规则、消息拓扑、Provider
+行为或服务 lifetime：
+
+- Application 删除横向 `Ports`，Runtime contracts 按 `Provisioning`、`Capacity`、
+  `Configuration`、`Callbacks` 归档；Submissions contracts 归入 owning feature。
+- Infrastructure 删除 `Persistence/UseCaseAdapters` 与横向 `Caching`，adapter 按
+  Administration、Authentication、Challenges、Competitions、Messaging、Notifications、
+  Persistence、Runtime、Scoring、Storage、Submissions、Teams capability 归档。
+- 通用 `Ef*` 文件和类型按业务责任重命名；仅在区分 provider 有意义时保留 `Postgres` 前缀。
+- 根 `ServiceRegistration.cs` 只组合 12 个 capability registration。重构前后均为 137 条
+  注册，service/implementation/lifetime 一致。
+- 新增 4 条架构规则，禁止 `Ports`、`UseCaseAdapters`、`Services`、`Helpers` dumping ground，
+  旧横向 namespace、泛化 `Ef*` 命名和根 DI 直接注册具体服务。
+- 测试只做 namespace/type 的必要机械更新，没有改变逻辑或断言；两个受保护 Runner 文件
+  只改了编译所需的 `using`，未改行为。
+
+交付脚本由 `984d633` 独立完成，行为与第 4 节最终实测一致。OpenAPI 输出换行稳定化仅位于
+显式 export 边界，不改变在线 API 响应或协议 artifact 内容。
 
 ### 6.7 CTF 完整边界
 
@@ -709,25 +732,19 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   `6B249693F0D3F5BAD075E4F51AF32DBEDDC51788ECD984E97062320F157C8098`；四模式与 deploy
   Compose、四份 PowerShell parser、`git diff --check` 均通过。
 
-仍待完成，且不得与 Provider 业务变化混在一个提交：
+本次目标迁移没有剩余实现项。仍未完成的 Libvirt 真机验证、Pool/Node CIDR 部署期审计、
+Docker `InternetOnly` 和后期 TargetPort/callback gateway 加固，均已在前文明确边界；它们不是
+capability/DI 或交付脚本的遗漏，也不得在没有新的用户批准和设计评审时顺带实现。
 
-- 按 capability 拆 Application/Infrastructure dumping ground，并保持 API 不引用 Provider、
-  Domain 不依赖 EF/HTTP/Redis/Wolverine/Provider SDK。
-- `backend/scripts/Verify-Backend.ps1` 已存在，但仍需按目标要求重构：
-  - 分开报告非 Integration 与 Integration；
-  - Docker 不可用必须明确 skipped/failure，不能伪装 passed；
-  - 保持 build、test、EF pending model、OpenAPI、`git diff --check` 门禁。
+## 7. 建议的下一交接顺序
 
-## 7. 建议的下一实施顺序
+1. 审阅 `2c6b4ce..HEAD` 的提交序列与本文，确认目标迁移边界、架构约束和实测证据一致。
+2. 再次执行 `git status --short --branch`，确认本文提交未包含第 2 节的用户文件。
+3. 按用户指示推送 `codex/backend-target-architecture-handoff` 或创建 PR，进入代码评审。
+4. 只有用户另行批准时，才从第 6 节非阻塞限制中选择新的纵切；不得把它们混入本次迁移交付。
 
-每一项必须独立 commit：
-
-1. 按 capability 机械拆分 Application/Infrastructure dumping ground，不改变协议、业务语义、
-   消息拓扑、三进程边界或 Provider 行为。
-2. 独立重构并实测 `Verify-Backend.ps1`。
-
-如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
-但不能自行发明新协议。
+如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
+决策的只读审计，但不能自行发明新协议。
 
 ## 8. 仓库硬约束
 
@@ -749,10 +766,11 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从 capability/DI 机械整理开始；不要重做已完成的四模式 E2E、deployment smoke、双栈
-   IPv6 deny、RuntimeKind dispatch、Docker/Kubernetes Compose handler、三 Provider crash
-   orphan reconciliation、IPv4 Cilium egress 验证或 Admin API 传输层重构。
-5. 每个纵切固定执行：
+4. 当前迁移已完成，从提交审阅和交接开始；不要重做 capability/DI、`Verify-Backend.ps1`、
+   四模式 E2E、deployment smoke、双栈 IPv6 deny、RuntimeKind dispatch、Docker/Kubernetes
+   Compose handler、三 Provider crash orphan reconciliation、IPv4 Cilium egress 验证或
+   Admin API 传输层重构。
+5. 若用户批准新的实现纵切，固定执行：
    - 失败测试；
    - 最小实现；
    - 相关测试；
@@ -762,4 +780,4 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
    - `git diff --check`；
    - 只暂存预期文件；
    - 独立 commit。
-6. 阶段结束时重跑 EF pending model 与 OpenAPI。
+6. 新纵切阶段结束时重跑 EF pending model、OpenAPI 与统一 `Verify-Backend.ps1`。
