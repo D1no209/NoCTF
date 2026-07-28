@@ -591,10 +591,16 @@ public static class BackendMessageHandlers
 
     public static async Task Handle(
         ProvisionCompetitionRuntimes message,
+        IAwdRuntimeProvisioner awdRuntimes,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
+        var awdOutcome = await awdRuntimes.EnsureAsync(
+            message.CompetitionId,
+            cancellationToken);
+        if (awdOutcome != AwdRuntimeProvisioningOutcome.NotApplicable)
+            return;
         var queued = await db.RuntimeInstances
             .Where(instance => instance.CompetitionId == message.CompetitionId
                 && instance.State == RuntimeState.Queued)

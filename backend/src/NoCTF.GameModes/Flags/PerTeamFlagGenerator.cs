@@ -17,7 +17,8 @@ public readonly record struct PerTeamFlagContext(
     Guid CompetitionId,
     Guid ChallengeId,
     Guid CompetitionChallengeId,
-    Guid TeamId);
+    Guid TeamId,
+    Guid? SpecificationId = null);
 
 public static partial class PerTeamFlagGenerator
 {
@@ -135,8 +136,10 @@ public static partial class PerTeamFlagGenerator
 
     private static string TeamHash(PerTeamFlagContext context, int length)
     {
-        var message = Encoding.UTF8.GetBytes(
-            $"noctf:teamhash:v1:{context.CompetitionId:D}:{context.CompetitionChallengeId:D}:{context.TeamId:D}");
+        var input = context.SpecificationId is Guid specificationId
+            ? $"noctf:teamhash:v2:{context.CompetitionId:D}:{context.CompetitionChallengeId:D}:{context.TeamId:D}:{specificationId:D}"
+            : $"noctf:teamhash:v1:{context.CompetitionId:D}:{context.CompetitionChallengeId:D}:{context.TeamId:D}";
+        var message = Encoding.UTF8.GetBytes(input);
         return Convert.ToHexStringLower(HMACSHA256.HashData(context.FlagDerivationSecret, message))[..length];
     }
 

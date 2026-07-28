@@ -36,15 +36,21 @@ function Remove-E2EResources {
     $containerIds = [System.Collections.Generic.HashSet[string]]::new()
     $networkNames = [System.Collections.Generic.HashSet[string]]::new()
 
-    foreach ($id in @(docker ps -aq --filter "ancestor=$script:RuntimeImage")) {
-        if (-not [string]::IsNullOrWhiteSpace($id)) { [void]$containerIds.Add($id.Trim()) }
+    foreach ($image in @($script:RuntimeImage, $script:CheckerImage)) {
+        foreach ($id in @(docker ps -aq --filter "ancestor=$image")) {
+            if (-not [string]::IsNullOrWhiteSpace($id)) {
+                [void]$containerIds.Add($id.Trim())
+            }
+        }
     }
     $platformNetworkId = docker network ls -q --filter "name=^$([regex]::Escape($script:NetworkName))$"
     if (-not [string]::IsNullOrWhiteSpace($platformNetworkId)) {
         $attached = docker network inspect $script:NetworkName `
             --format '{{range $id, $container := .Containers}}{{$id}} {{end}}'
         foreach ($id in ($attached -split '\s+')) {
-            if (-not [string]::IsNullOrWhiteSpace($id)) { [void]$containerIds.Add($id.Trim()) }
+            if (-not [string]::IsNullOrWhiteSpace($id)) {
+                [void]$containerIds.Add($id.Trim())
+            }
         }
     }
 
@@ -58,7 +64,7 @@ function Remove-E2EResources {
         }
     }
     if ($containerIds.Count -gt 0) {
-        & docker rm -f @($containerIds)
+        & docker rm -f @($containerIds) | Out-Null
     }
 
     try { Invoke-DockerCompose -Arguments @("down", "-v", "--remove-orphans", "--rmi", "local") }
@@ -70,39 +76,49 @@ function Remove-E2EResources {
             & docker network rm $name | Out-Null
         }
     }
-    $fixtureImage = docker image ls -q $script:RuntimeImage
-    if (-not [string]::IsNullOrWhiteSpace($fixtureImage)) {
-        & docker image rm $script:RuntimeImage | Out-Null
+    foreach ($image in @($script:RuntimeImage, $script:CheckerImage)) {
+        $fixtureImage = docker image ls -q $image
+        if (-not [string]::IsNullOrWhiteSpace($fixtureImage)) {
+            & docker image rm $image | Out-Null
+        }
     }
 }
 
 & docker version | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Docker is required for the CTF E2E test." }
+if ($LASTEXITCODE -ne 0) { throw "Docker is required for the AWD E2E test." }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$script:ComposeFile = Join-Path $repositoryRoot "backend\tests\NoCTF.E2E\docker-compose.ctf.yml"
+$script:ComposeFile = Join-Path $repositoryRoot "backend\tests\NoCTF.E2E\docker-compose.awd.yml"
 $suffix = "{0}-{1}" -f $PID, [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$script:ProjectName = "noctf-ctf-e2e-$suffix".ToLowerInvariant()
+$script:ProjectName = "noctf-awd-e2e-$suffix".ToLowerInvariant()
 $script:NetworkName = "$($script:ProjectName)-network"
 $script:RuntimeImage = "$($script:ProjectName)-runtime:latest"
+$script:CheckerImage = "$($script:ProjectName)-checker:latest"
+$callbackContainer = "$($script:ProjectName)-backend"
 $apiPort = Get-FreeTcpPort
 
 $env:NOCTF_E2E_API_PORT = $apiPort.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $env:NOCTF_E2E_NETWORK = $script:NetworkName
 $env:NOCTF_E2E_RUNTIME_IMAGE = $script:RuntimeImage
-$env:NOCTF_E2E_POSTGRES_PASSWORD = "ctf-e2e-postgres-$suffix"
-$env:NOCTF_E2E_MINIO_USER = "ctfe2e"
-$env:NOCTF_E2E_MINIO_PASSWORD = "ctf-e2e-minio-$suffix"
-$env:NOCTF_E2E_JWT_SECRET = "ctf-e2e-jwt-signing-key-$suffix-0123456789"
-$env:NOCTF_E2E_ADMIN_PASSWORD = "ctf-e2e-admin-$suffix"
+$env:NOCTF_E2E_CHECKER_IMAGE = $script:CheckerImage
+$env:NOCTF_E2E_CALLBACK_CONTAINER = $callbackContainer
+$env:NOCTF_E2E_POSTGRES_PASSWORD = "awd-e2e-postgres-$suffix"
+$env:NOCTF_E2E_MINIO_USER = "awde2e"
+$env:NOCTF_E2E_MINIO_PASSWORD = "awd-e2e-minio-$suffix"
+$env:NOCTF_E2E_JWT_SECRET = "awd-e2e-jwt-signing-key-$suffix-0123456789"
+$env:NOCTF_E2E_ADMIN_PASSWORD = "awd-e2e-admin-$suffix"
 $env:NOCTF_E2E_BUILD_HTTP_PROXY = Convert-BuildProxy $env:HTTP_PROXY
 $env:NOCTF_E2E_BUILD_HTTPS_PROXY = Convert-BuildProxy $env:HTTPS_PROXY
 $env:NOCTF_E2E_BASE_URL = "http://127.0.0.1:$apiPort"
 
 $succeeded = $false
 try {
-    Invoke-DockerCompose -Arguments @("build", "--quiet", "runtime-fixture", "migration", "backend", "worker", "runner")
-    Invoke-DockerCompose -Arguments @("up", "-d", "postgres", "redis", "minio", "minio-init", "migration", "backend", "worker", "runner")
+    Invoke-DockerCompose -Arguments @(
+        "build", "--quiet", "runtime-fixture", "checker-fixture",
+        "migration", "backend", "worker", "runner")
+    Invoke-DockerCompose -Arguments @(
+        "up", "-d", "postgres", "redis", "minio", "minio-init",
+        "migration", "backend", "worker", "runner")
 
     $deadline = [DateTimeOffset]::UtcNow.AddMinutes(3)
     $ready = $false
@@ -111,7 +127,7 @@ try {
             $response = Invoke-WebRequest -Uri "$($env:NOCTF_E2E_BASE_URL)/health" -TimeoutSec 3
             if ($response.StatusCode -eq 200) {
                 $heartbeat = docker compose -p $script:ProjectName -f $script:ComposeFile `
-                    exec -T redis redis-cli EXISTS runner:ctf-e2e-runner-1:heartbeat
+                    exec -T redis redis-cli EXISTS runner:awd-e2e-runner-1:heartbeat
                 if ($heartbeat -eq "1") {
                     $ready = $true
                     break
@@ -129,20 +145,21 @@ try {
     $testCommand = "cd '$backendWslPath' && " +
         "env NOCTF_E2E_BASE_URL='$($env:NOCTF_E2E_BASE_URL)' " +
         "NOCTF_E2E_RUNTIME_IMAGE='$($env:NOCTF_E2E_RUNTIME_IMAGE)' " +
+        "NOCTF_E2E_CHECKER_IMAGE='$($env:NOCTF_E2E_CHECKER_IMAGE)' " +
         "NOCTF_E2E_ADMIN_PASSWORD='$($env:NOCTF_E2E_ADMIN_PASSWORD)' " +
         "/home/fs/.dotnet/dotnet run --project tests/NoCTF.E2E/NoCTF.E2E.csproj --no-restore -- " +
-        "--treenode-filter '/*/*/*/*[Category=CtfE2E]' --minimum-expected-tests 1"
+        "--treenode-filter '/*/*/*/*[Category=AwdE2E]' --minimum-expected-tests 1"
     & wsl -d Ubuntu-22.04 -- bash -lc $testCommand
-    if ($LASTEXITCODE -ne 0) { throw "The CTF E2E test failed with exit code $LASTEXITCODE." }
+    if ($LASTEXITCODE -ne 0) { throw "The AWD E2E test failed with exit code $LASTEXITCODE." }
     $succeeded = $true
 }
 finally {
     if (-not $succeeded) {
         try { Invoke-DockerCompose -Arguments @("ps", "-a") } catch { Write-Warning $_ }
-        try { Invoke-DockerCompose -Arguments @("logs", "--no-color", "--tail", "200", "backend", "worker", "runner") } catch { Write-Warning $_ }
+        try { Invoke-DockerCompose -Arguments @("logs", "--no-color", "--tail", "250", "backend", "worker", "runner") } catch { Write-Warning $_ }
     }
     if ($KeepEnvironment) {
-        Write-Host "CTF E2E environment retained: project=$($script:ProjectName) api=$($env:NOCTF_E2E_BASE_URL)"
+        Write-Host "AWD E2E environment retained: project=$($script:ProjectName) api=$($env:NOCTF_E2E_BASE_URL)"
     }
     else {
         Remove-E2EResources
