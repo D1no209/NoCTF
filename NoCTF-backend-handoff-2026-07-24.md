@@ -41,10 +41,10 @@ IPv6 deny 验证、Admin API 传输契约重构、四模式完整边界 E2E、ca
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前实现与验证 HEAD：`4634244 test(runtime): stress runner capacity recovery`。
+- 当前实现与验证 HEAD：`a27dfd7 fix(api): serve embedded SPA routes`。
 - 本交接文档提交前，当前分支相对
-  `origin/codex/backend-target-architecture-handoff` ahead 5、behind 0；本文独立提交后
-  应为 ahead 6、behind 0。
+  `origin/codex/backend-target-architecture-handoff` ahead 7、behind 0；本文独立提交后
+  应为 ahead 8、behind 0。
 - 前序实现均先做本地提交；当前用户规则是只有收到明确推送指令后才能推送远端。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -823,6 +823,41 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 - 最终本轮 E2E container、network、volume 和 project image 数量均为 0。用户现有
   `deploy-backend-1`、`deploy-worker-1`、`deploy-runner-1`、PostgreSQL、Redis、MinIO
   六个容器保持运行；本轮没有部署、重启或替换任何环境。
+
+### 6.14 本地 deploy 栈更新与内置 SPA 修复
+
+用户于 2026-07-28 明确确认原 `deploy-*` 栈和数据均已过时，授权不做备份直接删除并以当前
+架构重建。本轮已完成实际本地部署；这不是生产部署：
+
+- 旧 PostgreSQL 卷记录 31 条历史 migration，history table 使用旧 `MigrationId` 列；
+  当前基线读取 `migration_id`，与既定“不保留旧 persistence compatibility”一致，不能
+  编写兼容迁移。经用户确认后，旧 `deploy` 容器、遗留 `deploy-frontend-1`、旧
+  `deploy_default` network 和 `deploy_postgres_data`、`deploy_redis_data`、
+  `deploy_minio_data`、`deploy_backend_uploads` 四个卷均已无备份删除，不可恢复。
+- 以当前分支重新创建 `noctf-network`、四个空数据卷以及 PostgreSQL、Redis、MinIO、
+  migration、API、Worker、Runner。migration exit 0，数据库只包含
+  `20260728013508_InitialBaseline`；PostgreSQL、Redis、MinIO 健康。
+- Runner 镜像包含 Docker CLI `28.5.2`、Docker Compose `2.40.3` 与 Kompose `1.38.0`。
+  初次 BuildKit 通过本机代理下载固定 Kompose release 时连续收到 GitHub 502；普通容器
+  直连下载正常，最终以无代理/传统构建路径成功完成镜像，没有为外部代理故障修改生产协议。
+- 部署实测发现 API 镜像虽然包含 Vite `wwwroot`，pipeline 没有启用静态文件，导致根路径
+  404。`a27dfd7` 启用 default/static files，并只对 GET、`Accept: text/html`、无文件扩展名、
+  非 `/api`、`/hubs`、`/health`、`/openapi`、`/swagger` 的 404 导航返回
+  `index.html`；API 404 不会被 SPA fallback 吞掉。
+- CTF 完整边界新增 SPA 回归：`/` 与 `/login` 均返回 `text/html` 和 Vite app root，
+  `/api/v1/does-not-exist` 仍为 404。实际本地 deploy 同样为 health 200、root 200、
+  login 200、unknown API 404。
+- 最终本地 deploy 的 API、Worker、Runner 均 0 restart；Runner heartbeat TTL 正常，
+  capacity 为配置的 `4294967296 / 2000000000 / 2048`，三条 durable maintenance
+  processing version 从 `4/4/20` 持续推进至 `40/40/237`，API/Worker/Runner dead letter
+  均为 0。
+- 完整后端门禁：solution build 0 warning/0 error；359 non-Integration passed；
+  49 Integration passed、0 failed、1 Kubernetes dataplane skipped；EF 无 pending model；
+  OpenAPI artifact 和 `git diff --check` 无漂移。合计 408 passed、0 failed、1 skipped。
+- 修复后的四模式完整边界：CTF（含 SPA、Container+Compose）1/1，1 分 26.1 秒；
+  AWD 1/1，1 分 42.6 秒；AWDP 1/1，1 分 16.3 秒；KoH 1/1，1 分 05.7 秒。
+  最终 E2E container、network、volume、project image 数量均为 0；新建的本地
+  `deploy-*` 栈继续运行。
 
 本次目标迁移没有剩余实现项。仍未完成的 Libvirt 真机验证、Pool/Node CIDR 部署期审计、
 Docker `InternetOnly` 和后期 TargetPort/callback gateway 加固，均已在前文明确边界；它们不是
