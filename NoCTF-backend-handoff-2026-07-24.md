@@ -41,10 +41,10 @@ IPv6 deny 验证、Admin API 传输契约重构、四模式完整边界 E2E、ca
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`eb36632 fix(runtime): close Docker Compose lifecycle gaps`。
+- 当前实现与验证 HEAD：`4634244 test(runtime): stress runner capacity recovery`。
 - 本交接文档提交前，当前分支相对
-  `origin/codex/backend-target-architecture-handoff` ahead 3、behind 0；本文独立提交后
-  应为 ahead 4、behind 0。
+  `origin/codex/backend-target-architecture-handoff` ahead 5、behind 0；本文独立提交后
+  应为 ahead 6、behind 0。
 - 前序实现均先做本地提交；当前用户规则是只有收到明确推送指令后才能推送远端。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -795,6 +795,34 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 - 最终 E2E container、network、project image、managed persistent Runtime network 与
   callback network 数量均为 0。用户 `deploy-*` 六容器继续运行在 `deploy_default`，
   未执行 up、down、restart 或替换；没有生产部署。
+
+### 6.13 Runner 容量并发与异常恢复专项
+
+用户于 2026-07-28 要求在 Docker Container/Compose 专项后继续验证 Runner 容量与异常
+恢复。`4634244` 没有改动生产协议或实现，而是在真实 Redis 上补齐此前缺少的并发压力证据：
+
+- `RedisRunnerCapacityGateTests` 从 6 项增加到 9 项并全部通过。64 个不同 Runtime 同时向
+  `1024 memory / 100 CPU / 10 PID` 的同一 Runner 申请 `128 / 10 / 1`，精确产生 8 个
+  claim 和 56 个 capacity insufficient；剩余容量为 `0 / 20 / 2`，没有超卖或负数。
+- 对 8 个成功 claim 各并发发送两次 release，精确产生 8 个 `Released` 和 8 个
+  `AlreadyReleased`；容量恢复为配置总量，全部 claim key 删除，没有重复归还。
+- 64 次同一 Runtime claim 在两个在线 Runner 间交错重放，只有一个 `Acquired`，同一
+  owner 的其余 31 次为 `AlreadyOwned`，另一 Runner 的 32 次全部拒绝；两个节点合计只
+  扣减一次，错误 owner 不能释放，正确 owner 释放后精确恢复。
+- Runner heartbeat 丢失后，新 claim 被拒绝；已经存在的 claim 仍可释放并恢复容量。
+  这避免离线节点继续接单，也不会让失联恢复流程因 heartbeat 已过期而无法归还预算。
+- 既有 `RunnerAssignmentReconciliationTests` 6/6 重新通过，继续覆盖离线 assignment
+  redispatch、Redis 不可用时整批 defer、后续 heartbeat 查询不可用时不做部分释放、
+  replacement 等待容量释放、在线节点资源审计和原节点 receipt ownership。消息重放、
+  assignment/orphan 状态收敛没有发现新的生产代码缺陷。
+- 最新完整后端门禁：solution build 0 warning/0 error；359 non-Integration passed；
+  49 Integration passed、0 failed、1 Kubernetes dataplane skipped；EF 无 pending model；
+  OpenAPI artifact 无漂移；`git diff --check` 通过。合计 408 passed、0 failed、1 skipped。
+- 四模式完整边界再次通过：CTF（Container+Compose）1/1，1 分 14.6 秒；AWD 1/1，
+  1 分 43.0 秒；AWDP 1/1，1 分 21.0 秒；KoH 1/1，1 分 06.4 秒。
+- 最终本轮 E2E container、network、volume 和 project image 数量均为 0。用户现有
+  `deploy-backend-1`、`deploy-worker-1`、`deploy-runner-1`、PostgreSQL、Redis、MinIO
+  六个容器保持运行；本轮没有部署、重启或替换任何环境。
 
 本次目标迁移没有剩余实现项。仍未完成的 Libvirt 真机验证、Pool/Node CIDR 部署期审计、
 Docker `InternetOnly` 和后期 TargetPort/callback gateway 加固，均已在前文明确边界；它们不是
