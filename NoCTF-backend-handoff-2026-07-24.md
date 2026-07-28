@@ -41,10 +41,10 @@ IPv6 deny 验证、Admin API 传输契约重构、四模式完整边界 E2E、ca
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`a1f158f fix(runtime): clean up Docker checker callback networks`。
+- 当前代码实现 HEAD：`eb36632 fix(runtime): close Docker Compose lifecycle gaps`。
 - 本交接文档提交前，当前分支相对
-  `origin/codex/backend-target-architecture-handoff` ahead 1、behind 0；本文独立提交后
-  应为 ahead 2、behind 0。
+  `origin/codex/backend-target-architecture-handoff` ahead 3、behind 0；本文独立提交后
+  应为 ahead 4、behind 0。
 - 前序实现均先做本地提交；当前用户规则是只有收到明确推送指令后才能推送远端。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -152,17 +152,17 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 38"
 ```
 
-- 最终 Windows 门禁为 43 passed、0 failed、1 skipped；总计发现 44 项。
+- 最终 Windows 门禁为 46 passed、0 failed、1 skipped；总计发现 47 项。
 - 唯一 skip 是未设置 `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例；此前
   2026-07-27 已在一次性 Cilium 集群完成该路径的真实复测，不把本轮 skip 伪装为 passed。
-- 非 Integration 与最终 Integration 分组总计 402 passed、0 failed、1 skipped。
+- 非 Integration 与最终 Integration 分组总计 405 passed、0 failed、1 skipped。
 - 2026-07-27 启用临时 Kubernetes 集群的 WSL 回归为 33/33 passed、0 failed、0 skipped。
 - `3227370` 后再次执行 Integration：32 passed、0 failed、1 skipped；唯一 skip 是未设置
   `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例。本阶段另以完整部署清单完成
   独立 Kubernetes smoke，不把该 skip 伪装为 passed。
 - Docker Desktop Engine `28.5.1`、Docker Compose `v2.40.3`。
 - `a1f158f` 后重新执行 Docker Container 专项和完整 Integration：单 Container
-  7/7 passed；完整 Integration 43 passed、0 failed、1 Kubernetes dataplane skipped。
+  7/7 passed；当时完整 Integration 43 passed、0 failed、1 Kubernetes dataplane skipped。
   专项测试发现无显式 `RuntimeInstanceId` 的一次性 checker receipt 会导致 callback
   network 被遗漏。修复后销毁使用与创建一致的
   `RuntimeInstanceId ?? OperationId` ownership identity，回归测试明确断言两个 callback
@@ -751,8 +751,9 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   `RuntimeInstanceId`。修复后销毁使用相同的 effective identity，并断言两个 callback
   network 均不可再查询。
 - 完整测试重新执行：solution build 0 warning/0 error；E2E project 在 WSL build
-  0 warning/0 error；359 non-Integration passed；43 Integration passed、0 failed、
-  1 Kubernetes dataplane skipped。
+  0 warning/0 error；359 non-Integration passed；当时 43 Integration passed、0 failed、
+  1 Kubernetes dataplane skipped。`eb36632` 增加 Compose 回归后最新值为
+  46 Integration passed、0 failed、1 Kubernetes dataplane skipped。
 - 四模式 Docker 完整边界重新执行并通过：CTF 1/1（54.2 秒）、AWD 1/1（1 分 37.1 秒）、
   AWDP 1/1（1 分 26.4 秒）、KoH 1/1（1 分 09.8 秒）。AWD 首次构建遇到 Docker Hub
   匿名 token 网络超时，预拉取 `python:3.13-alpine` 与 `curlimages/curl:8.14.1` 后业务
@@ -763,6 +764,37 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 - 用户原有 `deploy-backend-1`、`deploy-worker-1`、`deploy-runner-1`、PostgreSQL、Redis、
   MinIO 六个容器保持运行在 `deploy_default`；本轮没有对该栈执行 up、down、restart 或
   替换，也没有生产部署。
+
+### 6.12 Docker Compose Provider 专项复测与真实 CTF 边界
+
+用户于 2026-07-28 确认在单 Container 后继续完成 Docker Compose 专项。`eb36632`
+补齐了生命周期、失败清理和完整边界证据，并完成本轮唯一生产代码修复：
+
+- `DockerComposeRuntimeIntegrationTests` 从 1 项增加到 4 项并全部通过。真实 Docker
+  覆盖多 service DNS、可信 HAProxy 双网络入口、公开端口、selective PerTeam Flag
+  environment、实际 memory/CPU/PID/capability 限制、AWD checker Runtime+callback
+  双网络、相同 operation replay、正常 `Down`、crash orphan reconciliation 和
+  `docker compose up` 失败后的 partial resource cleanup。
+- 测试先证明非法 Compose 在纯内存策略阶段被拒绝后仍会留下 operation workdir。
+  `DockerComposeRuntime.UpAsync` 现在先执行 definition 与 ingress policy，再创建
+  workdir；无 Docker 资源产生的验证失败不会污染 Runner 工作目录。
+- CTF 完整边界新增第二个真实题目：API 保存一个 `web`+`db` Compose definition，
+  PerTeam Flag 只映射到 `web`；玩家经 HTTP 启动后，消息跨 API、Worker、Runner，
+  Runner 使用 Docker Compose 创建 appliance 与 ingress，玩家从公开 URL 读回不同于
+  单 Container 题目的生成 Flag，最后两个 Runtime 均经平台停止。
+- 新边界首次运行发现 `backend/tests/NoCTF.E2E/Dockerfile.runner` 未像生产 Runner 镜像
+  一样包含 Docker CLI/Compose plugin；单 Container 走 Docker API，所以此前未暴露。
+  E2E Runner 现从 `docker:28-cli` 复制 CLI 与 plugin，测试拓扑能够真实执行 Compose。
+- 最新门禁：solution 与 E2E project 均 0 warning/0 error；359 non-Integration passed；
+  46 Integration passed、0 failed、1 Kubernetes dataplane skipped；合计 405 passed、
+  0 failed、1 skipped。
+- 四模式最终回归：CTF（包含 Container+Compose）1/1 passed，1 分 17.9 秒；AWD 1/1，
+  1 分 36.1 秒；AWDP 1/1，1 分 24.7 秒；KoH 1/1，1 分 10.9 秒。期间 Docker Hub
+  `docker:28-cli` 匿名 token 曾网络超时；预拉取后同一测试通过，该外部失败不计为平台
+  功能失败。
+- 最终 E2E container、network、project image、managed persistent Runtime network 与
+  callback network 数量均为 0。用户 `deploy-*` 六容器继续运行在 `deploy_default`，
+  未执行 up、down、restart 或替换；没有生产部署。
 
 本次目标迁移没有剩余实现项。仍未完成的 Libvirt 真机验证、Pool/Node CIDR 部署期审计、
 Docker `InternetOnly` 和后期 TargetPort/callback gateway 加固，均已在前文明确边界；它们不是
