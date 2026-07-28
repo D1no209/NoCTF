@@ -52,6 +52,7 @@ using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Infrastructure.Competitions.Koh;
 using NoCTF.Infrastructure.Persistence.Challenges.Flags;
+using NoCTF.Infrastructure.Administration;
 
 namespace NoCTF.Infrastructure;
 
@@ -237,7 +238,12 @@ public static class ServiceRegistration
         if (exporting)
             services.AddScoped<IPlatformAdministrationStore, OpenApiPlatformAdministrationStore>();
         else
+        {
+            var postgres = configuration.GetConnectionString("PostgreSql")
+                ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
+            services.AddSingleton(_ => new WolverineProcessDeadLetters(postgres));
             services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
+        }
         services.AddScoped<ManagePlatform>();
         services.AddSingleton<IAccessTokenIssuer, JwtIssuer>();
         return services;

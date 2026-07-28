@@ -12,6 +12,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Messaging;
+using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 using NoCTF.Worker;
@@ -107,6 +108,69 @@ public sealed class WolverineTransactionalOutboxTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Scheduled_messages_are_owned_by_the_process_schema(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var connectionString = postgres.GetConnectionString();
+            using var runner = BuildHost(connectionString, WolverinePersistenceSchemas.Runner);
+            await runner.StartAsync(cancellationToken);
+            try
+            {
+                var id = Guid.CreateVersion7();
+                var dueAt = DateTimeOffset.UtcNow.AddSeconds(3);
+                var observation = ScheduledProbeObservation.Expect(id);
+
+                using (var worker = BuildHost(connectionString, WolverinePersistenceSchemas.Worker))
+                {
+                    await worker.StartAsync(cancellationToken);
+                    try
+                    {
+                        await using var scope = worker.Services.CreateAsyncScope();
+                        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+                        var outbox = scope.ServiceProvider
+                            .GetRequiredService<ITransactionalMessageOutbox>();
+                        await using var transaction = await db.Database.BeginTransactionAsync(
+                            cancellationToken);
+                        await outbox.ScheduleAsync(
+                            new ObserveScheduledOutboxProbe(id),
+                            dueAt);
+                        await db.SaveChangesAsync(cancellationToken);
+                        await transaction.CommitAsync(cancellationToken);
+                        await outbox.FlushOutgoingMessagesAsync();
+                    }
+                    finally
+                    {
+                        await worker.StopAsync(cancellationToken);
+                    }
+                }
+
+                var ownershipObservationDelay = dueAt + TimeSpan.FromSeconds(1)
+                    - DateTimeOffset.UtcNow;
+                if (ownershipObservationDelay > TimeSpan.Zero)
+                    await Task.Delay(ownershipObservationDelay, cancellationToken);
+                await Assert.That(observation.IsCompleted).IsFalse();
+
+                using var replacementWorker = BuildHost(
+                    connectionString,
+                    WolverinePersistenceSchemas.Worker);
+                await replacementWorker.StartAsync(cancellationToken);
+                var observedAt = await observation.WaitAsync(cancellationToken);
+                await Assert.That(observedAt).IsGreaterThanOrEqualTo(dueAt);
+                await replacementWorker.StopAsync(cancellationToken);
+            }
+            finally
+            {
+                await runner.StopAsync(cancellationToken);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Failed_business_transaction_rolls_back_and_dead_letter_can_be_replayed(
         CancellationToken cancellationToken)
     {
@@ -114,7 +178,8 @@ public sealed class WolverineTransactionalOutboxTests
         {
             await using var postgres = CreatePostgres();
             await postgres.StartAsync(cancellationToken);
-            using var host = BuildHost(postgres.GetConnectionString());
+            var connectionString = postgres.GetConnectionString();
+            using var host = BuildHost(connectionString, WolverinePersistenceSchemas.Worker);
             await using (var scope = host.Services.CreateAsyncScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
@@ -135,6 +200,13 @@ public sealed class WolverineTransactionalOutboxTests
                 var deadLetters = host.Services.GetRequiredService<IWolverineRuntime>()
                     .Storage.DeadLetters;
                 var deadLetter = await WaitForDeadLetterAsync(deadLetters, cancellationToken);
+                await using var processDeadLetters = new WolverineProcessDeadLetters(connectionString);
+                var aggregatedDeadLetter = await processDeadLetters.FindAsync(
+                    deadLetter.Id,
+                    cancellationToken);
+                await Assert.That(aggregatedDeadLetter).IsNotNull();
+                await Assert.That((await processDeadLetters.ListAsync(10, cancellationToken))
+                    .Any(candidate => candidate.Id == deadLetter.Id)).IsTrue();
                 await using (var scope = host.Services.CreateAsyncScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
@@ -145,9 +217,9 @@ public sealed class WolverineTransactionalOutboxTests
                 }
 
                 RollbackOutboxProbeHandler.Fail = false;
-                await deadLetters.ReplayAsync(
-                    new DeadLetterEnvelopeQuery([deadLetter.Id]),
-                    cancellationToken);
+                await Assert.That(await processDeadLetters.ReplayAsync(
+                    deadLetter.Id,
+                    cancellationToken)).IsTrue();
 
                 await Assert.That(await replayed.WaitAsync(cancellationToken)).IsTrue();
             }
@@ -537,7 +609,9 @@ public sealed class WolverineTransactionalOutboxTests
         await Assert.That(status).IsEqualTo(expected);
     }
 
-    private static IHost BuildHost(string connectionString)
+    private static IHost BuildHost(
+        string connectionString,
+        string envelopeSchema = "wolverine_test")
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
@@ -565,7 +639,7 @@ public sealed class WolverineTransactionalOutboxTests
             options.Discovery.IncludeType<ObserveAwdInjectionHandler>();
             options.Discovery.IncludeType<KohPollingHandler>();
             options.Discovery.IncludeType<KohObservationHandler>();
-            options.PersistMessagesWithPostgresql(connectionString, "wolverine_test");
+            options.PersistMessagesWithPostgresql(connectionString, envelopeSchema);
             options.UseEntityFrameworkCoreTransactions();
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
             options.Durability.ScheduledJobPollingTime = TimeSpan.FromMilliseconds(100);

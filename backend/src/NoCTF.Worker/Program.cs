@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
+using NoCTF.Infrastructure.Administration;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddNoCtfInfrastructure(builder.Configuration);
@@ -17,7 +18,7 @@ builder.UseWolverine(options =>
     options.Discovery.IncludeType(typeof(BackendMessageHandlers));
     var postgres = builder.Configuration.GetConnectionString("PostgreSql")
         ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-    options.PersistMessagesWithPostgresql(postgres, "wolverine");
+    options.PersistMessagesWithPostgresql(postgres, WolverinePersistenceSchemas.Worker);
     options.UseEntityFrameworkCoreTransactions();
     options.Durability.Mode = DurabilityMode.Balanced;
     options.Policies.OnException<TimeoutException>()

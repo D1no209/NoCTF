@@ -57,6 +57,14 @@ public sealed class AwdCheckerPersistenceTests
             var first = outbox.NodeMessages.OfType<RunAwdChecker>().Single();
             await Assert.That(first.CheckerSequence).IsEqualTo(1);
             await Assert.That(first.ProcessingVersion).IsEqualTo(7);
+            await using (var fenceDb = new NoCtfDbContext(options))
+            {
+                var deadlineMatches = await fenceDb.RuntimeInstances.AsNoTracking()
+                    .AnyAsync(runtime => runtime.Id == first.RuntimeInstanceId
+                        && runtime.CheckerDeadlineAt == first.Deadline,
+                        cancellationToken);
+                await Assert.That(deadlineMatches).IsTrue();
+            }
             await using (var inflightDb = new NoCtfDbContext(options))
             {
                 var runtime = await inflightDb.RuntimeInstances.SingleAsync(cancellationToken);

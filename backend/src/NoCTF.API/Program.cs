@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using NSwag.AspNetCore;
 using NSwag.Generation.AspNetCore;
 using Microsoft.AspNetCore.Http.Features;
+using NoCTF.Infrastructure.Administration;
 
 var builder = WebApplication.CreateBuilder(args);
 var exportSwagger = args.Contains("--export-openapi", StringComparer.OrdinalIgnoreCase)
@@ -30,7 +31,7 @@ builder.UseWolverine(options =>
     {
         var postgres = builder.Configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-        options.PersistMessagesWithPostgresql(postgres, "wolverine");
+        options.PersistMessagesWithPostgresql(postgres, WolverinePersistenceSchemas.Api);
         options.UseEntityFrameworkCoreTransactions();
         options.PublishMessage<EvaluateSubmission>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue("noctf-worker");

@@ -1,18 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration;
 using NoCTF.Domain.Identity;
+using NoCTF.Infrastructure.Administration;
 using Wolverine.Persistence.Durability;
-using Wolverine.Persistence.Durability.DeadLetterManagement;
-using Wolverine.Runtime;
 
 namespace NoCTF.Infrastructure.Persistence.UseCaseAdapters;
 
 public sealed class PlatformAdministrationStore(
     NoCtfDbContext db,
-    IWolverineRuntime runtime) : IPlatformAdministrationStore
+    WolverineProcessDeadLetters deadLetters) : IPlatformAdministrationStore
 {
-    private IDeadLetters DeadLetters => runtime.Storage.DeadLetters;
-
     public async Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken ct) =>
         await db.Users.AsNoTracking()
             .OrderBy(user => user.CreatedAt)
@@ -64,28 +61,18 @@ public sealed class PlatformAdministrationStore(
         int limit,
         CancellationToken ct)
     {
-        var result = await DeadLetters.QueryAsync(new DeadLetterEnvelopeQuery
-        {
-            PageNumber = 1,
-            PageSize = limit
-        }, ct);
-        return result.Envelopes.Select(Map).ToArray();
+        return (await deadLetters.ListAsync(limit, ct)).Select(Map).ToArray();
     }
 
     public async Task<DeadLetterView?> FindDeadLetterAsync(Guid messageId, CancellationToken ct)
     {
-        var result = await DeadLetters.QueryAsync(
-            new DeadLetterEnvelopeQuery([messageId]) { PageNumber = 1, PageSize = 1 },
-            ct);
-        return result.Envelopes.Count == 0 ? null : Map(result.Envelopes[0]);
+        var result = await deadLetters.FindAsync(messageId, ct);
+        return result is null ? null : Map(result);
     }
 
     public async Task<bool> RequeueDeadLetterAsync(Guid messageId, CancellationToken ct)
     {
-        if (await FindDeadLetterAsync(messageId, ct) is null)
-            return false;
-        await DeadLetters.ReplayAsync(new DeadLetterEnvelopeQuery([messageId]), ct);
-        return true;
+        return await deadLetters.ReplayAsync(messageId, ct);
     }
 
     private static PlatformUserView Map(User user) =>
