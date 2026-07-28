@@ -296,6 +296,17 @@ public sealed class DockerContainerLifecycleTests
                 await lifecycle.DeleteIsolatedNetworkAsync(firstSandbox, cancellationToken);
                 await lifecycle.DeleteIsolatedNetworkAsync(secondSandbox, cancellationToken);
             }
+
+            Func<Task> inspectFirstCallback = async () =>
+                _ = await docker.Networks.InspectNetworkAsync(
+                    $"noctf-callback-{firstOperationId:N}",
+                    cancellationToken);
+            Func<Task> inspectSecondCallback = async () =>
+                _ = await docker.Networks.InspectNetworkAsync(
+                    $"noctf-callback-{secondOperationId:N}",
+                    cancellationToken);
+            await Assert.That(inspectFirstCallback).ThrowsException();
+            await Assert.That(inspectSecondCallback).ThrowsException();
         });
     }
 

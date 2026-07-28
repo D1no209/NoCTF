@@ -251,10 +251,12 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
         try
         {
-            if (receipt.RuntimeInstanceId is Guid runtimeInstanceId && receipt.Generation > 0)
+            if (receipt.Generation > 0)
                 await DeleteCallbackNetworkAsync(
                     receipt.OperationId,
-                    new RuntimeResourceIdentity(runtimeInstanceId, receipt.Generation),
+                    new RuntimeResourceIdentity(
+                        receipt.RuntimeInstanceId ?? receipt.OperationId,
+                        receipt.Generation),
                     cancellationToken);
         }
         catch (Exception exception)
