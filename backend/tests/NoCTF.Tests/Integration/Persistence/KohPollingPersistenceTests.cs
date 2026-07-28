@@ -15,6 +15,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Koh;
 using NoCTF.Runner.Messages;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
@@ -24,6 +25,172 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class KohPollingPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Provisioning_creates_one_shared_runtime_and_preserves_generations(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_koh_runtime")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var cleanup = new NoCtfDbContext(options))
+            {
+                await cleanup.RuntimeInstances.ExecuteDeleteAsync(cancellationToken);
+            }
+
+            var firstOutbox = new RecordingOutbox();
+            await using (var first = new NoCtfDbContext(options))
+            {
+                var outcome = await new PostgresKohRuntimeProvisioner(
+                    first,
+                    new ChallengeRuntimeTemplateCatalog(),
+                    firstOutbox,
+                    new MutableTimeProvider(fixture.DueAt)).EnsureAsync(
+                        fixture.CompetitionId,
+                        cancellationToken);
+                await Assert.That(outcome).IsEqualTo(KohRuntimeProvisioningOutcome.Applied);
+            }
+
+            await Assert.That(firstOutbox.Published).Count().IsEqualTo(1);
+            await Assert.That(firstOutbox.Published.Single()).IsTypeOf<DispatchRuntime>();
+            await Assert.That(firstOutbox.FlushCount).IsEqualTo(1);
+            await using (var verify = new NoCtfDbContext(options))
+            {
+                var runtime = await verify.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(cancellationToken);
+                await Assert.That(runtime.TeamId).IsNull();
+                await Assert.That(runtime.Purpose).IsEqualTo(RuntimePurpose.Player);
+                await Assert.That(runtime.State).IsEqualTo(RuntimeState.Queued);
+                await Assert.That(runtime.Generation).IsEqualTo(1);
+                await Assert.That(runtime.ConfigurationRevision).IsEqualTo(0);
+            }
+
+            var replayOutbox = new RecordingOutbox();
+            await using (var replay = new NoCtfDbContext(options))
+            {
+                var outcome = await new PostgresKohRuntimeProvisioner(
+                    replay,
+                    new ChallengeRuntimeTemplateCatalog(),
+                    replayOutbox,
+                    new MutableTimeProvider(fixture.DueAt.AddSeconds(1))).EnsureAsync(
+                        fixture.CompetitionId,
+                        cancellationToken);
+                await Assert.That(outcome).IsEqualTo(KohRuntimeProvisioningOutcome.Idempotent);
+                await Assert.That(await replay.RuntimeInstances.CountAsync(cancellationToken))
+                    .IsEqualTo(1);
+            }
+            await Assert.That(replayOutbox.Published).IsEmpty();
+            await Assert.That(replayOutbox.FlushCount).IsEqualTo(0);
+
+            await using (var stop = new NoCtfDbContext(options))
+            {
+                await stop.RuntimeInstances.ExecuteUpdateAsync(
+                    setters => setters.SetProperty(runtime => runtime.State, RuntimeState.Stopped),
+                    cancellationToken);
+            }
+            await using (var replacement = new NoCtfDbContext(options))
+            {
+                var outcome = await new PostgresKohRuntimeProvisioner(
+                    replacement,
+                    new ChallengeRuntimeTemplateCatalog(),
+                    new RecordingOutbox(),
+                    new MutableTimeProvider(fixture.DueAt.AddSeconds(2))).EnsureAsync(
+                        fixture.CompetitionId,
+                        cancellationToken);
+                await Assert.That(outcome).IsEqualTo(KohRuntimeProvisioningOutcome.Applied);
+            }
+            await using (var verify = new NoCtfDbContext(options))
+            {
+                var generations = await verify.RuntimeInstances.AsNoTracking()
+                    .OrderBy(runtime => runtime.Generation)
+                    .Select(runtime => runtime.Generation)
+                    .ToArrayAsync(cancellationToken);
+                await Assert.That(generations).IsEquivalentTo([1, 2]);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Challenge_access_returns_only_the_callers_flag_and_participant_urls(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_koh_access")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var arrange = new NoCtfDbContext(options))
+            {
+                var runtime = await arrange.RuntimeInstances.SingleAsync(cancellationToken);
+                runtime.State = RuntimeState.Running;
+                runtime.Urls =
+                [
+                    "http://runner.example:32000/play",
+                    "http://hill.internal/owner"
+                ];
+                runtime.ParticipantUrlIndexes = [0];
+                runtime.ControlCheckUrl = "http://hill.internal/control";
+                await arrange.SaveChangesAsync(cancellationToken);
+            }
+
+            await using (var read = new NoCtfDbContext(options))
+            {
+                var access = await new PostgresKohChallengeAccessReader(read).FindAsync(
+                    fixture.CompetitionId,
+                    fixture.CompetitionChallengeId,
+                    fixture.OwnerId,
+                    cancellationToken);
+                await Assert.That(access).IsNotNull();
+                await Assert.That(access!.ControlFlag).IsEqualTo(fixture.Flag);
+                await Assert.That(access.Urls)
+                    .IsEquivalentTo(["http://runner.example:32000/play"]);
+                var outsider = await new PostgresKohChallengeAccessReader(read).FindAsync(
+                    fixture.CompetitionId,
+                    fixture.CompetitionChallengeId,
+                    Guid.CreateVersion7(),
+                    cancellationToken);
+                await Assert.That(outsider).IsNull();
+            }
+
+            await using (var pause = new NoCtfDbContext(options))
+            {
+                await pause.Competitions.ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        competition => competition.Status,
+                        CompetitionStatus.Paused),
+                    cancellationToken);
+            }
+            await using (var read = new NoCtfDbContext(options))
+            {
+                var access = await new PostgresKohChallengeAccessReader(read).FindAsync(
+                    fixture.CompetitionId,
+                    fixture.CompetitionChallengeId,
+                    fixture.OwnerId,
+                    cancellationToken);
+                await Assert.That(access).IsNull();
+            }
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Observation_writes_one_fact_and_schedules_only_the_next_future_poll(
@@ -140,6 +307,11 @@ public sealed class KohPollingPersistenceTests
             var next = outbox.Scheduled.Single();
             await Assert.That(next.At).IsEqualTo(fixture.DueAt.AddSeconds(20));
             await Assert.That(next.Message).IsTypeOf<PollKohChallenge>();
+            var projection = outbox.Published.Single();
+            await Assert.That(projection).IsTypeOf<ProjectLeaderboard>();
+            await Assert.That(((ProjectLeaderboard)projection).CompetitionId)
+                .IsEqualTo(fixture.CompetitionId);
+            await Assert.That(outbox.FlushCount).IsEqualTo(1);
 
             await using (var changeDb = new NoCtfDbContext(options))
             {
@@ -286,6 +458,8 @@ public sealed class KohPollingPersistenceTests
             Id = Guid.CreateVersion7(),
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
+            SpecificationKind = SpecificationKind.RuntimeDefinition,
+            SpecificationId = competitionChallengeId,
             Flag = flag,
             FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
             CreatedAt = dueAt
@@ -307,11 +481,12 @@ public sealed class KohPollingPersistenceTests
             CreatedAt = dueAt,
         });
         await db.SaveChangesAsync(cancellationToken);
-        return new(dueAt, competitionId, competitionChallengeId, teamId, runtimeId, flag);
+        return new(dueAt, ownerId, competitionId, competitionChallengeId, teamId, runtimeId, flag);
     }
 
     private sealed record Fixture(
         DateTimeOffset DueAt,
+        Guid OwnerId,
         Guid CompetitionId,
         Guid CompetitionChallengeId,
         Guid TeamId,
@@ -337,6 +512,7 @@ public sealed class KohPollingPersistenceTests
         public List<object> Published { get; } = [];
         public List<object> RunnerPoolMessages { get; } = [];
         public List<(object Message, DateTimeOffset At)> Scheduled { get; } = [];
+        public int FlushCount { get; private set; }
 
         public ValueTask PublishAsync<T>(T message)
         {
@@ -365,6 +541,10 @@ public sealed class KohPollingPersistenceTests
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
             where T : IRunnerNodeMessage => throw new NotSupportedException();
 
-        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+        public Task FlushOutgoingMessagesAsync()
+        {
+            FlushCount++;
+            return Task.CompletedTask;
+        }
     }
 }

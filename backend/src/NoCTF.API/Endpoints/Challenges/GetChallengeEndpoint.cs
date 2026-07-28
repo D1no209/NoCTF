@@ -1,7 +1,8 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Management;
-using Riok.Mapperly.Abstractions;
+using NoCTF.Application.Competitions.Koh;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -17,21 +18,35 @@ public sealed record ChallengeResponse(
     bool IsPublished,
     int Revision,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? ControlFlag = null,
+    IReadOnlyList<string>? Urls = null);
 
 public sealed record ChallengeListResponse(IReadOnlyList<ChallengeResponse> Items);
 
-[Mapper(
-    RequiredMappingStrategy = RequiredMappingStrategy.Source,
-    EnumMappingStrategy = EnumMappingStrategy.ByName)]
-internal static partial class ChallengeMapper
+internal static class ChallengeMapper
 {
-    public static partial ChallengeResponse ToResponse(ChallengeView view);
-    private static partial IReadOnlyList<ChallengeResponse> ToResponses(
-        IReadOnlyList<ChallengeView> views);
+    public static ChallengeResponse ToResponse(
+        ChallengeView view,
+        KohChallengeAccessView? koh = null) =>
+        new(
+            view.Id,
+            view.CompetitionId,
+            view.ChallengeId,
+            view.Title,
+            view.Description,
+            view.Direction,
+            view.BaseScore,
+            view.Order,
+            view.IsPublished,
+            view.Revision,
+            view.CreatedAt,
+            view.UpdatedAt,
+            koh?.ControlFlag,
+            koh?.Urls);
 
     public static ChallengeListResponse ToListResponse(IReadOnlyList<ChallengeView> views) =>
-        new(ToResponses(views));
+        new(views.Select(view => ToResponse(view)).ToArray());
 }
 
 public sealed class GetChallengeRequest
@@ -40,7 +55,10 @@ public sealed class GetChallengeRequest
     public Guid CompetitionChallengeId { get; set; }
 }
 
-public sealed class GetChallengeEndpoint(GetChallenge get) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
+public sealed class GetChallengeEndpoint(
+    GetChallenge get,
+    IKohChallengeAccessReader kohAccess,
+    IUserContext user) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -59,8 +77,13 @@ public sealed class GetChallengeEndpoint(GetChallenge get) : Endpoint<GetChallen
             includeUnpublished: false,
             ct);
 
-        return item is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(ChallengeMapper.ToResponse(item));
+        if (item is null)
+            return TypedResults.NotFound();
+        var access = await kohAccess.FindAsync(
+            item.CompetitionId,
+            item.Id,
+            user.UserId,
+            ct);
+        return TypedResults.Ok(ChallengeMapper.ToResponse(item, access));
     }
 }

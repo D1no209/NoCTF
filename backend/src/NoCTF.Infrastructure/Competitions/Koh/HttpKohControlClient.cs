@@ -2,8 +2,9 @@ using NoCTF.Application.Competitions.Koh;
 
 namespace NoCTF.Infrastructure.Competitions.Koh;
 
-public sealed class HttpKohControlClient(HttpClient client) : IKohControlClient
+public sealed class HttpKohControlClient(IHttpClientFactory clients) : IKohControlClient
 {
+    public const string ClientName = "KoHControl";
     private const int MaximumBodyBytes = 4096;
 
     public async Task<KohControlResponse> ObserveAsync(
@@ -15,6 +16,7 @@ public sealed class HttpKohControlClient(HttpClient client) : IKohControlClient
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             timeoutCancellation.Token);
+        using var client = clients.CreateClient(ClientName);
         try
         {
             using var response = await client.GetAsync(

@@ -78,6 +78,8 @@ public sealed class PostgresMissingFlagGenerator(
                 var exists = await db.ChallengeFlags.AnyAsync(flag =>
                     flag.CompetitionChallengeId == challenge.Id &&
                     flag.TeamId == teamId &&
+                    flag.SpecificationKind == SpecificationKind.RuntimeDefinition &&
+                    flag.SpecificationId == challenge.Id &&
                     flag.DeletedAt == null, ct);
                 if (exists)
                     continue;
@@ -93,6 +95,8 @@ public sealed class PostgresMissingFlagGenerator(
                         Id = Guid.CreateVersion7(now),
                         CompetitionChallengeId = challenge.Id,
                         TeamId = teamId,
+                        SpecificationKind = SpecificationKind.RuntimeDefinition,
+                        SpecificationId = challenge.Id,
                         Flag = flag,
                         FlagSha256 = ManageChallengeFlags.Hash(flag),
                         CreatedAt = now

@@ -118,6 +118,8 @@ public sealed class DockerContainerLifecycleTests
                     cancellationToken);
 
                 await Assert.That(receipt.IngressResourceId).IsNotNull();
+                await Assert.That(receipt.InternalHost)
+                    .IsEqualTo($"noctf-ingress-{operationId:N}");
                 await Assert.That(receipt.PortMappings[8080]).IsGreaterThan(0);
                 await Assert.That(replay.ResourceId).IsEqualTo(receipt.ResourceId);
                 await Assert.That(replay.IngressResourceId)

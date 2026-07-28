@@ -23,6 +23,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(File.Exists(workerDeployment)).IsTrue();
         await Assert.That(workerProgram)
             .Contains("options.Discovery.IncludeType(typeof(BackendMessageHandlers));");
+        await Assert.That(workerProgram)
+            .Contains("options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue(\"noctf-worker\");");
         foreach (var runnerAvailabilitySetting in new[]
                  {
                      "Runner__Capacity__MemoryBytes",

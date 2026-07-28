@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Application.Competitions.Awd;
+using NoCTF.Application.Competitions.Koh;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
@@ -592,6 +593,7 @@ public static class BackendMessageHandlers
     public static async Task Handle(
         ProvisionCompetitionRuntimes message,
         IAwdRuntimeProvisioner awdRuntimes,
+        IKohRuntimeProvisioner kohRuntimes,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
@@ -600,6 +602,11 @@ public static class BackendMessageHandlers
             message.CompetitionId,
             cancellationToken);
         if (awdOutcome != AwdRuntimeProvisioningOutcome.NotApplicable)
+            return;
+        var kohOutcome = await kohRuntimes.EnsureAsync(
+            message.CompetitionId,
+            cancellationToken);
+        if (kohOutcome != KohRuntimeProvisioningOutcome.NotApplicable)
             return;
         var queued = await db.RuntimeInstances
             .Where(instance => instance.CompetitionId == message.CompetitionId

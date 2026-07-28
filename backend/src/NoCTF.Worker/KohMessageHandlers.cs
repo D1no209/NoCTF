@@ -115,6 +115,8 @@ public sealed class KohPollingHandler(
         var matches = await db.ChallengeFlags.AsNoTracking()
             .Where(candidate => candidate.CompetitionChallengeId == competitionChallengeId
                 && candidate.TeamId != null
+                && candidate.SpecificationKind == NoCTF.Domain.Challenges.SpecificationKind.RuntimeDefinition
+                && candidate.SpecificationId == competitionChallengeId
                 && candidate.FlagSha256 == hash
                 && candidate.Flag == flag
                 && candidate.DeletedAt == null
@@ -138,7 +140,6 @@ public sealed class KohPollingHandler(
         ScoringFailureCode? FailureCode);
 }
 
-[Transactional]
 public sealed class KohObservationHandler(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
@@ -149,6 +150,7 @@ public sealed class KohObservationHandler(
         RecordKohObservation message,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var target = await db.CompetitionChallenges
             .Where(challenge => challenge.Id == message.CompetitionChallengeId
                 && challenge.CompetitionId == message.CompetitionId
@@ -205,5 +207,7 @@ public sealed class KohObservationHandler(
             message.RunningSince,
             nextDue), nextDue);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 }

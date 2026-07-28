@@ -1,0 +1,174 @@
+services:
+  postgres:
+    container_name: ${NOCTF_E2E_POSTGRES_CONTAINER}
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: noctf
+      POSTGRES_USER: noctf
+      POSTGRES_PASSWORD: ${NOCTF_E2E_POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noctf -d noctf"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${NOCTF_E2E_MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${NOCTF_E2E_MINIO_PASSWORD}
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  minio-init:
+    image: minio/minio:latest
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+        mc mb --ignore-existing local/noctf
+    environment:
+      MINIO_ROOT_USER: ${NOCTF_E2E_MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${NOCTF_E2E_MINIO_PASSWORD}
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  migration:
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+      target: api
+      args:
+        HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
+        HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
+    command: ["--migrate-only"]
+    environment: &api-environment
+      ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=noctf;Username=noctf;Password=${NOCTF_E2E_POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      Authentication__SigningKey: ${NOCTF_E2E_JWT_SECRET}
+      Authentication__Issuer: NoCTF.E2E
+      Authentication__Audience: NoCTF.E2E.Api
+      Authentication__RefreshCookieSecure: "false"
+      RunnerScoring__SigningKey: ${NOCTF_E2E_JWT_SECRET}
+      RunnerScoring__Issuer: NoCTF.E2E.Runner
+      RunnerScoring__Audience: NoCTF.E2E.Scoring
+      SeedAdmin__Email: admin@koh-e2e.test
+      SeedAdmin__UserName: koh-e2e-admin
+      SeedAdmin__Password: ${NOCTF_E2E_ADMIN_PASSWORD}
+      Storage__Provider: S3
+      Storage__S3__ServiceUrl: http://minio:9000
+      Storage__S3__Bucket: noctf
+      Storage__S3__ForcePathStyle: "true"
+      AWS_ACCESS_KEY_ID: ${NOCTF_E2E_MINIO_USER}
+      AWS_SECRET_ACCESS_KEY: ${NOCTF_E2E_MINIO_PASSWORD}
+      EmailVerification__Enabled: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  backend:
+    container_name: ${NOCTF_E2E_CALLBACK_CONTAINER}
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+      target: api
+      args:
+        HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
+        HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
+    labels:
+      noctf.io/internal-role: scoring-callback-gateway
+    environment:
+      <<: *api-environment
+      ASPNETCORE_URLS: http://+:8080
+      Storage__PublicBaseUrl: http://backend:8080
+    ports:
+      - 127.0.0.1:${NOCTF_E2E_API_PORT}:8080
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+      target: worker
+      args:
+        HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
+        HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
+    environment:
+      <<: *api-environment
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+
+  runner:
+    build:
+      context: ../../..
+      dockerfile: backend/tests/NoCTF.E2E/Dockerfile.runner
+      args:
+        HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
+        HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
+        ALL_PROXY: ${ALL_PROXY:-}
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=noctf;Username=noctf;Password=${NOCTF_E2E_POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      Runner__Provider: Docker
+      Runner__Pool: koh-e2e
+      Runner__Id: koh-e2e-runner-1
+      Runner__Capacity__MemoryBytes: "2147483648"
+      Runner__Capacity__NanoCpus: "2000000000"
+      Runner__Capacity__PidsLimit: "2048"
+      Runner__Heartbeat__IntervalSeconds: "2"
+      Runner__Heartbeat__TtlSeconds: "8"
+      RunnerScoring__SigningKey: ${NOCTF_E2E_JWT_SECRET}
+      RunnerScoring__Issuer: NoCTF.E2E.Runner
+      RunnerScoring__Audience: NoCTF.E2E.Scoring
+      RunnerScoring__CallbackBaseUrl: http://backend:8080
+      Runtime__Docker__Endpoint: unix:///var/run/docker.sock
+      Runtime__Docker__Network: ${NOCTF_E2E_NETWORK}
+      Runtime__Docker__PublicHost: 127.0.0.1
+      Runtime__Docker__CallbackContainer: ${NOCTF_E2E_CALLBACK_CONTAINER}
+      Runtime__Docker__CallbackContainerLabelValue: scoring-callback-gateway
+      Runtime__Docker__IngressProxyImage: haproxy:3.1-alpine
+      Runtime__Docker__IngressProxyMemoryBytes: "67108864"
+      Runtime__Docker__IngressProxyNanoCpus: "100000000"
+      Runtime__Docker__IngressProxyPidsLimit: "64"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "0"
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+
+  runtime-fixture:
+    image: ${NOCTF_E2E_RUNTIME_IMAGE}
+    build:
+      context: fixtures/koh-runtime
+    profiles: ["fixture"]
+
+networks:
+  default:
+    name: ${NOCTF_E2E_NETWORK}

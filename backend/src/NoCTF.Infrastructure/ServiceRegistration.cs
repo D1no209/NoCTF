@@ -192,14 +192,17 @@ public static class ServiceRegistration
         services.AddScoped<ICompetitionLifecycleStore, EfCompetitionLifecycleStore>();
         services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
         services.AddScoped<IAwdRuntimeProvisioner, PostgresAwdRuntimeProvisioner>();
+        services.AddScoped<IKohRuntimeProvisioner, PostgresKohRuntimeProvisioner>();
+        services.AddScoped<IKohChallengeAccessReader, PostgresKohChallengeAccessReader>();
         services.AddSingleton<AwdRoundConfigurationCatalog>();
         services.AddSingleton<AwdCheckerConfigurationCatalog>();
         services.AddSingleton<KohProducerConfigurationCatalog>();
-        services.AddHttpClient<IKohControlClient, HttpKohControlClient>()
+        services.AddHttpClient(HttpKohControlClient.ClientName)
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 AllowAutoRedirect = false
             });
+        services.AddTransient<IKohControlClient, HttpKohControlClient>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICompetitionStartGateStore, EfCompetitionStartGateStore>();
         services.AddScoped<CompetitionStartGate>();
