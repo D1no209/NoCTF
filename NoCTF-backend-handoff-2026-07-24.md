@@ -17,22 +17,22 @@ EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 
 完成真实复测。Docker/Kubernetes 持久 Container sandbox、可信 ingress proxy 与
 Compose appliance 的 crash orphan reconciliation 也已闭环。受控 Docker Compose 与
 Kubernetes 三进程 deployment smoke、真实双栈 Cilium IPv6 deny 验证均已完成并清理；
-Admin API 传输层、协议测试、OpenAPI 与文档重构也已完成。CTF、AWD 与 AWDP 完整边界
-E2E 均已通过，下一主线是 KoH 真实 E2E。
+Admin API 传输层、协议测试、OpenAPI 与文档重构也已完成。CTF、AWD、AWDP 与 KoH
+四模式完整边界 E2E 均已通过，下一主线是 capability/DI 机械整理与最终
+`Verify-Backend.ps1`。
 
 ### 当前完成度
 
-后端目标架构迁移当前完成度估算为 **97%**。这是按剩余交付里程碑计算的工程进度，
-不是测试覆盖率或生产可用性承诺。剩余约 3 个百分点固定分配为：
+后端目标架构迁移当前完成度估算为 **98%**。这是按剩余交付里程碑计算的工程进度，
+不是测试覆盖率或生产可用性承诺。剩余约 2 个百分点固定分配为：
 
-- KoH 真实 E2E：约 1%；
 - capability/DI 机械整理与最终 `Verify-Backend.ps1`：2%。
 
-已完成的 97% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
+已完成的 98% 包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
 三类 Runtime Provider lifecycle、容量状态机、CTF PerTeam Flag、AWDP 即时 target、
 DNS 命名隔离、Docker/Kubernetes 网络策略、Cilium fail-closed 前提和三 Provider
 crash orphan reconciliation、三进程 Docker/Kubernetes deployment smoke、真实双栈
-IPv6 deny 验证、Admin API 传输契约重构，以及 CTF/AWD/AWDP 完整边界 E2E。未完成项仍可能
+IPv6 deny 验证、Admin API 传输契约重构，以及四模式完整边界 E2E。未完成项仍可能
 在真实验证中暴露返工，因此百分比只用于交接排期。
 
 ## 2. Git 基线与工作树保护
@@ -41,9 +41,9 @@ IPv6 deny 验证、Admin API 传输契约重构，以及 CTF/AWD/AWDP 完整边�
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前代码实现 HEAD：`e24bfac test(backend): verify full-boundary AWDP flow`。
-- 当前分支相对 `origin/codex/backend-target-architecture-handoff` ahead 5；本交接文档
-  更新完成后仍需保留为独立本地 docs 提交。
+- 当前代码实现 HEAD：`a953ae1 test(backend): verify full-boundary KoH flow`。
+- 本交接文档独立提交后，当前分支相对
+  `origin/codex/backend-target-architecture-handoff` ahead 8。
 - 前序实现均先做本地提交；用户已于 2026-07-27 明确授权完善本文后推送当前分支。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -154,10 +154,10 @@ wsl bash -lc `
   "cd /mnt/e/SourceCode/NoCTF/backend && /home/fs/.dotnet/dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/*/*[Category=Integration]' --minimum-expected-tests 38"
 ```
 
-- 本轮 WSL 回归为 41 passed、0 failed、1 skipped；总计发现 42 项。
+- 本轮 WSL 回归为 43 passed、0 failed、1 skipped；总计发现 44 项。
 - 唯一 skip 是未设置 `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例；此前
   2026-07-27 已在一次性 Cilium 集群完成该路径的真实复测，不把本轮 skip 伪装为 passed。
-- 非 Integration 与本轮 Integration 分组总计 396 passed、0 failed、1 skipped。
+- 非 Integration 与本轮 Integration 分组总计 398 passed、0 failed、1 skipped。
 - 2026-07-27 启用临时 Kubernetes 集群的 WSL 回归为 33/33 passed、0 failed、0 skipped。
 - `3227370` 后再次执行 Integration：32 passed、0 failed、1 skipped；唯一 skip 是未设置
   `NOCTF_KUBERNETES_INTEGRATION` 的 Provider dataplane 用例。本阶段另以完整部署清单完成
@@ -304,7 +304,8 @@ wsl -d Ubuntu-22.04 -- bash -lc `
   Bearer security 与 tags；无 Admin 422 response，全部 Admin 400/409 使用
   `application/problem+json`。
 - `backend/artifacts/openapi/swagger.json` 与
-  `backend/src/NoCTF.API/wwwroot/openapi/v1.json` SHA-256 一致。
+  `backend/src/NoCTF.API/wwwroot/openapi/v1.json` SHA-256 均为
+  `6B249693F0D3F5BAD075E4F51AF32DBEDDC51788ECD984E97062320F157C8098`。
 
 ### 其他
 
@@ -672,6 +673,42 @@ AWDP 完整边界已由 `e24bfac` 独立完成。不要退回共享 target、进
   `7E8B803FB6F368B4E02894488AF5EEF54093F4A889E3130F3A771417D761232A`；CTF/AWD/AWDP 与
   deploy Compose、三份 PowerShell parser、`git diff --check` 均通过。
 
+### 6.10 KoH 完整边界
+
+KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进程内 poll、向所有队伍
+暴露 Control Flag，或让 Worker 直接访问题目容器的隔离网络：
+
+- 标准入口是 `backend/scripts/Run-KohE2E.ps1`；需要保留失败环境时使用
+  `-KeepEnvironment`，排查后必须按输出的唯一 project 精确清理。
+- 流程跨 HTTP、独立 API/Worker/Runner、真实 PostgreSQL/Redis/MinIO 与 Docker；验证每题
+  一个 shared Runtime、玩家本队 Control Flag、Participants URL、Wrong、Correct、
+  ProducerUnavailable、ProducerTimeout、AmbiguousFlagMatch、Pause/Resume、最终 leaderboard、
+  finish 与 Runtime/Docker cleanup。
+- KoH Running 时由 `IKohRuntimeProvisioner` 原子、幂等创建每个已发布题目的 team-null
+  shared Runtime；重放不重复创建，停止后重建递增 generation，继续使用既有
+  `RuntimeInstance` 状态机、`DispatchRuntime` 与 transactional outbox。
+- Control Flag 使用 `SpecificationKind.RuntimeDefinition` 与
+  `SpecificationId=CompetitionChallengeId`；poll 只匹配该合法 scope。玩家 detail 只在
+  Running 且队伍已批准、未封禁时返回调用者队伍的 `controlFlag` 与 Participants `urls`，
+  不返回 `ControlCheckUrl`。
+- Docker receipt 对有 ingress 的 Container 使用可信 ingress proxy 名称作为 `InternalHost`；
+  Worker 因此可经平台网络访问 Control URL，题目容器仍只连接自己的 internal network。
+- API 将首个 `PollKohChallenge` 路由到 Worker；Worker 将 `ProjectLeaderboard` 路由回自己的
+  PostgreSQL durable queue。KoH observation 使用显式 EF 事务写入事实、revision、下一轮 poll
+  和 projection outbox，commit 后再 flush；禁止恢复会让 outgoing envelope 滞留的隐式
+  `[Transactional]` 写法。
+- E2E 曾直接复现 Worker outgoing 表累积 20 条未发送 `ProjectLeaderboard`、dead letter 为 0、
+  snapshot 停在旧 revision。修复后 resume 的 Blue Team Correct 已进入 snapshot；最终
+  `stale=false` 在 finish 停止持续 observation 后断言，避免把正常持续写入窗口误判为最终投影。
+- 最终 KoH E2E 1/1 passed，1 分 29.8 秒；同轮 CTF 1/1 passed，50.6 秒；AWD 1/1 passed，
+  1 分 42.6 秒；AWDP 1/1 passed，1 分 25.9 秒。所有隔离 project、fixture 容器、network、
+  volume 和本地镜像均已清理；用户 `deploy` 栈未修改。
+- 同轮门禁：solution 与 E2E project 均 0 warning/0 error；355 non-Integration passed；
+  43 Integration passed、1 Kubernetes dataplane skipped；EF 无 pending model；OpenAPI 两份
+  artifact SHA-256 均为
+  `6B249693F0D3F5BAD075E4F51AF32DBEDDC51788ECD984E97062320F157C8098`；四模式与 deploy
+  Compose、四份 PowerShell parser、`git diff --check` 均通过。
+
 仍待完成，且不得与 Provider 业务变化混在一个提交：
 
 - 按 capability 拆 Application/Infrastructure dumping ground，并保持 API 不引用 Provider、
@@ -680,14 +717,14 @@ AWDP 完整边界已由 `e24bfac` 独立完成。不要退回共享 target、进
   - 分开报告非 Integration 与 Integration；
   - Docker 不可用必须明确 skipped/failure，不能伪装 passed；
   - 保持 build、test、EF pending model、OpenAPI、`git diff --check` 门禁。
-- 一条完整边界真实 E2E：KoH。
 
 ## 7. 建议的下一实施顺序
 
 每一项必须独立 commit：
 
-1. 按相同完整边界独立完成 KoH E2E；不要重复 CTF、AWD、AWDP 或 Admin 审计。
-2. 最后做 capability/DI 机械重构和 `Verify-Backend.ps1`。
+1. 按 capability 机械拆分 Application/Infrastructure dumping ground，不改变协议、业务语义、
+   消息拓扑、三进程边界或 Provider 行为。
+2. 独立重构并实测 `Verify-Backend.ps1`。
 
 如果某一步出现产品语义歧义，停止该步并用 `$grill-me`；可以继续不依赖该决策的只读审计，
 但不能自行发明新协议。
@@ -712,7 +749,7 @@ AWDP 完整边界已由 `e24bfac` 独立完成。不要退回共享 target、进
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 从 KoH 完整边界 E2E 开始；不要重做已完成的 CTF/AWD/AWDP、deployment smoke、双栈
+4. 从 capability/DI 机械整理开始；不要重做已完成的四模式 E2E、deployment smoke、双栈
    IPv6 deny、RuntimeKind dispatch、Docker/Kubernetes Compose handler、三 Provider crash
    orphan reconciliation、IPv4 Cilium egress 验证或 Admin API 传输层重构。
 5. 每个纵切固定执行：
