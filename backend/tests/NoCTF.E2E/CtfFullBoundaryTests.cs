@@ -158,6 +158,129 @@ public sealed class CtfFullBoundaryTests
             cancellationToken);
         var hintId = hint.GetProperty("id").GetGuid();
 
+        var composeTemplate = await SendJsonAsync(
+            admin,
+            HttpMethod.Post,
+            "/api/v1/admin/challenges",
+            new
+            {
+                visibility = 0,
+                title = "Compose Injected Flag Runtime",
+                description = "Reads a generated per-team Flag from a real multi-service Docker Compose runtime.",
+                direction = "Web"
+            },
+            HttpStatusCode.Created,
+            cancellationToken);
+        var composeChallenge = await SendJsonAsync(
+            admin,
+            HttpMethod.Post,
+            $"/api/v1/admin/competitions/{competitionId}/challenges",
+            new
+            {
+                challengeId = composeTemplate.GetProperty("id").GetGuid(),
+                baseScore = 250,
+                order = 1
+            },
+            HttpStatusCode.Created,
+            cancellationToken);
+        var composeCompetitionChallengeId = composeChallenge.GetProperty("id").GetGuid();
+        var composeChallengeRevision = composeChallenge.GetProperty("revision").GetInt32();
+        var composeConfigurationJson = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            points = new { initialPoints = 250, minimumPoints = 100, decayFactor = 10 },
+            bloodRewards = Array.Empty<object>(),
+            maxFlagAttempts = 5,
+            runtime = new
+            {
+                provider = 0,
+                allocation = 1,
+                definition = new
+                {
+                    kind = "compose",
+                    composeYaml = $$"""
+                        services:
+                          web:
+                            image: "{{runtimeImage}}"
+                          db:
+                            image: busybox:1.37
+                            command:
+                              - sleep
+                              - "300"
+                        """,
+                    serviceResources = new Dictionary<string, object>
+                    {
+                        ["web"] = new
+                        {
+                            memoryBytes = 67_108_864,
+                            nanoCpus = 100_000_000,
+                            pidsLimit = 64
+                        },
+                        ["db"] = new
+                        {
+                            memoryBytes = 67_108_864,
+                            nanoCpus = 100_000_000,
+                            pidsLimit = 64
+                        }
+                    },
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    flagEnvironmentVariables = new Dictionary<string, string>
+                    {
+                        ["web"] = "FLAG"
+                    },
+                    egressPolicy = 0
+                },
+                limits = new
+                {
+                    memoryBytes = 134_217_728,
+                    nanoCpus = 200_000_000,
+                    pidsLimit = 128
+                },
+                ttlSeconds = 300,
+                operationTimeoutSeconds = 60,
+                runnerPool = "ctf-e2e",
+                urlBindings = new[]
+                {
+                    new
+                    {
+                        urlTemplate = "http://{HOST}:{PORT}/",
+                        exposure = 0,
+                        containerPort = 8080,
+                        serviceName = "web"
+                    }
+                },
+                flagSource = 1
+            }
+        }, JsonOptions);
+        var updatedComposeConfiguration = await SendJsonAsync(
+            admin,
+            HttpMethod.Put,
+            $"/api/v1/admin/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/configuration",
+            new
+            {
+                expectedRevision = composeChallengeRevision,
+                json = composeConfigurationJson
+            },
+            HttpStatusCode.OK,
+            cancellationToken);
+        composeChallengeRevision = updatedComposeConfiguration
+            .GetProperty("revision")
+            .GetInt32();
+        await SendJsonAsync(
+            admin,
+            HttpMethod.Put,
+            $"/api/v1/admin/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}",
+            new
+            {
+                baseScore = 250,
+                order = 1,
+                isPublished = true,
+                expectedRevision = composeChallengeRevision
+            },
+            HttpStatusCode.OK,
+            cancellationToken);
+
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,
@@ -210,6 +333,7 @@ public sealed class CtfFullBoundaryTests
         await Assert.That(downloadedAttachment).IsEquivalentTo(attachmentBytes);
 
         Guid? runtimeInstanceId = null;
+        Guid? composeRuntimeInstanceId = null;
         try
         {
             var runtimeAccepted = await SendWithoutBodyForJsonAsync(
@@ -229,6 +353,31 @@ public sealed class CtfFullBoundaryTests
                 ?? throw new InvalidOperationException("The running runtime did not expose a URL.");
             var flag = await PollTextAsync(runtimeUrl, TimeSpan.FromSeconds(30), cancellationToken);
             await Assert.That(flag).StartsWith("flag{");
+
+            var composeRuntimeAccepted = await SendWithoutBodyForJsonAsync(
+                player,
+                HttpMethod.Post,
+                $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtime/start",
+                HttpStatusCode.Accepted,
+                cancellationToken);
+            composeRuntimeInstanceId = composeRuntimeAccepted
+                .GetProperty("runtimeInstanceId")
+                .GetGuid();
+            var composeRuntime = await PollJsonAsync(
+                player,
+                $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtime",
+                value => value.GetProperty("state").GetInt32() == 2,
+                TimeSpan.FromSeconds(90),
+                cancellationToken);
+            var composeRuntimeUrl = composeRuntime.GetProperty("urls")[0].GetString()
+                ?? throw new InvalidOperationException(
+                    "The running Compose runtime did not expose a URL.");
+            var composeFlag = await PollTextAsync(
+                composeRuntimeUrl,
+                TimeSpan.FromSeconds(30),
+                cancellationToken);
+            await Assert.That(composeFlag).StartsWith("flag{");
+            await Assert.That(composeFlag).IsNotEqualTo(flag);
 
             var submissionAccepted = await SendJsonAsync(
                 player,
@@ -292,17 +441,23 @@ public sealed class CtfFullBoundaryTests
         }
         finally
         {
-            if (runtimeInstanceId is not null)
+            foreach (var runtime in new[]
             {
+                (ChallengeId: competitionChallengeId, RuntimeId: runtimeInstanceId),
+                (ChallengeId: composeCompetitionChallengeId, RuntimeId: composeRuntimeInstanceId)
+            })
+            {
+                if (runtime.RuntimeId is null)
+                    continue;
                 using var stop = await player.PostAsync(
-                    $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/stop",
+                    $"/api/v1/competitions/{competitionId}/challenges/{runtime.ChallengeId}/runtime/stop",
                     null,
                     CancellationToken.None);
                 if (stop.StatusCode == HttpStatusCode.Accepted)
                 {
                     await PollJsonAsync(
                         player,
-                        $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime",
+                        $"/api/v1/competitions/{competitionId}/challenges/{runtime.ChallengeId}/runtime",
                         value => value.GetProperty("state").GetInt32() == 4,
                         TimeSpan.FromSeconds(60),
                         CancellationToken.None);
