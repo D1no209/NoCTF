@@ -92,7 +92,8 @@ public sealed class AwdpSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmi
         var submission = context.Submission;
         if (submission.Kind == SubmissionKind.Flag)
             return ModeSubmissionEvaluatorRules.Reject(submission, ScoringFailureCode.FlagNotSupported);
-        if (HasCorrectPrior(context, submission.Kind))
+        if (submission.Kind == SubmissionKind.Break
+            && HasCorrectPrior(context, submission.Kind))
             return new(ScoringEventKind.SubmissionEvaluation, ScoringResult.Duplicate,
                 ScoringFailureCode.DuplicateAchievement, submission.ReceivedAt, "awdp-evaluator-v2");
         return inner.Evaluate(context);

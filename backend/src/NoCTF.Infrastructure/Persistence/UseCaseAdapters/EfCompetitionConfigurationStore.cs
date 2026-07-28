@@ -93,8 +93,8 @@ public sealed class EfCompetitionConfigurationStore(
                     challenge.Revision));
             }
         }
-        await outbox.FlushOutgoingMessagesAsync();
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return new(await FindAsync(competitionId, ct));
     }
 }

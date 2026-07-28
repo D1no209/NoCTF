@@ -90,8 +90,8 @@ public sealed class EfInternalResultStore(
         runtime.LastAppliedCheckerBodySha256 = result.BodySha256;
         runtime.CheckerDeadlineAt = null;
         await db.SaveChangesAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return InternalResultDisposition.Applied;
     }
 
@@ -152,8 +152,8 @@ public sealed class EfInternalResultStore(
                 runtime.RunnerId
                     ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
             await db.SaveChangesAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
             await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
             return InternalResultDisposition.Superseded;
         }
 
@@ -207,8 +207,8 @@ public sealed class EfInternalResultStore(
             runtime.RunnerId
                 ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
         await db.SaveChangesAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return InternalResultDisposition.Applied;
     }
 }

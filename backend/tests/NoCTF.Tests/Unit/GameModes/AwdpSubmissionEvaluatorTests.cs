@@ -9,7 +9,7 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class AwdpSubmissionEvaluatorTests
 {
     [Test]
-    public async Task Accepted_fix_reprocessing_does_not_repeat_break_admission()
+    public async Task Accepted_fix_after_prior_correct_fix_still_requires_runner()
     {
         var submission = new Submission
         {
@@ -20,9 +20,29 @@ public sealed class AwdpSubmissionEvaluatorTests
             Kind = SubmissionKind.Fix,
             ReceivedAt = DateTimeOffset.UtcNow
         };
+        var priorSubmission = new Submission
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = submission.CompetitionId,
+            CompetitionChallengeId = submission.CompetitionChallengeId,
+            TeamId = submission.TeamId,
+            Kind = SubmissionKind.Fix,
+            ReceivedAt = submission.ReceivedAt.AddSeconds(-1)
+        };
         var context = new SubmissionProcessingContext(
             submission,
-            [],
+            [new ScoringEvent
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = submission.CompetitionId,
+                CompetitionChallengeId = submission.CompetitionChallengeId,
+                TeamId = submission.TeamId,
+                SubmissionId = priorSubmission.Id,
+                Kind = ScoringEventKind.SubmissionEvaluation,
+                Result = ScoringResult.Correct,
+                OccurredAt = priorSubmission.ReceivedAt,
+                CreatedAt = priorSubmission.ReceivedAt
+            }],
             [],
             null,
             "{}",
@@ -34,7 +54,8 @@ public sealed class AwdpSubmissionEvaluatorTests
                     true,
                     10,
                     10),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            [priorSubmission]);
 
         var decision = new AwdpSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
             .Evaluate(context);

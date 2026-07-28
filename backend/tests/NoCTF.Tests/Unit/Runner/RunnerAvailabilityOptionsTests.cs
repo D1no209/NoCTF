@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using NoCTF.Application.Storage;
 using NoCTF.Domain.Runtime;
+using NoCTF.Infrastructure.Storage;
 using NoCTF.Runner.Composition;
 
 namespace NoCTF.Tests.Unit.Runner;
@@ -70,6 +72,30 @@ public sealed class RunnerAvailabilityOptionsTests
         await Assert.That(read).Throws<OptionsValidationException>();
     }
 
+    [Test]
+    public async Task Runner_uses_the_configured_s3_object_storage_adapter()
+    {
+        using var services = BuildServices(new Dictionary<string, string?>
+        {
+            ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
+            ["Runner:Pool"] = "docker",
+            ["Runner:Id"] = "docker-1",
+            ["Runner:Capacity:MemoryBytes"] = "1024",
+            ["Runner:Capacity:NanoCpus"] = "100",
+            ["Runner:Capacity:PidsLimit"] = "10",
+            ["Runner:Heartbeat:IntervalSeconds"] = "5",
+            ["Runner:Heartbeat:TtlSeconds"] = "15",
+            ["Storage:Provider"] = "S3",
+            ["Storage:S3:ServiceUrl"] = "http://minio:9000",
+            ["Storage:S3:ForcePathStyle"] = "true",
+            ["Storage:S3:Bucket"] = "noctf"
+        });
+
+        var storage = services.GetRequiredService<IObjectStorage>();
+
+        await Assert.That(storage).IsTypeOf<S3ObjectStorage>();
+    }
+
     private static ServiceProvider BuildServices(IReadOnlyDictionary<string, string?> values)
     {
         var configurationValues = values.ToDictionary(pair => pair.Key, pair => pair.Value);
@@ -79,6 +105,7 @@ public sealed class RunnerAvailabilityOptionsTests
             .Build();
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IConfiguration>(configuration);
         services.AddNoCtfRunner(configuration);
         return services.BuildServiceProvider();
     }

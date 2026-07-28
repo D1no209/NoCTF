@@ -102,8 +102,8 @@ public sealed class EfChallengeConfigurationStore(
                 competition.ConfigurationRevision,
                 checked(expectedRevision + 1)));
         }
-        await outbox.FlushOutgoingMessagesAsync();
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return new(await FindAsync(competitionId, challengeId, ct));
     }
 }

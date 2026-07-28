@@ -1,3 +1,4 @@
+using Amazon.S3;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Storage;
@@ -202,7 +203,19 @@ public static class ServiceRegistration
         services.AddSingleton<IAwdpFixWorkReader, AwdpFixWorkReader>();
         services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
         services.AddSingleton<FixArchivePreparer>();
-        services.AddSingleton<IObjectStorage, LocalObjectStorage>();
+        if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config
+            {
+                ServiceURL = configuration["Storage:S3:ServiceUrl"],
+                ForcePathStyle = configuration.GetValue("Storage:S3:ForcePathStyle", true)
+            }));
+            services.AddSingleton<IObjectStorage, S3ObjectStorage>();
+        }
+        else
+        {
+            services.AddSingleton<IObjectStorage, LocalObjectStorage>();
+        }
         services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();
         return services;
     }
