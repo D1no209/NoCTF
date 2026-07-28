@@ -233,7 +233,8 @@ public sealed class LibvirtRoutedNetworkManager(
                 ["net-define", definitionPath],
                 cancellationToken);
             if (define.ExitCode != 0)
-                throw new InvalidOperationException("Libvirt rejected the Runtime network.");
+                throw new InvalidOperationException(
+                    $"Libvirt rejected the Runtime network: {define.StandardError.Trim()}");
             var start = await processes.RunAsync(
                 "virsh",
                 ["net-start", networkName],
@@ -244,7 +245,8 @@ public sealed class LibvirtRoutedNetworkManager(
                 "virsh",
                 ["net-undefine", networkName],
                 cancellationToken);
-            throw new InvalidOperationException("Libvirt could not start the Runtime network.");
+            throw new InvalidOperationException(
+                $"Libvirt could not start the Runtime network: {start.StandardError.Trim()}");
         }
         finally
         {

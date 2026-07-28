@@ -238,7 +238,8 @@ public sealed partial class LibvirtApplianceLifecycle(
                 cancellationToken);
             if (conversion.ExitCode != 0 || !File.Exists(convertedPath))
                 throw new InvalidOperationException(
-                    $"Unable to convert disk for OVF virtual machine '{plan.VmId}'.");
+                    $"Unable to convert disk for OVF virtual machine '{plan.VmId}': "
+                    + conversion.StandardError.Trim());
             convertedDisks.Add(convertedPath);
         }
 
@@ -266,7 +267,8 @@ public sealed partial class LibvirtApplianceLifecycle(
             cancellationToken);
         if (import.ExitCode != 0)
             throw new InvalidOperationException(
-                $"Libvirt rejected OVF virtual machine '{plan.VmId}'.");
+                $"Libvirt rejected OVF virtual machine '{plan.VmId}': "
+                + import.StandardError.Trim());
     }
 
     private async Task<IPAddress> DiscoverAddressAsync(

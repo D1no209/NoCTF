@@ -63,6 +63,21 @@ NOCTF_KOMPOSE_PATH=/usr/local/bin/kompose
 和删除收敛，然后删除该 Namespace。若 API endpoint 是本机地址，还必须将它加入
 `NO_PROXY`，避免 kubectl/.NET Kubernetes client 经 HTTP proxy 访问。
 
+Libvirt/OVA 真实集成要求 Linux KVM/Libvirt 测试节点可访问 `qemu:///system`，并提供
+`virsh`、`qemu-img`、`virt-install` 以及一个不会与节点现有委派冲突的
+`10.253.240.0/24` 测试 CIDR。设置：
+
+```text
+NOCTF_LIBVIRT_DISK_PATH=/absolute/path/to/fixture.img
+```
+
+fixture 必须是可由 BIOS/KVM 启动的磁盘镜像，自带 QEMU Guest Agent，并为
+`virtio_net` 接口启用 DHCP；测试不会下载、修改或向 Guest 注入这些依赖。测试运行时
+自行把磁盘流式打包为临时单 VM OVA，验证 SHA-256、qcow2 转换、routed network、
+Guest Agent IPv4、通过 Guest Agent 启动的 HTTP URL、generation 0 receipt stop、
+generation 1 replacement 与按完整 identity orphan cleanup。默认未设置变量时明确
+skip；Release 的受控 Libvirt Runner 应设置该变量并使用专用 fixture。
+
 ## 端到端
 
 每种模式至少一条真实依赖流程：

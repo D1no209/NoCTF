@@ -115,6 +115,59 @@ public sealed class LibvirtOvaRuntimeTests
     }
 
     [Test]
+    public async Task Libvirt_process_stderr_is_preserved_for_node_diagnostics()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var ovaPath = Path.Combine(root, "appliance.ova");
+            await WriteApplianceAsync(ovaPath);
+            var digest = await Sha256Async(ovaPath);
+            var options = new LibvirtRuntimeOptions(
+                Path.Combine(root, "cache"),
+                Path.Combine(root, "work"),
+                "10.92.0.0/16",
+                "10.92.0.0/24",
+                28);
+            const string processError = "iptables-nft table is incompatible";
+            var adapter = new RecordingLibvirtProcessAdapter
+            {
+                FailingCommand = "net-start",
+                FailureMessage = processError
+            };
+            var runtime = new LibvirtApplianceLifecycle(
+                adapter,
+                new OvaArtifactCache(new HttpClient(), options),
+                new LibvirtRoutedNetworkManager(adapter, options),
+                options,
+                TimeProvider.System);
+            var operationId = Guid.NewGuid();
+            var action = async () =>
+            {
+                _ = await runtime.ImportAsync(
+                    new OvaRuntimeRequest(
+                        operationId,
+                        0,
+                        new Uri(ovaPath),
+                        digest,
+                        $"noctf-{operationId:N}-0",
+                        new(256 * 1024 * 1024, 2_000_000_000, 256),
+                        TimeSpan.FromMinutes(1),
+                        TimeSpan.FromSeconds(5)),
+                    CancellationToken.None);
+            };
+
+            var exception = await Assert.That(action).Throws<InvalidOperationException>();
+
+            await Assert.That(exception!.Message).Contains(processError);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Test]
     public async Task Ovf_aggregate_resources_cannot_exceed_runtime_budget()
     {
         var root = CreateTemporaryDirectory();
@@ -280,6 +333,8 @@ public sealed class LibvirtOvaRuntimeTests
         private string? networkXml;
         private string? networkName;
 
+        public string? FailingCommand { get; init; }
+        public string? FailureMessage { get; init; }
         public HashSet<string> CreatedDomains { get; } = new(StringComparer.Ordinal);
         public bool NetworkExists { get; private set; }
 
@@ -289,6 +344,9 @@ public sealed class LibvirtOvaRuntimeTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var command = executable == "virsh" ? arguments[0] : executable;
+            if (string.Equals(command, FailingCommand, StringComparison.Ordinal))
+                return Failure(FailureMessage ?? "forced failure");
             if (executable == "qemu-img")
             {
                 File.Copy(arguments[^2], arguments[^1]);
@@ -373,7 +431,7 @@ public sealed class LibvirtOvaRuntimeTests
         private static Task<LibvirtProcessResult> Success(string output = "") =>
             Task.FromResult(new LibvirtProcessResult(0, output, string.Empty));
 
-        private static Task<LibvirtProcessResult> Failure() =>
-            Task.FromResult(new LibvirtProcessResult(1, string.Empty, "not found"));
+        private static Task<LibvirtProcessResult> Failure(string message = "not found") =>
+            Task.FromResult(new LibvirtProcessResult(1, string.Empty, message));
     }
 }
