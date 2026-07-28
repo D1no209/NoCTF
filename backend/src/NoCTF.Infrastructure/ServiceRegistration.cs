@@ -191,6 +191,7 @@ public static class ServiceRegistration
         }
         services.AddScoped<ICompetitionLifecycleStore, EfCompetitionLifecycleStore>();
         services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
+        services.AddScoped<IAwdRuntimeProvisioner, PostgresAwdRuntimeProvisioner>();
         services.AddSingleton<AwdRoundConfigurationCatalog>();
         services.AddSingleton<AwdCheckerConfigurationCatalog>();
         services.AddSingleton<KohProducerConfigurationCatalog>();

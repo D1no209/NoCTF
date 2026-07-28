@@ -6,6 +6,7 @@ using System.Text.Json;
 
 namespace NoCTF.E2E;
 
+[Category("CtfE2E")]
 public sealed class CtfFullBoundaryTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

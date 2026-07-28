@@ -126,7 +126,8 @@ public sealed class PostgresAwdRoundCoordinator(
                 message.CompetitionId,
                 target.Challenge.ChallengeId,
                 message.CompetitionChallengeId,
-                teamId);
+                teamId,
+                message.Round.Value);
             var flag = GenerateCandidate(template, context, candidates);
             var flagId = Guid.CreateVersion7();
             db.ChallengeFlags.Add(new ChallengeFlag
