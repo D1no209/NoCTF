@@ -960,6 +960,7 @@ public static class BackendMessageHandlers
         {
             submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued;
             submission.EvaluationFailureCode = null;
+            submission.EvaluationResultBodySha256 = null;
             submission.EvaluationUpdatedAt = now;
             submission.ProcessingVersion = checked(submission.ProcessingVersion + 1);
             await outbox.PublishAsync(new EvaluateSubmission(

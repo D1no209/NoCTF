@@ -87,7 +87,23 @@ public sealed class AwdpFixResultPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             var fixture = await SeedAsync(options, cancellationToken);
-            var outbox = new RecordingOutbox();
+            var factsWereCommittedAtFlush = false;
+            var outbox = new RecordingOutbox(async () =>
+            {
+                await using var observer = new NoCtfDbContext(options);
+                factsWereCommittedAtFlush =
+                    await observer.Submissions.AsNoTracking().AnyAsync(
+                        submission => submission.Id == fixture.SubmissionId
+                            && submission.EvaluationState == SubmissionEvaluationState.Completed,
+                        cancellationToken)
+                    && await observer.RuntimeInstances.AsNoTracking().AnyAsync(
+                        runtime => runtime.Id == fixture.RuntimeId
+                            && runtime.State == RuntimeState.Stopping,
+                        cancellationToken)
+                    && await observer.ScoringEvents.AsNoTracking().AnyAsync(
+                        scoringEvent => scoringEvent.SubmissionId == fixture.SubmissionId,
+                        cancellationToken);
+            });
             var result = AwdpFixResult.Create(
                 fixture.SubmissionId,
                 fixture.RuntimeId,
@@ -108,6 +124,7 @@ public sealed class AwdpFixResultPersistenceTests
 
             await Assert.That(first).IsEqualTo(InternalResultDisposition.Applied);
             await Assert.That(replay).IsEqualTo(InternalResultDisposition.Duplicate);
+            await Assert.That(factsWereCommittedAtFlush).IsTrue();
             await Assert.That(outbox.NodeMessages.OfType<StopContainerRuntime>().Count())
                 .IsEqualTo(1);
             await using var verify = new NoCtfDbContext(options);
@@ -119,6 +136,26 @@ public sealed class AwdpFixResultPersistenceTests
             await Assert.That(scoring.Result).IsEqualTo(ScoringResult.Correct);
             await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
             await Assert.That(runtime.ProcessingVersion).IsEqualTo(4);
+
+            await using (var rejudgeDb = new NoCtfDbContext(options))
+                await BackendMessageHandlers.Handle(
+                    new DrainSubmissions(
+                        fixture.CompetitionId,
+                        fixture.CompetitionChallengeId,
+                        fixture.Now,
+                        Rejudge: true,
+                        fixture.SubmissionId),
+                    rejudgeDb,
+                    outbox,
+                    cancellationToken);
+            await using (var rejudgeVerify = new NoCtfDbContext(options))
+            {
+                var requeued = await rejudgeVerify.Submissions.AsNoTracking()
+                    .SingleAsync(item => item.Id == fixture.SubmissionId, cancellationToken);
+                await Assert.That(requeued.EvaluationState)
+                    .IsEqualTo(SubmissionEvaluationState.Queued);
+                await Assert.That(requeued.EvaluationResultBodySha256).IsNull();
+            }
 
             var expired = await AddPendingFixAsync(options, fixture, cancellationToken);
             await using (var wrongOwnerDb = new NoCtfDbContext(options))
@@ -349,7 +386,7 @@ public sealed class AwdpFixResultPersistenceTests
             RunningAt = now
         });
         await db.SaveChangesAsync(cancellationToken);
-        return new(now, competitionId, submissionId, runtimeId);
+        return new(now, competitionId, competitionChallengeId, submissionId, runtimeId);
     }
 
     private static User NewUser(Guid id, string name, DateTimeOffset now) => new()
@@ -367,11 +404,19 @@ public sealed class AwdpFixResultPersistenceTests
     private sealed record Fixture(
         DateTimeOffset Now,
         Guid CompetitionId,
+        Guid CompetitionChallengeId,
         Guid SubmissionId,
         Guid RuntimeId);
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {
+        private readonly Func<Task> onFlush;
+
+        public RecordingOutbox(Func<Task>? onFlush = null)
+        {
+            this.onFlush = onFlush ?? (() => Task.CompletedTask);
+        }
+
         public List<object> NodeMessages { get; } = [];
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
@@ -387,6 +432,6 @@ public sealed class AwdpFixResultPersistenceTests
         }
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
-        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+        public Task FlushOutgoingMessagesAsync() => onFlush();
     }
 }
