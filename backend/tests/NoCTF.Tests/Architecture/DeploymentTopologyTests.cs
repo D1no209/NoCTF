@@ -53,6 +53,27 @@ public sealed class DeploymentTopologyTests
         }
     }
 
+    [Test]
+    public async Task Ctf_e2e_readiness_bypasses_proxy_and_normalizes_redis_output()
+    {
+        var script = await ReadAsync("backend", "scripts", "Run-CtfE2E.ps1");
+        var compose = await ReadAsync(
+            "backend",
+            "tests",
+            "NoCTF.E2E",
+            "docker-compose.ctf.yml");
+
+        await Assert.That(script).Contains("$httpHandler.UseProxy = $false");
+        await Assert.That(script).Contains("($heartbeat | Out-String).Trim()");
+        await Assert.That(script).Contains("Last API status");
+        await Assert.That(script).Contains("Last Redis heartbeat output");
+        await Assert.That(script).Contains("function Resolve-E2EApiPort");
+        await Assert.That(script).Contains("port backend 8080");
+        await Assert.That(script).Contains("$env:NO_PROXY = \"127.0.0.1,localhost\"");
+        await Assert.That(script).DoesNotContain("wsl");
+        await Assert.That(compose).Contains("\"127.0.0.1::8080\"");
+    }
+
     private static Task<string> ReadAsync(params string[] segments) =>
         File.ReadAllTextAsync(Path.Combine([RepositoryRoot, .. segments]));
 

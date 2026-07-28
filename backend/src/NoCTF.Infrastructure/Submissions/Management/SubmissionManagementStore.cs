@@ -19,36 +19,44 @@ public sealed class SubmissionManagementStore(
         int limit,
         CancellationToken ct)
     {
-        var query = Query().Where(item => item.Submission.CompetitionId == filter.CompetitionId);
+        var query = db.Submissions.AsNoTracking()
+            .Where(submission => submission.CompetitionId == filter.CompetitionId);
         if (filter.CompetitionChallengeId is Guid challengeId)
-            query = query.Where(item => item.Submission.CompetitionChallengeId == challengeId);
+            query = query.Where(submission =>
+                submission.CompetitionChallengeId == challengeId);
         if (filter.TeamId is Guid teamId)
-            query = query.Where(item => item.Submission.TeamId == teamId);
+            query = query.Where(submission => submission.TeamId == teamId);
         if (filter.UserId is Guid userId)
-            query = query.Where(item => item.Submission.SubmittedByUserId == userId);
+            query = query.Where(submission => submission.SubmittedByUserId == userId);
         if (filter.Kind is SubmissionKind kind)
-            query = query.Where(item => item.Submission.Kind == kind);
+            query = query.Where(submission => submission.Kind == kind);
         if (filter.EvaluationState is SubmissionEvaluationState state)
-            query = query.Where(item => item.Submission.EvaluationState == state);
+            query = query.Where(submission => submission.EvaluationState == state);
         if (filter.Result is ScoringResult result)
-            query = query.Where(item => item.Event != null && item.Event.Result == result);
+            query = query.Where(submission => db.ScoringEvents.Any(scoringEvent =>
+                scoringEvent.Id == submission.CurrentScoringEventId
+                && scoringEvent.Result == result));
         if (filter.FailureCode is ScoringFailureCode failure)
-            query = query.Where(item =>
-                item.Submission.EvaluationState == SubmissionEvaluationState.PlatformFailed
-                    ? item.Submission.EvaluationFailureCode == failure
-                    : item.Event != null && item.Event.FailureCode == failure);
+            query = query.Where(submission =>
+                submission.EvaluationState == SubmissionEvaluationState.PlatformFailed
+                    ? submission.EvaluationFailureCode == failure
+                    : db.ScoringEvents.Any(scoringEvent =>
+                        scoringEvent.Id == submission.CurrentScoringEventId
+                        && scoringEvent.FailureCode == failure));
         if (filter.ReceivedFrom is DateTimeOffset from)
-            query = query.Where(item => item.Submission.ReceivedAt >= from);
+            query = query.Where(submission => submission.ReceivedAt >= from);
         if (filter.ReceivedTo is DateTimeOffset to)
-            query = query.Where(item => item.Submission.ReceivedAt < to);
+            query = query.Where(submission => submission.ReceivedAt < to);
         if (!string.IsNullOrEmpty(filter.SubmittedFlag))
         {
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(filter.SubmittedFlag));
-            query = query.Where(item => item.Submission.SubmittedFlagSha256 == hash);
+            query = query.Where(submission => submission.SubmittedFlagSha256 == hash);
         }
         if (filter.HasCurrentScoringEvent is bool hasEvent)
-            query = query.Where(item => (item.Submission.CurrentScoringEventId != null) == hasEvent);
-        return await Page(query, beforeReceivedAt, beforeId, limit).ToListAsync(ct);
+            query = query.Where(submission =>
+                (submission.CurrentScoringEventId != null) == hasEvent);
+        return await Project(Page(query, beforeReceivedAt, beforeId, limit))
+            .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<SubmissionListItem>?> ListPlayerAsync(
@@ -65,13 +73,15 @@ public sealed class SubmissionManagementStore(
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
             return null;
-        return await Page(
-                Query().Where(item =>
-                    item.Submission.CompetitionId == competitionId &&
-                    item.Submission.TeamId == teamId.Value),
+        var submissions = db.Submissions.AsNoTracking()
+            .Where(submission =>
+                submission.CompetitionId == competitionId
+                && submission.TeamId == teamId.Value);
+        return await Project(Page(
+                submissions,
                 beforeReceivedAt,
                 beforeId,
-                limit)
+                limit))
             .ToListAsync(ct);
     }
 
@@ -91,46 +101,44 @@ public sealed class SubmissionManagementStore(
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    private IQueryable<SubmissionWithEvent> Query() =>
-        db.Submissions.AsNoTracking()
-            .GroupJoin(
-                db.ScoringEvents.AsNoTracking(),
-                submission => submission.CurrentScoringEventId,
-                scoringEvent => (Guid?)scoringEvent.Id,
-                (submission, events) => new { Submission = submission, Events = events })
-            .SelectMany(
-                item => item.Events.DefaultIfEmpty(),
-                (item, scoringEvent) => new SubmissionWithEvent(item.Submission, scoringEvent));
-
-    private static IQueryable<SubmissionListItem> Page(
-        IQueryable<SubmissionWithEvent> query,
+    private static IQueryable<Submission> Page(
+        IQueryable<Submission> query,
         DateTimeOffset? beforeReceivedAt,
         Guid? beforeId,
         int limit)
     {
         if (beforeReceivedAt is DateTimeOffset receivedAt && beforeId is Guid id)
-            query = query.Where(item =>
-                item.Submission.ReceivedAt < receivedAt ||
-                item.Submission.ReceivedAt == receivedAt && item.Submission.Id.CompareTo(id) < 0);
+            query = query.Where(submission =>
+                submission.ReceivedAt < receivedAt
+                || submission.ReceivedAt == receivedAt
+                && submission.Id.CompareTo(id) < 0);
         return query
-            .OrderByDescending(item => item.Submission.ReceivedAt)
-            .ThenByDescending(item => item.Submission.Id)
-            .Take(limit)
-            .Select(item => new SubmissionListItem(
-                item.Submission.Id,
-                item.Submission.CompetitionId,
-                item.Submission.CompetitionChallengeId,
-                item.Submission.TeamId,
-                item.Submission.SubmittedByUserId,
-                item.Submission.Kind,
-                item.Submission.EvaluationState,
-                item.Event == null ? null : item.Event.Result,
-                item.Submission.EvaluationState == SubmissionEvaluationState.PlatformFailed
-                    ? item.Submission.EvaluationFailureCode
-                    : item.Event == null ? null : item.Event.FailureCode,
-                item.Submission.ReceivedAt,
-                item.Submission.ProcessingVersion));
+            .OrderByDescending(submission => submission.ReceivedAt)
+            .ThenByDescending(submission => submission.Id)
+            .Take(limit);
     }
 
-    private sealed record SubmissionWithEvent(Submission Submission, ScoringEvent? Event);
+    private IQueryable<SubmissionListItem> Project(IQueryable<Submission> submissions) =>
+        submissions.Select(submission => new SubmissionListItem(
+            submission.Id,
+            submission.CompetitionId,
+            submission.CompetitionChallengeId,
+            submission.TeamId,
+            submission.SubmittedByUserId,
+            submission.Kind,
+            submission.EvaluationState,
+            db.ScoringEvents
+                .Where(scoringEvent =>
+                    scoringEvent.Id == submission.CurrentScoringEventId)
+                .Select(scoringEvent => (ScoringResult?)scoringEvent.Result)
+                .SingleOrDefault(),
+            submission.EvaluationState == SubmissionEvaluationState.PlatformFailed
+                ? submission.EvaluationFailureCode
+                : db.ScoringEvents
+                    .Where(scoringEvent =>
+                        scoringEvent.Id == submission.CurrentScoringEventId)
+                    .Select(scoringEvent => scoringEvent.FailureCode)
+                    .SingleOrDefault(),
+            submission.ReceivedAt,
+            submission.ProcessingVersion));
 }
