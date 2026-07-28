@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260724124250_InitialBaseline")]
+    [Migration("20260728013508_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -745,6 +745,16 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AwdCheckerTargetServiceName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("awd_checker_target_service_name");
+
+                    b.Property<string>("AwdCheckerTargetUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("awd_checker_target_url");
+
                     b.Property<DateTimeOffset?>("CheckerDeadlineAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("checker_deadline_at");
@@ -914,6 +924,8 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.ToTable("runtime_instances", null, t =>
                         {
+                            t.HasCheckConstraint("ck_runtime_instances_awd_checker_target", "(awd_checker_target_url IS NULL AND awd_checker_target_service_name IS NULL) OR (awd_checker_target_url IS NOT NULL AND ((runtime_kind = 0 AND awd_checker_target_service_name IS NULL) OR (runtime_kind = 1 AND awd_checker_target_service_name IS NOT NULL)))");
+
                             t.HasCheckConstraint("ck_runtime_instances_awdp_competition_revision", "(purpose = 1) = (competition_configuration_revision IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");

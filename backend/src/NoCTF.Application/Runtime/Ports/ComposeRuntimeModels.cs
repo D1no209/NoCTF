@@ -16,6 +16,7 @@ public sealed record ComposeRequest(
     TimeSpan OperationTimeout,
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
     RuntimeUrlBinding? ControlCheckUrlBinding = null,
+    RuntimeInternalEndpointBinding? AwdCheckerTargetBinding = null,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? ServiceEnvironment = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll);
 

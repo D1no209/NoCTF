@@ -33,7 +33,7 @@ public sealed class AwdConfigurationTests
     {
         const string json = """
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "attackRewardMode": "SplitVictimDefensePool",
               "attackPoints": 0,
               "victimDefensePoolPoints": 0,

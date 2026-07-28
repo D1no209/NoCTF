@@ -438,6 +438,8 @@ namespace NoCTF.Infrastructure.Migrations
                     urls = table.Column<string[]>(type: "text[]", nullable: false),
                     participant_url_indexes = table.Column<int[]>(type: "integer[]", nullable: false),
                     control_check_url = table.Column<string>(type: "text", nullable: true),
+                    awd_checker_target_url = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    awd_checker_target_service_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     checker_sequence = table.Column<long>(type: "bigint", nullable: false),
                     last_applied_checker_sequence = table.Column<long>(type: "bigint", nullable: false),
                     last_applied_checker_body_sha256 = table.Column<byte[]>(type: "bytea", nullable: true),
@@ -451,6 +453,7 @@ namespace NoCTF.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_runtime_instances", x => x.id);
+                    table.CheckConstraint("ck_runtime_instances_awd_checker_target", "(awd_checker_target_url IS NULL AND awd_checker_target_service_name IS NULL) OR (awd_checker_target_url IS NOT NULL AND ((runtime_kind = 0 AND awd_checker_target_service_name IS NULL) OR (runtime_kind = 1 AND awd_checker_target_service_name IS NOT NULL)))");
                     table.CheckConstraint("ck_runtime_instances_awdp_competition_revision", "(purpose = 1) = (competition_configuration_revision IS NOT NULL)");
                     table.CheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
                     table.CheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");

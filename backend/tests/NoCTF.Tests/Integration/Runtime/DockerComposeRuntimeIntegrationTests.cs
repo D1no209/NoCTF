@@ -24,6 +24,14 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 .WithCommand("true")
                 .Build();
             await dockerProbe.StartAsync(cancellationToken);
+            await using var callback = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand(
+                    "/bin/sh",
+                    "-c",
+                    "mkdir -p /www && echo callback > /www/index.html && exec httpd -f -p 8080 -h /www")
+                .WithLabel("noctf.io/internal-role", "awdp-callback-gateway")
+                .Build();
+            await callback.StartAsync(cancellationToken);
             var operationId = Guid.NewGuid();
             var platformNetworkName = $"noctf-platform-it-{operationId:N}";
             using var docker = new DockerClientBuilder()
@@ -41,10 +49,12 @@ public sealed class DockerComposeRuntimeIntegrationTests
             var runtimeOptions = new DockerRuntimeOptions(
                 Endpoint: DockerEndpoint(),
                 PublicHost: "localhost",
-                NetworkName: platformNetworkName);
+                NetworkName: platformNetworkName,
+                CallbackContainerName: callback.Id);
             var runtime = new DockerComposeRuntime(
                 runtimeOptions,
                 workDirectory: workRoot);
+            using var containerLifecycle = new DockerContainerLifecycle(runtimeOptions);
             using var reconciler = new DockerRuntimeResourceReconciler(
                 runtimeOptions,
                 runtime);
@@ -108,6 +118,55 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     cancellationToken);
                 await Assert.That(webInspect.NetworkSettings!.Networks.Keys)
                     .DoesNotContain(platformNetworkName);
+
+                var checkerOperationId = Guid.NewGuid();
+                var checkerResult = await containerLifecycle.RunAttachedAsync(
+                    new ContainerRequest(
+                        checkerOperationId,
+                        RuntimeProvider.Docker,
+                        "busybox:1.36.1",
+                        [
+                            "/bin/sh",
+                            "-c",
+                            "sleep 1 && wget -qO- \"$NOCTF_TARGET_URL\" | grep -q db && "
+                            + "wget -qO- \"$NOCTF_CALLBACK_URL\" | grep -q callback"
+                        ],
+                        new Dictionary<string, string>
+                        {
+                            ["NOCTF_TARGET_URL"] = "http://db:9090",
+                            ["NOCTF_CALLBACK_URL"] = "http://callback:8080/"
+                        },
+                        new Dictionary<string, string>
+                        {
+                            ["noctf.io/managed"] = "true",
+                            ["noctf.io/job-kind"] = "awd-checker",
+                            ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
+                            ["noctf.io/generation"] = "1",
+                            ["noctf.io/purpose"] = "awd-checker"
+                        },
+                        new Dictionary<int, int>(),
+                        new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                        new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                        TimeSpan.FromMinutes(1),
+                        OperationTimeout: TimeSpan.FromSeconds(30),
+                        AllowInternalCallback: true,
+                        Generation: 1,
+                        RuntimeInstanceId: operationId,
+                        NetworkPurpose: ContainerNetworkPurpose.AwdChecker),
+                    new AttachedComposeRuntimeTarget(
+                        new RuntimeResourceIdentity(operationId, 1),
+                        receipt,
+                        "db"),
+                    cancellationToken);
+                await Assert.That(checkerResult.StandardError).IsEmpty();
+                await Assert.That(checkerResult.ExitCode).IsEqualTo(0);
+                await Assert.That((await runtime.GetStatusAsync(receipt, cancellationToken))!.Status)
+                    .IsEqualTo(RuntimeStatus.Running);
+                Func<Task> inspectCheckerCallback = async () =>
+                    _ = await docker.Networks.InspectNetworkAsync(
+                        $"noctf-callback-{checkerOperationId:N}",
+                        cancellationToken);
+                await Assert.That(inspectCheckerCallback).ThrowsException();
 
                 var resourceIds = status.Services
                     .Select(service => service.ResourceId)

@@ -6,14 +6,17 @@ namespace NoCTF.Runner.Messages;
 public sealed record ExpandedRuntimeUrls(
     IReadOnlyList<string> Urls,
     IReadOnlyList<int> ParticipantUrlIndexes,
-    string? ControlCheckUrl);
+    string? ControlCheckUrl,
+    string? AwdCheckerTargetUrl,
+    string? AwdCheckerTargetServiceName);
 
 public static class RuntimeUrlExpander
 {
     public static ExpandedRuntimeUrls ExpandContainer(
         ContainerReceipt receipt,
         IReadOnlyList<RuntimeUrlBinding>? bindings,
-        RuntimeUrlBinding? controlCheckBinding)
+        RuntimeUrlBinding? controlCheckBinding,
+        RuntimeInternalEndpointBinding? awdCheckerTargetBinding = null)
     {
         var urls = new List<string>();
         var participantIndexes = new List<int>();
@@ -28,14 +31,23 @@ public static class RuntimeUrlExpander
         var controlCheckUrl = controlCheckBinding is null
             ? null
             : ExpandInternalContainerBinding(receipt, controlCheckBinding);
-        return new(urls, participantIndexes, controlCheckUrl);
+        var awdCheckerTargetUrl = awdCheckerTargetBinding is null
+            ? null
+            : ExpandInternalContainerBinding(receipt, awdCheckerTargetBinding);
+        return new(
+            urls,
+            participantIndexes,
+            controlCheckUrl,
+            awdCheckerTargetUrl,
+            null);
     }
 
     public static ExpandedRuntimeUrls ExpandCompose(
         ComposeReceipt receipt,
         ComposeStatus status,
         IReadOnlyList<RuntimeUrlBinding>? bindings,
-        RuntimeUrlBinding? controlCheckBinding)
+        RuntimeUrlBinding? controlCheckBinding,
+        RuntimeInternalEndpointBinding? awdCheckerTargetBinding = null)
     {
         var urls = new List<string>();
         var participantIndexes = new List<int>();
@@ -67,7 +79,21 @@ public static class RuntimeUrlExpander
                 service.InternalHost,
                 containerPort);
         }
-        return new(urls, participantIndexes, controlCheckUrl);
+        string? awdCheckerTargetUrl = null;
+        if (awdCheckerTargetBinding is not null)
+        {
+            var service = FindComposeService(status, awdCheckerTargetBinding.ServiceName);
+            awdCheckerTargetUrl = Expand(
+                awdCheckerTargetBinding.UrlTemplate,
+                service.InternalHost,
+                awdCheckerTargetBinding.ContainerPort);
+        }
+        return new(
+            urls,
+            participantIndexes,
+            controlCheckUrl,
+            awdCheckerTargetUrl,
+            awdCheckerTargetBinding?.ServiceName);
     }
 
     public static ExpandedRuntimeUrls ExpandOva(
@@ -91,7 +117,7 @@ public static class RuntimeUrlExpander
             : ExpandOvaBinding(
                 FindOvaVirtualMachine(receipt, controlCheckBinding),
                 controlCheckBinding);
-        return new(urls, participantIndexes, controlCheckUrl);
+        return new(urls, participantIndexes, controlCheckUrl, null, null);
     }
 
     private static ComposeServiceStatus FindComposeService(
@@ -108,6 +134,19 @@ public static class RuntimeUrlExpander
                        StringComparison.Ordinal))
                ?? throw new InvalidOperationException(
                    $"Compose service '{binding.ServiceName}' was not found.");
+    }
+
+    private static ComposeServiceStatus FindComposeService(
+        ComposeStatus status,
+        string? serviceName)
+    {
+        if (string.IsNullOrWhiteSpace(serviceName))
+            throw new InvalidOperationException(
+                "Compose internal endpoint requires ServiceName.");
+        return status.Services.SingleOrDefault(service =>
+                   string.Equals(service.Name, serviceName, StringComparison.Ordinal))
+               ?? throw new InvalidOperationException(
+                   $"Compose service '{serviceName}' was not found.");
     }
 
     private static OvaVirtualMachineReceipt FindOvaVirtualMachine(
@@ -176,6 +215,11 @@ public static class RuntimeUrlExpander
             receipt.InternalHost,
             containerPort);
     }
+
+    private static string ExpandInternalContainerBinding(
+        ContainerReceipt receipt,
+        RuntimeInternalEndpointBinding binding) =>
+        Expand(binding.UrlTemplate, receipt.InternalHost, binding.ContainerPort);
 
     private static string Expand(string template, string? host, int port)
     {

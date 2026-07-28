@@ -2,6 +2,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
+using NoCTF.GameModes.Awd.Configuration;
 
 namespace NoCTF.Worker.Runtime;
 
@@ -11,9 +12,11 @@ public static class RuntimeClaimFactory
         RuntimeInstance instance,
         GameMode mode,
         ChallengeRuntimeTemplate template,
+        string challengeConfigurationJson,
         string? perTeamFlag = null)
     {
         var fixedFlag = ResolvePerTeamFlag(mode, template, perTeamFlag);
+        var checkerTarget = ResolveAwdCheckerTarget(mode, challengeConfigurationJson);
         var limits = template.Limits
             ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
         TimeSpan? ttl = template.TtlSeconds is > 0
@@ -45,16 +48,14 @@ public static class RuntimeClaimFactory
                         ttl,
                         OperationTimeout: operationTimeout,
                         NetworkIsolation: ContainerNetworkIsolation.Isolated,
-                        InternalPorts: mode == GameMode.Koh
-                            && template.ControlCheckUrlBinding?.ContainerPort is int controlPort
-                                ? [controlPort]
-                                : null,
+                        InternalPorts: InternalPorts(mode, template, checkerTarget),
                         Generation: instance.Generation,
                         RuntimeInstanceId: instance.Id,
                         UrlBindings: template.UrlBindings,
                         ControlCheckUrlBinding: mode == GameMode.Koh
                             ? template.ControlCheckUrlBinding
                             : null,
+                        AwdCheckerTargetBinding: checkerTarget,
                         EgressPolicy: definition.EgressPolicy)),
             ComposeRuntimeDefinition definition
                 when template.Provider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
@@ -77,6 +78,7 @@ public static class RuntimeClaimFactory
                         operationTimeout,
                         template.UrlBindings,
                         mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
+                        checkerTarget,
                         ServiceEnvironment(definition, fixedFlag),
                         definition.EgressPolicy)),
             OvaRuntimeDefinition definition when template.Provider == RuntimeProvider.Libvirt =>
@@ -101,6 +103,42 @@ public static class RuntimeClaimFactory
             _ => throw new InvalidOperationException(
                 "Runtime definition and provider are incompatible.")
         };
+    }
+
+    private static RuntimeInternalEndpointBinding? ResolveAwdCheckerTarget(
+        GameMode mode,
+        string challengeConfigurationJson)
+    {
+        if (mode != GameMode.Awd)
+            return null;
+        var target = AwdConfigurationUpgrader.ParseChallenge(
+            challengeConfigurationJson).Checker?.Target;
+        return target switch
+        {
+            ContainerAwdCheckerTarget container => new(
+                container.UrlTemplate,
+                container.ContainerPort),
+            ComposeAwdCheckerTarget compose => new(
+                compose.UrlTemplate,
+                compose.ContainerPort,
+                compose.ServiceName),
+            null => null,
+            _ => throw new InvalidOperationException("Unsupported AWD Checker target kind.")
+        };
+    }
+
+    private static IReadOnlyList<int>? InternalPorts(
+        GameMode mode,
+        ChallengeRuntimeTemplate template,
+        RuntimeInternalEndpointBinding? checkerTarget)
+    {
+        var ports = new List<int>();
+        if (mode == GameMode.Koh
+            && template.ControlCheckUrlBinding?.ContainerPort is int controlPort)
+            ports.Add(controlPort);
+        if (checkerTarget is { ServiceName: null })
+            ports.Add(checkerTarget.ContainerPort);
+        return ports.Count == 0 ? null : ports.Distinct().Order().ToArray();
     }
 
     private static string? ResolvePerTeamFlag(

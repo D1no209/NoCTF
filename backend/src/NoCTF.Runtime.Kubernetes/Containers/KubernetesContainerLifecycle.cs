@@ -12,7 +12,7 @@ namespace NoCTF.Runtime.Kubernetes.Containers;
 public sealed class KubernetesContainerLifecycle(
     IKubernetes client,
     KubernetesRuntimeOptions options) : IContainerLifecycle, IOneShotJobRunner,
-    IContainerSandboxLifecycle, IRuntimeResourceReaper
+    IAttachedOneShotJobRunner, IContainerSandboxLifecycle, IRuntimeResourceReaper
 {
     public RuntimeProvider Provider => RuntimeProvider.Kubernetes;
     private const int ExecTimeoutExitCode = 124;
@@ -52,7 +52,7 @@ public sealed class KubernetesContainerLifecycle(
         if (request.AllowInternalCallback)
         {
             labels["noctf.io/managed"] = "true";
-            labels["noctf.io/job-kind"] = "awdp-verification";
+            labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
             labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
                 ?? request.OperationId).ToString("D");
             labels["noctf.io/generation"] = request.Generation.ToString(
@@ -114,7 +114,9 @@ public sealed class KubernetesContainerLifecycle(
                 await EnsureInternalCallbackPolicyAsync(name, labels, request, cancellationToken);
             var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
             return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending,
-                request.PortMappings, options.PublicHost, internalHost ?? $"{name}.{options.Namespace}.svc");
+                request.PortMappings, options.PublicHost, internalHost ?? $"{name}.{options.Namespace}.svc",
+                RuntimeInstanceId: request.RuntimeInstanceId,
+                Generation: request.Generation);
         }
         catch
         {
@@ -213,7 +215,9 @@ public sealed class KubernetesContainerLifecycle(
             RuntimeStatus.Running,
             request.PortMappings,
             options.PublicHost,
-            internalHost ?? $"{name}.{options.Namespace}.svc");
+            internalHost ?? $"{name}.{options.Namespace}.svc",
+            RuntimeInstanceId: request.RuntimeInstanceId,
+            Generation: request.Generation);
     }
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
@@ -280,6 +284,103 @@ public sealed class KubernetesContainerLifecycle(
                 RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
             await DestroyAsync(receipt, cleanupSource.Token);
         }
+    }
+
+    public async Task<OneShotResult> RunAttachedAsync(
+        ContainerRequest request,
+        AttachedRuntimeTarget target,
+        CancellationToken cancellationToken)
+    {
+        if (request.Provider != RuntimeProvider.Kubernetes)
+            throw new InvalidOperationException(
+                "An attached Kubernetes job requires the Kubernetes provider.");
+        string? sandbox = null;
+        switch (target)
+        {
+            case AttachedContainerRuntimeTarget container:
+                sandbox = await ValidateContainerTargetAsync(container, cancellationToken);
+                break;
+            case AttachedComposeRuntimeTarget compose:
+                await ValidateComposeTargetAsync(compose, cancellationToken);
+                break;
+            default:
+                throw new InvalidOperationException("The attached Runtime target is unsupported.");
+        }
+        var labels = new Dictionary<string, string>(request.Labels, StringComparer.Ordinal)
+        {
+            ["noctf.io/managed"] = "true",
+            ["noctf.io/runtime-instance-id"] = target.Identity.RuntimeInstanceId.ToString("D"),
+            ["noctf.io/generation"] = target.Identity.Generation.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            ["noctf.io/job-kind"] = "awd-checker",
+            ["noctf.io/purpose"] = "awd-checker"
+        };
+        return await RunAsync(
+            request with
+            {
+                Labels = labels,
+                NetworkName = sandbox,
+                AllowInternalCallback = true,
+                Generation = target.Identity.Generation,
+                RuntimeInstanceId = target.Identity.RuntimeInstanceId,
+                NetworkPurpose = ContainerNetworkPurpose.AwdChecker
+            },
+            cancellationToken);
+    }
+
+    private async Task<string> ValidateContainerTargetAsync(
+        AttachedContainerRuntimeTarget target,
+        CancellationToken cancellationToken)
+    {
+        var receipt = target.Receipt;
+        if (receipt.Provider != RuntimeProvider.Kubernetes
+            || receipt.RuntimeInstanceId != target.Identity.RuntimeInstanceId
+            || receipt.Generation != target.Identity.Generation
+            || string.IsNullOrWhiteSpace(receipt.NetworkId)
+            || string.IsNullOrWhiteSpace(receipt.ResourceId))
+            throw new InvalidOperationException(
+                "The attached Container receipt has a different ownership identity.");
+        var policy = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
+            receipt.NetworkId,
+            options.Namespace,
+            cancellationToken: cancellationToken);
+        var pod = await client.CoreV1.ReadNamespacedPodAsync(
+            receipt.ResourceId,
+            options.Namespace,
+            cancellationToken: cancellationToken);
+        if (!HasResourceIdentity(policy.Metadata.Labels, target.Identity)
+            || !HasNetworkPurpose(policy.Metadata.Labels, "persistent-runtime")
+            || !HasResourceIdentity(pod.Metadata.Labels, target.Identity)
+            || !HasLabel(pod.Metadata.Labels, "noctf.io/sandbox", receipt.NetworkId))
+            throw new InvalidOperationException(
+                "The attached Container resources have a different ownership identity.");
+        return receipt.NetworkId;
+    }
+
+    private async Task ValidateComposeTargetAsync(
+        AttachedComposeRuntimeTarget target,
+        CancellationToken cancellationToken)
+    {
+        var receipt = target.Receipt;
+        if (receipt.Provider != RuntimeProvider.Kubernetes
+            || receipt.OperationId != target.Identity.RuntimeInstanceId
+            || receipt.Generation != target.Identity.Generation
+            || !string.Equals(receipt.Namespace, options.Namespace, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(target.ServiceName))
+            throw new InvalidOperationException(
+                "The attached Compose receipt has a different ownership identity.");
+        var selector = $"noctf.io/managed=true,"
+            + $"noctf.io/runtime-instance-id={target.Identity.RuntimeInstanceId:D},"
+            + $"noctf.io/generation={target.Identity.Generation},"
+            + $"noctf.io/compose-service={target.ServiceName}";
+        var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(
+            options.Namespace,
+            labelSelector: selector,
+            cancellationToken: cancellationToken);
+        if (deployments.Items.Count != 1
+            || !HasResourceIdentity(deployments.Items[0].Metadata.Labels, target.Identity))
+            throw new InvalidOperationException(
+                "The attached Compose service was not found with the required ownership identity.");
     }
 
     public async Task<string> CreateIsolatedNetworkAsync(
@@ -628,6 +729,11 @@ public sealed class KubernetesContainerLifecycle(
         CancellationToken cancellationToken)
     {
         var callbackPort = GetCallbackPort(request);
+        var purpose = labels.TryGetValue("noctf.io/purpose", out var configuredPurpose)
+            && configuredPurpose is "awd-checker" or "awdp-checker"
+                ? configuredPurpose
+                : throw new InvalidOperationException(
+                    "A scoring checker requires a supported purpose label.");
         await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(new V1NetworkPolicy
         {
             Metadata = new V1ObjectMeta
@@ -643,7 +749,7 @@ public sealed class KubernetesContainerLifecycle(
                     MatchLabels = new Dictionary<string, string>
                     {
                         ["noctf.io/runtime-id"] = name,
-                        ["noctf.io/purpose"] = "awdp-checker"
+                        ["noctf.io/purpose"] = purpose
                     }
                 },
                 PolicyTypes = ["Egress"],
@@ -720,7 +826,7 @@ public sealed class KubernetesContainerLifecycle(
             || !Uri.TryCreate(callbackText, UriKind.Absolute, out var callback)
             || callback.Scheme is not ("http" or "https"))
             throw new InvalidOperationException(
-                "An AWDP checker callback requires an absolute HTTP(S) callback URL.");
+                "A scoring checker callback requires an absolute HTTP(S) callback URL.");
         return callback.Port;
     }
 
@@ -807,7 +913,7 @@ public sealed class KubernetesContainerLifecycle(
         && labels.TryGetValue("noctf.io/managed", out var managed)
         && string.Equals(managed, "true", StringComparison.Ordinal)
         && labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-        && jobKind is "awdp-verification" or "persistent-runtime"
+        && jobKind is "awd-checker" or "awdp-verification" or "persistent-runtime"
         && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
         && Guid.TryParse(runtimeText, out var runtimeId)
         && runtimeId != Guid.Empty
@@ -840,4 +946,20 @@ public sealed class KubernetesContainerLifecycle(
         labels is not null
         && labels.TryGetValue("noctf.io/network-purpose", out var value)
         && string.Equals(value, purpose, StringComparison.Ordinal);
+
+    private static bool HasLabel(
+        IDictionary<string, string>? labels,
+        string key,
+        string value) =>
+        labels is not null
+        && labels.TryGetValue(key, out var actual)
+        && string.Equals(actual, value, StringComparison.Ordinal);
+
+    private static string JobKind(ContainerNetworkPurpose purpose) => purpose switch
+    {
+        ContainerNetworkPurpose.AwdChecker => "awd-checker",
+        ContainerNetworkPurpose.AwdpVerification => "awdp-verification",
+        ContainerNetworkPurpose.PersistentRuntime => "persistent-runtime",
+        _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
+    };
 }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using System.Diagnostics;
+using System.Text.Json;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
@@ -31,6 +32,12 @@ public sealed class AwdCheckerHandlerTests
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             7,
             RuntimeProvider.Docker,
+            RuntimeKind.Container,
+            3,
+            ContainerReceiptJson(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                3),
+            null,
             "checker:latest",
             ["/checker"],
             new Dictionary<string, string> { ["MODE"] = "awd" },
@@ -56,6 +63,7 @@ public sealed class AwdCheckerHandlerTests
         await Assert.That(request.Labels["noctf.io/purpose"])
             .IsEqualTo("awd-checker");
         await Assert.That(request.OperationTimeout).IsEqualTo(TimeSpan.FromMinutes(1));
+        await Assert.That(runner.Target).IsTypeOf<AttachedContainerRuntimeTarget>();
     }
 
     [Test]
@@ -67,6 +75,12 @@ public sealed class AwdCheckerHandlerTests
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             8,
             RuntimeProvider.Docker,
+            RuntimeKind.Container,
+            3,
+            ContainerReceiptJson(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                3),
+            null,
             "checker:latest",
             ["/checker"],
             new Dictionary<string, string>(),
@@ -82,32 +96,81 @@ public sealed class AwdCheckerHandlerTests
         await Assert.That(runner.WasCancelled).IsTrue();
     }
 
-    private sealed class StubProviderCatalog(IOneShotJobRunner runner)
-        : IOneShotRuntimeProviderCatalog
+    [Test]
+    public async Task Checker_supersedes_a_receipt_from_another_generation()
     {
-        public IOneShotJobRunner OneShot(RuntimeProvider provider) => runner;
+        var runner = new RecordingOneShotRunner();
+        var executor = new AwdCheckerExecutor(new StubProviderCatalog(runner));
+        var runtimeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var work = new AwdCheckerWork(
+            runtimeId,
+            9,
+            RuntimeProvider.Docker,
+            RuntimeKind.Container,
+            4,
+            ContainerReceiptJson(runtimeId, 3),
+            null,
+            "checker:latest",
+            ["/checker"],
+            new Dictionary<string, string>(),
+            new Uri("http://target.internal/health"),
+            new Uri("https://api.example/api/internal/v1/awd/check-results"),
+            "claim-bound-token",
+            DateTimeOffset.UtcNow.AddMinutes(1),
+            TimeSpan.FromSeconds(10));
+
+        var outcome = await executor.ExecuteAsync(work, CancellationToken.None);
+
+        await Assert.That(outcome).IsEqualTo(AwdCheckerExecutionOutcome.Superseded);
+        await Assert.That(runner.Request).IsNull();
     }
 
-    private sealed class RecordingOneShotRunner : IOneShotJobRunner
+    private static string ContainerReceiptJson(Guid runtimeInstanceId, int generation) =>
+        JsonSerializer.Serialize(new ContainerReceipt(
+            runtimeInstanceId,
+            RuntimeProvider.Docker,
+            "target-container",
+            RuntimeStatus.Running,
+            new Dictionary<int, int>(),
+            "localhost",
+            "target.internal",
+            "target-network",
+            runtimeInstanceId,
+            generation));
+
+    private sealed class StubProviderCatalog(IAttachedOneShotJobRunner runner)
+        : IOneShotRuntimeProviderCatalog
+    {
+        public IOneShotJobRunner OneShot(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+
+        public IAttachedOneShotJobRunner Attached(RuntimeProvider provider) => runner;
+    }
+
+    private sealed class RecordingOneShotRunner : IAttachedOneShotJobRunner
     {
         public ContainerRequest? Request { get; private set; }
+        public AttachedRuntimeTarget? Target { get; private set; }
 
-        public Task<OneShotResult> RunAsync(
+        public Task<OneShotResult> RunAttachedAsync(
             ContainerRequest request,
+            AttachedRuntimeTarget target,
             CancellationToken cancellationToken)
         {
             Request = request;
+            Target = target;
             var now = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
             return Task.FromResult(new OneShotResult("checker", 0, "", "", now, now));
         }
     }
 
-    private sealed class HangingOneShotRunner : IOneShotJobRunner
+    private sealed class HangingOneShotRunner : IAttachedOneShotJobRunner
     {
         public bool WasCancelled { get; private set; }
 
-        public async Task<OneShotResult> RunAsync(
+        public async Task<OneShotResult> RunAttachedAsync(
             ContainerRequest request,
+            AttachedRuntimeTarget target,
             CancellationToken cancellationToken)
         {
             try

@@ -260,12 +260,14 @@ Redis 容量丢失但该节点仍有 `Provisioning | Running | Stopping` assignm
 
 ## Checker 调度字段
 
-AWD Checker 不建立 Operation 表。每个 AWD RuntimeInstance 保存 `CheckerSequence`（已分配的最大序号）、`LastAppliedCheckerSequence`、`LastAppliedCheckerBodySha256` 与 `NextCheckerDueAt`：
+AWD Checker 不建立 Operation 表。每个 AWD RuntimeInstance 除 Provider receipt 外，还保存 provision 时展开并冻结的 `AwdCheckerTargetUrl` 与 Compose-only `AwdCheckerTargetServiceName`。`ControlCheckUrl` 仍只属于 KoH。每个实例同时保存 `CheckerSequence`（已分配的最大序号）、`LastAppliedCheckerSequence`、`LastAppliedCheckerBodySha256` 与 `NextCheckerDueAt`：
 
 1. Worker 在短事务中锁 RuntimeInstance，若已到期且没有更新序号的任务，就递增 CheckerSequence、推进 NextCheckerDueAt，并写 Runner Outbox；
-2. durable message 带 RuntimeInstanceId、Generation、CheckerSequence、Deadline 和最小权限 JWT；
+2. durable message 带 RuntimeInstanceId、Generation、CheckerSequence、Deadline；Runner 从相同 Generation 的 receipt 构造强类型 attached target，并在执行时签发最小权限 JWT；Provider/receipt/Generation 不匹配时 superseded；
 3. callback 先把 typed state 规范化为精确 ASCII `Up`/`Down`，body hash=`SHA256(UTF8(normalizedState))`；序号大于 LastApplied 时比较当前服务状态，只在 Up/Down 发生变化时插入 AwdServiceStatus，无变化也更新 LastApplied 序号与 body hash；
 4. callback 序号等于 LastApplied 且 body hash 相同是幂等成功，不同返回 409；更小返回 202 superseded；
 5. Paused 清空 NextCheckerDueAt 且不补跑，Resume 将它设为当前时间。Finished 后不再分配序号。
 
 这些字段只负责调度和 HTTP 重试幂等，不是计分状态副本；轮次末状态仍从默认 Up 加 AwdServiceStatus 变化事件推导。
+
+Checker Job 与 interval 读取当前分配 CheckerSequence 时的题目配置；Target URL/service 是 Runtime Generation 事实，配置更新不会把存量 Runtime 的 Checker 静默切到另一个端点。Runtime 首次进入 Running 且存在冻结 Target 时，`NextCheckerDueAt` 初始化为 Running 时间。

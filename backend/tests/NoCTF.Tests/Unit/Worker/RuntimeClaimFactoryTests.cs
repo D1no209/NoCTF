@@ -1,7 +1,9 @@
+using System.Text.Json;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
+using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Worker.Runtime;
 
 namespace NoCTF.Tests.Unit.Worker;
@@ -21,7 +23,7 @@ public sealed class RuntimeClaimFactoryTests
                 EgressPolicy: RuntimeEgressPolicy.DenyAll),
             Limits: new(268_435_456, 500_000_000, 128));
 
-        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
+        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
 
         await Assert.That(claim).IsTypeOf<ClaimContainerRuntime>();
         var container = (ClaimContainerRuntime)claim;
@@ -53,6 +55,7 @@ public sealed class RuntimeClaimFactoryTests
             instance,
             GameMode.Ctf,
             template,
+            "{}",
             "flag{fixed-team}");
 
         await Assert.That(claim.Definition.Environment["FLAG"])
@@ -75,7 +78,7 @@ public sealed class RuntimeClaimFactoryTests
                 EgressPolicy: RuntimeEgressPolicy.DenyAll),
             Limits: new(268_435_456, 500_000_000, 128));
 
-        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
+        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
 
         await Assert.That(claim).IsTypeOf<ClaimComposeRuntime>();
         var compose = (ClaimComposeRuntime)claim;
@@ -87,6 +90,76 @@ public sealed class RuntimeClaimFactoryTests
             .IsEqualTo(RuntimeEgressPolicy.DenyAll);
         await Assert.That(compose.Definition.Labels["noctf.io/job-kind"])
             .IsEqualTo("persistent-runtime");
+    }
+
+    [Test]
+    public async Task Awd_container_claim_carries_the_internal_checker_target()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition("challenge:v1"));
+        var configuration = JsonSerializer.Serialize(
+            new AwdChallengeConfiguration(
+                AwdChallengeConfiguration.CurrentSchemaVersion,
+                Checker: new AwdCheckerConfiguration(
+                    new RunnerJobConfiguration(RuntimeProvider.Docker, "checker:v1"),
+                    new ContainerAwdCheckerTarget(
+                        "http://{HOST}:{PORT}/health",
+                        8080))),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+            instance,
+            GameMode.Awd,
+            template,
+            configuration);
+
+        await Assert.That(claim.Definition.AwdCheckerTargetBinding)
+            .IsEqualTo(new RuntimeInternalEndpointBinding(
+                "http://{HOST}:{PORT}/health",
+                8080));
+        await Assert.That(claim.Definition.InternalPorts).IsEquivalentTo([8080]);
+        await Assert.That(claim.Definition.ControlCheckUrlBinding).IsNull();
+    }
+
+    [Test]
+    public async Task Awd_compose_claim_carries_the_target_service()
+    {
+        var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Docker);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ComposeRuntimeDefinition(
+                "services:\n  web:\n    image: challenge:v1",
+                new Dictionary<string, RuntimeResourceLimits>
+                {
+                    ["web"] = new(268_435_456, 500_000_000, 128)
+                }));
+        var configuration = JsonSerializer.Serialize(
+            new AwdChallengeConfiguration(
+                AwdChallengeConfiguration.CurrentSchemaVersion,
+                Checker: new AwdCheckerConfiguration(
+                    new RunnerJobConfiguration(RuntimeProvider.Docker, "checker:v1"),
+                    new ComposeAwdCheckerTarget(
+                        "http://{HOST}:{PORT}/health",
+                        "web",
+                        8080))),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        var claim = (ClaimComposeRuntime)RuntimeClaimFactory.Create(
+            instance,
+            GameMode.Awd,
+            template,
+            configuration);
+
+        await Assert.That(claim.Definition.AwdCheckerTargetBinding)
+            .IsEqualTo(new RuntimeInternalEndpointBinding(
+                "http://{HOST}:{PORT}/health",
+                8080,
+                "web"));
+        await Assert.That(claim.Definition.ControlCheckUrlBinding).IsNull();
     }
 
     [Test]
@@ -119,6 +192,7 @@ public sealed class RuntimeClaimFactoryTests
             instance,
             GameMode.Ctf,
             template,
+            "{}",
             "flag{fixed-team}");
 
         await Assert.That(claim.Definition.ServiceEnvironment).IsNotNull();
@@ -140,7 +214,7 @@ public sealed class RuntimeClaimFactoryTests
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 
-        var action = () => RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
+        var action = () => RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
@@ -157,7 +231,7 @@ public sealed class RuntimeClaimFactoryTests
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
             Limits: new(1_073_741_824, 1_000_000_000, 256));
 
-        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
+        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
 
         await Assert.That(claim).IsTypeOf<ClaimOvaRuntime>();
         var ova = (ClaimOvaRuntime)claim;
@@ -184,7 +258,7 @@ public sealed class RuntimeClaimFactoryTests
                 }),
             Limits: new(268_435_456, 500_000_000, 128));
 
-        var action = () => RuntimeClaimFactory.Create(instance, GameMode.Ctf, template);
+        var action = () => RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }

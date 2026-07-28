@@ -2,7 +2,9 @@ using NoCTF.Application.Runtime.Ports;
 
 namespace NoCTF.GameModes.Awd.Configuration;
 
-public sealed record AwdCheckerSettings(int CheckerIntervalSeconds, RunnerJobConfiguration? Checker);
+public sealed record AwdCheckerSettings(
+    int CheckerIntervalSeconds,
+    RunnerJobConfiguration? Checker);
 
 public sealed class AwdCheckerConfigurationCatalog
 {
@@ -10,6 +12,8 @@ public sealed class AwdCheckerConfigurationCatalog
     {
         var competition = AwdConfigurationUpgrader.ParseCompetition(competitionConfigurationJson);
         var challenge = AwdConfigurationUpgrader.ParseChallenge(challengeConfigurationJson);
-        return new(challenge.CheckerIntervalSeconds ?? competition.CheckerIntervalSeconds, challenge.Checker);
+        return new(
+            challenge.CheckerIntervalSeconds ?? competition.CheckerIntervalSeconds,
+            challenge.Checker?.Job);
     }
 }

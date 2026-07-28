@@ -299,6 +299,139 @@ public sealed class DockerContainerLifecycleTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Awd_checker_attaches_to_the_runtime_and_callback_networks(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var imageProbe = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await imageProbe.StartAsync(cancellationToken);
+            await using var callback = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand(
+                    "/bin/sh",
+                    "-c",
+                    "mkdir -p /www && echo callback > /www/index.html && exec httpd -f -p 8080 -h /www")
+                .WithLabel("noctf.io/internal-role", "awdp-callback-gateway")
+                .Build();
+            await callback.StartAsync(cancellationToken);
+            var runtimeId = Guid.NewGuid();
+            var checkerOperationId = Guid.NewGuid();
+            var endpoint = DockerEndpoint();
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(endpoint))
+                .Build();
+            using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
+                endpoint,
+                "noctf-platform",
+                "localhost",
+                callback.Id));
+            var targetRequest = new ContainerRequest(
+                runtimeId,
+                RuntimeProvider.Docker,
+                "busybox:1.36.1",
+                [
+                    "/bin/sh",
+                    "-c",
+                    "mkdir -p /www && echo target > /www/index.html && exec httpd -f -p 8080 -h /www"
+                ],
+                new Dictionary<string, string>(),
+                new Dictionary<string, string>
+                {
+                    ["noctf.io/managed"] = "true",
+                    ["noctf.io/job-kind"] = "persistent-runtime",
+                    ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D"),
+                    ["noctf.io/generation"] = "1"
+                },
+                new Dictionary<int, int>(),
+                new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                TimeSpan.FromMinutes(5),
+                NetworkIsolation: ContainerNetworkIsolation.Isolated,
+                InternalPorts: [8080],
+                Generation: 1,
+                RuntimeInstanceId: runtimeId);
+            ContainerReceipt? targetReceipt = null;
+            try
+            {
+                targetReceipt = await IsolatedContainerProvisioner.ProvisionAsync(
+                    lifecycle,
+                    lifecycle,
+                    targetRequest,
+                    DateTimeOffset.UtcNow,
+                    cancellationToken);
+                var checkerRequest = new ContainerRequest(
+                    checkerOperationId,
+                    RuntimeProvider.Docker,
+                    "busybox:1.36.1",
+                    [
+                        "/bin/sh",
+                        "-c",
+                        "sleep 1 && wget -qO- \"$NOCTF_TARGET_URL\" | grep -q target && "
+                        + "wget -qO- \"$NOCTF_CALLBACK_URL\" | grep -q callback"
+                    ],
+                    new Dictionary<string, string>
+                    {
+                        ["NOCTF_TARGET_URL"] = $"http://{targetReceipt.InternalHost}:8080",
+                        ["NOCTF_CALLBACK_URL"] = "http://callback:8080/"
+                    },
+                    new Dictionary<string, string>
+                    {
+                        ["noctf.io/managed"] = "true",
+                        ["noctf.io/job-kind"] = "awd-checker",
+                        ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D"),
+                        ["noctf.io/generation"] = "1",
+                        ["noctf.io/purpose"] = "awd-checker"
+                    },
+                    new Dictionary<int, int>(),
+                    new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                    new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                    TimeSpan.FromMinutes(1),
+                    OperationTimeout: TimeSpan.FromSeconds(30),
+                    AllowInternalCallback: true,
+                    Generation: 1,
+                    RuntimeInstanceId: runtimeId,
+                    NetworkPurpose: ContainerNetworkPurpose.AwdChecker);
+
+                var result = await lifecycle.RunAttachedAsync(
+                    checkerRequest,
+                    new AttachedContainerRuntimeTarget(
+                        new RuntimeResourceIdentity(runtimeId, 1),
+                        targetReceipt),
+                    cancellationToken);
+
+                await Assert.That(result.StandardError).IsEmpty();
+                await Assert.That(result.ExitCode).IsEqualTo(0);
+                await Assert.That(await lifecycle.GetAsync(
+                    RuntimeProvider.Docker,
+                    targetReceipt.ResourceId,
+                    cancellationToken)).IsNotNull();
+                await Assert.That((await docker.Networks.InspectNetworkAsync(
+                    targetReceipt.NetworkId!,
+                    cancellationToken)).Internal).IsTrue();
+                Func<Task> inspectCallback = async () =>
+                    _ = await docker.Networks.InspectNetworkAsync(
+                        $"noctf-callback-{checkerOperationId:N}",
+                        cancellationToken);
+                await Assert.That(inspectCallback).ThrowsException();
+            }
+            finally
+            {
+                if (targetReceipt is not null)
+                {
+                    await IsolatedContainerProvisioner.DestroyAsync(
+                        lifecycle,
+                        lifecycle,
+                        targetReceipt,
+                        CancellationToken.None);
+                }
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Callback_network_failure_removes_container_created_before_receipt(
         CancellationToken cancellationToken)
     {
@@ -383,7 +516,8 @@ public sealed class DockerContainerLifecycleTests
         TimeSpan.FromMinutes(1),
         NetworkName: networkName,
         AllowInternalCallback: true,
-        Generation: 1);
+        Generation: 1,
+        NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
 
     private static ContainerReceipt Receipt(string resourceId) => new(
         Guid.NewGuid(), RuntimeProvider.Docker, resourceId, RuntimeStatus.Running,

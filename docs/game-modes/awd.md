@@ -12,10 +12,17 @@ CheckerIntervalSeconds: int > 0
 ServiceHealthyPoints: bigint >= 0
 ServiceUnhealthyPenalty: bigint >= 0
 RuntimeDefinition: Container | Compose
+AwdChecker:
+  Job: RunnerJobConfiguration
+  Target:
+    Container: UrlTemplate + ContainerPort
+    Compose: UrlTemplate + ServiceName + ContainerPort
 AwdFlagInjectionCommand: non-empty string
 ```
 
 FixedPerAttack 使用 AttackPoints；SplitVictimDefensePool 忽略 AttackPoints。两者都使用 VictimDefensePoolPoints。覆盖值 0 是显式 0，只有 null 继承。AWD 不使用 EvaluationDispatchMode/最大提交次数；Flag 接入总是 Automatic。
+
+CompetitionChallenge 当前 schemaVersion 为 4，不提供旧 schema 兼容层。Checker Job 与长期 Runtime 必须使用同一 Docker/Kubernetes Provider；Target kind 必须与 RuntimeKind 一致。Target 是内部端点，不带公开 `Exposure`，也不复用仅属于 KoH 的 `ControlCheckUrlBinding`。
 
 ## 时钟与加固期
 
@@ -91,7 +98,11 @@ victim -= VictimDefensePoolPoints once
 
 每题配置 CheckerIntervalSeconds（Competition 默认、题覆盖，正整数）。Running 时持续检查，加固期也检查；Paused 停止且不补，Resume 立即一次；同队同题最多一个在执行，前次未结束则跳过 interval。
 
-Checker 是隔离 Container，通过 JWT callback：
+Checker 是附着到特定 Runtime Generation 的可信一次性 Container。Runtime provision 时展开并冻结 Target URL；Container 同时冻结 target port，Compose 同时冻结 service name 与 target port。后续 Target 配置变化只影响下一 Generation，Checker Job 与 interval 变化从下一 CheckerSequence 生效。
+
+Docker Provider 从持久 receipt 与 ownership labels 解析该 Generation 的实际 Container/Compose 网络，不假设 Compose `_default` 网络；Checker 同时加入目标内部网络和隔离 callback 网络，结束时只清理自身与 callback 网络。Kubernetes Provider 复用同一 Runtime identity 与 NetworkPolicy，并只为带 `awd-checker` purpose 的 Pod 增加 callback egress，不把平台访问能力授予题目业务 Pod。
+
+Checker 通过 JWT callback：
 
 ```text
 POST /api/internal/v1/awd/check-results

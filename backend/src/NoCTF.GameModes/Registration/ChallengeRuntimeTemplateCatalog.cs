@@ -32,7 +32,8 @@ internal static class ChallengeRuntimeTemplateValidator
 {
     public static IReadOnlyList<string> Validate(
         ChallengeRuntimeTemplate? runtime,
-        bool allowControlCheckUrlBinding = false)
+        bool allowControlCheckUrlBinding = false,
+        RuntimeInternalEndpointBinding? internalEndpointBinding = null)
     {
         if (runtime is null) return [];
         var errors = new List<string>();
@@ -100,7 +101,8 @@ internal static class ChallengeRuntimeTemplateValidator
                     runtime.UrlBindings,
                     runtime.ControlCheckUrlBinding,
                     requireServicePids: runtime.Provider != RuntimeProvider.Kubernetes,
-                    requireDnsServiceNames: runtime.Provider == RuntimeProvider.Kubernetes));
+                    requireDnsServiceNames: runtime.Provider == RuntimeProvider.Kubernetes,
+                    internalEndpointBinding: internalEndpointBinding));
                 break;
             case OvaRuntimeDefinition ova:
                 if (runtime.Provider != RuntimeProvider.Libvirt)

@@ -148,11 +148,15 @@ public sealed class AwdCheckerPersistenceTests
                     expectedCompetitionConfigurationRevision: 0,
                     JsonSerializer.Serialize(new AwdChallengeConfiguration(
                         AwdChallengeConfiguration.CurrentSchemaVersion,
-                        Checker: new RunnerJobConfiguration(
-                            RuntimeProvider.Docker,
-                            "checker:v2",
-                            ["/checker"],
-                            TimeoutSeconds: 10)), JsonOptions),
+                        Checker: new AwdCheckerConfiguration(
+                            new RunnerJobConfiguration(
+                                RuntimeProvider.Docker,
+                                "checker:v2",
+                                ["/checker"],
+                                TimeoutSeconds: 10),
+                            new ContainerAwdCheckerTarget(
+                                "http://{HOST}:{PORT}/health",
+                                8080))), JsonOptions),
                     configurationUpdatedAt,
                     cancellationToken);
                 await Assert.That(update.Failure).IsNull();
@@ -245,11 +249,15 @@ public sealed class AwdCheckerPersistenceTests
             IsPublished = true,
             ConfigurationJson = JsonSerializer.Serialize(new AwdChallengeConfiguration(
                 AwdChallengeConfiguration.CurrentSchemaVersion,
-                Checker: new RunnerJobConfiguration(
-                    RuntimeProvider.Docker,
-                    "checker:latest",
-                    ["/checker"],
-                    TimeoutSeconds: 10)), JsonOptions),
+                Checker: new AwdCheckerConfiguration(
+                    new RunnerJobConfiguration(
+                        RuntimeProvider.Docker,
+                        "checker:latest",
+                        ["/checker"],
+                        TimeoutSeconds: 10),
+                    new ContainerAwdCheckerTarget(
+                        "http://{HOST}:{PORT}/health",
+                        8080))), JsonOptions),
             UpdatedAt = now
         });
         db.RuntimeInstances.Add(new RuntimeInstance
@@ -266,7 +274,7 @@ public sealed class AwdCheckerPersistenceTests
             State = RuntimeState.Running,
             ProcessingVersion = 7,
             ProviderReceiptJson = "{}",
-            ControlCheckUrl = "http://service.internal/health",
+            AwdCheckerTargetUrl = "http://service.internal/health",
             NextCheckerDueAt = now,
             CreatedAt = now,
             RunningAt = now

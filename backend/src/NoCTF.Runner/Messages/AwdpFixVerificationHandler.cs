@@ -260,7 +260,8 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             OperationTimeout: work.Timeout,
             AllowInternalCallback: true,
             Generation: work.Generation,
-            RuntimeInstanceId: work.RuntimeInstanceId);
+            RuntimeInstanceId: work.RuntimeInstanceId,
+            NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(work.Timeout);
         try

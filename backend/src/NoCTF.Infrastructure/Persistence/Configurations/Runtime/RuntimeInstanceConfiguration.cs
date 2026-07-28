@@ -17,6 +17,11 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                 "ck_runtime_instances_checker_sequence",
                 "last_applied_checker_sequence <= checker_sequence");
             table.HasCheckConstraint(
+                "ck_runtime_instances_awd_checker_target",
+                "(awd_checker_target_url IS NULL AND awd_checker_target_service_name IS NULL) OR "
+                + "(awd_checker_target_url IS NOT NULL AND ((runtime_kind = 0 AND awd_checker_target_service_name IS NULL) "
+                + "OR (runtime_kind = 1 AND awd_checker_target_service_name IS NOT NULL)))");
+            table.HasCheckConstraint(
                 "ck_runtime_instances_awdp_submission",
                 "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
             table.HasCheckConstraint(
