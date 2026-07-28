@@ -511,11 +511,10 @@ baseline policy 的静态状态，不执行启动时 dataplane 探测。
   Libvirt 节点投递审计；节点结合 PostgreSQL 当前 assignment，只删除精确
   RuntimeInstanceId+Generation orphan domain/network/workdir
 
-仍缺：
+后续第 6.16 节已在真实 KVM/QEMU/Libvirt 隔离测试主机补齐 import、Guest Agent、
+routed network、URL、stop、replacement generation 与 identity cleanup 验证。仍缺：
 
-- 在 Linux KVM/Libvirt 节点用真实 OVA 验证 import、Guest Agent、routed network、
-  URL 可达性和 stop/reset/expire；当前开发机只有 `/dev/kvm`，未安装
-  `virsh`/`qemu-img`/`virt-install`。
+- 在最终生产式 systemd Libvirt 节点执行带上游路由和正式防火墙配置的运维演练；
 - 为 Pool/Node CIDR 的非重叠委派增加部署期审计。
 
 ### 6.3 CTF PerTeam Runtime Flag 注入已闭环
@@ -887,9 +886,49 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   没有协作者 remote-only 提交。普通 `git fetch` 因 `origin` 使用 SSH 且当前 SSH key
   未授权而失败，没有修改 Git 认证配置。
 
-本次目标迁移没有剩余实现项。仍未完成的 Libvirt 真机验证、Pool/Node CIDR 部署期审计、
-Docker `InternetOnly` 和后期 TargetPort/callback gateway 加固，均已在前文明确边界；它们不是
-capability/DI 或交付脚本的遗漏，也不得在没有新的用户批准和设计评审时顺带实现。
+### 6.16 真实 Libvirt/OVA lifecycle 验证
+
+用户于 2026-07-28 要求继续推进后，本轮选择不改变安全语义的真实 Libvirt/OVA 验证纵切：
+
+- 新增显式 opt-in 的 `LibvirtOvaRuntimeIntegrationTests`。默认无
+  `NOCTF_LIBVIRT_DISK_PATH` 时明确 skip；受控 Runner 提供一个已启用
+  `virtio_net` DHCP 与 QEMU Guest Agent 的启动盘。测试自行流式生成临时 OVA，不把
+  大型镜像、OVA 或 Guest 凭据提交到仓库。
+- 真实测试使用 `/dev/kvm`、Libvirt 8.0、QEMU 6.2、`qemu:///system` 和真实
+  `virsh`/`qemu-img`/`virt-install`。fixture 基于官方 Ubuntu 24.04 minimal cloud
+  qcow2 的临时副本，校验发布 SHA-256 后离线加入 `qemu-guest-agent` 与明确的
+  `virtio_net` DHCP netplan；fixture 只用于本轮测试，已删除且不可恢复。
+- generation 0 真实完成 OVA SHA-256、解包、qcow2 转换、独立 routed network、KVM
+  domain、Guest Agent 唯一 IPv4；测试通过 Guest Agent 在 VM 内启动 Python HTTP，
+  并从 Libvirt 主机直连 `http://<guest>:8080/` 验证 URL 可达。随后使用持久 receipt
+  执行 stop cleanup。
+- 同一 operation 的 generation 1 创建全新即时目标，再次取得 Guest Agent 地址，最后
+  使用完整 operation+generation identity 执行 orphan cleanup。两轮结束后 domain、
+  `noctf-*` network 与 workdir 均为空；扩展测试 1/1 passed，用时 3 分 04.6 秒。
+  Reset/Expire 在 Provider 边界复用 replacement generation 与 stop cleanup，因此该测试
+  覆盖其实际资源生命周期，而不伪造新的 Provider 动作。
+- 首次直连 WSL system Libvirt 暴露宿主 `iptables-nft` 原生表与 Libvirt 8.0
+  `iptables` backend 不兼容；未切换 WSL 全局 alternatives。最终验证改用一次性特权
+  Ubuntu 22.04 Libvirt 容器，透传 `/dev/kvm`，并把 routed bridge/firewall 留在容器
+  namespace。该容器因无 systemd PID 1，QEMU 回收约需 40 秒；这不是生产节点性能基线。
+- 真实失败过程发现 `qemu-img`、`virt-install`、`virsh net-define/net-start` 的 stderr
+  被泛化异常丢弃。生产代码现保留原错误分类，同时把工具 stderr 加入内部异常，后续节点
+  配置错误可直接定位；纯单元回归强制 `net-start` 失败并断言 stderr 保留。没有改变
+  OVA、网络、Guest Agent、超时或清理语义。
+- 最终门禁：solution build 0 warning/0 error；Libvirt 单元 5/5；真实 Libvirt opt-in
+  1/1；360 non-Integration passed；常规真实依赖 Integration 49 passed、0 failed，
+  Kubernetes 与默认未配置 fixture 的 Libvirt 各 1 skipped；EF 无 pending model；
+  OpenAPI artifact、`git diff --check` 均无漂移。本轮 4 个 C# 文件的 scoped
+  `dotnet format --verify-no-changes` 通过。全仓 format 仍会报告 AWD validator、Flag
+  generator、旧 leaderboard tests 等既有 whitespace 基线，本轮未扩大范围修改它们。
+- 一次性 Libvirt 容器、定制工具镜像、fixture 目录均已精确删除；WSL system Libvirt
+  最终无 domain、只有原有 inactive `default` network。当前本地 `deploy` 六服务继续
+  运行，API 与 Runner healthy，未被本轮测试重启或替换。
+
+本次目标迁移没有剩余实现项。真实 Provider lifecycle 已验证；仍未完成的是生产式
+Libvirt 节点上游路由/防火墙运维演练、Pool/Node CIDR 部署期审计、Docker
+`InternetOnly` 和后期 TargetPort/callback gateway 加固。它们均已明确边界，不是
+capability/DI 或交付脚本遗漏，也不得在没有新的用户批准和设计评审时顺带实现。
 
 ## 7. 建议的下一交接顺序
 
