@@ -90,6 +90,22 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     cancellationToken);
                 await Assert.That(sameRuntime)
                     .IsEqualTo(new ContainerExecResult(0, false));
+                var injectedFlag = await runtime.ExecAsync(
+                    receipt,
+                    "web",
+                    ["/bin/sh", "-c", "test \"$FLAG\" = 'flag{compose-runtime}'"],
+                    TimeSpan.FromSeconds(10),
+                    cancellationToken);
+                var uninjectedFlag = await runtime.ExecAsync(
+                    receipt,
+                    "db",
+                    ["/bin/sh", "-c", "test -z \"${FLAG+x}\""],
+                    TimeSpan.FromSeconds(10),
+                    cancellationToken);
+                await Assert.That(injectedFlag)
+                    .IsEqualTo(new ContainerExecResult(0, false));
+                await Assert.That(uninjectedFlag)
+                    .IsEqualTo(new ContainerExecResult(0, false));
                 var composeContainers = await docker.Containers.ListContainersAsync(
                     new ContainersListParameters
                     {
@@ -118,6 +134,13 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     cancellationToken);
                 await Assert.That(webInspect.NetworkSettings!.Networks.Keys)
                     .DoesNotContain(platformNetworkName);
+                await Assert.That(webInspect.HostConfig!.Memory).IsEqualTo(67_108_864);
+                await Assert.That(webInspect.HostConfig.NanoCPUs).IsEqualTo(100_000_000);
+                await Assert.That(webInspect.HostConfig.PidsLimit).IsEqualTo(64);
+                await Assert.That(webInspect.HostConfig.Privileged).IsFalse();
+                await Assert.That(webInspect.HostConfig.CapDrop).Contains("ALL");
+                await Assert.That(webInspect.HostConfig.SecurityOpt)
+                    .Contains("no-new-privileges:true");
 
                 var checkerOperationId = Guid.NewGuid();
                 var checkerResult = await containerLifecycle.RunAttachedAsync(
@@ -207,6 +230,171 @@ public sealed class DockerComposeRuntimeIntegrationTests
         });
     }
 
+    [Test]
+    [Timeout(300_000)]
+    public async Task Failed_up_removes_partial_resources_and_work_directory(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var targetImage = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await targetImage.StartAsync(cancellationToken);
+            await using var proxyImage = new ContainerBuilder("haproxy:3.1-alpine")
+                .WithCommand("haproxy", "-v")
+                .Build();
+            await proxyImage.StartAsync(cancellationToken);
+            var operationId = Guid.NewGuid();
+            var request = Request(operationId);
+            var workRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-compose-failed-{operationId:N}");
+            var runtime = new DockerComposeRuntime(
+                new DockerRuntimeOptions(
+                    Endpoint: DockerEndpoint(),
+                    NetworkName: $"missing-platform-{operationId:N}"),
+                workDirectory: workRoot);
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            Func<Task> action = async () =>
+                _ = await runtime.UpAsync(request, cancellationToken);
+
+            try
+            {
+                await Assert.That(action).Throws<ComposeCommandFailedException>();
+                var containers = await docker.Containers.ListContainersAsync(
+                    new ContainersListParameters
+                    {
+                        All = true,
+                        Filters = new Dictionary<string, IDictionary<string, bool>>
+                        {
+                            ["label"] = new Dictionary<string, bool>
+                            {
+                                [$"com.docker.compose.project={request.ProjectName}"] = true
+                            }
+                        }
+                    },
+                    cancellationToken);
+                await Assert.That(containers).IsEmpty();
+                Func<Task> inspectNetwork = async () =>
+                    _ = await docker.Networks.InspectNetworkAsync(
+                        $"{request.ProjectName}_default",
+                        cancellationToken);
+                await Assert.That(inspectNetwork).ThrowsException();
+                await Assert.That(Directory.Exists(
+                    Path.Combine(workRoot, operationId.ToString("N")))).IsFalse();
+            }
+            finally
+            {
+                if (Directory.Exists(workRoot))
+                    Directory.Delete(workRoot, recursive: true);
+            }
+        });
+    }
+
+    [Test]
+    public async Task Invalid_definition_does_not_leave_an_operation_work_directory()
+    {
+        var operationId = Guid.NewGuid();
+        var workRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"noctf-compose-invalid-{operationId:N}");
+        var runtime = new DockerComposeRuntime(
+            new DockerRuntimeOptions(Endpoint: DockerEndpoint()),
+            workDirectory: workRoot);
+        Func<Task> action = async () =>
+            _ = await runtime.UpAsync(
+                Request(operationId) with
+                {
+                    EgressPolicy = RuntimeEgressPolicy.InternetOnly
+                },
+                CancellationToken.None);
+
+        try
+        {
+            await Assert.That(action).Throws<InvalidOperationException>();
+            await Assert.That(Directory.Exists(
+                Path.Combine(workRoot, operationId.ToString("N")))).IsFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(workRoot))
+                Directory.Delete(workRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Replay_preserves_the_service_and_down_removes_all_resources(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var dockerProbe = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await dockerProbe.StartAsync(cancellationToken);
+            var operationId = Guid.NewGuid();
+            var request = PrivateRequest(operationId);
+            var workRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-compose-down-{operationId:N}");
+            var runtime = new DockerComposeRuntime(
+                new DockerRuntimeOptions(Endpoint: DockerEndpoint()),
+                workDirectory: workRoot);
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            ComposeReceipt? receipt = null;
+            string? resourceId = null;
+            try
+            {
+                receipt = await runtime.UpAsync(request, cancellationToken);
+                var first = await runtime.GetStatusAsync(receipt, cancellationToken);
+                resourceId = first!.Services.Single().ResourceId;
+
+                var replay = await runtime.UpAsync(request, cancellationToken);
+                var replayed = await runtime.GetStatusAsync(replay, cancellationToken);
+
+                await Assert.That(replay.Namespace).IsEqualTo(receipt.Namespace);
+                await Assert.That(replayed!.Services.Single().ResourceId)
+                    .IsEqualTo(resourceId);
+                var flag = await runtime.ExecAsync(
+                    replay,
+                    "worker",
+                    ["/bin/sh", "-c", "test \"$FLAG\" = 'flag{compose-replay}'"],
+                    TimeSpan.FromSeconds(10),
+                    cancellationToken);
+                await Assert.That(flag).IsEqualTo(new ContainerExecResult(0, false));
+
+                await runtime.DownAsync(receipt, cancellationToken);
+                receipt = null;
+
+                Func<Task> inspectContainer = async () =>
+                    _ = await docker.Containers.InspectContainerAsync(
+                        resourceId,
+                        cancellationToken);
+                Func<Task> inspectNetwork = async () =>
+                    _ = await docker.Networks.InspectNetworkAsync(
+                        $"{request.ProjectName}_default",
+                        cancellationToken);
+                await Assert.That(inspectContainer).ThrowsException();
+                await Assert.That(inspectNetwork).ThrowsException();
+                await Assert.That(Directory.Exists(
+                    Path.Combine(workRoot, operationId.ToString("N")))).IsFalse();
+            }
+            finally
+            {
+                if (receipt is not null)
+                    await runtime.DownAsync(receipt, CancellationToken.None);
+                if (Directory.Exists(workRoot))
+                    Directory.Delete(workRoot, recursive: true);
+            }
+        });
+    }
+
     private static string DockerEndpoint() =>
         Environment.GetEnvironmentVariable("DOCKER_HOST")
         ?? (OperatingSystem.IsWindows()
@@ -278,5 +466,50 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 RuntimeExposure.Participants,
                 ContainerPort: 8080,
                 ServiceName: "web")
-        ]);
+        ],
+        ServiceEnvironment:
+            new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["web"] = new Dictionary<string, string>
+                {
+                    ["FLAG"] = "flag{compose-runtime}"
+                }
+            });
+
+    private static ComposeRequest PrivateRequest(Guid operationId) => new(
+        operationId,
+        RuntimeProvider.Docker,
+        1,
+        $"down-{operationId:N}",
+        """
+        services:
+          worker:
+            image: busybox:1.36.1
+            command:
+              - sleep
+              - "300"
+        """,
+        new Dictionary<string, string>(),
+        new Dictionary<string, string>
+        {
+            ["noctf.io/managed"] = "true",
+            ["noctf.io/job-kind"] = "persistent-runtime",
+            ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
+            ["noctf.io/generation"] = "1"
+        },
+        new Dictionary<string, RuntimeResourceLimits>
+        {
+            ["worker"] = new(67_108_864, 100_000_000, 64)
+        },
+        new(67_108_864, 100_000_000, 64),
+        TimeSpan.FromMinutes(5),
+        TimeSpan.FromMinutes(2),
+        ServiceEnvironment:
+            new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["worker"] = new Dictionary<string, string>
+                {
+                    ["FLAG"] = "flag{compose-replay}"
+                }
+            });
 }

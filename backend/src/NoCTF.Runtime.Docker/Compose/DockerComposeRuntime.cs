@@ -23,11 +23,11 @@ public sealed class DockerComposeRuntime(
 
     public async Task<ComposeReceipt> UpAsync(ComposeRequest request, CancellationToken cancellationToken)
     {
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+        var ingress = DockerComposeIngressProxyPolicy.Apply(prepared, request, options);
         Directory.CreateDirectory(workDirectory);
         var directory = Path.Combine(workDirectory, request.OperationId.ToString("N"));
         Directory.CreateDirectory(directory);
-        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
-        var ingress = DockerComposeIngressProxyPolicy.Apply(prepared, request, options);
         await WriteRuntimeMetadataAsync(
             directory,
             new DockerComposeRuntimeMetadata(
