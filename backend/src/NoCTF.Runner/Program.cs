@@ -10,6 +10,7 @@ using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.Postgresql;
 using Wolverine.ErrorHandling;
+using NoCTF.Infrastructure.Administration;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddNoCtfRunner(builder.Configuration);
@@ -25,7 +26,7 @@ var poolQueueName = RunnerQueueName.FromPool(runnerPool);
 var nodeQueueName = RunnerNodeQueueName.FromAssignment(runnerPool, runnerId);
 builder.UseWolverine(options =>
 {
-    options.PersistMessagesWithPostgresql(postgres, "wolverine");
+    options.PersistMessagesWithPostgresql(postgres, WolverinePersistenceSchemas.Runner);
     options.UseEntityFrameworkCoreTransactions();
     options.Durability.Mode = DurabilityMode.Balanced;
     options.Policies.OnException<TimeoutException>()

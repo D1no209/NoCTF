@@ -56,6 +56,7 @@ public sealed class AwdRoundCoordinationTests
             await Assert.That(advance).IsEqualTo(MessageExecutionOutcome.Applied);
             var generate = outbox.Published.OfType<GenerateAwdFlags>().Single();
             await Assert.That(generate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(1));
+            await Assert.That(outbox.Published.OfType<ProjectLeaderboard>()).IsEmpty();
 
             var generated = await coordinator.GenerateFlagsAsync(generate, cancellationToken);
             var replayed = await coordinator.GenerateFlagsAsync(generate, cancellationToken);
@@ -190,6 +191,8 @@ public sealed class AwdRoundCoordinationTests
             await Assert.That(delayedAdvance).IsEqualTo(MessageExecutionOutcome.Applied);
             var currentGenerate = outbox.Published.OfType<GenerateAwdFlags>().Last();
             await Assert.That(currentGenerate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(2));
+            var roundProjection = outbox.Published.OfType<ProjectLeaderboard>().Single();
+            await Assert.That(roundProjection.CompetitionId).IsEqualTo(fixture.CompetitionId);
             await Assert.That(currentGenerate.ValidStart).IsLessThanOrEqualTo(clock.UtcNow);
             await Assert.That(currentGenerate.ValidUntil).IsGreaterThan(clock.UtcNow);
             var currentGenerated = await coordinator.GenerateFlagsAsync(currentGenerate, cancellationToken);

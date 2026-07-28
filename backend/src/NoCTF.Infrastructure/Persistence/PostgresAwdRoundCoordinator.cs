@@ -288,6 +288,8 @@ public sealed class PostgresAwdRoundCoordinator(
                     window.ValidUntil,
                     message.CompetitionConfigurationRevision,
                     message.ProcessingVersion));
+                if (latest.Window is not null)
+                    await outbox.PublishAsync(new ProjectLeaderboard(message.CompetitionId));
                 await db.SaveChangesAsync(cancellationToken);
                 await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
                 return MessageExecutionOutcome.Applied;
