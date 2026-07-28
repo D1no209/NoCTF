@@ -1,5 +1,4 @@
 using NoCTF.Application.Submissions.Intake;
-using NoCTF.Application.Submissions.Ports;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;

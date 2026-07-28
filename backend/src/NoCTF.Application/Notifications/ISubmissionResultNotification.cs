@@ -1,4 +1,4 @@
-using NoCTF.Application.Submissions.Ports;
+using NoCTF.Application.Submissions.Status;
 
 namespace NoCTF.Application.Notifications;
 

@@ -7,7 +7,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -37,7 +37,7 @@ public sealed class CompetitionLifecyclePersistenceTests
 
             await using (var pauseDb = new NoCtfDbContext(options))
             {
-                var store = new EfCompetitionLifecycleStore(pauseDb, null!, outbox);
+                var store = new CompetitionLifecycleStore(pauseDb, null!, outbox);
                 var applied = await store.TryTransitionWithAuditAsync(
                     fixture.CompetitionId,
                     CompetitionStatus.Running,
@@ -62,7 +62,7 @@ public sealed class CompetitionLifecyclePersistenceTests
 
             await using (var resumeDb = new NoCtfDbContext(options))
             {
-                var store = new EfCompetitionLifecycleStore(resumeDb, null!, outbox);
+                var store = new CompetitionLifecycleStore(resumeDb, null!, outbox);
                 var applied = await store.TryTransitionWithAuditAsync(
                     fixture.CompetitionId,
                     CompetitionStatus.Paused,

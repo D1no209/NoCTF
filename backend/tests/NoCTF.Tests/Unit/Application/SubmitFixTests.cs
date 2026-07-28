@@ -1,6 +1,5 @@
 using System.Text.Json;
 using NoCTF.Application.Submissions.Intake;
-using NoCTF.Application.Submissions.Ports;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;

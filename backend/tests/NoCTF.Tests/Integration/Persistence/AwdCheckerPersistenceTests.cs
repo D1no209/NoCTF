@@ -2,7 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Challenges;
@@ -14,7 +14,8 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Scoring;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Challenges.Configuration;
+using NoCTF.Infrastructure.Submissions.Processing;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
@@ -109,7 +110,7 @@ public sealed class AwdCheckerPersistenceTests
             await Assert.That(second.CompetitionChallengeRevision).IsEqualTo(0);
             await using (var downDb = new NoCtfDbContext(options))
             {
-                var store = new EfInternalResultStore(downDb, outbox);
+                var store = new InternalResultStore(downDb, outbox);
                 var down = AwdCheckResult.Create(
                     fixture.RuntimeId, 3, 2, 7, AwdServiceState.Down, fixture.Now.AddSeconds(3));
                 await Assert.That(await store.RecordAwdAsync(down, cancellationToken))
@@ -148,7 +149,7 @@ public sealed class AwdCheckerPersistenceTests
             var configurationUpdatedAt = fixture.Now.AddSeconds(20);
             await using (var configurationDb = new NoCtfDbContext(options))
             {
-                var store = new EfChallengeConfigurationStore(configurationDb, outbox);
+                var store = new ChallengeConfigurationStore(configurationDb, outbox);
                 var update = await store.TryUpdateAsync(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
@@ -310,7 +311,7 @@ public sealed class AwdCheckerPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        var store = new EfInternalResultStore(db, outbox);
+        var store = new InternalResultStore(db, outbox);
         return await store.RecordAwdAsync(result, cancellationToken);
     }
 

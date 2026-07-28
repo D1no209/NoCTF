@@ -1,4 +1,4 @@
-using NoCTF.Application.Authentication.Ports;
+using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.RefreshJwt;
 
 namespace NoCTF.Tests.Unit.Application;

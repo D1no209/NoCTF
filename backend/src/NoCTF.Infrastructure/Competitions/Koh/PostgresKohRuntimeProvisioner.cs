@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Messaging;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;

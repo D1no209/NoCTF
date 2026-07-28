@@ -2,7 +2,7 @@ using k8s;
 using k8s.Autorest;
 using k8s.Models;
 using NSubstitute;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Containers;

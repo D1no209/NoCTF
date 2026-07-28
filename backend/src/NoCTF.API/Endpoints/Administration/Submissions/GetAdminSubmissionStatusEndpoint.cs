@@ -1,7 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
-using NoCTF.Application.Submissions.Ports;
+using NoCTF.Application.Submissions.Status;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.API.Endpoints.Submissions;
 

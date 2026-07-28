@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using NoCTF.Application.Common;
-using NoCTF.Application.Submissions.Ports;
+using NoCTF.Application.Submissions.Intake;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 

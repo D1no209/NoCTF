@@ -6,7 +6,7 @@ using System.Net;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using NoCTF.Application.Runtime.Configuration;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Kubernetes.Configuration;
 

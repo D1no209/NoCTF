@@ -1,4 +1,4 @@
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Configuration;
 
 namespace NoCTF.GameModes.Registration;
 

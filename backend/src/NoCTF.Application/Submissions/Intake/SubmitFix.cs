@@ -1,5 +1,5 @@
 using NoCTF.Application.Common;
-using NoCTF.Application.Submissions.Ports;
+using NoCTF.Application.Submissions.Intake;
 using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Application.Submissions.Intake;

@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using k8s.Models;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Runtime.Kubernetes.Configuration;
 
 namespace NoCTF.Runtime.Kubernetes.Networking;

@@ -2,7 +2,7 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NoCTF.Domain.Runtime;
-using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Infrastructure.Persistence;
 using Npgsql;
 using StackExchange.Redis;

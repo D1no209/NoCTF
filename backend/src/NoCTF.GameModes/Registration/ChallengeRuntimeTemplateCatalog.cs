@@ -1,6 +1,6 @@
 using System.Text.Json;
 using NoCTF.Application.Runtime.Configuration;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Awd.Configuration;

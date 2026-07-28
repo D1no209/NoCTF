@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using NoCTF.Application.Authentication.Ports;
+using NoCTF.Application.Authentication.Account;
 using NoCTF.Infrastructure.Authentication;
 
 namespace NoCTF.Tests.Unit.Application;

@@ -128,8 +128,8 @@ public static class AwdpConfigurationValidator
     }
 
     private static void ValidateProviderPair(
-        NoCTF.Application.Runtime.Ports.ChallengeRuntimeTemplate? runtime,
-        NoCTF.Application.Runtime.Ports.RunnerJobConfiguration? checker,
+        NoCTF.Application.Runtime.Provisioning.ChallengeRuntimeTemplate? runtime,
+        NoCTF.Application.Runtime.Configuration.RunnerJobConfiguration? checker,
         List<string> errors)
     {
         if (runtime is not null
@@ -139,17 +139,17 @@ public static class AwdpConfigurationValidator
     }
 
     private static void ValidateRuntime(
-        NoCTF.Application.Runtime.Ports.ChallengeRuntimeTemplate? runtime,
+        NoCTF.Application.Runtime.Provisioning.ChallengeRuntimeTemplate? runtime,
         List<string> errors)
     {
         if (runtime is not null
-            && (runtime.Definition is not NoCTF.Application.Runtime.Ports.ContainerRuntimeDefinition
+            && (runtime.Definition is not NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
                 || runtime.Provider is not (
                     NoCTF.Domain.Runtime.RuntimeProvider.Docker
                     or NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes)))
             errors.Add(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
-        if (runtime?.Definition is NoCTF.Application.Runtime.Ports.ContainerRuntimeDefinition
+        if (runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
             {
                 PortMappings: { Count: > 0 }
             }
@@ -161,7 +161,7 @@ public static class AwdpConfigurationValidator
     }
 
     private static void ValidateChecker(
-        NoCTF.Application.Runtime.Ports.RunnerJobConfiguration? checker,
+        NoCTF.Application.Runtime.Configuration.RunnerJobConfiguration? checker,
         List<string> errors)
     {
         if (checker is not null
