@@ -102,12 +102,10 @@ Command null 使用镜像默认。`FlagSource=PerTeam` 时
 `EgressPolicy: DenyAll | InternetOnly`，省略时为 `DenyAll`。OVA/Libvirt 首版不接受该字段。
 
 - Docker Container/Compose：首版只支持 `DenyAll`。每个长期 Runtime 使用独立
-  `internal` bridge network；Compose 中所有题目 network（包括平台补出的 default
-  network）都会被强制设为 `internal: true`。题目容器不连接平台网络。同一 Runtime 内
-  仍可互通；若存在公开 URL Binding，平台额外创建一个可信 HAProxy ingress，代理同时
-  连接 Runtime 内部网络与 `noctf-network`，只把声明的 TCP 端口转发回目标
-  service/container。代理的固定资源开销计入 Runner capacity，并随 Runtime receipt
-  幂等创建、回滚和删除。`InternetOnly` 在保存校验和 Runner 执行边界均直接拒绝；当前
+  独立 bridge network；Compose 中所有题目 network（包括平台补出的 default
+  network）都不连接平台网络。同一 Runtime 内仍可互通；若存在公开 URL Binding，题目 service/container 自身直接发布声明的 TCP
+  端口，宿主端口使用 `0`，由 Docker 分配随机端口。不得创建或使用 HAProxy/ingress
+  proxy；Runner 直接从 Docker 返回的端口映射展开公开 URL。`InternetOnly` 在保存校验和 Runner 执行边界均直接拒绝；当前
   没有通过 `DOCKER-USER` 修改宿主防火墙，也没有部署 Egress Gateway。
 - Kubernetes Container/Compose：每 Runtime 创建 NetworkPolicy。`DenyAll` 只放行同一
   不可变 Runtime selector 的 Pod 互通、集群 DNS，以及平台声明的公开/内部检查端口入站。

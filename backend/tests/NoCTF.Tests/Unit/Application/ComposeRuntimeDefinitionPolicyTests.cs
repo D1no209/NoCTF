@@ -184,7 +184,7 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         await Assert.That(Scalar(
                 Mapping(Mapping(root, "networks"), "challenge"),
                 "internal"))
-            .IsEqualTo("true");
+            .IsEqualTo("false");
     }
 
     [Test]

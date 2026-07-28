@@ -48,7 +48,7 @@ public sealed class DockerContainerLifecycleTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Persistent_runtime_uses_a_dual_network_ingress_proxy(
+    public async Task Persistent_runtime_publishes_the_target_port_directly(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -57,10 +57,6 @@ public sealed class DockerContainerLifecycleTests
                 .WithCommand("true")
                 .Build();
             await targetImage.StartAsync(cancellationToken);
-            await using var proxyImage = new ContainerBuilder("haproxy:3.1-alpine")
-                .WithCommand("haproxy", "-v")
-                .Build();
-            await proxyImage.StartAsync(cancellationToken);
             var operationId = Guid.NewGuid();
             var platformNetworkName = $"noctf-platform-it-{operationId:N}";
             using var docker = new DockerClientBuilder()
@@ -117,13 +113,10 @@ public sealed class DockerContainerLifecycleTests
                     DateTimeOffset.UtcNow,
                     cancellationToken);
 
-                await Assert.That(receipt.IngressResourceId).IsNotNull();
                 await Assert.That(receipt.InternalHost)
-                    .IsEqualTo($"noctf-ingress-{operationId:N}");
+                    .IsEqualTo($"noctf-{operationId:N}");
                 await Assert.That(receipt.PortMappings[8080]).IsGreaterThan(0);
                 await Assert.That(replay.ResourceId).IsEqualTo(receipt.ResourceId);
-                await Assert.That(replay.IngressResourceId)
-                    .IsEqualTo(receipt.IngressResourceId);
                 await Assert.That(replay.PortMappings[8080])
                     .IsEqualTo(receipt.PortMappings[8080]);
                 using var http = new HttpClient();
@@ -135,25 +128,18 @@ public sealed class DockerContainerLifecycleTests
                 var target = await docker.Containers.InspectContainerAsync(
                     receipt.ResourceId,
                     cancellationToken);
-                var ingress = await docker.Containers.InspectContainerAsync(
-                    receipt.IngressResourceId!,
-                    cancellationToken);
                 var runtimeNetwork = await docker.Networks.InspectNetworkAsync(
                     receipt.NetworkId!,
                     cancellationToken);
-                await Assert.That(runtimeNetwork.Internal).IsTrue();
+                await Assert.That(runtimeNetwork.Internal).IsFalse();
                 await Assert.That(runtimeNetwork.Labels.ContainsKey("noctf.io/expires-at"))
                     .IsFalse();
                 await Assert.That(target.NetworkSettings!.Networks.Keys)
                     .DoesNotContain(platformNetworkName);
-                await Assert.That(ingress.NetworkSettings!.Networks.Keys)
-                    .Contains(platformNetworkName);
-                await Assert.That(ingress.NetworkSettings.Networks).Count().IsEqualTo(2);
 
                 await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
                     .Contains(new RuntimeResourceIdentity(operationId, 1));
                 var targetId = receipt.ResourceId;
-                var ingressId = receipt.IngressResourceId!;
                 var networkId = receipt.NetworkId!;
                 await reconciler.DestroyByIdentityAsync(
                     new(operationId, 1),
@@ -163,11 +149,6 @@ public sealed class DockerContainerLifecycleTests
                     RuntimeProvider.Docker,
                     targetId,
                     cancellationToken)).IsNull();
-                Func<Task> inspectIngress = async () =>
-                    _ = await docker.Containers.InspectContainerAsync(
-                        ingressId,
-                        cancellationToken);
-                await Assert.That(inspectIngress).ThrowsException();
                 Func<Task> inspectSandbox = async () =>
                     _ = await docker.Networks.InspectNetworkAsync(
                         networkId,
@@ -422,7 +403,7 @@ public sealed class DockerContainerLifecycleTests
                     cancellationToken)).IsNotNull();
                 await Assert.That((await docker.Networks.InspectNetworkAsync(
                     targetReceipt.NetworkId!,
-                    cancellationToken)).Internal).IsTrue();
+                    cancellationToken)).Internal).IsFalse();
                 Func<Task> inspectCallback = async () =>
                     _ = await docker.Networks.InspectNetworkAsync(
                         $"noctf-callback-{checkerOperationId:N}",
@@ -498,7 +479,7 @@ public sealed class DockerContainerLifecycleTests
             }
         }
         throw new InvalidOperationException(
-            $"Docker ingress proxy did not become reachable at '{url}'.",
+            $"Docker runtime did not become reachable at '{url}'.",
             lastFailure);
     }
 

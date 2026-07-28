@@ -32,14 +32,7 @@ public sealed class RuntimeClaimHandler(
             CapacityLimits(
                 message.Definition.Provider,
                 message.Definition.Limits,
-                podCount: 1,
-                requiresDockerIngressProxy:
-                    message.Definition.Provider == RuntimeProvider.Docker
-                    && message.Definition.NetworkIsolation
-                        == ContainerNetworkIsolation.Isolated
-                    && message.Definition.NetworkPurpose
-                        == ContainerNetworkPurpose.PersistentRuntime
-                    && message.Definition.PortMappings.Count > 0),
+                podCount: 1),
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
             (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
                 new ProvisionContainerRuntime(
@@ -67,10 +60,7 @@ public sealed class RuntimeClaimHandler(
             CapacityLimits(
                 message.Definition.Provider,
                 message.Definition.Limits,
-                message.Definition.ServiceResources.Count,
-                requiresDockerIngressProxy:
-                    message.Definition.Provider == RuntimeProvider.Docker
-                    && message.Definition.UrlBindings?.Count > 0),
+                message.Definition.ServiceResources.Count),
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
             (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
                 new ProvisionComposeRuntime(
@@ -110,30 +100,8 @@ public sealed class RuntimeClaimHandler(
     private RuntimeResourceLimits CapacityLimits(
         RuntimeProvider provider,
         RuntimeResourceLimits configured,
-        int podCount,
-        bool requiresDockerIngressProxy = false)
+        int podCount)
     {
-        if (requiresDockerIngressProxy)
-        {
-            return configured with
-            {
-                MemoryBytes = checked(
-                    configured.MemoryBytes
-                    + ReadPositiveLong(
-                        "Runtime:Docker:IngressProxyMemoryBytes",
-                        67_108_864)),
-                NanoCpus = checked(
-                    configured.NanoCpus
-                    + ReadPositiveLong(
-                        "Runtime:Docker:IngressProxyNanoCpus",
-                        100_000_000)),
-                PidsLimit = checked(
-                    configured.PidsLimit
-                    + ReadPositiveLong(
-                        "Runtime:Docker:IngressProxyPidsLimit",
-                        64))
-            };
-        }
         if (provider != RuntimeProvider.Kubernetes)
             return configured;
         var podPidsLimit = ReadPositiveLong(

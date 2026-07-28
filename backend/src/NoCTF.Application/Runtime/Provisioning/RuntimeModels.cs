@@ -171,8 +171,7 @@ public sealed record ContainerReceipt(
     string? InternalHost,
     string? NetworkId = null,
     Guid? RuntimeInstanceId = null,
-    int Generation = 0,
-    string? IngressResourceId = null);
+    int Generation = 0);
 
 public sealed record OneShotResult(
     string ResourceId,

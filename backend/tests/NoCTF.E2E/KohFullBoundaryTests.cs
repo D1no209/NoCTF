@@ -438,7 +438,7 @@ public sealed class KohFullBoundaryTests
             if (string.IsNullOrWhiteSpace(containers) && string.IsNullOrWhiteSpace(networks)) return;
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
         }
-        throw new TimeoutException("KoH Runtime, ingress proxy, or network resources were not cleaned up.");
+        throw new TimeoutException("KoH Runtime or network resources were not cleaned up.");
     }
 
     private static async Task<TeamSession> RegisterTeamAsync(

@@ -152,11 +152,6 @@ public static class ComposeRuntimeDefinitionPolicy
             }
             if (!IsServiceName(serviceName))
                 errors.Add($"Compose service name '{serviceName}' is invalid.");
-            else if (string.Equals(
-                serviceName,
-                "noctf-ingress",
-                StringComparison.Ordinal))
-                errors.Add($"Compose service name '{serviceName}' is reserved by the platform.");
             else if (requireDnsServiceNames && !IsDnsLabel(serviceName))
                 errors.Add(
                     $"Kubernetes Compose service name '{serviceName}' must be a DNS-1123 label.");
@@ -653,7 +648,7 @@ public static class ComposeRuntimeDefinitionPolicy
         {
             var defaultNetwork = new YamlMappingNode();
             MergeMappingValues(defaultNetwork, "labels", labels);
-            SetScalar(defaultNetwork, "internal", "true");
+            SetScalar(defaultNetwork, "internal", "false");
             Set(document, "networks", new YamlMappingNode("default", defaultNetwork));
             return;
         }
@@ -662,7 +657,7 @@ public static class ComposeRuntimeDefinitionPolicy
         foreach (var network in networks.Children.Values.Cast<YamlMappingNode>())
         {
             MergeMappingValues(network, "labels", labels);
-            SetScalar(network, "internal", "true");
+            SetScalar(network, "internal", "false");
         }
     }
 
