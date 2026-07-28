@@ -19,6 +19,14 @@ public sealed class CtfFullBoundaryTests
         var baseUrl = RequiredEnvironment("NOCTF_E2E_BASE_URL");
         var runtimeImage = RequiredEnvironment("NOCTF_E2E_RUNTIME_IMAGE");
         using var anonymous = CreateClient(baseUrl);
+        await AssertSpaDocumentAsync(anonymous, "/", cancellationToken);
+        await AssertSpaDocumentAsync(anonymous, "/login", cancellationToken);
+        using (var unknownApi = await anonymous.GetAsync(
+            "/api/v1/does-not-exist",
+            cancellationToken))
+        {
+            await Assert.That(unknownApi.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        }
         using var admin = CreateClient(baseUrl, await LoginAsync(
             anonymous,
             "ctf-e2e-admin",
@@ -472,6 +480,20 @@ public sealed class CtfFullBoundaryTests
         if (token is not null)
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
+    }
+
+    private static async Task AssertSpaDocumentAsync(
+        HttpClient client,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/html"));
+        using var response = await client.SendAsync(request, cancellationToken);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("text/html");
+        await Assert.That(await response.Content.ReadAsStringAsync(cancellationToken))
+            .Contains("<div id=\"app\"></div>");
     }
 
     private static async Task<string> LoginAsync(
