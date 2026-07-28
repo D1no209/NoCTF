@@ -37,6 +37,7 @@
 - `CompetitionChallenge` is the per-competition challenge instance with its own id and `CompetitionId`/template `ChallengeId` links. It owns competition ordering/publication, `BaseScore`, revision, mode configuration JSON, and hints (including content, cost, and publication time). Template question/attachment metadata edits are live for all references; no CompetitionChallenge snapshot copy is introduced. Generated per-team `ChallengeFlag` rows (including RandomOne selections) are durable answer facts and are not retroactively rewritten by later template-flag edits.
 - Template-level static flags may use `ChallengeId`; competition-specific flags use `CompetitionChallengeId`. The two scopes are mutually exclusive. Submissions, scoring events, and runtime instances always use `CompetitionChallengeId`.
 - There is no `runtime_operations` or `runtime_artifacts` business table. Asynchronous state belongs to the corresponding `RuntimeInstance`, `Submission`, or `ChallengeFlag`, while Wolverine owns durable message delivery.
+- Docker Container and Compose Runtime public access must use the challenge service's own Docker port mapping with host port `0` (Docker-assigned random port). Do not add or use an HAProxy/ingress proxy for Docker Runtime exposure.
 
 ## Product scope
 

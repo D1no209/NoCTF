@@ -106,29 +106,6 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     .IsEqualTo(new ContainerExecResult(0, false));
                 await Assert.That(uninjectedFlag)
                     .IsEqualTo(new ContainerExecResult(0, false));
-                var composeContainers = await docker.Containers.ListContainersAsync(
-                    new ContainersListParameters
-                    {
-                        All = true,
-                        Filters = new Dictionary<string, IDictionary<string, bool>>
-                        {
-                            ["label"] = new Dictionary<string, bool>
-                            {
-                                [$"com.docker.compose.project={receipt.ProjectName}"] = true
-                            }
-                        }
-                    },
-                    cancellationToken);
-                var ingress = composeContainers.Single(container =>
-                    container.Labels.TryGetValue(
-                        "com.docker.compose.service",
-                        out var service)
-                    && service == DockerComposeIngressProxyPolicy.ProxyServiceName);
-                var ingressInspect = await docker.Containers.InspectContainerAsync(
-                    ingress.ID,
-                    cancellationToken);
-                await Assert.That(ingressInspect.NetworkSettings!.Networks.Keys)
-                    .Contains(platformNetworkName);
                 var webInspect = await docker.Containers.InspectContainerAsync(
                     web.ResourceId,
                     cancellationToken);
@@ -241,19 +218,20 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 .WithCommand("true")
                 .Build();
             await targetImage.StartAsync(cancellationToken);
-            await using var proxyImage = new ContainerBuilder("haproxy:3.1-alpine")
-                .WithCommand("haproxy", "-v")
-                .Build();
-            await proxyImage.StartAsync(cancellationToken);
             var operationId = Guid.NewGuid();
-            var request = Request(operationId);
+            var request = Request(operationId) with
+            {
+                ComposeYaml = Request(operationId).ComposeYaml.Replace(
+                    "exec httpd",
+                    "false && httpd",
+                    StringComparison.Ordinal)
+            };
             var workRoot = Path.Combine(
                 Path.GetTempPath(),
                 $"noctf-compose-failed-{operationId:N}");
             var runtime = new DockerComposeRuntime(
                 new DockerRuntimeOptions(
-                    Endpoint: DockerEndpoint(),
-                    NetworkName: $"missing-platform-{operationId:N}"),
+                    Endpoint: DockerEndpoint()),
                 workDirectory: workRoot);
             using var docker = new DockerClientBuilder()
                 .WithEndpoint(new Uri(DockerEndpoint()))
@@ -420,7 +398,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
             }
         }
         throw new InvalidOperationException(
-            $"Docker Compose ingress proxy did not become reachable at '{url}'.",
+            $"Docker Compose runtime did not become reachable at '{url}'.",
             lastFailure);
     }
 

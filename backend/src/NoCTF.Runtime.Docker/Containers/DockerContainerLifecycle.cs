@@ -29,16 +29,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Docker runtime cannot create another provider.");
 
         var exposedPorts = request.ContainerPorts.ToDictionary(port => $"{port}/tcp", _ => new EmptyStruct());
-        var useIngressProxy = RequiresIngressProxy(request);
-        var bindings = (useIngressProxy
-                ? new Dictionary<int, int>()
-                : request.PortMappings)
-            .ToDictionary(
+        var bindings = request.PortMappings.ToDictionary(
             pair => $"{pair.Key}/tcp",
             pair => (IList<PortBinding>)[new() { HostPort = pair.Value.ToString() }]);
         var containerName = $"noctf-{request.OperationId:N}";
         CreateContainerResponse? response = null;
-        string? ingressResourceId = null;
         try
         {
             var labels = BuildLabels(request);
@@ -67,25 +62,16 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 await ConnectInternalCallbackAsync(request, response.ID, cancellationToken);
             await client.Containers.StartContainerAsync(
                 response.ID, new ContainerStartParameters(), cancellationToken);
-            var ingress = useIngressProxy
-                ? await EnsureIngressProxyAsync(
-                    request,
-                    containerName,
-                    cancellationToken)
-                : null;
-            ingressResourceId = ingress?.ResourceId;
-            var publishedPorts = ingress?.PortMappings
-                ?? await ResolvePublishedPortsAsync(
-                    response.ID,
-                    request.PortMappings.Keys,
-                    cancellationToken);
+            var publishedPorts = await ResolvePublishedPortsAsync(
+                response.ID,
+                request.PortMappings.Keys,
+                cancellationToken);
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
                 publishedPorts,
                 options.PublicHost,
-                ingress is null ? containerName : IngressProxyName(request.OperationId),
+                containerName,
                 RuntimeInstanceId: request.RuntimeInstanceId,
-                Generation: request.Generation,
-                IngressResourceId: ingressResourceId);
+                Generation: request.Generation);
         }
         catch
         {
@@ -93,20 +79,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
             try
             {
-                await RemoveContainerAsync(
-                    ingressResourceId ?? IngressProxyName(request.OperationId),
-                    cleanupSource.Token);
-            }
-            catch
-            {
-                // A deterministic retry or the ownership-labelled reaper can recover the proxy.
-            }
-            try
-            {
-                await client.Containers.RemoveContainerAsync(
-                    response?.ID ?? containerName,
-                    new ContainerRemoveParameters { Force = true },
-                    cleanupSource.Token);
+                await RemoveContainerAsync(response?.ID ?? containerName, cleanupSource.Token);
             }
             catch
             {
@@ -187,14 +160,10 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return await CreateAsync(request, cancellationToken);
         }
 
-        var ingress = RequiresIngressProxy(request)
-            ? await EnsureIngressProxyAsync(request, resourceName, cancellationToken)
-            : null;
-        var publishedPorts = ingress?.PortMappings
-            ?? await ResolvePublishedPortsAsync(
-                existing.ID,
-                request.PortMappings.Keys,
-                cancellationToken);
+        var publishedPorts = await ResolvePublishedPortsAsync(
+            existing.ID,
+            request.PortMappings.Keys,
+            cancellationToken);
         return new ContainerReceipt(
             request.OperationId,
             RuntimeProvider.Docker,
@@ -202,26 +171,14 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             RuntimeStatus.Running,
             publishedPorts,
             options.PublicHost,
-            ingress is null ? resourceName : IngressProxyName(request.OperationId),
+            resourceName,
             RuntimeInstanceId: request.RuntimeInstanceId,
-            Generation: request.Generation,
-            IngressResourceId: ingress?.ResourceId);
+            Generation: request.Generation);
     }
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
         Exception? failure = null;
-        if (receipt.IngressResourceId is { Length: > 0 } ingressResourceId)
-        {
-            try
-            {
-                await RemoveContainerAsync(ingressResourceId, cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                failure = exception;
-            }
-        }
         try
         {
             await client.Containers.StopContainerAsync(receipt.ResourceId, new ContainerStopParameters(), cancellationToken);
@@ -347,7 +304,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             string.Equals(network.Name, name, StringComparison.Ordinal));
         if (current is not null)
         {
-            if (!current.Internal
+            if (current.Internal
                 || !HasResourceIdentity(current.Labels, identity)
                 || !HasNetworkPurpose(current.Labels, purpose))
                 throw new InvalidOperationException(
@@ -360,7 +317,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             var response = await client.Networks.CreateNetworkAsync(new NetworksCreateParameters
             {
                 Name = name,
-                Internal = true,
+                Internal = false,
                 Labels = NetworkLabels(request, purpose, expiresAt)
             }, cancellationToken);
             return response.ID;
@@ -533,8 +490,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         var network = await client.Networks.InspectNetworkAsync(
             receipt.NetworkId,
             cancellationToken);
-        if (!network.Internal
-            || !HasResourceIdentity(network.Labels, target.Identity)
+        if (!HasResourceIdentity(network.Labels, target.Identity)
             || !HasNetworkPurpose(network.Labels, "persistent-runtime"))
             throw new InvalidOperationException(
                 "The attached Container network has a different ownership identity.");
@@ -586,8 +542,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             var network = await client.Networks.InspectNetworkAsync(
                 networkId,
                 cancellationToken);
-            if (network.Internal
-                && HasResourceIdentity(network.Labels, target.Identity)
+            if (HasResourceIdentity(network.Labels, target.Identity)
                 && HasJobKind(network.Labels, "persistent-runtime")
                 && HasLabel(
                     network.Labels,
@@ -600,7 +555,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             .Select(network => network.ID)
             .FirstOrDefault()
             ?? throw new InvalidOperationException(
-                "The attached Compose service has no owned internal network.");
+                "The attached Compose service has no owned runtime network.");
     }
 
     private async Task ConnectInternalCallbackAsync(
@@ -727,121 +682,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             string.Equals(network.Name, networkName, StringComparison.Ordinal));
     }
 
-    private async Task<IngressProxyReceipt> EnsureIngressProxyAsync(
-        ContainerRequest request,
-        string targetHost,
-        CancellationToken cancellationToken)
-    {
-        if (request.NetworkName is null)
-            throw new InvalidOperationException(
-                "Docker ingress proxy requires an isolated Runtime network.");
-        var name = IngressProxyName(request.OperationId);
-        ContainerInspectResponse? existing;
-        try
-        {
-            existing = await client.Containers.InspectContainerAsync(name, cancellationToken);
-        }
-        catch (DockerContainerNotFoundException)
-        {
-            existing = null;
-        }
-
-        if (existing is null)
-        {
-            var exposedPorts = request.PortMappings.Keys.ToDictionary(
-                port => $"{port}/tcp",
-                _ => new EmptyStruct());
-            var bindings = request.PortMappings.ToDictionary(
-                pair => $"{pair.Key}/tcp",
-                pair => (IList<PortBinding>)
-                [
-                    new() { HostPort = pair.Value.ToString() }
-                ]);
-            var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
-            labels["noctf.io/managed"] = "true";
-            labels["noctf.io/resource-role"] = "ingress-proxy";
-            labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
-                ?? request.OperationId).ToString("D");
-            labels["noctf.io/generation"] = request.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
-            var response = await client.Containers.CreateContainerAsync(
-                new CreateContainerParameters
-                {
-                    Name = name,
-                    Image = options.IngressProxyImage,
-                    Entrypoint = ["/bin/sh", "-ec"],
-                    Cmd = [IngressProxyStartupScript(targetHost, request.PortMappings.Keys)],
-                    Labels = labels,
-                    ExposedPorts = exposedPorts,
-                    HostConfig = new HostConfig
-                    {
-                        NetworkMode = request.NetworkName,
-                        PortBindings = bindings,
-                        Memory = options.IngressProxyMemoryBytes,
-                        NanoCPUs = options.IngressProxyNanoCpus,
-                        PidsLimit = options.IngressProxyPidsLimit,
-                        SecurityOpt = ["no-new-privileges:true"],
-                        ReadonlyRootfs = true,
-                        CapDrop = ["ALL"],
-                        Tmpfs = new Dictionary<string, string>
-                        {
-                            ["/tmp"] = "rw,noexec,nosuid,size=16m"
-                        }
-                    }
-                },
-                cancellationToken);
-            try
-            {
-                await client.Networks.ConnectNetworkAsync(
-                    options.NetworkName,
-                    new NetworkConnectParameters { Container = response.ID },
-                    cancellationToken);
-                await client.Containers.StartContainerAsync(
-                    response.ID,
-                    new ContainerStartParameters(),
-                    cancellationToken);
-                existing = await client.Containers.InspectContainerAsync(
-                    response.ID,
-                    cancellationToken);
-            }
-            catch
-            {
-                await RemoveContainerAsync(response.ID, CancellationToken.None);
-                throw;
-            }
-        }
-        else
-        {
-            var existingLabels = existing.Config?.Labels;
-            if (!HasResourceIdentity(
-                    existingLabels,
-                    new RuntimeResourceIdentity(
-                        request.RuntimeInstanceId ?? request.OperationId,
-                        request.Generation))
-                || existingLabels?.TryGetValue(
-                    "noctf.io/resource-role",
-                    out var role) != true
-                || !string.Equals(role, "ingress-proxy", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "The existing Docker ingress proxy has a different ownership identity.");
-            }
-            if (ToRuntimeStatus(existing.State?.Status) != RuntimeStatus.Running)
-            {
-                await client.Containers.StartContainerAsync(
-                    existing.ID,
-                    new ContainerStartParameters(),
-                    cancellationToken);
-                existing = await client.Containers.InspectContainerAsync(
-                    existing.ID,
-                    cancellationToken);
-            }
-        }
-
-        var published = ResolvePublishedPorts(existing, request.PortMappings.Keys);
-        return new(existing.ID, published);
-    }
-
     private async Task<IReadOnlyDictionary<int, int>> ResolvePublishedPortsAsync(
         string resourceId,
         IEnumerable<int> targetPorts,
@@ -924,42 +764,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             cancellationToken);
     }
 
-    private static bool RequiresIngressProxy(ContainerRequest request) =>
-        request.NetworkIsolation == ContainerNetworkIsolation.Isolated
-        && request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
-        && request.PortMappings.Count > 0;
-
-    private static string IngressProxyName(Guid operationId) =>
-        $"noctf-ingress-{operationId:N}";
-
-    private static string IngressProxyStartupScript(
-        string targetHost,
-        IEnumerable<int> ports)
-    {
-        var config = new System.Text.StringBuilder()
-            .AppendLine("global")
-            .AppendLine("  log stdout format raw local0")
-            .AppendLine("defaults")
-            .AppendLine("  mode tcp")
-            .AppendLine("  timeout connect 5s")
-            .AppendLine("  timeout client 1h")
-            .AppendLine("  timeout server 1h");
-        foreach (var port in ports.Distinct().Order())
-        {
-            config
-                .Append("frontend ingress_").Append(port).AppendLine()
-                .Append("  bind :").Append(port).AppendLine()
-                .Append("  default_backend target_").Append(port).AppendLine()
-                .Append("backend target_").Append(port).AppendLine()
-                .Append("  server target ").Append(targetHost).Append(':').Append(port).AppendLine();
-        }
-        return $"""
-            cat > /tmp/noctf-haproxy.cfg <<'NOCTF_HAPROXY'
-            {config.ToString().TrimEnd()}
-            NOCTF_HAPROXY
-            exec haproxy -f /tmp/noctf-haproxy.cfg
-            """;
-    }
 
     private static Dictionary<string, string> BuildLabels(ContainerRequest request)
     {
@@ -1082,7 +886,4 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         return labels;
     }
 
-    private sealed record IngressProxyReceipt(
-        string ResourceId,
-        IReadOnlyDictionary<int, int> PortMappings);
 }

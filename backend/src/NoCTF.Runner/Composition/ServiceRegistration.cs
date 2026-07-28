@@ -104,20 +104,7 @@ public static class ServiceRegistration
             configuration["Runtime:Docker:PublicHost"] ?? "localhost",
             configuration["Runtime:Docker:CallbackContainer"] ?? "noctf-awdp-callback",
             configuration["Runtime:Docker:CallbackContainerLabelKey"] ?? "noctf.io/internal-role",
-            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback-gateway",
-            configuration["Runtime:Docker:IngressProxyImage"] ?? "haproxy:3.1-alpine",
-            ReadPositiveLongOrDefault(
-                configuration,
-                "Runtime:Docker:IngressProxyMemoryBytes",
-                67_108_864),
-            ReadPositiveLongOrDefault(
-                configuration,
-                "Runtime:Docker:IngressProxyNanoCpus",
-                100_000_000),
-            ReadPositiveLongOrDefault(
-                configuration,
-                "Runtime:Docker:IngressProxyPidsLimit",
-                64));
+            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback-gateway");
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
         services.AddSingleton<IRuntimeResourceReaper>(provider =>
