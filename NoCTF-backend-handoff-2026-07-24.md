@@ -41,10 +41,10 @@ IPv6 deny 验证、Admin API 传输契约重构、四模式完整边界 E2E、ca
 - 代码基线分支：`main`
 - 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
 - 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前实现与验证 HEAD：`a27dfd7 fix(api): serve embedded SPA routes`。
+- 当前实现与验证 HEAD：`1f0f3e3 fix(deploy): wait for API and Runner readiness`。
 - 本交接文档提交前，当前分支相对
-  `origin/codex/backend-target-architecture-handoff` ahead 7、behind 0；本文独立提交后
-  应为 ahead 8、behind 0。
+  `origin/codex/backend-target-architecture-handoff` ahead 9、behind 0；本文独立提交后
+  应为 ahead 10、behind 0。
 - 前序实现均先做本地提交；当前用户规则是只有收到明确推送指令后才能推送远端。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -858,6 +858,34 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   AWD 1/1，1 分 42.6 秒；AWDP 1/1，1 分 16.3 秒；KoH 1/1，1 分 05.7 秒。
   最终 E2E container、network、volume、project image 数量均为 0；新建的本地
   `deploy-*` 栈继续运行。
+
+### 6.15 本地 deploy 重启、替换与 readiness
+
+用户于 2026-07-28 要求继续推进后，本轮在第 6.14 节的新数据基线上验证进程重启和容器替换：
+
+- `docker compose restart backend worker runner` 后，API 约 5.1 秒恢复。PostgreSQL、
+  Redis、MinIO 和三个应用容器 ID 均未改变；maintenance processing version 从
+  `173/173/1033` 推进到 `175/175/1041`，证明 durable 状态在进程重启后继续执行。
+- `docker compose up --no-deps --force-recreate backend worker runner` 后，API 约
+  5.7 秒恢复。三个应用容器 ID 全部改变，三个依赖容器 ID 保持不变；maintenance version
+  继续推进到 `176/176/1051`，唯一 `InitialBaseline`、Runner heartbeat/capacity 和
+  SPA/API 路由均保持正确。
+- 两轮恢复后 API、Worker、Runner dead letter 仍为 `0/0/0`，新容器日志没有
+  `fail`、`crit`、unhandled exception 或 `No known handler`。
+- 实测发现原 Compose 没有 API/Runner healthcheck，`docker compose up --wait` 只能确认
+  进程已启动。`1f0f3e3` 使用基础镜像已有 Bash `/dev/tcp`，分别向 API `/health` 和
+  Runner `/health/ready` 发出真实 HTTP 请求并要求状态行包含 200；没有向运行镜像增加
+  curl/wget 或新的平台协议。
+- 更新后的真实 Compose 重建 API/Runner 后，`up --wait` 明确等待两者进入 `healthy`；
+  `docker inspect` 的 health command 已正确把 Compose `$$status` 转换为 shell
+  `$status`，两项探针 exit 0。Worker 没有伪造仅检查 PID 的 healthcheck。
+- 新增 `DeploymentTopologyTests` 断言两个 HTTP 探针及 200 检查不能被静默移除。
+  定向测试 1/1、全部 359 non-Integration、solution build 0 warning/0 error、
+  Compose config 和 `git diff --check` 均通过。第 6.14 节的完整 Integration 与四模式
+  E2E 已在同一代码基线上通过；本提交只修改 deployment Compose 与拓扑断言。
+- GitHub CLI 只读复核远端交接分支仍为 `96e8b1d`，与本地 remote-tracking ref 一致；
+  没有协作者 remote-only 提交。普通 `git fetch` 因 `origin` 使用 SSH 且当前 SSH key
+  未授权而失败，没有修改 Git 认证配置。
 
 本次目标迁移没有剩余实现项。仍未完成的 Libvirt 真机验证、Pool/Node CIDR 部署期审计、
 Docker `InternetOnly` 和后期 TargetPort/callback gateway 加固，均已在前文明确边界；它们不是
