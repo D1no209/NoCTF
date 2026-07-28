@@ -8438,6 +8438,17 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "controlFlag": {
+            "type": "string",
+            "nullable": true
+          },
+          "urls": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

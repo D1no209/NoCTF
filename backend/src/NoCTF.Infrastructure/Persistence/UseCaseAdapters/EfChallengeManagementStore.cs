@@ -56,17 +56,18 @@ public sealed class EfChallengeManagementStore(NoCtfDbContext db) : IChallengeMa
         Guid competitionChallengeId,
         bool includeUnpublished,
         CancellationToken ct) =>
-        Query(includeUnpublished, includeDeleted: false)
-            .SingleOrDefaultAsync(
-                item => item.Id == competitionChallengeId && item.CompetitionId == competitionId,
-                ct);
+        Query(
+                includeUnpublished,
+                includeDeleted: false,
+                competitionId,
+                competitionChallengeId)
+            .SingleOrDefaultAsync(ct);
 
     public async Task<IReadOnlyList<ChallengeView>> ListAsync(
         Guid competitionId,
         bool includeUnpublished,
         CancellationToken ct) =>
-        await Query(includeUnpublished, includeDeleted: false)
-            .Where(item => item.CompetitionId == competitionId)
+        await Query(includeUnpublished, includeDeleted: false, competitionId)
             .OrderBy(item => item.Order)
             .ThenBy(item => item.Id)
             .ToListAsync(ct);
@@ -159,11 +160,19 @@ public sealed class EfChallengeManagementStore(NoCtfDbContext db) : IChallengeMa
         }
     }
 
-    private IQueryable<ChallengeView> Query(bool includeUnpublished, bool includeDeleted)
+    private IQueryable<ChallengeView> Query(
+        bool includeUnpublished,
+        bool includeDeleted,
+        Guid? competitionId = null,
+        Guid? competitionChallengeId = null)
     {
         var instances = includeDeleted
             ? db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
             : db.CompetitionChallenges.AsNoTracking();
+        if (competitionId is Guid actualCompetitionId)
+            instances = instances.Where(item => item.CompetitionId == actualCompetitionId);
+        if (competitionChallengeId is Guid actualCompetitionChallengeId)
+            instances = instances.Where(item => item.Id == actualCompetitionChallengeId);
         return instances
             .Join(
                 db.Challenges.AsNoTracking(),

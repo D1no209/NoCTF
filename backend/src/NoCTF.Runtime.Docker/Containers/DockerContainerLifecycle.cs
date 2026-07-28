@@ -79,7 +79,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     request.PortMappings.Keys,
                     cancellationToken);
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
-                publishedPorts, options.PublicHost, containerName,
+                publishedPorts,
+                options.PublicHost,
+                ingress is null ? containerName : IngressProxyName(request.OperationId),
                 RuntimeInstanceId: request.RuntimeInstanceId,
                 Generation: request.Generation,
                 IngressResourceId: ingressResourceId);
@@ -199,7 +201,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             RuntimeStatus.Running,
             publishedPorts,
             options.PublicHost,
-            resourceName,
+            ingress is null ? resourceName : IngressProxyName(request.OperationId),
             RuntimeInstanceId: request.RuntimeInstanceId,
             Generation: request.Generation,
             IngressResourceId: ingress?.ResourceId);
