@@ -322,6 +322,59 @@ public sealed class CtfFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var teamId = team.GetProperty("id").GetGuid();
+        var captainId = team.GetProperty("captainId").GetGuid();
+
+        await SendJsonAsync(
+            anonymous,
+            HttpMethod.Post,
+            "/api/v1/auth/register",
+            new
+            {
+                userName = "ctf-teammate",
+                email = "teammate@ctf-e2e.test",
+                password = "ctf-teammate-password"
+            },
+            HttpStatusCode.Created,
+            cancellationToken);
+        using var teammate = CreateClient(baseUrl, await LoginAsync(
+            anonymous,
+            "ctf-teammate",
+            "ctf-teammate-password",
+            cancellationToken));
+        var invitation = await SendWithoutBodyForJsonAsync(
+            player,
+            HttpMethod.Post,
+            $"/api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate",
+            HttpStatusCode.OK,
+            cancellationToken);
+        var invitationToken = invitation.GetProperty("invitationToken").GetString()
+            ?? throw new InvalidOperationException("Invitation rotation did not return a token.");
+        await Assert.That(invitationToken.Length).IsEqualTo(32);
+        await SendJsonWithoutResponseAsync(
+            teammate,
+            HttpMethod.Post,
+            $"/api/v1/competitions/{competitionId}/teams/join",
+            new { invitationToken },
+            HttpStatusCode.NoContent,
+            cancellationToken);
+
+        var captainTeam = await GetJsonAsync(
+            player,
+            $"/api/v1/competitions/{competitionId}/teams/me",
+            cancellationToken);
+        var teammateTeam = await GetJsonAsync(
+            teammate,
+            $"/api/v1/competitions/{competitionId}/teams/me",
+            cancellationToken);
+        await Assert.That(captainTeam.GetProperty("id").GetGuid()).IsEqualTo(teamId);
+        await Assert.That(teammateTeam.GetProperty("id").GetGuid()).IsEqualTo(teamId);
+        var memberIds = teammateTeam.GetProperty("memberIds")
+            .EnumerateArray()
+            .Select(item => item.GetGuid())
+            .ToArray();
+        await Assert.That(memberIds).Contains(captainId);
+        await Assert.That(memberIds.Length).IsEqualTo(2);
+        var teammateId = memberIds.Single(id => id != captainId);
 
         await SendWithoutBodyAsync(
             admin,
@@ -387,6 +440,36 @@ public sealed class CtfFullBoundaryTests
             await Assert.That(composeFlag).StartsWith("flag{");
             await Assert.That(composeFlag).IsNotEqualTo(flag);
 
+            var wrongSubmissionAccepted = await SendJsonAsync(
+                teammate,
+                HttpMethod.Post,
+                $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions",
+                new { flag = flag + "-wrong" },
+                HttpStatusCode.Accepted,
+                cancellationToken);
+            var wrongSubmissionId = wrongSubmissionAccepted
+                .GetProperty("submissionId")
+                .GetGuid();
+            var wrongSubmission = await PollJsonAsync(
+                teammate,
+                $"/api/v1/competitions/{competitionId}/submissions/{wrongSubmissionId}",
+                value => value.GetProperty("evaluationState").GetInt32() == 3,
+                TimeSpan.FromSeconds(60),
+                cancellationToken);
+            await Assert.That(wrongSubmission.GetProperty("result").GetInt32()).IsEqualTo(1);
+            var unsolvedLeaderboard = await PollLeaderboardAsync(
+                anonymous,
+                competitionId,
+                teamId,
+                expectedScore: 0,
+                cancellationToken);
+            await AssertCtfLeaderboardStateAsync(
+                unsolvedLeaderboard,
+                teamId,
+                competitionChallengeId,
+                expectedSolveCount: 0,
+                expectedFirstBloodCount: 0);
+
             var submissionAccepted = await SendJsonAsync(
                 player,
                 HttpMethod.Post,
@@ -410,8 +493,76 @@ public sealed class CtfFullBoundaryTests
                 teamId,
                 expectedScore: 525,
                 cancellationToken);
-            await Assert.That(solvedLeaderboard.GetProperty("firstBloods").EnumerateArray()
-                .Any(item => item.GetProperty("teamId").GetGuid() == teamId)).IsTrue();
+            await AssertCtfLeaderboardStateAsync(
+                solvedLeaderboard,
+                teamId,
+                competitionChallengeId,
+                expectedSolveCount: 1,
+                expectedFirstBloodCount: 1);
+
+            var teammateSubmissions = await PollTeamSubmissionsAsync(
+                teammate,
+                competitionId,
+                items => items.Any(item =>
+                    item.GetProperty("id").GetGuid() == submissionId
+                    && item.GetProperty("result").GetInt32() == 0),
+                TimeSpan.FromSeconds(60),
+                cancellationToken);
+            var sharedCorrectSubmission = teammateSubmissions.Single(item =>
+                item.GetProperty("id").GetGuid() == submissionId);
+            await Assert.That(sharedCorrectSubmission.GetProperty("teamId").GetGuid())
+                .IsEqualTo(teamId);
+            await Assert.That(sharedCorrectSubmission
+                    .GetProperty("competitionChallengeId")
+                    .GetGuid())
+                .IsEqualTo(competitionChallengeId);
+            await Assert.That(sharedCorrectSubmission.GetProperty("submittedByUserId").GetGuid())
+                .IsEqualTo(captainId);
+
+            var duplicateSubmissionAccepted = await SendJsonAsync(
+                teammate,
+                HttpMethod.Post,
+                $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions",
+                new { flag },
+                HttpStatusCode.Accepted,
+                cancellationToken);
+            var duplicateSubmissionId = duplicateSubmissionAccepted
+                .GetProperty("submissionId")
+                .GetGuid();
+            var duplicateSubmission = await PollJsonAsync(
+                teammate,
+                $"/api/v1/competitions/{competitionId}/submissions/{duplicateSubmissionId}",
+                value => value.GetProperty("evaluationState").GetInt32() == 3,
+                TimeSpan.FromSeconds(60),
+                cancellationToken);
+            await Assert.That(duplicateSubmission.GetProperty("result").GetInt32()).IsEqualTo(2);
+            var submissionsAfterDuplicate = await PollTeamSubmissionsAsync(
+                teammate,
+                competitionId,
+                items => items.Any(item =>
+                        item.GetProperty("id").GetGuid() == submissionId
+                        && item.GetProperty("result").GetInt32() == 0)
+                    && items.Any(item =>
+                        item.GetProperty("id").GetGuid() == duplicateSubmissionId
+                        && item.GetProperty("result").GetInt32() == 2),
+                TimeSpan.FromSeconds(60),
+                cancellationToken);
+            var sharedDuplicateSubmission = submissionsAfterDuplicate.Single(item =>
+                item.GetProperty("id").GetGuid() == duplicateSubmissionId);
+            await Assert.That(sharedDuplicateSubmission.GetProperty("submittedByUserId").GetGuid())
+                .IsEqualTo(teammateId);
+            var leaderboardAfterDuplicate = await PollLeaderboardAsync(
+                anonymous,
+                competitionId,
+                teamId,
+                expectedScore: 525,
+                cancellationToken);
+            await AssertCtfLeaderboardStateAsync(
+                leaderboardAfterDuplicate,
+                teamId,
+                competitionChallengeId,
+                expectedSolveCount: 1,
+                expectedFirstBloodCount: 1);
 
             var unlockedHint = await SendWithoutBodyForJsonAsync(
                 player,
@@ -542,6 +693,23 @@ public sealed class CtfFullBoundaryTests
             throw await UnexpectedResponseAsync(response, expected, cancellationToken);
     }
 
+    private static async Task SendJsonWithoutResponseAsync(
+        HttpClient client,
+        HttpMethod method,
+        string path,
+        object body,
+        HttpStatusCode expected,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, path)
+        {
+            Content = JsonContent.Create(body, options: JsonOptions)
+        };
+        using var response = await client.SendAsync(request, cancellationToken);
+        if (response.StatusCode != expected)
+            throw await UnexpectedResponseAsync(response, expected, cancellationToken);
+    }
+
     private static async Task<JsonElement> SendWithoutBodyForJsonAsync(
         HttpClient client,
         HttpMethod method,
@@ -603,6 +771,28 @@ public sealed class CtfFullBoundaryTests
         throw new TimeoutException($"Polling {path} timed out. Last response: {last}");
     }
 
+    private static async Task<IReadOnlyList<JsonElement>> PollTeamSubmissionsAsync(
+        HttpClient client,
+        Guid competitionId,
+        Func<IReadOnlyList<JsonElement>, bool> completed,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var path = $"/api/v1/competitions/{competitionId}/submissions?limit=50";
+        var deadline = DateTimeOffset.UtcNow.Add(timeout);
+        IReadOnlyList<JsonElement> last = [];
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var response = await GetJsonAsync(client, path, cancellationToken);
+            last = response.GetProperty("items").EnumerateArray().ToArray();
+            if (completed(last))
+                return last;
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+        }
+        throw new TimeoutException(
+            $"Polling the current team's submissions timed out. Last count: {last.Count}.");
+    }
+
     private static async Task<string> PollTextAsync(
         string url,
         TimeSpan timeout,
@@ -658,6 +848,31 @@ public sealed class CtfFullBoundaryTests
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
         }
         throw new TimeoutException($"Leaderboard did not reach score {expectedScore} for team {teamId}.");
+    }
+
+    private static async Task AssertCtfLeaderboardStateAsync(
+        JsonElement leaderboard,
+        Guid teamId,
+        Guid competitionChallengeId,
+        int expectedSolveCount,
+        int expectedFirstBloodCount)
+    {
+        var entry = leaderboard.GetProperty("entries").EnumerateArray()
+            .Single(item => item.GetProperty("teamId").GetGuid() == teamId);
+        await Assert.That(entry.GetProperty("solveCount").GetInt32())
+            .IsEqualTo(expectedSolveCount);
+        var challengeSolves = entry.GetProperty("challenges").EnumerateArray()
+            .Where(item =>
+                item.GetProperty("competitionChallengeId").GetGuid()
+                == competitionChallengeId)
+            .Sum(item => item.GetProperty("solveCount").GetInt32());
+        await Assert.That(challengeSolves).IsEqualTo(expectedSolveCount);
+        var slotKey = $"challenge:{competitionChallengeId:N}";
+        var firstBloodCount = leaderboard.GetProperty("firstBloods").EnumerateArray()
+            .Count(item =>
+                item.GetProperty("teamId").GetGuid() == teamId
+                && item.GetProperty("slotKey").GetString() == slotKey);
+        await Assert.That(firstBloodCount).IsEqualTo(expectedFirstBloodCount);
     }
 
     private static string RequiredEnvironment(string name) =>
