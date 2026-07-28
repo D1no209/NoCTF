@@ -63,7 +63,7 @@ public static class BackendMessageHandlers
                     || (runtime.CheckerDeadlineAt != null
                         && runtime.CheckerDeadlineAt <= message.At))
                 && runtime.RunnerId != null
-                && runtime.ControlCheckUrl != null
+                && runtime.AwdCheckerTargetUrl != null
                 && (message.AfterRuntimeInstanceId == null
                     || runtime.Id.CompareTo(message.AfterRuntimeInstanceId.Value) > 0))
             .Join(
@@ -474,6 +474,7 @@ public static class BackendMessageHandlers
                     target.Instance,
                     target.Competition.Mode,
                     template,
+                    target.Challenge.ConfigurationJson,
                     perTeamFlag);
             }
         }

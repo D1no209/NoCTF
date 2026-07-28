@@ -27,13 +27,22 @@ public sealed class RuntimeUrlExpanderTests
             RuntimeExposure.OwnerOnly,
             ContainerPort: 8080);
 
-        var expanded = RuntimeUrlExpander.ExpandContainer(receipt, bindings, control);
+        var expanded = RuntimeUrlExpander.ExpandContainer(
+            receipt,
+            bindings,
+            control,
+            new RuntimeInternalEndpointBinding(
+                "http://{HOST}:{PORT}/health",
+                8081));
 
         await Assert.That(expanded.Urls).IsEquivalentTo(
             ["http://runner.example:32000/owner", "http://runner.example:32000/play"]);
         await Assert.That(expanded.ParticipantUrlIndexes).IsEquivalentTo([1]);
         await Assert.That(expanded.ControlCheckUrl)
             .IsEqualTo("http://container-1:8080/control");
+        await Assert.That(expanded.AwdCheckerTargetUrl)
+            .IsEqualTo("http://container-1:8081/health");
+        await Assert.That(expanded.AwdCheckerTargetServiceName).IsNull();
     }
 
     [Test]
@@ -95,12 +104,19 @@ public sealed class RuntimeUrlExpanderTests
             receipt,
             status,
             bindings,
-            control);
+            control,
+            new RuntimeInternalEndpointBinding(
+                "http://{HOST}:{PORT}/health",
+                8081,
+                "web"));
 
         await Assert.That(expanded.Urls)
             .IsEquivalentTo(["http://runner.example:32000/play"]);
         await Assert.That(expanded.ParticipantUrlIndexes).IsEquivalentTo([0]);
         await Assert.That(expanded.ControlCheckUrl)
             .IsEqualTo("http://web:8080/control");
+        await Assert.That(expanded.AwdCheckerTargetUrl)
+            .IsEqualTo("http://web:8081/health");
+        await Assert.That(expanded.AwdCheckerTargetServiceName).IsEqualTo("web");
     }
 }

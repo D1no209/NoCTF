@@ -83,7 +83,8 @@ public static class ComposeRuntimeDefinitionPolicy
         IReadOnlyList<RuntimeUrlBinding>? urlBindings = null,
         RuntimeUrlBinding? controlCheckUrlBinding = null,
         bool requireServicePids = true,
-        bool requireDnsServiceNames = false) =>
+        bool requireDnsServiceNames = false,
+        RuntimeInternalEndpointBinding? internalEndpointBinding = null) =>
         Validate(
             definition.ComposeYaml,
             definition.ServiceResources,
@@ -91,7 +92,8 @@ public static class ComposeRuntimeDefinitionPolicy
             urlBindings,
             controlCheckUrlBinding,
             requireServicePids,
-            requireDnsServiceNames);
+            requireDnsServiceNames,
+            internalEndpointBinding);
 
     public static IReadOnlyList<string> Validate(
         string composeYaml,
@@ -100,7 +102,8 @@ public static class ComposeRuntimeDefinitionPolicy
         IReadOnlyList<RuntimeUrlBinding>? urlBindings = null,
         RuntimeUrlBinding? controlCheckUrlBinding = null,
         bool requireServicePids = true,
-        bool requireDnsServiceNames = false)
+        bool requireDnsServiceNames = false,
+        RuntimeInternalEndpointBinding? internalEndpointBinding = null)
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(composeYaml))
@@ -178,6 +181,7 @@ public static class ComposeRuntimeDefinitionPolicy
             serviceNames,
             (urlBindings ?? []).Append(controlCheckUrlBinding),
             errors);
+        ValidateInternalBinding(serviceNames, internalEndpointBinding, errors);
         return errors;
     }
 
@@ -278,7 +282,8 @@ public static class ComposeRuntimeDefinitionPolicy
             request.UrlBindings,
             request.ControlCheckUrlBinding,
             requireServicePids,
-            requireDnsServiceNames);
+            requireDnsServiceNames,
+            request.AwdCheckerTargetBinding);
         if (errors.Count > 0)
             throw new InvalidOperationException(string.Join(" ", errors));
         return LoadRequired(request.ComposeYaml);
@@ -286,19 +291,31 @@ public static class ComposeRuntimeDefinitionPolicy
 
     private static IReadOnlyDictionary<string, int[]> BindingsByService(
         ComposeRequest request) =>
-        (request.UrlBindings ?? [])
-        .Append(request.ControlCheckUrlBinding)
-        .Where(binding => binding is not null)
-        .Select(binding => binding!)
-        .GroupBy(binding => binding.ServiceName!, StringComparer.Ordinal)
+        EndpointBindings(request)
+        .GroupBy(binding => binding.ServiceName, StringComparer.Ordinal)
         .ToDictionary(
             group => group.Key,
             group => group
-                .Select(binding => binding.ContainerPort!.Value)
+                .Select(binding => binding.ContainerPort)
                 .Distinct()
                 .Order()
                 .ToArray(),
             StringComparer.Ordinal);
+
+    private static IEnumerable<ComposeEndpointBinding> EndpointBindings(ComposeRequest request)
+    {
+        foreach (var binding in (request.UrlBindings ?? [])
+                     .Append(request.ControlCheckUrlBinding)
+                     .Where(binding => binding is not null)
+                     .Select(binding => binding!))
+        {
+            yield return new(
+                binding.ServiceName!,
+                binding.ContainerPort!.Value);
+        }
+        if (request.AwdCheckerTargetBinding is { } target)
+            yield return new(target.ServiceName!, target.ContainerPort);
+    }
 
     private static YamlMappingNode? Load(string yaml, ICollection<string> errors)
     {
@@ -448,6 +465,19 @@ public static class ComposeRuntimeDefinitionPolicy
             if (binding.ServiceName is { } serviceName && !serviceNames.Contains(serviceName))
                 errors.Add($"Compose URL binding references unknown service '{serviceName}'.");
         }
+    }
+
+    private static void ValidateInternalBinding(
+        IReadOnlySet<string> serviceNames,
+        RuntimeInternalEndpointBinding? binding,
+        ICollection<string> errors)
+    {
+        if (binding is null)
+            return;
+        if (string.IsNullOrWhiteSpace(binding.ServiceName)
+            || !serviceNames.Contains(binding.ServiceName))
+            errors.Add(
+                $"Compose internal endpoint references unknown service '{binding.ServiceName}'.");
     }
 
     private static void ValidateKeyValues(
@@ -709,4 +739,6 @@ public static class ComposeRuntimeDefinitionPolicy
 
     private static void Remove(YamlMappingNode mapping, string key) =>
         mapping.Children.Remove(new YamlScalarNode(key));
+
+    private sealed record ComposeEndpointBinding(string ServiceName, int ContainerPort);
 }

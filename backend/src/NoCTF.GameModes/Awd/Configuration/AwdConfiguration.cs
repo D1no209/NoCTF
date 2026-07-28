@@ -49,12 +49,34 @@ public sealed record AwdChallengeConfiguration(
     long? ServiceHealthyPoints = null,
     long? ServiceUnhealthyPenalty = null,
     ChallengeRuntimeTemplate? Runtime = null,
-    RunnerJobConfiguration? Checker = null,
+    AwdCheckerConfiguration? Checker = null,
     AwdFlagInjectionConfiguration? FlagInjection = null,
     PerTeamFlagTemplate? FlagTemplate = null)
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 }
+
+public sealed record AwdCheckerConfiguration(
+    RunnerJobConfiguration Job,
+    AwdCheckerTargetDefinition Target);
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(ContainerAwdCheckerTarget), "container")]
+[JsonDerivedType(typeof(ComposeAwdCheckerTarget), "compose")]
+public abstract record AwdCheckerTargetDefinition(
+    string UrlTemplate,
+    int ContainerPort);
+
+public sealed record ContainerAwdCheckerTarget(
+    string UrlTemplate,
+    int ContainerPort)
+    : AwdCheckerTargetDefinition(UrlTemplate, ContainerPort);
+
+public sealed record ComposeAwdCheckerTarget(
+    string UrlTemplate,
+    string ServiceName,
+    int ContainerPort)
+    : AwdCheckerTargetDefinition(UrlTemplate, ContainerPort);
 
 public sealed record AwdFlagInjectionConfiguration(
     string Command,

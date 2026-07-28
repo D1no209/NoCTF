@@ -10,6 +10,7 @@ namespace NoCTF.Runner.Composition;
 public interface IOneShotRuntimeProviderCatalog
 {
     IOneShotJobRunner OneShot(RuntimeProvider provider);
+    IAttachedOneShotJobRunner Attached(RuntimeProvider provider);
 }
 
 public interface IContainerRuntimeProviderCatalog
@@ -56,6 +57,13 @@ public sealed class RuntimeProviderCatalog(IServiceProvider services)
     };
 
     public IOneShotJobRunner OneShot(RuntimeProvider provider) => provider switch
+    {
+        RuntimeProvider.Docker => services.GetRequiredService<DockerContainerLifecycle>(),
+        RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesContainerLifecycle>(),
+        _ => throw new UnsupportedRuntimeProviderException(provider)
+    };
+
+    public IAttachedOneShotJobRunner Attached(RuntimeProvider provider) => provider switch
     {
         RuntimeProvider.Docker => services.GetRequiredService<DockerContainerLifecycle>(),
         RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesContainerLifecycle>(),

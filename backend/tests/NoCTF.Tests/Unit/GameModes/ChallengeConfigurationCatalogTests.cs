@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using NoCTF.Application.Runtime.Ports;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
+using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Tests.Unit.GameModes;
@@ -559,10 +560,72 @@ public class ChallengeConfigurationCatalogTests
 
         var errors = catalog.Validate(
             GameMode.Awd,
-            WithChecker(catalog.GetDefaultJson(GameMode.Awd), checker));
+            WithChecker(GameMode.Awd, catalog.GetDefaultJson(GameMode.Awd), checker));
 
         await Assert.That(errors)
             .Contains("AWD Checker requires the Docker or Kubernetes provider.");
+    }
+
+    [Test]
+    public async Task Awd_checker_requires_the_runtime_provider_and_target_kind()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeProvider.Docker,
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"),
+            Limits: new(268_435_456, 500_000_000, 128));
+        var catalog = new GameModeChallengeConfigurationCatalog();
+        var challenge = WithAwdFlagInjection(WithRuntime(
+            catalog.GetDefaultJson(GameMode.Awd),
+            runtime));
+        var providerMismatch = WithAwdChecker(
+            challenge,
+            new AwdCheckerConfiguration(
+                new RunnerJobConfiguration(
+                    RuntimeProvider.Kubernetes,
+                    "registry.example/checker:v1"),
+                new ContainerAwdCheckerTarget(
+                    "http://{HOST}:{PORT}/health",
+                    8080)));
+        var kindMismatch = WithAwdChecker(
+            challenge,
+            new AwdCheckerConfiguration(
+                new RunnerJobConfiguration(
+                    RuntimeProvider.Docker,
+                    "registry.example/checker:v1"),
+                new ComposeAwdCheckerTarget(
+                    "http://{HOST}:{PORT}/health",
+                    "web",
+                    8080)));
+
+        await Assert.That(catalog.Validate(GameMode.Awd, providerMismatch))
+            .Contains("AWD Runtime and Checker must use the same provider.");
+        await Assert.That(catalog.Validate(GameMode.Awd, kindMismatch))
+            .Contains("Checker.Target kind must match the AWD Runtime kind.");
+    }
+
+    [Test]
+    public async Task Awd_checker_null_target_returns_a_validation_error()
+    {
+        var root = JsonNode.Parse(
+            new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awd))!
+            .AsObject();
+        root["checker"] = new JsonObject
+        {
+            ["job"] = new JsonObject
+            {
+                ["provider"] = 0,
+                ["image"] = "registry.example/checker:v1",
+                ["timeoutSeconds"] = 30
+            },
+            ["target"] = null
+        };
+
+        var errors = new GameModeChallengeConfigurationCatalog().Validate(
+            GameMode.Awd,
+            root.ToJsonString());
+
+        await Assert.That(errors).Contains("Checker.Target is required.");
     }
 
     [Test]
@@ -607,7 +670,7 @@ public class ChallengeConfigurationCatalogTests
 
         var errors = catalog.Validate(
             GameMode.Awdp,
-            WithChecker(catalog.GetDefaultJson(GameMode.Awdp), checker));
+            WithChecker(GameMode.Awdp, catalog.GetDefaultJson(GameMode.Awdp), checker));
 
         await Assert.That(errors)
             .Contains("AWDP Checker environment cannot configure Runner-reserved variables.");
@@ -630,7 +693,7 @@ public class ChallengeConfigurationCatalogTests
         {
             var errors = catalog.Validate(
                 mode,
-                WithChecker(catalog.GetDefaultJson(mode), checker));
+                WithChecker(mode, catalog.GetDefaultJson(mode), checker));
 
             await Assert.That(errors)
                 .Contains("Checker environment variable '1INVALID' is invalid.");
@@ -651,7 +714,7 @@ public class ChallengeConfigurationCatalogTests
         {
             var errors = catalog.Validate(
                 mode,
-                WithChecker(catalog.GetDefaultJson(mode), checker));
+                WithChecker(mode, catalog.GetDefaultJson(mode), checker));
 
             await Assert.That(errors).Contains("Checker.Image is required.");
         }
@@ -927,7 +990,28 @@ public class ChallengeConfigurationCatalogTests
         return root.ToJsonString();
     }
 
-    private static string WithChecker(string json, RunnerJobConfiguration checker)
+    private static string WithChecker(
+        GameMode mode,
+        string json,
+        RunnerJobConfiguration checker)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        object configured = mode == GameMode.Awd
+            ? new AwdCheckerConfiguration(
+                checker,
+                new ContainerAwdCheckerTarget(
+                    "http://{HOST}:{PORT}/health",
+                    8080))
+            : checker;
+        root["checker"] = JsonSerializer.SerializeToNode(
+            configured,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return root.ToJsonString();
+    }
+
+    private static string WithAwdChecker(
+        string json,
+        AwdCheckerConfiguration checker)
     {
         var root = JsonNode.Parse(json)!.AsObject();
         root["checker"] = JsonSerializer.SerializeToNode(

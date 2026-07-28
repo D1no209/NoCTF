@@ -12,7 +12,18 @@ namespace NoCTF.Tests.Unit.Runtime;
 public sealed class KubernetesContainerLifecycleTests
 {
     [Test]
-    public async Task Checker_callback_policy_only_allows_callback_port_and_dns()
+    [Arguments(
+        ContainerNetworkPurpose.AwdpVerification,
+        "awdp-checker",
+        "awdp-verification")]
+    [Arguments(
+        ContainerNetworkPurpose.AwdChecker,
+        "awd-checker",
+        "awd-checker")]
+    public async Task Checker_callback_policy_only_allows_callback_port_and_dns(
+        ContainerNetworkPurpose networkPurpose,
+        string purpose,
+        string jobKind)
     {
         var (client, core, networking) = CreateClient();
         V1Pod? createdPod = null;
@@ -39,10 +50,21 @@ public sealed class KubernetesContainerLifecycleTests
                 CallbackPodLabelValue: "awdp-callback",
                 ClusterDnsServiceAddress: "10.96.0.10"));
 
-        _ = await lifecycle.CreateAsync(CheckerRequest(), CancellationToken.None);
+        _ = await lifecycle.CreateAsync(
+            CheckerRequest() with
+            {
+                Labels = new Dictionary<string, string>
+                {
+                    ["noctf.io/purpose"] = purpose
+                },
+                NetworkPurpose = networkPurpose
+            },
+            CancellationToken.None);
 
         await Assert.That(createdPolicy).IsNotNull();
         await Assert.That(createdPod!.Metadata.Labels.ContainsKey("noctf.io/expires-at")).IsTrue();
+        await Assert.That(createdPod.Metadata.Labels["noctf.io/job-kind"])
+            .IsEqualTo(jobKind);
         await Assert.That(createdPolicy!.Spec.PodSelector.MatchLabels.All(label =>
             createdPod.Metadata.Labels.TryGetValue(label.Key, out var value)
             && string.Equals(value, label.Value, StringComparison.Ordinal))).IsTrue();
@@ -263,7 +285,8 @@ public sealed class KubernetesContainerLifecycleTests
         TimeSpan.FromMinutes(1),
         NetworkName: "sandbox-a",
         AllowInternalCallback: true,
-        Generation: 3);
+        Generation: 3,
+        NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
 
     private static HttpOperationException NotFound() => new("not found")
     {

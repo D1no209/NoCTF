@@ -89,6 +89,8 @@ public sealed class AwdpCheckerExecutorTests
     private sealed class RecordingCatalog(IOneShotJobRunner runner) : IOneShotRuntimeProviderCatalog
     {
         public IOneShotJobRunner OneShot(RuntimeProvider provider) => runner;
+        public IAttachedOneShotJobRunner Attached(RuntimeProvider provider) =>
+            throw new NotSupportedException();
     }
 
     private sealed class RecordingOneShotRunner : IOneShotJobRunner

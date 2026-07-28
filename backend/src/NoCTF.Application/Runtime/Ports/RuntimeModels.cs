@@ -45,7 +45,8 @@ public enum RuntimeEgressPolicy
 public enum ContainerNetworkPurpose
 {
     PersistentRuntime,
-    AwdpVerification
+    AwdpVerification,
+    AwdChecker
 }
 
 public sealed record RuntimeUrlBinding(
@@ -55,6 +56,11 @@ public sealed record RuntimeUrlBinding(
     string? ServiceName = null,
     string? VmId = null,
     int? GuestPort = null);
+
+public sealed record RuntimeInternalEndpointBinding(
+    string UrlTemplate,
+    int ContainerPort,
+    string? ServiceName = null);
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(ContainerRuntimeDefinition), "container")]
@@ -141,6 +147,7 @@ public sealed record ContainerRequest(
     Guid? RuntimeInstanceId = null,
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
     RuntimeUrlBinding? ControlCheckUrlBinding = null,
+    RuntimeInternalEndpointBinding? AwdCheckerTargetBinding = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll,
     ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime)
 {
@@ -229,6 +236,28 @@ public interface IRuntimeResourceReaper
 
     Task<RuntimeResourceReapResult> ReapExpiredAsync(
         DateTimeOffset now, CancellationToken cancellationToken);
+}
+
+public abstract record AttachedRuntimeTarget(
+    RuntimeResourceIdentity Identity);
+
+public sealed record AttachedContainerRuntimeTarget(
+    RuntimeResourceIdentity Identity,
+    ContainerReceipt Receipt)
+    : AttachedRuntimeTarget(Identity);
+
+public sealed record AttachedComposeRuntimeTarget(
+    RuntimeResourceIdentity Identity,
+    ComposeReceipt Receipt,
+    string ServiceName)
+    : AttachedRuntimeTarget(Identity);
+
+public interface IAttachedOneShotJobRunner
+{
+    Task<OneShotResult> RunAttachedAsync(
+        ContainerRequest request,
+        AttachedRuntimeTarget target,
+        CancellationToken cancellationToken);
 }
 
 public interface IRuntimeManagedResourceReconciler

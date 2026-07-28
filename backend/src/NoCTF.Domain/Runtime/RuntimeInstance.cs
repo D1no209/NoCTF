@@ -64,6 +64,10 @@ public sealed class RuntimeInstance
     public string[] Urls { get; set; } = [];
     public int[] ParticipantUrlIndexes { get; set; } = [];
     public string? ControlCheckUrl { get; set; }
+    [MaxLength(2048)]
+    public string? AwdCheckerTargetUrl { get; set; }
+    [MaxLength(256)]
+    public string? AwdCheckerTargetServiceName { get; set; }
     public long CheckerSequence { get; set; }
     public long LastAppliedCheckerSequence { get; set; }
     public byte[]? LastAppliedCheckerBodySha256 { get; set; }

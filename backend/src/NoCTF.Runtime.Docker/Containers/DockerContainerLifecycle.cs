@@ -6,8 +6,8 @@ using NoCTF.Domain.Runtime;
 namespace NoCTF.Runtime.Docker.Containers;
 
 /// <summary>Runs single-container challenge instances through Docker's native client.</summary>
-public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobRunner, IContainerSandboxLifecycle,
-    IRuntimeResourceReaper, IDisposable
+public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobRunner,
+    IAttachedOneShotJobRunner, IContainerSandboxLifecycle, IRuntimeResourceReaper, IDisposable
 {
     private readonly DockerClient client;
     private readonly DockerRuntimeOptions options;
@@ -514,18 +514,102 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public void Dispose() => client.Dispose();
 
+    private async Task<string> ResolveContainerTargetNetworkAsync(
+        AttachedContainerRuntimeTarget target,
+        CancellationToken cancellationToken)
+    {
+        var receipt = target.Receipt;
+        if (receipt.Provider != RuntimeProvider.Docker
+            || receipt.RuntimeInstanceId != target.Identity.RuntimeInstanceId
+            || receipt.Generation != target.Identity.Generation
+            || string.IsNullOrWhiteSpace(receipt.NetworkId))
+            throw new InvalidOperationException(
+                "The attached Container receipt has a different ownership identity.");
+        var network = await client.Networks.InspectNetworkAsync(
+            receipt.NetworkId,
+            cancellationToken);
+        if (!network.Internal
+            || !HasResourceIdentity(network.Labels, target.Identity)
+            || !HasNetworkPurpose(network.Labels, "persistent-runtime"))
+            throw new InvalidOperationException(
+                "The attached Container network has a different ownership identity.");
+        return network.ID;
+    }
+
+    private async Task<string> ResolveComposeTargetNetworkAsync(
+        AttachedComposeRuntimeTarget target,
+        CancellationToken cancellationToken)
+    {
+        var receipt = target.Receipt;
+        if (receipt.Provider != RuntimeProvider.Docker
+            || receipt.OperationId != target.Identity.RuntimeInstanceId
+            || receipt.Generation != target.Identity.Generation
+            || string.IsNullOrWhiteSpace(receipt.ProjectName)
+            || string.IsNullOrWhiteSpace(target.ServiceName))
+            throw new InvalidOperationException(
+                "The attached Compose receipt has a different ownership identity.");
+        var containers = await client.Containers.ListContainersAsync(
+            new ContainersListParameters
+            {
+                All = true,
+                Filters = new Dictionary<string, IDictionary<string, bool>>
+                {
+                    ["label"] = new Dictionary<string, bool>
+                    {
+                        [$"com.docker.compose.project={receipt.ProjectName}"] = true,
+                        [$"com.docker.compose.service={target.ServiceName}"] = true
+                    }
+                }
+            },
+            cancellationToken);
+        var container = containers.SingleOrDefault(item =>
+            HasResourceIdentity(item.Labels, target.Identity)
+            && HasJobKind(item.Labels, "persistent-runtime"))
+            ?? throw new InvalidOperationException(
+                "The attached Compose service was not found with the required ownership identity.");
+        var inspected = await client.Containers.InspectContainerAsync(
+            container.ID,
+            cancellationToken);
+        var networkIds = inspected.NetworkSettings?.Networks?.Values
+            .Select(endpoint => endpoint.NetworkID)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray() ?? [];
+        var owned = new List<NetworkResponse>();
+        foreach (var networkId in networkIds)
+        {
+            var network = await client.Networks.InspectNetworkAsync(
+                networkId,
+                cancellationToken);
+            if (network.Internal
+                && HasResourceIdentity(network.Labels, target.Identity)
+                && HasJobKind(network.Labels, "persistent-runtime")
+                && HasLabel(
+                    network.Labels,
+                    "com.docker.compose.project",
+                    receipt.ProjectName))
+                owned.Add(network);
+        }
+        return owned
+            .OrderBy(network => network.Name, StringComparer.Ordinal)
+            .Select(network => network.ID)
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException(
+                "The attached Compose service has no owned internal network.");
+    }
+
     private async Task ConnectInternalCallbackAsync(
         ContainerRequest request,
         string checkerContainerId,
         CancellationToken cancellationToken)
     {
         if (request.Generation <= 0)
-            throw new InvalidOperationException("An AWDP checker requires a positive Runtime generation.");
+            throw new InvalidOperationException("A scoring checker requires a positive Runtime generation.");
         if (!request.Environment.TryGetValue("NOCTF_CALLBACK_URL", out var callbackText)
             || !Uri.TryCreate(callbackText, UriKind.Absolute, out var callback)
             || callback.Scheme is not ("http" or "https"))
             throw new InvalidOperationException(
-                "An AWDP checker callback requires an absolute HTTP(S) callback URL.");
+                "A scoring checker callback requires an absolute HTTP(S) callback URL.");
         var callbackContainer = await client.Containers.InspectContainerAsync(
             options.CallbackContainerName, cancellationToken);
         if (callbackContainer.Config?.Labels is null
@@ -534,7 +618,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             || !string.Equals(
                 callbackRole, options.CallbackContainerLabelValue, StringComparison.Ordinal))
             throw new InvalidOperationException(
-                "The configured AWDP callback container does not carry the required role label.");
+                "The configured callback container does not carry the required role label.");
 
         var networkName = CallbackNetworkName(request.OperationId);
         var network = await FindNetworkAsync(networkName, cancellationToken);
@@ -546,9 +630,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 Internal = true,
                 Labels = new Dictionary<string, string>
                 {
-                    ["noctf.io/network-purpose"] = "awdp-callback",
+                    ["noctf.io/network-purpose"] = CallbackNetworkPurpose(request),
                     ["noctf.io/managed"] = "true",
-                    ["noctf.io/job-kind"] = "awdp-verification",
+                    ["noctf.io/job-kind"] = JobKind(request.NetworkPurpose),
                     ["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
                         ?? request.OperationId).ToString("D"),
                     ["noctf.io/generation"] = request.Generation.ToString(
@@ -562,11 +646,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         if (!network.Internal
             || network.Labels is null
             || !network.Labels.TryGetValue("noctf.io/network-purpose", out var purpose)
-            || !string.Equals(purpose, "awdp-callback", StringComparison.Ordinal)
+            || !string.Equals(purpose, CallbackNetworkPurpose(request), StringComparison.Ordinal)
             || !HasResourceIdentity(network.Labels, new RuntimeResourceIdentity(
                 request.RuntimeInstanceId ?? request.OperationId,
                 request.Generation)))
-            throw new InvalidOperationException("The AWDP callback network is not an internal managed network.");
+            throw new InvalidOperationException("The checker callback network is not an internal managed network.");
 
         if (network.Containers?.ContainsKey(callbackContainer.ID) != true)
         {
@@ -598,7 +682,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         CancellationToken cancellationToken)
     {
         if (network.Labels?.TryGetValue("noctf.io/network-purpose", out var purpose) == true
-            && string.Equals(purpose, "awdp-callback", StringComparison.Ordinal))
+            && purpose is "awdp-callback" or "awd-checker-callback")
         {
             var current = await client.Networks.InspectNetworkAsync(network.ID, cancellationToken);
             foreach (var containerId in current.Containers?.Keys ?? [])
@@ -807,6 +891,34 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
     }
 
+    public async Task<OneShotResult> RunAttachedAsync(
+        ContainerRequest request,
+        AttachedRuntimeTarget target,
+        CancellationToken cancellationToken)
+    {
+        if (request.Provider != RuntimeProvider.Docker)
+            throw new InvalidOperationException(
+                "An attached Docker job requires the Docker provider.");
+        var networkId = target switch
+        {
+            AttachedContainerRuntimeTarget container =>
+                await ResolveContainerTargetNetworkAsync(container, cancellationToken),
+            AttachedComposeRuntimeTarget compose =>
+                await ResolveComposeTargetNetworkAsync(compose, cancellationToken),
+            _ => throw new InvalidOperationException("The attached Runtime target is unsupported.")
+        };
+        return await RunAsync(
+            request with
+            {
+                NetworkName = networkId,
+                AllowInternalCallback = true,
+                Generation = target.Identity.Generation,
+                RuntimeInstanceId = target.Identity.RuntimeInstanceId,
+                NetworkPurpose = ContainerNetworkPurpose.AwdChecker
+            },
+            cancellationToken);
+    }
+
     private static bool RequiresIngressProxy(ContainerRequest request) =>
         request.NetworkIsolation == ContainerNetworkIsolation.Isolated
         && request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
@@ -850,7 +962,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         if (request.AllowInternalCallback)
         {
             labels["noctf.io/managed"] = "true";
-            labels["noctf.io/job-kind"] = "awdp-verification";
+            labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
             labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
                 ?? request.OperationId).ToString("D");
             labels["noctf.io/generation"] = request.Generation.ToString(
@@ -868,6 +980,19 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     private static string CallbackNetworkName(Guid operationId) =>
         $"noctf-callback-{operationId:N}";
 
+    private static string CallbackNetworkPurpose(ContainerRequest request) =>
+        request.NetworkPurpose == ContainerNetworkPurpose.AwdChecker
+            ? "awd-checker-callback"
+            : "awdp-callback";
+
+    private static string JobKind(ContainerNetworkPurpose purpose) => purpose switch
+    {
+        ContainerNetworkPurpose.AwdChecker => "awd-checker",
+        ContainerNetworkPurpose.AwdpVerification => "awdp-verification",
+        ContainerNetworkPurpose.PersistentRuntime => "persistent-runtime",
+        _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
+    };
+
     private static RuntimeStatus ToRuntimeStatus(string? status) => status?.ToLowerInvariant() switch
     {
         "created" => RuntimeStatus.Pending,
@@ -883,7 +1008,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         && labels.TryGetValue("noctf.io/managed", out var managed)
         && string.Equals(managed, "true", StringComparison.Ordinal)
         && labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-        && jobKind is "awdp-verification" or "persistent-runtime"
+        && jobKind is "awd-checker" or "awdp-verification" or "persistent-runtime"
         && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
         && Guid.TryParse(runtimeText, out var runtimeId)
         && runtimeId != Guid.Empty
@@ -909,6 +1034,18 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         && int.TryParse(generationText, System.Globalization.NumberStyles.None,
             System.Globalization.CultureInfo.InvariantCulture, out var generation)
         && generation == identity.Generation;
+
+    private static bool HasJobKind(
+        IDictionary<string, string>? labels,
+        string jobKind) => HasLabel(labels, "noctf.io/job-kind", jobKind);
+
+    private static bool HasLabel(
+        IDictionary<string, string>? labels,
+        string key,
+        string value) =>
+        labels is not null
+        && labels.TryGetValue(key, out var actual)
+        && string.Equals(actual, value, StringComparison.Ordinal);
 
     private static bool HasNetworkPurpose(
         IDictionary<string, string>? labels,

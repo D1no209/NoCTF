@@ -50,7 +50,8 @@ public sealed class RuntimeProviderHandler(
                 expanded = RuntimeUrlExpander.ExpandContainer(
                     receipt,
                     message.Definition.UrlBindings,
-                    message.Definition.ControlCheckUrlBinding);
+                    message.Definition.ControlCheckUrlBinding,
+                    message.Definition.AwdCheckerTargetBinding);
             }
             catch (InvalidOperationException)
             {
@@ -75,7 +76,9 @@ public sealed class RuntimeProviderHandler(
                 expanded.Urls,
                 expanded.ParticipantUrlIndexes,
                 message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
-                expanded.ControlCheckUrl);
+                expanded.ControlCheckUrl,
+                expanded.AwdCheckerTargetUrl,
+                expanded.AwdCheckerTargetServiceName);
         }
         catch (TimeoutException)
         {
@@ -172,7 +175,8 @@ public sealed class RuntimeProviderHandler(
                     receipt,
                     status,
                     message.Definition.UrlBindings,
-                    message.Definition.ControlCheckUrlBinding);
+                    message.Definition.ControlCheckUrlBinding,
+                    message.Definition.AwdCheckerTargetBinding);
             }
             catch (InvalidOperationException)
             {
@@ -196,7 +200,9 @@ public sealed class RuntimeProviderHandler(
                 message.Definition.Ttl is { } ttl
                     ? DateTimeOffset.UtcNow.Add(ttl)
                     : null,
-                expanded.ControlCheckUrl);
+                expanded.ControlCheckUrl,
+                expanded.AwdCheckerTargetUrl,
+                expanded.AwdCheckerTargetServiceName);
         }
         catch (TimeoutException)
         {
@@ -426,10 +432,14 @@ public static class RuntimeWriteBackHandler
         instance.Urls = [.. message.Urls];
         instance.ParticipantUrlIndexes = [.. message.ParticipantUrlIndexes];
         instance.ControlCheckUrl = message.ControlCheckUrl;
+        instance.AwdCheckerTargetUrl = message.AwdCheckerTargetUrl;
+        instance.AwdCheckerTargetServiceName = message.AwdCheckerTargetServiceName;
         instance.State = RuntimeState.Running;
         instance.RunningAt = DateTimeOffset.UtcNow;
         instance.ExpiresAt = message.ExpiresAt;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        if (message.AwdCheckerTargetUrl is not null)
+            instance.NextCheckerDueAt = instance.RunningAt;
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.SubmissionId is Guid submissionId)
         {
