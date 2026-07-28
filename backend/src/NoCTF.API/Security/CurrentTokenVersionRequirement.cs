@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using NoCTF.Application.Authentication.Ports;
+using NoCTF.Application.Authentication.RefreshSession;
 
 namespace NoCTF.API.Security;
 

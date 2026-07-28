@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -12,8 +12,8 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.Challenges.Flags;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Challenges.Flags;
+using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
@@ -45,7 +45,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
 
             await using var db = new NoCtfDbContext(options);
             var runtimeFlags = new PostgresPerTeamRuntimeFlagStore(db);
-            var runtimes = new EfRuntimeInstanceStore(
+            var runtimes = new RuntimeInstanceStore(
                 db,
                 templates,
                 runtimeFlags,

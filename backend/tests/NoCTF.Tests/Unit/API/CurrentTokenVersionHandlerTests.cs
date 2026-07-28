@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using NoCTF.API.Security;
-using NoCTF.Application.Authentication.Ports;
+using NoCTF.Application.Authentication.RefreshSession;
 
 namespace NoCTF.Tests.Unit.API;
 

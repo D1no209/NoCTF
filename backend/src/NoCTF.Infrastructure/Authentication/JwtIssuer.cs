@@ -3,7 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using NoCTF.Application.Authentication.Ports;
+using NoCTF.Application.Authentication.Account;
 
 namespace NoCTF.Infrastructure.Authentication;
 

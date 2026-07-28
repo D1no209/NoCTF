@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Competitions.Management;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -63,7 +63,7 @@ public sealed class CompetitionManagementPersistenceTests
             });
             await db.SaveChangesAsync(cancellationToken);
 
-            var result = await new EfCompetitionManagementStore(db)
+            var result = await new CompetitionManagementStore(db)
                 .FindAsync(competitionId, includeDraft: false, cancellationToken);
 
             await Assert.That(result).IsNotNull();

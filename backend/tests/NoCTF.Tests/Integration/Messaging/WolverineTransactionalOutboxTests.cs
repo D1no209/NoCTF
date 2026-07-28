@@ -14,7 +14,8 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Competitions.Awd;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 using Wolverine;
@@ -822,7 +823,7 @@ public sealed class LifecycleTransitionProbeHandler
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var store = new EfCompetitionLifecycleStore(db, null!, outbox);
+        var store = new CompetitionLifecycleStore(db, null!, outbox);
         var applied = await store.TryTransitionWithAuditAsync(
             message.CompetitionId,
             CompetitionStatus.Running,

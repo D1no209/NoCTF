@@ -1,6 +1,6 @@
 using NoCTF.GameModes.Ctf.Scoring;
 using DynamicExpresso.Exceptions;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
 

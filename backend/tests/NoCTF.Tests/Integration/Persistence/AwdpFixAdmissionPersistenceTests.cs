@@ -8,7 +8,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Submissions.Intake;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -38,7 +38,7 @@ public sealed class AwdpFixAdmissionPersistenceTests
             await using (var intakeDb = new NoCtfDbContext(options))
             {
                 var useCase = new SubmitFix(
-                    new EfSubmissionIntakeStore(
+                    new SubmissionIntakeStore(
                         intakeDb,
                         new OpenApiTransactionalMessageOutbox()),
                     new GameModeSubmissionAdmissionPolicy());
@@ -67,7 +67,7 @@ public sealed class AwdpFixAdmissionPersistenceTests
             await using (var intakeDb = new NoCtfDbContext(options))
             {
                 var useCase = new SubmitFix(
-                    new EfSubmissionIntakeStore(
+                    new SubmissionIntakeStore(
                         intakeDb,
                         new OpenApiTransactionalMessageOutbox()),
                     new GameModeSubmissionAdmissionPolicy());

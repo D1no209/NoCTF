@@ -3,7 +3,7 @@ using k8s.Models;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Networking;
 

@@ -82,6 +82,68 @@ public sealed partial class TargetArchitectureRulesTests
     }
 
     [Test]
+    public async Task Application_and_infrastructure_are_organized_by_capability()
+    {
+        var forbiddenDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Ports",
+            "UseCaseAdapters",
+            "Services",
+            "Helpers"
+        };
+        var violations = new[] { "NoCTF.Application", "NoCTF.Infrastructure" }
+            .SelectMany(project => Directory.EnumerateDirectories(
+                Path.Combine(BackendRoot, "src", project), "*", SearchOption.AllDirectories))
+            .Where(path => forbiddenDirectories.Contains(Path.GetFileName(path)))
+            .Select(path => Path.GetRelativePath(BackendRoot, path))
+            .ToArray();
+
+        await Assert.That(violations).IsEmpty();
+    }
+
+    [Test]
+    public async Task Source_has_no_removed_horizontal_namespaces()
+    {
+        var files = EnumerateProjectSourceFiles("NoCTF.Application", "NoCTF.Infrastructure");
+        var violations = new List<string>();
+        foreach (var file in files)
+        {
+            var source = await File.ReadAllTextAsync(file);
+            if (source.Contains(".Ports", StringComparison.Ordinal)
+                || source.Contains(".Persistence.UseCaseAdapters", StringComparison.Ordinal))
+                violations.Add(Path.GetRelativePath(BackendRoot, file));
+        }
+
+        await Assert.That(violations).IsEmpty();
+    }
+
+    [Test]
+    public async Task Infrastructure_types_are_named_for_their_business_responsibility()
+    {
+        var files = EnumerateProjectSourceFiles("NoCTF.Infrastructure");
+        var violations = files
+            .Where(path => Path.GetFileNameWithoutExtension(path).StartsWith("Ef", StringComparison.Ordinal)
+                || EfTypeNameRegex().IsMatch(File.ReadAllText(path)))
+            .Select(path => Path.GetRelativePath(BackendRoot, path))
+            .ToArray();
+
+        await Assert.That(violations).IsEmpty();
+    }
+
+    [Test]
+    public async Task Infrastructure_composition_root_only_composes_capability_registrations()
+    {
+        var source = await File.ReadAllTextAsync(Path.Combine(
+            BackendRoot, "src", "NoCTF.Infrastructure", "ServiceRegistration.cs"));
+
+        await Assert.That(source).DoesNotContain("services.AddScoped");
+        await Assert.That(source).DoesNotContain("services.AddSingleton");
+        await Assert.That(source).DoesNotContain("services.AddTransient");
+        await Assert.That(source).DoesNotContain("services.AddHttpClient");
+        await Assert.That(source).DoesNotContain("services.AddDbContext");
+    }
+
+    [Test]
     public async Task Runtime_provider_and_game_mode_catalogs_are_closed_enums()
     {
         await Assert.That(Enum.GetValues<GameMode>())
@@ -130,9 +192,27 @@ public sealed partial class TargetArchitectureRulesTests
         throw new DirectoryNotFoundException("Could not locate the backend repository root.");
     }
 
+    private static string[] EnumerateProjectSourceFiles(params string[] projects) =>
+        projects
+            .SelectMany(project => Directory.EnumerateFiles(
+                Path.Combine(BackendRoot, "src", project), "*.cs", SearchOption.AllDirectories))
+            .Where(path => !path.Contains(
+                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal)
+                && !path.Contains(
+                    $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                    StringComparison.Ordinal)
+                && !path.Contains(
+                    $"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}",
+                    StringComparison.Ordinal))
+            .ToArray();
+
     [GeneratedRegex(@"\b(from|where|select|join)\s+[A-Za-z_][A-Za-z0-9_]*\s+in\b")]
     private static partial Regex QuerySyntaxRegex();
 
     [GeneratedRegex(@"\b(ServiceId|StageId|RuntimeOperationId|ChallengeInstanceId)\b")]
     private static partial Regex LegacyDimensionRegex();
+
+    [GeneratedRegex(@"\b(class|record|struct)\s+Ef[A-Z][A-Za-z0-9_]*\b")]
+    private static partial Regex EfTypeNameRegex();
 }

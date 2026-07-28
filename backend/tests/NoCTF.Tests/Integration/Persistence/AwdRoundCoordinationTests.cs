@@ -7,9 +7,10 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Runtime;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Awd;
 using NoCTF.Runner.Messages;
 using Testcontainers.PostgreSql;
 

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.Application.Notifications;
-using NoCTF.Application.Submissions.Ports;
+using NoCTF.Application.Submissions.Status;
 using NoCTF.API.SignalR.Hubs;
 
 namespace NoCTF.API.SignalR.Publishing;

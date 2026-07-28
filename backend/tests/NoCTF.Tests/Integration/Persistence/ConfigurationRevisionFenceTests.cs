@@ -6,7 +6,8 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Challenges.Configuration;
+using NoCTF.Infrastructure.Competitions.Configuration;
 using NoCTF.Infrastructure.Messaging;
 using Testcontainers.PostgreSql;
 
@@ -36,7 +37,7 @@ public sealed class ConfigurationRevisionFenceTests
 
             CompetitionConfigurationView competitionSnapshot;
             await using (var snapshotDb = new NoCtfDbContext(options))
-                competitionSnapshot = (await new EfCompetitionConfigurationStore(
+                competitionSnapshot = (await new CompetitionConfigurationStore(
                     snapshotDb,
                     new OpenApiTransactionalMessageOutbox())
                     .FindAsync(ids.CompetitionId, cancellationToken))!;
@@ -51,7 +52,7 @@ public sealed class ConfigurationRevisionFenceTests
 
             await using (var updateDb = new NoCtfDbContext(options))
             {
-                var result = await new EfCompetitionConfigurationStore(
+                var result = await new CompetitionConfigurationStore(
                     updateDb,
                     new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,
@@ -67,7 +68,7 @@ public sealed class ConfigurationRevisionFenceTests
 
             ChallengeConfigurationView challengeSnapshot;
             await using (var snapshotDb = new NoCtfDbContext(options))
-                challengeSnapshot = (await new EfChallengeConfigurationStore(
+                challengeSnapshot = (await new ChallengeConfigurationStore(
                     snapshotDb,
                     new OpenApiTransactionalMessageOutbox())
                     .FindAsync(ids.CompetitionId, ids.CompetitionChallengeId, cancellationToken))!;
@@ -83,7 +84,7 @@ public sealed class ConfigurationRevisionFenceTests
 
             await using (var updateDb = new NoCtfDbContext(options))
             {
-                var result = await new EfChallengeConfigurationStore(
+                var result = await new ChallengeConfigurationStore(
                     updateDb,
                     new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,

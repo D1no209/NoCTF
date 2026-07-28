@@ -9,7 +9,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Submissions.Processing;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
@@ -55,7 +55,7 @@ public sealed class AwdpFixResultPersistenceTests
             var outbox = new RecordingOutbox();
             InternalResultDisposition disposition;
             await using (var db = new NoCtfDbContext(options))
-                disposition = await new EfInternalResultStore(db, outbox)
+                disposition = await new InternalResultStore(db, outbox)
                     .RecordAwdpAsync(result, cancellationToken);
 
             await Assert.That(disposition).IsEqualTo(InternalResultDisposition.Superseded);
@@ -115,11 +115,11 @@ public sealed class AwdpFixResultPersistenceTests
 
             InternalResultDisposition first;
             await using (var db = new NoCtfDbContext(options))
-                first = await new EfInternalResultStore(db, outbox)
+                first = await new InternalResultStore(db, outbox)
                     .RecordAwdpAsync(result, cancellationToken);
             InternalResultDisposition replay;
             await using (var db = new NoCtfDbContext(options))
-                replay = await new EfInternalResultStore(db, outbox)
+                replay = await new InternalResultStore(db, outbox)
                     .RecordAwdpAsync(result, cancellationToken);
 
             await Assert.That(first).IsEqualTo(InternalResultDisposition.Applied);

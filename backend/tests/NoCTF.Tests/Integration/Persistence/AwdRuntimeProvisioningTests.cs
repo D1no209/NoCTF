@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Runtime.Ports;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -12,6 +12,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Awd;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;

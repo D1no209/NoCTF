@@ -3,7 +3,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Persistence.UseCaseAdapters;
+using NoCTF.Infrastructure.Challenges.Attachments;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -56,7 +56,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                 UpdatedAt = now
             });
             await db.SaveChangesAsync(cancellationToken);
-            var store = new EfChallengeAttachmentStore(db);
+            var store = new ChallengeAttachmentStore(db);
 
             var added = await store.AddAsync(
                 challengeId,
