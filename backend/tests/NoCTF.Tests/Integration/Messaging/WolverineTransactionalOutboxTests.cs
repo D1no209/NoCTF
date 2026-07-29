@@ -455,7 +455,7 @@ public sealed class WolverineTransactionalOutboxTests
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
-                    ConfigurationJson = System.Text.Json.JsonSerializer.Serialize(
+                    RulesJson = System.Text.Json.JsonSerializer.Serialize(
                         new AwdChallengeConfiguration(
                             AwdChallengeConfiguration.CurrentSchemaVersion),
                         new System.Text.Json.JsonSerializerOptions(

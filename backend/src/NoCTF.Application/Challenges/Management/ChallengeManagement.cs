@@ -40,6 +40,7 @@ public enum ChallengeMutationFailure
 {
     CompetitionNotFound,
     TemplateNotFound,
+    TemplateModeMismatch,
     ChallengeNotFound,
     ChallengeOrderConflict,
     RevisionConflict
@@ -88,6 +89,7 @@ internal static class ChallengeMutationFailureProtocol
     {
         ChallengeMutationFailure.CompetitionNotFound => "competition_not_found",
         ChallengeMutationFailure.TemplateNotFound => "challenge_template_not_found",
+        ChallengeMutationFailure.TemplateModeMismatch => "challenge_template_mode_mismatch",
         ChallengeMutationFailure.ChallengeNotFound => "competition_challenge_not_found",
         ChallengeMutationFailure.ChallengeOrderConflict => "challenge_order_conflict",
         ChallengeMutationFailure.RevisionConflict => "revision_conflict",

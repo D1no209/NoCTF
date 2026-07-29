@@ -201,7 +201,7 @@ public sealed class ChallengeHintStore(
             .Join(db.Challenges.IgnoreQueryFilters().AsNoTracking(), item => item.ChallengeId, template => template.Id,
                 (item, template) => new LeaderboardChallengeFact(
                     item.Id, template.Direction, item.DeletedAt != null || template.DeletedAt != null,
-                    item.ConfigurationJson))
+                    item.RulesJson))
             .ToListAsync(ct);
         var submissions = await db.Submissions.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId && item.CurrentScoringEventId != null)

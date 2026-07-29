@@ -61,6 +61,11 @@ public sealed class AwdFlagInjectionWorkReader(
                 pair => pair.Runtime.TeamId,
                 flag => flag.TeamId,
                 (pair, flag) => new { pair.Runtime, pair.Challenge, Flag = flag })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.Challenge.ChallengeId,
+                template => template.Id,
+                (item, template) => new { item.Runtime, item.Challenge, item.Flag, Template = template })
             .Where(target => target.Flag.Id == message.ChallengeFlagId
                 && target.Flag.CompetitionChallengeId == message.CompetitionChallengeId
                 && target.Flag.SpecificationKind == SpecificationKind.AwdRound
@@ -73,12 +78,12 @@ public sealed class AwdFlagInjectionWorkReader(
                 target.Runtime.RuntimeProvider,
                 ProviderReceiptJson = target.Runtime.ProviderReceiptJson!,
                 target.Flag.Flag,
-                target.Challenge.ConfigurationJson
+                target.Template.DefinitionJson
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null)
             return null;
-        var injection = configurations.Get(target.ConfigurationJson);
+        var injection = configurations.Get(target.DefinitionJson);
         if (injection is null)
             return null;
         return new(

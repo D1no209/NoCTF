@@ -11,17 +11,15 @@ public sealed class AwdpTargetDefinitionFactoryTests
     {
         var operationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition("target:latest"),
-            RunnerPool: "awdp");
+            new ContainerRuntimeDefinition("target:latest", InternalPorts: [8080]));
 
         var definition = AwdpTargetDefinitionFactory.Create(
             operationId,
             generation: 3,
             template,
-            targetPort: 8080,
-            DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
+            RuntimeProvider.Docker,
+            now: DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(definition.NetworkIsolation)
             .IsEqualTo(ContainerNetworkIsolation.Isolated);
@@ -36,12 +34,9 @@ public sealed class AwdpTargetDefinitionFactoryTests
     }
 
     [Test]
-    [Arguments(RuntimeProvider.Docker, RuntimeKind.Compose)]
-    [Arguments(RuntimeProvider.Libvirt, RuntimeKind.Container)]
-    [Arguments(RuntimeProvider.Libvirt, RuntimeKind.OvaVm)]
-    public async Task Disposable_target_rejects_non_container_or_non_sandbox_provider(
-        RuntimeProvider provider,
-        RuntimeKind kind)
+    [Arguments(RuntimeKind.Compose)]
+    [Arguments(RuntimeKind.OvaVm)]
+    public async Task Disposable_target_rejects_non_container_definition(RuntimeKind kind)
     {
         ChallengeRuntimeDefinition definition = kind switch
         {
@@ -58,12 +53,11 @@ public sealed class AwdpTargetDefinitionFactoryTests
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
         var template = new ChallengeRuntimeTemplate(
-            provider,
             RuntimeAllocation.PerTeam,
             definition);
 
         var action = () => AwdpTargetDefinitionFactory.Create(
-            Guid.NewGuid(), 1, template, 8080, DateTimeOffset.UtcNow);
+            Guid.NewGuid(), 1, template, RuntimeProvider.Docker, DateTimeOffset.UtcNow);
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }

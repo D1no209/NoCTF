@@ -48,6 +48,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             var runtimes = new RuntimeInstanceStore(
                 db,
                 templates,
+                new FixedRuntimePlacementPolicy(),
                 runtimeFlags,
                 outbox);
 
@@ -183,8 +184,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
         });
 
         var perTeamRuntime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 Environment: new Dictionary<string, string>
@@ -266,7 +266,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             ChallengeId = challengeId,
             Order = order,
             IsPublished = true,
-            ConfigurationJson = configurationJson,
+            RulesJson = configurationJson,
             UpdatedAt = now
         });
     }

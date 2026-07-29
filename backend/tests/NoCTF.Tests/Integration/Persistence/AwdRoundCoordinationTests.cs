@@ -163,15 +163,15 @@ public sealed class AwdRoundCoordinationTests
                     [],
                     [],
                     null,
-                    AwdCheckerTargetUrl: "http://green-container:8080/health"),
+                    AwdCheckerTargetHost: "green-container"),
                 db,
                 outbox,
                 cancellationToken);
             var runningGreenRuntime = await db.RuntimeInstances.SingleAsync(
                 runtime => runtime.Id == greenRuntimeId,
                 cancellationToken);
-            await Assert.That(runningGreenRuntime.AwdCheckerTargetUrl)
-                .IsEqualTo("http://green-container:8080/health");
+            await Assert.That(runningGreenRuntime.AwdCheckerTargetHost)
+                .IsEqualTo("green-container");
             await Assert.That(runningGreenRuntime.NextCheckerDueAt).IsNotNull();
             var deferredInjection = outbox.RunnerNodeMessages.OfType<InjectAwdFlag>().Last();
             var greenFlag = await db.ChallengeFlags.AsNoTracking().SingleAsync(
@@ -294,7 +294,7 @@ public sealed class AwdRoundCoordinationTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            ConfigurationJson = JsonSerializer.Serialize(
+            RulesJson = JsonSerializer.Serialize(
                 new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = now

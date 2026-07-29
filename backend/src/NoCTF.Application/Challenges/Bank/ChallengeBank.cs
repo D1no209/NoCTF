@@ -1,5 +1,7 @@
 using NoCTF.Application.Common;
+using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Challenges.Bank;
 
@@ -7,30 +9,36 @@ public sealed record ChallengeTemplateView(
     Guid Id,
     Guid OwnerId,
     IReadOnlyList<Guid> ManagerIds,
+    GameMode Mode,
     ChallengeVisibility Visibility,
     string Title,
     string? Description,
     string Direction,
+    string DefinitionJson,
     int Revision,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
 public sealed record CreateChallengeTemplateCommand(
     Guid OwnerId,
+    GameMode Mode,
     ChallengeVisibility Visibility,
     string Title,
     string? Description,
     string Direction,
+    string DefinitionJson,
     DateTimeOffset CreatedAt);
 
 public sealed record UpdateChallengeTemplateCommand(
     Guid ChallengeId,
     Guid ActorId,
     bool IsAdministrator,
+    GameMode Mode,
     ChallengeVisibility Visibility,
     string Title,
     string? Description,
     string Direction,
+    string DefinitionJson,
     int ExpectedRevision,
     DateTimeOffset UpdatedAt);
 
@@ -48,27 +56,49 @@ public interface IChallengeBankStore
 
 public static class ChallengeTemplateValidation
 {
-    public static OperationResult Validate(string title, string direction, int expectedRevision = 0)
+    public static OperationResult Validate(
+        GameMode mode,
+        string title,
+        string direction,
+        string definitionJson,
+        int expectedRevision = 0)
     {
+        if (!Enum.IsDefined(mode))
+            return OperationResult.Failure("invalid_mode", "Mode is invalid.");
         if (string.IsNullOrWhiteSpace(title) || title.Length > 160)
             return OperationResult.Failure("invalid_title", "Title is required and must be at most 160 characters.");
         if (string.IsNullOrWhiteSpace(direction) || direction.Length > 96)
             return OperationResult.Failure("invalid_direction", "Direction is required and must be at most 96 characters.");
+        if (string.IsNullOrWhiteSpace(definitionJson))
+            return OperationResult.Failure("invalid_definition", "DefinitionJson is required.");
         if (expectedRevision < 0)
             return OperationResult.Failure("invalid_revision", "ExpectedRevision cannot be negative.");
         return OperationResult.Success();
     }
 }
 
-public sealed class CreateChallengeTemplate(IChallengeBankStore store)
+public sealed class CreateChallengeTemplate(
+    IChallengeBankStore store,
+    IChallengeConfigurationCatalog configurations)
 {
     public async Task<OperationResult<ChallengeTemplateView>> ExecuteAsync(
         CreateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
-        var validation = ChallengeTemplateValidation.Validate(command.Title, command.Direction);
+        var validation = ChallengeTemplateValidation.Validate(
+            command.Mode,
+            command.Title,
+            command.Direction,
+            command.DefinitionJson);
         if (!validation.Succeeded)
             return OperationResult<ChallengeTemplateView>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
+        var definitionErrors = configurations.ValidateDefinition(
+            command.Mode,
+            command.DefinitionJson);
+        if (definitionErrors.Count > 0)
+            return OperationResult<ChallengeTemplateView>.Failure(
+                "invalid_definition",
+                string.Join(" ", definitionErrors));
         var result = await store.CreateAsync(command with
         {
             Title = command.Title.Trim(),
@@ -99,15 +129,29 @@ public sealed class GetChallengeTemplate(IChallengeBankStore store)
         store.FindAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
 }
 
-public sealed class UpdateChallengeTemplate(IChallengeBankStore store)
+public sealed class UpdateChallengeTemplate(
+    IChallengeBankStore store,
+    IChallengeConfigurationCatalog configurations)
 {
     public async Task<OperationResult<ChallengeTemplateView>> ExecuteAsync(
         UpdateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
-        var validation = ChallengeTemplateValidation.Validate(command.Title, command.Direction, command.ExpectedRevision);
+        var validation = ChallengeTemplateValidation.Validate(
+            command.Mode,
+            command.Title,
+            command.Direction,
+            command.DefinitionJson,
+            command.ExpectedRevision);
         if (!validation.Succeeded)
             return OperationResult<ChallengeTemplateView>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
+        var definitionErrors = configurations.ValidateDefinition(
+            command.Mode,
+            command.DefinitionJson);
+        if (definitionErrors.Count > 0)
+            return OperationResult<ChallengeTemplateView>.Failure(
+                "invalid_definition",
+                string.Join(" ", definitionErrors));
         var result = await store.UpdateAsync(command with
         {
             Title = command.Title.Trim(),

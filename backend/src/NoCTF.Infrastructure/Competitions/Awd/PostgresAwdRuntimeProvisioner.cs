@@ -13,6 +13,7 @@ namespace NoCTF.Infrastructure.Competitions.Awd;
 public sealed class PostgresAwdRuntimeProvisioner(
     NoCtfDbContext db,
     IChallengeRuntimeTemplateCatalog templates,
+    IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
     TimeProvider timeProvider) : IAwdRuntimeProvisioner
 {
@@ -39,12 +40,15 @@ public sealed class PostgresAwdRuntimeProvisioner(
             .Where(challenge => challenge.CompetitionId == competitionId
                 && challenge.IsPublished
                 && challenge.DeletedAt == null)
-            .Select(challenge => new
-            {
-                challenge.Id,
-                challenge.ConfigurationJson,
-                challenge.Revision
-            })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                challenge => challenge.ChallengeId,
+                template => template.Id,
+                (challenge, template) => new
+                {
+                    challenge.Id,
+                    template.DefinitionJson
+                })
             .ToListAsync(cancellationToken);
         var teamIds = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
@@ -79,7 +83,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
         var created = new List<RuntimeInstance>();
         foreach (var challenge in challenges)
         {
-            var template = templates.Get(GameMode.Awd, challenge.ConfigurationJson)
+            var template = templates.Get(GameMode.Awd, challenge.DefinitionJson)
                 ?? throw new InvalidOperationException(
                     $"Published AWD challenge '{challenge.Id}' has no Runtime template.");
             foreach (var teamId in teamIds)
@@ -87,6 +91,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
                 var key = (challenge.Id, teamId);
                 if (active.Contains(key))
                     continue;
+                var placement = placementPolicy.Resolve(template.RuntimeKind);
                 var runtime = new RuntimeInstance
                 {
                     Id = Guid.CreateVersion7(createdAt),
@@ -96,10 +101,9 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     Purpose = RuntimePurpose.Player,
                     Generation = checked(maximumGenerations.GetValueOrDefault(key) + 1),
                     RuntimeKind = template.RuntimeKind,
-                    RuntimeProvider = template.Provider,
-                    RunnerPool = template.RunnerPool,
+                    RuntimeProvider = placement.Provider,
+                    RunnerPool = placement.RunnerPool,
                     State = RuntimeState.Queued,
-                    ConfigurationRevision = challenge.Revision,
                     CreatedAt = createdAt
                 };
                 db.RuntimeInstances.Add(runtime);

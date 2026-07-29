@@ -50,6 +50,11 @@ public sealed class PostgresAwdRoundCoordinator(
                 challenge => challenge.CompetitionId,
                 competition => competition.Id,
                 (challenge, competition) => new { Challenge = challenge, Competition = competition })
+            .Join(
+                db.Challenges,
+                target => target.Challenge.ChallengeId,
+                template => template.Id,
+                (target, template) => new { target.Challenge, target.Competition, Template = template })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || target.Competition.Mode != GameMode.Awd
@@ -116,9 +121,7 @@ public sealed class PostgresAwdRoundCoordinator(
             })
             .ToListAsync(cancellationToken);
         var runtimeByTeam = runtimes.ToDictionary(instance => instance.TeamId);
-        var template = ResolveTemplate(
-            target.Competition.ConfigurationJson,
-            target.Challenge.ConfigurationJson);
+        var template = ResolveTemplate(target.Template.DefinitionJson);
         var candidates = existingFlags.Select(flag => flag.Flag).ToHashSet(StringComparer.Ordinal);
         foreach (var teamId in missing)
         {
@@ -215,6 +218,11 @@ public sealed class PostgresAwdRoundCoordinator(
                 challenge => challenge.CompetitionId,
                 competition => competition.Id,
                 (challenge, competition) => new { Challenge = challenge, Competition = competition })
+            .Join(
+                db.Challenges,
+                target => target.Challenge.ChallengeId,
+                template => template.Id,
+                (target, template) => new { target.Challenge, target.Competition, Template = template })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || target.Competition.Mode != GameMode.Awd
@@ -388,11 +396,10 @@ public sealed class PostgresAwdRoundCoordinator(
         return effective;
     }
 
-    private static PerTeamFlagTemplate ResolveTemplate(string competitionJson, string challengeJson)
+    private static PerTeamFlagTemplate ResolveTemplate(string definitionJson)
     {
-        var competition = AwdConfigurationUpgrader.ParseCompetition(competitionJson);
-        var challenge = AwdConfigurationUpgrader.ParseChallenge(challengeJson);
-        return challenge.FlagTemplate ?? competition.FlagTemplate ?? PerTeamFlagTemplate.Default;
+        var challenge = AwdConfigurationUpgrader.ParseChallenge(definitionJson);
+        return challenge.FlagTemplate ?? PerTeamFlagTemplate.Default;
     }
 
     private static string GenerateCandidate(

@@ -39,9 +39,9 @@ Team 只属于一个 Competition。字段包含 `CaptainId` 与无顺序语义�
 
 ### Challenge 与 CompetitionChallenge
 
-`Challenge` 是全局可复用题库模板，拥有题面、方向、模板 Attachment、模板级静态 Flag、OwnerId、ManagerIds 和 `Private | Shared` 可见性。它不包含比赛排序、发布状态、分数、Hint 或模式实例配置。
+`Challenge` 是且只属于一个 GameMode 的全局可复用题库模板，拥有题面、方向、模板 Attachment、明文模板静态 Flag，以及 provider-neutral 的 Runtime、Checker、动态 Flag 生成/注入定义。它不包含比赛排序、发布状态、分数、Hint、RuntimeProvider 或 RunnerPool。
 
-`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有 Order、IsPublished、BaseScore、Revision、模式 Configuration JSON 和 Hint。模板修改实时影响所有引用，不做快照复制。
+`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有 Order、IsPublished、BaseScore、Revision、Rules JSON 和 Hint。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Generation；下一次 Start/Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
 
 ### Submission 与 ScoringEvent
 
@@ -74,11 +74,11 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 
 1. 重读状态、StartAt/EndAt 与 revision；只接受 Visible/Published，EndAt 必须仍在未来；
 2. 校验 Competition 配置 schema、至少一个已发布且未删除的 CompetitionChallenge、所有实例模板存在且未删除；
-3. 校验每个已发布题的 mode schema、Flag/Attachment/Runtime/Checker/URL/RunnerPool 组合；
+3. 校验每个已发布题的 Challenge.Mode、Definition/Rules schema、Flag/Attachment/Runtime/Checker/逻辑 URL 组合；
 4. 校验所有 Approved Team 未删除/未 Ban且成员数组有效；
 5. CTF：Static 题至少有一个可用通用 Flag或合法 RandomOne 候选；PerTeam 只验证模板，Flag 仍在各队 Runtime Start 前按需确认/生成；
-6. AWD：仅 Container/Compose，RunnerPool 在线，按队 Runtime 额度足以覆盖全部 AWD 题，注入与 Checker 定义有效；此时只建启动任务，不提前生成 Round Flag；
-7. AWDP：Container target/Checker/Patch 定义完整，ObjectStorage 与对应 RunnerPool 可用；
+6. AWD：仅 Container/Compose，平台部署的 Runtime provider/runner pool 可用，按队 Runtime 额度足以覆盖全部 AWD 题，注入与 Checker 定义有效；此时只建启动任务，不提前生成 Round Flag；
+7. AWDP：Container target/Checker/Patch 定义完整，ObjectStorage 与平台 Runtime placement 可用；
 8. KoH：共享 Runtime/Control URL 有效，为所有队生成缺失 Control Flag；
 9. 无错误时设置 Running/RunningSince、追加 lifecycle owned audit，并在同事务写 Runtime/调度 Outbox；有任一错误则零状态变更、零启动消息。
 

@@ -5,26 +5,31 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class CreateChallengeTemplateRequest
 {
+    public GameMode Mode { get; set; }
     public ChallengeVisibility Visibility { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Direction { get; set; } = string.Empty;
+    public string DefinitionJson { get; set; } = """{"schemaVersion":1}""";
 }
 
 public sealed record ChallengeTemplateResponse(
     Guid Id,
     Guid OwnerId,
     IReadOnlyList<Guid> ManagerIds,
+    GameMode Mode,
     ChallengeVisibility Visibility,
     string Title,
     string? Description,
     string Direction,
+    string DefinitionJson,
     int Revision,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
@@ -33,9 +38,11 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
 {
     public CreateChallengeTemplateValidator()
     {
+        RuleFor(request => request.Mode).IsInEnum();
         RuleFor(request => request.Visibility).IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.Direction).NotEmpty().MaximumLength(96);
+        RuleFor(request => request.DefinitionJson).NotEmpty();
     }
 }
 

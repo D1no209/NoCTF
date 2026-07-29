@@ -6,7 +6,9 @@ namespace NoCTF.Application.Competitions.Lifecycle;
 
 public sealed record StartGateChallenge(
     Guid CompetitionChallengeId,
-    string ConfigurationJson,
+    GameMode ChallengeMode,
+    string RulesJson,
+    string DefinitionJson,
     bool Published);
 
 public sealed record CompetitionStartGateSnapshot(
@@ -49,7 +51,9 @@ public sealed class CompetitionStartGate(
                 "The competition must be Published before it can start."));
         var publishedChallengeConfigurations = snapshot.Challenges
             .Where(challenge => challenge.Published)
-            .Select(challenge => challenge.ConfigurationJson)
+            .Select(challenge => new ChallengeConfigurationSections(
+                challenge.RulesJson,
+                challenge.DefinitionJson))
             .ToArray();
         foreach (var message in competitionConfigurations.ValidateForStart(
                      snapshot.Mode,
@@ -69,13 +73,28 @@ public sealed class CompetitionStartGate(
                 "At least one approved team is required."));
         foreach (var challenge in snapshot.Challenges.Where(item => item.Published))
         {
-            foreach (var message in challengeConfigurations.Validate(
+            if (challenge.ChallengeMode != snapshot.Mode)
+            {
+                errors.Add(new(
+                    "challenge_mode_mismatch",
+                    challenge.CompetitionChallengeId,
+                    $"Challenge mode {challenge.ChallengeMode} does not match competition mode {snapshot.Mode}."));
+                continue;
+            }
+            foreach (var message in challengeConfigurations.ValidateRules(
                          snapshot.Mode,
-                         challenge.ConfigurationJson,
+                         challenge.RulesJson,
                          snapshot.ConfigurationJson,
                          snapshot.ApprovedTeamCount))
                 errors.Add(new(
-                    "challenge_configuration_invalid",
+                    "challenge_rules_invalid",
+                    challenge.CompetitionChallengeId,
+                    message));
+            foreach (var message in challengeConfigurations.ValidateDefinition(
+                         snapshot.Mode,
+                         challenge.DefinitionJson))
+                errors.Add(new(
+                    "challenge_definition_invalid",
                     challenge.CompetitionChallengeId,
                     message));
         }

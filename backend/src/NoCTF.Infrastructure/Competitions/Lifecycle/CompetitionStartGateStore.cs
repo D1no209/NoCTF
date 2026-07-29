@@ -27,10 +27,16 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
         var challenges = await db.CompetitionChallenges.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId
                 && item.DeletedAt == null)
-            .Select(item => new StartGateChallenge(
-                item.Id,
-                item.ConfigurationJson,
-                item.IsPublished))
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.ChallengeId,
+                template => template.Id,
+                (item, template) => new StartGateChallenge(
+                    item.Id,
+                    template.Mode,
+                    item.RulesJson,
+                    template.DefinitionJson,
+                    item.IsPublished))
             .ToArrayAsync(ct);
         var teams = await db.Teams.AsNoTracking().CountAsync(
             team => team.CompetitionId == competitionId

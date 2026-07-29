@@ -65,7 +65,7 @@ public static class BackendMessageHandlers
                     || (runtime.CheckerDeadlineAt != null
                         && runtime.CheckerDeadlineAt <= message.At))
                 && runtime.RunnerId != null
-                && runtime.AwdCheckerTargetUrl != null
+                && runtime.AwdCheckerTargetHost != null
                 && (message.AfterRuntimeInstanceId == null
                     || runtime.Id.CompareTo(message.AfterRuntimeInstanceId.Value) > 0))
             .Join(
@@ -83,6 +83,17 @@ public static class BackendMessageHandlers
                     pair.Challenge,
                     Competition = competition
                 })
+            .Join(
+                db.Challenges,
+                target => target.Challenge.ChallengeId,
+                challenge => challenge.Id,
+                (target, challenge) => new
+                {
+                    target.Runtime,
+                    target.Challenge,
+                    target.Competition,
+                    Template = challenge
+                })
             .Where(target => target.Competition.Mode == NoCTF.Domain.Competitions.GameMode.Awd
                 && target.Competition.Status == NoCTF.Domain.Competitions.CompetitionStatus.Running)
             .OrderBy(target => target.Runtime.Id)
@@ -94,7 +105,8 @@ public static class BackendMessageHandlers
         {
             var settings = configurations.Get(
                 target.Competition.ConfigurationJson,
-                target.Challenge.ConfigurationJson);
+                target.Challenge.RulesJson,
+                target.Template.DefinitionJson);
             if (settings.Checker is not { } checker)
             {
                 target.Runtime.NextCheckerDueAt = null;
@@ -108,7 +120,8 @@ public static class BackendMessageHandlers
                 if (target.Runtime.CheckerDeadlineAt is { } deadline && deadline <= message.At)
                 {
                     target.Runtime.LastAppliedCheckerSequence = target.Runtime.CheckerSequence;
-                    target.Runtime.LastAppliedCheckerBodySha256 = null;
+                    target.Runtime.CheckerStatus = AwdServiceState.Unknown;
+                    target.Runtime.CheckerStatusUpdatedAt = message.At;
                     target.Runtime.CheckerDeadlineAt = null;
                     await outbox.PublishAsync(new AwdCheckerCallbackMissing(
                         target.Runtime.CompetitionId,
@@ -390,32 +403,31 @@ public static class BackendMessageHandlers
                 pair => pair.Instance.CompetitionId,
                 competition => competition.Id,
                 (pair, competition) => new { pair.Instance, pair.Challenge, Competition = competition })
+            .Join(
+                db.Challenges,
+                item => item.Challenge.ChallengeId,
+                challenge => challenge.Id,
+                (item, challenge) => new
+                {
+                    item.Instance,
+                    item.Challenge,
+                    item.Competition,
+                    Template = challenge
+                })
             .SingleOrDefaultAsync(item => item.Instance.Id == message.RuntimeInstanceId, cancellationToken);
         if (target is null ||
             target.Instance.State != RuntimeState.Queued ||
             target.Instance.ProcessingVersion != message.ProcessingVersion)
             return;
 
-        if (target.Instance.Purpose == RuntimePurpose.AwdpTarget
-            && (target.Instance.ConfigurationRevision != target.Challenge.Revision
-                || target.Instance.CompetitionConfigurationRevision
-                    != target.Competition.ConfigurationRevision))
-        {
-            target.Instance.State = RuntimeState.Failed;
-            target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
-            await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
-            await db.SaveChangesAsync(cancellationToken);
-            return;
-        }
-
         var awdpConfiguration = target.Instance.Purpose == RuntimePurpose.AwdpTarget
             ? AwdpConfigurationResolver.Resolve(
                 target.Competition.ConfigurationJson,
-                target.Challenge.ConfigurationJson)
+                target.Challenge.RulesJson,
+                target.Template.DefinitionJson)
             : null;
         var template = awdpConfiguration?.Runtime
-            ?? templates.Get(target.Competition.Mode, target.Challenge.ConfigurationJson);
+            ?? templates.Get(target.Competition.Mode, target.Template.DefinitionJson);
         if (template is null)
         {
             target.Instance.State = RuntimeState.Failed;
@@ -461,7 +473,7 @@ public static class BackendMessageHandlers
                     target.Instance.Id,
                     target.Instance.Generation,
                     template,
-                    awdpConfiguration!.TargetPort,
+                    target.Instance.RuntimeProvider,
                     DateTimeOffset.UtcNow);
                 claim = new ClaimContainerRuntime(
                     target.Instance.Id,
@@ -476,7 +488,7 @@ public static class BackendMessageHandlers
                     target.Instance,
                     target.Competition.Mode,
                     template,
-                    target.Challenge.ConfigurationJson,
+                    target.Template.DefinitionJson,
                     perTeamFlag);
             }
         }

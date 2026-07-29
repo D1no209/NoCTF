@@ -28,7 +28,7 @@ public static class RuntimeClaimFactory
         return template.Definition switch
         {
             ContainerRuntimeDefinition definition
-                when template.Provider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
+                when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
                 new ClaimContainerRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
@@ -36,7 +36,7 @@ public static class RuntimeClaimFactory
                     instance.RunnerPool,
                     new ContainerRequest(
                         instance.Id,
-                        template.Provider,
+                        instance.RuntimeProvider,
                         definition.Image,
                         definition.Command ?? [],
                         ContainerEnvironment(definition, fixedFlag),
@@ -48,7 +48,7 @@ public static class RuntimeClaimFactory
                         ttl,
                         OperationTimeout: operationTimeout,
                         NetworkIsolation: ContainerNetworkIsolation.Isolated,
-                        InternalPorts: InternalPorts(mode, template, checkerTarget),
+                        InternalPorts: InternalPorts(mode, template, definition),
                         Generation: instance.Generation,
                         RuntimeInstanceId: instance.Id,
                         UrlBindings: template.UrlBindings,
@@ -58,7 +58,7 @@ public static class RuntimeClaimFactory
                         AwdCheckerTargetBinding: checkerTarget,
                         EgressPolicy: definition.EgressPolicy)),
             ComposeRuntimeDefinition definition
-                when template.Provider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
+                when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
                 new ClaimComposeRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
@@ -66,7 +66,7 @@ public static class RuntimeClaimFactory
                     instance.RunnerPool,
                     new ComposeRequest(
                         instance.Id,
-                        template.Provider,
+                        instance.RuntimeProvider,
                         instance.Generation,
                         ResourceName(instance),
                         definition.ComposeYaml,
@@ -81,7 +81,7 @@ public static class RuntimeClaimFactory
                         checkerTarget,
                         ServiceEnvironment(definition, fixedFlag),
                         definition.EgressPolicy)),
-            OvaRuntimeDefinition definition when template.Provider == RuntimeProvider.Libvirt =>
+            OvaRuntimeDefinition definition when instance.RuntimeProvider == RuntimeProvider.Libvirt =>
                 new ClaimOvaRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
@@ -111,33 +111,26 @@ public static class RuntimeClaimFactory
     {
         if (mode != GameMode.Awd)
             return null;
-        var target = AwdConfigurationUpgrader.ParseChallenge(
-            challengeConfigurationJson).Checker?.Target;
-        return target switch
+        var checker = AwdConfigurationUpgrader.ParseChallenge(
+            challengeConfigurationJson).Checker;
+        if (checker is null)
+            return null;
+        return checker.TargetServiceName switch
         {
-            ContainerAwdCheckerTarget container => new(
-                container.UrlTemplate,
-                container.ContainerPort),
-            ComposeAwdCheckerTarget compose => new(
-                compose.UrlTemplate,
-                compose.ContainerPort,
-                compose.ServiceName),
-            null => null,
-            _ => throw new InvalidOperationException("Unsupported AWD Checker target kind.")
+            { Length: > 0 } serviceName => new(serviceName),
+            _ => new()
         };
     }
 
     private static IReadOnlyList<int>? InternalPorts(
         GameMode mode,
         ChallengeRuntimeTemplate template,
-        RuntimeInternalEndpointBinding? checkerTarget)
+        ContainerRuntimeDefinition definition)
     {
-        var ports = new List<int>();
+        var ports = new List<int>(definition.InternalPorts ?? []);
         if (mode == GameMode.Koh
             && template.ControlCheckUrlBinding?.ContainerPort is int controlPort)
             ports.Add(controlPort);
-        if (checkerTarget is { ServiceName: null })
-            ports.Add(checkerTarget.ContainerPort);
         return ports.Count == 0 ? null : ports.Distinct().Order().ToArray();
     }
 

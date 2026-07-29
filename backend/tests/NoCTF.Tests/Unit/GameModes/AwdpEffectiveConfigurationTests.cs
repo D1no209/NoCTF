@@ -49,8 +49,6 @@ public sealed class AwdpEffectiveConfigurationTests
             .Contains("Runtime is required before an AWDP competition can start.");
         await Assert.That(AwdpConfigurationValidator.ValidateForStart(effective))
             .Contains("Checker is required before an AWDP competition can start.");
-        await Assert.That(AwdpConfigurationValidator.ValidateForStart(effective))
-            .Contains("TargetPort must be a valid TCP port before an AWDP competition can start.");
     }
 
     [Test]
@@ -91,7 +89,12 @@ public sealed class AwdpEffectiveConfigurationTests
                 NoCTF.Domain.Competitions.GameMode.Awdp,
                 NoCTF.Domain.Competitions.CompetitionStatus.Published,
                 competition,
-                [new(challengeId, challenge, true)],
+                [new(
+                    challengeId,
+                    NoCTF.Domain.Competitions.GameMode.Awdp,
+                    challenge,
+                    challenge,
+                    true)],
                 1)),
             new GameModeCompetitionConfigurationValidator(),
             new GameModeChallengeConfigurationCatalog());

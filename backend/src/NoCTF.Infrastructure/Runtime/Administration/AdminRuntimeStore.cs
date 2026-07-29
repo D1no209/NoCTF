@@ -12,6 +12,7 @@ namespace NoCTF.Infrastructure.Runtime.Administration;
 public sealed class AdminRuntimeStore(
     NoCtfDbContext db,
     IChallengeRuntimeTemplateCatalog templates,
+    IRuntimePlacementPolicy placementPolicy,
     IPerTeamRuntimeFlagStore runtimeFlags,
     ITransactionalMessageOutbox outbox) : IAdminRuntimeStore
 {
@@ -94,6 +95,16 @@ public sealed class AdminRuntimeStore(
                     Competition = competition,
                     Challenge = challenge
                 })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                scope => scope.Challenge.ChallengeId,
+                template => template.Id,
+                (scope, template) => new
+                {
+                    scope.Competition,
+                    Instance = scope.Challenge,
+                    Template = template
+                })
             .SingleOrDefaultAsync(ct);
         if (scope is null || scope.Competition.Status != CompetitionStatus.Running)
             return new(null, RuntimeMutationFailure.NotFound);
@@ -128,7 +139,7 @@ public sealed class AdminRuntimeStore(
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
             }
-            var template = templates.Get(scope.Competition.Mode, scope.Challenge.ConfigurationJson);
+            var template = templates.Get(scope.Competition.Mode, scope.Template.DefinitionJson);
             if (template is null)
                 return new(null, RuntimeMutationFailure.ConfigurationInvalid);
             if (scope.Competition.Mode == GameMode.Ctf
@@ -149,6 +160,7 @@ public sealed class AdminRuntimeStore(
                     return new(null, RuntimeMutationFailure.ConfigurationInvalid);
                 }
             }
+            var placement = placementPolicy.Resolve(template.RuntimeKind);
             entity = new RuntimeInstance
             {
                 Id = Guid.CreateVersion7(now),
@@ -157,10 +169,9 @@ public sealed class AdminRuntimeStore(
                 TeamId = teamId,
                 Generation = checked((current?.Generation ?? 0) + 1),
                 RuntimeKind = template.RuntimeKind,
-                RuntimeProvider = template.Provider,
-                RunnerPool = template.RunnerPool,
+                RuntimeProvider = placement.Provider,
+                RunnerPool = placement.RunnerPool,
                 State = RuntimeState.Queued,
-                ConfigurationRevision = scope.Challenge.Revision,
                 ReplacesRuntimeInstanceId = requiresCleanup ? current?.Id : null,
                 CreatedAt = now,
                 ExpiresAt = null

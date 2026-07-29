@@ -20,11 +20,25 @@ public sealed record ChallengeConfigurationView(
 public interface IChallengeConfigurationCatalog
 {
     string GetDefaultJson(GameMode mode);
+    string GetDefaultDefinitionJson(GameMode mode) => GetDefaultJson(mode);
+
     IReadOnlyList<string> Validate(
         GameMode mode,
         string json,
         string competitionConfigurationJson,
         int eligibleTeamCount);
+
+    IReadOnlyList<string> ValidateRules(
+        GameMode mode,
+        string json,
+        string competitionConfigurationJson,
+        int eligibleTeamCount) =>
+        Validate(mode, json, competitionConfigurationJson, eligibleTeamCount);
+
+    IReadOnlyList<string> ValidateDefinition(
+        GameMode mode,
+        string json) =>
+        Validate(mode, json, "{}", 1);
 }
 
 public interface IChallengeConfigurationStore
@@ -92,7 +106,7 @@ public sealed class UpdateChallengeConfiguration(
             return OperationResult<ChallengeConfigurationView>.Failure(
                 "challenge_not_found",
                 "Challenge was not found.");
-        var errors = catalog.Validate(
+        var errors = catalog.ValidateRules(
             current.Mode,
             json,
             current.CompetitionConfigurationJson,

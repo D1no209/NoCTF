@@ -78,8 +78,7 @@ public sealed class RuntimeProviderHandler(
                 expanded.ParticipantUrlIndexes,
                 message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
                 expanded.ControlCheckUrl,
-                expanded.AwdCheckerTargetUrl,
-                expanded.AwdCheckerTargetServiceName);
+                expanded.AwdCheckerTargetHost);
         }
         catch (TimeoutException)
         {
@@ -202,8 +201,7 @@ public sealed class RuntimeProviderHandler(
                     ? DateTimeOffset.UtcNow.Add(ttl)
                     : null,
                 expanded.ControlCheckUrl,
-                expanded.AwdCheckerTargetUrl,
-                expanded.AwdCheckerTargetServiceName);
+                expanded.AwdCheckerTargetHost);
         }
         catch (TimeoutException)
         {
@@ -433,36 +431,21 @@ public static class RuntimeWriteBackHandler
         instance.Urls = [.. message.Urls];
         instance.ParticipantUrlIndexes = [.. message.ParticipantUrlIndexes];
         instance.ControlCheckUrl = message.ControlCheckUrl;
-        instance.AwdCheckerTargetUrl = message.AwdCheckerTargetUrl;
-        instance.AwdCheckerTargetServiceName = message.AwdCheckerTargetServiceName;
+        instance.AwdCheckerTargetHost = message.AwdCheckerTargetHost;
         instance.State = RuntimeState.Running;
         instance.RunningAt = DateTimeOffset.UtcNow;
         instance.ExpiresAt = message.ExpiresAt;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
-        if (message.AwdCheckerTargetUrl is not null)
+        if (message.AwdCheckerTargetHost is not null)
             instance.NextCheckerDueAt = instance.RunningAt;
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.SubmissionId is Guid submissionId)
         {
             var submission = await db.Submissions
                 .SingleOrDefaultAsync(item => item.Id == submissionId, cancellationToken);
-            var currentRevisions = await db.CompetitionChallenges.AsNoTracking()
-                .Where(challenge => challenge.Id == instance.CompetitionChallengeId)
-                .Join(
-                    db.Competitions.AsNoTracking(),
-                    challenge => challenge.CompetitionId,
-                    competition => competition.Id,
-                    (challenge, competition) => new
-                    {
-                        Challenge = (int?)challenge.Revision,
-                        Competition = (int?)competition.ConfigurationRevision
-                    })
-                .SingleOrDefaultAsync(cancellationToken);
             if (submission is null
                 || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
-                || submission.ProcessingVersion != instance.SubmissionProcessingVersion
-                || currentRevisions?.Challenge != instance.ConfigurationRevision
-                || currentRevisions?.Competition != instance.CompetitionConfigurationRevision)
+                || submission.ProcessingVersion != instance.SubmissionProcessingVersion)
             {
                 if (submission is not null
                     && submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing

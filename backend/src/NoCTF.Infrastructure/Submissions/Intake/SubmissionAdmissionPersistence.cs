@@ -72,7 +72,7 @@ internal static class SubmissionAdmissionPersistence
             scope.Competition.ConfigurationRevision,
             scope.CompetitionChallenge.Revision,
             scope.Competition.ConfigurationJson,
-            scope.CompetitionChallenge.ConfigurationJson,
+            scope.CompetitionChallenge.RulesJson,
             attempts.GetValueOrDefault(SubmissionKind.Flag)
                 + attempts.GetValueOrDefault(SubmissionKind.Break),
             attempts.GetValueOrDefault(SubmissionKind.Fix),

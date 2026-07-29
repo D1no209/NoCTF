@@ -190,7 +190,7 @@ public sealed class AwdpFixAdmissionPersistenceTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            ConfigurationJson =
+            RulesJson =
                 """{"schemaVersion":1,"break":{"settlement":0,"points":10},"fix":{"settlement":0,"points":20},"requireBreakBeforeFix":true,"maxBreakSubmissions":10,"maxFixSubmissions":10}""",
             UpdatedAt = now
         });

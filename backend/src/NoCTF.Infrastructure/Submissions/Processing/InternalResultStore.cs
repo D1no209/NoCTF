@@ -25,19 +25,8 @@ public sealed class InternalResultStore(
             .SingleOrDefaultAsync(ct);
         if (runtime is null)
             return InternalResultDisposition.NotFound;
-        if (runtime.Generation != result.Generation ||
-            result.ProcessingVersion < runtime.ProcessingVersion ||
-            result.CheckerSequence < runtime.LastAppliedCheckerSequence)
+        if (runtime.Generation != result.Generation)
             return InternalResultDisposition.Superseded;
-        if (result.ProcessingVersion > runtime.ProcessingVersion)
-            return InternalResultDisposition.Conflict;
-        if (result.CheckerSequence > runtime.CheckerSequence)
-            return InternalResultDisposition.Conflict;
-        if (runtime.LastAppliedCheckerSequence == result.CheckerSequence
-            && runtime.LastAppliedCheckerBodySha256 is { } previousBody)
-            return CryptographicOperations.FixedTimeEquals(previousBody, result.BodySha256)
-                ? InternalResultDisposition.Duplicate
-                : InternalResultDisposition.Conflict;
 
         var revisions = await db.CompetitionChallenges
             .Where(challenge => challenge.Id == runtime.CompetitionChallengeId)
@@ -77,7 +66,7 @@ public sealed class InternalResultStore(
                 TeamId = runtime.TeamId,
                 Kind = ScoringEventKind.AwdServiceStatus,
                 Result = scoringResult,
-                ProcessingVersion = result.CheckerSequence,
+                ProcessingVersion = runtime.CheckerSequence,
                 CompetitionConfigurationRevision = revisions.Competition.ConfigurationRevision,
                 CompetitionChallengeRevision = revisions.ChallengeRevision,
                 OccurredAt = result.OccurredAt,
@@ -87,8 +76,9 @@ public sealed class InternalResultStore(
                 checked(revisions.Competition.LeaderboardRevision + 1);
             await outbox.PublishAsync(new ProjectLeaderboard(runtime.CompetitionId));
         }
-        runtime.LastAppliedCheckerSequence = result.CheckerSequence;
-        runtime.LastAppliedCheckerBodySha256 = result.BodySha256;
+        runtime.CheckerStatus = result.State;
+        runtime.CheckerStatusUpdatedAt = result.OccurredAt;
+        runtime.LastAppliedCheckerSequence = runtime.CheckerSequence;
         runtime.CheckerDeadlineAt = null;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -137,27 +127,6 @@ public sealed class InternalResultStore(
             .SingleAsync(ct);
         if (context.Competition.Mode != GameMode.Awdp || submission.Kind != SubmissionKind.Fix)
             return InternalResultDisposition.NotFound;
-        if (runtime.ConfigurationRevision != context.Challenge.Revision
-            || runtime.CompetitionConfigurationRevision
-                != context.Competition.ConfigurationRevision)
-        {
-            submission.EvaluationState = SubmissionEvaluationState.PlatformFailed;
-            submission.EvaluationFailureCode = ScoringFailureCode.CheckerPlatformError;
-            submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
-            runtime.State = RuntimeState.Stopping;
-            runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
-            await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
-                runtime.Id,
-                runtime.ProcessingVersion,
-                runtime.RunnerPool,
-                runtime.RunnerId
-                    ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
-            await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
-            return InternalResultDisposition.Superseded;
-        }
-
         var decision = AwdpFixOutcomeMapper.Map(result.Outcome);
         if (decision.Result == ScoringResult.PlatformFailed)
         {

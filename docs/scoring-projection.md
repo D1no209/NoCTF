@@ -8,7 +8,7 @@ ScoringEvent 只保存事实，绝不保存分数。排行榜使用当前 Compet
 
 - Points、Penalty、DynamicExpresso、血奖、Hint Cost、AWDP Achievement settlement/RoundDuration、排名可见性等投影参数立即对全部当前事件重新计算；不保存旧值，也不冻结 Finished 榜。AWDP 轮次按当前配置和生命周期审计重分组。
 - Flag、次数、Evaluator/Checker、Runtime/Archive 规则只用于之后的接入/判定/新 Runtime；既有 ScoringEvent 仍是事实，必须由管理者显式重判才改变。
-- 正在 Running 的 Runtime 不热改镜像/资源/URL/环境；新配置只用于下一 Generation。AWD Checker interval/definition 从下一次尚未分配的 CheckerSequence 生效。
+- 正在 Running 的 Runtime 不热改镜像/资源/URL/环境；Challenge 定义修改只用于下一次 Start/Reset，不记录定义版本，也不自动更新现有 Generation。AWD Checker interval/definition 从下一次尚未开始的检查生效。
 - 已生成的 PerTeam/RandomOne/AWD Flag 不因模板变化自动替换；具体规则见 Flag 文档。修改 AWD RoundDuration/HardeningDuration 不改写已生成 Flag 的 ValidStart/ValidUntil，也不重编号已产生事件；当前 AWD 轮完成后再按新 duration 生成下一轮。
 
 因此 `configuration_revision` 记录某次判定使用的配置版本只用于诊断和重判选择，不用于恢复旧分值；投影永远读取当前投影参数。

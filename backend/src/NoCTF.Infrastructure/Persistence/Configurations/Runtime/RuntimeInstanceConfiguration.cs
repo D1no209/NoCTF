@@ -18,15 +18,10 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                 "last_applied_checker_sequence <= checker_sequence");
             table.HasCheckConstraint(
                 "ck_runtime_instances_awd_checker_target",
-                "(awd_checker_target_url IS NULL AND awd_checker_target_service_name IS NULL) OR "
-                + "(awd_checker_target_url IS NOT NULL AND ((runtime_kind = 0 AND awd_checker_target_service_name IS NULL) "
-                + "OR (runtime_kind = 1 AND awd_checker_target_service_name IS NOT NULL)))");
+                "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
             table.HasCheckConstraint(
                 "ck_runtime_instances_awdp_submission",
                 "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
-            table.HasCheckConstraint(
-                "ck_runtime_instances_awdp_competition_revision",
-                "(purpose = 1) = (competition_configuration_revision IS NOT NULL)");
         });
         builder.HasKey(instance => instance.Id);
         builder.Property(instance => instance.RuntimeKind).HasConversion<short>();
@@ -34,6 +29,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
         builder.Property(instance => instance.RuntimeProvider).HasConversion<short>();
         builder.Property(instance => instance.State).HasConversion<short>();
         builder.Property(instance => instance.FailureCode).HasConversion<short>();
+        builder.Property(instance => instance.CheckerStatus).HasConversion<short>();
         builder.Property(instance => instance.ProcessingVersion).IsConcurrencyToken();
         builder.Property(instance => instance.ProviderReceiptJson).HasColumnType("jsonb");
         builder.Property(instance => instance.Urls).HasColumnType("text[]");

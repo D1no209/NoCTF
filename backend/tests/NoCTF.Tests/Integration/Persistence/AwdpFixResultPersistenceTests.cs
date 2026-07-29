@@ -259,8 +259,6 @@ public sealed class AwdpFixResultPersistenceTests
             RunnerId = "runner-a",
             State = RuntimeState.Running,
             ProcessingVersion = 5,
-            ConfigurationRevision = 2,
-            CompetitionConfigurationRevision = 0,
             ProviderReceiptJson = "{}",
             CreatedAt = fixture.Now,
             RunningAt = fixture.Now
@@ -331,7 +329,7 @@ public sealed class AwdpFixResultPersistenceTests
             ChallengeId = challengeId,
             IsPublished = true,
             Revision = 2,
-            ConfigurationJson = "{}",
+            RulesJson = "{}",
             UpdatedAt = now
         });
         db.PatchUploads.Add(new PatchUpload
@@ -379,8 +377,6 @@ public sealed class AwdpFixResultPersistenceTests
             RunnerId = "runner-a",
             State = RuntimeState.Running,
             ProcessingVersion = 3,
-            ConfigurationRevision = 2,
-            CompetitionConfigurationRevision = 0,
             ProviderReceiptJson = "{}",
             CreatedAt = now,
             RunningAt = now

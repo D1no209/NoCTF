@@ -116,8 +116,7 @@ public sealed record RuntimeProvisioned(
     IReadOnlyList<int> ParticipantUrlIndexes,
     DateTimeOffset? ExpiresAt,
     string? ControlCheckUrl = null,
-    string? AwdCheckerTargetUrl = null,
-    string? AwdCheckerTargetServiceName = null);
+    string? AwdCheckerTargetHost = null);
 
 public sealed record RuntimeProvisionFailed(
     Guid RuntimeInstanceId,

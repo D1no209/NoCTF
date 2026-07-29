@@ -13,10 +13,12 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         {
             Id = Guid.CreateVersion7(command.CreatedAt),
             OwnerId = command.OwnerId,
+            Mode = command.Mode,
             Visibility = command.Visibility,
             Title = command.Title,
             Description = command.Description,
             Direction = command.Direction,
+            DefinitionJson = command.DefinitionJson,
             CreatedAt = command.CreatedAt,
             UpdatedAt = command.CreatedAt
         };
@@ -33,8 +35,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             .OrderByDescending(challenge => challenge.UpdatedAt)
             .ThenBy(challenge => challenge.Id)
             .Select(challenge => new ChallengeTemplateView(
-                challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Visibility,
-                challenge.Title, challenge.Description, challenge.Direction, challenge.Revision,
+                challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Mode, challenge.Visibility,
+                challenge.Title, challenge.Description, challenge.Direction, challenge.DefinitionJson, challenge.Revision,
                 challenge.CreatedAt, challenge.UpdatedAt))
             .ToListAsync(ct);
 
@@ -51,8 +53,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         return Authorized(source, actorId, isAdministrator)
             .Where(challenge => challenge.Id == challengeId)
             .Select(challenge => new ChallengeTemplateView(
-                challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Visibility,
-                challenge.Title, challenge.Description, challenge.Direction, challenge.Revision,
+                challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Mode, challenge.Visibility,
+                challenge.Title, challenge.Description, challenge.Direction, challenge.DefinitionJson, challenge.Revision,
                 challenge.CreatedAt, challenge.UpdatedAt))
             .SingleOrDefaultAsync(ct);
     }
@@ -67,10 +69,12 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
                 challenge.Revision == command.ExpectedRevision, ct);
         if (entity is null)
             return null;
+        entity.Mode = command.Mode;
         entity.Visibility = command.Visibility;
         entity.Title = command.Title;
         entity.Description = command.Description;
         entity.Direction = command.Direction;
+        entity.DefinitionJson = command.DefinitionJson;
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
         await db.SaveChangesAsync(ct);
@@ -187,10 +191,12 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             challenge.Id,
             challenge.OwnerId,
             challenge.ManagerIds,
+            challenge.Mode,
             challenge.Visibility,
             challenge.Title,
             challenge.Description,
             challenge.Direction,
+            challenge.DefinitionJson,
             challenge.Revision,
             challenge.CreatedAt,
             challenge.UpdatedAt);

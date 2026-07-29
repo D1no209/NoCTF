@@ -44,6 +44,7 @@ public sealed class AwdRuntimeProvisioningTests
             var provisioner = new PostgresAwdRuntimeProvisioner(
                 db,
                 new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(runnerPool: "awd-tests"),
                 outbox,
                 TimeProvider.System);
             var first = await provisioner.EnsureAsync(
@@ -126,15 +127,13 @@ public sealed class AwdRuntimeProvisioningTests
             ChallengeId = challengeId,
             IsPublished = true,
             Revision = 3,
-            ConfigurationJson = JsonSerializer.Serialize(
+            RulesJson = JsonSerializer.Serialize(
                 new AwdChallengeConfiguration(
                     AwdChallengeConfiguration.CurrentSchemaVersion,
                     Runtime: new ChallengeRuntimeTemplate(
-                        RuntimeProvider.Docker,
-                        RuntimeAllocation.PerTeam,
+                                                RuntimeAllocation.PerTeam,
                         new ContainerRuntimeDefinition("awd-runtime:fixture"),
                         new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
-                        RunnerPool: "awd-tests",
                         FlagSource: RuntimeFlagSource.AwdRotation),
                     FlagInjection: new AwdFlagInjectionConfiguration(
                         "printf '%s' '${FLAG}' > /dev/shm/flag")),
@@ -168,18 +167,18 @@ public sealed class AwdRuntimeProvisioningTests
         string name,
         bool banned,
         DateTimeOffset now) => new()
-    {
-        Id = id,
-        CompetitionId = competitionId,
-        Name = name,
-        NormalizedName = name.ToUpperInvariant(),
-        CaptainId = captainId,
-        MemberIds = [captainId],
-        InvitationToken = id.ToString("N"),
-        RegistrationStatus = TeamRegistrationStatus.Approved,
-        IsBanned = banned,
-        RegisteredAt = now
-    };
+        {
+            Id = id,
+            CompetitionId = competitionId,
+            Name = name,
+            NormalizedName = name.ToUpperInvariant(),
+            CaptainId = captainId,
+            MemberIds = [captainId],
+            InvitationToken = id.ToString("N"),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            IsBanned = banned,
+            RegisteredAt = now
+        };
 
     private sealed record Fixture(Guid CompetitionId, IReadOnlyList<Guid> ActiveTeamIds);
 

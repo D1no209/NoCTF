@@ -76,6 +76,51 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
         }
     }
 
+    public IReadOnlyList<string> ValidateForStart(
+        GameMode mode,
+        string json,
+        int eligibleTeamCount,
+        IReadOnlyList<ChallengeConfigurationSections> challenges)
+    {
+        var errors = Validate(
+            mode,
+            json,
+            eligibleTeamCount,
+            challenges.Select(challenge => challenge.RulesJson).ToArray()).ToList();
+        if (errors.Count > 0)
+            return errors;
+
+        try
+        {
+            if (mode == GameMode.Awdp)
+            {
+                foreach (var challenge in challenges)
+                {
+                    errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.ValidateForStart(
+                        Awdp.Configuration.AwdpConfigurationResolver.Resolve(
+                            json,
+                            challenge.RulesJson,
+                            challenge.DefinitionJson)));
+                }
+            }
+            else if (mode == GameMode.Koh)
+            {
+                foreach (var challenge in challenges)
+                {
+                    errors.AddRange(Koh.Configuration.KohConfigurationValidator.ValidateForStart(
+                        Koh.Configuration.KohConfigurationUpgrader.ParseChallenge(
+                            challenge.DefinitionJson)));
+                }
+            }
+            return errors;
+        }
+        catch (Exception exception) when (
+            exception is GameModeConfigurationException or System.Text.Json.JsonException)
+        {
+            return [.. errors, exception.Message];
+        }
+    }
+
     private static IReadOnlyList<string> ValidateCtf(
         string json,
         int eligibleTeamCount,

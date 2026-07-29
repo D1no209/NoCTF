@@ -9,15 +9,16 @@ public static class AwdpTargetDefinitionFactory
         Guid operationId,
         int generation,
         ChallengeRuntimeTemplate template,
-        int targetPort,
+        RuntimeProvider provider,
         DateTimeOffset now)
     {
-        if (template.Definition is not ContainerRuntimeDefinition definition
-            || template.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
+        if (template.Definition is not ContainerRuntimeDefinition definition)
             throw new InvalidOperationException(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
-        if (targetPort is < 1 or > 65535)
-            throw new InvalidOperationException("AWDP TargetPort must be between 1 and 65535.");
+        if (definition.InternalPorts is not { Count: 1 }
+            || definition.InternalPorts[0] is < 1 or > 65535)
+            throw new InvalidOperationException(
+                "AWDP target Runtime must declare exactly one valid InternalPort.");
 
         var ttl = template.TtlSeconds is > 0
             ? TimeSpan.FromSeconds(template.TtlSeconds.Value)
@@ -35,7 +36,7 @@ public static class AwdpTargetDefinitionFactory
             System.Globalization.CultureInfo.InvariantCulture);
         return new ContainerRequest(
             operationId,
-            template.Provider,
+            provider,
             definition.Image,
             definition.Command ?? [],
             definition.Environment ?? new Dictionary<string, string>(),
@@ -48,7 +49,7 @@ public static class AwdpTargetDefinitionFactory
                 ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
                 : TimeSpan.FromMinutes(2),
             NetworkIsolation: ContainerNetworkIsolation.Isolated,
-            InternalPorts: [targetPort],
+            InternalPorts: definition.InternalPorts,
             Generation: generation,
             RuntimeInstanceId: operationId,
             EgressPolicy: definition.EgressPolicy,

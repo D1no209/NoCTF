@@ -11,7 +11,8 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
     {
         builder.ToTable("competition_challenges");
         builder.HasKey(item => item.Id);
-        builder.Property(item => item.ConfigurationJson).HasColumnType("jsonb");
+        // PostgreSQL jsonb is required for versioned, mode-specific competition rules.
+        builder.Property(item => item.RulesJson).HasColumnType("jsonb");
         builder.HasQueryFilter(item => item.DeletedAt == null);
         builder.HasOne<Competition>()
             .WithMany()

@@ -308,8 +308,6 @@ public static class ComposeRuntimeDefinitionPolicy
                 binding.ServiceName!,
                 binding.ContainerPort!.Value);
         }
-        if (request.AwdCheckerTargetBinding is { } target)
-            yield return new(target.ServiceName!, target.ContainerPort);
     }
 
     private static YamlMappingNode? Load(string yaml, ICollection<string> errors)

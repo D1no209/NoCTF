@@ -28,7 +28,7 @@ public sealed class ChallengeConfigurationStore(
                 item.Competition.Id,
                 item.Configuration.Id,
                 item.Competition.Mode,
-                item.Configuration.ConfigurationJson,
+                item.Configuration.RulesJson,
                 item.Competition.ConfigurationJson,
                 item.Competition.ConfigurationRevision,
                 item.Configuration.Revision,
@@ -75,7 +75,7 @@ public sealed class ChallengeConfigurationStore(
                 && configuration.DeletedAt == null
                 )
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(configuration => configuration.ConfigurationJson, json)
+                .SetProperty(configuration => configuration.RulesJson, json)
                 .SetProperty(configuration => configuration.Revision, expectedRevision + 1)
                 .SetProperty(configuration => configuration.UpdatedAt, updatedAt), ct);
 
@@ -93,7 +93,6 @@ public sealed class ChallengeConfigurationStore(
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(runtime => runtime.CheckerSequence, runtime => runtime.CheckerSequence + 1)
                     .SetProperty(runtime => runtime.LastAppliedCheckerSequence, runtime => runtime.CheckerSequence + 1)
-                    .SetProperty(runtime => runtime.LastAppliedCheckerBodySha256, (byte[]?)null)
                     .SetProperty(runtime => runtime.CheckerDeadlineAt, (DateTimeOffset?)null)
                     .SetProperty(runtime => runtime.NextCheckerDueAt, updatedAt), ct);
             await outbox.PublishAsync(new AdvanceAwdRound(

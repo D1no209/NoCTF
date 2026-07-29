@@ -54,6 +54,7 @@ public sealed class KohPollingPersistenceTests
                 var outcome = await new PostgresKohRuntimeProvisioner(
                     first,
                     new ChallengeRuntimeTemplateCatalog(),
+                    new FixedRuntimePlacementPolicy(),
                     firstOutbox,
                     new MutableTimeProvider(fixture.DueAt)).EnsureAsync(
                         fixture.CompetitionId,
@@ -72,7 +73,6 @@ public sealed class KohPollingPersistenceTests
                 await Assert.That(runtime.Purpose).IsEqualTo(RuntimePurpose.Player);
                 await Assert.That(runtime.State).IsEqualTo(RuntimeState.Queued);
                 await Assert.That(runtime.Generation).IsEqualTo(1);
-                await Assert.That(runtime.ConfigurationRevision).IsEqualTo(0);
             }
 
             var replayOutbox = new RecordingOutbox();
@@ -81,6 +81,7 @@ public sealed class KohPollingPersistenceTests
                 var outcome = await new PostgresKohRuntimeProvisioner(
                     replay,
                     new ChallengeRuntimeTemplateCatalog(),
+                    new FixedRuntimePlacementPolicy(),
                     replayOutbox,
                     new MutableTimeProvider(fixture.DueAt.AddSeconds(1))).EnsureAsync(
                         fixture.CompetitionId,
@@ -103,6 +104,7 @@ public sealed class KohPollingPersistenceTests
                 var outcome = await new PostgresKohRuntimeProvisioner(
                     replacement,
                     new ChallengeRuntimeTemplateCatalog(),
+                    new FixedRuntimePlacementPolicy(),
                     new RecordingOutbox(),
                     new MutableTimeProvider(fixture.DueAt.AddSeconds(2))).EnsureAsync(
                         fixture.CompetitionId,
@@ -378,8 +380,7 @@ public sealed class KohPollingPersistenceTests
         var teamId = Guid.CreateVersion7();
         const string flag = "NOCTF{raw-koh-control}";
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.Shared,
+                        RuntimeAllocation.Shared,
             new ContainerRuntimeDefinition(
                 "registry.example/hill:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 },
@@ -436,7 +437,7 @@ public sealed class KohPollingPersistenceTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            ConfigurationJson = JsonSerializer.Serialize(
+            RulesJson = JsonSerializer.Serialize(
                 new KohChallengeConfiguration(1, runtime),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = dueAt

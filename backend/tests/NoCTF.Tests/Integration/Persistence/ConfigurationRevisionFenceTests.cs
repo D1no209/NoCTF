@@ -101,7 +101,7 @@ public sealed class ConfigurationRevisionFenceTests
             var persisted = await verifyDb.CompetitionChallenges.AsNoTracking()
                 .SingleAsync(challenge => challenge.Id == ids.CompetitionChallengeId, cancellationToken);
             await Assert.That(JsonNode.DeepEquals(
-                JsonNode.Parse(persisted.ConfigurationJson),
+                JsonNode.Parse(persisted.RulesJson),
                 JsonNode.Parse("""{"schemaVersion":1}"""))).IsTrue();
             var persistedCompetition = await verifyDb.Competitions.AsNoTracking()
                 .SingleAsync(competition => competition.Id == ids.CompetitionId, cancellationToken);
@@ -161,7 +161,7 @@ public sealed class ConfigurationRevisionFenceTests
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            RulesJson = """{"schemaVersion":1}""",
             UpdatedAt = now
         });
         await db.SaveChangesAsync(cancellationToken);

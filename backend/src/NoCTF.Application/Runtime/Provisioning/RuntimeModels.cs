@@ -57,10 +57,7 @@ public sealed record RuntimeUrlBinding(
     string? VmId = null,
     int? GuestPort = null);
 
-public sealed record RuntimeInternalEndpointBinding(
-    string UrlTemplate,
-    int ContainerPort,
-    string? ServiceName = null);
+public sealed record RuntimeInternalEndpointBinding(string? ServiceName = null);
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(ContainerRuntimeDefinition), "container")]
@@ -80,7 +77,8 @@ public sealed record ContainerRuntimeDefinition(
     IReadOnlyDictionary<int, int>? PortMappings = null,
     ContainerSecurityPolicy? Security = null,
     string? FlagEnvironmentVariableName = null,
-    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll) : ChallengeRuntimeDefinition
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll,
+    IReadOnlyList<int>? InternalPorts = null) : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.Container;
 }
@@ -105,13 +103,11 @@ public sealed record OvaRuntimeDefinition(
 }
 
 public sealed record ChallengeRuntimeTemplate(
-    RuntimeProvider Provider,
     RuntimeAllocation Allocation,
     ChallengeRuntimeDefinition Definition,
     RuntimeResourceLimits? Limits = null,
     int? TtlSeconds = null,
     int? OperationTimeoutSeconds = null,
-    string RunnerPool = "default",
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
     RuntimeFlagSource FlagSource = RuntimeFlagSource.Static,
     RuntimeUrlBinding? ControlCheckUrlBinding = null)
@@ -124,6 +120,14 @@ public sealed record ChallengeRuntimeTemplate(
 public interface IChallengeRuntimeTemplateCatalog
 {
     ChallengeRuntimeTemplate? Get(NoCTF.Domain.Competitions.GameMode mode, string challengeConfigurationJson);
+}
+
+public sealed record RuntimePlacement(RuntimeProvider Provider, string RunnerPool);
+
+/// <summary>Resolves platform-owned Runtime placement independently of challenge definitions.</summary>
+public interface IRuntimePlacementPolicy
+{
+    RuntimePlacement Resolve(RuntimeKind runtimeKind);
 }
 
 public sealed record ContainerRequest(

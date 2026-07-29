@@ -24,8 +24,6 @@ public static class AwdpConfigurationValidator
             errors.Add("PatchTimeoutSeconds must be positive.");
         if (configuration.ReadyTimeoutSeconds <= 0)
             errors.Add("ReadyTimeoutSeconds must be positive.");
-        if (configuration.TargetPort is not 0 and (< 1 or > 65535))
-            errors.Add("TargetPort must be zero or a valid TCP port.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(
             configuration.Runtime));
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(
@@ -33,7 +31,6 @@ public static class AwdpConfigurationValidator
             "Checker"));
         ValidateRuntime(configuration.Runtime, errors);
         ValidateChecker(configuration.Checker, errors);
-        ValidateProviderPair(configuration.Runtime, configuration.Checker, errors);
         return errors;
     }
 
@@ -56,13 +53,10 @@ public static class AwdpConfigurationValidator
             errors.Add("PatchTimeoutSeconds must be positive when configured.");
         if (configuration.ReadyTimeoutSeconds is <= 0)
             errors.Add("ReadyTimeoutSeconds must be positive when configured.");
-        if (configuration.TargetPort is not null and (< 1 or > 65535))
-            errors.Add("TargetPort must be a valid TCP port when configured.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(configuration.Checker, "Checker"));
         ValidateRuntime(configuration.Runtime, errors);
         ValidateChecker(configuration.Checker, errors);
-        ValidateProviderPair(configuration.Runtime, configuration.Checker, errors);
         return errors;
     }
 
@@ -85,8 +79,6 @@ public static class AwdpConfigurationValidator
             errors.Add("PatchTimeoutSeconds must be positive.");
         if (configuration.ReadyTimeoutSeconds <= 0)
             errors.Add("ReadyTimeoutSeconds must be positive.");
-        if (configuration.TargetPort is not 0 and (< 1 or > 65535))
-            errors.Add("TargetPort must be zero or a valid TCP port.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(
             configuration.Runtime));
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(
@@ -94,7 +86,6 @@ public static class AwdpConfigurationValidator
             "Checker"));
         ValidateRuntime(configuration.Runtime, errors);
         ValidateChecker(configuration.Checker, errors);
-        ValidateProviderPair(configuration.Runtime, configuration.Checker, errors);
         return errors;
     }
 
@@ -106,11 +97,8 @@ public static class AwdpConfigurationValidator
             errors.Add("Runtime is required before an AWDP competition can start.");
         if (configuration.Checker is null)
             errors.Add("Checker is required before an AWDP competition can start.");
-        if (configuration.TargetPort is < 1 or > 65535)
-            errors.Add("TargetPort must be a valid TCP port before an AWDP competition can start.");
         ValidateRuntime(configuration.Runtime, errors);
         ValidateChecker(configuration.Checker, errors);
-        ValidateProviderPair(configuration.Runtime, configuration.Checker, errors);
         return errors;
     }
 
@@ -127,26 +115,12 @@ public static class AwdpConfigurationValidator
             errors.Add("PatchEntrypoint must be a safe relative path.");
     }
 
-    private static void ValidateProviderPair(
-        NoCTF.Application.Runtime.Provisioning.ChallengeRuntimeTemplate? runtime,
-        NoCTF.Application.Runtime.Configuration.RunnerJobConfiguration? checker,
-        List<string> errors)
-    {
-        if (runtime is not null
-            && checker is not null
-            && runtime.Provider != checker.Provider)
-            errors.Add("Runtime and Checker must use the same provider.");
-    }
-
     private static void ValidateRuntime(
         NoCTF.Application.Runtime.Provisioning.ChallengeRuntimeTemplate? runtime,
         List<string> errors)
     {
         if (runtime is not null
-            && (runtime.Definition is not NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
-                || runtime.Provider is not (
-                    NoCTF.Domain.Runtime.RuntimeProvider.Docker
-                    or NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes)))
+            && runtime.Definition is not NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition)
             errors.Add(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
         if (runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
@@ -158,20 +132,19 @@ public static class AwdpConfigurationValidator
             errors.Add(
                 "AWDP disposable targets cannot configure public ports or URLs.");
         }
+        if (runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
+            { InternalPorts: not { Count: 1 } })
+        {
+            errors.Add("AWDP target Runtime must declare exactly one InternalPort.");
+        }
     }
 
     private static void ValidateChecker(
         NoCTF.Application.Runtime.Configuration.RunnerJobConfiguration? checker,
         List<string> errors)
     {
-        if (checker is not null
-            && checker.Provider is not (
-                NoCTF.Domain.Runtime.RuntimeProvider.Docker
-                or NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes))
-            errors.Add("AWDP Checker requires the Docker or Kubernetes provider.");
         if (checker?.Environment?.Keys.Any(name =>
                 name.Equals("TARGET_HOST", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("TARGET_PORT", StringComparison.OrdinalIgnoreCase)
                 || name.Equals(
                     "TARGET_READY_TIMEOUT_SECONDS",
                     StringComparison.OrdinalIgnoreCase)) == true)

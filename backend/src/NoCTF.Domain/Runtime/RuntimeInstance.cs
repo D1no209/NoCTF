@@ -57,20 +57,17 @@ public sealed class RuntimeInstance
     public RuntimeFailureCode? FailureCode { get; set; }
     public DateTimeOffset? RunnerUnavailableAt { get; set; }
     public long ProcessingVersion { get; set; }
-    public int ConfigurationRevision { get; set; }
-    public int? CompetitionConfigurationRevision { get; set; }
     public Guid? ReplacesRuntimeInstanceId { get; set; }
     public string? ProviderReceiptJson { get; set; }
     public string[] Urls { get; set; } = [];
     public int[] ParticipantUrlIndexes { get; set; } = [];
     public string? ControlCheckUrl { get; set; }
-    [MaxLength(2048)]
-    public string? AwdCheckerTargetUrl { get; set; }
     [MaxLength(256)]
-    public string? AwdCheckerTargetServiceName { get; set; }
+    public string? AwdCheckerTargetHost { get; set; }
+    public AwdServiceState CheckerStatus { get; set; } = AwdServiceState.Unknown;
+    public DateTimeOffset? CheckerStatusUpdatedAt { get; set; }
     public long CheckerSequence { get; set; }
     public long LastAppliedCheckerSequence { get; set; }
-    public byte[]? LastAppliedCheckerBodySha256 { get; set; }
     public DateTimeOffset? NextCheckerDueAt { get; set; }
     public DateTimeOffset? CheckerDeadlineAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

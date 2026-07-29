@@ -44,7 +44,7 @@ public sealed class KohPollingHandler(
 
         var settings = configurations.Get(
             target.Competition.ConfigurationJson,
-            target.Challenge.ConfigurationJson);
+            target.Challenge.RulesJson);
         var timeout = TimeSpan.FromSeconds(Math.Min(settings.PollIntervalSeconds, 30));
         var controlUrls = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.CompetitionId == message.CompetitionId
@@ -170,7 +170,7 @@ public sealed class KohObservationHandler(
 
         var settings = configurations.Get(
             target.Competition.ConfigurationJson,
-            target.Challenge.ConfigurationJson);
+            target.Challenge.RulesJson);
         var currentRevision = target.Competition.ConfigurationRevision;
         var currentChallengeRevision = target.Challenge.Revision;
         if (currentRevision == message.CompetitionConfigurationRevision

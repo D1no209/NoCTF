@@ -7,6 +7,10 @@ namespace NoCTF.Application.Competitions.Configuration;
 
 public sealed record CompetitionChallengeConfigurationSnapshot(Guid Id, int Revision, string Json);
 
+public sealed record ChallengeConfigurationSections(
+    string RulesJson,
+    string DefinitionJson);
+
 public sealed record CompetitionConfigurationView(
     Guid CompetitionId,
     GameMode Mode,
@@ -31,6 +35,17 @@ public interface ICompetitionConfigurationValidator
         int eligibleTeamCount,
         IReadOnlyList<string> challengeConfigurationJsons) =>
         Validate(mode, json, eligibleTeamCount, challengeConfigurationJsons);
+
+    IReadOnlyList<string> ValidateForStart(
+        GameMode mode,
+        string json,
+        int eligibleTeamCount,
+        IReadOnlyList<ChallengeConfigurationSections> challenges) =>
+        ValidateForStart(
+            mode,
+            json,
+            eligibleTeamCount,
+            challenges.Select(challenge => challenge.RulesJson).ToArray());
 }
 
 public interface ICompetitionConfigurationStore

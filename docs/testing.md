@@ -15,7 +15,7 @@
 - 四模式投影、血奖、罚分、所有 tie-break；
 - Submission 次数、预占释放、重判版本栅栏；
 - 权限矩阵、Team/Competition UUID 数组不变量；
-- URL template 与 Runtime 配置验证、Queued/Reset replacement/ProcessingVersion、CheckerSequence callback hash 幂等；
+- 逻辑 URL 与 provider-neutral Runtime 配置验证、Queued/Reset replacement/ProcessingVersion、Checker 状态后写覆盖及 Unknown/异常退出/超时；
 - Problem code/result mapping。
 
 ## PostgreSQL 集成

@@ -53,6 +53,21 @@ public class ChallengeManagementTests
     }
 
     [Test]
+    public async Task CreateChallenge_TemplateModeMismatch_PropagatesTypedErrorCode()
+    {
+        var store = new Store
+        {
+            CreateResult = new ChallengeMutationResult(
+                null,
+                ChallengeMutationFailure.TemplateModeMismatch)
+        };
+
+        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
+
+        await Assert.That(result.ErrorCode).IsEqualTo("challenge_template_mode_mismatch");
+    }
+
+    [Test]
     public async Task ListChallenges_PublicQuery_ExcludesUnpublishedAtStoreBoundary()
     {
         var store = new Store();
