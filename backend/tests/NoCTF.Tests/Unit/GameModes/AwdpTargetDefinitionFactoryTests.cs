@@ -28,7 +28,7 @@ public sealed class AwdpTargetDefinitionFactoryTests
         await Assert.That(definition.Labels["noctf.io/purpose"]).IsEqualTo("awdp-target");
         await Assert.That(definition.Labels["noctf.io/managed"]).IsEqualTo("true");
         await Assert.That(definition.Labels["noctf.io/generation"]).IsEqualTo("3");
-        await Assert.That(definition.Labels["noctf.io/expires-at"]).IsEqualTo("1784852100");
+        await Assert.That(definition.Labels.ContainsKey("noctf.io/expires-at")).IsFalse();
         await Assert.That(definition.Security.CapAdd).IsEmpty();
         await Assert.That(definition.Security.CapDrop).Contains("ALL");
     }

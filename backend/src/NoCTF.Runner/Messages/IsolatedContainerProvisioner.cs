@@ -30,7 +30,6 @@ public static class IsolatedContainerProvisioner
                 request.NetworkPurpose == ContainerNetworkPurpose.AwdpVerification
                     ? request.InternalPorts?.SingleOrDefault()
                     : null),
-            now.Add(request.Ttl ?? TimeSpan.FromMinutes(15)),
             cancellationToken);
         try
         {

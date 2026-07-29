@@ -660,6 +660,28 @@ public static class BackendMessageHandlers
         if (schedule.ProcessingVersion != message.ProcessingVersion)
             return MessageExecutionOutcome.Superseded;
 
+        var expiredRuntimes = await db.RuntimeInstances
+            .Where(instance => instance.State == RuntimeState.Running
+                && instance.ExpiresAt != null
+                && instance.ExpiresAt <= message.At)
+            .OrderBy(instance => instance.ExpiresAt)
+            .ThenBy(instance => instance.Id)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+        foreach (var instance in expiredRuntimes)
+        {
+            instance.State = RuntimeState.Stopping;
+            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+            if (!string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
+                await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
+            else
+            {
+                instance.State = RuntimeState.Stopped;
+                instance.StoppedAt = message.At;
+            }
+        }
+        applied |= expiredRuntimes.Count > 0;
+
         var assignments = await db.RuntimeInstances
             .Where(instance => instance.RunnerId != null
                 && (instance.State == RuntimeState.Provisioning
@@ -814,7 +836,7 @@ public static class BackendMessageHandlers
         foreach (var audit in resourceAudits)
             await outbox.PublishToRunnerNodeAsync(audit);
         applied |= resourceAudits.Count > 0;
-        var nextAt = pageIsFull
+        var nextAt = pageIsFull || expiredRuntimes.Count == 500
             ? DateTimeOffset.UtcNow
             : DateTimeOffset.UtcNow.Add(RunnerReconciliationInterval);
         AdvanceMaintenanceSchedule(schedule, nextAt);

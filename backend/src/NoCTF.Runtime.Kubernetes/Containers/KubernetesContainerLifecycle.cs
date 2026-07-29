@@ -13,9 +13,8 @@ namespace NoCTF.Runtime.Kubernetes.Containers;
 public sealed class KubernetesContainerLifecycle(
     IKubernetes client,
     KubernetesRuntimeOptions options) : IContainerLifecycle, IOneShotJobRunner,
-    IAttachedOneShotJobRunner, IContainerSandboxLifecycle, IRuntimeResourceReaper
+    IAttachedOneShotJobRunner, IContainerSandboxLifecycle
 {
-    public RuntimeProvider Provider => RuntimeProvider.Kubernetes;
     private const int ExecTimeoutExitCode = 124;
     private const string ExecTimeoutScript = """
         duration=$1
@@ -59,9 +58,6 @@ public sealed class KubernetesContainerLifecycle(
             labels["noctf.io/generation"] = request.Generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture);
         }
-        if (request.AllowInternalCallback && request.Ttl is not null)
-            labels["noctf.io/expires-at"] = DateTimeOffset.UtcNow.Add(request.Ttl.Value)
-                .ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var pod = new V1Pod
         {
             Metadata = new V1ObjectMeta
@@ -136,7 +132,7 @@ public sealed class KubernetesContainerLifecycle(
             }
             catch
             {
-                // Expiry labels and the resource reaper remain the final cleanup fallback.
+                // The failed create has no durable receipt; surface the cleanup failure.
             }
             throw;
         }
@@ -386,7 +382,6 @@ public sealed class KubernetesContainerLifecycle(
 
     public async Task<string> CreateIsolatedNetworkAsync(
         ContainerNetworkPolicyRequest request,
-        DateTimeOffset expiresAt,
         CancellationToken cancellationToken)
     {
         var identity = request.Identity;
@@ -435,11 +430,6 @@ public sealed class KubernetesContainerLifecycle(
             ["noctf.io/generation"] = identity.Generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture)
         };
-        if (request.Purpose == ContainerNetworkPurpose.AwdpVerification)
-        {
-            labels["noctf.io/expires-at"] = expiresAt.ToUnixTimeSeconds().ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
-        }
         var selector = new V1LabelSelector
         {
             MatchLabels = new Dictionary<string, string> { ["noctf.io/sandbox"] = name }
@@ -509,7 +499,7 @@ public sealed class KubernetesContainerLifecycle(
             }
             catch
             {
-                // The ownership-labelled reaper is the final fallback.
+                // The ambiguous network policy could not be safely cleaned up.
             }
             throw;
         }
@@ -610,47 +600,6 @@ public sealed class KubernetesContainerLifecycle(
     {
         using var cleanupSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await DestroyAsync(receipt, cleanupSource.Token);
-    }
-
-    public async Task<RuntimeResourceReapResult> ReapExpiredAsync(
-        DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        const string selector = "noctf.io/managed=true,noctf.io/expires-at";
-        var removed = 0;
-        var failed = 0;
-        var pods = await client.CoreV1.ListNamespacedPodAsync(
-            options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
-        foreach (var pod in pods.Items.Where(item => IsOwnedExpired(item.Metadata.Labels, now)))
-            await TryDeleteAsync(async () => { await client.CoreV1.DeleteNamespacedPodAsync(
-                pod.Metadata.Name, options.Namespace, body: new V1DeleteOptions(), cancellationToken: cancellationToken); });
-        var services = await client.CoreV1.ListNamespacedServiceAsync(
-            options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
-        foreach (var service in services.Items.Where(item => IsOwnedExpired(item.Metadata.Labels, now)))
-            await TryDeleteAsync(async () => { await client.CoreV1.DeleteNamespacedServiceAsync(
-                service.Metadata.Name, options.Namespace, body: new V1DeleteOptions(), cancellationToken: cancellationToken); });
-        var policies = await client.NetworkingV1.ListNamespacedNetworkPolicyAsync(
-            options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
-        foreach (var policy in policies.Items.Where(item => IsOwnedExpired(item.Metadata.Labels, now)))
-            await TryDeleteAsync(async () => { await client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
-                policy.Metadata.Name, options.Namespace, body: new V1DeleteOptions(), cancellationToken: cancellationToken); });
-        return new(removed, failed);
-
-        async Task TryDeleteAsync(Func<Task> delete)
-        {
-            try
-            {
-                await delete();
-                removed++;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                failed++;
-            }
-        }
     }
 
     public async Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)
@@ -908,24 +857,6 @@ public sealed class KubernetesContainerLifecycle(
         }
         throw new InvalidOperationException("Kubernetes exec ended without an exit code.");
     }
-
-    private static bool IsOwnedExpired(IDictionary<string, string>? labels, DateTimeOffset now) =>
-        labels is not null
-        && labels.TryGetValue("noctf.io/managed", out var managed)
-        && string.Equals(managed, "true", StringComparison.Ordinal)
-        && labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-        && jobKind is "awd-checker" or "awdp-verification" or "persistent-runtime"
-        && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
-        && Guid.TryParse(runtimeText, out var runtimeId)
-        && runtimeId != Guid.Empty
-        && labels.TryGetValue("noctf.io/generation", out var generationText)
-        && int.TryParse(generationText, System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out var generation)
-        && generation > 0
-        && labels.TryGetValue("noctf.io/expires-at", out var text)
-        && long.TryParse(text, System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out var expiresAt)
-        && expiresAt <= now.ToUnixTimeSeconds();
 
     private static bool HasResourceIdentity(
         IDictionary<string, string>? labels,

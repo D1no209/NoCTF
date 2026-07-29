@@ -8,12 +8,10 @@ namespace NoCTF.Runtime.Docker.Containers;
 
 /// <summary>Runs single-container challenge instances through Docker's native client.</summary>
 public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobRunner,
-    IAttachedOneShotJobRunner, IContainerSandboxLifecycle, IRuntimeResourceReaper, IDisposable
+    IAttachedOneShotJobRunner, IContainerSandboxLifecycle, IDisposable
 {
     private readonly DockerClient client;
     private readonly DockerRuntimeOptions options;
-
-    public RuntimeProvider Provider => RuntimeProvider.Docker;
 
     public DockerContainerLifecycle(DockerRuntimeOptions options)
     {
@@ -95,7 +93,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             }
             catch
             {
-                // The expiry-labelled reaper remains the final container cleanup fallback.
+                // The failed create has no durable receipt; surface the cleanup failure.
             }
             if (request.AllowInternalCallback)
             {
@@ -110,7 +108,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 }
                 catch
                 {
-                    // The expiry-labelled reaper remains the final network cleanup fallback.
+                    // The failed create has no durable receipt; surface the cleanup failure.
                 }
             }
             throw;
@@ -282,7 +280,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public async Task<string> CreateIsolatedNetworkAsync(
         ContainerNetworkPolicyRequest request,
-        DateTimeOffset expiresAt,
         CancellationToken cancellationToken)
     {
         var identity = request.Identity;
@@ -330,7 +327,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             {
                 Name = name,
                 Internal = false,
-                Labels = NetworkLabels(request, purpose, expiresAt)
+                Labels = NetworkLabels(request, purpose)
             }, cancellationToken);
             return response.ID;
         }
@@ -348,7 +345,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             }
             catch
             {
-                // The ownership-labelled reaper is the final fallback.
+                // The ambiguous network could not be safely cleaned up.
             }
             throw;
         }
@@ -426,64 +423,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             // The owning cleanup path has already removed the container.
         }
-    }
-
-    public async Task<RuntimeResourceReapResult> ReapExpiredAsync(
-        DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        var removed = 0;
-        var failed = 0;
-        var filters = new Dictionary<string, IDictionary<string, bool>>
-        {
-            ["label"] = new Dictionary<string, bool>
-            {
-                ["noctf.io/managed=true"] = true,
-                ["noctf.io/expires-at"] = true
-            }
-        };
-        var containers = await client.Containers.ListContainersAsync(
-            new ContainersListParameters { All = true, Filters = filters }, cancellationToken);
-        foreach (var container in containers.Where(item => IsOwnedExpired(item.Labels, now)))
-        {
-            try
-            {
-                await client.Containers.RemoveContainerAsync(container.ID,
-                    new ContainerRemoveParameters { Force = true }, cancellationToken);
-                removed++;
-            }
-            catch (DockerContainerNotFoundException)
-            {
-                removed++;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                failed++;
-            }
-        }
-
-        var networks = await client.Networks.ListNetworksAsync(
-            new NetworksListParameters { Filters = filters }, cancellationToken);
-        foreach (var network in networks.Where(item => IsOwnedExpired(item.Labels, now)))
-        {
-            try
-            {
-                await DeleteNetworkAsync(network, cancellationToken);
-                removed++;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                failed++;
-            }
-        }
-        return new(removed, failed);
     }
 
     public void Dispose() => client.Dispose();
@@ -612,8 +551,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     ["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
                         ?? request.OperationId).ToString("D"),
                     ["noctf.io/generation"] = request.Generation.ToString(
-                        System.Globalization.CultureInfo.InvariantCulture),
-                    ["noctf.io/expires-at"] = ExpiresAt(request).ToUnixTimeSeconds().ToString(
                         System.Globalization.CultureInfo.InvariantCulture)
                 }
             }, cancellationToken);
@@ -805,14 +742,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             labels["noctf.io/generation"] = request.Generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture);
         }
-        if (request.AllowInternalCallback && request.Ttl is not null)
-            labels["noctf.io/expires-at"] = ExpiresAt(request).ToUnixTimeSeconds().ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
         return labels;
     }
-
-    private static DateTimeOffset ExpiresAt(ContainerRequest request) =>
-        DateTimeOffset.UtcNow.Add(request.Ttl ?? TimeSpan.FromMinutes(15));
 
     private static string CallbackNetworkName(Guid operationId) =>
         $"noctf-callback-{operationId:N}";
@@ -839,24 +770,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         "exited" or "dead" => RuntimeStatus.Stopped,
         _ => RuntimeStatus.Failed
     };
-
-    private static bool IsOwnedExpired(IDictionary<string, string>? labels, DateTimeOffset now) =>
-        labels is not null
-        && labels.TryGetValue("noctf.io/managed", out var managed)
-        && string.Equals(managed, "true", StringComparison.Ordinal)
-        && labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-        && jobKind is "awd-checker" or "awdp-verification" or "persistent-runtime"
-        && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
-        && Guid.TryParse(runtimeText, out var runtimeId)
-        && runtimeId != Guid.Empty
-        && labels.TryGetValue("noctf.io/generation", out var generationText)
-        && int.TryParse(generationText, System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out var generation)
-        && generation > 0
-        && labels.TryGetValue("noctf.io/expires-at", out var text)
-        && long.TryParse(text, System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out var expiresAt)
-        && expiresAt <= now.ToUnixTimeSeconds();
 
     private static bool HasResourceIdentity(
         IDictionary<string, string>? labels,
@@ -893,8 +806,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     private static Dictionary<string, string> NetworkLabels(
         ContainerNetworkPolicyRequest request,
-        string purpose,
-        DateTimeOffset expiresAt)
+        string purpose)
     {
         var labels = new Dictionary<string, string>
         {
@@ -906,11 +818,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             ["noctf.io/generation"] = request.Identity.Generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture)
         };
-        if (request.Purpose == ContainerNetworkPurpose.AwdpVerification)
-        {
-            labels["noctf.io/expires-at"] = expiresAt.ToUnixTimeSeconds().ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
-        }
         return labels;
     }
 
