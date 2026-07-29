@@ -30,12 +30,12 @@ public sealed class DockerContainerLifecycleTests
             var operationId = Guid.NewGuid();
             var first = await lifecycle.CreateIsolatedNetworkAsync(
                 SandboxRequest(operationId),
-                DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                cancellationToken);
             try
             {
                 var replay = await lifecycle.CreateIsolatedNetworkAsync(
                     SandboxRequest(operationId),
-                    DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                    cancellationToken);
 
                 await Assert.That(replay).IsEqualTo(first);
             }
@@ -114,7 +114,7 @@ public sealed class DockerContainerLifecycleTests
                     cancellationToken);
 
                 await Assert.That(receipt.InternalHost)
-                    .IsEqualTo($"noctf-{operationId:N}");
+                    .IsEqualTo("target");
                 await Assert.That(receipt.PortMappings[8080]).IsGreaterThan(0);
                 await Assert.That(replay.ResourceId).IsEqualTo(receipt.ResourceId);
                 await Assert.That(replay.PortMappings[8080])
@@ -241,10 +241,10 @@ public sealed class DockerContainerLifecycleTests
             var secondOperationId = Guid.NewGuid();
             var firstSandbox = await lifecycle.CreateIsolatedNetworkAsync(
                 SandboxRequest(firstOperationId),
-                DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                cancellationToken);
             var secondSandbox = await lifecycle.CreateIsolatedNetworkAsync(
                 SandboxRequest(secondOperationId),
-                DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                cancellationToken);
             ContainerReceipt? first = null;
             ContainerReceipt? second = null;
             try
@@ -440,7 +440,7 @@ public sealed class DockerContainerLifecycleTests
                 DockerEndpoint(), "noctf-platform", "localhost", $"missing-{Guid.NewGuid():N}"));
             var sandbox = await lifecycle.CreateIsolatedNetworkAsync(
                 SandboxRequest(operationId),
-                DateTimeOffset.UtcNow.AddMinutes(1), cancellationToken);
+                cancellationToken);
             Func<Task> action = () => lifecycle.CreateAsync(
                 CheckerRequest(operationId, sandbox), cancellationToken);
 

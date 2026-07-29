@@ -125,7 +125,6 @@ public sealed class IsolatedContainerProvisionerTests
         public ContainerNetworkPolicyRequest? Request { get; private set; }
         public Task<string> CreateIsolatedNetworkAsync(
             ContainerNetworkPolicyRequest request,
-            DateTimeOffset expiresAt,
             CancellationToken cancellationToken)
         {
             Request = request;

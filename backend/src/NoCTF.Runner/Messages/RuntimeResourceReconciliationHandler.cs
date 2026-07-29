@@ -10,7 +10,6 @@ namespace NoCTF.Runner.Messages;
 public sealed class RuntimeResourceReconciliationHandler(
     NoCtfDbContext db,
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
-    IEnumerable<IRuntimeResourceReaper> reapers,
     IConfiguration configuration)
 {
     public async Task Handle(
@@ -85,16 +84,6 @@ public sealed class RuntimeResourceReconciliationHandler(
             {
                 failures++;
             }
-        }
-
-        var reaper = reapers.SingleOrDefault(candidate =>
-            candidate.Provider == configuredProvider);
-        if (reaper is not null)
-        {
-            var reapResult = await reaper.ReapExpiredAsync(
-                message.RequestedAt,
-                cancellationToken);
-            failures += reapResult.FailedCount;
         }
 
         if (failures > 0)

@@ -206,7 +206,6 @@ public interface IContainerSandboxLifecycle
 {
     Task<string> CreateIsolatedNetworkAsync(
         ContainerNetworkPolicyRequest request,
-        DateTimeOffset expiresAt,
         CancellationToken cancellationToken);
     Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken);
     Task CopyArchiveAsync(ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken);
@@ -230,16 +229,6 @@ public sealed record ContainerNetworkPolicyRequest(
     RuntimeEgressPolicy EgressPolicy,
     IReadOnlyList<int> PublicIngressPorts,
     int? TargetPort = null);
-
-public sealed record RuntimeResourceReapResult(int RemovedCount, int FailedCount);
-
-public interface IRuntimeResourceReaper
-{
-    RuntimeProvider Provider { get; }
-
-    Task<RuntimeResourceReapResult> ReapExpiredAsync(
-        DateTimeOffset now, CancellationToken cancellationToken);
-}
 
 public abstract record AttachedRuntimeTarget(
     RuntimeResourceIdentity Identity);

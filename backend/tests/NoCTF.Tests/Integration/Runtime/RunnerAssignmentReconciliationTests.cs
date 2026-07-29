@@ -376,12 +376,10 @@ public sealed class RunnerAssignmentReconciliationTests
                     ["Runner:Provider"] = nameof(RuntimeProvider.Libvirt)
                 })
                 .Build();
-            var reaper = new RecordingResourceReaper(RuntimeProvider.Libvirt);
             await using var db = new NoCtfDbContext(options);
             var handler = new RuntimeResourceReconciliationHandler(
                 db,
                 [provider],
-                [reaper],
                 configuration);
 
             await handler.Handle(
@@ -397,7 +395,6 @@ public sealed class RunnerAssignmentReconciliationTests
                     new RuntimeResourceIdentity(fixture.RedispatchId, 2),
                     new RuntimeResourceIdentity(orphanId, 1)
                 ]);
-            await Assert.That(reaper.RequestedAt).IsEqualTo(fixture.Now);
         });
     }
 
@@ -603,18 +600,4 @@ public sealed class RunnerAssignmentReconciliationTests
         }
     }
 
-    private sealed class RecordingResourceReaper(RuntimeProvider provider)
-        : IRuntimeResourceReaper
-    {
-        public RuntimeProvider Provider { get; } = provider;
-        public DateTimeOffset? RequestedAt { get; private set; }
-
-        public Task<RuntimeResourceReapResult> ReapExpiredAsync(
-            DateTimeOffset now,
-            CancellationToken cancellationToken)
-        {
-            RequestedAt = now;
-            return Task.FromResult(new RuntimeResourceReapResult(0, 0));
-        }
-    }
 }

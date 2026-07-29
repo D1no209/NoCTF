@@ -107,8 +107,6 @@ public static class ServiceRegistration
             configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback-gateway");
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
-        services.AddSingleton<IRuntimeResourceReaper>(provider =>
-            provider.GetRequiredService<DockerContainerLifecycle>());
         services.AddSingleton<DockerComposeRuntime>();
         services.AddSingleton<DockerRuntimeResourceReconciler>();
         services.AddSingleton<IRuntimeManagedResourceReconciler>(provider =>
@@ -144,8 +142,6 @@ public static class ServiceRegistration
         if (isKubernetesPool)
             services.AddHostedService<KubernetesRuntimePoolStartupCheck>();
         services.AddSingleton<KubernetesContainerLifecycle>();
-        services.AddSingleton<IRuntimeResourceReaper>(provider =>
-            provider.GetRequiredService<KubernetesContainerLifecycle>());
         services.AddSingleton<IKomposeConverter>(new KomposeConverter());
         services.AddSingleton<KubernetesComposeRuntime>();
         services.AddSingleton<KubernetesRuntimeResourceReconciler>();

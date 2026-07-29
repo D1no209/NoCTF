@@ -32,8 +32,6 @@ public static class AwdpTargetDefinitionFactory
             System.Globalization.CultureInfo.InvariantCulture);
         labels["noctf.io/purpose"] = "awdp-target";
         labels["noctf.io/job-kind"] = "awdp-verification";
-        labels["noctf.io/expires-at"] = now.Add(ttl).ToUnixTimeSeconds().ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
         return new ContainerRequest(
             operationId,
             provider,

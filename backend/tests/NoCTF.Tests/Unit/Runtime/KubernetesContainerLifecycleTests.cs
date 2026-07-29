@@ -62,7 +62,7 @@ public sealed class KubernetesContainerLifecycleTests
             CancellationToken.None);
 
         await Assert.That(createdPolicy).IsNotNull();
-        await Assert.That(createdPod!.Metadata.Labels.ContainsKey("noctf.io/expires-at")).IsTrue();
+        await Assert.That(createdPod!.Metadata.Labels.ContainsKey("noctf.io/expires-at")).IsFalse();
         await Assert.That(createdPod.Metadata.Labels["noctf.io/job-kind"])
             .IsEqualTo(jobKind);
         await Assert.That(createdPolicy!.Spec.PodSelector.MatchLabels.All(label =>
@@ -192,7 +192,6 @@ public sealed class KubernetesContainerLifecycleTests
                 RuntimeEgressPolicy.DenyAll,
                 [],
                 8080),
-            DateTimeOffset.UtcNow.AddMinutes(1),
             CancellationToken.None);
 
         await Assert.That(action).Throws<TimeoutException>();
@@ -233,7 +232,6 @@ public sealed class KubernetesContainerLifecycleTests
                 ContainerNetworkPurpose.PersistentRuntime,
                 RuntimeEgressPolicy.InternetOnly,
                 [8080]),
-            DateTimeOffset.UtcNow.AddMinutes(1),
             CancellationToken.None);
 
         await Assert.That(name)
