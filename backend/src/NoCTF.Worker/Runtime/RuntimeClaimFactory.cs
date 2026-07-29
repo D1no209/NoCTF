@@ -49,6 +49,7 @@ public static class RuntimeClaimFactory
                         OperationTimeout: operationTimeout,
                         NetworkIsolation: ContainerNetworkIsolation.Isolated,
                         InternalPorts: InternalPorts(mode, template, definition),
+                        AllowInternalCallback: mode == GameMode.Koh,
                         Generation: instance.Generation,
                         RuntimeInstanceId: instance.Id,
                         UrlBindings: template.UrlBindings,

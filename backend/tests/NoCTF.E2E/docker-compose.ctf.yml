@@ -66,6 +66,8 @@ services:
       RunnerScoring__SigningKey: ${NOCTF_E2E_JWT_SECRET}
       RunnerScoring__Issuer: NoCTF.E2E.Runner
       RunnerScoring__Audience: NoCTF.E2E.Scoring
+      Runtime__Provider: ${NOCTF_E2E_RUNTIME_PROVIDER}
+      Runtime__RunnerPool: ${NOCTF_E2E_RUNNER_POOL}
       SeedAdmin__Email: admin@ctf-e2e.test
       SeedAdmin__UserName: ctf-e2e-admin
       SeedAdmin__Password: ${NOCTF_E2E_ADMIN_PASSWORD}
@@ -130,8 +132,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=noctf;Username=noctf;Password=${NOCTF_E2E_POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
-      Runner__Provider: Docker
-      Runner__Pool: ctf-e2e
+      Runner__Provider: ${NOCTF_E2E_RUNTIME_PROVIDER}
+      Runner__Pool: ${NOCTF_E2E_RUNNER_POOL}
       Runner__Id: ctf-e2e-runner-1
       Runner__Capacity__MemoryBytes: "2147483648"
       Runner__Capacity__NanoCpus: "2000000000"
@@ -145,10 +147,6 @@ services:
       Runtime__Docker__Endpoint: unix:///var/run/docker.sock
       Runtime__Docker__Network: ${NOCTF_E2E_NETWORK}
       Runtime__Docker__PublicHost: 127.0.0.1
-      Runtime__Docker__IngressProxyImage: haproxy:3.1-alpine
-      Runtime__Docker__IngressProxyMemoryBytes: "67108864"
-      Runtime__Docker__IngressProxyNanoCpus: "100000000"
-      Runtime__Docker__IngressProxyPidsLimit: "64"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Formats.Tar;
 using System.IO.Compression;
 using System.Net;
@@ -80,7 +79,9 @@ public sealed class AwdpFullBoundaryTests
                 visibility = 0,
                 title = "Disposable Patch Target",
                 description = "Accepts an isolated patch and reports its fixed state.",
-                direction = "Pwn"
+                direction = "Pwn",
+                mode = 2,
+                definitionJson = BuildDefinition(targetImage, checkerImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -109,51 +110,7 @@ public sealed class AwdpFullBoundaryTests
             schemaVersion = 1,
             requireBreakBeforeFix = true,
             maxBreakSubmissions = 5,
-            maxFixSubmissions = 5,
-            runtime = new
-            {
-                provider = 0,
-                allocation = 1,
-                definition = new
-                {
-                    kind = "container",
-                    image = targetImage,
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new Dictionary<string, int>(),
-                    security = new
-                    {
-                        noNewPrivileges = true,
-                        readonlyRootfs = false,
-                        runAsNonRoot = true,
-                        capDrop = new[] { "ALL" },
-                        capAdd = Array.Empty<string>()
-                    },
-                    egressPolicy = 0
-                },
-                limits = new
-                {
-                    memoryBytes = 67_108_864,
-                    nanoCpus = 100_000_000,
-                    pidsLimit = 64
-                },
-                ttlSeconds = 120,
-                operationTimeoutSeconds = 60,
-                runnerPool = "awdp-e2e"
-            },
-            patchEntrypoint = "fix.sh",
-            patchCommand = new[] { "/bin/sh", "{entrypoint}" },
-            patchTimeoutSeconds = 10,
-            checker = new
-            {
-                provider = 0,
-                image = checkerImage,
-                command = Array.Empty<string>(),
-                environment = new Dictionary<string, string>(),
-                timeoutSeconds = 20
-            },
-            targetPort = 8080,
-            readyTimeoutSeconds = 10
+            maxFixSubmissions = 5
         }, JsonOptions);
         var updatedConfiguration = await SendJsonAsync(
             admin,
@@ -360,8 +317,54 @@ public sealed class AwdpFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/finish",
             HttpStatusCode.NoContent,
             cancellationToken);
-        await PollDockerCleanupAsync(runtimeIds, TimeSpan.FromSeconds(60), cancellationToken);
     }
+
+    private static string BuildDefinition(string targetImage, string checkerImage) =>
+        JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            runtime = new
+            {
+                allocation = 1,
+                definition = new
+                {
+                    kind = "container",
+                    image = targetImage,
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    portMappings = new Dictionary<string, int>(),
+                    security = new
+                    {
+                        noNewPrivileges = true,
+                        readonlyRootfs = false,
+                        runAsNonRoot = true,
+                        capDrop = new[] { "ALL" },
+                        capAdd = Array.Empty<string>()
+                    },
+                    egressPolicy = 0,
+                    internalPorts = new[] { 8080 }
+                },
+                limits = new
+                {
+                    memoryBytes = 67_108_864,
+                    nanoCpus = 100_000_000,
+                    pidsLimit = 64
+                },
+                ttlSeconds = 120,
+                operationTimeoutSeconds = 60
+            },
+            patchEntrypoint = "fix.sh",
+            patchCommand = new[] { "/bin/sh", "{entrypoint}" },
+            patchTimeoutSeconds = 10,
+            checker = new
+            {
+                image = checkerImage,
+                command = Array.Empty<string>(),
+                environment = new Dictionary<string, string>(),
+                timeoutSeconds = 20
+            },
+            readyTimeoutSeconds = 10
+        }, JsonOptions);
 
     private static async Task<TeamSession> RegisterTeamAsync(
         HttpClient anonymous,
@@ -541,60 +544,6 @@ public sealed class AwdpFullBoundaryTests
         }
         throw new TimeoutException(
             $"Leaderboard did not reach AWDP score {expectedScore}. Last response: {last}");
-    }
-
-    private static async Task PollDockerCleanupAsync(
-        IReadOnlyList<Guid> runtimeIds,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            var hasResources = false;
-            foreach (var runtimeId in runtimeIds)
-            {
-                var label = $"label=noctf.io/runtime-instance-id={runtimeId:D}";
-                var containers = await RunProcessAsync(
-                    "docker", ["ps", "-aq", "--filter", label], cancellationToken);
-                var networks = await RunProcessAsync(
-                    "docker", ["network", "ls", "-q", "--filter", label], cancellationToken);
-                if (!string.IsNullOrWhiteSpace(containers)
-                    || !string.IsNullOrWhiteSpace(networks))
-                {
-                    hasResources = true;
-                    break;
-                }
-            }
-            if (!hasResources)
-                return;
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        }
-        throw new TimeoutException("AWDP target, checker, or network resources were not cleaned up.");
-    }
-
-    private static async Task<string> RunProcessAsync(
-        string fileName,
-        IReadOnlyList<string> arguments,
-        CancellationToken cancellationToken)
-    {
-        var start = new ProcessStartInfo(fileName)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        foreach (var argument in arguments)
-            start.ArgumentList.Add(argument);
-        using var process = Process.Start(start)
-            ?? throw new InvalidOperationException($"Could not start {fileName}.");
-        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var error = await process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"{fileName} exited with {process.ExitCode}: {error}");
-        return output.Trim();
     }
 
     private static HttpClient CreateClient(string baseUrl, string? token = null)
