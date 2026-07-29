@@ -248,7 +248,7 @@ GET  /api/internal/v1/awdp/fix-archives/{submissionId}
 
 全部使用独立 JWT Scheme、精确 audience/permission 与资源 Claims。Request body 不能包含可覆盖 Claims 的 Competition/Team/Submission Id。JWT 由调度该 durable Job 的可信进程签发，不提供公开“任意换 Token”接口。
 
-- AWD callback permission=`awd:check-result:write`，绑定 RuntimeInstanceId、Generation、CheckerSequence、deadline。
+- AWD callback permission=`awd:check-result:write`，绑定 RuntimeInstanceId、Generation 与 deadline；请求只提交 typed checker status，后一次覆盖前一次。
 - AWDP callback permission=`awdp:fix-result:write`，绑定 SubmissionId、ProcessingVersion、deadline。
 - Archive permission=`awdp:fix-archive:read`，只绑定一个 SubmissionId；Runner 使用它读取 archive，Checker callback Token 不含此权限。S3 可返回短时预签名地址，LocalFileSystem 可流式返回。
 

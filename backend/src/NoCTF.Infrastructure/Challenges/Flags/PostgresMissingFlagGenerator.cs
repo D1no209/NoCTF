@@ -27,12 +27,16 @@ public sealed class PostgresMissingFlagGenerator(
             return [new(Guid.Empty, Guid.Empty, "game_mode_unsupported", "Only CTF and KoH use this generator.")];
         var challenges = await db.CompetitionChallenges.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId && item.IsPublished)
-            .Select(item => new
-            {
-                item.Id,
-                item.ChallengeId,
-                item.ConfigurationJson
-            })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.ChallengeId,
+                template => template.Id,
+                (item, template) => new
+                {
+                    item.Id,
+                    item.ChallengeId,
+                    template.DefinitionJson
+                })
             .ToListAsync(ct);
         var teams = await db.Teams.AsNoTracking()
             .Where(item =>
@@ -45,7 +49,7 @@ public sealed class PostgresMissingFlagGenerator(
         foreach (var challenge in challenges)
         {
             var usesPerTeamRuntimeFlag = competition.Mode == GameMode.Ctf
-                && templates.Get(competition.Mode, challenge.ConfigurationJson)?.FlagSource
+                && templates.Get(competition.Mode, challenge.DefinitionJson)?.FlagSource
                     == RuntimeFlagSource.PerTeam;
             if (competition.Mode == GameMode.Ctf && !usesPerTeamRuntimeFlag)
                 continue;

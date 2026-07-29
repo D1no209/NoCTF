@@ -50,7 +50,7 @@ Submission 尝试次数使用更细粒度 `(TeamId, CompetitionChallengeId, Subm
 
 Submission、RuntimeInstance 以及需要异步写回的实体使用单调递增 ProcessingVersion。消息携带期望版本；写回时版本不符则结果为 superseded，不覆盖当前状态。相同版本与相同结果重放幂等成功，不同结果返回冲突。Runtime 的 Start/Stop/Reset/Extend 状态都落在 RuntimeInstance；Reset 预建下一 Generation 并用 `replaces_runtime_instance_id` 串联清理和创建，不引入 Operation 行。
 
-AWD Checker 额外使用每个 RuntimeInstance 单调 CheckerSequence。序号在写 Runner Outbox 的同一事务分配，callback 通过 LastAppliedCheckerSequence 与 body hash 判定幂等、冲突或 superseded；只在 Up/Down 改变时写计分事件。完整字段与算法见 [Runtime Checker 调度](runtime.md#checker-调度字段)。
+AWD Checker 由 Worker 周期调度并附着到 Runtime 内部网络。Checker 通过 internal endpoint 主动更新状态，后一次覆盖前一次；正常无回报、异常退出、超时分别记录 `Unknown`、`CheckerAbnormalExit`、`CheckerTimedOut`，只在 Up/Down 改变时写计分事件。完整语义见 [Runtime Checker 调度](runtime.md#checker-调度与状态)。
 
 ## Runner 容量
 

@@ -104,9 +104,6 @@ public sealed class CompetitionLifecycleStore(
                                 instance => instance.LastAppliedCheckerSequence,
                                 instance => instance.CheckerSequence + 1)
                             .SetProperty(
-                                instance => instance.LastAppliedCheckerBodySha256,
-                                (byte[]?)null)
-                            .SetProperty(
                                 instance => instance.CheckerDeadlineAt,
                                 (DateTimeOffset?)null),
                         cancellationToken);

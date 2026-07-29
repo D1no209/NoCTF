@@ -2,10 +2,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Infrastructure.Runtime.Administration;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Infrastructure.Runtime.Targets;
+using NoCTF.Infrastructure.Runtime.Placement;
 using StackExchange.Redis;
 
 namespace NoCTF.Infrastructure.Runtime;
@@ -26,6 +28,7 @@ internal static class RuntimeInfrastructure
             return ConnectionMultiplexer.Connect(redisOptions);
         });
         services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
+        services.AddSingleton<IRuntimePlacementPolicy, ConfiguredRuntimePlacementPolicy>();
 
         services.AddScoped<IRuntimeInstanceStore, RuntimeInstanceStore>();
         services.AddScoped<GetPlayerRuntime>();

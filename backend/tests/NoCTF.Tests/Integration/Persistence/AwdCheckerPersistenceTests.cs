@@ -81,14 +81,12 @@ public sealed class AwdCheckerPersistenceTests
                 await Assert.That(outbox.NodeMessages.OfType<RunAwdChecker>().Count()).IsEqualTo(1);
             }
             var up = AwdCheckResult.Create(
-                fixture.RuntimeId, 3, 1, 7, AwdServiceState.Up, fixture.Now.AddSeconds(1));
+                fixture.RuntimeId, 3, AwdServiceState.Up, fixture.Now.AddSeconds(1));
             var concurrentCallbacks = await Task.WhenAll(
                 RecordAsync(options, outbox, up, cancellationToken),
                 RecordAsync(options, outbox, up, cancellationToken));
             await Assert.That(concurrentCallbacks.Count(
-                outcome => outcome == InternalResultDisposition.Applied)).IsEqualTo(1);
-            await Assert.That(concurrentCallbacks.Count(
-                outcome => outcome == InternalResultDisposition.Duplicate)).IsEqualTo(1);
+                outcome => outcome == InternalResultDisposition.Applied)).IsEqualTo(2);
 
             await using (var dueDb = new NoCtfDbContext(options))
             {
@@ -112,13 +110,13 @@ public sealed class AwdCheckerPersistenceTests
             {
                 var store = new InternalResultStore(downDb, outbox);
                 var down = AwdCheckResult.Create(
-                    fixture.RuntimeId, 3, 2, 7, AwdServiceState.Down, fixture.Now.AddSeconds(3));
+                    fixture.RuntimeId, 3, AwdServiceState.Down, fixture.Now.AddSeconds(3));
                 await Assert.That(await store.RecordAwdAsync(down, cancellationToken))
                     .IsEqualTo(InternalResultDisposition.Applied);
-                var conflicting = AwdCheckResult.Create(
-                    fixture.RuntimeId, 3, 2, 7, AwdServiceState.Up, fixture.Now.AddSeconds(4));
-                await Assert.That(await store.RecordAwdAsync(conflicting, cancellationToken))
-                    .IsEqualTo(InternalResultDisposition.Conflict);
+                var later = AwdCheckResult.Create(
+                    fixture.RuntimeId, 3, AwdServiceState.Up, fixture.Now.AddSeconds(4));
+                await Assert.That(await store.RecordAwdAsync(later, cancellationToken))
+                    .IsEqualTo(InternalResultDisposition.Applied);
             }
 
             await using (var thirdDispatchDb = new NoCtfDbContext(options))
@@ -158,14 +156,9 @@ public sealed class AwdCheckerPersistenceTests
                     JsonSerializer.Serialize(new AwdChallengeConfiguration(
                         AwdChallengeConfiguration.CurrentSchemaVersion,
                         Checker: new AwdCheckerConfiguration(
-                            new RunnerJobConfiguration(
-                                RuntimeProvider.Docker,
-                                "checker:v2",
+                            new RunnerJobConfiguration("checker:v2",
                                 ["/checker"],
-                                TimeoutSeconds: 10),
-                            new ContainerAwdCheckerTarget(
-                                "http://{HOST}:{PORT}/health",
-                                8080))), JsonOptions),
+                                TimeoutSeconds: 10))), JsonOptions),
                     configurationUpdatedAt,
                     cancellationToken);
                 await Assert.That(update.Failure).IsNull();
@@ -256,17 +249,12 @@ public sealed class AwdCheckerPersistenceTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            ConfigurationJson = JsonSerializer.Serialize(new AwdChallengeConfiguration(
+            RulesJson = JsonSerializer.Serialize(new AwdChallengeConfiguration(
                 AwdChallengeConfiguration.CurrentSchemaVersion,
                 Checker: new AwdCheckerConfiguration(
-                    new RunnerJobConfiguration(
-                        RuntimeProvider.Docker,
-                        "checker:latest",
+                    new RunnerJobConfiguration("checker:latest",
                         ["/checker"],
-                        TimeoutSeconds: 10),
-                    new ContainerAwdCheckerTarget(
-                        "http://{HOST}:{PORT}/health",
-                        8080))), JsonOptions),
+                        TimeoutSeconds: 10))), JsonOptions),
             UpdatedAt = now
         });
         db.RuntimeInstances.Add(new RuntimeInstance
@@ -283,7 +271,7 @@ public sealed class AwdCheckerPersistenceTests
             State = RuntimeState.Running,
             ProcessingVersion = 7,
             ProviderReceiptJson = "{}",
-            AwdCheckerTargetUrl = "http://service.internal/health",
+            AwdCheckerTargetHost = "service.internal",
             NextCheckerDueAt = now,
             CreatedAt = now,
             RunningAt = now

@@ -37,8 +37,8 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
         RoutePrefixOverride(string.Empty);
         Summary(summary =>
         {
-            summary.Summary = "Records a claim-bound AWD checker result.";
-            summary.Description = "Runtime, generation, processing version, checker sequence, and deadline come exclusively from the internal JWT.";
+            summary.Summary = "Updates the status reported by an AWD checker.";
+            summary.Description = "Each accepted update replaces the runtime's previous checker status. Runtime identity and generation come from the internal JWT.";
         });
     }
 
@@ -53,16 +53,12 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
                 $"runtime:{runtimeId:D}",
                 StringComparison.Ordinal) ||
             !int.TryParse(User.FindFirstValue("generation"), out var generation) ||
-            !long.TryParse(User.FindFirstValue("checker_sequence"), out var checkerSequence) ||
-            !long.TryParse(User.FindFirstValue("processing_version"), out var processingVersion) ||
             !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
             DateTimeOffset.UtcNow > DateTimeOffset.FromUnixTimeSeconds(deadline).AddHours(24))
             return TypedResults.Unauthorized();
         var disposition = await record.AwdAsync(AwdCheckResult.Create(
             runtimeId,
             generation,
-            checkerSequence,
-            processingVersion,
             request.State,
             DateTimeOffset.UtcNow), ct);
         return disposition switch

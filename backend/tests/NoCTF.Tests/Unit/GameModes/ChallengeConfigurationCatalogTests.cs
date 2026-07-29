@@ -48,8 +48,32 @@ public class ChallengeConfigurationCatalogTests
                 competition.RootElement.GetProperty("requireBreakBeforeFix").GetBoolean())
             .IsTrue();
         await Assert.That(
-                challenge.RootElement.GetProperty("requireBreakBeforeFix").ValueKind)
-            .IsEqualTo(JsonValueKind.Null);
+                challenge.RootElement.TryGetProperty("requireBreakBeforeFix", out _))
+            .IsFalse();
+    }
+
+    [Test]
+    public async Task Rules_reject_runtime_owned_by_challenge_definition()
+    {
+        var errors = new GameModeChallengeConfigurationCatalog().ValidateRules(
+            GameMode.Ctf,
+            """{"schemaVersion":1,"runtime":null}""",
+            GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+            1);
+
+        await Assert.That(errors)
+            .Contains("RulesJson cannot contain 'runtime' because it belongs to the other challenge section.");
+    }
+
+    [Test]
+    public async Task Definition_rejects_scoring_owned_by_competition_challenge_rules()
+    {
+        var errors = new GameModeChallengeConfigurationCatalog().ValidateDefinition(
+            GameMode.Ctf,
+            """{"schemaVersion":1,"points":null}""");
+
+        await Assert.That(errors)
+            .Contains("DefinitionJson cannot contain 'points' because it belongs to the other challenge section.");
     }
 
     [Test]
@@ -113,8 +137,7 @@ public class ChallengeConfigurationCatalogTests
         var configurations = new GameModeChallengeConfigurationCatalog();
         var runtimes = new ChallengeRuntimeTemplateCatalog();
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Kubernetes,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 ["/app/challenge"],
@@ -137,7 +160,8 @@ public class ChallengeConfigurationCatalogTests
                 {
                     PortMappings = mode == GameMode.Awdp
                         ? new Dictionary<int, int>()
-                        : ((ContainerRuntimeDefinition)template.Definition).PortMappings
+                        : ((ContainerRuntimeDefinition)template.Definition).PortMappings,
+                    InternalPorts = mode == GameMode.Awdp ? [8080] : null
                 }
             };
             var json = WithRuntime(
@@ -148,7 +172,7 @@ public class ChallengeConfigurationCatalogTests
             var parsed = runtimes.Get(mode, json);
 
             await Assert.That(parsed).IsNotNull();
-            await Assert.That(parsed!.Provider).IsEqualTo(RuntimeProvider.Kubernetes);
+            await Assert.That(parsed!.RuntimeKind).IsEqualTo(RuntimeKind.Container);
             await Assert.That(parsed.Allocation).IsEqualTo(expectedAllocation);
             await Assert.That(parsed.Definition).IsTypeOf<ContainerRuntimeDefinition>();
             await Assert.That(((ContainerRuntimeDefinition)parsed.Definition).Image)
@@ -162,8 +186,7 @@ public class ChallengeConfigurationCatalogTests
     {
         var configurations = new GameModeChallengeConfigurationCatalog();
         var invalid = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.Shared,
+                        RuntimeAllocation.Shared,
             new ContainerRuntimeDefinition(
                 string.Empty,
                 Security: new(false, false, false, [], [])),
@@ -180,7 +203,7 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task Docker_runtime_definitions_reject_InternetOnly_egress()
+    public async Task Portable_runtime_definitions_reject_InternetOnly_egress()
     {
         var configurations = new GameModeChallengeConfigurationCatalog();
         ChallengeRuntimeDefinition[] definitions =
@@ -200,8 +223,7 @@ public class ChallengeConfigurationCatalogTests
         foreach (var definition in definitions)
         {
             var template = new ChallengeRuntimeTemplate(
-                RuntimeProvider.Docker,
-                RuntimeAllocation.PerTeam,
+                                RuntimeAllocation.PerTeam,
                 definition,
                 Limits: new(268_435_456, 500_000_000, 128));
 
@@ -210,27 +232,27 @@ public class ChallengeConfigurationCatalogTests
                 WithRuntime(configurations.GetDefaultJson(GameMode.Ctf), template));
 
             await Assert.That(errors).Contains(
-                "Docker runtimes do not support InternetOnly egress; use DenyAll or a Kubernetes Runner Pool.");
+                "Portable challenge runtimes cannot require the Kubernetes-only InternetOnly egress policy.");
         }
     }
 
     [Test]
-    public async Task Kubernetes_runtime_definition_accepts_InternetOnly_egress()
+    public async Task Runtime_definition_cannot_select_a_provider_specific_egress_policy()
     {
         var configurations = new GameModeChallengeConfigurationCatalog();
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Kubernetes,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 EgressPolicy: RuntimeEgressPolicy.InternetOnly),
-            Limits: new(268_435_456, 500_000_000, 0));
+            Limits: new(268_435_456, 500_000_000, 128));
 
         var errors = configurations.Validate(
             GameMode.Ctf,
             WithRuntime(configurations.GetDefaultJson(GameMode.Ctf), template));
 
-        await Assert.That(errors).IsEmpty();
+        await Assert.That(errors).Contains(
+            "Portable challenge runtimes cannot require the Kubernetes-only InternetOnly egress policy.");
     }
 
     [Test]
@@ -241,11 +263,9 @@ public class ChallengeConfigurationCatalogTests
         ChallengeRuntimeTemplate[] templates =
         [
             new(
-                RuntimeProvider.Docker,
                 RuntimeAllocation.PerTeam,
                 new ContainerRuntimeDefinition("registry.example/challenge:v1")),
             new(
-                RuntimeProvider.Docker,
                 RuntimeAllocation.PerTeam,
                 new ComposeRuntimeDefinition(
                     "services:\n  web:\n    image: registry.example/challenge:v1",
@@ -254,7 +274,6 @@ public class ChallengeConfigurationCatalogTests
                         ["web"] = new(268_435_456, 500_000_000, 128)
                     })),
             new(
-                RuntimeProvider.Libvirt,
                 RuntimeAllocation.PerTeam,
                 new OvaRuntimeDefinition(
                     "file:///var/lib/noctf/challenge.ova",
@@ -278,8 +297,7 @@ public class ChallengeConfigurationCatalogTests
     {
         var configurations = new GameModeChallengeConfigurationCatalog();
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition("registry.example/challenge:v1"));
 
         foreach (var mode in Enum.GetValues<GameMode>())
@@ -304,8 +322,7 @@ public class ChallengeConfigurationCatalogTests
     {
         var catalog = new GameModeChallengeConfigurationCatalog();
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Libvirt,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new OvaRuntimeDefinition(
                 "https://runtime.example/challenge.ova",
                 "not-a-digest"),
@@ -316,7 +333,7 @@ public class ChallengeConfigurationCatalogTests
             WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
 
         await Assert.That(errors)
-            .Contains("OvaVm runtimes require a 64-character SHA-256 digest.");
+            .Contains("Challenge definitions support only portable Container or Compose runtimes.");
     }
 
     [Test]
@@ -324,8 +341,7 @@ public class ChallengeConfigurationCatalogTests
     {
         var catalog = new GameModeChallengeConfigurationCatalog();
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
                 """
                 services:
@@ -352,8 +368,7 @@ public class ChallengeConfigurationCatalogTests
     {
         var configurations = new GameModeChallengeConfigurationCatalog();
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 Security: new(true, true, true, [], [])),
@@ -378,28 +393,23 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task Container_runtime_rejects_libvirt_provider()
+    public async Task Runtime_template_serialization_has_no_provider_field()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Libvirt,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition("registry.example/challenge:v1"));
         var catalog = new GameModeChallengeConfigurationCatalog();
 
-        var errors = catalog.Validate(
-            GameMode.Ctf,
-            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+        var json = WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime);
 
-        await Assert.That(errors)
-            .Contains("Container runtimes require the Docker or Kubernetes provider.");
+        await Assert.That(json).DoesNotContain("\"provider\"");
     }
 
     [Test]
     public async Task Ctf_runtime_rejects_shared_allocation()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.Shared,
+                        RuntimeAllocation.Shared,
             new ContainerRuntimeDefinition("registry.example/challenge:v1"));
         var catalog = new GameModeChallengeConfigurationCatalog();
 
@@ -414,8 +424,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Ctf_per_team_container_requires_a_flag_environment_variable()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition("registry.example/challenge:v1"),
             FlagSource: RuntimeFlagSource.PerTeam);
         var catalog = new GameModeChallengeConfigurationCatalog();
@@ -432,8 +441,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Ctf_per_team_compose_validates_flag_target_services_and_variables()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
                 "services:\n  web:\n    image: registry.example/challenge:v1",
                 new Dictionary<string, RuntimeResourceLimits>
@@ -464,8 +472,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Ctf_static_runtime_rejects_flag_injection_configuration()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 FlagEnvironmentVariableName: "FLAG"));
@@ -484,8 +491,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Ctf_runtime_rejects_awd_rotation_flag_source()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition("registry.example/challenge:v1"),
             FlagSource: RuntimeFlagSource.AwdRotation);
         var catalog = new GameModeChallengeConfigurationCatalog();
@@ -502,8 +508,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Ctf_runtime_rejects_participant_url_exposure()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 }),
@@ -529,12 +534,10 @@ public class ChallengeConfigurationCatalogTests
     {
         var catalog = new GameModeChallengeConfigurationCatalog();
         var shared = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.Shared,
+                        RuntimeAllocation.Shared,
             new ContainerRuntimeDefinition("registry.example/challenge:v1"));
         var ova = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Libvirt,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new OvaRuntimeDefinition(
                 "file:///var/lib/noctf/challenge.ova",
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
@@ -552,11 +555,9 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task Awd_checker_rejects_non_container_provider()
+    public async Task Awd_checker_requires_a_runtime()
     {
-        var checker = new RunnerJobConfiguration(
-            RuntimeProvider.Libvirt,
-            "registry.example/checker:v1");
+        var checker = new RunnerJobConfiguration("registry.example/checker:v1");
         var catalog = new GameModeChallengeConfigurationCatalog();
 
         var errors = catalog.Validate(
@@ -564,49 +565,38 @@ public class ChallengeConfigurationCatalogTests
             WithChecker(GameMode.Awd, catalog.GetDefaultJson(GameMode.Awd), checker));
 
         await Assert.That(errors)
-            .Contains("AWD Checker requires the Docker or Kubernetes provider.");
+            .Contains("Runtime is required when Checker is configured.");
     }
 
     [Test]
-    public async Task Awd_checker_requires_the_runtime_provider_and_target_kind()
+    public async Task Awd_checker_target_service_name_matches_runtime_kind()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition("registry.example/challenge:v1"),
             Limits: new(268_435_456, 500_000_000, 128));
         var catalog = new GameModeChallengeConfigurationCatalog();
         var challenge = WithAwdFlagInjection(WithRuntime(
             catalog.GetDefaultJson(GameMode.Awd),
             runtime));
-        var providerMismatch = WithAwdChecker(
+        var containerChecker = WithAwdChecker(
             challenge,
             new AwdCheckerConfiguration(
-                new RunnerJobConfiguration(
-                    RuntimeProvider.Kubernetes,
-                    "registry.example/checker:v1"),
-                new ContainerAwdCheckerTarget(
-                    "http://{HOST}:{PORT}/health",
-                    8080)));
+                new RunnerJobConfiguration("registry.example/checker:v1")));
         var kindMismatch = WithAwdChecker(
             challenge,
             new AwdCheckerConfiguration(
-                new RunnerJobConfiguration(
-                    RuntimeProvider.Docker,
-                    "registry.example/checker:v1"),
-                new ComposeAwdCheckerTarget(
-                    "http://{HOST}:{PORT}/health",
-                    "web",
-                    8080)));
+                new RunnerJobConfiguration("registry.example/checker:v1"),
+                TargetServiceName: "web"));
 
-        await Assert.That(catalog.Validate(GameMode.Awd, providerMismatch))
-            .Contains("AWD Runtime and Checker must use the same provider.");
+        await Assert.That(catalog.Validate(GameMode.Awd, containerChecker))
+            .DoesNotContain("Checker.TargetServiceName is required only for Compose Runtime.");
         await Assert.That(catalog.Validate(GameMode.Awd, kindMismatch))
-            .Contains("Checker.Target kind must match the AWD Runtime kind.");
+            .Contains("Checker.TargetServiceName is required only for Compose Runtime.");
     }
 
     [Test]
-    public async Task Awd_checker_null_target_returns_a_validation_error()
+    public async Task Legacy_checker_target_fields_do_not_supply_a_runtime()
     {
         var root = JsonNode.Parse(
             new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awd))!
@@ -626,15 +616,14 @@ public class ChallengeConfigurationCatalogTests
             GameMode.Awd,
             root.ToJsonString());
 
-        await Assert.That(errors).Contains("Checker.Target is required.");
+        await Assert.That(errors).DoesNotContain("Checker.Target is required.");
     }
 
     [Test]
     public async Task Awdp_target_rejects_public_ports_and_urls()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/target:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 }),
@@ -659,9 +648,7 @@ public class ChallengeConfigurationCatalogTests
     [Test]
     public async Task Awdp_checker_rejects_runner_reserved_environment_variables()
     {
-        var checker = new RunnerJobConfiguration(
-            RuntimeProvider.Docker,
-            "registry.example/checker:v1",
+        var checker = new RunnerJobConfiguration("registry.example/checker:v1",
             Environment: new Dictionary<string, string>
             {
                 ["TARGET_HOST"] = "attacker-controlled",
@@ -680,9 +667,7 @@ public class ChallengeConfigurationCatalogTests
     [Test]
     public async Task Checker_environment_rejects_invalid_names_and_noctf_prefix()
     {
-        var checker = new RunnerJobConfiguration(
-            RuntimeProvider.Docker,
-            "registry.example/checker:v1",
+        var checker = new RunnerJobConfiguration("registry.example/checker:v1",
             Environment: new Dictionary<string, string>
             {
                 ["1INVALID"] = "value",
@@ -706,9 +691,7 @@ public class ChallengeConfigurationCatalogTests
     [Test]
     public async Task Checker_null_image_returns_validation_error()
     {
-        var checker = new RunnerJobConfiguration(
-            RuntimeProvider.Docker,
-            null!);
+        var checker = new RunnerJobConfiguration(null!);
         var catalog = new GameModeChallengeConfigurationCatalog();
 
         foreach (var mode in new[] { GameMode.Awd, GameMode.Awdp })
@@ -725,8 +708,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Runtime_environment_rejects_invalid_names_and_reserved_prefix()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 Environment: new Dictionary<string, string>
@@ -750,8 +732,7 @@ public class ChallengeConfigurationCatalogTests
     {
         var catalog = new GameModeChallengeConfigurationCatalog();
         var container = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 }),
@@ -764,8 +745,7 @@ public class ChallengeConfigurationCatalogTests
                     ServiceName: "web")
             ]);
         var compose = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
                 "services:\n  web:\n    image: registry.example/challenge:v1",
                 new Dictionary<string, RuntimeResourceLimits>
@@ -777,8 +757,7 @@ public class ChallengeConfigurationCatalogTests
                 new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 8080)
             ]);
         var ova = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Libvirt,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new OvaRuntimeDefinition(
                 "file:///var/lib/noctf/challenge.ova",
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
@@ -809,8 +788,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Runtime_url_binding_must_expand_to_absolute_uri()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 }),
@@ -835,8 +813,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Runtime_url_binding_null_template_returns_validation_error()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 }),
@@ -862,8 +839,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Runtime_url_bindings_reject_null_entries()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition("registry.example/challenge:v1"),
             Limits: new(268_435_456, 500_000_000, 128),
             UrlBindings: [null!]);
@@ -881,8 +857,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Control_check_url_binding_is_reserved_for_KoH()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 }),
@@ -909,8 +884,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Koh_container_control_check_requires_dynamic_port_mapping()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.Shared,
+                        RuntimeAllocation.Shared,
             new ContainerRuntimeDefinition(
                 "registry.example/hill:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 }),
@@ -956,8 +930,7 @@ public class ChallengeConfigurationCatalogTests
     public async Task Koh_shared_runtime_with_control_binding_is_valid_for_start()
     {
         var runtime = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.Shared,
+                        RuntimeAllocation.Shared,
             new ContainerRuntimeDefinition(
                 "registry.example/hill:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 },
@@ -999,10 +972,7 @@ public class ChallengeConfigurationCatalogTests
         var root = JsonNode.Parse(json)!.AsObject();
         object configured = mode == GameMode.Awd
             ? new AwdCheckerConfiguration(
-                checker,
-                new ContainerAwdCheckerTarget(
-                    "http://{HOST}:{PORT}/health",
-                    8080))
+                checker)
             : checker;
         root["checker"] = JsonSerializer.SerializeToNode(
             configured,

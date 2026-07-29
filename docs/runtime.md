@@ -1,6 +1,6 @@
 # Runtime 规范
 
-## 类型与 Provider
+## 题目定义与平台 Placement
 
 RuntimeKind：
 
@@ -8,18 +8,18 @@ RuntimeKind：
 - `Compose`：原始 compose.yaml；Provider Docker/Kubernetes（Kompose）。
 - `OvaVm`：Libvirt/QEMU/KVM，多 VM Appliance。
 
-RuntimeKind 与 RuntimeProvider 是独立 enum。Runtime 配置包含 RunnerPool，任务进入对应 Wolverine durable queue。
+Challenge 只声明 RuntimeKind、镜像/Compose 内容、命令、环境、逻辑端点和资源需求，不声明 RuntimeProvider 或 RunnerPool。一个 NoCTF 部署只启用一种容器 provider：Docker 或 Kubernetes；provider 与 runner pool 由平台配置的 `IRuntimePlacementPolicy` 选择，Competition 同样不参与选择。
 
 模式兼容矩阵：
 
 | 模式/用途 | Container | Compose | OvaVm |
 |---|---:|---:|---:|
-| CTF Static/PerTeamRuntime | 是 | 是 | 是，但 FlagSource 只能 Static |
+| CTF Static/PerTeamRuntime | 是 | 是 | 否 |
 | AWD 长期按队 Runtime | 是 | 是 | 否 |
 | AWDP 一次性 Fix target | 是 | 否 | 否 |
-| KoH shared Hill | 是 | 是 | 是 |
+| KoH shared Hill | 是 | 是 | 否 |
 
-OVA 永远不接收平台生成的动态/PerTeam/AWD Flag，也不执行 Flag 注入命令；“固定 Flag”必须作为 ChallengeFlag 预先存在并由题目镜像/虚拟机自身配置使用。
+当前 Challenge schema 不接受 OVA Runtime。部署若选择 Docker，则所有新 Runtime/Checker 使用 Docker；选择 Kubernetes 时全部使用 Kubernetes。不能由某道题或某场比赛混用或覆盖。
 
 ## RuntimeInstance 生命周期
 
@@ -256,16 +256,15 @@ Runner 使用部署配置的 CPU、内存和 PID 总额度初始化容量，刷�
 Redis 容量丢失但该节点仍有 `Provisioning | Running | Stopping` assignment 时保持离线，
 不会根据可能已经变化的题目配置推算占用；assignment 收敛后才按部署总额度安全重建。
 
-## Checker 调度字段
+## Checker 调度与状态
 
-AWD Checker 不建立 Operation 表。每个 AWD RuntimeInstance 除 Provider receipt 外，还保存 provision 时展开并冻结的 `AwdCheckerTargetUrl` 与 Compose-only `AwdCheckerTargetServiceName`。`ControlCheckUrl` 仍只属于 KoH。每个实例同时保存 `CheckerSequence`（已分配的最大序号）、`LastAppliedCheckerSequence`、`LastAppliedCheckerBodySha256` 与 `NextCheckerDueAt`：
+AWD Checker 不建立 Operation 表。Checker 与目标加入同一内部网络；单 Container 目标使用稳定 DNS `target`，Compose 目标使用 compose service name。Checker 自己知道目标服务端口，Challenge/Competition 不需要为 Checker 再配置或发现公开端口。`ControlCheckUrl` 仍只属于 KoH。
 
-1. Worker 在短事务中锁 RuntimeInstance，若已到期且没有更新序号的任务，就递增 CheckerSequence、推进 NextCheckerDueAt，并写 Runner Outbox；
-2. durable message 带 RuntimeInstanceId、Generation、CheckerSequence、Deadline；Runner 从相同 Generation 的 receipt 构造强类型 attached target，并在执行时签发最小权限 JWT；Provider/receipt/Generation 不匹配时 superseded；
-3. callback 先把 typed state 规范化为精确 ASCII `Up`/`Down`，body hash=`SHA256(UTF8(normalizedState))`；序号大于 LastApplied 时比较当前服务状态，只在 Up/Down 发生变化时插入 AwdServiceStatus，无变化也更新 LastApplied 序号与 body hash；
-4. callback 序号等于 LastApplied 且 body hash 相同是幂等成功，不同返回 409；更小返回 202 superseded；
-5. Paused 清空 NextCheckerDueAt 且不补跑，Resume 将它设为当前时间。Finished 后不再分配序号。
+1. Worker 到期后写 Runner Outbox；Runner 从该 Runtime Generation 的 receipt 构造 attached target；
+2. Checker 通过 `POST /api/internal/v1/awd/check-results` 主动写 `Up` 或 `Down`，同一次执行可以多次写，后一次状态直接覆盖前一次；
+3. 正常退出但从未回报时保持/写入 `Unknown`；非零异常退出写 `CheckerAbnormalExit`；超时写 `CheckerTimedOut`；
+4. Runner 只用退出结果区分 Checker 自身是否异常或超时，绝不把退出码解释为服务 Up/Down；
+5. 只有 `Up`/`Down` 的变化产生服务计分事实，`Unknown`、`CheckerAbnormalExit`、`CheckerTimedOut` 是诊断状态；
+6. Paused 停止调度且不补跑，Resume 立即安排一次。Finished 后不再安排。
 
-这些字段只负责调度和 HTTP 重试幂等，不是计分状态副本；轮次末状态仍从默认 Up 加 AwdServiceStatus 变化事件推导。
-
-Checker Job 与 interval 读取当前分配 CheckerSequence 时的题目配置；Target URL/service 是 Runtime Generation 事实，配置更新不会把存量 Runtime 的 Checker 静默切到另一个端点。Runtime 首次进入 Running 且存在冻结 Target 时，`NextCheckerDueAt` 初始化为 Running 时间。
+Runtime/Checker 定义更新不热改存量 Runtime；下一次 Start/Reset 使用 Challenge 最新定义。RuntimeInstance 不保存 Challenge 定义版本，也不自动升级。

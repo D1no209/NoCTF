@@ -122,7 +122,7 @@ deleted_at?
 
 ## challenges
 
-全局模板字段：id、owner_id、manager_ids uuid[]、visibility、title、description、direction、revision、created_at、updated_at、deleted_at。ManagerIds 无重复且不含 OwnerId，使用 GIN。存在未删除 CompetitionChallenge 引用时禁止删除。
+全局模板字段：id、owner_id、manager_ids uuid[]、mode、visibility、title、description、direction、definition_json jsonb、revision、created_at、updated_at、deleted_at。DefinitionJson 保存 provider-neutral Runtime/Checker/Flag 注入定义，不得包含 RuntimeProvider 或 RunnerPool。ManagerIds 无重复且不含 OwnerId，使用 GIN。存在未删除 CompetitionChallenge 引用时禁止删除。
 
 ## challenge_attachments
 
@@ -271,15 +271,15 @@ runner_id?, runner_pool
 state
 failure_code?
 processing_version
-configuration_revision
 replaces_runtime_instance_id?
 provider_receipt_json? jsonb
 urls text[]
 participant_url_indexes integer[]
 control_check_url?
+awd_checker_target_host?
+checker_status, checker_status_updated_at?
 checker_sequence
 last_applied_checker_sequence
-last_applied_checker_body_sha256? bytea(32)
 next_checker_due_at?
 created_at, running_at?, expires_at?, stopped_at?
 ```
@@ -287,7 +287,10 @@ created_at, running_at?, expires_at?, stopped_at?
 - `(competition_challenge_id, team_id, generation)` 唯一。
 - CTF/AWD 同队同题最多一个 Queued/Provisioning/Running/Stopping；KoH TeamId null 时同题最多一个共享活动实例。使用部分唯一索引。
 - ReplacesRuntimeInstanceId 只能指向同 CompetitionChallenge/Team 的较小 Generation；仅 Reset 设置。替换前后 Generation 在并发额度中合并算一个槽。
-- RunnerId、receipt、URL 在调度/Provider 成功后逐步填写；URLs 与 ParticipantUrlIndexes 缺省空数组。indexes 是严格递增、无重复、0-based 且必须落在 URLs 范围内，固化该 Generation 的 Exposure；玩家自己的 `urls` 返回全部，AWD/KoH 跨队公开只按 indexes 选择。CheckerSequence 与 LastAppliedCheckerSequence 初始为 0 且后者不得大于前者。
+- RunnerId、实际 RuntimeProvider/RunnerPool、receipt、URL 在平台调度/Provider 成功后逐步填写；题目定义和 Competition 不保存 placement。URLs 与 ParticipantUrlIndexes 缺省空数组。indexes 是严格递增、无重复、0-based 且必须落在 URLs 范围内，固化该 Generation 的 Exposure；玩家自己的 `urls` 返回全部，AWD/KoH 跨队公开只按 indexes 选择。
+- RuntimeInstance 不保存 Challenge 定义版本；定义修改只影响下一次 Start/Reset。
+- CheckerStatus 为 Unknown/Up/Down/CheckerAbnormalExit/CheckerTimedOut，后一次 internal callback 覆盖前一次；诊断状态不直接计分。
+- AwdCheckerTargetHost 只保存平台从本次 Runtime receipt 得到的内部 DNS host，不保存 URL、端口或题目定义版本。
 - FailureCode 必须且只能在 State=Failed 非空；对玩家只返回 code，管理详情另可返回脱敏 receipt/error。
 - URL 是展开后的完整受保护字符串；只有 Running 才返回选手。
 - ControlCheckUrl 只允许 KoH，Running 时必须是展开后的绝对 URL；只供 Worker 轮询，绝不进入玩家 DTO/SignalR/日志。

@@ -12,26 +12,39 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public string GetDefaultJson(GameMode mode) => mode switch
+    public string GetDefaultJson(GameMode mode) =>
+        JsonSerializer.Serialize(
+            new { schemaVersion = CurrentSchemaVersion(mode) },
+            JsonOptions);
+
+    public string GetDefaultDefinitionJson(GameMode mode) => GetDefaultJson(mode);
+
+    public IReadOnlyList<string> ValidateRules(
+        GameMode mode,
+        string json,
+        string competitionConfigurationJson,
+        int eligibleTeamCount) =>
+        [
+            .. ValidateOwnedProperties(mode, json, DefinitionProperties(mode), "RulesJson"),
+            .. Validate(mode, json, competitionConfigurationJson, eligibleTeamCount)
+        ];
+
+    public IReadOnlyList<string> ValidateDefinition(GameMode mode, string json) =>
+        [
+            .. ValidateOwnedProperties(mode, json, RuleProperties(mode), "DefinitionJson"),
+            .. Validate(
+                mode,
+                json,
+                GameModeDefaultConfiguration.GetCompetitionJson(mode),
+                1)
+        ];
+
+    private static int CurrentSchemaVersion(GameMode mode) => mode switch
     {
-        GameMode.Ctf => JsonSerializer.Serialize(
-            new CtfChallengeConfiguration(CtfChallengeConfiguration.CurrentSchemaVersion, null, null, null),
-            JsonOptions),
-        GameMode.Awd => JsonSerializer.Serialize(
-            new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion),
-            JsonOptions),
-        GameMode.Awdp => JsonSerializer.Serialize(
-            new AwdpChallengeConfiguration(
-                AwdpChallengeConfiguration.CurrentSchemaVersion,
-                null,
-                null,
-                null,
-                null,
-                null),
-            JsonOptions),
-        GameMode.Koh => JsonSerializer.Serialize(
-            new KohChallengeConfiguration(KohChallengeConfiguration.CurrentSchemaVersion),
-            JsonOptions),
+        GameMode.Ctf => CtfChallengeConfiguration.CurrentSchemaVersion,
+        GameMode.Awd => AwdChallengeConfiguration.CurrentSchemaVersion,
+        GameMode.Awdp => AwdpChallengeConfiguration.CurrentSchemaVersion,
+        GameMode.Koh => KohChallengeConfiguration.CurrentSchemaVersion,
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };
 
@@ -81,4 +94,86 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                 AwdpConfigurationResolver.Resolve(competition, challenge))
         ];
     }
+
+    private static IReadOnlyList<string> ValidateOwnedProperties(
+        GameMode mode,
+        string json,
+        IReadOnlySet<string> forbidden,
+        string section)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return [$"{section} must be a JSON object."];
+            return document.RootElement.EnumerateObject()
+                .Where(property => forbidden.Contains(property.Name))
+                .Select(property =>
+                    $"{section} cannot contain '{property.Name}' because it belongs to the other challenge section.")
+                .ToArray();
+        }
+        catch (JsonException exception)
+        {
+            return [exception.Message];
+        }
+    }
+
+    private static IReadOnlySet<string> DefinitionProperties(GameMode mode) =>
+        new HashSet<string>(
+            mode switch
+            {
+                GameMode.Ctf => ["runtime"],
+                GameMode.Awd => ["runtime", "checker", "flagInjection", "flagTemplate"],
+                GameMode.Awdp =>
+                [
+                    "runtime",
+                    "patchEntrypoint",
+                    "patchCommand",
+                    "patchTimeoutSeconds",
+                    "checker",
+                    "readyTimeoutSeconds"
+                ],
+                GameMode.Koh => ["runtime"],
+                _ => []
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+    private static IReadOnlySet<string> RuleProperties(GameMode mode) =>
+        new HashSet<string>(
+            mode switch
+            {
+                GameMode.Ctf =>
+                [
+                    "points",
+                    "bloodRewards",
+                    "maxFlagAttempts",
+                    "scoreExpression",
+                    "wrongSubmissionPenalty"
+                ],
+                GameMode.Awd =>
+                [
+                    "attackRewardMode",
+                    "attackPoints",
+                    "victimDefensePoolPoints",
+                    "checkerIntervalSeconds",
+                    "serviceHealthyPoints",
+                    "serviceUnhealthyPenalty"
+                ],
+                GameMode.Awdp =>
+                [
+                    "break",
+                    "fix",
+                    "requireBreakBeforeFix",
+                    "maxBreakSubmissions",
+                    "maxFixSubmissions",
+                    "breakWrongPenalty",
+                    "fixFailurePenalty",
+                    "violationPenalty",
+                    "serviceDownPenalty",
+                    "evaluationDispatchMode"
+                ],
+                GameMode.Koh => ["pollIntervalSeconds", "controlPointsPerInterval"],
+                _ => []
+            },
+            StringComparer.OrdinalIgnoreCase);
 }

@@ -31,7 +31,6 @@ public static class GameModeDefaultConfiguration
             PatchCommand: null,
             PatchTimeoutSeconds: 60,
             Checker: null,
-            TargetPort: 0,
             ReadyTimeoutSeconds: 30), Options),
         GameMode.Koh => JsonSerializer.Serialize(new Koh.Configuration.KohConfiguration(1, 5, 10), Options),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")

@@ -26,7 +26,9 @@ public sealed class AwdCheckerHandlerTests
     public async Task Checker_job_receives_target_and_claim_bound_callback_only_at_execution_time()
     {
         var runner = new RecordingOneShotRunner();
-        var executor = new AwdCheckerExecutor(new StubProviderCatalog(runner));
+        var executor = new AwdCheckerExecutor(
+            new StubProviderCatalog(runner),
+            new StubHttpClientFactory());
         var deadline = DateTimeOffset.Parse("2026-07-24T00:01:00Z");
         var work = new AwdCheckerWork(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
@@ -37,11 +39,10 @@ public sealed class AwdCheckerHandlerTests
             ContainerReceiptJson(
                 Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 3),
-            null,
+            "target.internal",
             "checker:latest",
             ["/checker"],
             new Dictionary<string, string> { ["MODE"] = "awd" },
-            new Uri("http://target.internal/health"),
             new Uri("https://api.example/api/internal/v1/awd/check-results"),
             "claim-bound-token",
             deadline,
@@ -51,8 +52,8 @@ public sealed class AwdCheckerHandlerTests
 
         var request = runner.Request!;
         await Assert.That(request.OperationId).IsNotEqualTo(work.RuntimeInstanceId);
-        await Assert.That(request.Environment["NOCTF_TARGET_URL"])
-            .IsEqualTo("http://target.internal/health");
+        await Assert.That(request.Environment["NOCTF_TARGET_HOST"])
+            .IsEqualTo("target.internal");
         await Assert.That(request.Environment["NOCTF_CALLBACK_URL"])
             .IsEqualTo("https://api.example/api/internal/v1/awd/check-results");
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"])
@@ -70,7 +71,9 @@ public sealed class AwdCheckerHandlerTests
     public async Task Checker_timeout_cancels_a_hung_provider_wait()
     {
         var runner = new HangingOneShotRunner();
-        var executor = new AwdCheckerExecutor(new StubProviderCatalog(runner));
+        var executor = new AwdCheckerExecutor(
+            new StubProviderCatalog(runner),
+            new StubHttpClientFactory());
         var work = new AwdCheckerWork(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             8,
@@ -80,11 +83,10 @@ public sealed class AwdCheckerHandlerTests
             ContainerReceiptJson(
                 Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 3),
-            null,
+            "target.internal",
             "checker:latest",
             ["/checker"],
             new Dictionary<string, string>(),
-            new Uri("http://target.internal/health"),
             new Uri("https://api.example/api/internal/v1/awd/check-results"),
             "claim-bound-token",
             DateTimeOffset.UtcNow.AddMinutes(1),
@@ -100,7 +102,9 @@ public sealed class AwdCheckerHandlerTests
     public async Task Checker_supersedes_a_receipt_from_another_generation()
     {
         var runner = new RecordingOneShotRunner();
-        var executor = new AwdCheckerExecutor(new StubProviderCatalog(runner));
+        var executor = new AwdCheckerExecutor(
+            new StubProviderCatalog(runner),
+            new StubHttpClientFactory());
         var runtimeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var work = new AwdCheckerWork(
             runtimeId,
@@ -109,11 +113,10 @@ public sealed class AwdCheckerHandlerTests
             RuntimeKind.Container,
             4,
             ContainerReceiptJson(runtimeId, 3),
-            null,
+            "target.internal",
             "checker:latest",
             ["/checker"],
             new Dictionary<string, string>(),
-            new Uri("http://target.internal/health"),
             new Uri("https://api.example/api/internal/v1/awd/check-results"),
             "claim-bound-token",
             DateTimeOffset.UtcNow.AddMinutes(1),
@@ -184,5 +187,18 @@ public sealed class AwdCheckerHandlerTests
             }
             throw new UnreachableException();
         }
+    }
+
+    private sealed class StubHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new(new SuccessHandler());
+    }
+
+    private sealed class SuccessHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
     }
 }

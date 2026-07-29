@@ -54,10 +54,12 @@ namespace NoCTF.Infrastructure.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     owner_id = table.Column<Guid>(type: "uuid", nullable: false),
                     manager_ids = table.Column<Guid[]>(type: "uuid[]", nullable: false),
+                    mode = table.Column<short>(type: "smallint", nullable: false),
                     visibility = table.Column<short>(type: "smallint", nullable: false),
                     title = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: false),
                     description = table.Column<string>(type: "text", nullable: true),
                     direction = table.Column<string>(type: "character varying(96)", maxLength: 96, nullable: false),
+                    definition_json = table.Column<string>(type: "jsonb", nullable: false),
                     revision = table.Column<int>(type: "integer", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -176,7 +178,7 @@ namespace NoCTF.Infrastructure.Migrations
                     base_score = table.Column<long>(type: "bigint", nullable: false),
                     order = table.Column<int>(type: "integer", nullable: false),
                     is_published = table.Column<bool>(type: "boolean", nullable: false),
-                    configuration_json = table.Column<string>(type: "jsonb", nullable: false),
+                    rules_json = table.Column<string>(type: "jsonb", nullable: false),
                     revision = table.Column<int>(type: "integer", nullable: false),
                     last_scheduled_awd_round = table.Column<int>(type: "integer", nullable: false),
                     awd_schedule_competition_revision = table.Column<int>(type: "integer", nullable: false),
@@ -431,18 +433,16 @@ namespace NoCTF.Infrastructure.Migrations
                     failure_code = table.Column<short>(type: "smallint", nullable: true),
                     runner_unavailable_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     processing_version = table.Column<long>(type: "bigint", nullable: false),
-                    configuration_revision = table.Column<int>(type: "integer", nullable: false),
-                    competition_configuration_revision = table.Column<int>(type: "integer", nullable: true),
                     replaces_runtime_instance_id = table.Column<Guid>(type: "uuid", nullable: true),
                     provider_receipt_json = table.Column<string>(type: "jsonb", nullable: true),
                     urls = table.Column<string[]>(type: "text[]", nullable: false),
                     participant_url_indexes = table.Column<int[]>(type: "integer[]", nullable: false),
                     control_check_url = table.Column<string>(type: "text", nullable: true),
-                    awd_checker_target_url = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
-                    awd_checker_target_service_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    awd_checker_target_host = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    checker_status = table.Column<short>(type: "smallint", nullable: false),
+                    checker_status_updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     checker_sequence = table.Column<long>(type: "bigint", nullable: false),
                     last_applied_checker_sequence = table.Column<long>(type: "bigint", nullable: false),
-                    last_applied_checker_body_sha256 = table.Column<byte[]>(type: "bytea", nullable: true),
                     next_checker_due_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     checker_deadline_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -453,8 +453,7 @@ namespace NoCTF.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_runtime_instances", x => x.id);
-                    table.CheckConstraint("ck_runtime_instances_awd_checker_target", "(awd_checker_target_url IS NULL AND awd_checker_target_service_name IS NULL) OR (awd_checker_target_url IS NOT NULL AND ((runtime_kind = 0 AND awd_checker_target_service_name IS NULL) OR (runtime_kind = 1 AND awd_checker_target_service_name IS NOT NULL)))");
-                    table.CheckConstraint("ck_runtime_instances_awdp_competition_revision", "(purpose = 1) = (competition_configuration_revision IS NOT NULL)");
+                    table.CheckConstraint("ck_runtime_instances_awd_checker_target", "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
                     table.CheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
                     table.CheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
                     table.CheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");

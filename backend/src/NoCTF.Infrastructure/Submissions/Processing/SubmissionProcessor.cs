@@ -2,6 +2,7 @@ using NoCTF.Infrastructure.Persistence;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
@@ -17,6 +18,7 @@ public sealed class SubmissionProcessor(
     NoCtfDbContext db,
     ISubmissionEvaluatorCatalog evaluatorCatalog,
     ISubmissionAdmissionModePolicy admissionModePolicy,
+    IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox) : ISubmissionProcessor
 {
     public async Task ProcessAsync(
@@ -74,7 +76,7 @@ public sealed class SubmissionProcessor(
         var rules = admissionModePolicy.GetRules(
             configuration.Competition.Mode,
             configuration.Competition.ConfigurationJson,
-            configuration.CompetitionChallenge.ConfigurationJson);
+            configuration.CompetitionChallenge.RulesJson);
         var maxAttempts = submission.Kind is SubmissionKind.Flag or SubmissionKind.Break
             ? rules.MaxFlagAttempts
             : rules.MaxFixAttempts;
@@ -138,7 +140,7 @@ public sealed class SubmissionProcessor(
             flags,
             patch,
             configuration.Competition.ConfigurationJson,
-            configuration.CompetitionChallenge.ConfigurationJson,
+            configuration.CompetitionChallenge.RulesJson,
             priorSubmissions,
             configuration.Competition.StartAt,
             effectiveRunningTime));
@@ -177,12 +179,37 @@ public sealed class SubmissionProcessor(
                         (challenge, competition) => new
                         {
                             Competition = competition.ConfigurationJson,
-                            Challenge = challenge.ConfigurationJson
+                            Challenge = challenge
+                        })
+                    .Join(
+                        db.Challenges.AsNoTracking(),
+                        scope => scope.Challenge.ChallengeId,
+                        template => template.Id,
+                        (scope, template) => new
+                        {
+                            scope.Competition,
+                            Rules = scope.Challenge.RulesJson,
+                            template.DefinitionJson
                         })
                     .SingleAsync(cancellationToken);
+                var definition = AwdpConfigurationParser.ParseChallenge(
+                    configurationJson.DefinitionJson);
+                var rules = AwdpConfigurationParser.ParseChallenge(configurationJson.Rules);
+                var combined = rules with
+                {
+                    Runtime = definition.Runtime,
+                    Checker = definition.Checker,
+                    PatchEntrypoint = definition.PatchEntrypoint,
+                    PatchCommand = definition.PatchCommand,
+                    PatchTimeoutSeconds = definition.PatchTimeoutSeconds,
+                    ReadyTimeoutSeconds = definition.ReadyTimeoutSeconds
+                };
                 var configuration = AwdpConfigurationResolver.Resolve(
                     configurationJson.Competition,
-                    configurationJson.Challenge);
+                    System.Text.Json.JsonSerializer.Serialize(
+                        combined,
+                        new System.Text.Json.JsonSerializerOptions(
+                            System.Text.Json.JsonSerializerDefaults.Web)));
                 if (configuration.Runtime is { } template
                     && submission.PatchUploadId is not null)
                 {
@@ -190,8 +217,13 @@ public sealed class SubmissionProcessor(
                     var configurationIsValid = true;
                     try
                     {
+                        var placement = placementPolicy.Resolve(template.RuntimeKind);
                         _ = AwdpTargetDefinitionFactory.Create(
-                            targetId, 1, template, configuration.TargetPort, now);
+                            targetId,
+                            1,
+                            template,
+                            placement.Provider,
+                            now);
                     }
                     catch (InvalidOperationException)
                     {
@@ -209,10 +241,9 @@ public sealed class SubmissionProcessor(
                             submission.CompetitionChallengeId,
                             targetId,
                             template,
+                            placementPolicy.Resolve(template.RuntimeKind),
                             generation,
                             submission.ProcessingVersion,
-                            evaluation.CompetitionRevision,
-                            evaluation.CompetitionChallengeRevision,
                             now);
                         db.RuntimeInstances.Add(target);
                         await outbox.PublishAsync(new DispatchRuntime(

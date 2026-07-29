@@ -17,35 +17,15 @@ public enum InternalResultDisposition
 public sealed record AwdCheckResult(
     Guid RuntimeInstanceId,
     int Generation,
-    long CheckerSequence,
-    long ProcessingVersion,
     AwdServiceState State,
-    byte[] BodySha256,
     DateTimeOffset OccurredAt)
 {
     public static AwdCheckResult Create(
         Guid runtimeInstanceId,
         int generation,
-        long checkerSequence,
-        long processingVersion,
         AwdServiceState state,
-        DateTimeOffset occurredAt)
-    {
-        var normalizedState = state switch
-        {
-            AwdServiceState.Up => "Up",
-            AwdServiceState.Down => "Down",
-            _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
-        };
-        return new(
-            runtimeInstanceId,
-            generation,
-            checkerSequence,
-            processingVersion,
-            state,
-            SHA256.HashData(Encoding.UTF8.GetBytes(normalizedState)),
-            occurredAt);
-    }
+        DateTimeOffset occurredAt) =>
+        new(runtimeInstanceId, generation, state, occurredAt);
 }
 
 public static class AwdServiceStateTransition
@@ -57,7 +37,9 @@ public static class AwdServiceStateTransition
             ? null
             : received == AwdServiceState.Up
                 ? ScoringResult.Correct
-                : ScoringResult.Wrong;
+                : received == AwdServiceState.Down
+                    ? ScoringResult.Wrong
+                    : null;
 }
 
 public sealed record AwdpFixResult(

@@ -14,6 +14,9 @@ internal sealed class ChallengeEntityConfiguration : IEntityTypeConfiguration<Ch
         builder.Property(challenge => challenge.Title).HasMaxLength(160);
         builder.Property(challenge => challenge.Direction).HasMaxLength(96);
         builder.Property(challenge => challenge.ManagerIds).HasColumnType("uuid[]");
+        builder.Property(challenge => challenge.Mode).HasConversion<short>();
+        // PostgreSQL jsonb is required for versioned, mode-specific executable definitions.
+        builder.Property(challenge => challenge.DefinitionJson).HasColumnType("jsonb");
         builder.Property(challenge => challenge.Visibility).HasConversion<short>();
         builder.HasIndex(challenge => challenge.ManagerIds).HasMethod("gin");
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()

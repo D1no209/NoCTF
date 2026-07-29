@@ -49,9 +49,9 @@ Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未�
 
 ## 内部 JWT
 
-内部 Scheme 必须验证精确 audience、permission、资源 Claims 与 exp，不能接受用户 Access/Refresh audience。Token 绑定具体 SubmissionId/RuntimeInstanceId、ProcessingVersion/Generation/CheckerSequence；请求体不能覆盖 Claims 身份。
+内部 Scheme 必须验证精确 audience、permission、资源 Claims 与 exp，不能接受用户 Access/Refresh audience。Token 绑定具体 SubmissionId 或 RuntimeInstanceId/Generation；请求体不能覆盖 Claims 身份。
 
-Checker callback 相同实体版本与相同规范化 body 重试幂等，不同 body 冲突。迟到 Token 可使用到 Deadline+24h；旧 Sequence/Version 接收为 superseded，不改变当前事实。
+AWD Checker callback 只绑定 Runtime identity/generation 和最小写权限。一次执行可以多次更新状态，后一次覆盖前一次；请求体不能覆盖 Token 中的资源身份。
 
 ## 日志中的敏感内容
 

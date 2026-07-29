@@ -25,7 +25,6 @@ public sealed record AwdpCheckerWork(
     IReadOnlyDictionary<string, string> Environment,
     string NetworkId,
     string TargetHost,
-    int TargetPort,
     int TargetReadyTimeoutSeconds,
     Uri CallbackUrl,
     string CallbackToken,
@@ -135,8 +134,22 @@ public sealed class AwdpFixWorkReader(
                     item.Submission,
                     item.Upload,
                     item.Runtime,
-                    ChallengeConfigurationJson = challenge.ConfigurationJson,
+                    ChallengeRulesJson = challenge.RulesJson,
+                    challenge.ChallengeId,
                     challenge.Revision
+                })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.ChallengeId,
+                challenge => challenge.Id,
+                (item, challenge) => new
+                {
+                    item.Upload,
+                    item.Runtime,
+                    item.ChallengeRulesJson,
+                    ChallengeDefinitionJson = challenge.DefinitionJson,
+                    item.Revision,
+                    item.Submission
                 })
             .Join(
                 db.Competitions.AsNoTracking(),
@@ -146,25 +159,21 @@ public sealed class AwdpFixWorkReader(
                 {
                     item.Upload,
                     item.Runtime,
-                    item.ChallengeConfigurationJson,
-                    CompetitionConfigurationJson = competition.ConfigurationJson,
-                    CompetitionConfigurationRevision = competition.ConfigurationRevision,
-                    item.Revision
+                    item.ChallengeRulesJson,
+                    item.ChallengeDefinitionJson,
+                    CompetitionConfigurationJson = competition.ConfigurationJson
                 })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
-            || target.Runtime.ConfigurationRevision != target.Revision
-            || target.Runtime.CompetitionConfigurationRevision
-                != target.CompetitionConfigurationRevision
             || timeProvider.GetUtcNow() >= message.Deadline
             || string.IsNullOrWhiteSpace(target.Runtime.ProviderReceiptJson))
             return null;
 
         var settings = AwdpConfigurationResolver.Resolve(
             target.CompetitionConfigurationJson,
-            target.ChallengeConfigurationJson);
-        if (settings.Checker is not { } checker
-            || settings.TargetPort is < 1 or > 65535)
+            target.ChallengeRulesJson,
+            target.ChallengeDefinitionJson);
+        if (settings.Checker is not { } checker)
             return null;
         var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
             target.Runtime.ProviderReceiptJson);
@@ -207,13 +216,12 @@ public sealed class AwdpFixWorkReader(
             new(
                 message.RuntimeInstanceId,
                 message.Generation,
-                checker.Provider,
+                target.Runtime.RuntimeProvider,
                 checker.Image,
                 checker.Command ?? [],
                 checker.Environment ?? new Dictionary<string, string>(),
                 networkId,
                 targetHost,
-                settings.TargetPort,
                 settings.ReadyTimeoutSeconds,
                 new Uri(baseUri, "/api/internal/v1/awdp/fix-results"),
                 callbackToken,
@@ -231,7 +239,6 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
         var environment = new Dictionary<string, string>(work.Environment, StringComparer.Ordinal)
         {
             ["TARGET_HOST"] = work.TargetHost,
-            ["TARGET_PORT"] = work.TargetPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["TARGET_READY_TIMEOUT_SECONDS"] = work.TargetReadyTimeoutSeconds.ToString(
                 System.Globalization.CultureInfo.InvariantCulture),
             ["NOCTF_CALLBACK_URL"] = work.CallbackUrl.AbsoluteUri,

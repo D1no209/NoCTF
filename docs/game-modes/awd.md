@@ -2,7 +2,7 @@
 
 ## 配置契约
 
-Competition 必须配置 `HardeningDurationSeconds >= 0`、`RoundDurationSeconds > 0`，并提供以下题目默认值；CompetitionChallenge 可用 nullable 字段逐项覆盖：
+Competition 必须配置 `HardeningDurationSeconds >= 0`、`RoundDurationSeconds > 0`，并提供以下比赛默认规则；CompetitionChallenge 的 `RulesJson` 可用 nullable 字段逐项覆盖：
 
 ```text
 AttackRewardMode: FixedPerAttack | SplitVictimDefensePool
@@ -11,18 +11,23 @@ VictimDefensePoolPoints: bigint >= 0
 CheckerIntervalSeconds: int > 0
 ServiceHealthyPoints: bigint >= 0
 ServiceUnhealthyPenalty: bigint >= 0
-RuntimeDefinition: Container | Compose
-AwdChecker:
+```
+
+`Challenge.DefinitionJson` 管理 Runtime、Checker、Flag 生成与注入：
+
+```text
+Runtime: Container | Compose
+Checker:
   Job: RunnerJobConfiguration
-  Target:
-    Container: UrlTemplate + ContainerPort
-    Compose: UrlTemplate + ServiceName + ContainerPort
-AwdFlagInjectionCommand: non-empty string
+  TargetServiceName: 仅 Compose 必填
+FlagInjection:
+  Command: 包含 ${FLAG} 的非空模板
+  ServiceName: 仅 Compose 必填
 ```
 
 FixedPerAttack 使用 AttackPoints；SplitVictimDefensePool 忽略 AttackPoints。两者都使用 VictimDefensePoolPoints。覆盖值 0 是显式 0，只有 null 继承。AWD 不使用 EvaluationDispatchMode/最大提交次数；Flag 接入总是 Automatic。
 
-CompetitionChallenge 当前 schemaVersion 为 4，不提供旧 schema 兼容层。Checker Job 与长期 Runtime 必须使用同一 Docker/Kubernetes Provider；Target kind 必须与 RuntimeKind 一致。Target 是内部端点，不带公开 `Exposure`，也不复用仅属于 KoH 的 `ControlCheckUrlBinding`。
+Challenge 当前 schemaVersion 为 4，不提供旧 schema 兼容层。Challenge 不声明 Docker/Kubernetes Provider 或 RunnerPool。Checker 与长期 Runtime 由平台放入同一内部网络；平台只注入 `NOCTF_TARGET_HOST`。Container 使用固定 `target` DNS，Compose 使用 `TargetServiceName` 对应的服务 DNS。Checker 自己知道服务端口，不配置 Target URL 或 TargetPort，也不复用仅属于 KoH 的 `ControlCheckUrlBinding`。
 
 ## 时钟与加固期
 
@@ -98,7 +103,7 @@ victim -= VictimDefensePoolPoints once
 
 每题配置 CheckerIntervalSeconds（Competition 默认、题覆盖，正整数）。Running 时持续检查，加固期也检查；Paused 停止且不补，Resume 立即一次；同队同题最多一个在执行，前次未结束则跳过 interval。
 
-Checker 是附着到特定 Runtime Generation 的可信一次性 Container。Runtime provision 时展开并冻结 Target URL；Container 同时冻结 target port，Compose 同时冻结 service name 与 target port。后续 Target 配置变化只影响下一 Generation，Checker Job 与 interval 变化从下一 CheckerSequence 生效。
+Checker 是附着到特定 Runtime Generation 的可信一次性 Container，与目标处在同一内部网络。单 Container 目标以 `target` 作为稳定 DNS，Compose 目标使用 service name；Checker 镜像自己知道目标端口，平台不向 Checker传递端口配置。后续 Runtime/Checker 定义变化只影响下一次 Start/Reset。
 
 Docker Provider 从持久 receipt 与 ownership labels 解析该 Generation 的实际 Container/Compose 网络，不假设 Compose `_default` 网络；Checker 同时加入目标内部网络和隔离 callback 网络，结束时只清理自身与 callback 网络。Kubernetes Provider 复用同一 Runtime identity 与 NetworkPolicy，并只为带 `awd-checker` purpose 的 Pod 增加 callback egress，不把平台访问能力授予题目业务 Pod。
 
@@ -109,7 +114,7 @@ POST /api/internal/v1/awd/check-results
 body: { state: Up | Down }
 ```
 
-JWT audience/permission/resource claims 固定。服务端接收成功时间为 OccurredAt；恰好等于 RoundEnd 的变化从下一轮生效。初始隐式 Up。
+JWT audience/permission/resource claims 固定。一次 Checker 执行可以多次调用，后一次状态覆盖前一次。服务端接收成功时间为 OccurredAt；恰好等于 RoundEnd 的变化从下一轮生效。
 
 数据库只写状态变化：
 
@@ -120,7 +125,7 @@ Down + Down: no event
 Down + Up: AwdServiceStatus/Result.Correct
 ```
 
-无 callback 为 PlatformFailed、不改变状态。允许 Deadline 后 24h callback；CheckerSequence 小于 LastApplied 时 superseded。同一 CheckerSequence 相同 body 重试幂等、不同 body 冲突。
+正常退出且无 callback 为 `Unknown`；异常退出为 `CheckerAbnormalExit`；超时为 `CheckerTimedOut`。这些是 Checker 诊断状态，不由退出码推断服务 Up/Down，也不直接产生服务分。只有 Checker 主动回报的 Up/Down 参与服务状态计分。
 
 每个完整轮次只看 `OccurredAt < RoundEnd` 的最新状态：Up `+ServiceHealthyPoints`，Down `-ServiceUnhealthyPenalty`。不按在线时长比例；状态跨轮持续；禁用 Checker 时两项为 0/无事件。
 

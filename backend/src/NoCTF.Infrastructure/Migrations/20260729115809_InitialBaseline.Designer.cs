@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260728013508_InitialBaseline")]
+    [Migration("20260729115809_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -36,6 +36,11 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("definition_json");
+
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
@@ -54,6 +59,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("uuid[]")
                         .HasColumnName("manager_ids");
+
+                    b.Property<short>("Mode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("mode");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
@@ -262,11 +271,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
 
-                    b.Property<string>("ConfigurationJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("configuration_json");
-
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
@@ -286,6 +290,11 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<int>("Revision")
                         .HasColumnType("integer")
                         .HasColumnName("revision");
+
+                    b.Property<string>("RulesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("rules_json");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -745,15 +754,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("AwdCheckerTargetServiceName")
+                    b.Property<string>("AwdCheckerTargetHost")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
-                        .HasColumnName("awd_checker_target_service_name");
-
-                    b.Property<string>("AwdCheckerTargetUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("awd_checker_target_url");
+                        .HasColumnName("awd_checker_target_host");
 
                     b.Property<DateTimeOffset?>("CheckerDeadlineAt")
                         .HasColumnType("timestamp with time zone")
@@ -763,21 +767,21 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("checker_sequence");
 
+                    b.Property<short>("CheckerStatus")
+                        .HasColumnType("smallint")
+                        .HasColumnName("checker_status");
+
+                    b.Property<DateTimeOffset?>("CheckerStatusUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checker_status_updated_at");
+
                     b.Property<Guid>("CompetitionChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_challenge_id");
 
-                    b.Property<int?>("CompetitionConfigurationRevision")
-                        .HasColumnType("integer")
-                        .HasColumnName("competition_configuration_revision");
-
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
-
-                    b.Property<int>("ConfigurationRevision")
-                        .HasColumnType("integer")
-                        .HasColumnName("configuration_revision");
 
                     b.Property<string>("ControlCheckUrl")
                         .HasColumnType("text")
@@ -798,10 +802,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<int>("Generation")
                         .HasColumnType("integer")
                         .HasColumnName("generation");
-
-                    b.Property<byte[]>("LastAppliedCheckerBodySha256")
-                        .HasColumnType("bytea")
-                        .HasColumnName("last_applied_checker_body_sha256");
 
                     b.Property<long>("LastAppliedCheckerSequence")
                         .HasColumnType("bigint")
@@ -924,9 +924,7 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.ToTable("runtime_instances", null, t =>
                         {
-                            t.HasCheckConstraint("ck_runtime_instances_awd_checker_target", "(awd_checker_target_url IS NULL AND awd_checker_target_service_name IS NULL) OR (awd_checker_target_url IS NOT NULL AND ((runtime_kind = 0 AND awd_checker_target_service_name IS NULL) OR (runtime_kind = 1 AND awd_checker_target_service_name IS NOT NULL)))");
-
-                            t.HasCheckConstraint("ck_runtime_instances_awdp_competition_revision", "(purpose = 1) = (competition_configuration_revision IS NOT NULL)");
+                            t.HasCheckConstraint("ck_runtime_instances_awd_checker_target", "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
 
                             t.HasCheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
 

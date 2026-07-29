@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
@@ -21,11 +23,10 @@ public sealed record AwdCheckerWork(
     RuntimeKind RuntimeKind,
     int Generation,
     string ProviderReceiptJson,
-    string? TargetServiceName,
+    string TargetHost,
     string Image,
     IReadOnlyList<string> Command,
     IReadOnlyDictionary<string, string> Environment,
-    Uri TargetUrl,
     Uri CallbackUrl,
     string CallbackToken,
     DateTimeOffset Deadline,
@@ -46,6 +47,7 @@ public interface IAwdCheckerExecutor
 public enum AwdCheckerExecutionOutcome
 {
     Completed,
+    AbnormalExit,
     TimedOut,
     Superseded
 }
@@ -73,7 +75,7 @@ public sealed class AwdCheckerWorkReader(
                 && runtime.State == RuntimeState.Running
                 && runtime.RunnerPool == message.RunnerPool
                 && runtime.RunnerId == message.RunnerId
-                && runtime.AwdCheckerTargetUrl != null
+                && runtime.AwdCheckerTargetHost != null
                 && runtime.ProviderReceiptJson != null)
             .Join(
                 db.CompetitionChallenges.AsNoTracking(),
@@ -82,8 +84,20 @@ public sealed class AwdCheckerWorkReader(
                 (runtime, challenge) => new
                 {
                     Runtime = runtime,
-                    ChallengeConfiguration = challenge.ConfigurationJson,
+                    ChallengeRules = challenge.RulesJson,
+                    challenge.ChallengeId,
                     challenge.Revision
+                })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                pair => pair.ChallengeId,
+                challenge => challenge.Id,
+                (pair, challenge) => new
+                {
+                    pair.Runtime,
+                    pair.ChallengeRules,
+                    pair.Revision,
+                    ChallengeDefinition = challenge.DefinitionJson
                 })
             .Join(
                 db.Competitions.AsNoTracking(),
@@ -92,7 +106,8 @@ public sealed class AwdCheckerWorkReader(
                 (pair, competition) => new
                 {
                     pair.Runtime,
-                    pair.ChallengeConfiguration,
+                    pair.ChallengeRules,
+                    pair.ChallengeDefinition,
                     pair.Revision,
                     CompetitionConfiguration = competition.ConfigurationJson,
                     competition.ConfigurationRevision,
@@ -108,18 +123,11 @@ public sealed class AwdCheckerWorkReader(
             return null;
         var settings = configurations.Get(
             target.CompetitionConfiguration,
-            target.ChallengeConfiguration);
+            target.ChallengeRules,
+            target.ChallengeDefinition);
         if (settings.Checker is not { } checker
-            || checker.Provider != target.Runtime.RuntimeProvider
-            || target.Runtime.RuntimeKind == RuntimeKind.Container
-                && target.Runtime.AwdCheckerTargetServiceName is not null
-            || target.Runtime.RuntimeKind == RuntimeKind.Compose
-                && string.IsNullOrWhiteSpace(target.Runtime.AwdCheckerTargetServiceName)
-            || target.Runtime.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose)
-            || !Uri.TryCreate(
-                target.Runtime.AwdCheckerTargetUrl,
-                UriKind.Absolute,
-                out var targetUrl))
+            || string.IsNullOrWhiteSpace(target.Runtime.AwdCheckerTargetHost)
+            || target.Runtime.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
             return null;
         var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"] ?? "http://noctf-api";
         if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri))
@@ -140,15 +148,14 @@ public sealed class AwdCheckerWorkReader(
         return new(
             message.RuntimeInstanceId,
             message.CheckerSequence,
-            checker.Provider,
+            target.Runtime.RuntimeProvider,
             target.Runtime.RuntimeKind,
             target.Runtime.Generation,
             target.Runtime.ProviderReceiptJson!,
-            target.Runtime.AwdCheckerTargetServiceName,
+            target.Runtime.AwdCheckerTargetHost,
             checker.Image,
             checker.Command ?? [],
             checker.Environment ?? new Dictionary<string, string>(),
-            targetUrl,
             callbackUrl,
             token,
             message.Deadline,
@@ -158,7 +165,9 @@ public sealed class AwdCheckerWorkReader(
     }
 }
 
-public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
+public sealed class AwdCheckerExecutor(
+    IOneShotRuntimeProviderCatalog providers,
+    IHttpClientFactory httpClients)
     : IAwdCheckerExecutor
 {
     public async Task<AwdCheckerExecutionOutcome> ExecuteAsync(
@@ -167,7 +176,7 @@ public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
     {
         var environment = new Dictionary<string, string>(work.Environment, StringComparer.Ordinal)
         {
-            ["NOCTF_TARGET_URL"] = work.TargetUrl.AbsoluteUri,
+            ["NOCTF_TARGET_HOST"] = work.TargetHost,
             ["NOCTF_CALLBACK_URL"] = work.CallbackUrl.AbsoluteUri,
             ["NOCTF_CALLBACK_TOKEN"] = work.CallbackToken
         };
@@ -202,17 +211,41 @@ public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
         timeoutSource.CancelAfter(work.Timeout);
         try
         {
-            _ = await providers.Attached(work.Provider).RunAttachedAsync(
+            var result = await providers.Attached(work.Provider).RunAttachedAsync(
                 request,
                 target,
                 timeoutSource.Token);
-            return AwdCheckerExecutionOutcome.Completed;
+            if (result.ExitCode == 0)
+                return AwdCheckerExecutionOutcome.Completed;
+            await ReportPlatformStatusAsync(
+                work,
+                AwdServiceState.CheckerAbnormalExit,
+                cancellationToken);
+            return AwdCheckerExecutionOutcome.AbnormalExit;
         }
         catch (OperationCanceledException) when (
             !cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
         {
+            await ReportPlatformStatusAsync(
+                work,
+                AwdServiceState.CheckerTimedOut,
+                cancellationToken);
             return AwdCheckerExecutionOutcome.TimedOut;
         }
+    }
+
+    private async Task ReportPlatformStatusAsync(
+        AwdCheckerWork work,
+        AwdServiceState status,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, work.CallbackUrl)
+        {
+            Content = JsonContent.Create(new { State = status.ToString() })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", work.CallbackToken);
+        using var response = await httpClients.CreateClient().SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
     }
 
     private static AttachedRuntimeTarget? CreateTarget(AwdCheckerWork work)
@@ -256,8 +289,8 @@ public sealed class AwdCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
             && receipt.Provider == work.Provider
             && receipt.OperationId == identity.RuntimeInstanceId
             && receipt.Generation == identity.Generation
-            && !string.IsNullOrWhiteSpace(work.TargetServiceName)
-                ? new(identity, receipt, work.TargetServiceName)
+            && !string.IsNullOrWhiteSpace(work.TargetHost)
+                ? new(identity, receipt, work.TargetHost)
                 : null;
     }
 

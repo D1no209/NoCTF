@@ -45,6 +45,16 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 Env = request.Environment.Select(pair => $"{pair.Key}={pair.Value}").ToList(),
                 Labels = labels,
                 ExposedPorts = exposedPorts,
+                NetworkingConfig = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
+                    && !string.IsNullOrWhiteSpace(request.NetworkName)
+                    ? new NetworkingConfig
+                    {
+                        EndpointsConfig = new Dictionary<string, EndpointSettings>
+                        {
+                            [request.NetworkName] = new() { Aliases = ["target"] }
+                        }
+                    }
+                    : null,
                 HostConfig = new HostConfig
                 {
                     PortBindings = bindings,
@@ -69,7 +79,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
                 publishedPorts,
                 options.PublicHost,
-                containerName,
+                request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
+                    ? "target"
+                    : containerName,
                 RuntimeInstanceId: request.RuntimeInstanceId,
                 Generation: request.Generation);
         }

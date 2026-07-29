@@ -13,6 +13,7 @@ namespace NoCTF.Infrastructure.Runtime.Instances;
 public sealed class RuntimeInstanceStore(
     NoCtfDbContext db,
     IChallengeRuntimeTemplateCatalog templates,
+    IRuntimePlacementPolicy placementPolicy,
     IPerTeamRuntimeFlagStore runtimeFlags,
     ITransactionalMessageOutbox outbox) : IRuntimeInstanceStore
 {
@@ -161,7 +162,7 @@ public sealed class RuntimeInstanceStore(
         Guid? replaces,
         CancellationToken cancellationToken)
     {
-        var template = templates.Get(scope.Mode, scope.ConfigurationJson)
+        var template = templates.Get(scope.Mode, scope.DefinitionJson)
             ?? throw new InvalidOperationException("The challenge does not define a runtime template.");
         if (scope.Mode == GameMode.Ctf
             && template.FlagSource == RuntimeFlagSource.PerTeam)
@@ -173,6 +174,7 @@ public sealed class RuntimeInstanceStore(
                 command.Now,
                 cancellationToken);
         }
+        var placement = placementPolicy.Resolve(template.RuntimeKind);
         return new RuntimeInstance
         {
             Id = Guid.CreateVersion7(command.Now),
@@ -182,10 +184,9 @@ public sealed class RuntimeInstanceStore(
             Purpose = RuntimePurpose.Player,
             Generation = generation,
             RuntimeKind = template.RuntimeKind,
-            RuntimeProvider = template.Provider,
-            RunnerPool = template.RunnerPool,
+            RuntimeProvider = placement.Provider,
+            RunnerPool = placement.RunnerPool,
             State = RuntimeState.Queued,
-            ConfigurationRevision = scope.ConfigurationRevision,
             ReplacesRuntimeInstanceId = replaces,
             CreatedAt = command.Now,
             ExpiresAt = null
@@ -213,13 +214,17 @@ public sealed class RuntimeInstanceStore(
                 pair => pair.Team.CompetitionId,
                 competition => competition.Id,
                 (pair, competition) => new { pair.Team, pair.Challenge, Competition = competition })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.Challenge.ChallengeId,
+                template => template.Id,
+                (item, template) => new { item.Team, item.Challenge, item.Competition, Template = template })
             .Where(item => item.Challenge.Id == competitionChallengeId)
             .Select(item => new RuntimeScope(
                 item.Team.Id,
                 item.Competition.Mode,
                 item.Competition.Status,
-                item.Challenge.ConfigurationJson,
-                item.Challenge.Revision))
+                item.Template.DefinitionJson))
             .SingleOrDefaultAsync(ct);
 
     private Task AcquireLockAsync(Guid teamId, Guid challengeId, CancellationToken ct) =>
@@ -241,6 +246,5 @@ public sealed class RuntimeInstanceStore(
         Guid TeamId,
         GameMode Mode,
         CompetitionStatus Status,
-        string ConfigurationJson,
-        int ConfigurationRevision);
+        string DefinitionJson);
 }

@@ -16,8 +16,7 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 },
@@ -44,8 +43,7 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:v1",
                 Environment: new Dictionary<string, string> { ["FLAG"] = "author-value" },
@@ -68,8 +66,7 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
                 "services:\n  web:\n    image: challenge:v1",
                 new Dictionary<string, RuntimeResourceLimits>
@@ -98,17 +95,13 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition("challenge:v1"));
         var configuration = JsonSerializer.Serialize(
             new AwdChallengeConfiguration(
                 AwdChallengeConfiguration.CurrentSchemaVersion,
                 Checker: new AwdCheckerConfiguration(
-                    new RunnerJobConfiguration(RuntimeProvider.Docker, "checker:v1"),
-                    new ContainerAwdCheckerTarget(
-                        "http://{HOST}:{PORT}/health",
-                        8080))),
+                    new RunnerJobConfiguration("checker:v1"))),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
         var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
@@ -118,10 +111,8 @@ public sealed class RuntimeClaimFactoryTests
             configuration);
 
         await Assert.That(claim.Definition.AwdCheckerTargetBinding)
-            .IsEqualTo(new RuntimeInternalEndpointBinding(
-                "http://{HOST}:{PORT}/health",
-                8080));
-        await Assert.That(claim.Definition.InternalPorts).IsEquivalentTo([8080]);
+            .IsEqualTo(new RuntimeInternalEndpointBinding());
+        await Assert.That(claim.Definition.InternalPorts).IsNull();
         await Assert.That(claim.Definition.ControlCheckUrlBinding).IsNull();
     }
 
@@ -130,7 +121,6 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
                 "services:\n  web:\n    image: challenge:v1",
@@ -142,11 +132,8 @@ public sealed class RuntimeClaimFactoryTests
             new AwdChallengeConfiguration(
                 AwdChallengeConfiguration.CurrentSchemaVersion,
                 Checker: new AwdCheckerConfiguration(
-                    new RunnerJobConfiguration(RuntimeProvider.Docker, "checker:v1"),
-                    new ComposeAwdCheckerTarget(
-                        "http://{HOST}:{PORT}/health",
-                        "web",
-                        8080))),
+                    new RunnerJobConfiguration("checker:v1"),
+                    TargetServiceName: "web")),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
         var claim = (ClaimComposeRuntime)RuntimeClaimFactory.Create(
@@ -156,10 +143,7 @@ public sealed class RuntimeClaimFactoryTests
             configuration);
 
         await Assert.That(claim.Definition.AwdCheckerTargetBinding)
-            .IsEqualTo(new RuntimeInternalEndpointBinding(
-                "http://{HOST}:{PORT}/health",
-                8080,
-                "web"));
+            .IsEqualTo(new RuntimeInternalEndpointBinding("web"));
         await Assert.That(claim.Definition.ControlCheckUrlBinding).IsNull();
     }
 
@@ -168,8 +152,7 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
                 """
                 services:
@@ -208,8 +191,7 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:v1",
                 FlagEnvironmentVariableName: "FLAG"),
@@ -225,8 +207,7 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.OvaVm, RuntimeProvider.Libvirt);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Libvirt,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new OvaRuntimeDefinition(
                 "file:///var/lib/noctf/challenge.ova",
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
@@ -249,8 +230,7 @@ public sealed class RuntimeClaimFactoryTests
     {
         var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Libvirt);
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Libvirt,
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ComposeRuntimeDefinition(
                 "services:\n  web:\n    image: challenge:v1",
                 new Dictionary<string, RuntimeResourceLimits>

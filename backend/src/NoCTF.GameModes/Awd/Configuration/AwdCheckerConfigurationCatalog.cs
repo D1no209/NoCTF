@@ -8,12 +8,16 @@ public sealed record AwdCheckerSettings(
 
 public sealed class AwdCheckerConfigurationCatalog
 {
-    public AwdCheckerSettings Get(string competitionConfigurationJson, string challengeConfigurationJson)
+    public AwdCheckerSettings Get(
+        string competitionConfigurationJson,
+        string challengeRulesJson,
+        string challengeDefinitionJson)
     {
         var competition = AwdConfigurationUpgrader.ParseCompetition(competitionConfigurationJson);
-        var challenge = AwdConfigurationUpgrader.ParseChallenge(challengeConfigurationJson);
+        var rules = AwdConfigurationUpgrader.ParseChallenge(challengeRulesJson);
+        var definition = AwdConfigurationUpgrader.ParseChallenge(challengeDefinitionJson);
         return new(
-            challenge.CheckerIntervalSeconds ?? competition.CheckerIntervalSeconds,
-            challenge.Checker?.Job);
+            rules.CheckerIntervalSeconds ?? competition.CheckerIntervalSeconds,
+            definition.Checker?.Job);
     }
 }

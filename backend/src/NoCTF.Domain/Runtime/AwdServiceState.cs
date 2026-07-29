@@ -2,6 +2,9 @@ namespace NoCTF.Domain.Runtime;
 
 public enum AwdServiceState : short
 {
+    Unknown,
     Up,
-    Down
+    Down,
+    CheckerAbnormalExit,
+    CheckerTimedOut
 }

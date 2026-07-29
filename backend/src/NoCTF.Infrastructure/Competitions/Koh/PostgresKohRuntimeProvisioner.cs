@@ -11,6 +11,7 @@ namespace NoCTF.Infrastructure.Competitions.Koh;
 public sealed class PostgresKohRuntimeProvisioner(
     NoCtfDbContext db,
     IChallengeRuntimeTemplateCatalog templates,
+    IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
     TimeProvider timeProvider) : IKohRuntimeProvisioner
 {
@@ -37,12 +38,15 @@ public sealed class PostgresKohRuntimeProvisioner(
             .Where(challenge => challenge.CompetitionId == competitionId
                 && challenge.IsPublished
                 && challenge.DeletedAt == null)
-            .Select(challenge => new
-            {
-                challenge.Id,
-                challenge.ConfigurationJson,
-                challenge.Revision
-            })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                challenge => challenge.ChallengeId,
+                template => template.Id,
+                (challenge, template) => new
+                {
+                    challenge.Id,
+                    template.DefinitionJson
+                })
             .ToListAsync(cancellationToken);
         var challengeIds = challenges.Select(challenge => challenge.Id).ToArray();
         var existing = await db.RuntimeInstances.AsNoTracking()
@@ -73,9 +77,10 @@ public sealed class PostgresKohRuntimeProvisioner(
         {
             if (active.Contains(challenge.Id))
                 continue;
-            var template = templates.Get(GameMode.Koh, challenge.ConfigurationJson)
+            var template = templates.Get(GameMode.Koh, challenge.DefinitionJson)
                 ?? throw new InvalidOperationException(
                     $"Published KoH challenge '{challenge.Id}' has no Runtime template.");
+            var placement = placementPolicy.Resolve(template.RuntimeKind);
             var runtime = new RuntimeInstance
             {
                 Id = Guid.CreateVersion7(createdAt),
@@ -85,10 +90,9 @@ public sealed class PostgresKohRuntimeProvisioner(
                 Purpose = RuntimePurpose.Player,
                 Generation = checked(maximumGenerations.GetValueOrDefault(challenge.Id) + 1),
                 RuntimeKind = template.RuntimeKind,
-                RuntimeProvider = template.Provider,
-                RunnerPool = template.RunnerPool,
+                RuntimeProvider = placement.Provider,
+                RunnerPool = placement.RunnerPool,
                 State = RuntimeState.Queued,
-                ConfigurationRevision = challenge.Revision,
                 CreatedAt = createdAt
             };
             db.RuntimeInstances.Add(runtime);

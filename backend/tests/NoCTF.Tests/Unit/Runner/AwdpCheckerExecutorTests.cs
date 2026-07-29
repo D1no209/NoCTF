@@ -25,7 +25,6 @@ public sealed class AwdpCheckerExecutorTests
             },
             "network-1",
             "target.internal",
-            8080,
             30,
             new Uri("https://api.example/api/internal/v1/awdp/fix-results"),
             "callback-token",
@@ -36,7 +35,7 @@ public sealed class AwdpCheckerExecutorTests
         var request = runner.Request!;
         await Assert.That(request.NetworkName).IsEqualTo("network-1");
         await Assert.That(request.Environment["TARGET_HOST"]).IsEqualTo("target.internal");
-        await Assert.That(request.Environment["TARGET_PORT"]).IsEqualTo("8080");
+        await Assert.That(request.Environment).DoesNotContainKey("TARGET_PORT");
         await Assert.That(request.Environment["TARGET_READY_TIMEOUT_SECONDS"]).IsEqualTo("30");
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"]).IsEqualTo("callback-token");
         await Assert.That(request.Environment).DoesNotContainKey("OBJECT_KEY");
@@ -80,7 +79,6 @@ public sealed class AwdpCheckerExecutorTests
         new Dictionary<string, string>(),
         "network-1",
         "target.internal",
-        8080,
         30,
         new Uri("https://api.example/api/internal/v1/awdp/fix-results"),
         "callback-token",

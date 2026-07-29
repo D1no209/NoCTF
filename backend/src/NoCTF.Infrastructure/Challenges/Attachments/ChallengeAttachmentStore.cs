@@ -227,7 +227,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
             .Select(item => new PlayerScope(
                 item.Team.Id,
                 item.Challenge.ChallengeId,
-                item.Challenge.ConfigurationJson))
+                item.Challenge.RulesJson))
             .SingleOrDefaultAsync(ct);
 
     private static AttachmentDeliveryPolicy ReadPolicy(string json)

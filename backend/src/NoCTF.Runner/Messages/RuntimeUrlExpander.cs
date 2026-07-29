@@ -7,8 +7,7 @@ public sealed record ExpandedRuntimeUrls(
     IReadOnlyList<string> Urls,
     IReadOnlyList<int> ParticipantUrlIndexes,
     string? ControlCheckUrl,
-    string? AwdCheckerTargetUrl,
-    string? AwdCheckerTargetServiceName);
+    string? AwdCheckerTargetHost);
 
 public static class RuntimeUrlExpander
 {
@@ -31,15 +30,14 @@ public static class RuntimeUrlExpander
         var controlCheckUrl = controlCheckBinding is null
             ? null
             : ExpandInternalContainerBinding(receipt, controlCheckBinding);
-        var awdCheckerTargetUrl = awdCheckerTargetBinding is null
+        var awdCheckerTargetHost = awdCheckerTargetBinding is null
             ? null
-            : ExpandInternalContainerBinding(receipt, awdCheckerTargetBinding);
+            : RequireHost(receipt.InternalHost);
         return new(
             urls,
             participantIndexes,
             controlCheckUrl,
-            awdCheckerTargetUrl,
-            null);
+            awdCheckerTargetHost);
     }
 
     public static ExpandedRuntimeUrls ExpandCompose(
@@ -79,21 +77,17 @@ public static class RuntimeUrlExpander
                 service.InternalHost,
                 containerPort);
         }
-        string? awdCheckerTargetUrl = null;
+        string? awdCheckerTargetHost = null;
         if (awdCheckerTargetBinding is not null)
         {
             var service = FindComposeService(status, awdCheckerTargetBinding.ServiceName);
-            awdCheckerTargetUrl = Expand(
-                awdCheckerTargetBinding.UrlTemplate,
-                service.InternalHost,
-                awdCheckerTargetBinding.ContainerPort);
+            awdCheckerTargetHost = RequireHost(service.InternalHost);
         }
         return new(
             urls,
             participantIndexes,
             controlCheckUrl,
-            awdCheckerTargetUrl,
-            awdCheckerTargetBinding?.ServiceName);
+            awdCheckerTargetHost);
     }
 
     public static ExpandedRuntimeUrls ExpandOva(
@@ -117,7 +111,7 @@ public static class RuntimeUrlExpander
             : ExpandOvaBinding(
                 FindOvaVirtualMachine(receipt, controlCheckBinding),
                 controlCheckBinding);
-        return new(urls, participantIndexes, controlCheckUrl, null, null);
+        return new(urls, participantIndexes, controlCheckUrl, null);
     }
 
     private static ComposeServiceStatus FindComposeService(
@@ -216,11 +210,6 @@ public static class RuntimeUrlExpander
             containerPort);
     }
 
-    private static string ExpandInternalContainerBinding(
-        ContainerReceipt receipt,
-        RuntimeInternalEndpointBinding binding) =>
-        Expand(binding.UrlTemplate, receipt.InternalHost, binding.ContainerPort);
-
     private static string Expand(string template, string? host, int port)
     {
         if (string.IsNullOrWhiteSpace(host))
@@ -235,4 +224,10 @@ public static class RuntimeUrlExpander
             throw new InvalidOperationException("Runtime URL binding did not expand to an absolute URI.");
         return expanded;
     }
+
+    private static string RequireHost(string? host) =>
+        !string.IsNullOrWhiteSpace(host)
+            ? host
+            : throw new InvalidOperationException(
+                "Runtime receipt does not contain the required internal host.");
 }

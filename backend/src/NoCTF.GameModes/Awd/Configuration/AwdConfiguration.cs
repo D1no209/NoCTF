@@ -59,25 +59,7 @@ public sealed record AwdChallengeConfiguration(
 
 public sealed record AwdCheckerConfiguration(
     RunnerJobConfiguration Job,
-    AwdCheckerTargetDefinition Target);
-
-[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
-[JsonDerivedType(typeof(ContainerAwdCheckerTarget), "container")]
-[JsonDerivedType(typeof(ComposeAwdCheckerTarget), "compose")]
-public abstract record AwdCheckerTargetDefinition(
-    string UrlTemplate,
-    int ContainerPort);
-
-public sealed record ContainerAwdCheckerTarget(
-    string UrlTemplate,
-    int ContainerPort)
-    : AwdCheckerTargetDefinition(UrlTemplate, ContainerPort);
-
-public sealed record ComposeAwdCheckerTarget(
-    string UrlTemplate,
-    string ServiceName,
-    int ContainerPort)
-    : AwdCheckerTargetDefinition(UrlTemplate, ContainerPort);
+    string? TargetServiceName = null);
 
 public sealed record AwdFlagInjectionConfiguration(
     string Command,

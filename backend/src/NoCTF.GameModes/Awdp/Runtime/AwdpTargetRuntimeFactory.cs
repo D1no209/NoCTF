@@ -11,14 +11,12 @@ public static class AwdpTargetRuntimeFactory
         Guid competitionChallengeId,
         Guid runtimeInstanceId,
         ChallengeRuntimeTemplate template,
+        RuntimePlacement placement,
         int generation,
         long submissionProcessingVersion,
-        int competitionConfigurationRevision,
-        int challengeConfigurationRevision,
         DateTimeOffset now)
     {
-        if (template.Definition is not ContainerRuntimeDefinition
-            || template.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
+        if (template.Definition is not ContainerRuntimeDefinition)
             throw new InvalidOperationException(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
         if (generation < 1)
@@ -35,11 +33,9 @@ public static class AwdpTargetRuntimeFactory
             SubmissionProcessingVersion = submissionProcessingVersion,
             Generation = generation,
             RuntimeKind = RuntimeKind.Container,
-            RuntimeProvider = template.Provider,
-            RunnerPool = template.RunnerPool,
+            RuntimeProvider = placement.Provider,
+            RunnerPool = placement.RunnerPool,
             State = RuntimeState.Queued,
-            ConfigurationRevision = challengeConfigurationRevision,
-            CompetitionConfigurationRevision = competitionConfigurationRevision,
             CreatedAt = now
         };
     }

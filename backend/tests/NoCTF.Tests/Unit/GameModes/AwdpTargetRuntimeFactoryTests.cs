@@ -11,10 +11,8 @@ public sealed class AwdpTargetRuntimeFactoryTests
     {
         var submissionId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var template = new ChallengeRuntimeTemplate(
-            RuntimeProvider.Docker,
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition("target:latest"),
-            RunnerPool: "awdp");
+            new ContainerRuntimeDefinition("target:latest"));
 
         var target = AwdpTargetRuntimeFactory.Create(
             submissionId,
@@ -22,10 +20,9 @@ public sealed class AwdpTargetRuntimeFactoryTests
             Guid.Parse("33333333-3333-3333-3333-333333333333"),
             Guid.Parse("44444444-4444-4444-4444-444444444444"),
             template,
+            new RuntimePlacement(RuntimeProvider.Docker, "awdp"),
             generation: 2,
             submissionProcessingVersion: 11,
-            competitionConfigurationRevision: 5,
-            challengeConfigurationRevision: 7,
             now: DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(target.Purpose).IsEqualTo(RuntimePurpose.AwdpTarget);
@@ -33,8 +30,6 @@ public sealed class AwdpTargetRuntimeFactoryTests
         await Assert.That(target.TeamId).IsNull();
         await Assert.That(target.Generation).IsEqualTo(2);
         await Assert.That(target.SubmissionProcessingVersion).IsEqualTo(11);
-        await Assert.That(target.CompetitionConfigurationRevision).IsEqualTo(5);
-        await Assert.That(target.ConfigurationRevision).IsEqualTo(7);
         await Assert.That(target.RunnerPool).IsEqualTo("awdp");
         await Assert.That(target.State).IsEqualTo(RuntimeState.Queued);
         await Assert.That(target.ExpiresAt).IsNull();

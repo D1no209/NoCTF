@@ -12,7 +12,7 @@ RequireBreakBeforeFix: bool
 MaxBreakSubmissions / MaxFixSubmissions: int       // <=0 无限
 EvaluationDispatchMode: Automatic | ManualBatch
 PatchEntrypoint / PatchCommand / PatchTimeoutSeconds
-TargetPort / ReadyTimeoutSeconds
+ReadyTimeoutSeconds
 RuntimeDefinition: Container
 CheckerDefinition: Container
 ```
@@ -50,7 +50,7 @@ Patch multipart 上传和 Fix trigger 是两个 API，详见 [存储](../storage
 AWDP target 只支持单 Container，Provider Docker/Kubernetes；不支持 Compose/OVA。每个 Fix 创建全新目标与隔离网络：
 
 - Docker user-defined bridge；Kubernetes 统一 Namespace+Operation labels+NetworkPolicy；
-- target 仅接收同 Operation Checker 的 TargetPort；不暴露公网；
+- target 只接收同 Operation Checker 的内部流量；不暴露公网。Runtime 定义声明一个内部端口用于平台网络策略，Checker 镜像自行知道使用哪个端口，平台不注入端口；
 - Checker 只访问 target、DNS、内部 callback；
 - target/Checker 禁止公网、平台私网、其他 Runtime；
 - 完成/失败/超时清理资源，labels/reaper 兜底。
@@ -65,7 +65,6 @@ Fix 永不修改比赛长期 Runtime。
 PatchEntrypoint (default fix.sh, safe relative path)
 PatchCommand (default ["/bin/sh", "{entrypoint}"])
 PatchTimeoutSeconds
-TargetPort
 ReadyTimeoutSeconds
 Runtime Container definition
 Checker definition
@@ -75,7 +74,7 @@ Checker definition
 
 ## Checker callback
 
-Runner 注入：TARGET_HOST、TARGET_PORT、TARGET_READY_TIMEOUT_SECONDS、NOCTF_CALLBACK_URL、NOCTF_CALLBACK_TOKEN。题目不能覆盖保留变量。Checker 不获得 archive、对象键/文件名、Flag、选手身份或长期 Runtime。
+Runner 注入：TARGET_HOST、TARGET_READY_TIMEOUT_SECONDS、NOCTF_CALLBACK_URL、NOCTF_CALLBACK_TOKEN。题目不能覆盖这些保留变量；端口由 Checker 自身配置。Checker 不获得 archive、对象键/文件名、Flag、选手身份或长期 Runtime。
 
 ```text
 POST /api/internal/v1/awdp/fix-results

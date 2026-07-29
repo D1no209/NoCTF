@@ -34,8 +34,7 @@ public static class AwdConfigurationValidator
             && !PerTeamFlagGenerator.IsValidTemplate(flagTemplate))
             errors.Add("FlagTemplate is invalid.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(
-            configuration.Runtime,
-            internalEndpointBinding: CheckerInternalBinding(configuration.Checker)));
+            configuration.Runtime));
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
             errors.Add("AWD runtimes must use PerTeam allocation.");
         if (configuration.Runtime?.Definition is not null
@@ -44,13 +43,6 @@ public static class AwdConfigurationValidator
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(
             configuration.Checker?.Job,
             "Checker"));
-        if (configuration.Checker?.Job is
-            {
-                Provider: not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes)
-            })
-        {
-            errors.Add("AWD Checker requires the Docker or Kubernetes provider.");
-        }
         if (configuration.Checker is { } checker)
             ValidateChecker(configuration.Runtime, checker, errors);
         if (configuration.Runtime is not null && configuration.FlagInjection is null)
@@ -76,62 +68,20 @@ public static class AwdConfigurationValidator
     {
         if (checker.Job is null)
             return;
-        if (checker.Target is null)
-        {
-            errors.Add("Checker.Target is required.");
-            return;
-        }
         if (runtime is null)
         {
             errors.Add("Runtime is required when Checker is configured.");
             return;
         }
-        if (runtime.Provider != checker.Job.Provider)
-            errors.Add("AWD Runtime and Checker must use the same provider.");
-        if (checker.Target.ContainerPort is < 1 or > 65535)
-            errors.Add("Checker.Target.ContainerPort must be a valid TCP port.");
-        ValidateTargetTemplate(checker.Target.UrlTemplate, errors);
-
-        switch (runtime.Definition, checker.Target)
+        switch (runtime.Definition)
         {
-            case (ContainerRuntimeDefinition, ContainerAwdCheckerTarget):
+            case ContainerRuntimeDefinition when checker.TargetServiceName is null:
                 break;
-            case (ComposeRuntimeDefinition, ComposeAwdCheckerTarget):
+            case ComposeRuntimeDefinition when !string.IsNullOrWhiteSpace(checker.TargetServiceName):
                 break;
             default:
-                errors.Add("Checker.Target kind must match the AWD Runtime kind.");
+                errors.Add("Checker.TargetServiceName is required only for Compose Runtime.");
                 break;
         }
-    }
-
-    private static RuntimeInternalEndpointBinding? CheckerInternalBinding(
-        AwdCheckerConfiguration? checker) => checker?.Target switch
-    {
-        ComposeAwdCheckerTarget target => new(
-            target.UrlTemplate,
-            target.ContainerPort,
-            target.ServiceName),
-        _ => null
-    };
-
-    private static void ValidateTargetTemplate(string template, ICollection<string> errors)
-    {
-        if (string.IsNullOrWhiteSpace(template))
-        {
-            errors.Add("Checker.Target.UrlTemplate is required.");
-            return;
-        }
-        var remaining = template
-            .Replace("{HOST}", string.Empty, StringComparison.Ordinal)
-            .Replace("{PORT}", string.Empty, StringComparison.Ordinal);
-        if (remaining.Contains('{', StringComparison.Ordinal)
-            || remaining.Contains('}', StringComparison.Ordinal))
-            errors.Add("Checker.Target.UrlTemplate contains an unsupported placeholder.");
-        var probe = template
-            .Replace("{HOST}", "runtime.internal", StringComparison.Ordinal)
-            .Replace("{PORT}", "8080", StringComparison.Ordinal);
-        if (!Uri.TryCreate(probe, UriKind.Absolute, out var uri)
-            || uri.Scheme is not ("http" or "https"))
-            errors.Add("Checker.Target.UrlTemplate must expand to an absolute HTTP(S) URI.");
     }
 }

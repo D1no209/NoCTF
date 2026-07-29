@@ -30,7 +30,6 @@ public sealed record AwdpConfiguration(
     IReadOnlyList<string>? PatchCommand = null,
     int PatchTimeoutSeconds = 60,
     RunnerJobConfiguration? Checker = null,
-    int TargetPort = 0,
     int ReadyTimeoutSeconds = 30)
 {
     public const int CurrentSchemaVersion = 1;
@@ -48,7 +47,6 @@ public sealed record AwdpChallengeConfiguration(
     IReadOnlyList<string>? PatchCommand = null,
     int? PatchTimeoutSeconds = null,
     RunnerJobConfiguration? Checker = null,
-    int? TargetPort = null,
     int? ReadyTimeoutSeconds = null,
     long? BreakWrongPenalty = null,
     long? FixFailurePenalty = null,
@@ -76,5 +74,4 @@ public sealed record AwdpEffectiveConfiguration(
     IReadOnlyList<string>? PatchCommand,
     int PatchTimeoutSeconds,
     RunnerJobConfiguration? Checker,
-    int TargetPort,
     int ReadyTimeoutSeconds);

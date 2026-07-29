@@ -39,11 +39,8 @@ internal static class ChallengeRuntimeTemplateValidator
         var errors = new List<string>();
         if (!allowControlCheckUrlBinding && runtime.ControlCheckUrlBinding is not null)
             errors.Add("ControlCheckUrlBinding is only supported for KoH runtimes.");
-        if (!Enum.IsDefined(runtime.Provider)) errors.Add("Runtime provider is invalid.");
         if (!Enum.IsDefined(runtime.Allocation)) errors.Add("Runtime allocation is invalid.");
         if (!Enum.IsDefined(runtime.FlagSource)) errors.Add("Runtime flag source is invalid.");
-        if (string.IsNullOrWhiteSpace(runtime.RunnerPool) || runtime.RunnerPool.Length > 256)
-            errors.Add("Runtime RunnerPool must contain 1..256 characters.");
         if (runtime.Definition is null)
             errors.Add("Runtime definition is required.");
         var hasReservedEnvironmentVariable = false;
@@ -66,9 +63,7 @@ internal static class ChallengeRuntimeTemplateValidator
         switch (runtime.Definition)
         {
             case ContainerRuntimeDefinition container:
-                if (runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
-                    errors.Add("Container runtimes require the Docker or Kubernetes provider.");
-                ValidateEgressPolicy(runtime.Provider, container.EgressPolicy, errors);
+                ValidateEgressPolicy(container.EgressPolicy, errors);
                 if (string.IsNullOrWhiteSpace(container.Image))
                     errors.Add("Runtime image is required.");
                 else if (container.Image.Length > 512)
@@ -80,6 +75,10 @@ internal static class ChallengeRuntimeTemplateValidator
                     if (port.Value is < 0 or > 65535)
                         errors.Add($"Runtime host port {port.Value} is invalid.");
                 }
+                if (container.InternalPorts?.Any(port => port is < 1 or > 65535) == true)
+                    errors.Add("Runtime internal ports must be between 1 and 65535.");
+                if (container.InternalPorts?.Distinct().Count() != container.InternalPorts?.Count)
+                    errors.Add("Runtime internal ports cannot contain duplicates.");
                 if (container.Security is { } security)
                 {
                     if (!security.RunAsNonRoot)
@@ -92,31 +91,18 @@ internal static class ChallengeRuntimeTemplateValidator
                 }
                 break;
             case ComposeRuntimeDefinition compose:
-                if (runtime.Provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
-                    errors.Add("Compose runtimes require the Docker or Kubernetes provider.");
-                ValidateEgressPolicy(runtime.Provider, compose.EgressPolicy, errors);
+                ValidateEgressPolicy(compose.EgressPolicy, errors);
                 errors.AddRange(ComposeRuntimeDefinitionPolicy.Validate(
                     compose,
                     runtime.Limits ?? new(long.MaxValue, long.MaxValue, long.MaxValue),
                     runtime.UrlBindings,
                     runtime.ControlCheckUrlBinding,
-                    requireServicePids: runtime.Provider != RuntimeProvider.Kubernetes,
-                    requireDnsServiceNames: runtime.Provider == RuntimeProvider.Kubernetes,
+                    requireServicePids: true,
+                    requireDnsServiceNames: true,
                     internalEndpointBinding: internalEndpointBinding));
                 break;
-            case OvaRuntimeDefinition ova:
-                if (runtime.Provider != RuntimeProvider.Libvirt)
-                    errors.Add("OvaVm runtimes require the Libvirt provider.");
-                if (string.IsNullOrWhiteSpace(ova.OvaSourceUrl)
-                    || !Uri.TryCreate(ova.OvaSourceUrl, UriKind.Absolute, out var source)
-                    || source.Scheme is not ("https" or "file"))
-                    errors.Add("OvaVm runtimes require an absolute https or file OVA source URL.");
-                if (string.IsNullOrWhiteSpace(ova.Sha256)
-                    || ova.Sha256.Length != 64
-                    || !ova.Sha256.All(Uri.IsHexDigit))
-                    errors.Add("OvaVm runtimes require a 64-character SHA-256 digest.");
-                if (runtime.FlagSource != RuntimeFlagSource.Static)
-                    errors.Add("OvaVm runtimes only support static flags.");
+            case OvaRuntimeDefinition:
+                errors.Add("Challenge definitions support only portable Container or Compose runtimes.");
                 break;
         }
         if (runtime.TtlSeconds is <= 0 or > 604800)
@@ -127,9 +113,7 @@ internal static class ChallengeRuntimeTemplateValidator
             errors.Add("Runtime resource limits are required.");
         else if (limits.MemoryBytes <= 0
             || limits.NanoCpus <= 0
-            || (runtime.Provider == RuntimeProvider.Kubernetes
-                ? limits.PidsLimit < 0
-                : limits.PidsLimit <= 0))
+            || limits.PidsLimit <= 0)
             errors.Add("Runtime resource limits must be positive.");
         if (runtime.UrlBindings?.Any(binding => binding is null) == true)
             errors.Add("Runtime URL bindings cannot contain null entries.");
@@ -206,7 +190,6 @@ internal static class ChallengeRuntimeTemplateValidator
     }
 
     private static void ValidateEgressPolicy(
-        RuntimeProvider provider,
         RuntimeEgressPolicy egressPolicy,
         ICollection<string> errors)
     {
@@ -215,11 +198,10 @@ internal static class ChallengeRuntimeTemplateValidator
             errors.Add("Runtime egress policy is invalid.");
             return;
         }
-        if (provider == RuntimeProvider.Docker
-            && egressPolicy == RuntimeEgressPolicy.InternetOnly)
+        if (egressPolicy == RuntimeEgressPolicy.InternetOnly)
         {
             errors.Add(
-                "Docker runtimes do not support InternetOnly egress; use DenyAll or a Kubernetes Runner Pool.");
+                "Portable challenge runtimes cannot require the Kubernetes-only InternetOnly egress policy.");
         }
     }
 

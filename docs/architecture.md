@@ -53,7 +53,7 @@ API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务�
 
 ## Runner Pool
 
-Runner 配置 RunnerId、RunnerPool 与支持 Provider。Runtime 配置引用 Provider 与开放文本 RunnerPool；同 Pool 多节点竞争同一 durable queue。节点通过 Redis TTL heartbeat 发布版本与容量。RuntimeInstance 持久化实际 RunnerId、RunnerPool、ProviderReceiptJson 与展开 URL。
+平台部署配置 RunnerId、一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。同 Pool 多节点竞争同一 durable queue。节点通过 Redis TTL heartbeat 发布容量。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RunnerPool、RuntimeProvider、ProviderReceiptJson 与展开 URL。
 
 `file://` OVA URL 必须在 Pool 所有候选节点可访问。平台 API 不下载或管理 OVA；配置固定
 预期 SHA-256，Libvirt Provider 负责读取/下载、校验、内容寻址缓存以及多 VM Appliance
@@ -63,6 +63,6 @@ Runner 配置 RunnerId、RunnerPool 与支持 Provider。Runtime 配置引用 Pr
 
 Access、Refresh 与内部 JWT 可以共用签名密钥，但必须使用互不接受的 audience、token_type/permission 与验证 Scheme。生产部署可以改用不同签名密钥；验证器不得因密钥相同而跨 Scheme 接受 Token。
 
-调度 Checker 的可信进程在持久化 Job 时通过 `IInternalTokenIssuer` 签发一次性操作 Token，并把 Token 放入发给 Runner 的 durable message；Runner 只把它注入该 Job 的 Checker，不把签名密钥或其他 Token 交给题目容器。Token 绑定具体 Submission/RuntimeInstance、ProcessingVersion/Generation/CheckerSequence 和单一 permission。它的 `iat` 是签发时间，`exp` 固定为 OperationDeadline 后 24 小时，使迟到 callback 仍能到达版本栅栏；旧 Sequence/Version 被接收为 superseded，但不能覆盖新结果。
+调度 Checker 的可信进程签发最小权限 internal JWT，并只把它注入对应 Checker，不把签名密钥或其他 Token 交给题目容器。AWD Checker 可多次写状态，后一次覆盖前一次；Runtime identity/generation 来自 Token。运行退出只区分 Checker 自身正常、异常或超时，不用于判断服务 Up/Down。
 
 Runner 本身直接消费 Wolverine、访问必要业务表，不给自己签 callback JWT。Runner 启动的不可信 Checker 只能通过 `/api/internal/v1` 最小权限接口写结果。

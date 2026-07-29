@@ -22,11 +22,17 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
+        var competitionMode = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == command.CompetitionId)
+            .Select(competition => competition.Mode)
+            .SingleAsync(ct);
 
         var template = await db.Challenges.AsNoTracking()
             .SingleOrDefaultAsync(challenge => challenge.Id == command.ChallengeId, ct);
         if (template is null)
             return new(null, ChallengeMutationFailure.TemplateNotFound);
+        if (template.Mode != competitionMode)
+            return new(null, ChallengeMutationFailure.TemplateModeMismatch);
 
         var entity = new CompetitionChallenge
         {
@@ -35,7 +41,7 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
             ChallengeId = command.ChallengeId,
             BaseScore = command.BaseScore,
             Order = command.Order,
-            ConfigurationJson = configurationJson,
+            RulesJson = configurationJson,
             UpdatedAt = command.CreatedAt
         };
         db.CompetitionChallenges.Add(entity);
