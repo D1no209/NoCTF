@@ -54,23 +54,25 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Ctf_e2e_readiness_bypasses_proxy_and_normalizes_redis_output()
+    public async Task E2e_orchestrator_is_portable_and_uses_docker_assigned_ports()
     {
-        var script = await ReadAsync("backend", "scripts", "Run-CtfE2E.ps1");
+        var orchestrator = await ReadAsync("backend", "tests", "e2e.cs");
         var compose = await ReadAsync(
             "backend",
             "tests",
             "NoCTF.E2E",
             "docker-compose.ctf.yml");
 
-        await Assert.That(script).Contains("$httpHandler.UseProxy = $false");
-        await Assert.That(script).Contains("($heartbeat | Out-String).Trim()");
-        await Assert.That(script).Contains("Last API status");
-        await Assert.That(script).Contains("Last Redis heartbeat output");
-        await Assert.That(script).Contains("function Resolve-E2EApiPort");
-        await Assert.That(script).Contains("port backend 8080");
-        await Assert.That(script).Contains("$env:NO_PROXY = \"127.0.0.1,localhost\"");
-        await Assert.That(script).DoesNotContain("wsl");
+        await Assert.That(orchestrator).Contains("#:property TargetFramework=net10.0");
+        await Assert.That(orchestrator).Contains("[CallerFilePath]");
+        await Assert.That(orchestrator).Contains("ProcessStartInfo");
+        await Assert.That(orchestrator).Contains("ArgumentList.Add");
+        await Assert.That(orchestrator).Contains("[\"port\", \"backend\", \"8080\"]");
+        await Assert.That(orchestrator).Contains("API/Runner readiness timed out");
+        await Assert.That(orchestrator).Contains("health={lastHealth}");
+        await Assert.That(orchestrator).Contains("heartbeat={lastHeartbeat}");
+        await Assert.That(orchestrator).DoesNotContain("wsl");
+        await Assert.That(orchestrator).DoesNotContain(".ps1");
         await Assert.That(compose).Contains("\"127.0.0.1::8080\"");
     }
 

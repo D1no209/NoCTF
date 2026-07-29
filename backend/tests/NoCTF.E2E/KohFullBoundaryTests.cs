@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -18,7 +17,6 @@ public sealed class KohFullBoundaryTests
     {
         var baseUrl = RequiredEnvironment("NOCTF_E2E_BASE_URL");
         var runtimeImage = RequiredEnvironment("NOCTF_E2E_RUNTIME_IMAGE");
-        var postgresContainer = RequiredEnvironment("NOCTF_E2E_POSTGRES_CONTAINER");
         using var anonymous = CreateClient(baseUrl);
         using var admin = CreateClient(baseUrl, await LoginAsync(
             anonymous,
@@ -70,7 +68,9 @@ public sealed class KohFullBoundaryTests
                 visibility = 0,
                 title = "Shared KoH Hill",
                 description = "Returns the current controlling Team Flag as a raw response body.",
-                direction = "Pwn"
+                direction = "Pwn",
+                mode = 3,
+                definitionJson = BuildDefinition(runtimeImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -86,52 +86,8 @@ public sealed class KohFullBoundaryTests
         var configuration = JsonSerializer.Serialize(new
         {
             schemaVersion = 1,
-            runtime = new
-            {
-                provider = 0,
-                allocation = 0,
-                definition = new
-                {
-                    kind = "container",
-                    image = runtimeImage,
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
-                    security = new
-                    {
-                        noNewPrivileges = true,
-                        readonlyRootfs = true,
-                        runAsNonRoot = true,
-                        capDrop = new[] { "ALL" },
-                        capAdd = Array.Empty<string>()
-                    },
-                    egressPolicy = 0
-                },
-                limits = new
-                {
-                    memoryBytes = 67_108_864,
-                    nanoCpus = 100_000_000,
-                    pidsLimit = 64
-                },
-                operationTimeoutSeconds = 60,
-                runnerPool = "koh-e2e",
-                urlBindings = new[]
-                {
-                    new
-                    {
-                        urlTemplate = "http://{HOST}:{PORT}/play",
-                        exposure = 1,
-                        containerPort = 8080
-                    }
-                },
-                flagSource = 0,
-                controlCheckUrlBinding = new
-                {
-                    urlTemplate = "http://{HOST}:{PORT}/control",
-                    exposure = 0,
-                    containerPort = 8080
-                }
-            }
+            pollIntervalSeconds = 2,
+            controlPointsPerInterval = 10
         }, JsonOptions);
         var configured = await SendJsonAsync(
             admin,
@@ -214,35 +170,24 @@ public sealed class KohFullBoundaryTests
         await Assert.That(redDetail.ToString()).DoesNotContain("controlCheckUrl");
         var fixtureUrl = ToHostUrl(redDetail.GetProperty("urls")[0].GetString()!);
 
-        var known = (await ReadObservationsAsync(postgresContainer, competitionId, cancellationToken))
-            .Select(item => item.Id).ToHashSet();
         await SetFixtureAsync(fixtureUrl, "wrong", null, cancellationToken);
-        var wrong = await WaitForObservationAsync(
-            postgresContainer, competitionId, known,
-            item => item.Result == 1 && item.FailureCode is null && item.TeamId is null,
-            TimeSpan.FromSeconds(15), cancellationToken);
-        known.Add(wrong.Id);
+        await AssertScoresStableAsync(
+            anonymous, competitionId, TimeSpan.FromSeconds(5), cancellationToken);
 
+        var beforeRed = await ReadScoresAsync(anonymous, competitionId, cancellationToken);
         await SetFixtureAsync(fixtureUrl, "flag", redFlag, cancellationToken);
-        var correct = await WaitForObservationAsync(
-            postgresContainer, competitionId, known,
-            item => item.Result == 0 && item.TeamId == red.TeamId,
+        await PollScoreAsync(
+            anonymous, competitionId, red.TeamId,
+            beforeRed.GetValueOrDefault(red.TeamId) + 10,
             TimeSpan.FromSeconds(15), cancellationToken);
-        known.Add(correct.Id);
 
         await SetFixtureAsync(fixtureUrl, "unavailable", null, cancellationToken);
-        var unavailable = await WaitForObservationAsync(
-            postgresContainer, competitionId, known,
-            item => item.Result == 4 && item.FailureCode == 19,
-            TimeSpan.FromSeconds(15), cancellationToken);
-        known.Add(unavailable.Id);
+        await AssertScoresStableAsync(
+            anonymous, competitionId, TimeSpan.FromSeconds(5), cancellationToken);
 
         await SetFixtureAsync(fixtureUrl, "timeout", null, cancellationToken);
-        var timeout = await WaitForObservationAsync(
-            postgresContainer, competitionId, known,
-            item => item.Result == 4 && item.FailureCode == 18,
-            TimeSpan.FromSeconds(20), cancellationToken);
-        known.Add(timeout.Id);
+        await AssertScoresStableAsync(
+            anonymous, competitionId, TimeSpan.FromSeconds(7), cancellationToken);
         await SetFixtureAsync(fixtureUrl, "wrong", null, cancellationToken);
 
         const string ambiguousFlag = "flag{koh-ambiguous-control}";
@@ -250,13 +195,9 @@ public sealed class KohFullBoundaryTests
             byTeam[red.TeamId], ambiguousFlag, cancellationToken);
         await UpdateFlagAsync(admin, competitionId, competitionChallengeId,
             byTeam[blue.TeamId], ambiguousFlag, cancellationToken);
-        known = (await ReadObservationsAsync(postgresContainer, competitionId, cancellationToken))
-            .Select(item => item.Id).ToHashSet();
         await SetFixtureAsync(fixtureUrl, "flag", ambiguousFlag, cancellationToken);
-        _ = await WaitForObservationAsync(
-            postgresContainer, competitionId, known,
-            item => item.Result == 4 && item.FailureCode == 20,
-            TimeSpan.FromSeconds(15), cancellationToken);
+        await AssertScoresStableAsync(
+            anonymous, competitionId, TimeSpan.FromSeconds(5), cancellationToken);
         await SetFixtureAsync(fixtureUrl, "wrong", null, cancellationToken);
         await UpdateFlagAsync(admin, competitionId, competitionChallengeId,
             byTeam[red.TeamId], redFlag, cancellationToken);
@@ -267,12 +208,9 @@ public sealed class KohFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/pause",
             HttpStatusCode.NoContent, cancellationToken);
         await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
-        var pausedCount = (await ReadObservationsAsync(
-            postgresContainer, competitionId, cancellationToken)).Count;
         await SetFixtureAsync(fixtureUrl, "flag", blueFlag, cancellationToken);
-        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
-        await Assert.That((await ReadObservationsAsync(
-            postgresContainer, competitionId, cancellationToken)).Count).IsEqualTo(pausedCount);
+        await AssertScoresStableAsync(
+            anonymous, competitionId, TimeSpan.FromSeconds(5), cancellationToken);
         var pausedRuntime = await GetJsonAsync(admin, runtimePath, cancellationToken);
         await Assert.That(pausedRuntime.GetProperty("items")[0].GetProperty("id").GetGuid())
             .IsEqualTo(runtimeId);
@@ -282,14 +220,13 @@ public sealed class KohFullBoundaryTests
         await Assert.That(pausedDetail.GetProperty("controlFlag").ValueKind)
             .IsEqualTo(JsonValueKind.Null);
 
-        known = (await ReadObservationsAsync(postgresContainer, competitionId, cancellationToken))
-            .Select(item => item.Id).ToHashSet();
+        var beforeBlue = await ReadScoresAsync(anonymous, competitionId, cancellationToken);
         await SendWithoutBodyAsync(admin, HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/resume",
             HttpStatusCode.NoContent, cancellationToken);
-        _ = await WaitForObservationAsync(
-            postgresContainer, competitionId, known,
-            item => item.Result == 0 && item.TeamId == blue.TeamId,
+        await PollScoreAsync(
+            anonymous, competitionId, blue.TeamId,
+            beforeBlue.GetValueOrDefault(blue.TeamId) + 10,
             TimeSpan.FromSeconds(15), cancellationToken);
 
         await SendWithoutBodyAsync(admin, HttpMethod.Post,
@@ -312,8 +249,57 @@ public sealed class KohFullBoundaryTests
             value => value.GetProperty("items")[0].GetProperty("state").GetInt32() == 4,
             TimeSpan.FromSeconds(90),
             cancellationToken);
-        await PollDockerCleanupAsync(runtimeId, TimeSpan.FromSeconds(60), cancellationToken);
     }
+
+    private static string BuildDefinition(string runtimeImage) =>
+        JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            runtime = new
+            {
+                allocation = 0,
+                definition = new
+                {
+                    kind = "container",
+                    image = runtimeImage,
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
+                    security = new
+                    {
+                        noNewPrivileges = true,
+                        readonlyRootfs = true,
+                        runAsNonRoot = true,
+                        capDrop = new[] { "ALL" },
+                        capAdd = Array.Empty<string>()
+                    },
+                    egressPolicy = 0
+                },
+                limits = new
+                {
+                    memoryBytes = 67_108_864,
+                    nanoCpus = 100_000_000,
+                    pidsLimit = 64
+                },
+                operationTimeoutSeconds = 60,
+                urlBindings = new[]
+                {
+                    new
+                    {
+                        urlTemplate = "http://{HOST}:{PORT}/play",
+                        exposure = 1,
+                        containerPort = 8080
+                    }
+                },
+                flagSource = 0,
+                controlCheckUrlBinding = new
+                {
+                    urlTemplate = "http://{HOST}:{PORT}/control",
+                    exposure = 0,
+                    containerPort = 8080
+                }
+            }
+        }, JsonOptions);
 
     private static async Task UpdateFlagAsync(
         HttpClient admin,
@@ -374,72 +360,65 @@ public sealed class KohFullBoundaryTests
         return builder.Uri;
     }
 
-    private static async Task<Observation> WaitForObservationAsync(
-        string postgresContainer,
-        Guid competitionId,
-        IReadOnlySet<Guid> known,
-        Func<Observation, bool> predicate,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-        IReadOnlyList<Observation> last = [];
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            last = await ReadObservationsAsync(postgresContainer, competitionId, cancellationToken);
-            var match = last.FirstOrDefault(item => !known.Contains(item.Id) && predicate(item));
-            if (match is not null) return match;
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        }
-        throw new TimeoutException($"KoH observation did not arrive. Last facts: {string.Join(';', last)}");
-    }
-
-    private static async Task<IReadOnlyList<Observation>> ReadObservationsAsync(
-        string postgresContainer,
-        Guid competitionId,
-        CancellationToken cancellationToken)
-    {
-        var sql = $"SELECT id::text, result::int, COALESCE(failure_code::int, -1), "
-            + $"COALESCE(team_id::text, '') FROM scoring_events WHERE competition_id = '{competitionId:D}' "
-            + "AND kind = 3 ORDER BY occurred_at, id";
-        var output = await RunProcessAsync(
-            "docker",
-            ["exec", postgresContainer, "psql", "-U", "noctf", "-d", "noctf", "-At", "-F", "|", "-c", sql],
-            cancellationToken);
-        if (string.IsNullOrWhiteSpace(output)) return [];
-        return output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => line.Trim().Split('|'))
-            .Select(parts => new Observation(
-                Guid.Parse(parts[0]),
-                int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture),
-                parts[2] == "-1" ? null : int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture),
-                string.IsNullOrEmpty(parts[3]) ? null : Guid.Parse(parts[3])))
-            .ToArray();
-    }
-
     private static Dictionary<Guid, long> Scores(JsonElement leaderboard) =>
         leaderboard.GetProperty("entries").EnumerateArray().ToDictionary(
             item => item.GetProperty("teamId").GetGuid(),
             item => item.GetProperty("score").GetInt64());
 
-    private static async Task PollDockerCleanupAsync(
-        Guid runtimeId,
-        TimeSpan timeout,
+    private static async Task<Dictionary<Guid, long>> ReadScoresAsync(
+        HttpClient client,
+        Guid competitionId,
         CancellationToken cancellationToken)
     {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-        var filter = $"label=noctf.io/runtime-instance-id={runtimeId:D}";
+        var leaderboard = await PollJsonAsync(
+            client,
+            $"/api/v1/competitions/{competitionId}/leaderboard",
+            _ => true,
+            TimeSpan.FromSeconds(10),
+            cancellationToken);
+        return Scores(leaderboard);
+    }
+
+    private static async Task AssertScoresStableAsync(
+        HttpClient client,
+        Guid competitionId,
+        TimeSpan observationWindow,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(observationWindow).AddSeconds(15);
+        var stableSince = DateTimeOffset.UtcNow;
+        var previous = await ReadScoresAsync(client, competitionId, cancellationToken);
         while (DateTimeOffset.UtcNow < deadline)
         {
-            var containers = await RunProcessAsync(
-                "docker", ["ps", "-aq", "--filter", filter], cancellationToken);
-            var networks = await RunProcessAsync(
-                "docker", ["network", "ls", "-q", "--filter", filter], cancellationToken);
-            if (string.IsNullOrWhiteSpace(containers) && string.IsNullOrWhiteSpace(networks)) return;
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            var current = await ReadScoresAsync(client, competitionId, cancellationToken);
+            if (!current.OrderBy(item => item.Key).SequenceEqual(previous.OrderBy(item => item.Key)))
+            {
+                previous = current;
+                stableSince = DateTimeOffset.UtcNow;
+                continue;
+            }
+            if (DateTimeOffset.UtcNow - stableSince >= observationWindow)
+                return;
         }
-        throw new TimeoutException("KoH Runtime or network resources were not cleaned up.");
+        throw new TimeoutException(
+            $"KoH scores did not remain stable for {observationWindow}. Last scores: "
+            + string.Join(", ", previous.Select(item => $"{item.Key:D}={item.Value}")));
     }
+
+    private static Task<JsonElement> PollScoreAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid teamId,
+        long expectedMinimum,
+        TimeSpan timeout,
+        CancellationToken cancellationToken) =>
+        PollJsonAsync(
+            client,
+            $"/api/v1/competitions/{competitionId}/leaderboard",
+            value => Scores(value).GetValueOrDefault(teamId) >= expectedMinimum,
+            timeout,
+            cancellationToken);
 
     private static async Task<TeamSession> RegisterTeamAsync(
         HttpClient anonymous,
@@ -580,33 +559,10 @@ public sealed class KohFullBoundaryTests
         return client;
     }
 
-    private static async Task<string> RunProcessAsync(
-        string fileName,
-        IReadOnlyList<string> arguments,
-        CancellationToken cancellationToken)
-    {
-        var start = new ProcessStartInfo(fileName)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        using var process = Process.Start(start)
-            ?? throw new InvalidOperationException($"Could not start {fileName}.");
-        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var error = await process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException($"{fileName} exited with {process.ExitCode}: {error}");
-        return output.Trim();
-    }
-
     private static string RequiredEnvironment(string name) =>
         Environment.GetEnvironmentVariable(name)
         ?? throw new InvalidOperationException($"{name} is required for the external KoH E2E test.");
 
-    private sealed record Observation(Guid Id, int Result, int? FailureCode, Guid? TeamId);
     private sealed record TeamSession(HttpClient Client, Guid TeamId) : IDisposable
     {
         public void Dispose() => Client.Dispose();

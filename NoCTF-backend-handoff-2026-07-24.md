@@ -205,7 +205,7 @@ wsl bash -lc `
 
 ### CTF 完整边界 E2E（`9c18118`）
 
-- `backend/scripts/Run-CtfE2E.ps1` 使用隔离 Compose project、动态 API 端口和唯一镜像/
+- 当前统一入口 `dotnet run --file backend/tests/e2e.cs -- --mode ctf --suite smoke` 使用隔离 Compose project、动态 API 端口和唯一镜像/
   network，启动独立 API、Worker、Runner、PostgreSQL、Redis、MinIO 与真实 Docker
   Runtime；成功和失败路径都只清理本轮资源，不修改现有 `deploy-*` 容器。
 - HTTP 流程覆盖种子管理员登录、CTF 比赛/题库模板/附件/CompetitionChallenge/Runtime
@@ -230,7 +230,7 @@ wsl bash -lc `
 
 ### AWD 完整边界 E2E（`c46917d`）
 
-- `backend/scripts/Run-AwdE2E.ps1` 使用独立 Compose project、动态 API 端口、唯一网络与
+- 当前统一入口 `dotnet run --file backend/tests/e2e.cs -- --mode awd --suite smoke` 使用独立 Compose project、动态 API 端口、唯一网络与
   fixture 镜像，启动独立 API、Worker、Runner、PostgreSQL、Redis、MinIO 和真实 Docker
   Runtime/Checker；最终 1/1 passed，耗时 1 分 42.6 秒，并精确清理本轮资源。
 - HTTP 流程覆盖 AWD 比赛/题库模板/CompetitionChallenge/Runtime/Checker 配置、两支自动
@@ -650,8 +650,8 @@ Capability/DI 整理由 `39ff3d3` 独立完成，没有改变协议、业务规�
 
 CTF 完整边界已由 `9c18118` 独立完成。不要退回进程内测试或只验证 API：
 
-- 标准入口是 `backend/scripts/Run-CtfE2E.ps1`；需要保留失败环境时使用
-  `-KeepEnvironment`，排查完必须按输出的唯一 project 精确清理。
+- 标准入口是 `dotnet run --file backend/tests/e2e.cs -- --mode ctf --suite smoke`；需要保留
+  失败环境时追加 `--keep-environment`，排查完必须按输出的唯一 project 精确清理。
 - 测试必须继续跨 HTTP、独立 API/Worker/Runner、真实 PostgreSQL/Redis/MinIO 与 Docker；
   Runtime fixture 必须保持非 root、只读 rootfs 和平台 ingress proxy 路径。
 - CTF 已验证附件、PerTeam Runtime Flag、first blood、Hint 扣分、leaderboard projection、
@@ -662,7 +662,7 @@ CTF 完整边界已由 `9c18118` 独立完成。不要退回进程内测试或�
 
 AWD 完整边界已由 `c46917d` 独立完成。不要退回固定 Flag、预建 Runtime 或进程内 Checker：
 
-- 标准入口是 `backend/scripts/Run-AwdE2E.ps1`；需要保留失败环境时使用 `-KeepEnvironment`，
+- 标准入口是 `dotnet run --file backend/tests/e2e.cs -- --mode awd --suite smoke`；需要保留失败环境时追加 `--keep-environment`，
   排查后必须按输出的唯一 project 精确清理。
 - 每个已批准未封禁队伍由 Worker 通过 `IAwdRuntimeProvisioner` 创建题目 PerTeam Runtime；
   重放幂等，已有 active generation 不重复创建，仍使用既有 Runtime durable 状态机。
@@ -678,8 +678,8 @@ AWD 完整边界已由 `c46917d` 独立完成。不要退回固定 Flag、预建
 AWDP 完整边界已由 `e24bfac` 独立完成。不要退回共享 target、进程内 Checker 或把 Fix
 建模为 Flag：
 
-- 标准入口是 `backend/scripts/Run-AwdpE2E.ps1`；需要保留失败环境时使用
-  `-KeepEnvironment`，排查后必须按输出的唯一 project 精确清理。
+- 标准入口是 `dotnet run --file backend/tests/e2e.cs -- --mode awdp --suite smoke`；需要保留
+  失败环境时追加 `--keep-environment`，排查后必须按输出的唯一 project 精确清理。
 - 流程跨 HTTP、独立 API/Worker/Runner、真实 PostgreSQL/Redis/MinIO 与 Docker，验证静态
   Break Flag、无效 archive 422、Break gate 不消费 upload、错误/正确 Break、成功 Fix、
   Patch 失败、精确 Fix rejudge、三个独立 disposable target 及其 checker/network cleanup。
@@ -706,8 +706,8 @@ AWDP 完整边界已由 `e24bfac` 独立完成。不要退回共享 target、进
 KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进程内 poll、向所有队伍
 暴露 Control Flag，或让 Worker 直接访问题目容器的隔离网络：
 
-- 标准入口是 `backend/scripts/Run-KohE2E.ps1`；需要保留失败环境时使用
-  `-KeepEnvironment`，排查后必须按输出的唯一 project 精确清理。
+- 标准入口是 `dotnet run --file backend/tests/e2e.cs -- --mode koh --suite smoke`；需要保留
+  失败环境时追加 `--keep-environment`，排查后必须按输出的唯一 project 精确清理。
 - 流程跨 HTTP、独立 API/Worker/Runner、真实 PostgreSQL/Redis/MinIO 与 Docker；验证每题
   一个 shared Runtime、玩家本队 Control Flag、Participants URL、Wrong、Correct、
   ProducerUnavailable、ProducerTimeout、AmbiguousFlagMatch、Pause/Resume、最终 leaderboard、

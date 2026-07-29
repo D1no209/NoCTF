@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -71,10 +70,12 @@ public sealed class AwdFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
+                mode = 1,
                 visibility = 0,
                 title = "Rotating AWD Service",
                 description = "Exposes rotating Flags and a controllable health endpoint.",
-                direction = "Pwn"
+                direction = "Pwn",
+                definitionJson = BuildDefinition(runtimeImage, checkerImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -92,69 +93,7 @@ public sealed class AwdFullBoundaryTests
 
         var challengeConfigurationJson = JsonSerializer.Serialize(new
         {
-            schemaVersion = 4,
-            runtime = new
-            {
-                provider = 0,
-                allocation = 1,
-                definition = new
-                {
-                    kind = "container",
-                    image = runtimeImage,
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
-                    security = new
-                    {
-                        noNewPrivileges = true,
-                        readonlyRootfs = true,
-                        runAsNonRoot = true,
-                        capDrop = new[] { "ALL" },
-                        capAdd = Array.Empty<string>()
-                    },
-                    egressPolicy = 0
-                },
-                limits = new
-                {
-                    memoryBytes = 67_108_864,
-                    nanoCpus = 100_000_000,
-                    pidsLimit = 64
-                },
-                operationTimeoutSeconds = 60,
-                runnerPool = "awd-e2e",
-                urlBindings = new[]
-                {
-                    new
-                    {
-                        urlTemplate = "http://{HOST}:{PORT}/",
-                        exposure = 1,
-                        containerPort = 8080
-                    }
-                },
-                flagSource = 2
-            },
-            checker = new
-            {
-                job = new
-                {
-                    provider = 0,
-                    image = checkerImage,
-                    command = Array.Empty<string>(),
-                    environment = new Dictionary<string, string>(),
-                    timeoutSeconds = 15
-                },
-                target = new
-                {
-                    kind = "container",
-                    urlTemplate = "http://{HOST}:{PORT}/cgi-bin/health",
-                    containerPort = 8080
-                }
-            },
-            flagInjection = new
-            {
-                command = "printf '%s' '${FLAG}' > /dev/shm/flag",
-                timeoutSeconds = 5
-            }
+            schemaVersion = 4
         }, JsonOptions);
         var updatedConfiguration = await SendJsonAsync(
             admin,
@@ -384,11 +323,66 @@ public sealed class AwdFullBoundaryTests
                     .All(item => item.GetProperty("state").GetInt32() == 4),
             TimeSpan.FromSeconds(90),
             cancellationToken);
-        await PollDockerCleanupAsync(
-            new[] { redRuntimeId, blueRuntimeId },
-            TimeSpan.FromSeconds(60),
-            cancellationToken);
     }
+
+    private static string BuildDefinition(string runtimeImage, string checkerImage) =>
+        JsonSerializer.Serialize(new
+        {
+            schemaVersion = 4,
+            runtime = new
+            {
+                allocation = 1,
+                definition = new
+                {
+                    kind = "container",
+                    image = runtimeImage,
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
+                    security = new
+                    {
+                        noNewPrivileges = true,
+                        readonlyRootfs = true,
+                        runAsNonRoot = true,
+                        capDrop = new[] { "ALL" },
+                        capAdd = Array.Empty<string>()
+                    },
+                    egressPolicy = 0
+                },
+                limits = new
+                {
+                    memoryBytes = 67_108_864,
+                    nanoCpus = 100_000_000,
+                    pidsLimit = 64
+                },
+                operationTimeoutSeconds = 60,
+                urlBindings = new[]
+                {
+                    new
+                    {
+                        urlTemplate = "http://{HOST}:{PORT}/",
+                        exposure = 1,
+                        containerPort = 8080
+                    }
+                },
+                flagSource = 2
+            },
+            checker = new
+            {
+                job = new
+                {
+                    image = checkerImage,
+                    command = Array.Empty<string>(),
+                    environment = new Dictionary<string, string>(),
+                    timeoutSeconds = 15
+                }
+            },
+            flagInjection = new
+            {
+                command = "printf '%s' '${FLAG}' > /dev/shm/flag",
+                timeoutSeconds = 5
+            }
+        }, JsonOptions);
 
     private static async Task<TeamSession> RegisterTeamAsync(
         HttpClient anonymous,
@@ -549,59 +543,6 @@ public sealed class AwdFullBoundaryTests
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
         }
         throw new TimeoutException($"Leaderboard did not reach the expected AWD scores. Last response: {last}");
-    }
-
-    private static async Task PollDockerCleanupAsync(
-        IReadOnlyList<Guid> runtimeIds,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            var hasResources = false;
-            foreach (var runtimeId in runtimeIds)
-            {
-                var label = $"label=noctf.io/runtime-instance-id={runtimeId:D}";
-                var containers = await RunProcessAsync(
-                    "docker", ["ps", "-aq", "--filter", label], cancellationToken);
-                var networks = await RunProcessAsync(
-                    "docker", ["network", "ls", "-q", "--filter", label], cancellationToken);
-                if (!string.IsNullOrWhiteSpace(containers)
-                    || !string.IsNullOrWhiteSpace(networks))
-                {
-                    hasResources = true;
-                    break;
-                }
-            }
-            if (!hasResources) return;
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        }
-        throw new TimeoutException("AWD Runtime, Checker, or network resources were not cleaned up.");
-    }
-
-    private static async Task<string> RunProcessAsync(
-        string fileName,
-        IReadOnlyList<string> arguments,
-        CancellationToken cancellationToken)
-    {
-        var start = new ProcessStartInfo(fileName)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        foreach (var argument in arguments)
-            start.ArgumentList.Add(argument);
-        using var process = Process.Start(start)
-            ?? throw new InvalidOperationException($"Could not start {fileName}.");
-        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var error = await process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"{fileName} exited with {process.ExitCode}: {error}");
-        return output.Trim();
     }
 
     private static HttpClient CreateClient(string baseUrl, string? token = null)

@@ -1,4 +1,4 @@
-FROM python:3.13-alpine
+FROM python:3.11.9-slim-bookworm
 
 COPY --chmod=0444 server.py /server.py
 

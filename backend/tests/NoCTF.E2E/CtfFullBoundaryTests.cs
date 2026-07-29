@@ -58,10 +58,12 @@ public sealed class CtfFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
+                mode = 0,
                 visibility = 0,
                 title = "Injected Flag Runtime",
                 description = "Reads a generated per-team Flag from a real Docker runtime.",
-                direction = "Web"
+                direction = "Web",
+                definitionJson = BuildContainerDefinition(runtimeImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -97,49 +99,7 @@ public sealed class CtfFullBoundaryTests
             schemaVersion = 1,
             points = new { initialPoints = 500, minimumPoints = 100, decayFactor = 10 },
             bloodRewards = new[] { new { policy = 0, value = 25m } },
-            maxFlagAttempts = 5,
-            runtime = new
-            {
-                provider = 0,
-                allocation = 1,
-                definition = new
-                {
-                    kind = "container",
-                    image = runtimeImage,
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
-                    security = new
-                    {
-                        noNewPrivileges = true,
-                        readonlyRootfs = true,
-                        runAsNonRoot = true,
-                        capDrop = new[] { "ALL" },
-                        capAdd = Array.Empty<string>()
-                    },
-                    flagEnvironmentVariableName = "FLAG",
-                    egressPolicy = 0
-                },
-                limits = new
-                {
-                    memoryBytes = 67_108_864,
-                    nanoCpus = 100_000_000,
-                    pidsLimit = 64
-                },
-                ttlSeconds = 300,
-                operationTimeoutSeconds = 60,
-                runnerPool = "ctf-e2e",
-                urlBindings = new[]
-                {
-                    new
-                    {
-                        urlTemplate = "http://{HOST}:{PORT}/",
-                        exposure = 0,
-                        containerPort = 8080
-                    }
-                },
-                flagSource = 1
-            }
+            maxFlagAttempts = 5
         }, JsonOptions);
         var updatedConfiguration = await SendJsonAsync(
             admin,
@@ -172,10 +132,12 @@ public sealed class CtfFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
+                mode = 0,
                 visibility = 0,
                 title = "Compose Injected Flag Runtime",
                 description = "Reads a generated per-team Flag from a real multi-service Docker Compose runtime.",
-                direction = "Web"
+                direction = "Web",
+                definitionJson = BuildComposeDefinition(runtimeImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -198,68 +160,7 @@ public sealed class CtfFullBoundaryTests
             schemaVersion = 1,
             points = new { initialPoints = 250, minimumPoints = 100, decayFactor = 10 },
             bloodRewards = Array.Empty<object>(),
-            maxFlagAttempts = 5,
-            runtime = new
-            {
-                provider = 0,
-                allocation = 1,
-                definition = new
-                {
-                    kind = "compose",
-                    composeYaml = $$"""
-                        services:
-                          web:
-                            image: "{{runtimeImage}}"
-                          db:
-                            image: busybox:1.37
-                            command:
-                              - sleep
-                              - "300"
-                        """,
-                    serviceResources = new Dictionary<string, object>
-                    {
-                        ["web"] = new
-                        {
-                            memoryBytes = 67_108_864,
-                            nanoCpus = 100_000_000,
-                            pidsLimit = 64
-                        },
-                        ["db"] = new
-                        {
-                            memoryBytes = 67_108_864,
-                            nanoCpus = 100_000_000,
-                            pidsLimit = 64
-                        }
-                    },
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    flagEnvironmentVariables = new Dictionary<string, string>
-                    {
-                        ["web"] = "FLAG"
-                    },
-                    egressPolicy = 0
-                },
-                limits = new
-                {
-                    memoryBytes = 134_217_728,
-                    nanoCpus = 200_000_000,
-                    pidsLimit = 128
-                },
-                ttlSeconds = 300,
-                operationTimeoutSeconds = 60,
-                runnerPool = "ctf-e2e",
-                urlBindings = new[]
-                {
-                    new
-                    {
-                        urlTemplate = "http://{HOST}:{PORT}/",
-                        exposure = 0,
-                        containerPort = 8080,
-                        serviceName = "web"
-                    }
-                },
-                flagSource = 1
-            }
+            maxFlagAttempts = 5
         }, JsonOptions);
         var updatedComposeConfiguration = await SendJsonAsync(
             admin,
@@ -632,6 +533,119 @@ public sealed class CtfFullBoundaryTests
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
+
+    private static string BuildContainerDefinition(string runtimeImage) =>
+        JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            runtime = new
+            {
+                allocation = 1,
+                definition = new
+                {
+                    kind = "container",
+                    image = runtimeImage,
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
+                    security = SecureContainerPolicy(),
+                    flagEnvironmentVariableName = "FLAG",
+                    egressPolicy = 0
+                },
+                limits = new
+                {
+                    memoryBytes = 67_108_864,
+                    nanoCpus = 100_000_000,
+                    pidsLimit = 64
+                },
+                ttlSeconds = 300,
+                operationTimeoutSeconds = 60,
+                urlBindings = new[]
+                {
+                    new
+                    {
+                        urlTemplate = "http://{HOST}:{PORT}/",
+                        exposure = 0,
+                        containerPort = 8080
+                    }
+                },
+                flagSource = 1
+            }
+        }, JsonOptions);
+
+    private static string BuildComposeDefinition(string runtimeImage) =>
+        JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            runtime = new
+            {
+                allocation = 1,
+                definition = new
+                {
+                    kind = "compose",
+                    composeYaml = $$"""
+                        services:
+                          web:
+                            image: "{{runtimeImage}}"
+                          db:
+                            image: busybox:1.37
+                            command:
+                              - sleep
+                              - "300"
+                        """,
+                    serviceResources = new Dictionary<string, object>
+                    {
+                        ["web"] = new
+                        {
+                            memoryBytes = 67_108_864,
+                            nanoCpus = 100_000_000,
+                            pidsLimit = 64
+                        },
+                        ["db"] = new
+                        {
+                            memoryBytes = 67_108_864,
+                            nanoCpus = 100_000_000,
+                            pidsLimit = 64
+                        }
+                    },
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    flagEnvironmentVariables = new Dictionary<string, string>
+                    {
+                        ["web"] = "FLAG"
+                    },
+                    egressPolicy = 0
+                },
+                limits = new
+                {
+                    memoryBytes = 134_217_728,
+                    nanoCpus = 200_000_000,
+                    pidsLimit = 128
+                },
+                ttlSeconds = 300,
+                operationTimeoutSeconds = 60,
+                urlBindings = new[]
+                {
+                    new
+                    {
+                        urlTemplate = "http://{HOST}:{PORT}/",
+                        exposure = 0,
+                        containerPort = 8080,
+                        serviceName = "web"
+                    }
+                },
+                flagSource = 1
+            }
+        }, JsonOptions);
+
+    private static object SecureContainerPolicy() => new
+    {
+        noNewPrivileges = true,
+        readonlyRootfs = true,
+        runAsNonRoot = true,
+        capDrop = new[] { "ALL" },
+        capAdd = Array.Empty<string>()
+    };
 
     private static async Task AssertSpaDocumentAsync(
         HttpClient client,

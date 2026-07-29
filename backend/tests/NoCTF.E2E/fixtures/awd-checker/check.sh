@@ -1,14 +1,15 @@
 #!/bin/sh
 set -eu
 
-if curl --fail --silent --show-error --max-time 3 "$NOCTF_TARGET_URL" >/dev/null; then
+if wget -qO /dev/null -T 3 \
+    "http://$NOCTF_TARGET_HOST:8080/cgi-bin/health"; then
     state='Up'
 else
     state='Down'
 fi
 
-curl --fail --silent --show-error --max-time 3 \
-    -H "Authorization: Bearer $NOCTF_CALLBACK_TOKEN" \
-    -H 'Content-Type: application/json' \
-    --data "{\"state\":\"$state\"}" \
-    "$NOCTF_CALLBACK_URL" >/dev/null
+wget -qO /dev/null -T 3 \
+    --header "Authorization: Bearer $NOCTF_CALLBACK_TOKEN" \
+    --header 'Content-Type: application/json' \
+    --post-data "{\"state\":\"$state\"}" \
+    "$NOCTF_CALLBACK_URL"

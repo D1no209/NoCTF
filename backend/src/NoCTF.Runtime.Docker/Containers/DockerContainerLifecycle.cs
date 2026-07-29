@@ -577,11 +577,15 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     {
         if (request.Generation <= 0)
             throw new InvalidOperationException("A scoring checker requires a positive Runtime generation.");
-        if (!request.Environment.TryGetValue("NOCTF_CALLBACK_URL", out var callbackText)
-            || !Uri.TryCreate(callbackText, UriKind.Absolute, out var callback)
-            || callback.Scheme is not ("http" or "https"))
+        Uri? callback = null;
+        if (request.NetworkPurpose != ContainerNetworkPurpose.PersistentRuntime
+            && (!request.Environment.TryGetValue("NOCTF_CALLBACK_URL", out var callbackText)
+                || !Uri.TryCreate(callbackText, UriKind.Absolute, out callback)
+                || callback.Scheme is not ("http" or "https")))
+        {
             throw new InvalidOperationException(
                 "A scoring checker callback requires an absolute HTTP(S) callback URL.");
+        }
         var callbackContainer = await client.Containers.InspectContainerAsync(
             options.CallbackContainerName, cancellationToken);
         if (callbackContainer.Config?.Labels is null
@@ -629,12 +633,24 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             await client.Networks.ConnectNetworkAsync(network.ID, new NetworkConnectParameters
             {
                 Container = callbackContainer.ID,
-                EndpointConfig = new EndpointSettings { Aliases = [callback.Host] }
+                EndpointConfig = new EndpointSettings
+                {
+                    Aliases = callback is null ? [] : [callback.Host]
+                }
             }, cancellationToken);
         }
         await client.Networks.ConnectNetworkAsync(
             network.ID,
-            new NetworkConnectParameters { Container = checkerContainerId },
+            new NetworkConnectParameters
+            {
+                Container = checkerContainerId,
+                EndpointConfig = new EndpointSettings
+                {
+                    Aliases = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
+                        ? ["target"]
+                        : []
+                }
+            },
             cancellationToken);
     }
 

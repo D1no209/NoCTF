@@ -148,6 +148,30 @@ public sealed class RuntimeClaimFactoryTests
     }
 
     [Test]
+    public async Task Koh_container_claim_connects_the_worker_to_the_internal_control_endpoint()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        var control = new RuntimeUrlBinding(
+            "http://{HOST}:{PORT}/control",
+            RuntimeExposure.OwnerOnly,
+            ContainerPort: 8080);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.Shared,
+            new ContainerRuntimeDefinition("challenge:v1"),
+            ControlCheckUrlBinding: control);
+
+        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+            instance,
+            GameMode.Koh,
+            template,
+            "{}");
+
+        await Assert.That(claim.Definition.AllowInternalCallback).IsTrue();
+        await Assert.That(claim.Definition.InternalPorts).IsEquivalentTo([8080]);
+        await Assert.That(claim.Definition.ControlCheckUrlBinding).IsEqualTo(control);
+    }
+
+    [Test]
     public async Task Ctf_per_team_compose_targets_only_configured_services()
     {
         var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Docker);

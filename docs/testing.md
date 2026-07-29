@@ -80,12 +80,50 @@ skip；Release 的受控 Libvirt Runner 应设置该变量并使用专用 fixtur
 
 ## 端到端
 
-每种模式至少一条真实依赖流程：
+本地 E2E 使用 .NET 10 file-based app 统一编排，不依赖 PowerShell、Bash、WSL、
+固定端口或当前工作目录。入口位于 `backend/tests/e2e.cs`，默认运行四种模式的
+Full 套件：
+
+```bash
+dotnet run --file backend/tests/e2e.cs
+dotnet run --file backend/tests/e2e.cs -- --mode ctf --suite smoke
+dotnet run --file backend/tests/e2e.cs -- --mode all --suite full
+dotnet run --file backend/tests/e2e.cs -- --mode awd --keep-environment
+```
+
+`--mode` 可取 `ctf`、`awd`、`awdp`、`koh`、`all`；`--suite` 可取 `smoke`、
+`full`。编排器从自身源文件位置定位仓库，为每个模式生成唯一 Compose project、
+network、volume、镜像、Runner pool 和随机凭据，以 Docker 分配的 backend host
+port 启动 API、Worker、Runner，等待健康检查与 Runner heartbeat 后在宿主机运行
+TUnit。失败时输出 Compose 状态以及 API、Worker、Runner 日志。默认总会清理；
+`--keep-environment` 会保留现场并打印精确清理命令。
+
+API、Worker 与 Runner 的部署配置共同指定 Docker placement。题目 Definition 和
+比赛题目 Rules 均不包含 `provider` 或 `runnerPool`；Checker 只通过隔离网络的内部
+DNS 访问目标，题目也不提供 Checker target URL/port。
+
+Smoke 覆盖每种模式至少一条真实依赖流程：
 
 - CTF：注册/队伍/附件或 Runtime/Flag/血奖/Hint/重判；
 - AWD：加固/轮换/批量攻击/重复/服务 Up-Down/轮末投影；
 - AWDP：Break/Upload/Trigger/Patch/Checker/重判；
-- KoH：共享 Runtime/Control Flag/四种观测/暂停恢复。
+- KoH：共享 Runtime/Control Flag、正确/错误/不可用/超时/歧义行为、暂停恢复。
+
+Full 在模式业务流程之后还会验证 API 重启后原 JWT 有效、Redis 停止时认证回退
+PostgreSQL、Redis 恢复后 Runner heartbeat 重建，以及 PostgreSQL 重启后三进程重新
+连接。服务停止和重启由编排器负责，成功条件只通过 HTTP 与 heartbeat 判断。
+
+E2E 只通过 HTTP、排行榜、Submission、Runtime 管理 API 和 Runtime 对外行为判断
+业务结果。不查询 PostgreSQL，不使用 Docker inspect/资源列表证明业务成功。
+Runner/数据库/Wolverine 的精确持久化事实和 KoH failure code 映射继续由真实依赖
+集成测试负责。
+
+静态验收命令：
+
+```bash
+dotnet build backend/tests/e2e.cs
+dotnet build backend/tests/NoCTF.E2E/NoCTF.E2E.csproj --no-restore
+```
 
 ## CI 门槛
 
