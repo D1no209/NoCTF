@@ -5,6 +5,11 @@ import type {
 import { describe, expect, test } from 'bun:test'
 import { createI18n } from 'vue-i18n'
 import {
+  buildChallengeGitOpsAccessUpdate,
+  existingChallengeManagerIds,
+  gitOpsBotCandidates,
+} from '../src/components/admin/challenges/challengeGitOpsAccess'
+import {
   canDeleteTemplate,
   canRestoreTemplate,
   CHALLENGE_MODE,
@@ -13,6 +18,10 @@ import {
   challengeVisibilityLabelKey,
   isDeletedTemplate,
 } from '../src/components/admin/challenges/challengeTemplatePresentation'
+import {
+  PLATFORM_USER_KIND,
+  PLATFORM_USER_ROLE,
+} from '../src/components/admin/users/platformUserPresentation'
 import en from '../src/locales/en.json'
 import zhCN from '../src/locales/zh-CN.json'
 
@@ -63,6 +72,71 @@ describe('admin challenge template presentation', () => {
     expect(canDeleteTemplate({ deletedAt: null })).toBe(false)
   })
 
+  test('adds only an unassigned Organizer Bot while preserving existing Managers', () => {
+    const template = {
+      id: 'challenge-01',
+      ownerId: 'owner-01',
+      managerIds: ['manager-02', 'owner-01', 'manager-01', 'manager-01'],
+      revision: 7,
+    }
+    const users = [
+      {
+        id: 'owner-01',
+        userName: 'owner-bot',
+        kind: PLATFORM_USER_KIND.bot,
+        role: PLATFORM_USER_ROLE.organizer,
+      },
+      {
+        id: 'manager-01',
+        userName: 'assigned-bot',
+        kind: PLATFORM_USER_KIND.bot,
+        role: PLATFORM_USER_ROLE.organizer,
+      },
+      {
+        id: 'bot-02',
+        userName: 'zeta-bot',
+        kind: PLATFORM_USER_KIND.bot,
+        role: PLATFORM_USER_ROLE.organizer,
+      },
+      {
+        id: 'bot-01',
+        userName: 'alpha-bot',
+        kind: PLATFORM_USER_KIND.bot,
+        role: PLATFORM_USER_ROLE.organizer,
+      },
+      {
+        id: 'human-organizer',
+        userName: 'human',
+        kind: PLATFORM_USER_KIND.human,
+        role: PLATFORM_USER_ROLE.organizer,
+      },
+      {
+        id: 'ordinary-bot',
+        userName: 'ordinary-bot',
+        kind: PLATFORM_USER_KIND.bot,
+        role: PLATFORM_USER_ROLE.user,
+      },
+    ]
+
+    expect(existingChallengeManagerIds(template)).toEqual(['manager-01', 'manager-02'])
+    expect(gitOpsBotCandidates(users, template).map(user => user.id)).toEqual([
+      'bot-01',
+      'bot-02',
+    ])
+    expect(buildChallengeGitOpsAccessUpdate(template, 'bot-01')).toEqual({
+      challengeId: 'challenge-01',
+      managerIds: ['bot-01', 'manager-01', 'manager-02'],
+      expectedRevision: 7,
+    })
+    expect(buildChallengeGitOpsAccessUpdate(template, 'owner-01')).toBeNull()
+    expect(
+      buildChallengeGitOpsAccessUpdate({ ...template, revision: undefined }, 'bot-01'),
+    ).toBeNull()
+    expect(
+      buildChallengeGitOpsAccessUpdate({ ...template, managerIds: undefined }, 'bot-01'),
+    ).toBeNull()
+  })
+
   test.each([
     ['en', en],
     ['zh-CN', zhCN],
@@ -87,6 +161,14 @@ describe('admin challenge template presentation', () => {
       'admin.challenges.restore',
       'admin.challenges.restoreKeepsId',
       'admin.challenges.softDeleteNote',
+      'admin.challenges.gitOpsAccess',
+      'admin.challenges.gitOpsAccessTitle',
+      'admin.challenges.gitOpsAccessDescription',
+      'admin.challenges.existingManagersPreserved',
+      'admin.challenges.organizerBot',
+      'admin.challenges.grantGitOpsAccess',
+      'admin.challenges.gitOpsAccessRevisionConflict',
+      'admin.challenges.gitOpsAccessRoleNotEligible',
     ]) {
       expect(i18n.global.t(key)).not.toBe(key)
     }

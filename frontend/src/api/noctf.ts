@@ -1,6 +1,9 @@
 import type {
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
+  NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
 import { translate as tt } from '@/i18n'
@@ -27,6 +30,16 @@ export class ApiError extends Error {
     this.status = status
     this.details = details
   }
+}
+
+export interface PlatformRoleAssignmentBlockers {
+  competitionIds: string[]
+  challengeIds: string[]
+}
+
+export interface ChallengeTemplateConflict {
+  code: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode
+  userIds: string[]
 }
 
 type ApiResult<T> = {
@@ -57,6 +70,60 @@ function isEmptyObject(value: unknown) {
     !Array.isArray(value) &&
     Object.keys(value).length === 0,
   )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+function normalizedIds(value: unknown) {
+  if (!Array.isArray(value))
+    return []
+
+  return [
+    ...new Set(value.filter((id): id is string => typeof id === 'string' && id.length > 0)),
+  ].sort()
+}
+
+export function readPlatformRoleAssignmentBlockers(
+  error: unknown,
+): PlatformRoleAssignmentBlockers | null {
+  if (!(error instanceof ApiError) || error.status !== 409 || !isRecord(error.details))
+    return null
+
+  const details
+    = error.details as NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse
+  if (details.code !== 'ActiveOwnerOrManagerAssignments')
+    return null
+
+  return {
+    competitionIds: normalizedIds(details.competitionIds),
+    challengeIds: normalizedIds(details.challengeIds),
+  }
+}
+
+const challengeTemplateConflictCodes
+  = new Set<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode>([
+    'ResourceIdConflict',
+    'RevisionConflict',
+    'OwnerIncludedInManagerSet',
+    'UserNotFound',
+    'RoleNotEligible',
+  ])
+
+export function readChallengeTemplateConflict(error: unknown): ChallengeTemplateConflict | null {
+  if (!(error instanceof ApiError) || error.status !== 409 || !isRecord(error.details))
+    return null
+
+  const details
+    = error.details as NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse
+  if (!details.code || !challengeTemplateConflictCodes.has(details.code))
+    return null
+
+  return {
+    code: details.code,
+    userIds: normalizedIds(details.userIds),
+  }
 }
 
 export function apiUrl(path: string) {
@@ -491,6 +558,28 @@ export const challengeBankAdminApi = {
       tt('errors.loadChallenges'),
     )
     return response.items ?? []
+  },
+  async template(challengeId: string, includeDeleted = false): Promise<ChallengeTemplate> {
+    return unwrap(
+      await generatedSdk.adminChallengeBankGetTemplate({
+        path: { challengeId },
+        query: { includeDeleted },
+      }),
+      tt('errors.loadChallenges'),
+    )
+  },
+  async updatePermissions(
+    challengeId: string,
+    managerIds: string[],
+    expectedRevision: number,
+  ): Promise<ChallengeTemplate> {
+    return unwrap(
+      await generatedSdk.adminChallengeBankUpdatePermissions({
+        path: { challengeId },
+        body: { managerIds, expectedRevision },
+      }),
+      tt('errors.requestFailed'),
+    )
   },
   async deleteTemplate(challengeId: string): Promise<void> {
     await requireSuccess(

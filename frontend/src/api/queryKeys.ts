@@ -22,6 +22,7 @@ export const queryKeys = {
   adminUsers: ['admin-users'] as const,
   adminTeams: ['admin-teams'] as const,
   adminChallenges: ['admin-challenges'] as const,
+  adminChallenge: (id: string) => ['admin-challenge', id] as const,
   adminCollaborators: (competitionId?: string) => ['admin-collaborators', competitionId ?? 'all'] as const,
   adminContainers: ['admin-containers'] as const,
   adminPlugins: ['admin-plugins'] as const,

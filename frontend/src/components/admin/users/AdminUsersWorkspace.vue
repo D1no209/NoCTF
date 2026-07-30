@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SortingState } from '@tanstack/vue-table'
 import type { NoCtfDomainIdentityUserRole } from '@/api/generated/types.gen'
-import type { IssuedBotToken, PlatformUser } from '@/api/noctf'
+import type { IssuedBotToken, PlatformRoleAssignmentBlockers, PlatformUser } from '@/api/noctf'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -31,8 +31,9 @@ import {
 import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { platformAdminApi } from '@/api/noctf'
+import { platformAdminApi, readPlatformRoleAssignmentBlockers } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -96,6 +97,7 @@ const newBotUserName = ref('')
 
 const roleDialog = ref(false)
 const newRole = ref(String(PLATFORM_USER_ROLE.user))
+const roleAssignmentBlockers = ref<PlatformRoleAssignmentBlockers | null>(null)
 
 const issueTokenDialog = ref(false)
 const tokenLifetime = ref(String(BOT_TOKEN_LIFETIMES[BOT_TOKEN_LIFETIMES.length - 1].seconds))
@@ -138,11 +140,20 @@ const changeRoleMutation = useMutation({
     platformAdminApi.updateUserRole(id, role),
   onSuccess: (user) => {
     roleDialog.value = false
+    roleAssignmentBlockers.value = null
     replaceCachedUser(user)
     void queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers })
     toast.success(t('admin.users.roleUpdateSuccess'))
   },
-  onError: () => toast.error(t('admin.users.actionErrorRole')),
+  onError: async (error) => {
+    roleAssignmentBlockers.value = readPlatformRoleAssignmentBlockers(error)
+    await queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers })
+    toast.error(
+      roleAssignmentBlockers.value
+        ? t('admin.users.roleDowngradeBlocked')
+        : t('admin.users.actionErrorRole'),
+    )
+  },
 })
 
 const issueTokenMutation = useMutation({
@@ -201,6 +212,7 @@ function openRoleDialog(user: PlatformUser) {
 
   selectedUser.value = user
   newRole.value = String(user.role ?? PLATFORM_USER_ROLE.user)
+  roleAssignmentBlockers.value = null
   roleDialog.value = true
 }
 
@@ -223,6 +235,7 @@ function updateUserRole() {
   if (!userId || !hasRoleChange.value)
     return
 
+  roleAssignmentBlockers.value = null
   changeRoleMutation.mutate({
     id: userId,
     role: Number(newRole.value) as NoCtfDomainIdentityUserRole,
@@ -621,6 +634,37 @@ const table = useVueTable({
               {{ t('admin.users.adminRoleWarning') }}
             </p>
           </div>
+
+          <Alert v-if="roleAssignmentBlockers" variant="destructive">
+            <AlertTitle>{{ t('admin.users.roleDowngradeBlocked') }}</AlertTitle>
+            <AlertDescription class="mt-2 space-y-3">
+              <p>{{ t('admin.users.roleDowngradeBlockedHint') }}</p>
+              <div v-if="roleAssignmentBlockers.competitionIds.length" class="space-y-1">
+                <p class="font-medium">
+                  {{ t('admin.users.blockingCompetitions') }}
+                </p>
+                <code
+                  v-for="competitionId in roleAssignmentBlockers.competitionIds"
+                  :key="competitionId"
+                  class="block break-all font-mono text-xs"
+                >
+                  {{ competitionId }}
+                </code>
+              </div>
+              <div v-if="roleAssignmentBlockers.challengeIds.length" class="space-y-1">
+                <p class="font-medium">
+                  {{ t('admin.users.blockingChallenges') }}
+                </p>
+                <code
+                  v-for="challengeId in roleAssignmentBlockers.challengeIds"
+                  :key="challengeId"
+                  class="block break-all font-mono text-xs"
+                >
+                  {{ challengeId }}
+                </code>
+              </div>
+            </AlertDescription>
+          </Alert>
         </div>
         <DialogFooter>
           <Button variant="outline" @click="roleDialog = false">

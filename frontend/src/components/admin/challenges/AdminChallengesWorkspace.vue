@@ -20,6 +20,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Search,
+  ShieldCheck,
   Trash2,
 } from 'lucide-vue-next'
 import { computed, h, ref, watch } from 'vue'
@@ -56,6 +57,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useAuthStore } from '@/stores/auth'
+import AdminChallengeGitOpsAccessDialog from './AdminChallengeGitOpsAccessDialog.vue'
 import {
   canDeleteTemplate,
   canRestoreTemplate,
@@ -70,6 +73,7 @@ type LifecycleAction = 'delete' | 'restore'
 
 const { locale, t } = useI18n()
 const queryClient = useQueryClient()
+const auth = useAuthStore()
 
 const globalFilter = ref('')
 const sorting = ref<SortingState>([])
@@ -78,6 +82,9 @@ const selectedTemplate = ref<ChallengeTemplate | null>(null)
 const lifecycleAction = ref<LifecycleAction | null>(null)
 const lifecycleDialog = ref(false)
 const copiedId = ref<string | null>(null)
+const gitOpsAccessDialog = ref(false)
+const gitOpsAccessTemplate = ref<ChallengeTemplate | null>(null)
+const isAdministrator = computed(() => auth.userRole === 'Admin')
 
 const challengeTemplatesQueryKey = computed(() => [
   ...queryKeys.adminChallenges,
@@ -189,6 +196,20 @@ function onLifecycleDialogChange(open: boolean) {
     selectedTemplate.value = null
     lifecycleAction.value = null
   }
+}
+
+function openGitOpsAccessDialog(template: ChallengeTemplate) {
+  if (!isAdministrator.value || !template.id || isDeletedTemplate(template))
+    return
+
+  gitOpsAccessTemplate.value = template
+  gitOpsAccessDialog.value = true
+}
+
+function onGitOpsAccessDialogChange(open: boolean) {
+  gitOpsAccessDialog.value = open
+  if (!open)
+    gitOpsAccessTemplate.value = null
 }
 
 function modeVariant(mode: ChallengeTemplate['mode']): 'default' | 'secondary' | 'outline' {
@@ -515,6 +536,17 @@ watch([globalFilter, includeDeleted], () => table.setPageIndex(0))
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
+                    v-if="isAdministrator && !isDeletedTemplate(row.original)"
+                    :disabled="!row.original.id"
+                    @click="openGitOpsAccessDialog(row.original)"
+                  >
+                    <ShieldCheck class="mr-2 size-4" />
+                    {{ t('admin.challenges.gitOpsAccess') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator
+                    v-if="isAdministrator && !isDeletedTemplate(row.original)"
+                  />
+                  <DropdownMenuItem
                     v-if="canRestoreTemplate(row.original)"
                     @click="openLifecycleDialog(row.original, 'restore')"
                   >
@@ -631,5 +663,11 @@ watch([globalFilter, includeDeleted], () => table.setPageIndex(0))
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AdminChallengeGitOpsAccessDialog
+      :open="gitOpsAccessDialog"
+      :template="gitOpsAccessTemplate"
+      @update:open="onGitOpsAccessDialogChange"
+    />
   </div>
 </template>
