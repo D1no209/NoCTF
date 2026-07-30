@@ -23,10 +23,10 @@ public sealed class SaveChallengeFlagValidator : Validator<SaveChallengeFlagRequ
 {
     public SaveChallengeFlagValidator()
     {
-        RuleFor(request => request.Flag).NotEmpty().MaximumLength(4096);
         RuleFor(request => request.Id)
-            .NotEqual(Guid.Empty)
-            .When(request => request.Id is not null);
+            .Must(id => id is null || id != Guid.Empty)
+            .WithMessage("Id cannot be empty when supplied.");
+        RuleFor(request => request.Flag).NotEmpty().MaximumLength(4096);
         RuleFor(request => request.SpecificationKind)
             .IsInEnum()
             .When(request => request.SpecificationKind is not null);
@@ -39,12 +39,12 @@ internal static class SaveChallengeFlagMapping
         SaveChallengeFlagRequest request,
         ChallengeFlagScope scope,
         Guid? flagId,
+        bool isCreate,
         DateTimeOffset now) =>
         new(
-            scope, flagId, request.TeamId, request.Flag,
+            scope, flagId, isCreate, request.TeamId, request.Flag,
             request.SpecificationKind, request.SpecificationId,
-            request.ValidStart, request.ValidUntil, now,
-            flagId is null ? request.Id : null);
+            request.ValidStart, request.ValidUntil, now);
 }
 
 public sealed class CreateChallengeFlagEndpoint(
@@ -71,7 +71,11 @@ public sealed class CreateChallengeFlagEndpoint(
         var challengeId = Route<Guid>("challengeId");
         var result = await flags.SaveAsync(
             SaveChallengeFlagMapping.ToCommand(
-                request, ChallengeFlagScope.Template(challengeId), null, DateTimeOffset.UtcNow),
+                request,
+                ChallengeFlagScope.Template(challengeId),
+                request.Id,
+                isCreate: true,
+                DateTimeOffset.UtcNow),
             user.UserId,
             user.IsAdministrator,
             ct);
@@ -79,9 +83,12 @@ public sealed class CreateChallengeFlagEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
+                statusCode: result.ErrorCode == "resource_id_conflict"
+                    ? StatusCodes.Status409Conflict
+                    : StatusCodes.Status400BadRequest,
                 title: "Flag was not created.",
-                detail: result.ErrorMessage);
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
         var response = ChallengeFlagMapping.ToResponse(result.Value!);
         return TypedResults.Created($"/api/v1/admin/challenges/{challengeId}/flags/{response.Id}", response);
     }

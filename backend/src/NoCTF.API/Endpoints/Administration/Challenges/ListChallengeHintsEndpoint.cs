@@ -12,9 +12,9 @@ public sealed record ChallengeHintResponse(
     string Content,
     long Cost,
     DateTimeOffset? PublishedAt,
+    DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt,
-    DateTimeOffset? DeletedAt);
+    DateTimeOffset UpdatedAt);
 
 public sealed record ChallengeHintListResponse(IReadOnlyList<ChallengeHintResponse> Items);
 
@@ -23,11 +23,13 @@ internal static class ChallengeHintMapping
     public static ChallengeHintResponse ToResponse(ChallengeHintView view) =>
         new(
             view.Id, view.CompetitionChallengeId, view.Content, view.Cost,
-            view.PublishedAt, view.CreatedAt, view.UpdatedAt, view.DeletedAt);
+            view.PublishedAt, view.DeletedAt, view.CreatedAt, view.UpdatedAt);
 }
 
 public sealed class ListChallengeHintsRequest
 {
+    public Guid CompetitionId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
     [QueryParam]
     public bool IncludeDeleted { get; set; }
 }
@@ -60,9 +62,9 @@ public sealed class ListChallengeHintsEndpoint(
             return TypedResults.Forbid();
         var items = await hints.ListAsync(
             competitionId,
-            Route<Guid>("competitionChallengeId"),
-            ct,
-            request.IncludeDeleted);
+            request.CompetitionChallengeId,
+            request.IncludeDeleted,
+            ct);
         return items is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(new ChallengeHintListResponse(

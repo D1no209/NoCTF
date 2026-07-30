@@ -38,6 +38,7 @@ public sealed class UpdateChallengeFlagEndpoint(
                 request,
                 ChallengeFlagScope.Competition(competitionId, Route<Guid>("competitionChallengeId")),
                 Route<Guid>("flagId"),
+                isCreate: false,
                 DateTimeOffset.UtcNow),
             actorId: null,
             isAdministrator: true,

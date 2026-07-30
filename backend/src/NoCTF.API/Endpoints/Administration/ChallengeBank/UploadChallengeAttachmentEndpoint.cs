@@ -19,8 +19,8 @@ public sealed class UploadChallengeAttachmentValidator : Validator<UploadChallen
     {
         RuleFor(request => request.File).NotNull();
         RuleFor(request => request.Id)
-            .NotEqual(Guid.Empty)
-            .When(request => request.Id is not null);
+            .Must(id => id is null || id != Guid.Empty)
+            .WithMessage("Id cannot be empty when supplied.");
     }
 }
 
@@ -51,19 +51,22 @@ public sealed class UploadChallengeAttachmentEndpoint(
             Route<Guid>("challengeId"),
             user.UserId,
             user.IsAdministrator,
+            request.Id,
             request.File.FileName,
             request.File.ContentType,
             content,
-            request.Id,
             DateTimeOffset.UtcNow,
             ct);
         if (result.ErrorCode == "challenge_not_found")
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
+                statusCode: result.ErrorCode == "resource_id_conflict"
+                    ? StatusCodes.Status409Conflict
+                    : StatusCodes.Status400BadRequest,
                 title: "Attachment was not uploaded.",
-                detail: result.ErrorMessage);
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
         var response = ChallengeAttachmentMapping.ToResponse(result.Value!);
         return TypedResults.Created(
             $"/api/v1/admin/challenges/{response.ChallengeId}/attachments/{response.Id}",

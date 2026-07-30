@@ -17,9 +17,8 @@ public sealed class RestoreChallengeAttachmentEndpoint(
         Description(builder => builder.WithName("AdminChallengeBankRestoreAttachment"));
         Summary(summary =>
         {
-            summary.Summary = "Restores a soft-deleted challenge attachment.";
-            summary.Description =
-                "Restores immutable attachment metadata and its retained object reference.";
+            summary.Summary = "Restores a deleted challenge attachment.";
+            summary.Description = "Restores attachment metadata while preserving its stored object and stable ID.";
         });
     }
 

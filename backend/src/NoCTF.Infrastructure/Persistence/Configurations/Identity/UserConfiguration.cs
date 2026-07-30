@@ -18,5 +18,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.Role).HasConversion<short>();
         builder.HasIndex(user => user.NormalizedUserName).IsUnique();
         builder.HasIndex(user => user.NormalizedEmail).IsUnique();
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_users_bot_role",
+            "\"kind\" <> 1 OR \"role\" IN (0, 1)"));
     }
 }

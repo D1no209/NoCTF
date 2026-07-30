@@ -660,7 +660,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_users_normalized_user_name");
 
-                    b.ToTable("users", (string)null);
+                    b.ToTable("users", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_users_bot_role", "\"kind\" <> 1 OR \"role\" IN (0, 1)");
+                        });
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Notifications.Notification", b =>

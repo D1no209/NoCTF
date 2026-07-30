@@ -1,8 +1,14 @@
 using NoCTF.Application.Common;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.Application.Authentication.Account;
 
-public sealed record AuthenticatedUser(Guid Id, string UserName, string Role, int TokenVersion);
+public sealed record AuthenticatedUser(
+    Guid Id,
+    string UserName,
+    UserRole Role,
+    UserKind Kind,
+    int TokenVersion);
 public sealed record IssuedAccessToken(string Token, DateTimeOffset ExpiresAt);
 public sealed record IssuedRefreshToken(string Token, DateTimeOffset ExpiresAt);
 public sealed record RefreshTokenPrincipal(Guid UserId, int TokenVersion);
@@ -10,7 +16,8 @@ public sealed record UserProfile(
     Guid Id,
     string UserName,
     string Email,
-    string Role,
+    UserRole Role,
+    UserKind Kind,
     bool EmailVerified);
 public enum CreateUserState { Created, UserNameConflict, EmailConflict }
 
@@ -41,8 +48,10 @@ public interface IUserAuthenticationStore
 
 public interface IAccessTokenIssuer
 {
-    IssuedAccessToken Issue(AuthenticatedUser user);
-    IssuedAccessToken Issue(AuthenticatedUser user, TimeSpan lifetime);
+    IssuedAccessToken Issue(
+        AuthenticatedUser user,
+        DateTimeOffset now,
+        TimeSpan? lifetime = null);
     IssuedRefreshToken IssueRefresh(AuthenticatedUser user);
     RefreshTokenPrincipal? ValidateRefresh(string token);
 }

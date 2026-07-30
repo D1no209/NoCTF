@@ -12,8 +12,8 @@ public sealed record ChallengeAttachmentResponse(
     string ContentType,
     long ByteLength,
     string Sha256,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? DeletedAt);
+    DateTimeOffset? DeletedAt,
+    DateTimeOffset CreatedAt);
 
 public sealed record ChallengeAttachmentListResponse(IReadOnlyList<ChallengeAttachmentResponse> Items);
 
@@ -27,12 +27,13 @@ internal static class ChallengeAttachmentMapping
             view.ContentType,
             view.ByteLength,
             view.Sha256,
-            view.CreatedAt,
-            view.DeletedAt);
+            view.DeletedAt,
+            view.CreatedAt);
 }
 
 public sealed class ListChallengeAttachmentsRequest
 {
+    public Guid ChallengeId { get; set; }
     [QueryParam]
     public bool IncludeDeleted { get; set; }
 }
@@ -40,7 +41,8 @@ public sealed class ListChallengeAttachmentsRequest
 public sealed class ListChallengeAttachmentsEndpoint(
     ManageChallengeAttachments attachments,
     IUserContext user)
-    : Endpoint<ListChallengeAttachmentsRequest, Results<Ok<ChallengeAttachmentListResponse>, NotFound>>
+    : Endpoint<ListChallengeAttachmentsRequest,
+        Results<Ok<ChallengeAttachmentListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -59,7 +61,7 @@ public sealed class ListChallengeAttachmentsEndpoint(
         CancellationToken ct)
     {
         var items = await attachments.ListAsync(
-            Route<Guid>("challengeId"),
+            request.ChallengeId,
             user.UserId,
             user.IsAdministrator,
             request.IncludeDeleted,

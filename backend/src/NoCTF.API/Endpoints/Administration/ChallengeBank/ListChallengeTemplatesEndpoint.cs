@@ -7,10 +7,16 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed record ChallengeTemplateListResponse(IReadOnlyList<ChallengeTemplateResponse> Items);
 
+public sealed class ListChallengeTemplatesRequest
+{
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
+}
+
 public sealed class ListChallengeTemplatesEndpoint(
     ListChallengeTemplates list,
     IUserContext user)
-    : EndpointWithoutRequest<Ok<ChallengeTemplateListResponse>>
+    : Endpoint<ListChallengeTemplatesRequest, Ok<ChallengeTemplateListResponse>>
 {
     public override void Configure()
     {
@@ -24,7 +30,13 @@ public sealed class ListChallengeTemplatesEndpoint(
         });
     }
 
-    public override async Task<Ok<ChallengeTemplateListResponse>> ExecuteAsync(CancellationToken ct) =>
+    public override async Task<Ok<ChallengeTemplateListResponse>> ExecuteAsync(
+        ListChallengeTemplatesRequest request,
+        CancellationToken ct) =>
         TypedResults.Ok(ChallengeTemplateMapper.ToListResponse(
-            await list.ExecuteAsync(user.UserId, user.IsAdministrator, ct)));
+            await list.ExecuteAsync(
+                user.UserId,
+                user.IsAdministrator,
+                request.IncludeDeleted,
+                ct)));
 }

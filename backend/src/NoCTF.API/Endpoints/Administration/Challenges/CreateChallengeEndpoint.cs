@@ -21,10 +21,10 @@ public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
 {
     public CreateChallengeValidator()
     {
-        RuleFor(request => request.ChallengeId).NotEmpty();
         RuleFor(request => request.Id)
-            .NotEqual(Guid.Empty)
-            .When(request => request.Id is not null);
+            .Must(id => id is null || id != Guid.Empty)
+            .WithMessage("Id cannot be empty when supplied.");
+        RuleFor(request => request.ChallengeId).NotEmpty();
         RuleFor(request => request.BaseScore).GreaterThanOrEqualTo(0);
         RuleFor(request => request.Order).GreaterThanOrEqualTo(0);
     }
@@ -60,22 +60,23 @@ public sealed class CreateChallengeEndpoint(
             return TypedResults.Forbid();
 
         var result = await create.ExecuteAsync(new CreateCompetitionChallengeCommand(
+            request.Id,
             competitionId,
             request.ChallengeId,
             request.BaseScore,
             request.Order,
-            DateTimeOffset.UtcNow,
-            request.Id), ct);
+            DateTimeOffset.UtcNow), ct);
         if (result.ErrorCode is "competition_not_found" or "challenge_template_not_found")
             return TypedResults.NotFound();
         if (!result.Succeeded)
         {
             return TypedResults.Problem(
-                statusCode: result.ErrorCode == "challenge_order_conflict"
+                statusCode: result.ErrorCode is "challenge_order_conflict" or "resource_id_conflict"
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
                 title: "Challenge was not created.",
-                detail: result.ErrorMessage);
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
         }
 
         var response = ChallengeMapper.ToResponse(result.Value!);

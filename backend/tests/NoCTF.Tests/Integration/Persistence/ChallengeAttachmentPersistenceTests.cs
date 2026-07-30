@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Challenges.Attachments;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Identity;
@@ -72,7 +73,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                 now,
                 cancellationToken);
 
-            await Assert.That(added).IsTrue();
+            await Assert.That(added).IsEqualTo(AddChallengeAttachmentState.Added);
             db.ChangeTracker.Clear();
             var attachment = await db.Set<ChallengeAttachment>()
                 .SingleAsync(item => item.Id == attachmentId, cancellationToken);

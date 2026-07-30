@@ -50,7 +50,7 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
         return TypedResults.Ok(new RefreshTokenResponse(
             result.Value.UserId,
             result.Value.UserName,
-            result.Value.Role,
+            result.Value.Role.ToString(),
             result.Value.AccessToken,
             result.Value.AccessTokenExpiresAt));
     }

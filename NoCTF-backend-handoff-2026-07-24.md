@@ -938,6 +938,88 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   最终无 domain、只有原有 inactive `default` network。当前本地 `deploy` 六服务继续
   运行，API 与 Runner healthy，未被本轮测试重启或替换。
 
+### 6.17 `origin/main` 后端整合（2026-07-31，按用户要求暂停）
+
+本节是下一位协作者必须优先阅读的最新状态。用户要求先整合协作者更新后的 `main`，
+完成后端第一阶段并本地提交；随后在全套测试运行中途明确要求暂停，写清 handoff 后交接。
+因此不得把本节记录为“完整门禁已通过”，也不得自行继续部署、GitOps 实机演练或前端功能
+整合。
+
+#### 已整合的来源和取舍
+
+- 协作者的 `origin/main` 为 `1687acbd6c81944cbad2672698b3b3c1002c98da`（
+  `feat: add bot identities and restore APIs`）；本地 GitOps 后端基线为 `0a664a8`，后续
+  修正提交为 `94fbcfb`。两边从 `a186d5f` 分叉，自动合并预演有 39 个冲突，因此在隔离
+  worktree 的 `codex/backend-main-integration` 分支执行显式合并和逐项复核，没有用覆盖式
+  reset。
+- 采用协作者 `main` 的稳定资源 ID、`includeDeleted`、精确 restore、Bot identity 和统一
+  `ManagePlatform` / `PlatformAdministrationStore` 实现；删除本地分支上功能重复的
+  `Administration/Bots` 应用与基础设施实现，避免形成两套 Bot 业务入口。
+- Bot 被收紧为 GitOps 专用 Organizer 身份：用户名只允许 3～64 个 ASCII 字母、数字、
+  `_`、`-`；只允许 `Organizer`；Access JWT lifetime 为 60～31,536,000 秒；普通角色更新
+  也不能把 Bot 改成其他角色。Bot 仍无密码登录和 refresh token。
+- Challenge template create/update 的 `Mode`、`Visibility`，以及 Bot create 的 `Role`
+  在 API 边界接受文档所用的 enum 名称；为兼容已生成或已有调用方仍接受正确的旧数字值。
+  OpenAPI 明确发布字符串 enum。对应 protocol tests 已加入，GitOps 模板无需把
+  `Ctf`、`Private`、`Organizer` 改成数字。
+- 保留用户已确认的 AWDP revision fence：每次 Fix 创建全新的即时目标，并固化
+  Competition configuration、CompetitionChallenge、Challenge definition 三个 revision；
+  任一 revision 变化都把在途结果标记为 `Superseded` / `PlatformFailed`，调度目标清理，
+  不产生 scoring event，也不自动重跑。
+- 修复合并后真实 PostgreSQL 测试暴露的 EF 翻译问题：
+  `ChallengeBankStore` 在 projection 前过滤，`ChallengeManagementStore` 在 projection
+  前排序。GitOps persistence contract 已适配协作者的新 command/result 结构。
+- migration 全程由 EF CLI 管理。最终基线为
+  `20260729165305_InitialBaseline`，AWDP 增量为
+  `20260730162036_AddAwdpTargetRevisionFence`；重复的 Bot migration 和旧 AWDP migration
+  已通过 EF CLI 移除后重新生成，没有手改 migration 或 snapshot。
+- CI 的 SDK 与 `global.json` 对齐为 .NET SDK `10.0.300`；OpenAPI 启动探针从不存在的
+  `/api/health` 修正为 `/health`，循环结束后增加一次 fail-fast health 请求，避免 API
+  未启动时继续生成客户端。
+
+#### 已完成验证
+
+- 最终源码的 Release solution build：0 warning、0 error。
+- 合并后的 non-Integration 在最后一次协议小修前为 377/377 passed；新增 Bot protocol
+  test 已在随后的 Release build 中成功编译。下一位必须重跑完整 non-Integration，不能
+  沿用 377 作为最终数量。
+- 定向真实依赖测试已通过：Bot authentication 1/1、GitOps persistence contract 1/1、
+  AWDP Fix result persistence 2/2。
+- EF `has-pending-model-changes` 在最终 migration 生成后通过；最后一次 Bot JSON converter
+  修改不涉及数据模型。
+- 最终 OpenAPI 两份后端 artifact 已重新导出且 SHA-256 相同；生成的 TypeScript client
+  已刷新。`bun run build` 通过。
+- 一次把测试放在普通 SDK 容器内的 Integration 尝试得到 48 passed、4 failed、2 skipped；
+  4 个失败全部是测试宿主不带 Docker CLI或容器内 `localhost` 无法访问宿主随机端口，
+  不能作为代码失败或最终门禁结果。随后已改在 WSL 原生文件系统和其完整 Docker/.NET
+  工具链运行。
+
+#### 用户要求暂停时的状态
+
+- WSL 原生目录中的完整 `dotnet test backend/NoCTF.slnx` 已运行约三分钟，尚未产生失败
+  输出或最终摘要时，用户要求立即暂停。测试进程已终止，Testcontainers/Ryuk 临时容器已
+  退出；不得宣称完整测试通过。下一位应从干净的 WSL 原生副本重新跑完门禁。
+- 没有使用本轮整合源码重建 `deploy-*`，没有删除或修改现有部署数据，没有执行 GitOps
+  apply/reapply/restore 实机演练。现有六服务仍是整合前镜像。
+- Frontend 只为 OpenAPI drift 做了客户端再生成与编译验证；Bot、稳定 ID、restore 和
+  GitOps 管理 UI 尚未做功能整合，协作者 Frontend 分支也尚未合并。
+- 没有推送、没有 PR、没有生产部署。本节对应工作只允许形成一个本地提交。
+- 主工作区原有的以下用户文件必须继续保护，不能混入后端整合提交：
+  `WolverineTransactionalMessageOutbox.cs`、`backend/src/NoCTF.Runner/Properties/`、
+  `deploy/docker-compose.local-ports.yml`、
+  `frontend/src/composables/useInstanceOperationState.ts`、
+  `frontend/src/lib/queryClient.ts`、
+  `frontend/tests/useInstanceOperationState.test.ts` 和 `scripts/`。
+
+#### 下一位协作者的起点
+
+1. 先确认当前本地整合提交和 `git status`，保护上列用户文件；不要重复合并 `main`。
+2. 在 WSL 原生文件系统重跑 Release build、完整 non-Integration、完整 Integration、
+   analyzer、EF pending model、OpenAPI/client drift 和 `git diff --check`。
+3. 只有上述门禁完整通过后，才可在用户再次授权时重建本地 deploy 并进行真实 Bot +
+   GitOps apply/reapply/restore；当前 handoff 不授权自动部署。
+4. 前端功能整合仍是独立后续阶段。推送继续等待用户明确指令。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；

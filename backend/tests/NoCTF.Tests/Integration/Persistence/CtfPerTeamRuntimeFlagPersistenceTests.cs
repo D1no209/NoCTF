@@ -255,6 +255,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
         {
             Id = challengeId,
             OwnerId = ownerId,
+            Mode = GameMode.Ctf,
             Title = title,
             DefinitionJson = configurationJson,
             CreatedAt = now,
@@ -270,8 +271,8 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             RulesJson = JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
                     CtfChallengeConfiguration.CurrentSchemaVersion,
-                    Points: null,
-                    BloodRewards: null),
+                    null,
+                    null),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = now
         });

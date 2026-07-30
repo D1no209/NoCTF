@@ -1,8 +1,8 @@
 namespace NoCTF.Domain.Identity;
 
-/// <summary>Defines whether an identity can use interactive authentication.</summary>
-public enum UserKind
+/// <summary>Distinguishes interactive people from non-interactive automation identities.</summary>
+public enum UserKind : short
 {
-    Human,
-    Bot
+    Human = 0,
+    Bot = 1
 }

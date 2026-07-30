@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260729115809_InitialBaseline")]
-    partial class InitialBaseline
+    [Migration("20260730162036_AddAwdpTargetRevisionFence")]
+    partial class AddAwdpTargetRevisionFence
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -613,6 +613,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("email_verified_at");
 
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -659,7 +663,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_users_normalized_user_name");
 
-                    b.ToTable("users", (string)null);
+                    b.ToTable("users", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_users_bot_role", "\"kind\" <> 1 OR \"role\" IN (0, 1)");
+                        });
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Notifications.Notification", b =>
@@ -863,6 +870,18 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<short>("RuntimeProvider")
                         .HasColumnType("smallint")
                         .HasColumnName("runtime_provider");
+
+                    b.Property<int>("SourceChallengeDefinitionRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_challenge_definition_revision");
+
+                    b.Property<int>("SourceCompetitionChallengeRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_competition_challenge_revision");
+
+                    b.Property<int>("SourceCompetitionConfigurationRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_competition_configuration_revision");
 
                     b.Property<short>("State")
                         .HasColumnType("smallint")

@@ -7,12 +7,12 @@ using NoCTF.Domain.Competitions;
 namespace NoCTF.Application.Challenges.Management;
 
 public sealed record CreateCompetitionChallengeCommand(
+    Guid? CompetitionChallengeId,
     Guid CompetitionId,
     Guid ChallengeId,
     long BaseScore,
     int Order,
-    DateTimeOffset CreatedAt,
-    Guid? Id = null);
+    DateTimeOffset CreatedAt);
 
 public sealed record UpdateCompetitionChallengeCommand(
     Guid CompetitionId,
@@ -34,9 +34,9 @@ public sealed record ChallengeView(
     int Order,
     bool IsPublished,
     int Revision,
+    DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt,
-    DateTimeOffset? DeletedAt);
+    DateTimeOffset UpdatedAt);
 
 public enum ChallengeMutationFailure
 {
@@ -44,6 +44,7 @@ public enum ChallengeMutationFailure
     TemplateNotFound,
     TemplateModeMismatch,
     ChallengeNotFound,
+    ResourceIdConflict,
     ChallengeOrderConflict,
     RevisionConflict
 }
@@ -95,6 +96,7 @@ internal static class ChallengeMutationFailureProtocol
         ChallengeMutationFailure.TemplateNotFound => "challenge_template_not_found",
         ChallengeMutationFailure.TemplateModeMismatch => "challenge_template_mode_mismatch",
         ChallengeMutationFailure.ChallengeNotFound => "competition_challenge_not_found",
+        ChallengeMutationFailure.ResourceIdConflict => "resource_id_conflict",
         ChallengeMutationFailure.ChallengeOrderConflict => "challenge_order_conflict",
         ChallengeMutationFailure.RevisionConflict => "revision_conflict",
         _ => "challenge_conflict"
@@ -111,10 +113,6 @@ public sealed class CreateChallenge(
     {
         if (command.ChallengeId == Guid.Empty)
             return OperationResult<ChallengeView>.Failure("invalid_challenge_id", "ChallengeId is required.");
-        if (command.Id == Guid.Empty)
-            return OperationResult<ChallengeView>.Failure(
-                "invalid_competition_challenge_id",
-                "Id must be omitted or contain a non-empty UUID.");
         if (command.BaseScore < 0)
             return OperationResult<ChallengeView>.Failure("invalid_base_score", "BaseScore cannot be negative.");
         if (command.Order < 0)

@@ -20,10 +20,10 @@ public sealed class SaveChallengeHintValidator : Validator<SaveChallengeHintRequ
 {
     public SaveChallengeHintValidator()
     {
-        RuleFor(request => request.Content).NotEmpty();
         RuleFor(request => request.Id)
-            .NotEqual(Guid.Empty)
-            .When(request => request.Id is not null);
+            .Must(id => id is null || id != Guid.Empty)
+            .WithMessage("Id cannot be empty when supplied.");
+        RuleFor(request => request.Content).NotEmpty();
         RuleFor(request => request.Cost).GreaterThanOrEqualTo(0);
     }
 }
@@ -56,15 +56,18 @@ public sealed class CreateChallengeHintEndpoint(
             return TypedResults.Forbid();
         var challengeId = Route<Guid>("competitionChallengeId");
         var result = await hints.SaveAsync(new(
-            competitionId, challengeId, null, request.Content, request.Cost,
-            request.PublishedAt, DateTimeOffset.UtcNow, request.Id), ct);
+            competitionId, challengeId, request.Id, true, request.Content, request.Cost,
+            request.PublishedAt, DateTimeOffset.UtcNow), ct);
         if (result.ErrorCode == "hint_not_found")
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
+                statusCode: result.ErrorCode == "resource_id_conflict"
+                    ? StatusCodes.Status409Conflict
+                    : StatusCodes.Status400BadRequest,
                 title: "Hint was not created.",
-                detail: result.ErrorMessage);
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
         var response = ChallengeHintMapping.ToResponse(result.Value!);
         return TypedResults.Created(
             $"/api/v1/admin/competitions/{competitionId}/challenges/{challengeId}/hints/{response.Id}",

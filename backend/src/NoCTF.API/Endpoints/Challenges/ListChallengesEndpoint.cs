@@ -25,7 +25,8 @@ public sealed class ListChallengesEndpoint(ListChallenges list) : Endpoint<ListC
         var items = await list.ExecuteAsync(
             Route<Guid>("competitionId"),
             includeUnpublished: false,
-            ct: ct);
+            includeDeleted: false,
+            ct);
         return TypedResults.Ok(ChallengeMapper.ToListResponse(items));
     }
 }

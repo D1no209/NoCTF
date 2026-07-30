@@ -17,9 +17,8 @@ public sealed class RestoreChallengeFlagEndpoint(
         Description(builder => builder.WithName("AdminChallengeBankRestoreFlag"));
         Summary(summary =>
         {
-            summary.Summary = "Restores a soft-deleted template flag.";
-            summary.Description =
-                "Restores protected static flag material within its original template scope.";
+            summary.Summary = "Restores a deleted template flag.";
+            summary.Description = "Restores a soft-deleted template-scoped static flag by stable ID.";
         });
     }
 
@@ -31,6 +30,7 @@ public sealed class RestoreChallengeFlagEndpoint(
             Route<Guid>("flagId"),
             user.UserId,
             user.IsAdministrator,
+            DateTimeOffset.UtcNow,
             ct);
         return result.Succeeded ? TypedResults.NoContent() : TypedResults.NotFound();
     }

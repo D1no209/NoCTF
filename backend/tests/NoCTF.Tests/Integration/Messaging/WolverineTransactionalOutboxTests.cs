@@ -445,6 +445,7 @@ public sealed class WolverineTransactionalOutboxTests
                 {
                     Id = challengeId,
                     OwnerId = ownerId,
+                    Mode = GameMode.Awd,
                     Title = "AWD outbox challenge",
                     DefinitionJson = System.Text.Json.JsonSerializer.Serialize(
                         new AwdChallengeConfiguration(

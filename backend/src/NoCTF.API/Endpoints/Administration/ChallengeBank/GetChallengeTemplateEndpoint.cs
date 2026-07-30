@@ -7,6 +7,7 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class GetChallengeTemplateRequest
 {
+    public Guid ChallengeId { get; set; }
     [QueryParam]
     public bool IncludeDeleted { get; set; }
 }
@@ -33,7 +34,7 @@ public sealed class GetChallengeTemplateEndpoint(
         CancellationToken ct)
     {
         var result = await get.ExecuteAsync(
-            Route<Guid>("challengeId"),
+            request.ChallengeId,
             user.UserId,
             user.IsAdministrator,
             request.IncludeDeleted,

@@ -9,6 +9,9 @@ public sealed class OpenApiPlatformAdministrationStore : IPlatformAdministration
         Task.FromResult<IReadOnlyList<PlatformUserView>>([]);
     public Task<PlatformUserView?> FindUserAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult<PlatformUserView?>(null);
+    public Task<CreateBotResult> CreateBotAsync(
+        string userName, UserRole role, DateTimeOffset now, CancellationToken cancellationToken) =>
+        Task.FromResult(new CreateBotResult(CreateBotState.UserNameConflict));
     public Task<PlatformUserView?> UpdateRoleAsync(
         Guid userId, UserRole role, DateTimeOffset now, CancellationToken cancellationToken) =>
         Task.FromResult<PlatformUserView?>(null);
