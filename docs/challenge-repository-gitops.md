@@ -205,6 +205,8 @@ JWT 只在签发响应中返回一次。NoCTF 不保存完整 JWT。管理员撤
 
 平台管理员可在 `/admin/users` 查看 Human/Bot 类型、Role 和 TokenVersion，创建固定为 Organizer 的 Bot、按受控有效期签发一次性显示的 Access JWT，以及使某个身份的全部现有令牌失效。关闭令牌对话框后，前端必须同时清除显示状态和请求缓存中的完整 JWT。
 
+题库管理者可在 `/admin/challenges` 以稳定 UUID、Revision、可见性和活跃比赛引用数核对 GitOps 清单，并切换查看软删除模板。Delete 和 Restore 必须作用于同一 UUID；仍被活跃比赛引用的模板不得从界面发起删除。
+
 建议一场比赛创建一个专用 Bot，并只把该 Bot 加入该 Competition 的 `ManagerIds`。仓库保存：
 
 比赛 GitOps Bot 使用 `UserRole.Organizer`，因为 Competition Owner/Manager 必须是 Organizer 或 Administrator。它不需要也不应拥有平台 Administrator 角色。

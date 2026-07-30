@@ -1,4 +1,5 @@
 import type {
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
@@ -476,6 +477,36 @@ export const penetrationAdminApi = {
     return unwrap(await sdk.noCtfapiEndpointsAdminDestroyPenetrationAdminInstanceEndpoint({
       path: { competitionId, instanceId },
     }), tt('errors.destroyInstance'))
+  },
+}
+
+export type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
+
+export const challengeBankAdminApi = {
+  async templates(includeDeleted: boolean): Promise<ChallengeTemplate[]> {
+    const response = unwrap(
+      await generatedSdk.adminChallengeBankListTemplates({
+        query: { includeDeleted },
+      }),
+      tt('errors.loadChallenges'),
+    )
+    return response.items ?? []
+  },
+  async deleteTemplate(challengeId: string): Promise<void> {
+    await requireSuccess(
+      generatedSdk.adminChallengeBankDeleteTemplate({
+        path: { challengeId },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async restoreTemplate(challengeId: string): Promise<void> {
+    await requireSuccess(
+      generatedSdk.adminChallengeBankRestoreTemplate({
+        path: { challengeId },
+      }),
+      tt('errors.requestFailed'),
+    )
   },
 }
 
