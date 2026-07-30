@@ -96,15 +96,35 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+            return null;
         var entity = await db.Competitions.SingleOrDefaultAsync(competition =>
             competition.Id == competitionId &&
             (isAdministrator || competition.OwnerId == actorId), ct);
         if (entity is null || !await db.Users.AnyAsync(user => user.Id == ownerId, ct))
             return null;
+        var previousOwnerId = entity.OwnerId;
         entity.OwnerId = ownerId;
-        entity.ManagerIds = entity.ManagerIds.Where(id => id != ownerId).ToArray();
+        entity.ManagerIds = entity.ManagerIds
+            .Append(previousOwnerId)
+            .Where(id => id != ownerId)
+            .Distinct()
+            .Order()
+            .ToArray();
+        entity.JudgeIds = entity.JudgeIds
+            .Where(id => id != ownerId)
+            .Distinct()
+            .Order()
+            .ToArray();
+        entity.ObserverIds = entity.ObserverIds
+            .Where(id => id != ownerId)
+            .Distinct()
+            .Order()
+            .ToArray();
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return Map(entity);
     }
 

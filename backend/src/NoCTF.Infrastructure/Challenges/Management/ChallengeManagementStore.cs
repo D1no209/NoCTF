@@ -2,6 +2,7 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Domain.Challenges;
+using NoCTF.Infrastructure.Challenges;
 using Npgsql;
 
 namespace NoCTF.Infrastructure.Challenges.Management;
@@ -22,6 +23,7 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
+        await ChallengeWriteLock.AcquireAsync(db, command.ChallengeId, ct);
         var competitionMode = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == command.CompetitionId)
             .Select(competition => competition.Mode)
@@ -154,6 +156,13 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
             (restore ? item.DeletedAt != null : item.DeletedAt == null), ct);
         if (entity is null)
             return ChallengeMutationFailure.ChallengeNotFound;
+        if (restore)
+        {
+            await ChallengeWriteLock.AcquireAsync(db, entity.ChallengeId, ct);
+            if (!await db.Challenges.AsNoTracking()
+                    .AnyAsync(challenge => challenge.Id == entity.ChallengeId, ct))
+                return ChallengeMutationFailure.TemplateNotFound;
+        }
 
         entity.DeletedAt = restore ? null : now;
         entity.Revision = checked(entity.Revision + 1);
