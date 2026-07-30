@@ -38,6 +38,7 @@ public static class ServiceRegistration
             options.EnableJWTBearerAuth = false;
             options.DocumentSettings = settings =>
             {
+                settings.SchemaSettings.ResolveExternalXmlDocumentation = false;
                 settings.AddAuth("Bearer", new OpenApiSecurityScheme
                 {
                     Type = OpenApiSecuritySchemeType.Http,
