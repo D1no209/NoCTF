@@ -68,36 +68,6 @@ interface CompetitionDto {
   awdpFixTimeoutSeconds?: number | null
 }
 
-interface ChallengeHintDto {
-  id?: string
-  content: string
-  displayOrder?: number
-}
-
-interface CompetitionChallengeDto {
-  id: string
-  templateId?: string
-  title: string
-  description?: string
-  descriptionFormat: string
-  typeId: string
-  direction: string
-  deploymentType?: string | number
-  exposedPort?: number | null
-  flagPrefix?: string
-  flagEnvironmentVariable?: string
-  pointsConfig: PointsConfigDto
-  difficultyCoefficient: number
-  enableBloodBonus: boolean
-  awdpAttackScorePerRound?: number | null
-  awdpDefenseScorePerRound?: number | null
-  awdpMaxAttackAttempts?: number | null
-  awdpMaxDefenseAttempts?: number | null
-  awdpFixEntry?: string | null
-  awdpFixTimeoutSeconds?: number | null
-  hints: ChallengeHintDto[]
-}
-
 interface CompetitionTeamDto {
   id: string
   name: string
@@ -265,11 +235,6 @@ const { data: competition, isLoading: loadingCompetition } = useQuery({
   queryFn: () => adminApi.competition<CompetitionDto>(competitionId.value),
 })
 
-const { data: competitionChallenges, isLoading: loadingChallenges } = useQuery({
-  queryKey: computed(() => queryKeys.adminCompetitionChallenges(competitionId.value)),
-  queryFn: () => adminApi.competitionChallenges<CompetitionChallengeDto[]>(competitionId.value),
-})
-
 const { data: competitionTeams, isLoading: loadingTeams } = useQuery({
   queryKey: computed(() => queryKeys.adminCompetitionTeams(competitionId.value)),
   queryFn: () => adminApi.competitionTeams<CompetitionTeamDto[]>(competitionId.value),
@@ -339,15 +304,6 @@ const saveCompetitionMutation = useMutation({
   onError: () => toast.error(t('admin.competitionDetail.saveCompetitionError')),
 })
 
-const deleteChallengeMutation = useMutation({
-  mutationFn: (challengeId: string) => adminApi.deleteCompetitionChallenge(competitionId.value, challengeId),
-  onSuccess: () => {
-    qc.invalidateQueries({ queryKey: queryKeys.adminCompetitionChallenges(competitionId.value) })
-    toast.success(t('admin.competitionDetail.removeChallengeSuccess'))
-  },
-  onError: () => toast.error(t('admin.competitionDetail.removeChallengeError')),
-})
-
 const approveTeamMutation = useMutation({
   mutationFn: (teamId: string) => adminApi.approveCompetitionTeam(competitionId.value, teamId),
   onSuccess: () => {
@@ -394,12 +350,6 @@ const unbanTeamMutation = useMutation({
     toast.success(t('admin.competitionDetail.teamUnbanned'))
   },
   onError: () => toast.error(t('admin.competitionDetail.teamActionError')),
-})
-
-const restartContainerMutation = useMutation({
-  mutationFn: (challengeId: string) => adminApi.restartCompetitionChallengeContainer(competitionId.value, challengeId),
-  onSuccess: () => toast.success(t('admin.competitionDetail.containerRestarted')),
-  onError: () => toast.error(t('admin.competitionDetail.containerRestartError')),
 })
 
 const rebuildScoreboardMutation = useMutation({
@@ -519,12 +469,6 @@ function sectionRoute(section: CompetitionDetailSection) {
             <AdminCompetitionChallengesPanel
               v-if="activeSection === 'challenges'"
               :competition-id="competitionId"
-              :challenges="competitionChallenges"
-              :loading="loadingChallenges"
-              :deleting="deleteChallengeMutation.isPending.value"
-              :restarting="restartContainerMutation.isPending.value"
-              @delete="deleteChallengeMutation.mutate($event)"
-              @restart="restartContainerMutation.mutate($event)"
             />
           </TabsContent>
 
@@ -558,7 +502,6 @@ function sectionRoute(section: CompetitionDetailSection) {
             />
           </TabsContent>
         </section>
-
       </div>
     </Tabs>
   </div>

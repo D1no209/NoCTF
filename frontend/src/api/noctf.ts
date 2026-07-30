@@ -2,8 +2,12 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
+  NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest,
+  NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
+  NoCtfapiEndpointsChallengesChallengeResponse,
+  NoCtfapiEndpointsCompetitionsCompetitionResponse,
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
 import { translate as tt } from '@/i18n'
@@ -548,6 +552,89 @@ export const penetrationAdminApi = {
 }
 
 export type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
+export type AdminCompetition = NoCtfapiEndpointsCompetitionsCompetitionResponse
+export type CompetitionChallenge = NoCtfapiEndpointsChallengesChallengeResponse
+
+export const competitionAdminApi = {
+  async get(competitionId: string): Promise<AdminCompetition> {
+    return unwrap(
+      await generatedSdk.adminGetCompetition({
+        path: { competitionId },
+      }),
+      tt('errors.loadCompetition'),
+    )
+  },
+}
+
+export const competitionChallengeAdminApi = {
+  async list(
+    competitionId: string,
+    includeDeleted: boolean,
+  ): Promise<CompetitionChallenge[]> {
+    const response = unwrap(
+      await generatedSdk.adminListCompetitionChallenges({
+        path: { competitionId },
+        query: { includeDeleted },
+      }),
+      tt('errors.loadCompetitionChallenges'),
+    )
+    return response.items ?? []
+  },
+  async get(
+    competitionId: string,
+    competitionChallengeId: string,
+    includeDeleted: boolean,
+  ): Promise<CompetitionChallenge> {
+    return unwrap(
+      await generatedSdk.adminGetCompetitionChallenge({
+        path: { competitionId, competitionChallengeId },
+        query: { includeDeleted },
+      }),
+      tt('errors.loadCompetitionChallenges'),
+    )
+  },
+  async create(
+    competitionId: string,
+    body: NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest,
+  ): Promise<CompetitionChallenge> {
+    return unwrap(
+      await generatedSdk.adminCreateCompetitionChallenge({
+        path: { competitionId },
+        body,
+      }),
+      tt('errors.bindChallenge'),
+    )
+  },
+  async update(
+    competitionId: string,
+    competitionChallengeId: string,
+    body: NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest,
+  ): Promise<CompetitionChallenge> {
+    return unwrap(
+      await generatedSdk.adminUpdateCompetitionChallenge({
+        path: { competitionId, competitionChallengeId },
+        body,
+      }),
+      tt('errors.updateCompetitionChallenge'),
+    )
+  },
+  async delete(competitionId: string, competitionChallengeId: string): Promise<void> {
+    await requireSuccess(
+      generatedSdk.adminDeleteCompetitionChallenge({
+        path: { competitionId, competitionChallengeId },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async restore(competitionId: string, competitionChallengeId: string): Promise<void> {
+    await requireSuccess(
+      generatedSdk.adminRestoreCompetitionChallenge({
+        path: { competitionId, competitionChallengeId },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+}
 
 export const challengeBankAdminApi = {
   async templates(includeDeleted: boolean): Promise<ChallengeTemplate[]> {
@@ -727,32 +814,6 @@ export const adminApi = {
       url: '/api/admin/competitions/{competitionId}/challenges',
       path: { competitionId },
     }), tt('errors.loadCompetitionChallenges'))
-  },
-  async bindCompetitionChallenge<T = unknown>(competitionId: string, body: unknown) {
-    return unwrap(await client.post<{ 201: T }, unknown, false>({
-      url: '/api/admin/competitions/{competitionId}/challenges',
-      path: { competitionId },
-      body,
-    }), tt('errors.bindChallenge'))
-  },
-  async updateCompetitionChallenge<T = unknown>(competitionId: string, challengeId: string, body: unknown) {
-    return unwrap(await client.put<{ 200: T }, unknown, false>({
-      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}',
-      path: { competitionId, challengeId },
-      body,
-    }), tt('errors.updateCompetitionChallenge'))
-  },
-  async deleteCompetitionChallenge(competitionId: string, challengeId: string) {
-    await requireSuccess(client.delete({
-      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}',
-      path: { competitionId, challengeId },
-    }), tt('errors.requestFailed'))
-  },
-  async restartCompetitionChallengeContainer<T = unknown>(competitionId: string, challengeId: string) {
-    return unwrap(await client.post<{ 200: T }, unknown, false>({
-      url: '/api/admin/competitions/{competitionId}/challenges/{challengeId}/container/restart',
-      path: { competitionId, challengeId },
-    }), tt('errors.restartChallengeContainer'))
   },
   async competitionTeams<T = unknown[]>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({
