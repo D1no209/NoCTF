@@ -113,7 +113,7 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
-          path: 'competitions/:id/challenges/:challengeId/edit',
+          path: 'competitions/:id/challenges/:competitionChallengeId/edit',
           name: 'admin-competition-challenge-edit',
           component: () => import('@/views/admin/AdminCompetitionChallengeEditorView.vue'),
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },

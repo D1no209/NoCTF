@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowLeft, Loader2, Plus, Save, Trash2 } from 'lucide-vue-next'
-import { computed, reactive, watch } from 'vue'
+import { ArrowLeft, Loader2, Save } from 'lucide-vue-next'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { adminApi } from '@/api/noctf'
+import {
+  ApiError,
+  challengeBankAdminApi,
+  competitionAdminApi,
+  competitionChallengeAdminApi,
+} from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
-import DecayCurvePreview from '@/components/admin/DecayCurvePreview.vue'
+import { challengeModeLabelKey } from '@/components/admin/challenges/challengeTemplatePresentation'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Panel } from '@/components/ui/panel'
 import {
   Select,
   SelectContent,
@@ -21,203 +26,253 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { challengeDirectionsForType, normalizeDirection } from '@/lib/challengeDirections'
-
-interface CompetitionDto {
-  id: string
-  title: string
-  gameModeType: string
-  awdpAttackScorePerRound?: number | null
-  awdpDefenseScorePerRound?: number | null
-  awdpMaxAttackAttempts?: number | null
-  awdpMaxDefenseAttempts?: number | null
-  awdpFixEntry?: string | null
-  awdpFixTimeoutSeconds?: number | null
-}
-
-interface ChallengeTemplateDto {
-  id: string
-  title: string
-  description?: string
-  typeId: string
-  direction: string
-}
-
-interface CompetitionChallengeDto {
-  id: string
-  templateId?: string
-  title: string
-  description?: string
-  typeId: string
-  direction: string
-  flagPrefix?: string
-  pointsConfig: {
-    initialPoints: number
-    minimumPoints: number
-    decayFactor: number
-    decayFunction: string
-  }
-  difficultyCoefficient: number
-  enableBloodBonus: boolean
-  awdpAttackScorePerRound?: number | null
-  awdpDefenseScorePerRound?: number | null
-  awdpMaxAttackAttempts?: number | null
-  awdpMaxDefenseAttempts?: number | null
-  awdpFixEntry?: string | null
-  awdpFixTimeoutSeconds?: number | null
-  hints: Array<{ content: string }>
-}
+import {
+  buildCompetitionChallengeCreateRequest,
+  buildCompetitionChallengeUpdateRequest,
+  isAvailableCompetitionChallengeTemplate,
+  isValidOptionalCompetitionChallengeId,
+  nextCompetitionChallengeOrder,
+} from './competitionChallengeLifecycle'
 
 const route = useRoute()
 const router = useRouter()
-const qc = useQueryClient()
+const queryClient = useQueryClient()
 const { t } = useI18n()
 const competitionId = computed(() => String(route.params.id))
-const challengeId = computed(() => typeof route.params.challengeId === 'string' ? route.params.challengeId : '')
-const editing = computed(() => Boolean(challengeId.value))
+const competitionChallengeId = computed(() =>
+  typeof route.params.competitionChallengeId === 'string'
+    ? route.params.competitionChallengeId
+    : '',
+)
+const editing = computed(() => Boolean(competitionChallengeId.value))
+const orderInitialized = ref(false)
 
 const form = reactive({
-  templateId: '',
-  direction: 'WEB',
-  description: '',
-  initialPoints: 500,
-  minimumPoints: 100,
-  decayFactor: 450,
-  decayFunction: 'sigmoid',
-  difficultyCoefficient: 1,
-  enableBloodBonus: false,
-  flagPrefix: 'flag',
-  awdpAttackScorePerRound: 50 as number | undefined,
-  awdpDefenseScorePerRound: 100 as number | undefined,
-  awdpMaxAttackAttempts: 5 as number | undefined,
-  awdpMaxDefenseAttempts: 3 as number | undefined,
-  awdpFixEntry: 'fix.sh',
-  awdpFixTimeoutSeconds: 60 as number | undefined,
-  hints: [''],
+  stableId: '',
+  challengeId: '',
+  baseScore: 500,
+  order: 0,
+  isPublished: false,
 })
 
-const { data: competition, isLoading: loadingCompetition } = useQuery({
-  queryKey: computed(() => queryKeys.adminCompetition(competitionId.value)),
-  queryFn: () => adminApi.competition<CompetitionDto>(competitionId.value),
+const competitionQuery = useQuery({
+  queryKey: computed(() => queryKeys.adminCompetitionSummary(competitionId.value)),
+  queryFn: () => competitionAdminApi.get(competitionId.value),
 })
 
-const { data: templates, isLoading: loadingTemplates } = useQuery({
-  queryKey: queryKeys.adminChallenges,
-  queryFn: () => adminApi.challenges<ChallengeTemplateDto[]>(),
+const templatesQuery = useQuery({
+  queryKey: computed(() => [...queryKeys.adminChallenges, { includeDeleted: false }]),
+  queryFn: () => challengeBankAdminApi.templates(false),
   enabled: computed(() => !editing.value),
 })
 
-const { data: challenges, isLoading: loadingChallenges } = useQuery({
-  queryKey: computed(() => queryKeys.adminCompetitionChallenges(competitionId.value)),
-  queryFn: () => adminApi.competitionChallenges<CompetitionChallengeDto[]>(competitionId.value),
-  enabled: computed(() => editing.value),
+const createInventoryQuery = useQuery({
+  queryKey: computed(() => [
+    ...queryKeys.adminCompetitionChallenges(competitionId.value),
+    { includeDeleted: true },
+  ]),
+  queryFn: () => competitionChallengeAdminApi.list(competitionId.value, true),
+  enabled: computed(() => !editing.value),
 })
 
-const selectedTemplate = computed(() => templates.value?.find(template => template.id === form.templateId))
-const selectedChallenge = computed(() => challenges.value?.find(challenge => challenge.id === challengeId.value))
-const activeTypeId = computed(() => editing.value ? selectedChallenge.value?.typeId : selectedTemplate.value?.typeId)
-const directionOptions = computed(() => challengeDirectionsForType(activeTypeId.value))
-const loading = computed(() => loadingCompetition.value || (editing.value ? loadingChallenges.value : loadingTemplates.value))
+const challengeQuery = useQuery({
+  queryKey: computed(() =>
+    queryKeys.adminCompetitionChallenge(
+      competitionId.value,
+      competitionChallengeId.value || 'unselected',
+      true,
+    ),
+  ),
+  queryFn: () =>
+    competitionChallengeAdminApi.get(
+      competitionId.value,
+      competitionChallengeId.value,
+      true,
+    ),
+  enabled: editing,
+})
 
-watch(templates, (items) => {
-  if (!editing.value && !form.templateId && items?.length)
-    form.templateId = items[0].id
-}, { immediate: true })
+const compatibleTemplates = computed(() => {
+  const mode = competitionQuery.data.value?.mode
+  if (mode === undefined)
+    return []
 
-watch(selectedTemplate, (template) => {
-  if (!template || editing.value)
-    return
-  form.direction = normalizeDirection(template.direction)
-}, { immediate: true })
+  return (templatesQuery.data.value ?? []).filter(
+    template => template.id && template.mode === mode,
+  )
+})
 
-watch(competition, (value) => {
-  if (!value)
-    return
-  form.awdpAttackScorePerRound = value.awdpAttackScorePerRound ?? 50
-  form.awdpDefenseScorePerRound = value.awdpDefenseScorePerRound ?? 100
-  form.awdpMaxAttackAttempts = value.awdpMaxAttackAttempts ?? 5
-  form.awdpMaxDefenseAttempts = value.awdpMaxDefenseAttempts ?? 3
-  form.awdpFixEntry = value.awdpFixEntry ?? 'fix.sh'
-  form.awdpFixTimeoutSeconds = value.awdpFixTimeoutSeconds ?? 60
-}, { immediate: true })
+const competitionModeLabel = computed(() => {
+  const mode = competitionQuery.data.value?.mode
+  return mode === undefined ? '' : t(challengeModeLabelKey(mode))
+})
+const stableIdIsValid = computed(() =>
+  isValidOptionalCompetitionChallengeId(form.stableId),
+)
+const selectedTemplateIsCompatible = computed(() =>
+  isAvailableCompetitionChallengeTemplate(form.challengeId, compatibleTemplates.value),
+)
+const draft = computed(() => ({
+  stableId: form.stableId,
+  challengeId: form.challengeId,
+  baseScore: Number(form.baseScore),
+  order: Number(form.order),
+  isPublished: form.isPublished,
+}))
+const createRequest = computed(() =>
+  editing.value || !selectedTemplateIsCompatible.value
+    ? null
+    : buildCompetitionChallengeCreateRequest(draft.value),
+)
+const updateRequest = computed(() => {
+  const challenge = challengeQuery.data.value
+  return editing.value && challenge
+    ? buildCompetitionChallengeUpdateRequest(challenge, draft.value)
+    : null
+})
+const requestBody = computed(() => {
+  return editing.value ? updateRequest.value : createRequest.value
+})
+const isLoading = computed(
+  () =>
+    competitionQuery.isLoading.value
+    || (editing.value
+      ? challengeQuery.isLoading.value
+      : templatesQuery.isLoading.value || createInventoryQuery.isLoading.value),
+)
+const isError = computed(
+  () =>
+    competitionQuery.isError.value
+    || (editing.value
+      ? challengeQuery.isError.value
+      : templatesQuery.isError.value || createInventoryQuery.isError.value),
+)
 
-watch(selectedChallenge, (challenge) => {
-  if (!challenge)
-    return
-  form.templateId = challenge.templateId ?? ''
-  form.direction = normalizeDirection(challenge.direction)
-  form.description = challenge.description ?? ''
-  form.initialPoints = challenge.pointsConfig.initialPoints
-  form.minimumPoints = challenge.pointsConfig.minimumPoints
-  form.decayFactor = challenge.pointsConfig.decayFactor
-  form.decayFunction = challenge.pointsConfig.decayFunction
-  form.difficultyCoefficient = challenge.difficultyCoefficient
-  form.enableBloodBonus = challenge.enableBloodBonus
-  form.flagPrefix = challenge.flagPrefix ?? 'flag'
-  form.awdpAttackScorePerRound = challenge.awdpAttackScorePerRound ?? form.awdpAttackScorePerRound
-  form.awdpDefenseScorePerRound = challenge.awdpDefenseScorePerRound ?? form.awdpDefenseScorePerRound
-  form.awdpMaxAttackAttempts = challenge.awdpMaxAttackAttempts ?? form.awdpMaxAttackAttempts
-  form.awdpMaxDefenseAttempts = challenge.awdpMaxDefenseAttempts ?? form.awdpMaxDefenseAttempts
-  form.awdpFixEntry = challenge.awdpFixEntry ?? form.awdpFixEntry
-  form.awdpFixTimeoutSeconds = challenge.awdpFixTimeoutSeconds ?? form.awdpFixTimeoutSeconds
-  form.hints = challenge.hints.length ? challenge.hints.map(hint => hint.content) : ['']
-}, { immediate: true })
+watch(
+  compatibleTemplates,
+  (templates) => {
+    if (
+      !editing.value
+      && !isAvailableCompetitionChallengeTemplate(form.challengeId, templates)
+    ) {
+      form.challengeId = templates[0]?.id ?? ''
+    }
+  },
+  { immediate: true },
+)
 
-function optionalNumber(value: number | undefined) {
-  return value === undefined ? undefined : Number(value)
-}
+watch(
+  () => createInventoryQuery.data.value,
+  (challenges) => {
+    if (editing.value || orderInitialized.value || !challenges)
+      return
 
-function payload() {
-  return {
-    direction: normalizeDirection(form.direction),
-    description: form.description.trim() || undefined,
-    descriptionFormat: 'markdown',
-    flagPrefix: form.flagPrefix.trim() || 'flag',
-    pointsConfig: {
-      initialPoints: Number(form.initialPoints),
-      minimumPoints: Number(form.minimumPoints),
-      decayFactor: Number(form.decayFactor),
-      decayFunction: form.decayFunction,
-    },
-    difficultyCoefficient: Number(form.difficultyCoefficient),
-    enableBloodBonus: form.enableBloodBonus,
-    awdpAttackScorePerRound: optionalNumber(form.awdpAttackScorePerRound),
-    awdpDefenseScorePerRound: optionalNumber(form.awdpDefenseScorePerRound),
-    awdpMaxAttackAttempts: optionalNumber(form.awdpMaxAttackAttempts),
-    awdpMaxDefenseAttempts: optionalNumber(form.awdpMaxDefenseAttempts),
-    awdpFixEntry: form.awdpFixEntry.trim() || undefined,
-    awdpFixTimeoutSeconds: optionalNumber(form.awdpFixTimeoutSeconds),
-    hints: form.hints.map(hint => hint.trim()).filter(Boolean),
-  }
-}
+    form.order = nextCompetitionChallengeOrder(challenges)
+    orderInitialized.value = true
+  },
+  { immediate: true },
+)
 
-function returnToChallenges() {
-  return router.push({ name: 'admin-competition-detail', params: { id: competitionId.value }, query: { section: 'challenges' } })
-}
+watch(
+  () => challengeQuery.data.value,
+  (challenge) => {
+    if (!challenge)
+      return
+
+    form.stableId = challenge.id ?? ''
+    form.challengeId = challenge.challengeId ?? ''
+    form.baseScore = challenge.baseScore ?? 0
+    form.order = challenge.order ?? 0
+    form.isPublished = challenge.isPublished ?? false
+  },
+  { immediate: true },
+)
 
 const saveMutation = useMutation({
-  mutationFn: () => editing.value
-    ? adminApi.updateCompetitionChallenge(competitionId.value, challengeId.value, payload())
-    : adminApi.bindCompetitionChallenge(competitionId.value, { templateId: form.templateId, ...payload() }),
+  mutationFn: async () => {
+    if (editing.value) {
+      const body = updateRequest.value
+      if (!body)
+        throw new Error('Competition challenge update is incomplete.')
+
+      return await competitionChallengeAdminApi.update(
+        competitionId.value,
+        competitionChallengeId.value,
+        body,
+      )
+    }
+
+    const body = createRequest.value
+    if (!body)
+      throw new Error('Competition challenge creation is incomplete.')
+
+    return await competitionChallengeAdminApi.create(competitionId.value, body)
+  },
   onSuccess: async () => {
-    await qc.invalidateQueries({ queryKey: queryKeys.adminCompetitionChallenges(competitionId.value) })
-    toast.success(t(editing.value ? 'admin.competitionDetail.updateChallengeSuccess' : 'admin.competitionDetail.deploySuccess'))
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.adminCompetitionChallenges(competitionId.value),
+    })
+    toast.success(
+      t(
+        editing.value
+          ? 'admin.competitionDetail.updateChallengeSuccess'
+          : 'admin.competitionDetail.deploySuccess',
+      ),
+    )
     await returnToChallenges()
   },
-  onError: () => toast.error(t(editing.value ? 'admin.competitionDetail.updateChallengeError' : 'admin.competitionDetail.deployError')),
+  onError: async (error) => {
+    const staleEditorState
+      = error instanceof ApiError
+        && (error.status === 409 || error.status === 404)
+    if (staleEditorState) {
+      if (editing.value) {
+        await challengeQuery.refetch()
+      }
+      else {
+        await Promise.all([
+          competitionQuery.refetch(),
+          templatesQuery.refetch(),
+          createInventoryQuery.refetch(),
+        ])
+      }
+
+      toast.error(t('admin.competitionDetail.challengeRevisionConflict'))
+      return
+    }
+
+    toast.error(
+      t(
+        editing.value
+          ? 'admin.competitionDetail.updateChallengeError'
+          : 'admin.competitionDetail.deployError',
+      ),
+    )
+  },
 })
 
-function removeHint(index: number) {
-  if (form.hints.length === 1)
-    form.hints[0] = ''
-  else
-    form.hints.splice(index, 1)
+function returnToChallenges() {
+  return router.push({
+    name: 'admin-competition-detail',
+    params: { id: competitionId.value },
+    query: { section: 'challenges' },
+  })
+}
+
+function refreshEditor() {
+  void competitionQuery.refetch()
+  if (editing.value) {
+    void challengeQuery.refetch()
+  }
+  else {
+    void templatesQuery.refetch()
+    void createInventoryQuery.refetch()
+  }
 }
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl space-y-6">
+  <div class="mx-auto max-w-4xl space-y-6">
     <header class="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <Button variant="ghost" size="sm" class="-ml-2 mb-2" @click="returnToChallenges">
@@ -225,135 +280,176 @@ function removeHint(index: number) {
           {{ t('admin.competitionDetail.backToChallenges') }}
         </Button>
         <h2 class="text-2xl font-bold tracking-tight">
-          {{ t(editing ? 'admin.competitionDetail.editCompetitionChallenge' : 'admin.competitionDetail.createCompetitionChallenge') }}
+          {{
+            t(
+              editing
+                ? 'admin.competitionDetail.editCompetitionChallenge'
+                : 'admin.competitionDetail.createCompetitionChallenge',
+            )
+          }}
         </h2>
         <p class="text-sm text-muted-foreground">
-          {{ competition?.title }} · {{ t('admin.competitionDetail.challengeEditorDescription') }}
+          {{ competitionQuery.data.value?.title }}
+          <template v-if="competitionModeLabel">
+            · {{ competitionModeLabel }}
+          </template>
         </p>
       </div>
-      <Button :disabled="loading || saveMutation.isPending.value || (!editing && !form.templateId)" @click="saveMutation.mutate()">
-        <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-        <Save v-else class="mr-2 size-4" />
+      <Button
+        :disabled="isLoading || saveMutation.isPending.value || !requestBody"
+        @click="saveMutation.mutate()"
+      >
+        <Loader2 v-if="saveMutation.isPending.value" class="size-4 animate-spin" />
+        <Save v-else class="size-4" />
         {{ t('common.save') }}
       </Button>
     </header>
 
-    <div v-if="loading" class="flex min-h-80 items-center justify-center text-sm text-muted-foreground">
+    <div
+      v-if="isLoading"
+      class="flex min-h-80 items-center justify-center text-sm text-muted-foreground"
+    >
       <Loader2 class="mr-2 size-4 animate-spin" />
       {{ t('common.loading') }}
     </div>
 
+    <Alert v-else-if="isError" variant="destructive">
+      <AlertTitle>{{ t('admin.competitionDetail.challengeEditorLoadError') }}</AlertTitle>
+      <AlertDescription class="mt-3">
+        <Button variant="outline" size="sm" @click="refreshEditor">
+          {{ t('common.retry') }}
+        </Button>
+      </AlertDescription>
+    </Alert>
+
     <template v-else>
+      <Alert v-if="editing && challengeQuery.data.value?.deletedAt" variant="destructive">
+        <AlertTitle>{{ t('admin.competitionDetail.challengeDeleted') }}</AlertTitle>
+        <AlertDescription>
+          {{ t('admin.competitionDetail.deletedChallengeEditBlocked') }}
+        </AlertDescription>
+      </Alert>
+
+      <Alert v-if="!editing && compatibleTemplates.length === 0">
+        <AlertTitle>{{ t('admin.competitionDetail.noMatchingTemplates') }}</AlertTitle>
+        <AlertDescription>
+          {{ t('admin.competitionDetail.noMatchingTemplatesDescription') }}
+        </AlertDescription>
+      </Alert>
+
       <Card class="p-0">
-        <CardContent class="grid gap-5 p-5 lg:grid-cols-2">
-          <div v-if="!editing" class="grid gap-2 lg:col-span-2">
-            <Label>{{ t('admin.competitionDetail.challengeTemplate') }}</Label>
-            <Select v-model="form.templateId">
-              <SelectTrigger><SelectValue :placeholder="t('admin.competitionDetail.selectTemplate')" /></SelectTrigger>
+        <CardContent class="grid gap-5 p-5 sm:grid-cols-2">
+          <div v-if="!editing" class="grid gap-2 sm:col-span-2">
+            <Label for="competition-challenge-stable-id">
+              {{ t('admin.competitionDetail.stableChallengeId') }}
+            </Label>
+            <Input
+              id="competition-challenge-stable-id"
+              v-model="form.stableId"
+              autocomplete="off"
+              :aria-invalid="!stableIdIsValid"
+              :placeholder="t('admin.competitionDetail.stableChallengeIdPlaceholder')"
+            />
+            <p
+              class="text-xs"
+              :class="stableIdIsValid ? 'text-muted-foreground' : 'text-destructive'"
+            >
+              {{
+                stableIdIsValid
+                  ? t('admin.competitionDetail.stableChallengeIdHint')
+                  : t('admin.competitionDetail.invalidStableChallengeId')
+              }}
+            </p>
+          </div>
+
+          <div v-else class="grid gap-2 sm:col-span-2">
+            <div class="flex items-center justify-between gap-3">
+              <Label>{{ t('admin.competitionDetail.stableChallengeId') }}</Label>
+              <Badge variant="outline">
+                v{{ challengeQuery.data.value?.revision ?? '—' }}
+              </Badge>
+            </div>
+            <code class="block break-all border bg-muted/30 p-3 font-mono text-xs">
+              {{ challengeQuery.data.value?.id }}
+            </code>
+          </div>
+
+          <div class="grid gap-2 sm:col-span-2">
+            <Label for="competition-challenge-template">
+              {{ t('admin.competitionDetail.challengeTemplate') }}
+            </Label>
+            <Select
+              v-if="!editing"
+              v-model="form.challengeId"
+              :disabled="compatibleTemplates.length === 0"
+            >
+              <SelectTrigger id="competition-challenge-template">
+                <SelectValue :placeholder="t('admin.competitionDetail.selectTemplate')" />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="template in templates ?? []" :key="template.id" :value="template.id">
-                  {{ template.title }} · {{ template.typeId }} / {{ normalizeDirection(template.direction) }}
+                <SelectItem
+                  v-for="template in compatibleTemplates"
+                  :key="template.id"
+                  :value="template.id ?? ''"
+                >
+                  {{ template.title || template.id }} · {{ template.direction }}
                 </SelectItem>
               </SelectContent>
             </Select>
+            <code v-else class="block break-all border bg-muted/30 p-3 font-mono text-xs">
+              {{ challengeQuery.data.value?.challengeId }}
+            </code>
           </div>
-          <div v-else class="lg:col-span-2">
-            <Badge variant="outline">{{ selectedChallenge?.title }}</Badge>
-          </div>
-          <div class="grid gap-2">
-            <Label>{{ t('admin.challenges.direction') }}</Label>
-            <Select v-model="form.direction">
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="item in directionOptions" :key="item" :value="item">{{ item }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="grid gap-2">
-            <Label>{{ t('admin.competitionDetail.difficultyCoefficient') }}</Label>
-            <Input v-model.number="form.difficultyCoefficient" type="number" min="0.1" step="0.1" />
-          </div>
-          <div class="grid gap-2">
-            <Label>{{ t('admin.competitionDetail.flagPrefix') }}</Label>
-            <Input v-model="form.flagPrefix" placeholder="flag" />
-          </div>
-          <Panel v-if="competition?.gameModeType === 'Ctf'">
-            <label class="flex min-h-10 cursor-pointer items-center gap-3 px-3 py-2 text-sm">
-              <input v-model="form.enableBloodBonus" type="checkbox" class="size-4">
-              <span>{{ t('admin.competitionDetail.enableBloodBonus') }}</span>
-            </label>
-          </Panel>
-          <div class="grid gap-2 lg:col-span-2">
-            <Label>{{ t('admin.competitionDetail.markdownDescription') }}</Label>
-            <Textarea v-model="form.description" class="font-mono text-xs" rows="8" :placeholder="t('admin.competitionDetail.descriptionPlaceholder')" />
-          </div>
-        </CardContent>
-      </Card>
 
-      <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card class="p-0">
-          <CardContent class="space-y-5 p-5">
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.initial') }}</Label><Input v-model.number="form.initialPoints" type="number" /></div>
-              <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.minimum') }}</Label><Input v-model.number="form.minimumPoints" type="number" /></div>
-              <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.decayFactor') }}</Label><Input v-model.number="form.decayFactor" type="number" /></div>
-              <div class="grid gap-2">
-                <Label>{{ t('admin.competitionDetail.decayFunction') }}</Label>
-                <Select v-model="form.decayFunction">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sigmoid">{{ t('admin.competitionDetail.decaySigmoid') }}</SelectItem>
-                    <SelectItem value="quadratic">{{ t('admin.competitionDetail.decayQuadratic') }}</SelectItem>
-                    <SelectItem value="logarithmic">{{ t('admin.competitionDetail.decayLogarithmic') }}</SelectItem>
-                    <SelectItem value="linear">{{ t('admin.competitionDetail.decayLinear') }}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DecayCurvePreview :config="form" />
-          </CardContent>
-        </Card>
+          <div class="grid gap-2">
+            <Label for="competition-challenge-base-score">
+              {{ t('admin.competitionDetail.baseScore') }}
+            </Label>
+            <Input
+              id="competition-challenge-base-score"
+              v-model.number="form.baseScore"
+              type="number"
+              min="0"
+              step="1"
+            />
+          </div>
 
-        <Card class="p-0">
-          <CardContent class="p-5">
-            <div class="mb-4 flex items-center justify-between">
-              <div>
-                <h3 class="font-semibold">{{ t('admin.competitionDetail.hints') }}</h3>
-                <p class="text-xs text-muted-foreground">{{ t('admin.competitionDetail.hintsDescription') }}</p>
-              </div>
-              <Button variant="outline" size="sm" @click="form.hints.push('')">
-                <Plus class="mr-2 size-4" />
-                {{ t('common.add') }}
-              </Button>
-            </div>
-            <div class="space-y-3">
-              <div v-for="(_, index) in form.hints" :key="index" class="flex items-center gap-2">
-                <Input v-model="form.hints[index]" :placeholder="t('admin.competitionDetail.hintPlaceholder', { index: index + 1 })" />
-                <Button variant="ghost" size="icon" class="shrink-0 text-destructive" @click="removeHint(index)">
-                  <Trash2 class="size-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <div class="grid gap-2">
+            <Label for="competition-challenge-order">
+              {{ t('admin.competitionDetail.challengeOrder') }}
+            </Label>
+            <Input
+              id="competition-challenge-order"
+              v-model.number="form.order"
+              type="number"
+              min="0"
+              step="1"
+            />
+          </div>
 
-      <Card v-if="competition?.gameModeType === 'Awdp'" class="p-0">
-        <CardContent class="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
-          <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.awdpAttackScore') }}</Label><Input v-model.number="form.awdpAttackScorePerRound" type="number" min="0" /></div>
-          <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.awdpDefenseScore') }}</Label><Input v-model.number="form.awdpDefenseScorePerRound" type="number" min="0" /></div>
-          <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.awdpMaxAttackAttempts') }}</Label><Input v-model.number="form.awdpMaxAttackAttempts" type="number" min="1" /></div>
-          <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.awdpMaxDefenseAttempts') }}</Label><Input v-model.number="form.awdpMaxDefenseAttempts" type="number" min="1" /></div>
-          <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.awdpFixEntry') }}</Label><Input v-model="form.awdpFixEntry" /></div>
-          <div class="grid gap-2"><Label>{{ t('admin.competitionDetail.awdpFixTimeout') }}</Label><Input v-model.number="form.awdpFixTimeoutSeconds" type="number" min="1" /></div>
+          <label
+            v-if="editing"
+            class="flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 text-sm sm:col-span-2"
+          >
+            <input v-model="form.isPublished" type="checkbox" class="size-4">
+            <span>{{ t('admin.competitionDetail.publishChallenge') }}</span>
+          </label>
+          <p v-else class="text-xs text-muted-foreground sm:col-span-2">
+            {{ t('admin.competitionDetail.newChallengeStartsDraft') }}
+          </p>
         </CardContent>
       </Card>
 
       <div class="flex justify-end gap-2 border-t pt-5">
-        <Button variant="outline" @click="returnToChallenges">{{ t('common.cancel') }}</Button>
-        <Button :disabled="saveMutation.isPending.value || (!editing && !form.templateId)" @click="saveMutation.mutate()">
-          <Loader2 v-if="saveMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-          <Save v-else class="mr-2 size-4" />
+        <Button variant="outline" @click="returnToChallenges">
+          {{ t('common.cancel') }}
+        </Button>
+        <Button
+          :disabled="saveMutation.isPending.value || !requestBody"
+          @click="saveMutation.mutate()"
+        >
+          <Loader2 v-if="saveMutation.isPending.value" class="size-4 animate-spin" />
+          <Save v-else class="size-4" />
           {{ t('common.save') }}
         </Button>
       </div>
