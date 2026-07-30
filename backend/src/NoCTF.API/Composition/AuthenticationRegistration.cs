@@ -30,6 +30,15 @@ public static class AuthenticationRegistration
                             && context.Request.Query.TryGetValue("access_token", out var token))
                             context.Token = token;
                         return Task.CompletedTask;
+                    },
+                    OnTokenValidated = async context =>
+                    {
+                        var validator = context.HttpContext.RequestServices
+                            .GetRequiredService<CurrentAccessTokenValidator>();
+                        if (!await validator.IsCurrentAsync(
+                                context.Principal,
+                                context.HttpContext.RequestAborted))
+                            context.Fail("The access token is no longer current.");
                     }
                 };
                 options.TokenValidationParameters = new TokenValidationParameters
@@ -61,12 +70,11 @@ public static class AuthenticationRegistration
                     NameClaimType = "runner_id"
                 };
             });
-        services.AddScoped<IAuthorizationHandler, CurrentTokenVersionHandler>();
+        services.AddScoped<CurrentAccessTokenValidator>();
         services.AddAuthorization(options =>
         {
             options.DefaultPolicy = new AuthorizationPolicyBuilder(AccessScheme)
                 .RequireAuthenticatedUser()
-                .AddRequirements(new CurrentTokenVersionRequirement())
                 .Build();
             options.AddPolicy("AwdCheckResult", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)

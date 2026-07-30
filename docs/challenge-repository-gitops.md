@@ -776,17 +776,17 @@ Matrix 以 image 为粒度，因此一个 Compose Challenge 的多个 service �
 ### GitHub Repository Variables
 
 ```text
-NOCTF_BASE_URL
+NOCTF_API_URL
 NOCTF_IMAGE_REGISTRY
-CUSTOM_REGISTRY
+CUSTOM_REGISTRY_HOST
 CUSTOM_REGISTRY_NAMESPACE
 ```
 
 含义：
 
-- `NOCTF_BASE_URL`：NoCTF API base URL；
+- `NOCTF_API_URL`：NoCTF API origin，例如 `https://ctf.example.com`，不要附加 `/api/v1`；
 - `NOCTF_IMAGE_REGISTRY`：`ghcr` 或 `custom`，决定最终写入 NoCTF Definition 的镜像来源，默认 `ghcr`；
-- `CUSTOM_REGISTRY`：可选，例如 `registry.example.com`；
+- `CUSTOM_REGISTRY_HOST`：可选，例如 `registry.example.com`；
 - `CUSTOM_REGISTRY_NAMESPACE`：可选的自定义 Registry namespace。
 
 ### GitHub Repository Secrets
@@ -1154,7 +1154,7 @@ apply-to-noctf:
 
     - name: Apply repository state
       env:
-        NOCTF_BASE_URL: ${{ vars.NOCTF_BASE_URL }}
+        NOCTF_API_URL: ${{ vars.NOCTF_API_URL }}
         NOCTF_BOT_TOKEN: ${{ secrets.NOCTF_BOT_TOKEN }}
         NOCTF_IMAGE_REGISTRY: ${{ vars.NOCTF_IMAGE_REGISTRY }}
       run: >

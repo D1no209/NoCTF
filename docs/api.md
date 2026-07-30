@@ -242,9 +242,9 @@ GET  /api/v1/admin/platform/dead-letters/{messageId}
 POST /api/v1/admin/platform/dead-letters/{messageId}/requeue
 ```
 
-Bot 创建请求只包含 UserName 和 `UserRole.User | Organizer`，不能直接创建 Administrator
+Bot 创建请求只包含 UserName 和固定的 `UserRole.Organizer`，不能创建 User 或 Administrator
 Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。
-Token 签发请求包含正数 ExpiresInSeconds，只接受 Bot User，返回一次普通 AccessToken 与
+Token 签发请求包含正数 ExpiresInSeconds，只接受 Bot 身份，返回一次普通 AccessToken 与
 ExpiresAt，不签发 Refresh Token。Role 更新与 token invalidate 原子递增 User.TokenVersion。
 Dead Letter DTO 隐去 JWT、Flag/Submission 原文和 archive 内容；requeue 创建新的 durable
 delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作
