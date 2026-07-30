@@ -446,6 +446,11 @@ public sealed class WolverineTransactionalOutboxTests
                     Id = challengeId,
                     OwnerId = ownerId,
                     Title = "AWD outbox challenge",
+                    DefinitionJson = System.Text.Json.JsonSerializer.Serialize(
+                        new AwdChallengeConfiguration(
+                            AwdChallengeConfiguration.CurrentSchemaVersion),
+                        new System.Text.Json.JsonSerializerOptions(
+                            System.Text.Json.JsonSerializerDefaults.Web)),
                     CreatedAt = now,
                     UpdatedAt = now
                 });

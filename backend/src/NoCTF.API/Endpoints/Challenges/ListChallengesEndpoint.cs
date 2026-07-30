@@ -22,7 +22,10 @@ public sealed class ListChallengesEndpoint(ListChallenges list) : Endpoint<ListC
         ListChallengesRequest request,
         CancellationToken ct)
     {
-        var items = await list.ExecuteAsync(Route<Guid>("competitionId"), includeUnpublished: false, ct);
+        var items = await list.ExecuteAsync(
+            Route<Guid>("competitionId"),
+            includeUnpublished: false,
+            ct: ct);
         return TypedResults.Ok(ChallengeMapper.ToListResponse(items));
     }
 }

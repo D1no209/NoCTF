@@ -25,13 +25,7 @@ public static class GameModeDefaultConfiguration
             FixFailurePenalty: 0,
             MaxBreakSubmissions: 10,
             MaxFixSubmissions: 10,
-            EvaluationDispatchMode: EvaluationDispatchMode.Automatic,
-            Runtime: null,
-            PatchEntrypoint: "fix.sh",
-            PatchCommand: null,
-            PatchTimeoutSeconds: 60,
-            Checker: null,
-            ReadyTimeoutSeconds: 30), Options),
+            EvaluationDispatchMode: EvaluationDispatchMode.Automatic), Options),
         GameMode.Koh => JsonSerializer.Serialize(new Koh.Configuration.KohConfiguration(1, 5, 10), Options),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };

@@ -11,7 +11,7 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
     {
         var entity = new Challenge
         {
-            Id = Guid.CreateVersion7(command.CreatedAt),
+            Id = command.Id ?? Guid.CreateVersion7(command.CreatedAt),
             OwnerId = command.OwnerId,
             Mode = command.Mode,
             Visibility = command.Visibility,
@@ -24,7 +24,7 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         };
         db.Challenges.Add(entity);
         await db.SaveChangesAsync(ct);
-        return Map(entity);
+        return await MapAsync(entity, ct);
     }
 
     public async Task<IReadOnlyList<ChallengeTemplateView>> ListAsync(
@@ -37,7 +37,9 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             .Select(challenge => new ChallengeTemplateView(
                 challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Mode, challenge.Visibility,
                 challenge.Title, challenge.Description, challenge.Direction, challenge.DefinitionJson, challenge.Revision,
-                challenge.CreatedAt, challenge.UpdatedAt))
+                challenge.CreatedAt, challenge.UpdatedAt, challenge.DeletedAt,
+                db.CompetitionChallenges.IgnoreQueryFilters().Count(instance =>
+                    instance.ChallengeId == challenge.Id && instance.DeletedAt == null)))
             .ToListAsync(ct);
 
     public Task<ChallengeTemplateView?> FindAsync(
@@ -55,7 +57,9 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             .Select(challenge => new ChallengeTemplateView(
                 challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Mode, challenge.Visibility,
                 challenge.Title, challenge.Description, challenge.Direction, challenge.DefinitionJson, challenge.Revision,
-                challenge.CreatedAt, challenge.UpdatedAt))
+                challenge.CreatedAt, challenge.UpdatedAt, challenge.DeletedAt,
+                db.CompetitionChallenges.IgnoreQueryFilters().Count(instance =>
+                    instance.ChallengeId == challenge.Id && instance.DeletedAt == null)))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -78,7 +82,7 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
         await db.SaveChangesAsync(ct);
-        return Map(entity);
+        return await MapAsync(entity, ct);
     }
 
     public Task<bool> SoftDeleteAsync(
@@ -117,7 +121,7 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return Map(entity);
+        return await MapAsync(entity, ct);
     }
 
     public async Task<ChallengeTemplateView?> TransferOwnerAsync(
@@ -140,7 +144,7 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return Map(entity);
+        return await MapAsync(entity, ct);
     }
 
     private async Task<bool> SetDeletedAsync(
@@ -186,8 +190,18 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
                 challenge.OwnerId == actorId ||
                 challenge.ManagerIds.Contains(actorId));
 
-    private static ChallengeTemplateView Map(Challenge challenge) =>
-        new(
+    private async Task<ChallengeTemplateView> MapAsync(
+        Challenge challenge,
+        CancellationToken ct)
+    {
+        var activeCompetitionReferenceCount = await db.CompetitionChallenges
+            .IgnoreQueryFilters()
+            .CountAsync(
+                instance =>
+                    instance.ChallengeId == challenge.Id
+                    && instance.DeletedAt == null,
+                ct);
+        return new(
             challenge.Id,
             challenge.OwnerId,
             challenge.ManagerIds,
@@ -199,6 +213,9 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             challenge.DefinitionJson,
             challenge.Revision,
             challenge.CreatedAt,
-            challenge.UpdatedAt);
+            challenge.UpdatedAt,
+            challenge.DeletedAt,
+            activeCompetitionReferenceCount);
+    }
 
 }

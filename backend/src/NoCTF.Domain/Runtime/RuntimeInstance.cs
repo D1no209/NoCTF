@@ -45,6 +45,9 @@ public sealed class RuntimeInstance
     public RuntimePurpose Purpose { get; set; }
     public Guid? SubmissionId { get; set; }
     public long? SubmissionProcessingVersion { get; set; }
+    public int SourceCompetitionConfigurationRevision { get; set; }
+    public int SourceCompetitionChallengeRevision { get; set; }
+    public int SourceChallengeDefinitionRevision { get; set; }
     public int Generation { get; set; }
     public RuntimeKind RuntimeKind { get; set; }
     public RuntimeProvider RuntimeProvider { get; set; }

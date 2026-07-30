@@ -36,7 +36,7 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
 
         var entity = new CompetitionChallenge
         {
-            Id = Guid.CreateVersion7(command.CreatedAt),
+            Id = command.Id ?? Guid.CreateVersion7(command.CreatedAt),
             CompetitionId = command.CompetitionId,
             ChallengeId = command.ChallengeId,
             BaseScore = command.BaseScore,
@@ -62,10 +62,11 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         Guid competitionId,
         Guid competitionChallengeId,
         bool includeUnpublished,
+        bool includeDeleted,
         CancellationToken ct) =>
         Query(
                 includeUnpublished,
-                includeDeleted: false,
+                includeDeleted,
                 competitionId,
                 competitionChallengeId)
             .SingleOrDefaultAsync(ct);
@@ -73,11 +74,9 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
     public async Task<IReadOnlyList<ChallengeView>> ListAsync(
         Guid competitionId,
         bool includeUnpublished,
+        bool includeDeleted,
         CancellationToken ct) =>
-        await Query(includeUnpublished, includeDeleted: false, competitionId)
-            .OrderBy(item => item.Order)
-            .ThenBy(item => item.Id)
-            .ToListAsync(ct);
+        await Query(includeUnpublished, includeDeleted, competitionId).ToListAsync(ct);
 
     public async Task<ChallengeMutationResult> UpdateAsync(
         UpdateCompetitionChallengeCommand command,
@@ -187,6 +186,8 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
                 template => template.Id,
                 (instance, template) => new { Instance = instance, Template = template })
             .Where(item => includeUnpublished || item.Instance.IsPublished)
+            .OrderBy(item => item.Instance.Order)
+            .ThenBy(item => item.Instance.Id)
             .Select(item => new ChallengeView(
                 item.Instance.Id,
                 item.Instance.CompetitionId,
@@ -199,7 +200,8 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
                 item.Instance.IsPublished,
                 item.Instance.Revision,
                 item.Template.CreatedAt,
-                item.Instance.UpdatedAt));
+                item.Instance.UpdatedAt,
+                item.Instance.DeletedAt));
     }
 
     private static ChallengeView Map(CompetitionChallenge instance, Challenge template) =>
@@ -215,7 +217,8 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
             instance.IsPublished,
             instance.Revision,
             template.CreatedAt,
-            instance.UpdatedAt);
+            instance.UpdatedAt,
+            instance.DeletedAt);
 
     private static bool IsCompetitionChallengeConflict(DbUpdateException exception) =>
         exception.InnerException is PostgresException

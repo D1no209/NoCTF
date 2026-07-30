@@ -1,50 +1,43 @@
 # NoCTF 后端目标架构交接
 
-> 创建于 2026-07-24，最后核验于 2026-07-28。文件名保留原日期，本文内容以最后核验日期为准。
+> 创建于 2026-07-24，最后核验于 2026-07-30。文件名保留原日期，本文内容以最后核验日期为准。
 
 ## 1. 下一会话目标
 
-后端目标架构迁移的既定交付项已经完成。下一会话以交接复核为主：审阅本分支提交，
-确认受保护工作树未被纳入，按用户指示推送或创建 PR；不要再把 capability/DI 或
-`Verify-Backend.ps1` 当作待实现项。
+2026-07-30 已切换到协作者更新后的 `main`（基线 `a186d5f`），当前工作不是单纯交接
+复核，而是完成协作者引入的后端收尾：
 
-默认只修改 `backend`、Runtime 部署清单与本交接文档。除非用户明确扩大范围，不修改
-Frontend、仓库外 CI 或用户的本地辅助文件。
+- Docker Container/Compose 公开服务直接请求随机宿主端口，删除旧 HAProxy 假设；
+- 完成 Challenge.DefinitionJson 与 CompetitionChallenge.RulesJson 的严格所有权边界；
+- 对齐 `D1no209/NoCTF-Challenge-Template` 的 GitOps Manifest 与后端 API；
+- 修正 GitOps、部署和本交接文档；
+- 重新执行真实依赖、OpenAPI、EF 与四模式边界测试；
+- 后端稳定并本地提交后，再评估 Frontend 整合。Frontend 分支当前不得提前合并。
 
-Container、Docker Compose 与 Kubernetes Compose 的持久 Runtime 执行路径已经接通，
-OVA/Libvirt lifecycle、orphan reconciliation 与 CTF PerTeam Runtime Flag 注入也已闭环。
-EgressPolicy 强类型模型、Docker `DenyAll`、可信双网络 ingress proxy 与 Kubernetes
-`DenyAll | InternetOnly` enforcement 已接通，并已在 Cilium `always` 模式的临时集群
-完成真实复测。Docker/Kubernetes 持久 Container sandbox、可信 ingress proxy 与
-Compose appliance 的 crash orphan reconciliation 也已闭环。受控 Docker Compose 与
-Kubernetes 三进程 deployment smoke、真实双栈 Cilium IPv6 deny 验证均已完成并清理；
-Admin API 传输层、协议测试、OpenAPI 与文档重构也已完成。CTF、AWD、AWDP 与 KoH
-四模式完整边界 E2E 均已通过。Application/Infrastructure capability 归档、DI composition
-root 收口和最终 `Verify-Backend.ps1` 也分别由 `39ff3d3`、`984d633` 完成并通过全量门禁。
+2026-07-30 已验证 GitOps 模板 `2571893` 可构建，`validate` 与 `self-test` 均通过。用户经
+`$grill-me` 明确选择方案 A：使用普通 Organizer Bot、普通长生命周期 Access JWT、现有
+细粒度管理 API 和稳定 UUID，不引入 Repository 专用 JWT 或原子 bundle API。后端现已
+补齐 Bot identity/token、显式 ID、`includeDeleted`、模板与子资源恢复，并以真实
+PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` 已改为方案 A。
 
 ### 当前完成度
 
-后端目标架构迁移的既定交付项完成度为 **100%**。这是本次目标迁移清单的完成度，
-不是测试覆盖率、生产部署状态或生产可用性承诺。
-
-已完成项包含目标数据模型、强类型 API/消息边界、四模式主要业务闭环、
-三类 Runtime Provider lifecycle、容量状态机、CTF PerTeam Flag、AWDP 即时 target、
-DNS 命名隔离、Docker/Kubernetes 网络策略、Cilium fail-closed 前提和三 Provider
-crash orphan reconciliation、三进程 Docker/Kubernetes deployment smoke、真实双栈
-IPv6 deny 验证、Admin API 传输契约重构、四模式完整边界 E2E、capability/DI 整理与
-可区分测试门禁。第 6 节列出的真实环境验证和后续网络加固仍是独立非阻塞工作，
-不得据此把已完成的迁移交付项重新描述为未完成。
+- 本轮约定的后端代码与本地验证范围：100%。
+- NoCTF 整体交付估算：约 90%；主要余项是 Frontend 对新 OpenAPI/GitOps 管理能力的整合、
+  更新后的本地 deploy 镜像重建验收，以及正式环境部署/运维验收。
+- “后端 100%”不表示已经生产部署，也不表示 Kubernetes/Libvirt 所有可选基础设施已在
+  当前机器再次实测；第 6 节明确区分代码、测试、本地部署和生产部署状态。
 
 ## 2. Git 基线与工作树保护
 
 - 仓库：`E:\SourceCode\NoCTF`
-- 代码基线分支：`main`
-- 代码基线 HEAD：`2c6b4ce fix(backend): reject null runtime URL bindings`
-- 本交接分支：`codex/backend-target-architecture-handoff`
-- 当前实现与验证 HEAD：`1f0f3e3 fix(deploy): wait for API and Runner readiness`。
-- 本交接文档提交前，当前分支相对
-  `origin/codex/backend-target-architecture-handoff` ahead 9、behind 0；本文独立提交后
-  应为 ahead 10、behind 0。
+- 2026-07-30 代码基线分支：`main`
+- 2026-07-30 代码基线 HEAD：`a186d5f`，与 `origin/main` 一致。
+- 当前本地工作分支：`codex/backend-gitops-completion`
+- 本轮仍遵循“先本地提交，只有用户明确要求后才推送”；当前不得推送远端。
+- 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
+  序列是历史记录，不再代表当前 Git 状态。
+- 当前分支未设置 upstream；本轮只创建本地提交，不推送、不创建 PR。
 - 前序实现均先做本地提交；当前用户规则是只有收到明确推送指令后才能推送远端。
 - 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
   Docker Compose 纵切。
@@ -95,9 +88,10 @@ git log --oneline 003b75c..2c6b4ce -- backend
     不防管理员内鬼；选手、题目业务容器及其网络输入仍按不可信处理。
 12. `EgressPolicy` 只属于 Container/Compose，OVA 首版不增加该字段。Docker 首版只支持
     `DenyAll`，`InternetOnly` 直接拒绝；Kubernetes 支持两者。
-13. Docker 的 `internal` network 不提供可用的直接 published port。公开 Runtime 使用
-    用户确认的 1A：平台托管可信 HAProxy ingress，同时连接题目内部 network 与
-    `noctf-network`，只转发已声明的 TCP URL Binding；题目容器不连接平台网络。
+13. 2026-07-30 用户确认协作者的新实现为准：Docker Container/Compose 公开服务由题目
+    容器直接发布声明的 TCP 端口，宿主端口请求 `0` 并由 Docker 随机分配；Runner 根据
+    实际映射展开 URL。不得恢复 HAProxy/ingress proxy。Runtime 仍使用独立普通
+    user-defined bridge network，不把题目容器接入 `noctf-network`。
 14. Kubernetes `InternetOnly` 只放行公网 IPv4；IPv6 不放行。特殊/私有地址使用内建
     deny ranges，并要求 Runner Pool 额外声明非空 `ProtectedCidrs`。
 15. 生产 Kubernetes Runner Pool 必须使用 Cilium
@@ -115,8 +109,31 @@ git log --oneline 003b75c..2c6b4ce -- backend
 20. Competition 普通更新继续使用 lifecycle status concurrency fence，不增加通用
     `Competition.Revision`；模式配置使用 `ConfigurationRevision`。
 21. CompetitionChallenge 普通更新与模式配置更新继续使用各自现有 revision。
+22. GitOps 采用方案 A：平台 Bot 是普通 `UserKind.Bot` Organizer，令牌是普通 Access
+    JWT；同步逐个调用既有细粒度管理 API。Manifest UUID 是稳定资源身份，删除后可通过
+    `includeDeleted` 找回并恢复。不增加 Repository 专用身份、专用 JWT 或原子 bundle API。
 
-## 4. 2026-07-28 当前 HEAD 的实测门禁
+## 4. 当前门禁状态与 2026-07-28 历史记录
+
+> 本节后续带旧提交号的明细是历史记录。以下列表是
+> `codex/backend-gitops-completion` 当前工作树在本地提交前的最新结果。
+
+- solution build：0 warning、0 error。
+- 非 Integration：371 passed、0 failed、0 skipped。
+- Integration：51 passed、0 failed、2 skipped；Kubernetes dataplane 与 Libvirt fixture
+  均为显式 opt-in，未把 skip 伪装为 passed。
+- EF pending model check：通过；两项新增 migration 均由 `dotnet ef` 生成：
+  `AddPlatformBotUserKind`、`AddAwdpTargetRevisionFence`。
+- OpenAPI artifact/export/route drift：通过；共 131 条 route（含 health），130 条公开
+  文档 route，85 条 Admin route。
+- GitOps 模板 `2571893`：build、validate、self-test 通过。
+- GitOps 真实 PostgreSQL persistence contract：通过。
+- Docker 全边界 smoke：CTF、AWD、AWDP、KoH 各 1/1 passed。AWD/AWDP checker fixture
+  的 shell CRLF 问题已用根级 `.gitattributes` 固定为 LF，并经两个模式实际验证。
+- Docker Desktop Engine `28.5.1`、Compose `v2.40.3`。E2E 会动态读取 Docker socket
+  GID；清理按精确 Compose project label 覆盖独立 Runtime 网络，不再遗留题目容器。
+- `deploy-*` 六服务目前均运行在 `noctf-network`，API 与 Runner healthy；它们是此前
+  本地部署，尚未用本轮分支镜像重建，因此不能作为本轮 GitOps/Bot API 的部署验收。
 
 最终门禁在 Windows 直接执行 `backend/scripts/Verify-Backend.ps1`；下列 WSL 命令保留为
 前序专项回归记录。最终脚本摘要为：
@@ -546,12 +563,10 @@ routed network、URL、stop、replacement generation 与 identity cleanup 验证
   network，而是创建不可变 RuntimeInstanceId+Generation 的独立 sandbox。
 - Docker Container/Compose 只接受 `DenyAll`。所有题目 network 强制
   `internal: true`；`InternetOnly` 在保存校验和 provider 执行边界双重拒绝。
-- Docker 公开 URL 使用一个平台托管 HAProxy ingress。proxy 同时连接 Runtime 内部
-  network 与 `noctf-network`，题目容器不连接平台网络；proxy 只监听声明的 TCP Binding。
-  Container receipt 保存 proxy resource id；Compose 保存本地 ingress 映射 metadata，
-  status 把 proxy host port 映射回原 service/target port。
-- proxy 使用 `read_only`、drop ALL capabilities、no-new-privileges、固定内存/CPU/PID
-  limits；其资源开销计入 Runner capacity。创建重放、失败回滚、Stop/Reset cleanup 已覆盖。
+- 本段旧 HAProxy ingress 方案已被 2026-07-30 用户确认的新实现取代。Docker
+  Container/Compose 直接把声明的 TCP 端口发布为 Docker 随机宿主端口，Runner 从实际
+ 映射展开 URL；不得恢复平台 HAProxy。题目 Runtime 仍使用独立 user-defined bridge，
+  不连接 `noctf-network`。
 - Kubernetes Container/Compose 每 Runtime 创建 NetworkPolicy。`DenyAll` 只允许同
   Runtime、DNS 和平台声明入站；`InternetOnly` 额外允许 `0.0.0.0/0`，通过 `except`
   排除内建特殊/私有 IPv4 与 Pool `ProtectedCidrs`，不生成 IPv6 allow。
@@ -560,7 +575,7 @@ routed network、URL、stop、replacement generation 与 identity cleanup 验证
   deployment-owned Namespace baseline default-deny 与实际 kube-dns ClusterIP。
   Docker/Libvirt Pool 不被无关 Kubernetes 配置阻塞。
 - `deploy/docker-compose.yml` 将默认平台网络命名为 `noctf-network`，并加入新的
-  Runtime Docker/proxy/Runner 配置；`deploy/k8s/configmap.yaml` 加入
+  Runtime Docker/Runner 配置；`deploy/k8s/configmap.yaml` 加入
   `ProtectedCidrs` 与 k3s 默认 `ClusterDnsServiceAddress` 示例。
 
 当前实际部署状态：
@@ -581,8 +596,6 @@ routed network、URL、stop、replacement generation 与 identity cleanup 验证
 - Runner 不做持续 dataplane/Cilium 健康探测；启动检查只证明指定配置和基线资源存在，
   `NetworkPolicyRequired=true` 仍保留运维声明语义。
 - Pod/Service/node/management CIDR 自动发现；Pool 运维必须维护 `ProtectedCidrs`。
-- 单 Container proxy 镜像的自动 registry 拉取/鉴权；节点须预拉取受信任镜像。Compose
-  路径由 Compose pull policy 处理。
 - Docker TargetPort ACL 与 callback-only gateway；它们仍是后期加固，不阻塞当前迁移。
 
 不得把可信管理员假设、JWT、label、DNS 名称或独立 network 单独描述成完整安全边界。
@@ -925,17 +938,34 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   最终无 domain、只有原有 inactive `default` network。当前本地 `deploy` 六服务继续
   运行，API 与 Runner healthy，未被本轮测试重启或替换。
 
-本次目标迁移没有剩余实现项。真实 Provider lifecycle 已验证；仍未完成的是生产式
-Libvirt 节点上游路由/防火墙运维演练、Pool/Node CIDR 部署期审计、Docker
-`InternetOnly` 和后期 TargetPort/callback gateway 加固。它们均已明确边界，不是
-capability/DI 或交付脚本遗漏，也不得在没有新的用户批准和设计评审时顺带实现。
+上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
+
+- 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
+- Challenge `DefinitionJson` / CompetitionChallenge `RulesJson` 所有权边界；
+- AWDP disposable target 同时固化 Competition configuration、CompetitionChallenge 和
+  Challenge definition 三个 revision，任一变化均 PlatformFailed、清理且不自动重跑；
+- Docker 直接随机宿主端口、E2E socket GID/清理修正和 shell fixture LF 约束；
+- 四模式全边界、真实 PostgreSQL、EF、OpenAPI 和 solution 门禁。
+
+仍未完成/不属于本轮已部署：
+
+- Frontend 尚未整合新的 Bot、稳定 ID、恢复和 GitOps 管理流程；协作者 Frontend 分支仍
+  未合并。
+- 现有 `deploy-*` 六服务未用本轮 commit 重建；GitOps 模板尚未对一个部署了本轮 API 的
+  环境执行真实 push/pull 同步演练。
+- 未推送远端、未创建 PR、未生产部署。
+- 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境；
+  Docker `InternetOnly`、TargetPort ACL 和 callback-only gateway 是已记录的后续加固，
+  不阻塞本轮架构迁移。
 
 ## 7. 建议的下一交接顺序
 
-1. 审阅 `2c6b4ce..HEAD` 的提交序列与本文，确认目标迁移边界、架构约束和实测证据一致。
-2. 再次执行 `git status --short --branch`，确认本文提交未包含第 2 节的用户文件。
-3. 按用户指示推送 `codex/backend-target-architecture-handoff` 或创建 PR，进入代码评审。
-4. 只有用户另行批准时，才从第 6 节非阻塞限制中选择新的纵切；不得把它们混入本次迁移交付。
+1. 从本轮本地 commit 开始整合 Frontend，对照生成的 OpenAPI 接入 Bot、恢复和 GitOps
+   管理流程；合并协作者 Frontend 前先检查其差异和冲突。
+2. 用本轮镜像重建本地 `deploy-*`，再以真实 Platform Bot token 运行 GitOps 模板同步
+   演练；不得把模板自身 self-test 当成已部署 API 的验收。
+3. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
+4. 推送必须等待用户明确指令；当前本地 commit 不得自行 push 或创建 PR。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
 决策的只读审计，但不能自行发明新协议。
@@ -960,11 +990,9 @@ capability/DI 或交付脚本遗漏，也不得在没有新的用户批准和设
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 当前迁移已完成，从提交审阅和交接开始；不要重做 capability/DI、`Verify-Backend.ps1`、
-   四模式 E2E、deployment smoke、双栈 IPv6 deny、RuntimeKind dispatch、Docker/Kubernetes
-   Compose handler、三 Provider crash orphan reconciliation、IPv4 Cilium egress 验证或
-   Admin API 传输层重构。
-5. 若用户批准新的实现纵切，固定执行：
+4. 旧目标迁移与 2026-07-30 GitOps 后端收尾无需重做；下一阶段是 Frontend 整合和使用
+   本轮镜像的本地部署/GitOps 联调。引用测试数量时使用第 4 节最新快照。
+5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
    - 相关测试；

@@ -16,7 +16,8 @@ public sealed record ChallengeAttachmentView(
     string ContentType,
     long ByteLength,
     string Sha256,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? DeletedAt);
 
 public sealed record ChallengeAttachmentContent(
     ChallengeAttachmentView Metadata,
@@ -28,6 +29,7 @@ public interface IChallengeAttachmentStore
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken cancellationToken);
     Task<bool> AddAsync(
         Guid challengeId,
@@ -46,6 +48,13 @@ public interface IChallengeAttachmentStore
         string contentType,
         CancellationToken cancellationToken);
     Task<bool> DeleteAsync(
+        Guid challengeId,
+        Guid attachmentId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<bool> RestoreAsync(
         Guid challengeId,
         Guid attachmentId,
         Guid actorId,
@@ -73,8 +82,9 @@ public sealed class ManageChallengeAttachments(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.ListAdminAsync(challengeId, actorId, isAdministrator, ct);
+        store.ListAdminAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
 
     public async Task<OperationResult<ChallengeAttachmentView>> UploadAsync(
         Guid challengeId,
@@ -83,12 +93,17 @@ public sealed class ManageChallengeAttachments(
         string fileName,
         string contentType,
         Stream content,
+        Guid? requestedId,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 260)
             return OperationResult<ChallengeAttachmentView>.Failure("invalid_file_name", "FileName is invalid.");
-        var attachmentId = Guid.CreateVersion7(now);
+        if (requestedId == Guid.Empty)
+            return OperationResult<ChallengeAttachmentView>.Failure(
+                "invalid_attachment_id",
+                "Id must be omitted or contain a non-empty UUID.");
+        var attachmentId = requestedId ?? Guid.CreateVersion7(now);
         var objectKey = $"challenges/{challengeId:N}/attachments/{attachmentId:N}";
         var stored = await objects.PutAsync(
             objectKey,
@@ -112,7 +127,8 @@ public sealed class ManageChallengeAttachments(
             stored.ContentType,
             stored.Length,
             stored.Sha256,
-            now));
+            now,
+            null));
     }
 
     public async Task<OperationResult<ChallengeAttachmentView>> UpdateAsync(
@@ -144,6 +160,25 @@ public sealed class ManageChallengeAttachments(
         await store.DeleteAsync(challengeId, attachmentId, actorId, isAdministrator, now, ct)
             ? OperationResult.Success()
             : OperationResult.Failure("attachment_not_found", "Attachment was not found or access was denied.");
+
+    public async Task<OperationResult> RestoreAsync(
+        Guid challengeId,
+        Guid attachmentId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        await store.RestoreAsync(
+            challengeId,
+            attachmentId,
+            actorId,
+            isAdministrator,
+            now,
+            ct)
+            ? OperationResult.Success()
+            : OperationResult.Failure(
+                "attachment_not_found",
+                "Deleted attachment was not found or access was denied.");
 }
 
 public sealed class GetChallengeAttachments(

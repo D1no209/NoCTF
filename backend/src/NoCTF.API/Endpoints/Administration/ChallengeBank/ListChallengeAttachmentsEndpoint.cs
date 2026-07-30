@@ -12,20 +12,35 @@ public sealed record ChallengeAttachmentResponse(
     string ContentType,
     long ByteLength,
     string Sha256,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? DeletedAt);
 
 public sealed record ChallengeAttachmentListResponse(IReadOnlyList<ChallengeAttachmentResponse> Items);
 
 internal static class ChallengeAttachmentMapping
 {
     public static ChallengeAttachmentResponse ToResponse(ChallengeAttachmentView view) =>
-        new(view.Id, view.ChallengeId, view.FileName, view.ContentType, view.ByteLength, view.Sha256, view.CreatedAt);
+        new(
+            view.Id,
+            view.ChallengeId,
+            view.FileName,
+            view.ContentType,
+            view.ByteLength,
+            view.Sha256,
+            view.CreatedAt,
+            view.DeletedAt);
+}
+
+public sealed class ListChallengeAttachmentsRequest
+{
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
 }
 
 public sealed class ListChallengeAttachmentsEndpoint(
     ManageChallengeAttachments attachments,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeAttachmentListResponse>, NotFound>>
+    : Endpoint<ListChallengeAttachmentsRequest, Results<Ok<ChallengeAttachmentListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -40,10 +55,15 @@ public sealed class ListChallengeAttachmentsEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeAttachmentListResponse>, NotFound>> ExecuteAsync(
+        ListChallengeAttachmentsRequest request,
         CancellationToken ct)
     {
         var items = await attachments.ListAsync(
-            Route<Guid>("challengeId"), user.UserId, user.IsAdministrator, ct);
+            Route<Guid>("challengeId"),
+            user.UserId,
+            user.IsAdministrator,
+            request.IncludeDeleted,
+            ct);
         return items is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(new ChallengeAttachmentListResponse(

@@ -16,9 +16,10 @@ public sealed class AuthenticationStore(
     {
         var normalized = login.Trim().ToUpperInvariant();
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(
-            item => item.NormalizedEmail == normalized
-                || item.NormalizedUserName == normalized
-                || item.Id.ToString() == login,
+            item => item.Kind == UserKind.Human
+                && (item.NormalizedEmail == normalized
+                    || item.NormalizedUserName == normalized
+                    || item.Id.ToString() == login),
             ct);
         return ToAuthenticated(user);
     }
@@ -28,7 +29,9 @@ public sealed class AuthenticationStore(
         string password,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(
+            item => item.Id == userId && item.Kind == UserKind.Human,
+            ct);
         if (user is null)
             return false;
         var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
@@ -43,7 +46,7 @@ public sealed class AuthenticationStore(
 
     public async Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken ct) =>
         ToAuthenticated(await db.Users.AsNoTracking().SingleOrDefaultAsync(
-            item => item.Id == userId, ct));
+            item => item.Id == userId && item.Kind == UserKind.Human, ct));
 
     public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken ct) =>
         db.Users.AsNoTracking()
@@ -78,6 +81,7 @@ public sealed class AuthenticationStore(
             NormalizedUserName = normalizedUserName,
             Email = email,
             NormalizedEmail = normalizedEmail,
+            Kind = UserKind.Human,
             Role = UserRole.User,
             CreatedAt = now,
             UpdatedAt = now
@@ -106,7 +110,9 @@ public sealed class AuthenticationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(
+            item => item.Id == userId && item.Kind == UserKind.Human,
+            ct);
         if (user is null
             || passwordHasher.VerifyHashedPassword(
                 user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)

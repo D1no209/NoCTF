@@ -9,7 +9,8 @@ public sealed record ChallengeHintView(
     long Cost,
     DateTimeOffset? PublishedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? DeletedAt);
 
 public sealed record SaveChallengeHintCommand(
     Guid CompetitionId,
@@ -18,7 +19,8 @@ public sealed record SaveChallengeHintCommand(
     string Content,
     long Cost,
     DateTimeOffset? PublishedAt,
-    DateTimeOffset Now);
+    DateTimeOffset Now,
+    Guid? RequestedId = null);
 
 public sealed record HintUnlockResult(ChallengeHintView Hint, bool Created);
 
@@ -41,16 +43,24 @@ public interface IChallengeHintStore
     Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool includeDeleted = false);
     Task<ChallengeHintView?> FindAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool includeDeleted = false);
     Task<ChallengeHintView?> SaveAsync(
         SaveChallengeHintCommand command,
         CancellationToken cancellationToken);
     Task<bool> DeleteAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid hintId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<bool> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
@@ -70,15 +80,22 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
     public Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        CancellationToken ct = default) =>
-        store.ListAsync(competitionId, competitionChallengeId, ct);
+        CancellationToken ct = default,
+        bool includeDeleted = false) =>
+        store.ListAsync(competitionId, competitionChallengeId, ct, includeDeleted);
 
     public Task<ChallengeHintView?> GetAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
-        CancellationToken ct = default) =>
-        store.FindAsync(competitionId, competitionChallengeId, hintId, ct);
+        CancellationToken ct = default,
+        bool includeDeleted = false) =>
+        store.FindAsync(
+            competitionId,
+            competitionChallengeId,
+            hintId,
+            ct,
+            includeDeleted);
 
     public async Task<OperationResult<ChallengeHintView>> SaveAsync(
         SaveChallengeHintCommand command,
@@ -88,6 +105,10 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
             return OperationResult<ChallengeHintView>.Failure("invalid_hint", "Hint content is required.");
         if (command.Cost < 0)
             return OperationResult<ChallengeHintView>.Failure("invalid_hint_cost", "Hint cost cannot be negative.");
+        if (command.RequestedId == Guid.Empty)
+            return OperationResult<ChallengeHintView>.Failure(
+                "invalid_hint_id",
+                "Id must be omitted or contain a non-empty UUID.");
         var result = await store.SaveAsync(command with { Content = command.Content.Trim() }, ct);
         return result is null
             ? OperationResult<ChallengeHintView>.Failure("hint_not_found", "Competition challenge or hint was not found.")
@@ -103,6 +124,21 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
         await store.DeleteAsync(competitionId, competitionChallengeId, hintId, now, ct)
             ? OperationResult.Success()
             : OperationResult.Failure("hint_not_found", "Hint was not found.");
+
+    public async Task<OperationResult> RestoreAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid hintId,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        await store.RestoreAsync(
+            competitionId,
+            competitionChallengeId,
+            hintId,
+            now,
+            ct)
+            ? OperationResult.Success()
+            : OperationResult.Failure("hint_not_found", "Deleted hint was not found.");
 }
 
 public sealed class UnlockChallengeHint(IChallengeHintStore store)

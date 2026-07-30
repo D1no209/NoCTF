@@ -21,6 +21,8 @@ builder.UseWolverine(options =>
     options.PersistMessagesWithPostgresql(postgres, WolverinePersistenceSchemas.Worker);
     options.UseEntityFrameworkCoreTransactions();
     options.Durability.Mode = DurabilityMode.Balanced;
+    options.Durability.ScheduledJobFirstExecution = TimeSpan.FromSeconds(1);
+    options.Durability.ScheduledJobPollingTime = TimeSpan.FromSeconds(1);
     options.Policies.OnException<TimeoutException>()
         .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
     options.Policies.OnException<System.Net.Http.HttpRequestException>()

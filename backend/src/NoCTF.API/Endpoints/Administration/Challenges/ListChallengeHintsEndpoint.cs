@@ -13,7 +13,8 @@ public sealed record ChallengeHintResponse(
     long Cost,
     DateTimeOffset? PublishedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? DeletedAt);
 
 public sealed record ChallengeHintListResponse(IReadOnlyList<ChallengeHintResponse> Items);
 
@@ -22,14 +23,21 @@ internal static class ChallengeHintMapping
     public static ChallengeHintResponse ToResponse(ChallengeHintView view) =>
         new(
             view.Id, view.CompetitionChallengeId, view.Content, view.Cost,
-            view.PublishedAt, view.CreatedAt, view.UpdatedAt);
+            view.PublishedAt, view.CreatedAt, view.UpdatedAt, view.DeletedAt);
+}
+
+public sealed class ListChallengeHintsRequest
+{
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
 }
 
 public sealed class ListChallengeHintsEndpoint(
     ManageChallengeHints hints,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeHintListResponse>, NotFound, ForbidHttpResult>>
+    : Endpoint<ListChallengeHintsRequest,
+        Results<Ok<ChallengeHintListResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
@@ -44,13 +52,17 @@ public sealed class ListChallengeHintsEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeHintListResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
+        ListChallengeHintsRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var items = await hints.ListAsync(
-            competitionId, Route<Guid>("competitionChallengeId"), ct);
+            competitionId,
+            Route<Guid>("competitionChallengeId"),
+            ct,
+            request.IncludeDeleted);
         return items is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(new ChallengeHintListResponse(

@@ -20,6 +20,15 @@
 
 Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未删除 Competition/Challenge 的 Owner 或 Manager；否则返回 409 并列出阻塞资源 Id。角色更新和 TokenVersion++ 同事务，旧 Access/Refresh JWT 随后都失效。
 
+### Organizer Bot Access JWT
+
+GitOps 使用 `UserKind.Bot` 的 Organizer。Bot 使用同一 Access Scheme、audience、
+`token_type=access` 与 TokenVersion 校验，但 Token 只能由平台 Administrator 通过
+`/admin/platform/bots/{botUserId}/tokens` 签发，生命周期为 60 秒～1 年。Bot 不能密码
+登录、修改密码或使用 Refresh；服务端只保存随机 dummy PasswordHash 和不可投递的唯一
+`.invalid` Email。管理员通过普通 token invalidate 接口递增 Bot TokenVersion 完成撤销。
+这不是第二套 Repository JWT。
+
 ## Refresh JWT
 
 - 固定 30 天；使用相同签名密钥、独立 refresh audience 与 `token_type=refresh`。

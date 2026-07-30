@@ -16,6 +16,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken ct)
     {
         var challenge = await WriteAuthorized(actorId, isAdministrator)
@@ -23,7 +24,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
         return challenge is null
             ? null
-            : challenge.Attachments.Where(item => item.DeletedAt == null)
+            : challenge.Attachments.Where(item => includeDeleted || item.DeletedAt == null)
                 .OrderBy(item => item.CreatedAt).ThenBy(item => item.Id).Select(Map).ToArray();
     }
 
@@ -97,6 +98,28 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         if (attachment is null)
             return false;
         attachment.DeletedAt = now;
+        challenge!.Revision = checked(challenge.Revision + 1);
+        challenge.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> RestoreAsync(
+        Guid challengeId,
+        Guid attachmentId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var challenge = await WriteAuthorized(actorId, isAdministrator)
+            .Include(item => item.Attachments)
+            .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
+        var attachment = challenge?.Attachments.SingleOrDefault(item =>
+            item.Id == attachmentId && item.DeletedAt != null);
+        if (attachment is null)
+            return false;
+        attachment.DeletedAt = null;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
@@ -245,7 +268,8 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         new(
             attachment.Id, attachment.ChallengeId, attachment.FileName,
             attachment.ContentType, attachment.Length,
-            Convert.ToHexString(attachment.Sha256Bytes), attachment.CreatedAt);
+            Convert.ToHexString(attachment.Sha256Bytes), attachment.CreatedAt,
+            attachment.DeletedAt);
 
     private sealed record PlayerScope(Guid TeamId, Guid ChallengeId, string ConfigurationJson);
 }

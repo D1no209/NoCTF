@@ -34,7 +34,8 @@ public sealed class ChallengeHintUnlockTests
             0,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            null);
         var result = await new UnlockChallengeHint(new Store(
                 HintUnlockAttempt.Success(new HintUnlockResult(hint, true))))
             .ExecuteAsync(
@@ -53,14 +54,16 @@ public sealed class ChallengeHintUnlockTests
         public Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
             Guid competitionId,
             Guid competitionChallengeId,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            bool includeDeleted = false) =>
             throw new NotSupportedException();
 
         public Task<ChallengeHintView?> FindAsync(
             Guid competitionId,
             Guid competitionChallengeId,
             Guid hintId,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            bool includeDeleted = false) =>
             throw new NotSupportedException();
 
         public Task<ChallengeHintView?> SaveAsync(
@@ -69,6 +72,14 @@ public sealed class ChallengeHintUnlockTests
             throw new NotSupportedException();
 
         public Task<bool> DeleteAsync(
+            Guid competitionId,
+            Guid competitionChallengeId,
+            Guid hintId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<bool> RestoreAsync(
             Guid competitionId,
             Guid competitionChallengeId,
             Guid hintId,

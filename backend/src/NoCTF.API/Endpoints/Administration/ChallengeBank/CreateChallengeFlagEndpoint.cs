@@ -10,6 +10,7 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class SaveChallengeFlagRequest
 {
+    public Guid? Id { get; set; }
     public Guid? TeamId { get; set; }
     public string Flag { get; set; } = string.Empty;
     public SpecificationKind? SpecificationKind { get; set; }
@@ -23,6 +24,9 @@ public sealed class SaveChallengeFlagValidator : Validator<SaveChallengeFlagRequ
     public SaveChallengeFlagValidator()
     {
         RuleFor(request => request.Flag).NotEmpty().MaximumLength(4096);
+        RuleFor(request => request.Id)
+            .NotEqual(Guid.Empty)
+            .When(request => request.Id is not null);
         RuleFor(request => request.SpecificationKind)
             .IsInEnum()
             .When(request => request.SpecificationKind is not null);
@@ -39,7 +43,8 @@ internal static class SaveChallengeFlagMapping
         new(
             scope, flagId, request.TeamId, request.Flag,
             request.SpecificationKind, request.SpecificationId,
-            request.ValidStart, request.ValidUntil, now);
+            request.ValidStart, request.ValidUntil, now,
+            flagId is null ? request.Id : null);
 }
 
 public sealed class CreateChallengeFlagEndpoint(

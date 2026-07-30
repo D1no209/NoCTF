@@ -11,17 +11,18 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         ChallengeFlagScope scope,
         Guid? actorId,
         bool isAdministrator,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool includeDeleted = false)
     {
         if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
             return null;
-        return await Scoped(scope).AsNoTracking()
+        return await Scoped(scope, includeDeleted).AsNoTracking()
             .OrderBy(flag => flag.CreatedAt)
             .ThenBy(flag => flag.Id)
             .Select(flag => new ChallengeFlagView(
                 flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
                 flag.Flag, flag.SpecificationKind, flag.SpecificationId,
-                flag.ValidStart, flag.ValidUntil, flag.CreatedAt))
+                flag.ValidStart, flag.ValidUntil, flag.CreatedAt, flag.DeletedAt))
             .ToListAsync(ct);
     }
 
@@ -30,16 +31,17 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         Guid flagId,
         Guid? actorId,
         bool isAdministrator,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool includeDeleted = false)
     {
         if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
             return null;
-        return await Scoped(scope).AsNoTracking()
+        return await Scoped(scope, includeDeleted).AsNoTracking()
             .Where(flag => flag.Id == flagId)
             .Select(flag => new ChallengeFlagView(
                 flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
                 flag.Flag, flag.SpecificationKind, flag.SpecificationId,
-                flag.ValidStart, flag.ValidUntil, flag.CreatedAt))
+                flag.ValidStart, flag.ValidUntil, flag.CreatedAt, flag.DeletedAt))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -63,7 +65,7 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         {
             entity = new ChallengeFlag
             {
-                Id = Guid.CreateVersion7(command.Now),
+                Id = command.RequestedId ?? Guid.CreateVersion7(command.Now),
                 ChallengeId = command.Scope.ChallengeId,
                 CompetitionChallengeId = command.Scope.CompetitionChallengeId,
                 CreatedAt = command.Now
@@ -99,10 +101,35 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         return true;
     }
 
-    private IQueryable<ChallengeFlag> Scoped(ChallengeFlagScope scope) =>
-        db.ChallengeFlags.Where(flag =>
+    public async Task<bool> RestoreAsync(
+        ChallengeFlagScope scope,
+        Guid flagId,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
+            return false;
+        var entity = await Scoped(scope, includeDeleted: true)
+            .SingleOrDefaultAsync(flag => flag.Id == flagId && flag.DeletedAt != null, ct);
+        if (entity is null)
+            return false;
+        entity.DeletedAt = null;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    private IQueryable<ChallengeFlag> Scoped(
+        ChallengeFlagScope scope,
+        bool includeDeleted = false)
+    {
+        var source = includeDeleted
+            ? db.ChallengeFlags.IgnoreQueryFilters()
+            : db.ChallengeFlags;
+        return source.Where(flag =>
             flag.ChallengeId == scope.ChallengeId &&
             flag.CompetitionChallengeId == scope.CompetitionChallengeId);
+    }
 
     private Task<bool> ScopeExistsAsync(
         ChallengeFlagScope scope,
@@ -126,6 +153,6 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         new(
             flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
             flag.Flag, flag.SpecificationKind, flag.SpecificationId,
-            flag.ValidStart, flag.ValidUntil, flag.CreatedAt);
+            flag.ValidStart, flag.ValidUntil, flag.CreatedAt, flag.DeletedAt);
 
 }

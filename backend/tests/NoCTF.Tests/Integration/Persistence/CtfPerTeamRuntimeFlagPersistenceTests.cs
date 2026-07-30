@@ -256,6 +256,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             Id = challengeId,
             OwnerId = ownerId,
             Title = title,
+            DefinitionJson = configurationJson,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -266,7 +267,12 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             ChallengeId = challengeId,
             Order = order,
             IsPublished = true,
-            RulesJson = configurationJson,
+            RulesJson = JsonSerializer.Serialize(
+                new CtfChallengeConfiguration(
+                    CtfChallengeConfiguration.CurrentSchemaVersion,
+                    Points: null,
+                    BloodRewards: null),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = now
         });
     }

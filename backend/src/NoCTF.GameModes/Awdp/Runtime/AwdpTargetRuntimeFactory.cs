@@ -14,6 +14,9 @@ public static class AwdpTargetRuntimeFactory
         RuntimePlacement placement,
         int generation,
         long submissionProcessingVersion,
+        int competitionConfigurationRevision,
+        int competitionChallengeRevision,
+        int challengeDefinitionRevision,
         DateTimeOffset now)
     {
         if (template.Definition is not ContainerRuntimeDefinition)
@@ -21,6 +24,14 @@ public static class AwdpTargetRuntimeFactory
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
         if (generation < 1)
             throw new ArgumentOutOfRangeException(nameof(generation));
+        if (competitionConfigurationRevision < 0
+            || competitionChallengeRevision < 0
+            || challengeDefinitionRevision < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(competitionConfigurationRevision),
+                "AWDP target source revisions cannot be negative.");
+        }
 
         return new RuntimeInstance
         {
@@ -31,6 +42,9 @@ public static class AwdpTargetRuntimeFactory
             Purpose = RuntimePurpose.AwdpTarget,
             SubmissionId = submissionId,
             SubmissionProcessingVersion = submissionProcessingVersion,
+            SourceCompetitionConfigurationRevision = competitionConfigurationRevision,
+            SourceCompetitionChallengeRevision = competitionChallengeRevision,
+            SourceChallengeDefinitionRevision = challengeDefinitionRevision,
             Generation = generation,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = placement.Provider,

@@ -610,6 +610,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("email_verified_at");
 
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -860,6 +864,18 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<short>("RuntimeProvider")
                         .HasColumnType("smallint")
                         .HasColumnName("runtime_provider");
+
+                    b.Property<int>("SourceChallengeDefinitionRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_challenge_definition_revision");
+
+                    b.Property<int>("SourceCompetitionChallengeRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_competition_challenge_revision");
+
+                    b.Property<int>("SourceCompetitionConfigurationRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_competition_configuration_revision");
 
                     b.Property<short>("State")
                         .HasColumnType("smallint")

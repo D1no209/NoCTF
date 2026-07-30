@@ -21,7 +21,7 @@ public class AdminOpenApiRulesTests
                     operation.Value)))
             .ToArray();
 
-        await Assert.That(operations).Count().IsEqualTo(80);
+        await Assert.That(operations).Count().IsEqualTo(85);
         await Assert.That(operations
             .Where(operation => !operation.Value.TryGetProperty("operationId", out var id)
                 || id.GetString() is not { } value

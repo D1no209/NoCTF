@@ -2,7 +2,7 @@
 
 ## 配置契约
 
-Competition 必须配置 `RoundDurationSeconds > 0`，并提供以下默认值；CompetitionChallenge 可用 nullable 字段逐项覆盖：
+Competition 必须配置 `RoundDurationSeconds > 0`，并提供以下比赛规则默认值；CompetitionChallenge.RulesJson 可用 nullable 字段逐项覆盖：
 
 ```text
 BreakSettlement / FixSettlement: Milestone | PerRound
@@ -11,13 +11,9 @@ BreakWrongPenalty / FixFailurePenalty / ViolationPenalty / ServiceDownPenalty: b
 RequireBreakBeforeFix: bool
 MaxBreakSubmissions / MaxFixSubmissions: int       // <=0 无限
 EvaluationDispatchMode: Automatic | ManualBatch
-PatchEntrypoint / PatchCommand / PatchTimeoutSeconds
-ReadyTimeoutSeconds
-RuntimeDefinition: Container
-CheckerDefinition: Container
 ```
 
-覆盖数值 0 是显式 0，只有 null 表示继承。Patch/Runtime/Checker 定义整体由题目覆盖，不做字段级合并；保存时完整验证。所有 JSON 带 schemaVersion，未知版本拒绝。
+覆盖数值 0 是显式 0，只有 null 表示继承。Runtime、Checker、Patch 和 ReadyTimeoutSeconds 只属于 Challenge.DefinitionJson，Competition 配置和 CompetitionChallenge.RulesJson 均不得声明或覆盖。复用 Challenge 模板即复用相同判题定义。所有 JSON 带 schemaVersion，未知版本拒绝。
 
 ## 基本模型
 
@@ -57,9 +53,14 @@ AWDP target 只支持单 Container，Provider Docker/Kubernetes；不支持 Comp
 
 Fix 永不修改比赛长期 Runtime。
 
+创建 disposable target 时会固化 Competition configuration revision、
+CompetitionChallenge revision 和 Challenge definition revision。Fix 结果落库前再次核对
+这三个 revision；任一变化都把本次 Fix 记为 PlatformFailed，停止并清理即时 target，
+不计分、不消耗尝试，也不自动用新配置重跑。管理员需要显式 rejudge。
+
 ## Archive/Patch
 
-只支持 tar.gz。安全解包见存储文档。题目配置：
+只支持 tar.gz。安全解包见存储文档。Challenge.DefinitionJson 配置：
 
 ```text
 PatchEntrypoint (default fix.sh, safe relative path)

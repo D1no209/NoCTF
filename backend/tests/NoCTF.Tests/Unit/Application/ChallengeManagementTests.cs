@@ -72,7 +72,9 @@ public class ChallengeManagementTests
     {
         var store = new Store();
 
-        await new ListChallenges(store).ExecuteAsync(Guid.NewGuid(), includeUnpublished: false);
+        await new ListChallenges(store).ExecuteAsync(
+            Guid.NewGuid(),
+            includeUnpublished: false);
 
         await Assert.That(store.LastIncludeUnpublished).IsFalse();
     }
@@ -82,7 +84,10 @@ public class ChallengeManagementTests
     {
         var store = new Store();
 
-        await new GetChallenge(store).ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), includeUnpublished: true);
+        await new GetChallenge(store).ExecuteAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            includeUnpublished: true);
 
         await Assert.That(store.LastIncludeUnpublished).IsTrue();
     }
@@ -168,7 +173,8 @@ public class ChallengeManagementTests
             false,
             0,
             DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            null);
 
         public CompetitionStatus? Status { get; init; } = CompetitionStatus.Draft;
         public ChallengeMutationResult? CreateResult { get; init; }
@@ -194,6 +200,7 @@ public class ChallengeManagementTests
             Guid competitionId,
             Guid challengeId,
             bool includeUnpublished,
+            bool includeDeleted,
             CancellationToken cancellationToken)
         {
             LastIncludeUnpublished = includeUnpublished;
@@ -203,6 +210,7 @@ public class ChallengeManagementTests
         public Task<IReadOnlyList<ChallengeView>> ListAsync(
             Guid competitionId,
             bool includeUnpublished,
+            bool includeDeleted,
             CancellationToken cancellationToken)
         {
             LastIncludeUnpublished = includeUnpublished;

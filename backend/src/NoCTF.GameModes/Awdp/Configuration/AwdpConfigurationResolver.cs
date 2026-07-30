@@ -2,6 +2,10 @@ namespace NoCTF.GameModes.Awdp.Configuration;
 
 public static class AwdpConfigurationResolver
 {
+    private const string DefaultPatchEntrypoint = "fix.sh";
+    private const int DefaultPatchTimeoutSeconds = 60;
+    private const int DefaultReadyTimeoutSeconds = 30;
+
     public static AwdpEffectiveConfiguration Resolve(
         string competitionJson,
         string legacyChallengeJson) =>
@@ -32,12 +36,12 @@ public static class AwdpConfigurationResolver
             rules.MaxBreakSubmissions ?? competition.MaxBreakSubmissions,
             rules.MaxFixSubmissions ?? competition.MaxFixSubmissions,
             rules.EvaluationDispatchMode ?? competition.EvaluationDispatchMode,
-            definition.Runtime ?? competition.Runtime,
-            definition.PatchEntrypoint ?? competition.PatchEntrypoint,
-            definition.PatchCommand ?? competition.PatchCommand,
-            definition.PatchTimeoutSeconds ?? competition.PatchTimeoutSeconds,
-            definition.Checker ?? competition.Checker,
-            definition.ReadyTimeoutSeconds ?? competition.ReadyTimeoutSeconds);
+            definition.Runtime,
+            definition.PatchEntrypoint ?? DefaultPatchEntrypoint,
+            definition.PatchCommand,
+            definition.PatchTimeoutSeconds ?? DefaultPatchTimeoutSeconds,
+            definition.Checker,
+            definition.ReadyTimeoutSeconds ?? DefaultReadyTimeoutSeconds);
 
     public static AwdpEffectiveConfiguration Resolve(
         AwdpConfiguration competition,

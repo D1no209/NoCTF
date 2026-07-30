@@ -12,6 +12,7 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class CreateChallengeTemplateRequest
 {
+    public Guid? Id { get; set; }
     public GameMode Mode { get; set; }
     public ChallengeVisibility Visibility { get; set; }
     public string Title { get; set; } = string.Empty;
@@ -32,13 +33,18 @@ public sealed record ChallengeTemplateResponse(
     string DefinitionJson,
     int Revision,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? DeletedAt,
+    int ActiveCompetitionReferenceCount);
 
 public sealed class CreateChallengeTemplateValidator : Validator<CreateChallengeTemplateRequest>
 {
     public CreateChallengeTemplateValidator()
     {
         RuleFor(request => request.Mode).IsInEnum();
+        RuleFor(request => request.Id)
+            .NotEqual(Guid.Empty)
+            .When(request => request.Id is not null);
         RuleFor(request => request.Visibility).IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.Direction).NotEmpty().MaximumLength(96);
