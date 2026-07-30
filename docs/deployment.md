@@ -25,9 +25,9 @@ Runner 管理端口只在内部网络。Checker callback API 可达，但严格 
 ## Provider 前置条件
 
 - Docker Pool：Docker daemon，禁止把 socket 暴露给题目 Container。平台网络统一命名为
-  `noctf-network`；Runner 必须配置 `Runtime__Docker__Network=noctf-network` 和可信
-  `IngressProxyImage` 及其固定内存/CPU/PID 开销。Compose 部署保持 Runner 为非 root，
-  并将 `DOCKER_SOCKET_GID` 设置为宿主 `/var/run/docker.sock` 的数字组 ID（Linux 可用
+  `noctf-network`；Runner 必须配置 `Runtime__Docker__Network=noctf-network`。
+  Compose 部署保持 Runner 为非 root，并将 `DOCKER_SOCKET_GID` 设置为宿主
+  `/var/run/docker.sock` 的数字组 ID（Linux 可用
   `stat -c '%g' /var/run/docker.sock` 查询；Docker Desktop 默认通常为 `0`）。
 - Kubernetes Pool：统一 Runtime Namespace、支持 NetworkPolicy 的 CNI、固定 Kompose
   `v1.38.0` 与最小 Kubernetes API 权限。Pool 必须显式声明
