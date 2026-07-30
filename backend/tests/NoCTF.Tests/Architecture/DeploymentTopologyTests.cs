@@ -45,7 +45,8 @@ public sealed class DeploymentTopologyTests
                  {
                      "Runner__ApiKey",
                      "Runner__BaseUrl",
-                     "QqBot__PublicBaseUrl"
+                     "QqBot__PublicBaseUrl",
+                     "Runtime__Docker__IngressProxy"
                  })
         {
             await Assert.That(compose).DoesNotContain(legacySetting);

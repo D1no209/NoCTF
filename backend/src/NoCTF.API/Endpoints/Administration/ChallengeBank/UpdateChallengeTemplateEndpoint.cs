@@ -2,6 +2,7 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using System.Text.Json.Serialization;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
@@ -11,7 +12,9 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class UpdateChallengeTemplateRequest
 {
+    [JsonConverter(typeof(JsonStringEnumConverter<GameMode>))]
     public GameMode Mode { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter<ChallengeVisibility>))]
     public ChallengeVisibility Visibility { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
