@@ -72,6 +72,10 @@ describe('platform user presentation', () => {
       'admin.users.issueToken',
       'admin.users.invalidateTokens',
       'admin.users.tokenOneTimeWarning',
+      'admin.users.roleDowngradeBlocked',
+      'admin.users.roleDowngradeBlockedHint',
+      'admin.users.blockingCompetitions',
+      'admin.users.blockingChallenges',
     ]) {
       expect(i18n.global.t(key)).not.toBe(key)
     }

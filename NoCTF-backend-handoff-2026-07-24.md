@@ -1110,7 +1110,7 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   `WolverineTransactionalMessageOutbox.cs`、Runner `Properties/`、本地端口 compose、
   三个 instance-operation/query 文件和 `scripts/` 继续视为用户工作，不得混入本轮提交。
 
-### 6.19 Owner/Manager 角色资格与生命周期串行化（2026-07-31，当前最新）
+### 6.19 Owner/Manager 角色资格与生命周期串行化（2026-07-31）
 
 本节完成 6.18 明确记录的最后一个 Frontend 前置后端阻断项，并取代第 7 节原先要求再次
 实现该切片的旧顺序。6.18 仍保留为所有权并发修复的历史记录。
@@ -1195,6 +1195,50 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 - 保护文件列表与 6.18 相同；本地提交不得包含用户的 Wolverine、Runner Properties、
   本地端口 compose、instance-operation/query 文件或 `scripts/`。
 
+### 6.20 Frontend typed 409 与 Challenge GitOps Manager 授权（2026-07-31，当前最新）
+
+本节完成 6.19 和第 7 节前两项 Frontend 纵切；后续不得重复恢复旧 `/collaborators`
+协议，也不得把 Challenge permission 的全量替换误用于 Competition permission。
+
+#### Platform 角色降级冲突
+
+- `/admin/users` 直接读取生成契约的
+  `UpdatePlatformUserRoleConflictResponse`。只有 HTTP 409 且 code 为
+  `ActiveOwnerOrManagerAssignments` 时，才显示排序、去重后的 Competition/Challenge
+  阻塞 ID；未知状态或 code 继续走通用错误。
+- 角色更新失败后保留对话框并刷新 `adminUsers` 查询；打开对话框、重试和成功后都会清除
+  旧 blocker，避免把上一次冲突误显示给其他用户。
+- 没有根据资源 ID 拼接 URL，也没有解析 ProblemDetails 文本。
+
+#### Challenge GitOps access
+
+- Challenge Bank 活动模板只对平台 Administrator 显示“Grant GitOps access”入口。
+  对话框使用生成的 `adminChallengeBankGetTemplate`、`adminPlatformListUsers` 和
+  `adminChallengeBankUpdatePermissions`。
+- 候选人严格限制为未分配的 Organizer Bot，并排除 Owner；提交 payload 保留、去重并排序
+  全部现有 `ManagerIds`，加入所选 Bot，显式发送最新 `expectedRevision`。
+- 生成响应缺失 `OwnerId`、`ManagerIds` 或 `Revision` 时 fail-closed，不会以空数组覆盖已有
+  权限。typed 409 后同时重取模板和平台用户，所选 Bot 必须在最新候选集合中仍然有效才可
+  再次提交。
+- 没有手写 URL，没有复用已废弃的 `AdminCollaboratorsWorkspace` 或 `/collaborators`。
+
+#### Frontend 验证与 Git 状态
+
+- 提交前通过 GitHub compare 再次核验远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`，与本地已合并基线 `identical`；该提交是
+  当前 HEAD 的祖先，因此没有新冲突或需要创建空 merge commit。
+- `bun test`：30/30 passed。
+- `bun run build`：`vue-tsc --noEmit` 与 Vite production build passed；仅保留依赖 PURE
+  annotation 和既有大 chunk 警告。
+- 除 `src/api/noctf.ts` 外，本轮目标文件 scoped ESLint passed；`noctf.ts` 的 11 项均位于
+  HEAD 已有代理/type/正则/旧样式代码，本轮新增 typed helper 没有新增 lint 告警。全仓
+  `bun run lint` 仍被既有数千项 baseline 阻塞，本轮没有借机格式化或重写无关文件。
+- `git diff --check` passed；独立只读审查确认 Organizer Bot 筛选、Manager 保留、Owner
+  排除、fail-closed、revision 与 409 refetch 无剩余阻塞。
+- 本节作为独立 Frontend 本地提交；不 push、不创建 PR。保护文件列表继续沿用 6.18。
+- 下一项进入 CompetitionChallenge 稳定 ID 的 create/update/delete/restore 管理流程；
+  Competition permission UI 仍等待后端读取契约返回完整权限集合。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1206,8 +1250,8 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 
 仍未完成/不属于本轮已部署：
 
-- Frontend 的 Bot 与 Challenge lifecycle inventory 已完成；Challenge Bot Manager 授权、
-  CompetitionChallenge lifecycle 等后续管理纵切尚未完成。
+- Frontend 的 Bot、Challenge lifecycle inventory、typed role 409 与 Challenge Bot
+  Manager 授权已完成；CompetitionChallenge lifecycle 等后续管理纵切尚未完成。
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
   环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
@@ -1217,16 +1261,12 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 
 ## 7. 建议的下一交接顺序
 
-1. 先适配 `/admin/users` 的 typed role-downgrade 409，展示阻塞 Competition/Challenge
-   IDs，失败后刷新列表；不得解析旧 ProblemDetails 字符串。
-2. 完成 Challenge 的 Platform Bot Manager 授权 UI，只使用生成的强类型 OpenAPI SDK；
-   加 revision/现有 Manager 保留测试，处理 409 后重新获取最新模板。
-3. 再推进 CompetitionChallenge 稳定 ID 的 create/update/delete/restore 管理流程；每个
+1. 推进 CompetitionChallenge 稳定 ID 的 create/update/delete/restore 管理流程；每个
    纵切独立测试、build 和本地 commit。
-4. Competition permission UI 等待读取契约补齐完整权限数组后再实现，不得以空数组覆盖
+2. Competition permission UI 等待读取契约补齐完整权限数组后再实现，不得以空数组覆盖
    现有权限，也不得恢复已废弃的 `/collaborators` 协议。
-5. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
-6. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
+3. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
+4. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
 决策的只读审计，但不能自行发明新协议。
@@ -1251,9 +1291,9 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；下一阶段从 6.19 和
-   第 7 节记录的 Frontend typed 409 与 Bot Manager 授权开始。引用测试数量时使用
-   6.19 最新快照。
+4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；Frontend typed 409 与
+   Bot Manager 授权也已完成。下一阶段从 6.20 和第 7 节记录的 CompetitionChallenge
+   lifecycle 开始；引用后端测试数量时使用 6.19，引用前端状态时使用 6.20。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
