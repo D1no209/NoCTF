@@ -572,9 +572,24 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse>;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse = {
+    code?: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode;
+    competitionIds?: Array<string>;
+    challengeIds?: Array<string>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode = 'ActiveOwnerOrManagerAssignments';
+
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest = {
     role?: NoCtfDomainIdentityUserRole;
 };
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse = {
+    code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode;
+    userIds?: Array<string>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode = 'RolesOverlap' | 'OwnerIncluded' | 'UserNotFound' | 'RoleNotEligible';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest = {
     title: string;
@@ -756,6 +771,13 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
 };
 
 export type NoCtfDomainChallengesChallengeVisibility = 0 | 1;
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse = {
+    code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode;
+    userIds?: Array<string>;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'RevisionConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest = {
     id?: string | null;
@@ -3248,6 +3270,7 @@ export type AdminPlatformUpdateUserRoleErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse;
 };
 
 export type AdminPlatformUpdateUserRoleError = AdminPlatformUpdateUserRoleErrors[keyof AdminPlatformUpdateUserRoleErrors];
@@ -3308,6 +3331,7 @@ export type AdminCreateCompetitionErrors = {
      * Forbidden
      */
     403: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse;
 };
 
 export type AdminCreateCompetitionError = AdminCreateCompetitionErrors[keyof AdminCreateCompetitionErrors];
@@ -3730,7 +3754,10 @@ export type AdminRestoreCompetitionErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse;
 };
+
+export type AdminRestoreCompetitionError = AdminRestoreCompetitionErrors[keyof AdminRestoreCompetitionErrors];
 
 export type AdminRestoreCompetitionResponses = {
     /**
@@ -3839,6 +3866,7 @@ export type AdminTransferCompetitionOwnerErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse;
 };
 
 export type AdminTransferCompetitionOwnerError = AdminTransferCompetitionOwnerErrors[keyof AdminTransferCompetitionOwnerErrors];
@@ -3878,7 +3906,7 @@ export type AdminUpdateCompetitionPermissionsErrors = {
      * Not Found
      */
     404: unknown;
-    409: FastEndpointsErrorResponse;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse;
 };
 
 export type AdminUpdateCompetitionPermissionsError = AdminUpdateCompetitionPermissionsErrors[keyof AdminUpdateCompetitionPermissionsErrors];
@@ -4793,6 +4821,7 @@ export type AdminChallengeBankCreateTemplateErrors = {
      * Forbidden
      */
     403: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse;
 };
 
 export type AdminChallengeBankCreateTemplateError = AdminChallengeBankCreateTemplateErrors[keyof AdminChallengeBankCreateTemplateErrors];
@@ -5262,7 +5291,10 @@ export type AdminChallengeBankRestoreTemplateErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse;
 };
+
+export type AdminChallengeBankRestoreTemplateError = AdminChallengeBankRestoreTemplateErrors[keyof AdminChallengeBankRestoreTemplateErrors];
 
 export type AdminChallengeBankRestoreTemplateResponses = {
     /**
@@ -5295,7 +5327,11 @@ export type AdminChallengeBankTransferOwnerErrors = {
      * Forbidden
      */
     403: unknown;
-    409: FastEndpointsErrorResponse;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse;
 };
 
 export type AdminChallengeBankTransferOwnerError = AdminChallengeBankTransferOwnerErrors[keyof AdminChallengeBankTransferOwnerErrors];
@@ -5331,7 +5367,11 @@ export type AdminChallengeBankUpdatePermissionsErrors = {
      * Forbidden
      */
     403: unknown;
-    409: FastEndpointsErrorResponse;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse;
 };
 
 export type AdminChallengeBankUpdatePermissionsError = AdminChallengeBankUpdatePermissionsErrors[keyof AdminChallengeBankUpdatePermissionsErrors];

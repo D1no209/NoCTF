@@ -30,8 +30,14 @@ public class CompetitionManagementTests
         var invalidSize = await new CreateCompetition(store).ExecuteAsync(new(
             "CTF", null, GameMode.Ctf, now, now.AddHours(1), true, 0, Guid.NewGuid(), now));
 
-        await Assert.That(invalidSchedule.ErrorCode).IsEqualTo("invalid_schedule");
-        await Assert.That(invalidSize.ErrorCode).IsEqualTo("invalid_team_size");
+        await Assert.That(invalidSchedule.State)
+            .IsEqualTo(CompetitionCreationState.InvalidRequest);
+        await Assert.That(invalidSchedule.Detail)
+            .IsEqualTo("Competition start time must be before its end time.");
+        await Assert.That(invalidSize.State)
+            .IsEqualTo(CompetitionCreationState.InvalidRequest);
+        await Assert.That(invalidSize.Detail)
+            .IsEqualTo("MaxTeamMembers must be greater than zero.");
     }
 
     [Test]
@@ -110,11 +116,15 @@ public class CompetitionManagementTests
     private sealed class Store : ICompetitionManagementStore
     {
         public CompetitionView? Last { get; set; }
-        public Task<CompetitionView> CreateAsync(CreateCompetitionCommand command, CancellationToken cancellationToken)
+        public Task<CompetitionCreationResult> CreateAsync(
+            CreateCompetitionCommand command,
+            CancellationToken cancellationToken)
         {
             Last = new(Guid.NewGuid(), command.Title, command.Description, command.Mode, command.StartTime, command.EndTime,
                 CompetitionStatus.Draft, command.TeamRegistrationAutoApprove, command.MaxTeamMembers, command.OwnerId);
-            return Task.FromResult(Last);
+            return Task.FromResult(new CompetitionCreationResult(
+                CompetitionCreationState.Created,
+                Last));
         }
         public Task<CompetitionView?> FindAsync(Guid competitionId, bool includeDraft, CancellationToken cancellationToken) => Task.FromResult(Last);
         public Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CompetitionView>>(Last is null ? [] : [Last]);

@@ -40,6 +40,43 @@ public sealed record ChallengeTemplateResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+[JsonConverter(typeof(JsonStringEnumConverter<ChallengeTemplateConflictCode>))]
+public enum ChallengeTemplateConflictCode
+{
+    ResourceIdConflict,
+    RevisionConflict,
+    OwnerIncludedInManagerSet,
+    UserNotFound,
+    RoleNotEligible
+}
+
+public sealed record ChallengeTemplateConflictResponse(
+    ChallengeTemplateConflictCode Code,
+    IReadOnlyList<Guid> UserIds);
+
+internal static class ChallengeTemplateWriteResponseMapper
+{
+    public static ChallengeTemplateConflictResponse ToConflict(
+        ChallengeTemplateWriteResult result) =>
+        new(
+            result.State switch
+            {
+                ChallengeTemplateWriteState.ResourceIdConflict =>
+                    ChallengeTemplateConflictCode.ResourceIdConflict,
+                ChallengeTemplateWriteState.RevisionConflict =>
+                    ChallengeTemplateConflictCode.RevisionConflict,
+                ChallengeTemplateWriteState.OwnerIncludedInManagerSet =>
+                    ChallengeTemplateConflictCode.OwnerIncludedInManagerSet,
+                ChallengeTemplateWriteState.UserNotFound =>
+                    ChallengeTemplateConflictCode.UserNotFound,
+                ChallengeTemplateWriteState.RoleNotEligible =>
+                    ChallengeTemplateConflictCode.RoleNotEligible,
+                _ => throw new InvalidOperationException(
+                    $"Unsupported challenge template conflict state: {result.State}.")
+            },
+            result.UserIds ?? []);
+}
+
 public sealed class CreateChallengeTemplateValidator : Validator<CreateChallengeTemplateRequest>
 {
     public CreateChallengeTemplateValidator()
@@ -82,7 +119,12 @@ internal static partial class ChallengeTemplateMapper
 public sealed class CreateChallengeTemplateEndpoint(
     CreateChallengeTemplate create,
     IUserContext user)
-    : Endpoint<CreateChallengeTemplateRequest, Results<Created<ChallengeTemplateResponse>, ProblemHttpResult>>
+    : Endpoint<
+        CreateChallengeTemplateRequest,
+        Results<
+            Created<ChallengeTemplateResponse>,
+            Conflict<ChallengeTemplateConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -97,22 +139,36 @@ public sealed class CreateChallengeTemplateEndpoint(
         });
     }
 
-    public override async Task<Results<Created<ChallengeTemplateResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<
+        Results<
+            Created<ChallengeTemplateResponse>,
+            Conflict<ChallengeTemplateConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         CreateChallengeTemplateRequest request,
         CancellationToken ct)
     {
         var result = await create.ExecuteAsync(
             ChallengeTemplateMapper.ToCommand(request, user.UserId, DateTimeOffset.UtcNow),
             ct);
-        if (!result.Succeeded)
-            return TypedResults.Problem(
-                statusCode: result.ErrorCode == "resource_id_conflict"
-                    ? StatusCodes.Status409Conflict
-                    : StatusCodes.Status400BadRequest,
+        return result.State switch
+        {
+            ChallengeTemplateWriteState.Succeeded =>
+                TypedResults.Created(
+                    $"/api/v1/admin/challenges/{result.Template!.Id}",
+                    ChallengeTemplateMapper.ToResponse(result.Template)),
+            ChallengeTemplateWriteState.InvalidRequest
+                or ChallengeTemplateWriteState.InvalidDefinition =>
+                TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Challenge template was not created.",
-                detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
-        var response = ChallengeTemplateMapper.ToResponse(result.Value!);
-        return TypedResults.Created($"/api/v1/admin/challenges/{response.Id}", response);
+                detail: result.Detail),
+            ChallengeTemplateWriteState.ResourceIdConflict
+                or ChallengeTemplateWriteState.UserNotFound
+                or ChallengeTemplateWriteState.RoleNotEligible =>
+                TypedResults.Conflict(
+                    ChallengeTemplateWriteResponseMapper.ToConflict(result)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported challenge template creation state: {result.State}.")
+        };
     }
 }

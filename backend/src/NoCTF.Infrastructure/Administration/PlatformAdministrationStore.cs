@@ -68,22 +68,48 @@ public sealed class PlatformAdministrationStore(
         }
     }
 
-    public async Task<PlatformUserView?> UpdateRoleAsync(
+    public async Task<UpdatePlatformRoleResult> UpdateRoleAsync(
         Guid userId,
         UserRole role,
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
-            return null;
+            return new(UpdatePlatformRoleState.UserNotFound);
         if (user.Kind == UserKind.Bot && role != UserRole.Organizer)
-            return null;
+            return new(UpdatePlatformRoleState.InvalidBotRole);
+        if (role == UserRole.User && user.Role.CanManageResources())
+        {
+            var competitionIds = await db.Competitions.AsNoTracking()
+                .Where(competition =>
+                    competition.OwnerId == userId ||
+                    competition.ManagerIds.Contains(userId))
+                .OrderBy(competition => competition.Id)
+                .Select(competition => competition.Id)
+                .ToArrayAsync(ct);
+            var challengeIds = await db.Challenges.AsNoTracking()
+                .Where(challenge =>
+                    challenge.OwnerId == userId ||
+                    challenge.ManagerIds.Contains(userId))
+                .OrderBy(challenge => challenge.Id)
+                .Select(challenge => challenge.Id)
+                .ToArrayAsync(ct);
+            if (competitionIds.Length > 0 || challengeIds.Length > 0)
+            {
+                return new(
+                    UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments,
+                    Blockers: new(competitionIds, challengeIds));
+            }
+        }
         user.Role = role;
         user.TokenVersion = checked(user.TokenVersion + 1);
         user.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return Map(user);
+        await transaction.CommitAsync(ct);
+        return new(UpdatePlatformRoleState.Updated, Map(user));
     }
 
     public async Task<PlatformUserView?> InvalidateTokensAsync(

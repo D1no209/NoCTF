@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Administration;
 using NoCTF.Domain.Identity;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -18,9 +19,24 @@ public sealed class UpdatePlatformUserRoleValidator : Validator<UpdatePlatformUs
         RuleFor(request => request.Role).IsInEnum();
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<UpdatePlatformUserRoleConflictCode>))]
+public enum UpdatePlatformUserRoleConflictCode
+{
+    ActiveOwnerOrManagerAssignments
+}
+
+public sealed record UpdatePlatformUserRoleConflictResponse(
+    UpdatePlatformUserRoleConflictCode Code,
+    IReadOnlyList<Guid> CompetitionIds,
+    IReadOnlyList<Guid> ChallengeIds);
+
 public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
     : Endpoint<UpdatePlatformUserRoleRequest,
-        Results<Ok<PlatformUserResponse>, NotFound, ProblemHttpResult>>
+        Results<
+            Ok<PlatformUserResponse>,
+            NotFound,
+            Conflict<UpdatePlatformUserRoleConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -31,28 +47,42 @@ public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
         Summary(summary =>
         {
             summary.Summary = "Updates a platform role and invalidates existing tokens.";
-            summary.Description = "Atomically changes the bounded user role and increments the token version.";
+            summary.Description =
+                "Atomically changes the bounded user role and increments the token version unless active owner or manager assignments block a downgrade.";
         });
     }
 
     public override async Task<
-        Results<Ok<PlatformUserResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+        Results<
+            Ok<PlatformUserResponse>,
+            NotFound,
+            Conflict<UpdatePlatformUserRoleConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         UpdatePlatformUserRoleRequest request,
         CancellationToken ct)
     {
         var userId = Route<Guid>("userId");
-        var existing = await platform.GetUserAsync(userId, ct);
-        if (existing is null)
-            return TypedResults.NotFound();
-        if (existing.Kind == UserKind.Bot && request.Role != UserRole.Organizer)
-            return TypedResults.Problem(
+        var result = await platform.UpdateRoleAsync(
+            userId,
+            request.Role,
+            DateTimeOffset.UtcNow,
+            ct);
+        return result.State switch
+        {
+            UpdatePlatformRoleState.Updated =>
+                TypedResults.Ok(PlatformUserMapping.ToResponse(result.User!)),
+            UpdatePlatformRoleState.UserNotFound => TypedResults.NotFound(),
+            UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments =>
+                TypedResults.Conflict(new UpdatePlatformUserRoleConflictResponse(
+                    UpdatePlatformUserRoleConflictCode.ActiveOwnerOrManagerAssignments,
+                    result.Blockers!.CompetitionIds,
+                    result.Blockers.ChallengeIds)),
+            UpdatePlatformRoleState.InvalidBotRole => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Role is not valid for a bot.",
-                detail: "GitOps Bots must use the Organizer role.");
-        var user = await platform.UpdateRoleAsync(
-            userId, request.Role, DateTimeOffset.UtcNow, ct);
-        return user is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(PlatformUserMapping.ToResponse(user));
+                detail: "GitOps Bots must use the Organizer role."),
+            _ => throw new InvalidOperationException(
+                $"Unsupported platform role update state: {result.State}.")
+        };
     }
 }

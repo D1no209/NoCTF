@@ -62,11 +62,15 @@ public class AdminOpenApiRulesTests
             .ToArray()).IsEmpty();
         await Assert.That(operations
             .Where(operation => operation.Value.GetProperty("responses").TryGetProperty("409", out var conflict)
-                && (!conflict.TryGetProperty("content", out var content)
-                    || !content.TryGetProperty("application/problem+json", out _)))
+                && !HasConflictContent(conflict))
             .Select(operation => operation.Route)
             .ToArray()).IsEmpty();
     }
+
+    private static bool HasConflictContent(JsonElement response) =>
+        response.TryGetProperty("content", out var content)
+        && (content.TryGetProperty("application/problem+json", out _)
+            || content.TryGetProperty("application/json", out _));
 
     private static bool MissingText(JsonElement operation, string propertyName) =>
         !operation.TryGetProperty(propertyName, out var value)

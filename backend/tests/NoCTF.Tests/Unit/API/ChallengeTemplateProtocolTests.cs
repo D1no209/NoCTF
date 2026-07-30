@@ -37,4 +37,14 @@ public sealed class ChallengeTemplateProtocolTests
         await Assert.That(request!.Mode).IsEqualTo(GameMode.Ctf);
         await Assert.That(request.Visibility).IsEqualTo(ChallengeVisibility.Private);
     }
+
+    [Test]
+    public async Task Conflict_code_serializes_as_a_named_enum()
+    {
+        var json = JsonSerializer.Serialize(
+            ChallengeTemplateConflictCode.RoleNotEligible,
+            JsonOptions);
+
+        await Assert.That(json).IsEqualTo("\"RoleNotEligible\"");
+    }
 }

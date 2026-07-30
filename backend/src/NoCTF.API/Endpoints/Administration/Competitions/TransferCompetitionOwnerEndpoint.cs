@@ -1,5 +1,6 @@
 using FastEndpoints;
 using FluentValidation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
@@ -21,7 +22,13 @@ public sealed class TransferCompetitionOwnerValidator : Validator<TransferCompet
 public sealed class TransferCompetitionOwnerEndpoint(
     TransferCompetitionOwner transfer,
     IUserContext user)
-    : Endpoint<TransferCompetitionOwnerRequest, Results<Ok<CompetitionResponse>, NotFound>>
+    : Endpoint<
+        TransferCompetitionOwnerRequest,
+        Results<
+            Ok<CompetitionResponse>,
+            NotFound,
+            Conflict<CompetitionResourceManagerConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -35,7 +42,12 @@ public sealed class TransferCompetitionOwnerEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<CompetitionResponse>, NotFound>> ExecuteAsync(
+    public override async Task<
+        Results<
+            Ok<CompetitionResponse>,
+            NotFound,
+            Conflict<CompetitionResourceManagerConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         TransferCompetitionOwnerRequest request,
         CancellationToken ct)
     {
@@ -46,8 +58,27 @@ public sealed class TransferCompetitionOwnerEndpoint(
             request.OwnerId,
             DateTimeOffset.UtcNow,
             ct);
-        return result.Succeeded
-            ? TypedResults.Ok(CompetitionMapper.ToResponse(result.Value!))
-            : TypedResults.NotFound();
+        return result.State switch
+        {
+            CompetitionOwnerTransferState.Transferred =>
+                TypedResults.Ok(CompetitionMapper.ToResponse(result.Competition!)),
+            CompetitionOwnerTransferState.NotFound => TypedResults.NotFound(),
+            CompetitionOwnerTransferState.UserNotFound =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.UserNotFound,
+                        result.UserIds)),
+            CompetitionOwnerTransferState.RoleNotEligible =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.RoleNotEligible,
+                        result.UserIds)),
+            CompetitionOwnerTransferState.InvalidOwnerId => TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Competition ownership was not transferred.",
+                detail: "OwnerId is required."),
+            _ => throw new InvalidOperationException(
+                $"Unsupported competition owner transfer state: {result.State}.")
+        };
     }
 }

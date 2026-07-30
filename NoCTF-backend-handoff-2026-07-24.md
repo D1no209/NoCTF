@@ -22,9 +22,9 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 
 ### 当前完成度
 
-- 6.18 所有权转移与并发切片的代码和本地验证范围：100%；进入 Frontend 前仍须完成
-  Owner/Manager 角色资格、降级阻塞与 restore 重验这一独立后端纵切。
-- NoCTF 整体交付估算：约 90%；主要余项是 Frontend 对新 OpenAPI/GitOps 管理能力的整合、
+- 6.19 Owner/Manager 角色资格、降级阻塞、restore 重验及 restore/hard-delete 串行化的
+  代码和本地验证范围：100%；当前明确的 Frontend 前置后端阻断项已闭合。
+- NoCTF 整体交付估算：约 91%；主要余项是 Frontend 对新 OpenAPI/GitOps 管理能力的整合、
   更新后的本地 deploy 镜像重建验收，以及正式环境部署/运维验收。
 - “后端 100%”不表示已经生产部署，也不表示 Kubernetes/Libvirt 所有可选基础设施已在
   当前机器再次实测；第 6 节明确区分代码、测试、本地部署和生产部署状态。
@@ -1019,7 +1019,7 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
    GitOps apply/reapply/restore；当前 handoff 不授权自动部署。
 4. 前端功能整合仍是独立后续阶段。推送继续等待用户明确指令。
 
-### 6.18 所有权转移与并发收口（2026-07-31，当前最新）
+### 6.18 所有权转移与并发收口（2026-07-31）
 
 本节取代 6.17 的“暂停中”状态；6.17 仅保留为历史过程，不得据此重复旧工作或否定本节
 已经完成的验证。
@@ -1110,6 +1110,91 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   `WolverineTransactionalMessageOutbox.cs`、Runner `Properties/`、本地端口 compose、
   三个 instance-operation/query 文件和 `scripts/` 继续视为用户工作，不得混入本轮提交。
 
+### 6.19 Owner/Manager 角色资格与生命周期串行化（2026-07-31，当前最新）
+
+本节完成 6.18 明确记录的最后一个 Frontend 前置后端阻断项，并取代第 7 节原先要求再次
+实现该切片的旧顺序。6.18 仍保留为所有权并发修复的历史记录。
+
+#### 角色不变量与事务协议
+
+- Domain 新增 `UserRolePolicy.CanManageResources()`；Competition 与 Challenge 的 Owner 和
+  Manager 只允许 `Organizer` 或 `Administrator`。Judge/Observer 未被擅自扩展为同一
+  规则，已验证普通 `User` 仍可作为 Competition Judge。
+- 新增共享 `ResourceManagerRoleGuard`：使用 user-scoped PostgreSQL advisory transaction
+  lock，批量 UUID 先去重、排序再加锁，并在锁后重查用户存在性与角色。赋权路径固定为
+  Resource lock → 排序后的 User locks；平台降级只取得目标 User lock 后做无锁 MVCC
+  扫描，不存在 User → Resource 的反向锁环。
+- Platform 角色更新改为单事务 typed result。`Organizer`/`Administrator` 降级为 `User`
+  时扫描所有未删除 Competition/Challenge 的 Owner/Manager 关系；阻塞时返回排序后的
+  `CompetitionIds` 与 `ChallengeIds`，并保持 Role、TokenVersion、UpdatedAt 不变。只有
+  已删除资源时允许降级。
+- Competition 与 Challenge 的 create、完整 Manager set replacement、Owner transfer 和
+  restore 都在事务内锁定并重验最终 Owner + Manager 集合。缺失用户与角色不合格使用
+  不同 enum 状态和稳定 User ID 列表；失败时不写入、不递增 Revision，也不更新时间。
+- Competition restore 只允许 Owner 或平台 Administrator；hard-delete 同样收紧为该权限，
+  并与 restore 共用 Competition advisory lock。真实并发回归证明 restore 已成功后，
+  hard-delete 不会再把刚恢复的资源永久删除。Challenge restore 继续允许 Owner、Manager
+  或平台 Administrator，OpenAPI 文案已与实际权限一致。
+
+#### 强类型 HTTP/OpenAPI 契约
+
+- Platform role downgrade 的 409 body 为
+  `UpdatePlatformUserRoleConflictResponse`，code 为
+  `ActiveOwnerOrManagerAssignments`。
+- Competition create/permissions/transfer/restore 的 409 body 统一为
+  `CompetitionResourceManagerConflictResponse`，code 为
+  `RolesOverlap | OwnerIncluded | UserNotFound | RoleNotEligible`。
+- Challenge create/permissions/transfer/restore 的 409 body 统一为
+  `ChallengeTemplateConflictResponse`，code 为
+  `ResourceIdConflict | RevisionConflict | OwnerIncludedInManagerSet | UserNotFound |
+  RoleNotEligible`。
+- Application 与 Store 路径使用 typed state/result；新路径没有用字符串承载有界业务状态。
+  Endpoint 的未知 enum 分支 fail-fast，不会静默误映射。OpenAPI architecture test 允许
+  既有 `application/problem+json` 冲突和新的具体 `application/json` typed conflict。
+- OpenAPI 导出仍注册 132 endpoints；两份 artifact 完全一致，SHA-256 均为
+  `AE8990A76B5A7810761FAD8A399274739C18956D71ECA7B90F34537A1E365E76`。
+  `@hey-api/openapi-ts 0.97.3` 已从该 artifact 重新生成并执行项目 patch，未手改 SDK。
+- 没有 EF 模型或 migration 变化。
+
+#### 最终验证快照
+
+- WSL 原生干净副本、.NET SDK 10.0.301、真实 Docker/Testcontainers：
+  - Release `NoCTF.slnx` build：0 warning、0 error；
+  - non-Integration：383/383 passed；
+  - Integration：62 total，60 passed、0 failed、2 skipped；两个 skip 仍是未启用的真实
+    Kubernetes dataplane 与未配置 fixture 的真实 Libvirt opt-in；
+  - 新增 restore/hard-delete 并发项定向执行 1/1 passed；
+  - 全 solution analyzer `--severity warn` 与全部本轮 C# 文件 whitespace
+    `--verify-no-changes`：passed；
+  - EF `has-pending-model-changes`：明确无模型漂移；
+  - `git diff --check`：passed。
+- 新增真实 PostgreSQL 覆盖包括：
+  - 活跃 Owner/Manager 阻止降级，阻塞 ID 稳定排序且 TokenVersion 不变；
+  - 仅软删除资源时允许降级，restore 在角色不合格时保持删除状态，升级后可恢复；
+  - create/permissions/transfer 拒绝缺失或普通 User 的 Owner/Manager，失败状态原子不变；
+  - 降级先持 User lock 与赋权先持 User lock 的两种执行顺序都只能得到合法串行结果；
+  - Competition restore 与 hard-delete 不能同时成功并留下“恢复成功后资源消失”的状态。
+- 独立只读审查确认 typed mapping、授权可见性、锁序、事务边界和测试设计无剩余阻塞；
+  Challenge 共享同一 guard 的并发闭环由代表性的 Competition 双向竞态测试覆盖。
+
+#### Git 与下一阶段
+
+- 提交前通过 GitHub compare 再次核验远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`，与 6.18 已合并基线 `identical`；当前
+  HEAD 已包含该提交，因此没有新冲突或需要制造空 merge commit。
+- 本节对应一个独立本地提交，提交说明为
+  `fix(auth): enforce resource manager roles`；不 push、不创建 PR。
+- 下一阶段进入 Frontend：
+  1. `/admin/users` 对 typed downgrade 409 显示阻塞 Competition/Challenge ID，并在失败后
+     刷新用户数据；
+  2. Challenge Bank 的管理员 GitOps access UI 只从 Platform Organizer Bot 选择 Manager，
+     保留现有 ManagerIds、排除 Owner、显式发送当前 `expectedRevision`，409 后重新拉取；
+  3. 所有请求只使用生成 SDK，不写死 URL，不恢复旧 `/collaborators`。
+- Competition permission UI 仍等待读取契约返回完整 manager/judge/observer 数组；在此之前
+  不得用空数组做全量替换。
+- 保护文件列表与 6.18 相同；本地提交不得包含用户的 Wolverine、Runner Properties、
+  本地端口 compose、instance-operation/query 文件或 `scripts/`。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1132,9 +1217,8 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 
 ## 7. 建议的下一交接顺序
 
-1. 先闭合 6.18 记录的 Owner/Manager 角色资格不变量：assignment/transfer/create 的
-   事务内重验、Organizer 降级 409 blocker IDs、删除后降级再 restore 的 409，以及真实
-   PostgreSQL 并发测试；随后导出 OpenAPI 并重新生成客户端。
+1. 先适配 `/admin/users` 的 typed role-downgrade 409，展示阻塞 Competition/Challenge
+   IDs，失败后刷新列表；不得解析旧 ProblemDetails 字符串。
 2. 完成 Challenge 的 Platform Bot Manager 授权 UI，只使用生成的强类型 OpenAPI SDK；
    加 revision/现有 Manager 保留测试，处理 409 后重新获取最新模板。
 3. 再推进 CompetitionChallenge 稳定 ID 的 create/update/delete/restore 管理流程；每个
@@ -1167,8 +1251,9 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；下一阶段从 6.18 和
-   第 7 节记录的 Frontend Bot Manager 授权开始。引用测试数量时使用 6.18 最新快照。
+4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；下一阶段从 6.19 和
+   第 7 节记录的 Frontend typed 409 与 Bot Manager 授权开始。引用测试数量时使用
+   6.19 最新快照。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

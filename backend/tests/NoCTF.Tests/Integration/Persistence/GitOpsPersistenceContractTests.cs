@@ -110,7 +110,9 @@ public sealed class GitOpsPersistenceContractTests
                     """{"schemaVersion":1}""",
                     now),
                 cancellationToken);
-            await Assert.That(challenge!.Id).IsEqualTo(challengeId);
+            await Assert.That(challenge.State)
+                .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
+            await Assert.That(challenge.Template!.Id).IsEqualTo(challengeId);
 
             var competitionChallengeId = Guid.CreateVersion7(now.AddMilliseconds(4));
             var competitionChallenges = new ChallengeManagementStore(db);

@@ -27,14 +27,17 @@ public sealed class TransferChallengeTemplateOwnerEndpoint(
     TransferChallengeTemplateOwner transfer,
     IUserContext user)
     : Endpoint<TransferChallengeTemplateOwnerRequest,
-        Results<Ok<ChallengeTemplateResponse>, ProblemHttpResult>>
+        Results<
+            Ok<ChallengeTemplateResponse>,
+            NotFound,
+            Conflict<ChallengeTemplateConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/challenges/{challengeId}/owner/transfer");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminChallengeBankTransferOwner")
-            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Description(builder => builder.WithName("AdminChallengeBankTransferOwner"));
         Summary(summary =>
         {
             summary.Summary = "Transfers challenge template ownership.";
@@ -42,7 +45,12 @@ public sealed class TransferChallengeTemplateOwnerEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeTemplateResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<
+        Results<
+            Ok<ChallengeTemplateResponse>,
+            NotFound,
+            Conflict<ChallengeTemplateConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         TransferChallengeTemplateOwnerRequest request,
         CancellationToken ct)
     {
@@ -54,11 +62,22 @@ public sealed class TransferChallengeTemplateOwnerEndpoint(
             request.ExpectedRevision,
             DateTimeOffset.UtcNow,
             ct);
-        return result.Succeeded
-            ? TypedResults.Ok(ChallengeTemplateMapper.ToResponse(result.Value!))
-            : TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
+        return result.State switch
+        {
+            ChallengeTemplateWriteState.Succeeded =>
+                TypedResults.Ok(ChallengeTemplateMapper.ToResponse(result.Template!)),
+            ChallengeTemplateWriteState.NotFoundOrForbidden => TypedResults.NotFound(),
+            ChallengeTemplateWriteState.InvalidRequest => TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Challenge template ownership was not transferred.",
-                detail: result.ErrorMessage);
+                detail: result.Detail),
+            ChallengeTemplateWriteState.RevisionConflict
+                or ChallengeTemplateWriteState.UserNotFound
+                or ChallengeTemplateWriteState.RoleNotEligible =>
+                TypedResults.Conflict(
+                    ChallengeTemplateWriteResponseMapper.ToConflict(result)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported challenge template owner transfer state: {result.State}.")
+        };
     }
 }

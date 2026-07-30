@@ -3,27 +3,58 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Registration;
+using NoCTF.Infrastructure.Administration;
 
 namespace NoCTF.Infrastructure.Competitions.Management;
 
 public sealed class CompetitionManagementStore(NoCtfDbContext db) : ICompetitionManagementStore
 {
-    public async Task<CompetitionView> CreateAsync(CreateCompetitionCommand command, CancellationToken ct)
+    public async Task<CompetitionCreationResult> CreateAsync(
+        CreateCompetitionCommand command,
+        CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
+            db,
+            [command.OwnerId],
+            ct);
+        if (eligibility.MissingUserIds.Length > 0)
+        {
+            return new(
+                CompetitionCreationState.UserNotFound,
+                UserIds: eligibility.MissingUserIds);
+        }
+        if (eligibility.RoleIneligibleUserIds.Length > 0)
+        {
+            return new(
+                CompetitionCreationState.RoleNotEligible,
+                UserIds: eligibility.RoleIneligibleUserIds);
+        }
+
         var id = Guid.CreateVersion7(command.CreatedAt);
         var competition = new Competition
         {
-            Id = id, Title = command.Title.Trim(), Description = command.Description?.Trim(), OwnerId = command.OwnerId,
-            Mode = command.Mode, StartAt = command.StartTime, EndAt = command.EndTime,
-            Status = CompetitionStatus.Draft, TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove,
-            MaxTeamMembers = command.MaxTeamMembers, CreatedAt = command.CreatedAt, UpdatedAt = command.CreatedAt,
+            Id = id,
+            Title = command.Title.Trim(),
+            Description = command.Description?.Trim(),
+            OwnerId = command.OwnerId,
+            Mode = command.Mode,
+            StartAt = command.StartTime,
+            EndAt = command.EndTime,
+            Status = CompetitionStatus.Draft,
+            TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove,
+            MaxTeamMembers = command.MaxTeamMembers,
+            CreatedAt = command.CreatedAt,
+            UpdatedAt = command.CreatedAt,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
-            ConfigurationRevision = 0, ConfigurationUpdatedAt = command.CreatedAt,
+            ConfigurationRevision = 0,
+            ConfigurationUpdatedAt = command.CreatedAt,
             FlagDerivationSecret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)
         };
         db.Competitions.Add(competition);
         await db.SaveChangesAsync(ct);
-        return Map(competition);
+        await transaction.CommitAsync(ct);
+        return new(CompetitionCreationState.Created, Map(competition));
     }
 
     public async Task<CompetitionView?> FindAsync(Guid competitionId, bool includeDraft, CancellationToken ct) =>
