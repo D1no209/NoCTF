@@ -1,6 +1,6 @@
 # NoCTF 后端目标架构交接
 
-> 创建于 2026-07-24，最后核验于 2026-07-30。文件名保留原日期，本文内容以最后核验日期为准。
+> 创建于 2026-07-24，最后核验于 2026-07-31。文件名保留原日期，本文内容以最后核验日期为准。
 
 ## 1. 下一会话目标
 
@@ -22,7 +22,8 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 
 ### 当前完成度
 
-- 本轮约定的后端代码与本地验证范围：100%。
+- 6.18 所有权转移与并发切片的代码和本地验证范围：100%；进入 Frontend 前仍须完成
+  Owner/Manager 角色资格、降级阻塞与 restore 重验这一独立后端纵切。
 - NoCTF 整体交付估算：约 90%；主要余项是 Frontend 对新 OpenAPI/GitOps 管理能力的整合、
   更新后的本地 deploy 镜像重建验收，以及正式环境部署/运维验收。
 - “后端 100%”不表示已经生产部署，也不表示 Kubernetes/Libvirt 所有可选基础设施已在
@@ -928,12 +929,10 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   被泛化异常丢弃。生产代码现保留原错误分类，同时把工具 stderr 加入内部异常，后续节点
   配置错误可直接定位；纯单元回归强制 `net-start` 失败并断言 stderr 保留。没有改变
   OVA、网络、Guest Agent、超时或清理语义。
-- 最终门禁：solution build 0 warning/0 error；Libvirt 单元 5/5；真实 Libvirt opt-in
-  1/1；360 non-Integration passed；常规真实依赖 Integration 49 passed、0 failed，
-  Kubernetes 与默认未配置 fixture 的 Libvirt 各 1 skipped；EF 无 pending model；
-  OpenAPI artifact、`git diff --check` 均无漂移。本轮 4 个 C# 文件的 scoped
-  `dotnet format --verify-no-changes` 通过。全仓 format 仍会报告 AWD validator、Flag
-  generator、旧 leaderboard tests 等既有 whitespace 基线，本轮未扩大范围修改它们。
+- 最新最终门禁见 6.18：Release solution build 0 warning/0 error；380/380
+  non-Integration passed；真实依赖 Integration 56 passed、0 failed、2 个显式 opt-in
+  skipped；EF 无 pending model；全 solution analyzer、限定文件 whitespace、OpenAPI
+  artifact、生成 TypeScript client 与 `git diff --check` 均无漂移。
 - 一次性 Libvirt 容器、定制工具镜像、fixture 目录均已精确删除；WSL system Libvirt
   最终无 domain、只有原有 inactive `default` network。当前本地 `deploy` 六服务继续
   运行，API 与 Runner healthy，未被本轮测试重启或替换。
@@ -1020,6 +1019,97 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
    GitOps apply/reapply/restore；当前 handoff 不授权自动部署。
 4. 前端功能整合仍是独立后续阶段。推送继续等待用户明确指令。
 
+### 6.18 所有权转移与并发收口（2026-07-31，当前最新）
+
+本节取代 6.17 的“暂停中”状态；6.17 仅保留为历史过程，不得据此重复旧工作或否定本节
+已经完成的验证。
+
+#### 远端基线与本地提交
+
+- 通过 GitHub API 再次核验远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`；本地 `origin/main` 同一 SHA，且是当前
+  `codex/backend-gitops-completion` 的祖先。`ada6a7f` 已完成该来源的显式合并，因此本轮
+  没有新的冲突，也没有制造空 merge commit。
+- 6.17 之后已形成以下本地提交：
+  - `06fb745 fix(ci): stabilize backend release gates`
+  - `c0857fe fix(auth): enforce access token revocation`
+  - `49040fe feat(admin): manage platform bots`
+  - `0a98a02 feat(admin): reconcile challenge lifecycle`
+- 外部模板仓库 `D1no209/NoCTF-Challenge-Template` 的本地分支
+  `codex/gitops-apply-idempotency` 已提交
+  `cd0086e fix(gitops): make challenge apply idempotent`。两个仓库均未 push。
+
+#### 最后一个后端契约缺口及修复
+
+- Competition 与 Challenge 的 Owner transfer endpoint/document 均承诺把旧 Owner 保留为
+  Manager；原 store 只替换 `OwnerId` 并移除新 Owner，导致 GitOps Bot 转交所有权后失去
+  后续写权限。本轮在同一次写入中把旧 Owner 加入去重、有序的 `ManagerIds`，移除新
+  Owner；Competition 还会从 `JudgeIds`、`ObserverIds` 移除新 Owner，满足 PostgreSQL
+  互斥约束。
+- Competition transfer 复用既有 `CompetitionWriteLock` 和事务，避免并发 transfer 或
+  permission update 覆盖上一任 Owner。Challenge 新增按模板 UUID 的 PostgreSQL advisory
+  transaction lock，并由 template update、permissions、owner transfer、delete/restore、
+  attachment add/update/delete/restore 共同使用，保证 `Revision` 不丢增量。
+- CompetitionChallenge create 按固定顺序先取得 Competition lock、再取得 Challenge
+  lock；restore 也在恢复活动引用前取得 Challenge lock 并重查活动模板。Challenge
+  soft-delete 在同一锁和事务内检查活动引用，从而不能与引用创建同时成功并留下
+  “活动比赛题目引用已删除模板”的状态。当前锁序未形成反向环。
+- Challenge transfer 在写入前验证新 Owner 存在，避免外键异常；三个 Challenge 写接口都
+  在持锁事务内完成返回 View 投影，再提交，避免已成功写入后因紧随其后的修改/删除返回
+  错误状态。
+- 没有修改 endpoint、OpenAPI 或 migration；无效目标 Owner 仍使用现有
+  `not found or revision conflict` 协议语义，未擅自扩展外部契约。
+
+#### 最终验证快照
+
+- 在 WSL 原生干净副本、.NET SDK 10.0.301、Docker 28.5.1 下完成：
+  - Release `NoCTF.slnx` build：0 warning、0 error；
+  - non-Integration：380/380 passed；
+  - Integration：58 total，56 passed、0 failed、2 skipped；两个 skip 分别是未启用的真实
+    Kubernetes dataplane 和未配置 fixture 的真实 Libvirt opt-in；
+  - 全 solution analyzer `--severity warn`、本轮文件 whitespace
+    `--verify-no-changes`：passed；
+  - EF `has-pending-model-changes`：明确无模型漂移。
+- 新的真实 PostgreSQL/TUnit 回归覆盖：
+  - Competition 双并发 Owner transfer 不丢任何上一任 Owner；
+  - Challenge 同 revision 双并发 transfer 只有一个成功；
+  - template soft-delete 与 CompetitionChallenge create 只能得到合法串行结果；
+  - attachment revision 更新与 Owner transfer 不会丢 revision 增量；
+  - 新 Owner 不存在时不修改持久化状态。
+- OpenAPI 导出仍注册 132 endpoints；两份 artifact 及仓库当前 artifact 的 SHA-256 均为
+  `8dba9f2ee6081b5408733dd039abbf55b49418f5967851a939090e3d6f13f2cd`。
+  `@hey-api/openapi-ts 0.97.3` 从该 artifact 重新生成并执行项目 patch 后，生成目录零 diff。
+- Windows 直接运行 backend verification 会选中本机 .NET SDK 10.0.201，与仓库
+  `global.json` 的 10.0.300 feature band 不兼容；这是工具链问题。上述最终结论来自
+  工具链匹配的 WSL 干净副本，不使用失败的 Windows 结果。
+
+#### 本地部署、GitOps 与前端状态
+
+- 本轮已使用整合后的源码重建本地六服务并确认健康；已用真实 Platform Bot token 完成
+  GitOps template apply、重复 apply、软删除和按稳定 UUID restore。该演练仅是本地部署，
+  不代表生产环境验收。
+- Frontend 已完成 Platform Bot 创建、一次性 token、TokenVersion invalidate，以及
+  Challenge Bank 的 `includeDeleted`、稳定 UUID、活动引用数、受限删除和精确恢复；全部
+  调用生成的强类型 SDK，没有手写 URL。
+- 进入 Frontend 前仍有一个明确的后端阻断项：Owner/Manager 必须是 Organizer 或
+  Administrator；Organizer 降级为 User 时必须在事务内扫描所有未删除 Competition 与
+  Challenge 的 Owner/Manager 关系，409 返回稳定的阻塞资源 ID 且不能递增
+  `TokenVersion`；已删除资源允许降级，但 restore 必须重新验证角色并在不合格时返回
+  409。Create、permissions、owner transfer 也必须在事务内重查目标用户角色。该切片需要
+  具体的 result enum/response schema、真实 PostgreSQL 并发测试、OpenAPI 与生成客户端
+  更新，不能由 UI 禁用选项代替。
+- 完成上述后端阻断项后，下一个前端纵切是“GitOps 访问权限”：管理员从 Platform Bot
+  中选择 Organizer Bot，把它加入已有 Challenge 的 `ManagerIds`。使用
+  `adminPlatformListUsers`、`adminChallengeBankGetTemplate` 和
+  `adminChallengeBankUpdatePermissions`；更新是全量替换，必须保留现有 Manager、排除
+  Owner，并显式发送当前 `expectedRevision`。该管理员专用流程没有未决产品语义。
+- 不复用旧 `AdminCollaboratorsWorkspace`；它依赖已废弃且后端不存在的手写
+  `/collaborators` URL。Competition permission UI 也暂不做，因为当前读取响应没有返回
+  manager/judge/observer 全量集合，不能安全执行全量替换。
+- 没有 push、PR 或生产部署。主工作区原有
+  `WolverineTransactionalMessageOutbox.cs`、Runner `Properties/`、本地端口 compose、
+  三个 instance-operation/query 文件和 `scripts/` 继续视为用户工作，不得混入本轮提交。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1031,10 +1121,10 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 
 仍未完成/不属于本轮已部署：
 
-- Frontend 尚未整合新的 Bot、稳定 ID、恢复和 GitOps 管理流程；协作者 Frontend 分支仍
-  未合并。
-- 现有 `deploy-*` 六服务未用本轮 commit 重建；GitOps 模板尚未对一个部署了本轮 API 的
-  环境执行真实 push/pull 同步演练。
+- Frontend 的 Bot 与 Challenge lifecycle inventory 已完成；Challenge Bot Manager 授权、
+  CompetitionChallenge lifecycle 等后续管理纵切尚未完成。
+- 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
+  环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境；
   Docker `InternetOnly`、TargetPort ACL 和 callback-only gateway 是已记录的后续加固，
@@ -1042,12 +1132,17 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 
 ## 7. 建议的下一交接顺序
 
-1. 从本轮本地 commit 开始整合 Frontend，对照生成的 OpenAPI 接入 Bot、恢复和 GitOps
-   管理流程；合并协作者 Frontend 前先检查其差异和冲突。
-2. 用本轮镜像重建本地 `deploy-*`，再以真实 Platform Bot token 运行 GitOps 模板同步
-   演练；不得把模板自身 self-test 当成已部署 API 的验收。
-3. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
-4. 推送必须等待用户明确指令；当前本地 commit 不得自行 push 或创建 PR。
+1. 先闭合 6.18 记录的 Owner/Manager 角色资格不变量：assignment/transfer/create 的
+   事务内重验、Organizer 降级 409 blocker IDs、删除后降级再 restore 的 409，以及真实
+   PostgreSQL 并发测试；随后导出 OpenAPI 并重新生成客户端。
+2. 完成 Challenge 的 Platform Bot Manager 授权 UI，只使用生成的强类型 OpenAPI SDK；
+   加 revision/现有 Manager 保留测试，处理 409 后重新获取最新模板。
+3. 再推进 CompetitionChallenge 稳定 ID 的 create/update/delete/restore 管理流程；每个
+   纵切独立测试、build 和本地 commit。
+4. Competition permission UI 等待读取契约补齐完整权限数组后再实现，不得以空数组覆盖
+   现有权限，也不得恢复已废弃的 `/collaborators` 协议。
+5. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
+6. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
 决策的只读审计，但不能自行发明新协议。
@@ -1072,8 +1167,8 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 旧目标迁移与 2026-07-30 GitOps 后端收尾无需重做；下一阶段是 Frontend 整合和使用
-   本轮镜像的本地部署/GitOps 联调。引用测试数量时使用第 4 节最新快照。
+4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；下一阶段从 6.18 和
+   第 7 节记录的 Frontend Bot Manager 授权开始。引用测试数量时使用 6.18 最新快照。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

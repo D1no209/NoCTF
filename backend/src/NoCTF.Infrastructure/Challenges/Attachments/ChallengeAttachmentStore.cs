@@ -7,6 +7,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Challenges;
 
 namespace NoCTF.Infrastructure.Challenges.Attachments;
 
@@ -43,6 +44,8 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
         if (challenge is null)
@@ -66,6 +69,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         try
         {
             await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
             return AddChallengeAttachmentState.Added;
         }
         catch (DbUpdateException)
@@ -83,6 +87,8 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         string contentType,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator)
             .Include(item => item.Attachments)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
@@ -95,6 +101,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return Map(attachment);
     }
 
@@ -106,6 +113,8 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator)
             .Include(item => item.Attachments)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
@@ -117,6 +126,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return true;
     }
 
@@ -128,6 +138,8 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator, includeDeleted: true)
             .Include(item => item.Attachments)
             .SingleOrDefaultAsync(item => item.Id == challengeId && item.DeletedAt == null, ct);
@@ -139,6 +151,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return true;
     }
 

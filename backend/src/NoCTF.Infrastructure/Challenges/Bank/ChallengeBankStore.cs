@@ -2,6 +2,7 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
+using NoCTF.Infrastructure.Challenges;
 
 namespace NoCTF.Infrastructure.Challenges.Bank;
 
@@ -73,6 +74,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         UpdateChallengeTemplateCommand command,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, command.ChallengeId, ct);
         var entity = await WriteAuthorized(db.Challenges, command.ActorId, command.IsAdministrator)
             .SingleOrDefaultAsync(challenge =>
                 challenge.Id == command.ChallengeId &&
@@ -88,9 +91,11 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
         await db.SaveChangesAsync(ct);
-        return await Project(db.Challenges.AsNoTracking()
+        var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
+        await transaction.CommitAsync(ct);
+        return result;
     }
 
     public async Task<ChallengeTemplateDeleteFailure?> SoftDeleteAsync(
@@ -100,22 +105,44 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(
                 item => item.ChallengeId == challengeId && item.DeletedAt == null,
                 ct))
             return ChallengeTemplateDeleteFailure.InUse;
-        return await SetDeletedAsync(challengeId, actorId, isAdministrator, now, restore: false, ct)
-            ? null
-            : ChallengeTemplateDeleteFailure.NotFound;
+        if (!await SetDeletedEntityAsync(
+                challengeId,
+                actorId,
+                isAdministrator,
+                now,
+                restore: false,
+                ct))
+            return ChallengeTemplateDeleteFailure.NotFound;
+        await transaction.CommitAsync(ct);
+        return null;
     }
 
-    public Task<bool> RestoreAsync(
+    public async Task<bool> RestoreAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
         DateTimeOffset now,
-        CancellationToken ct) =>
-        SetDeletedAsync(challengeId, actorId, isAdministrator, now, restore: true, ct);
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
+        if (!await SetDeletedEntityAsync(
+                challengeId,
+                actorId,
+                isAdministrator,
+                now,
+                restore: true,
+                ct))
+            return false;
+        await transaction.CommitAsync(ct);
+        return true;
+    }
 
     public async Task<ChallengeTemplateView?> UpdatePermissionsAsync(
         Guid challengeId,
@@ -127,6 +154,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         var normalized = managerIds.Distinct().Order().ToArray();
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var entity = await db.Challenges.SingleOrDefaultAsync(challenge =>
             challenge.Id == challengeId &&
             challenge.Revision == expectedRevision &&
@@ -137,9 +166,11 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return await Project(db.Challenges.AsNoTracking()
+        var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
+        await transaction.CommitAsync(ct);
+        return result;
     }
 
     public async Task<ChallengeTemplateView?> TransferOwnerAsync(
@@ -151,23 +182,35 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var entity = await db.Challenges.SingleOrDefaultAsync(challenge =>
             challenge.Id == challengeId &&
             challenge.Revision == expectedRevision &&
             (isAdministrator || challenge.OwnerId == actorId), ct);
-        if (entity is null || ownerId == Guid.Empty)
+        if (entity is null ||
+            ownerId == Guid.Empty ||
+            !await db.Users.AsNoTracking().AnyAsync(user => user.Id == ownerId, ct))
             return null;
+        var previousOwnerId = entity.OwnerId;
         entity.OwnerId = ownerId;
-        entity.ManagerIds = entity.ManagerIds.Where(id => id != ownerId).ToArray();
+        entity.ManagerIds = entity.ManagerIds
+            .Append(previousOwnerId)
+            .Where(id => id != ownerId)
+            .Distinct()
+            .Order()
+            .ToArray();
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return await Project(db.Challenges.AsNoTracking()
+        var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
+        await transaction.CommitAsync(ct);
+        return result;
     }
 
-    private async Task<bool> SetDeletedAsync(
+    private async Task<bool> SetDeletedEntityAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
