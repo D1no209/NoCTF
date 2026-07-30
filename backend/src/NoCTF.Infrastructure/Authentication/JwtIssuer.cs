@@ -16,10 +16,12 @@ public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
     private readonly TimeSpan lifetime = TimeSpan.FromMinutes(
         configuration.GetValue("Authentication:AccessTokenMinutes", 15));
 
-    public IssuedAccessToken Issue(AuthenticatedUser user)
+    public IssuedAccessToken Issue(
+        AuthenticatedUser user,
+        DateTimeOffset now,
+        TimeSpan? requestedLifetime = null)
     {
-        var now = DateTimeOffset.UtcNow;
-        var expires = now.Add(lifetime);
+        var expires = now.Add(requestedLifetime ?? lifetime);
         var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
             issuer: issuer,
@@ -28,7 +30,8 @@ public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
             [
                 new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new(ClaimTypes.Name, user.UserName),
-                new(ClaimTypes.Role, user.Role),
+                new(ClaimTypes.Role, user.Role.ToString()),
+                new("user_kind", user.Kind.ToString()),
                 new("token_version", user.TokenVersion.ToString()),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
                 new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),

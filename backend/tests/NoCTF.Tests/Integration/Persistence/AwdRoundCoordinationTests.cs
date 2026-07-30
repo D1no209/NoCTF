@@ -284,7 +284,11 @@ public sealed class AwdRoundCoordinationTests
         {
             Id = challengeId,
             OwnerId = ownerId,
+            Mode = GameMode.Awd,
             Title = "AWD service",
+            DefinitionJson = JsonSerializer.Serialize(
+                new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             CreatedAt = now,
             UpdatedAt = now
         });

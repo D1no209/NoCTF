@@ -37,6 +37,7 @@ public sealed class UpdateChallengeHintEndpoint(
             competitionId,
             Route<Guid>("competitionChallengeId"),
             Route<Guid>("hintId"),
+            false,
             request.Content,
             request.Cost,
             request.PublishedAt,

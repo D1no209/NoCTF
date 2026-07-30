@@ -7,11 +7,20 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
+public sealed class ListCompetitionChallengeFlagsRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
+}
+
 public sealed class ListChallengeFlagsEndpoint(
     ManageChallengeFlags flags,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeFlagListResponse>, NotFound, ForbidHttpResult>>
+    : Endpoint<ListCompetitionChallengeFlagsRequest,
+        Results<Ok<ChallengeFlagListResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
@@ -26,15 +35,17 @@ public sealed class ListChallengeFlagsEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeFlagListResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
+        ListCompetitionChallengeFlagsRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var items = await flags.ListAsync(
-            ChallengeFlagScope.Competition(competitionId, Route<Guid>("competitionChallengeId")),
+            ChallengeFlagScope.Competition(competitionId, request.CompetitionChallengeId),
             actorId: null,
             isAdministrator: true,
+            request.IncludeDeleted,
             ct);
         return items is null
             ? TypedResults.NotFound()

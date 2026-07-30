@@ -20,6 +20,7 @@
 
 ```text
 GameMode: Ctf | Awd | Awdp | Koh
+UserKind: Human | Bot
 CompetitionStatus: Draft | Visible | Published | Running | Paused | Finished
 TeamRegistrationStatus: Pending | Approved | Rejected
 SubmissionKind: Flag | Break | Fix
@@ -42,14 +43,18 @@ RuntimeFailureCode: InvalidConfiguration | RunnerUnavailable | ProviderUnavailab
 |---|---|
 | id | uuid PK |
 | user_name / normalized_user_name | varchar(64)，Normalized 唯一 |
-| email / normalized_email | varchar(320)，Normalized 唯一 |
-| password_hash | text，ASP.NET Core Identity V3 |
+| kind | smallint Human/Bot |
+| email / normalized_email | varchar(320) 非空，Normalized 唯一 |
+| password_hash | text 非空，ASP.NET Core Identity V3 |
 | role | smallint User/Organizer/Administrator |
 | token_version | integer >= 0 |
 | email_verified_at | timestamptz nullable |
 | created_at / updated_at | timestamptz |
 
-Role 变更、密码修改/重置、管理员全局失效会递增 token_version。
+Human 使用注册输入的 email 和 password。Bot 使用服务端生成的
+`bot-<user-id-N>@bot.invalid`/大写 NormalizedEmail，以及一次性随机 GUID 的 PasswordHash；
+GUID 明文不返回、不记录，`email_verified_at` 必须为空。Bot 只能使用 User 或 Organizer
+角色。Role 变更、Human 密码修改/重置、管理员全局失效会递增 token_version。
 
 ## email_verification_tokens
 

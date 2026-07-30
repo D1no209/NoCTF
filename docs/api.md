@@ -154,11 +154,13 @@ GET  /api/v1/admin/challenges/{challengeId}/attachments
 POST /api/v1/admin/challenges/{challengeId}/attachments
 PUT  /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}
 DELETE /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}
+POST /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/restore
 GET  /api/v1/admin/challenges/{challengeId}/flags
 POST /api/v1/admin/challenges/{challengeId}/flags
 GET  /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 PUT  /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 DELETE /api/v1/admin/challenges/{challengeId}/flags/{flagId}
+POST /api/v1/admin/challenges/{challengeId}/flags/{flagId}/restore
 ```
 
 ## Admin Runtime
@@ -193,11 +195,13 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}
 PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/restore
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
 PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}/restore
 ```
 
 ## Admin Submission 与判定
@@ -229,6 +233,8 @@ GET /api/v1/notifications
 ```text
 GET  /api/v1/admin/platform/users
 GET  /api/v1/admin/platform/users/{userId}
+POST /api/v1/admin/platform/bots
+POST /api/v1/admin/platform/bots/{userId}/tokens
 PUT  /api/v1/admin/platform/users/{userId}/role
 POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
 GET  /api/v1/admin/platform/dead-letters
@@ -236,7 +242,13 @@ GET  /api/v1/admin/platform/dead-letters/{messageId}
 POST /api/v1/admin/platform/dead-letters/{messageId}/requeue
 ```
 
-Role 更新与 token invalidate 原子递增 User.TokenVersion。Dead Letter DTO 隐去 JWT、Flag/Submission 原文和 archive 内容；requeue 创建新的 durable delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作 DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
+Bot 创建请求只包含 UserName 和 `UserRole.User | Organizer`，不能直接创建 Administrator
+Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。
+Token 签发请求包含正数 ExpiresInSeconds，只接受 Bot User，返回一次普通 AccessToken 与
+ExpiresAt，不签发 Refresh Token。Role 更新与 token invalidate 原子递增 User.TokenVersion。
+Dead Letter DTO 隐去 JWT、Flag/Submission 原文和 archive 内容；requeue 创建新的 durable
+delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作
+DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
 
 ## Internal v1
 

@@ -38,7 +38,8 @@ public sealed class CreateChallengeFlagEndpoint(
             SaveChallengeFlagMapping.ToCommand(
                 request,
                 ChallengeFlagScope.Competition(competitionId, competitionChallengeId),
-                null,
+                request.Id,
+                isCreate: true,
                 DateTimeOffset.UtcNow),
             actorId: null,
             isAdministrator: true,
@@ -47,9 +48,12 @@ public sealed class CreateChallengeFlagEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
+                statusCode: result.ErrorCode == "resource_id_conflict"
+                    ? StatusCodes.Status409Conflict
+                    : StatusCodes.Status400BadRequest,
                 title: "Flag was not created.",
-                detail: result.ErrorMessage);
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
         var response = ChallengeFlagMapping.ToResponse(result.Value!);
         return TypedResults.Created(
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{response.Id}",

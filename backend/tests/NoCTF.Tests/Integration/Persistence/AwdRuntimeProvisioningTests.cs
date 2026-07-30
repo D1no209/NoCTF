@@ -116,7 +116,19 @@ public sealed class AwdRuntimeProvisioningTests
         {
             Id = challengeId,
             OwnerId = ownerId,
+            Mode = GameMode.Awd,
             Title = "AWD service",
+            DefinitionJson = JsonSerializer.Serialize(
+                new AwdChallengeConfiguration(
+                    AwdChallengeConfiguration.CurrentSchemaVersion,
+                    Runtime: new ChallengeRuntimeTemplate(
+                        RuntimeAllocation.PerTeam,
+                        new ContainerRuntimeDefinition("awd-runtime:fixture"),
+                        new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                        FlagSource: RuntimeFlagSource.AwdRotation),
+                    FlagInjection: new AwdFlagInjectionConfiguration(
+                        "printf '%s' '${FLAG}' > /dev/shm/flag")),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -129,14 +141,7 @@ public sealed class AwdRuntimeProvisioningTests
             Revision = 3,
             RulesJson = JsonSerializer.Serialize(
                 new AwdChallengeConfiguration(
-                    AwdChallengeConfiguration.CurrentSchemaVersion,
-                    Runtime: new ChallengeRuntimeTemplate(
-                                                RuntimeAllocation.PerTeam,
-                        new ContainerRuntimeDefinition("awd-runtime:fixture"),
-                        new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
-                        FlagSource: RuntimeFlagSource.AwdRotation),
-                    FlagInjection: new AwdFlagInjectionConfiguration(
-                        "printf '%s' '${FLAG}' > /dev/shm/flag")),
+                    AwdChallengeConfiguration.CurrentSchemaVersion),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = now
         });

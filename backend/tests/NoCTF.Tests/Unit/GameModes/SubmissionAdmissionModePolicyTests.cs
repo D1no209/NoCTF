@@ -19,7 +19,7 @@ public class SubmissionAdmissionModePolicyTests
     [Test]
     public async Task Awdp_UsesConfiguredBreakAndFixAttemptLimits()
     {
-        const string json = """{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":true,"maxBreakSubmissions":3,"maxFixSubmissions":2,"runtime":{"provider":0,"allocation":1,"definition":{"kind":"container","image":"target:v1","portMappings":{"8080":0}}},"patchEntrypoint":"fix.sh","patchCommand":["/bin/sh","{entrypoint}"],"patchTimeoutSeconds":60,"checker":{"provider":0,"image":"checker:v1","timeoutSeconds":60},"targetPort":8080,"readyTimeoutSeconds":30}""";
+        const string json = """{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":true,"maxBreakSubmissions":3,"maxFixSubmissions":2,"runtime":{"allocation":1,"definition":{"kind":"container","image":"target:v1","internalPorts":[8080]},"limits":{"memoryBytes":268435456,"nanoCpus":500000000,"pidsLimit":128}},"patchEntrypoint":"fix.sh","patchCommand":["/bin/sh","{entrypoint}"],"patchTimeoutSeconds":60,"checker":{"image":"checker:v1","timeoutSeconds":60},"readyTimeoutSeconds":30}""";
         var policy = new GameModeSubmissionAdmissionPolicy();
 
         var rules = policy.GetRules(

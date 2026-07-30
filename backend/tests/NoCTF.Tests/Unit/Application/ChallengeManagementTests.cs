@@ -139,6 +139,7 @@ public class ChallengeManagementTests
     }
 
     private static CreateCompetitionChallengeCommand CreateCommand(Guid? competitionId = null) => new(
+        null,
         competitionId ?? Guid.NewGuid(),
         Guid.NewGuid(),
         100,
@@ -167,6 +168,7 @@ public class ChallengeManagementTests
             1,
             false,
             0,
+            null,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow);
 
@@ -194,6 +196,7 @@ public class ChallengeManagementTests
             Guid competitionId,
             Guid challengeId,
             bool includeUnpublished,
+            bool includeDeleted,
             CancellationToken cancellationToken)
         {
             LastIncludeUnpublished = includeUnpublished;
@@ -203,6 +206,7 @@ public class ChallengeManagementTests
         public Task<IReadOnlyList<ChallengeView>> ListAsync(
             Guid competitionId,
             bool includeUnpublished,
+            bool includeDeleted,
             CancellationToken cancellationToken)
         {
             LastIncludeUnpublished = includeUnpublished;

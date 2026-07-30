@@ -12,22 +12,29 @@ namespace NoCTF.Infrastructure.Challenges.Attachments;
 
 public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAttachmentStore
 {
+    public Task<bool> AttachmentIdExistsAsync(
+        Guid attachmentId,
+        CancellationToken ct) =>
+        db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(item => item.Id == attachmentId, ct);
+
     public async Task<IReadOnlyList<ChallengeAttachmentView>?> ListAdminAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken ct)
     {
-        var challenge = await WriteAuthorized(actorId, isAdministrator)
+        var challenge = await WriteAuthorized(actorId, isAdministrator, includeDeleted)
             .Include(item => item.Attachments)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
         return challenge is null
             ? null
-            : challenge.Attachments.Where(item => item.DeletedAt == null)
+            : challenge.Attachments.Where(item => includeDeleted || item.DeletedAt == null)
                 .OrderBy(item => item.CreatedAt).ThenBy(item => item.Id).Select(Map).ToArray();
     }
 
-    public async Task<bool> AddAsync(
+    public async Task<AddChallengeAttachmentState> AddAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
@@ -39,7 +46,10 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         var challenge = await WriteAuthorized(actorId, isAdministrator)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
         if (challenge is null)
-            return false;
+            return AddChallengeAttachmentState.ChallengeNotFound;
+        if (await db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(item => item.Id == attachmentId, ct))
+            return AddChallengeAttachmentState.ResourceIdConflict;
         db.Set<ChallengeAttachment>().Add(new ChallengeAttachment
         {
             Id = attachmentId,
@@ -53,8 +63,15 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         });
         challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
-        return true;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return AddChallengeAttachmentState.Added;
+        }
+        catch (DbUpdateException)
+        {
+            return AddChallengeAttachmentState.ResourceIdConflict;
+        }
     }
 
     public async Task<ChallengeAttachmentView?> UpdateAsync(
@@ -97,6 +114,28 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         if (attachment is null)
             return false;
         attachment.DeletedAt = now;
+        challenge!.Revision = checked(challenge.Revision + 1);
+        challenge.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> RestoreAsync(
+        Guid challengeId,
+        Guid attachmentId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var challenge = await WriteAuthorized(actorId, isAdministrator, includeDeleted: true)
+            .Include(item => item.Attachments)
+            .SingleOrDefaultAsync(item => item.Id == challengeId && item.DeletedAt == null, ct);
+        var attachment = challenge?.Attachments.SingleOrDefault(item =>
+            item.Id == attachmentId && item.DeletedAt != null);
+        if (attachment is null)
+            return false;
+        attachment.DeletedAt = null;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
@@ -193,11 +232,18 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         return new(Map(attachment), attachment.ObjectKey);
     }
 
-    private IQueryable<Challenge> WriteAuthorized(Guid actorId, bool isAdministrator) =>
+    private IQueryable<Challenge> WriteAuthorized(
+        Guid actorId,
+        bool isAdministrator,
+        bool includeDeleted = false)
+    {
+        var source = includeDeleted ? db.Challenges.IgnoreQueryFilters() : db.Challenges;
+        return
         isAdministrator
-            ? db.Challenges
-            : db.Challenges.Where(challenge =>
+            ? source
+            : source.Where(challenge =>
                 challenge.OwnerId == actorId || challenge.ManagerIds.Contains(actorId));
+    }
 
     private async Task<PlayerScope?> ResolvePlayerScopeAsync(
         Guid competitionId,
@@ -245,7 +291,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         new(
             attachment.Id, attachment.ChallengeId, attachment.FileName,
             attachment.ContentType, attachment.Length,
-            Convert.ToHexString(attachment.Sha256Bytes), attachment.CreatedAt);
+            Convert.ToHexString(attachment.Sha256Bytes), attachment.DeletedAt, attachment.CreatedAt);
 
     private sealed record PlayerScope(Guid TeamId, Guid ChallengeId, string ConfigurationJson);
 }

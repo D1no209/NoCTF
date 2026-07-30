@@ -12,6 +12,7 @@
 - **Challenge template** is a reusable question definition for exactly one Game Mode. It owns the statement, attachments, static Flags, provider-neutral Runtime definition, Checker definition, and dynamic Flag injection contract.
 - **Competition challenge** is one competition's use of a Challenge template. It owns ordering, publication, scoring and admission rules, and Hints, but never infrastructure-provider details.
 - **Checker** is a one-shot job attached to a Runtime's internal network. It updates its execution status through the platform Internal API; process failure and timeout are checker execution states, not challenge results.
+- **Bot user** is a platform User created by an administrator for non-interactive automation. It cannot authenticate with a password, but its issued JWTs and competition or Challenge permissions use the same authorization model as every other User.
 
 ## Architecture vocabulary
 
