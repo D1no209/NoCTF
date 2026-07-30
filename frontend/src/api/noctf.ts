@@ -1,7 +1,11 @@
-import { client } from './generated/client.gen'
-import * as generatedSdk from './generated/sdk.gen'
+import type {
+  NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
+  NoCtfDomainIdentityUserRole,
+} from './generated/types.gen'
 import { translate as tt } from '@/i18n'
 import { readAuthSession } from './auth-session'
+import { client } from './generated/client.gen'
+import * as generatedSdk from './generated/sdk.gen'
 
 // Some legacy screens still call optional endpoints that are not part of the
 // current public competition contract. Keep their failure typed and contained
@@ -475,6 +479,61 @@ export const penetrationAdminApi = {
   },
 }
 
+export type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
+
+export interface IssuedBotToken {
+  accessToken: string
+  expiresAt: string
+}
+
+export const platformAdminApi = {
+  async users(): Promise<PlatformUser[]> {
+    const response = unwrap(await generatedSdk.adminPlatformListUsers(), tt('errors.loadUsers'))
+    return response.items ?? []
+  },
+  async createBot(userName: string): Promise<PlatformUser> {
+    return unwrap(
+      await generatedSdk.adminPlatformCreateBot({
+        body: { userName, role: 'Organizer' },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async updateUserRole(userId: string, role: NoCtfDomainIdentityUserRole): Promise<PlatformUser> {
+    return unwrap(
+      await generatedSdk.adminPlatformUpdateUserRole({
+        path: { userId },
+        body: { role },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async issueBotToken(userId: string, expiresInSeconds: number): Promise<IssuedBotToken> {
+    const response = unwrap(
+      await generatedSdk.adminPlatformIssueBotToken({
+        path: { userId },
+        body: { expiresInSeconds },
+      }),
+      tt('errors.requestFailed'),
+    )
+    if (!response.accessToken || !response.expiresAt)
+      throw new ApiError(tt('errors.requestFailed'))
+
+    return {
+      accessToken: response.accessToken,
+      expiresAt: response.expiresAt,
+    }
+  },
+  async invalidateUserTokens(userId: string): Promise<PlatformUser> {
+    return unwrap(
+      await generatedSdk.adminPlatformInvalidateUserTokens({
+        path: { userId },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+}
+
 export const adminApi = {
   async competitions<T = unknown[]>() {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions' }), tt('errors.loadCompetitions'))
@@ -491,14 +550,8 @@ export const adminApi = {
   async deleteCompetition(id: string) {
     await requireSuccess(client.delete({ url: '/api/admin/competitions/{id}', path: { id } }), tt('errors.requestFailed'))
   },
-  async users<T = unknown[]>() {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/users' }), tt('errors.loadUsers'))
-  },
-  async updateUserRole(id: string, role: string) {
-    await requireSuccess(client.post({ url: '/api/admin/users/{id}/role', path: { id }, body: { role } }), tt('errors.requestFailed'))
-  },
-  async resetUserPassword(id: string, newPassword: string) {
-    await requireSuccess(client.post({ url: '/api/admin/users/{id}/reset-password', path: { id }, body: { newPassword } }), tt('errors.requestFailed'))
+  async users<T = PlatformUser[]>() {
+    return (await platformAdminApi.users()) as T
   },
   async teams<T = unknown[]>() {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/teams' }), tt('errors.loadAdminTeams'))
