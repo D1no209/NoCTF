@@ -5,10 +5,17 @@ using NoCTF.Application.Challenges.Bank;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
+public sealed class GetChallengeTemplateRequest
+{
+    public Guid ChallengeId { get; set; }
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
+}
+
 public sealed class GetChallengeTemplateEndpoint(
     GetChallengeTemplate get,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeTemplateResponse>, NotFound>>
+    : Endpoint<GetChallengeTemplateRequest, Results<Ok<ChallengeTemplateResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -23,12 +30,14 @@ public sealed class GetChallengeTemplateEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeTemplateResponse>, NotFound>> ExecuteAsync(
+        GetChallengeTemplateRequest request,
         CancellationToken ct)
     {
         var result = await get.ExecuteAsync(
-            Route<Guid>("challengeId"),
+            request.ChallengeId,
             user.UserId,
             user.IsAdministrator,
+            request.IncludeDeleted,
             ct: ct);
         return result is null
             ? TypedResults.NotFound()

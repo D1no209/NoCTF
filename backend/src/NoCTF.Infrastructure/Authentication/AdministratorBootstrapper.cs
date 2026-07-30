@@ -45,6 +45,7 @@ public sealed class AdministratorBootstrapper(
             NormalizedUserName = normalizedUserName,
             Email = email,
             NormalizedEmail = normalizedEmail,
+            Kind = UserKind.Human,
             Role = UserRole.Administrator,
             EmailVerifiedAt = now,
             CreatedAt = now,

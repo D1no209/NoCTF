@@ -7,11 +7,13 @@ namespace NoCTF.Infrastructure.Challenges.Bank;
 
 public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
 {
-    public async Task<ChallengeTemplateView> CreateAsync(CreateChallengeTemplateCommand command, CancellationToken ct)
+    public async Task<ChallengeTemplateView?> CreateAsync(
+        CreateChallengeTemplateCommand command,
+        CancellationToken ct)
     {
         var entity = new Challenge
         {
-            Id = Guid.CreateVersion7(command.CreatedAt),
+            Id = command.ChallengeId ?? Guid.CreateVersion7(command.CreatedAt),
             OwnerId = command.OwnerId,
             Mode = command.Mode,
             Visibility = command.Visibility,
@@ -23,21 +25,32 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             UpdatedAt = command.CreatedAt
         };
         db.Challenges.Add(entity);
-        await db.SaveChangesAsync(ct);
-        return Map(entity);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return await Project(db.Challenges.AsNoTracking())
+                .SingleAsync(challenge => challenge.Id == entity.Id, ct);
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(entity).State = EntityState.Detached;
+            return null;
+        }
     }
 
     public async Task<IReadOnlyList<ChallengeTemplateView>> ListAsync(
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken ct) =>
-        await Authorized(db.Challenges.AsNoTracking(), actorId, isAdministrator)
+        await Project(Authorized(
+                includeDeleted
+                    ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
+                    : db.Challenges.AsNoTracking(),
+                actorId,
+                isAdministrator))
             .OrderByDescending(challenge => challenge.UpdatedAt)
             .ThenBy(challenge => challenge.Id)
-            .Select(challenge => new ChallengeTemplateView(
-                challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Mode, challenge.Visibility,
-                challenge.Title, challenge.Description, challenge.Direction, challenge.DefinitionJson, challenge.Revision,
-                challenge.CreatedAt, challenge.UpdatedAt))
             .ToListAsync(ct);
 
     public Task<ChallengeTemplateView?> FindAsync(
@@ -50,12 +63,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         var source = includeDeleted
             ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
             : db.Challenges.AsNoTracking();
-        return Authorized(source, actorId, isAdministrator)
+        return Project(Authorized(source, actorId, isAdministrator))
             .Where(challenge => challenge.Id == challengeId)
-            .Select(challenge => new ChallengeTemplateView(
-                challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Mode, challenge.Visibility,
-                challenge.Title, challenge.Description, challenge.Direction, challenge.DefinitionJson, challenge.Revision,
-                challenge.CreatedAt, challenge.UpdatedAt))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -78,16 +87,25 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
         await db.SaveChangesAsync(ct);
-        return Map(entity);
+        return await Project(db.Challenges.AsNoTracking())
+            .SingleAsync(challenge => challenge.Id == entity.Id, ct);
     }
 
-    public Task<bool> SoftDeleteAsync(
+    public async Task<ChallengeTemplateDeleteFailure?> SoftDeleteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
         DateTimeOffset now,
-        CancellationToken ct) =>
-        SetDeletedAsync(challengeId, actorId, isAdministrator, now, restore: false, ct);
+        CancellationToken ct)
+    {
+        if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(
+                item => item.ChallengeId == challengeId && item.DeletedAt == null,
+                ct))
+            return ChallengeTemplateDeleteFailure.InUse;
+        return await SetDeletedAsync(challengeId, actorId, isAdministrator, now, restore: false, ct)
+            ? null
+            : ChallengeTemplateDeleteFailure.NotFound;
+    }
 
     public Task<bool> RestoreAsync(
         Guid challengeId,
@@ -117,7 +135,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return Map(entity);
+        return await Project(db.Challenges.AsNoTracking())
+            .SingleAsync(challenge => challenge.Id == entity.Id, ct);
     }
 
     public async Task<ChallengeTemplateView?> TransferOwnerAsync(
@@ -140,7 +159,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return Map(entity);
+        return await Project(db.Challenges.AsNoTracking())
+            .SingleAsync(challenge => challenge.Id == entity.Id, ct);
     }
 
     private async Task<bool> SetDeletedAsync(
@@ -186,8 +206,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
                 challenge.OwnerId == actorId ||
                 challenge.ManagerIds.Contains(actorId));
 
-    private static ChallengeTemplateView Map(Challenge challenge) =>
-        new(
+    private IQueryable<ChallengeTemplateView> Project(IQueryable<Challenge> source) =>
+        source.Select(challenge => new ChallengeTemplateView(
             challenge.Id,
             challenge.OwnerId,
             challenge.ManagerIds,
@@ -198,7 +218,10 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             challenge.Direction,
             challenge.DefinitionJson,
             challenge.Revision,
+            challenge.DeletedAt,
+            db.CompetitionChallenges.IgnoreQueryFilters().Count(item =>
+                item.ChallengeId == challenge.Id && item.DeletedAt == null),
             challenge.CreatedAt,
-            challenge.UpdatedAt);
+            challenge.UpdatedAt));
 
 }

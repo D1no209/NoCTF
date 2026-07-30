@@ -11,17 +11,18 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         ChallengeFlagScope scope,
         Guid? actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken ct)
     {
         if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
             return null;
-        return await Scoped(scope).AsNoTracking()
+        return await Scoped(scope, includeDeleted).AsNoTracking()
             .OrderBy(flag => flag.CreatedAt)
             .ThenBy(flag => flag.Id)
             .Select(flag => new ChallengeFlagView(
                 flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
                 flag.Flag, flag.SpecificationKind, flag.SpecificationId,
-                flag.ValidStart, flag.ValidUntil, flag.CreatedAt))
+                flag.ValidStart, flag.ValidUntil, flag.DeletedAt, flag.CreatedAt))
             .ToListAsync(ct);
     }
 
@@ -30,40 +31,45 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         Guid flagId,
         Guid? actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken ct)
     {
         if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
             return null;
-        return await Scoped(scope).AsNoTracking()
+        return await Scoped(scope, includeDeleted).AsNoTracking()
             .Where(flag => flag.Id == flagId)
             .Select(flag => new ChallengeFlagView(
                 flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
                 flag.Flag, flag.SpecificationKind, flag.SpecificationId,
-                flag.ValidStart, flag.ValidUntil, flag.CreatedAt))
+                flag.ValidStart, flag.ValidUntil, flag.DeletedAt, flag.CreatedAt))
             .SingleOrDefaultAsync(ct);
     }
 
-    public async Task<ChallengeFlagView?> SaveAsync(
+    public async Task<ChallengeFlagSaveResult> SaveAsync(
         SaveChallengeFlagCommand command,
         Guid? actorId,
         bool isAdministrator,
         CancellationToken ct)
     {
         if (!await ScopeExistsAsync(command.Scope, actorId, isAdministrator, ct))
-            return null;
+            return new(null, ChallengeFlagSaveFailure.ScopeNotFound);
         ChallengeFlag entity;
-        if (command.FlagId is Guid flagId)
+        if (!command.IsCreate && command.FlagId is Guid flagId)
         {
             entity = await Scoped(command.Scope).SingleOrDefaultAsync(flag => flag.Id == flagId, ct)
                 ?? null!;
             if (entity is null)
-                return null;
+                return new(null, ChallengeFlagSaveFailure.FlagNotFound);
         }
         else
         {
+            var requestedId = command.FlagId ?? Guid.CreateVersion7(command.Now);
+            if (await db.ChallengeFlags.IgnoreQueryFilters().AsNoTracking()
+                    .AnyAsync(flag => flag.Id == requestedId, ct))
+                return new(null, ChallengeFlagSaveFailure.ResourceIdConflict);
             entity = new ChallengeFlag
             {
-                Id = Guid.CreateVersion7(command.Now),
+                Id = requestedId,
                 ChallengeId = command.Scope.ChallengeId,
                 CompetitionChallengeId = command.Scope.CompetitionChallengeId,
                 CreatedAt = command.Now
@@ -77,8 +83,15 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         entity.SpecificationId = command.SpecificationId;
         entity.ValidStart = command.ValidStart;
         entity.ValidUntil = command.ValidUntil;
-        await db.SaveChangesAsync(ct);
-        return Map(entity);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return new(Map(entity));
+        }
+        catch (DbUpdateException) when (command.IsCreate)
+        {
+            return new(null, ChallengeFlagSaveFailure.ResourceIdConflict);
+        }
     }
 
     public async Task<bool> DeleteAsync(
@@ -99,10 +112,36 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         return true;
     }
 
-    private IQueryable<ChallengeFlag> Scoped(ChallengeFlagScope scope) =>
-        db.ChallengeFlags.Where(flag =>
+    public async Task<bool> RestoreAsync(
+        ChallengeFlagScope scope,
+        Guid flagId,
+        Guid? actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
+            return false;
+        var entity = await Scoped(scope, includeDeleted: true)
+            .SingleOrDefaultAsync(flag => flag.Id == flagId && flag.DeletedAt != null, ct);
+        if (entity is null)
+            return false;
+        entity.DeletedAt = null;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    private IQueryable<ChallengeFlag> Scoped(
+        ChallengeFlagScope scope,
+        bool includeDeleted = false)
+    {
+        var source = includeDeleted
+            ? db.ChallengeFlags.IgnoreQueryFilters()
+            : db.ChallengeFlags;
+        return source.Where(flag =>
             flag.ChallengeId == scope.ChallengeId &&
             flag.CompetitionChallengeId == scope.CompetitionChallengeId);
+    }
 
     private Task<bool> ScopeExistsAsync(
         ChallengeFlagScope scope,
@@ -126,6 +165,6 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         new(
             flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
             flag.Flag, flag.SpecificationKind, flag.SpecificationId,
-            flag.ValidStart, flag.ValidUntil, flag.CreatedAt);
+            flag.ValidStart, flag.ValidUntil, flag.DeletedAt, flag.CreatedAt);
 
 }

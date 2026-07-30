@@ -427,7 +427,11 @@ public sealed class KohPollingPersistenceTests
         {
             Id = challengeId,
             OwnerId = ownerId,
+            Mode = GameMode.Koh,
             Title = "Hill",
+            DefinitionJson = JsonSerializer.Serialize(
+                new KohChallengeConfiguration(1, runtime),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             CreatedAt = dueAt,
             UpdatedAt = dueAt
         });
@@ -438,7 +442,7 @@ public sealed class KohPollingPersistenceTests
             ChallengeId = challengeId,
             IsPublished = true,
             RulesJson = JsonSerializer.Serialize(
-                new KohChallengeConfiguration(1, runtime),
+                new KohChallengeConfiguration(1),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = dueAt
         });

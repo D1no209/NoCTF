@@ -16,10 +16,13 @@ public sealed record ChallengeTemplateView(
     string Direction,
     string DefinitionJson,
     int Revision,
+    DateTimeOffset? DeletedAt,
+    int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
 public sealed record CreateChallengeTemplateCommand(
+    Guid? ChallengeId,
     Guid OwnerId,
     GameMode Mode,
     ChallengeVisibility Visibility,
@@ -44,14 +47,29 @@ public sealed record UpdateChallengeTemplateCommand(
 
 public interface IChallengeBankStore
 {
-    Task<ChallengeTemplateView> CreateAsync(CreateChallengeTemplateCommand command, CancellationToken cancellationToken);
-    Task<IReadOnlyList<ChallengeTemplateView>> ListAsync(Guid actorId, bool isAdministrator, CancellationToken cancellationToken);
+    Task<ChallengeTemplateView?> CreateAsync(CreateChallengeTemplateCommand command, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ChallengeTemplateView>> ListAsync(
+        Guid actorId,
+        bool isAdministrator,
+        bool includeDeleted,
+        CancellationToken cancellationToken);
     Task<ChallengeTemplateView?> FindAsync(Guid challengeId, Guid actorId, bool isAdministrator, bool includeDeleted, CancellationToken cancellationToken);
     Task<ChallengeTemplateView?> UpdateAsync(UpdateChallengeTemplateCommand command, CancellationToken cancellationToken);
-    Task<bool> SoftDeleteAsync(Guid challengeId, Guid actorId, bool isAdministrator, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<ChallengeTemplateDeleteFailure?> SoftDeleteAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
     Task<bool> RestoreAsync(Guid challengeId, Guid actorId, bool isAdministrator, DateTimeOffset now, CancellationToken cancellationToken);
     Task<ChallengeTemplateView?> UpdatePermissionsAsync(Guid challengeId, Guid actorId, bool isAdministrator, Guid[] managerIds, int expectedRevision, DateTimeOffset now, CancellationToken cancellationToken);
     Task<ChallengeTemplateView?> TransferOwnerAsync(Guid challengeId, Guid actorId, bool isAdministrator, Guid ownerId, int expectedRevision, DateTimeOffset now, CancellationToken cancellationToken);
+}
+
+public enum ChallengeTemplateDeleteFailure
+{
+    NotFound,
+    InUse
 }
 
 public static class ChallengeTemplateValidation
@@ -105,6 +123,10 @@ public sealed class CreateChallengeTemplate(
             Description = command.Description?.Trim(),
             Direction = command.Direction.Trim()
         }, ct);
+        if (result is null)
+            return OperationResult<ChallengeTemplateView>.Failure(
+                "resource_id_conflict",
+                "The requested challenge ID is already in use.");
         return OperationResult<ChallengeTemplateView>.Success(result);
     }
 }
@@ -114,8 +136,9 @@ public sealed class ListChallengeTemplates(IChallengeBankStore store)
     public Task<IReadOnlyList<ChallengeTemplateView>> ExecuteAsync(
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.ListAsync(actorId, isAdministrator, ct);
+        store.ListAsync(actorId, isAdministrator, includeDeleted, ct);
 }
 
 public sealed class GetChallengeTemplate(IChallengeBankStore store)
@@ -174,12 +197,29 @@ public sealed class DeleteChallengeTemplate(IChallengeBankStore store)
         DateTimeOffset now,
         CancellationToken ct = default)
     {
-        var changed = restore
-            ? await store.RestoreAsync(challengeId, actorId, isAdministrator, now, ct)
-            : await store.SoftDeleteAsync(challengeId, actorId, isAdministrator, now, ct);
-        return changed
-            ? OperationResult.Success()
-            : OperationResult.Failure("challenge_not_found", "Challenge was not found or access was denied.");
+        if (restore)
+            return await store.RestoreAsync(challengeId, actorId, isAdministrator, now, ct)
+                ? OperationResult.Success()
+                : OperationResult.Failure(
+                    "challenge_not_found",
+                    "Challenge was not found or access was denied.");
+
+        var failure = await store.SoftDeleteAsync(
+            challengeId,
+            actorId,
+            isAdministrator,
+            now,
+            ct);
+        return failure switch
+        {
+            null => OperationResult.Success(),
+            ChallengeTemplateDeleteFailure.InUse => OperationResult.Failure(
+                "challenge_in_use",
+                "Challenge is still referenced by an active competition challenge."),
+            _ => OperationResult.Failure(
+                "challenge_not_found",
+                "Challenge was not found or access was denied.")
+        };
     }
 }
 

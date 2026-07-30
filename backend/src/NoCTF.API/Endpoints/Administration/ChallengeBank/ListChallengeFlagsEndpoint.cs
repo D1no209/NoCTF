@@ -16,6 +16,7 @@ public sealed record ChallengeFlagResponse(
     Guid? SpecificationId,
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidUntil,
+    DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt);
 
 public sealed record ChallengeFlagListResponse(IReadOnlyList<ChallengeFlagResponse> Items);
@@ -26,13 +27,20 @@ internal static class ChallengeFlagMapping
         new(
             view.Id, view.ChallengeId, view.CompetitionChallengeId, view.TeamId,
             view.Flag, view.SpecificationKind, view.SpecificationId,
-            view.ValidStart, view.ValidUntil, view.CreatedAt);
+            view.ValidStart, view.ValidUntil, view.DeletedAt, view.CreatedAt);
+}
+
+public sealed class ListChallengeFlagsRequest
+{
+    public Guid ChallengeId { get; set; }
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
 }
 
 public sealed class ListChallengeFlagsEndpoint(
     ManageChallengeFlags flags,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeFlagListResponse>, NotFound>>
+    : Endpoint<ListChallengeFlagsRequest, Results<Ok<ChallengeFlagListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -47,12 +55,14 @@ public sealed class ListChallengeFlagsEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeFlagListResponse>, NotFound>> ExecuteAsync(
+        ListChallengeFlagsRequest request,
         CancellationToken ct)
     {
         var items = await flags.ListAsync(
-            ChallengeFlagScope.Template(Route<Guid>("challengeId")),
+            ChallengeFlagScope.Template(request.ChallengeId),
             user.UserId,
             user.IsAdministrator,
+            request.IncludeDeleted,
             ct);
         return items is null
             ? TypedResults.NotFound()

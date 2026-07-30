@@ -57,7 +57,11 @@
 
 ## Revision 并发
 
-CompetitionChallenge 普通更新 DTO 必须带 expectedRevision。Competition 普通元数据更新使用当前状态作为并发栅栏，不引入通用 Revision。Competition 与 CompetitionChallenge 的模式配置更新分别携带对应配置的 expectedRevision；数据库条件更新成功后对应 Revision+1。冲突返回 409，不自动合并；CompetitionChallenge 子资源变更递增所属 Revision。
+CompetitionChallenge 聚合更新 DTO 必须带 expectedRevision。Competition 普通元数据更新使用
+当前状态作为并发栅栏，不引入通用 Revision。Competition 与 CompetitionChallenge 的模式配置
+更新分别携带对应配置的 expectedRevision；数据库条件更新成功后对应 Revision+1。冲突返回
+409，不自动合并。Attachment、Flag、Hint 没有独立 Revision；GitOps 通过稳定 UUID、内容和
+删除状态收敛，子资源 Endpoint 不要求伪造一套 ExpectedRevision 协议。
 
 ## 限流
 

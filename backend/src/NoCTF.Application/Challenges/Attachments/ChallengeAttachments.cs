@@ -16,11 +16,19 @@ public sealed record ChallengeAttachmentView(
     string ContentType,
     long ByteLength,
     string Sha256,
+    DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt);
 
 public sealed record ChallengeAttachmentContent(
     ChallengeAttachmentView Metadata,
     string ObjectKey);
+
+public enum AddChallengeAttachmentState
+{
+    Added,
+    ChallengeNotFound,
+    ResourceIdConflict
+}
 
 public interface IChallengeAttachmentStore
 {
@@ -28,14 +36,18 @@ public interface IChallengeAttachmentStore
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken cancellationToken);
-    Task<bool> AddAsync(
+    Task<AddChallengeAttachmentState> AddAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
         Guid attachmentId,
         StoredObject storedObject,
         DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<bool> AttachmentIdExistsAsync(
+        Guid attachmentId,
         CancellationToken cancellationToken);
     Task<ChallengeAttachmentView?> UpdateAsync(
         Guid challengeId,
@@ -46,6 +58,13 @@ public interface IChallengeAttachmentStore
         string contentType,
         CancellationToken cancellationToken);
     Task<bool> DeleteAsync(
+        Guid challengeId,
+        Guid attachmentId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<bool> RestoreAsync(
         Guid challengeId,
         Guid attachmentId,
         Guid actorId,
@@ -73,13 +92,15 @@ public sealed class ManageChallengeAttachments(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.ListAdminAsync(challengeId, actorId, isAdministrator, ct);
+        store.ListAdminAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
 
     public async Task<OperationResult<ChallengeAttachmentView>> UploadAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
+        Guid? requestedAttachmentId,
         string fileName,
         string contentType,
         Stream content,
@@ -88,7 +109,11 @@ public sealed class ManageChallengeAttachments(
     {
         if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 260)
             return OperationResult<ChallengeAttachmentView>.Failure("invalid_file_name", "FileName is invalid.");
-        var attachmentId = Guid.CreateVersion7(now);
+        var attachmentId = requestedAttachmentId ?? Guid.CreateVersion7(now);
+        if (await store.AttachmentIdExistsAsync(attachmentId, ct))
+            return OperationResult<ChallengeAttachmentView>.Failure(
+                "resource_id_conflict",
+                "The requested attachment ID is already in use.");
         var objectKey = $"challenges/{challengeId:N}/attachments/{attachmentId:N}";
         var stored = await objects.PutAsync(
             objectKey,
@@ -98,12 +123,16 @@ public sealed class ManageChallengeAttachments(
             ct);
         var saved = await store.AddAsync(
             challengeId, actorId, isAdministrator, attachmentId, stored, now, ct);
-        if (!saved)
+        if (saved != AddChallengeAttachmentState.Added)
         {
             await objects.DeleteAsync(objectKey, ct);
             return OperationResult<ChallengeAttachmentView>.Failure(
-                "challenge_not_found",
-                "Challenge was not found or access was denied.");
+                saved == AddChallengeAttachmentState.ResourceIdConflict
+                    ? "resource_id_conflict"
+                    : "challenge_not_found",
+                saved == AddChallengeAttachmentState.ResourceIdConflict
+                    ? "The requested attachment ID is already in use."
+                    : "Challenge was not found or access was denied.");
         }
         return OperationResult<ChallengeAttachmentView>.Success(new(
             attachmentId,
@@ -112,6 +141,7 @@ public sealed class ManageChallengeAttachments(
             stored.ContentType,
             stored.Length,
             stored.Sha256,
+            null,
             now));
     }
 
@@ -144,6 +174,25 @@ public sealed class ManageChallengeAttachments(
         await store.DeleteAsync(challengeId, attachmentId, actorId, isAdministrator, now, ct)
             ? OperationResult.Success()
             : OperationResult.Failure("attachment_not_found", "Attachment was not found or access was denied.");
+
+    public async Task<OperationResult> RestoreAsync(
+        Guid challengeId,
+        Guid attachmentId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        await store.RestoreAsync(
+            challengeId,
+            attachmentId,
+            actorId,
+            isAdministrator,
+            now,
+            ct)
+            ? OperationResult.Success()
+            : OperationResult.Failure(
+                "attachment_not_found",
+                "Deleted attachment was not found or access was denied.");
 }
 
 public sealed class GetChallengeAttachments(

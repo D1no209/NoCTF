@@ -12,6 +12,7 @@ public sealed record ChallengeHintResponse(
     string Content,
     long Cost,
     DateTimeOffset? PublishedAt,
+    DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -22,14 +23,23 @@ internal static class ChallengeHintMapping
     public static ChallengeHintResponse ToResponse(ChallengeHintView view) =>
         new(
             view.Id, view.CompetitionChallengeId, view.Content, view.Cost,
-            view.PublishedAt, view.CreatedAt, view.UpdatedAt);
+            view.PublishedAt, view.DeletedAt, view.CreatedAt, view.UpdatedAt);
+}
+
+public sealed class ListChallengeHintsRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
 }
 
 public sealed class ListChallengeHintsEndpoint(
     ManageChallengeHints hints,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeHintListResponse>, NotFound, ForbidHttpResult>>
+    : Endpoint<ListChallengeHintsRequest,
+        Results<Ok<ChallengeHintListResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
@@ -44,13 +54,17 @@ public sealed class ListChallengeHintsEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeHintListResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
+        ListChallengeHintsRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var items = await hints.ListAsync(
-            competitionId, Route<Guid>("competitionChallengeId"), ct);
+            competitionId,
+            request.CompetitionChallengeId,
+            request.IncludeDeleted,
+            ct);
         return items is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(new ChallengeHintListResponse(

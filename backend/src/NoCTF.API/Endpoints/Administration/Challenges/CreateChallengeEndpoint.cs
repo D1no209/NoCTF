@@ -11,6 +11,7 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class CreateChallengeRequest
 {
+    public Guid? Id { get; set; }
     public Guid ChallengeId { get; set; }
     public long BaseScore { get; set; }
     public int Order { get; set; }
@@ -20,6 +21,9 @@ public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
 {
     public CreateChallengeValidator()
     {
+        RuleFor(request => request.Id)
+            .Must(id => id is null || id != Guid.Empty)
+            .WithMessage("Id cannot be empty when supplied.");
         RuleFor(request => request.ChallengeId).NotEmpty();
         RuleFor(request => request.BaseScore).GreaterThanOrEqualTo(0);
         RuleFor(request => request.Order).GreaterThanOrEqualTo(0);
@@ -56,6 +60,7 @@ public sealed class CreateChallengeEndpoint(
             return TypedResults.Forbid();
 
         var result = await create.ExecuteAsync(new CreateCompetitionChallengeCommand(
+            request.Id,
             competitionId,
             request.ChallengeId,
             request.BaseScore,
@@ -66,11 +71,12 @@ public sealed class CreateChallengeEndpoint(
         if (!result.Succeeded)
         {
             return TypedResults.Problem(
-                statusCode: result.ErrorCode == "challenge_order_conflict"
+                statusCode: result.ErrorCode is "challenge_order_conflict" or "resource_id_conflict"
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
                 title: "Challenge was not created.",
-                detail: result.ErrorMessage);
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
         }
 
         var response = ChallengeMapper.ToResponse(result.Value!);

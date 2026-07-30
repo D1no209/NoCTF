@@ -1,5 +1,6 @@
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.RefreshJwt;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -9,7 +10,8 @@ public sealed class RefreshAccessTokenTests
     public async Task ExecuteAsync_RejectsRefreshTokenAfterTokenVersionChanges()
     {
         var userId = Guid.NewGuid();
-        var store = new Store(new AuthenticatedUser(userId, "alice", "User", 8));
+        var store = new Store(new AuthenticatedUser(
+            userId, "alice", UserRole.User, UserKind.Human, 8));
         var issuer = new Issuer(new RefreshTokenPrincipal(userId, 7));
 
         var result = await new RefreshAccessToken(store, issuer)
@@ -22,7 +24,8 @@ public sealed class RefreshAccessTokenTests
     [Test]
     public async Task ExecuteAsync_RefreshesWhenTokenVersionIsCurrent()
     {
-        var user = new AuthenticatedUser(Guid.NewGuid(), "alice", "User", 7);
+        var user = new AuthenticatedUser(
+            Guid.NewGuid(), "alice", UserRole.User, UserKind.Human, 7);
         var store = new Store(user);
         var issuer = new Issuer(new RefreshTokenPrincipal(user.Id, user.TokenVersion));
 
@@ -31,6 +34,20 @@ public sealed class RefreshAccessTokenTests
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(result.Value!.RefreshToken).IsEqualTo("new-refresh-token");
+    }
+
+    [Test]
+    public async Task ExecuteAsync_RejectsBotEvenWhenTokenVersionMatches()
+    {
+        var user = new AuthenticatedUser(
+            Guid.NewGuid(), "gitops-bot", UserRole.Organizer, UserKind.Bot, 2);
+        var issuer = new Issuer(new RefreshTokenPrincipal(user.Id, user.TokenVersion));
+
+        var result = await new RefreshAccessToken(new Store(user), issuer)
+            .ExecuteAsync("refresh-token");
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.ErrorCode).IsEqualTo("refresh_invalid");
     }
 
     private sealed class Store(AuthenticatedUser user) : IUserAuthenticationStore
@@ -58,8 +75,11 @@ public sealed class RefreshAccessTokenTests
 
     private sealed class Issuer(RefreshTokenPrincipal? principal) : IAccessTokenIssuer
     {
-        public IssuedAccessToken Issue(AuthenticatedUser user) =>
-            new("access-token", DateTimeOffset.UtcNow.AddMinutes(15));
+        public IssuedAccessToken Issue(
+            AuthenticatedUser user,
+            DateTimeOffset now,
+            TimeSpan? lifetime = null) =>
+            new("access-token", now.Add(lifetime ?? TimeSpan.FromMinutes(15)));
 
         public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
             new("new-refresh-token", DateTimeOffset.UtcNow.AddDays(30));

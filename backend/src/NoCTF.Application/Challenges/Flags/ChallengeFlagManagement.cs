@@ -25,11 +25,13 @@ public sealed record ChallengeFlagView(
     Guid? SpecificationId,
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidUntil,
+    DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt);
 
 public sealed record SaveChallengeFlagCommand(
     ChallengeFlagScope Scope,
     Guid? FlagId,
+    bool IsCreate,
     Guid? TeamId,
     string Flag,
     SpecificationKind? SpecificationKind,
@@ -38,25 +40,45 @@ public sealed record SaveChallengeFlagCommand(
     DateTimeOffset? ValidUntil,
     DateTimeOffset Now);
 
+public enum ChallengeFlagSaveFailure
+{
+    ScopeNotFound,
+    FlagNotFound,
+    ResourceIdConflict
+}
+
+public sealed record ChallengeFlagSaveResult(
+    ChallengeFlagView? Flag,
+    ChallengeFlagSaveFailure? Failure = null);
+
 public interface IChallengeFlagStore
 {
     Task<IReadOnlyList<ChallengeFlagView>?> ListAsync(
         ChallengeFlagScope scope,
         Guid? actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken cancellationToken);
     Task<ChallengeFlagView?> FindAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken cancellationToken);
-    Task<ChallengeFlagView?> SaveAsync(
+    Task<ChallengeFlagSaveResult> SaveAsync(
         SaveChallengeFlagCommand command,
         Guid? actorId,
         bool isAdministrator,
         CancellationToken cancellationToken);
     Task<bool> DeleteAsync(
+        ChallengeFlagScope scope,
+        Guid flagId,
+        Guid? actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<bool> RestoreAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
@@ -71,16 +93,18 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         ChallengeFlagScope scope,
         Guid? actorId,
         bool isAdministrator,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.ListAsync(scope, actorId, isAdministrator, ct);
+        store.ListAsync(scope, actorId, isAdministrator, includeDeleted, ct);
 
     public Task<ChallengeFlagView?> GetAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
         bool isAdministrator,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.FindAsync(scope, flagId, actorId, isAdministrator, ct);
+        store.FindAsync(scope, flagId, actorId, isAdministrator, includeDeleted, ct);
 
     public async Task<OperationResult<ChallengeFlagView>> SaveAsync(
         SaveChallengeFlagCommand command,
@@ -109,11 +133,18 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
                 "Template flags cannot be team-scoped or time-windowed.");
 
         var result = await store.SaveAsync(command, actorId, isAdministrator, ct);
-        return result is null
-            ? OperationResult<ChallengeFlagView>.Failure(
-                "flag_not_found",
-                "Flag scope was not found, access was denied, or the flag does not exist.")
-            : OperationResult<ChallengeFlagView>.Success(result);
+        return result.Failure switch
+        {
+            ChallengeFlagSaveFailure.ResourceIdConflict =>
+                OperationResult<ChallengeFlagView>.Failure(
+                    "resource_id_conflict",
+                    "The requested flag ID is already in use."),
+            ChallengeFlagSaveFailure.ScopeNotFound or ChallengeFlagSaveFailure.FlagNotFound =>
+                OperationResult<ChallengeFlagView>.Failure(
+                    "flag_not_found",
+                    "Flag scope was not found, access was denied, or the flag does not exist."),
+            _ => OperationResult<ChallengeFlagView>.Success(result.Flag!)
+        };
     }
 
     public async Task<OperationResult> DeleteAsync(
@@ -126,6 +157,19 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         await store.DeleteAsync(scope, flagId, actorId, isAdministrator, now, ct)
             ? OperationResult.Success()
             : OperationResult.Failure("flag_not_found", "Flag was not found or access was denied.");
+
+    public async Task<OperationResult> RestoreAsync(
+        ChallengeFlagScope scope,
+        Guid flagId,
+        Guid? actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        await store.RestoreAsync(scope, flagId, actorId, isAdministrator, now, ct)
+            ? OperationResult.Success()
+            : OperationResult.Failure(
+                "flag_not_found",
+                "Deleted flag was not found or access was denied.");
 
     private static bool teamOrWindowPresent(SaveChallengeFlagCommand command) =>
         command.TeamId is not null || command.ValidStart is not null || command.ValidUntil is not null;

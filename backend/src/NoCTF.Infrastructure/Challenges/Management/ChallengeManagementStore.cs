@@ -26,6 +26,10 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
             .Where(competition => competition.Id == command.CompetitionId)
             .Select(competition => competition.Mode)
             .SingleAsync(ct);
+        if (command.CompetitionChallengeId is Guid requestedId
+            && await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(item => item.Id == requestedId, ct))
+            return new(null, ChallengeMutationFailure.ResourceIdConflict);
 
         var template = await db.Challenges.AsNoTracking()
             .SingleOrDefaultAsync(challenge => challenge.Id == command.ChallengeId, ct);
@@ -36,7 +40,7 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
 
         var entity = new CompetitionChallenge
         {
-            Id = Guid.CreateVersion7(command.CreatedAt),
+            Id = command.CompetitionChallengeId ?? Guid.CreateVersion7(command.CreatedAt),
             CompetitionId = command.CompetitionId,
             ChallengeId = command.ChallengeId,
             BaseScore = command.BaseScore,
@@ -62,10 +66,11 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         Guid competitionId,
         Guid competitionChallengeId,
         bool includeUnpublished,
+        bool includeDeleted,
         CancellationToken ct) =>
         Query(
                 includeUnpublished,
-                includeDeleted: false,
+                includeDeleted,
                 competitionId,
                 competitionChallengeId)
             .SingleOrDefaultAsync(ct);
@@ -73,8 +78,9 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
     public async Task<IReadOnlyList<ChallengeView>> ListAsync(
         Guid competitionId,
         bool includeUnpublished,
+        bool includeDeleted,
         CancellationToken ct) =>
-        await Query(includeUnpublished, includeDeleted: false, competitionId)
+        await Query(includeUnpublished, includeDeleted, competitionId)
             .OrderBy(item => item.Order)
             .ThenBy(item => item.Id)
             .ToListAsync(ct);
@@ -176,13 +182,16 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         var instances = includeDeleted
             ? db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
             : db.CompetitionChallenges.AsNoTracking();
+        var templates = includeDeleted
+            ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
+            : db.Challenges.AsNoTracking();
         if (competitionId is Guid actualCompetitionId)
             instances = instances.Where(item => item.CompetitionId == actualCompetitionId);
         if (competitionChallengeId is Guid actualCompetitionChallengeId)
             instances = instances.Where(item => item.Id == actualCompetitionChallengeId);
         return instances
             .Join(
-                db.Challenges.AsNoTracking(),
+                templates,
                 instance => instance.ChallengeId,
                 template => template.Id,
                 (instance, template) => new { Instance = instance, Template = template })
@@ -198,6 +207,7 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
                 item.Instance.Order,
                 item.Instance.IsPublished,
                 item.Instance.Revision,
+                item.Instance.DeletedAt,
                 item.Template.CreatedAt,
                 item.Instance.UpdatedAt));
     }
@@ -214,6 +224,7 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
             instance.Order,
             instance.IsPublished,
             instance.Revision,
+            instance.DeletedAt,
             template.CreatedAt,
             instance.UpdatedAt);
 

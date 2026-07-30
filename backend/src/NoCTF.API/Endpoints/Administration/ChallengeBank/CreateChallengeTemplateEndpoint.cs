@@ -12,6 +12,7 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class CreateChallengeTemplateRequest
 {
+    public Guid? Id { get; set; }
     public GameMode Mode { get; set; }
     public ChallengeVisibility Visibility { get; set; }
     public string Title { get; set; } = string.Empty;
@@ -31,6 +32,8 @@ public sealed record ChallengeTemplateResponse(
     string Direction,
     string DefinitionJson,
     int Revision,
+    DateTimeOffset? DeletedAt,
+    int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -38,6 +41,9 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
 {
     public CreateChallengeTemplateValidator()
     {
+        RuleFor(request => request.Id)
+            .Must(id => id is null || id != Guid.Empty)
+            .WithMessage("Id cannot be empty when supplied.");
         RuleFor(request => request.Mode).IsInEnum();
         RuleFor(request => request.Visibility).IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
@@ -49,10 +55,20 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
 internal static partial class ChallengeTemplateMapper
 {
-    public static partial CreateChallengeTemplateCommand ToCommand(
+    public static CreateChallengeTemplateCommand ToCommand(
         CreateChallengeTemplateRequest request,
         Guid ownerId,
-        DateTimeOffset createdAt);
+        DateTimeOffset createdAt) =>
+        new(
+            request.Id,
+            ownerId,
+            request.Mode,
+            request.Visibility,
+            request.Title,
+            request.Description,
+            request.Direction,
+            request.DefinitionJson,
+            createdAt);
     public static partial ChallengeTemplateResponse ToResponse(ChallengeTemplateView source);
     private static partial IReadOnlyList<ChallengeTemplateResponse> ToResponses(
         IReadOnlyList<ChallengeTemplateView> source);
@@ -87,9 +103,12 @@ public sealed class CreateChallengeTemplateEndpoint(
             ct);
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
+                statusCode: result.ErrorCode == "resource_id_conflict"
+                    ? StatusCodes.Status409Conflict
+                    : StatusCodes.Status400BadRequest,
                 title: "Challenge template was not created.",
-                detail: result.ErrorMessage);
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
         var response = ChallengeTemplateMapper.ToResponse(result.Value!);
         return TypedResults.Created($"/api/v1/admin/challenges/{response.Id}", response);
     }

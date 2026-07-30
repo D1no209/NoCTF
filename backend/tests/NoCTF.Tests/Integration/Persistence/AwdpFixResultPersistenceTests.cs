@@ -20,7 +20,7 @@ public sealed class AwdpFixResultPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Competition_revision_change_supersedes_inflight_fix(
+    public async Task Competition_revision_change_does_not_supersede_inflight_fix(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -58,14 +58,14 @@ public sealed class AwdpFixResultPersistenceTests
                 disposition = await new InternalResultStore(db, outbox)
                     .RecordAwdpAsync(result, cancellationToken);
 
-            await Assert.That(disposition).IsEqualTo(InternalResultDisposition.Superseded);
+            await Assert.That(disposition).IsEqualTo(InternalResultDisposition.Applied);
             await using var verify = new NoCtfDbContext(options);
             var submission = await verify.Submissions.SingleAsync(cancellationToken);
             var runtime = await verify.RuntimeInstances.SingleAsync(cancellationToken);
             await Assert.That(submission.EvaluationState)
-                .IsEqualTo(SubmissionEvaluationState.PlatformFailed);
+                .IsEqualTo(SubmissionEvaluationState.Completed);
             await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
-            await Assert.That(await verify.ScoringEvents.AnyAsync(cancellationToken)).IsFalse();
+            await Assert.That(await verify.ScoringEvents.AnyAsync(cancellationToken)).IsTrue();
         });
     }
 

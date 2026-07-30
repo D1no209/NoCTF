@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -9,7 +10,8 @@ public sealed record CurrentUserResponse(
     Guid UserId,
     string UserName,
     string Email,
-    string Role,
+    UserRole Role,
+    UserKind Kind,
     bool EmailVerified);
 
 public sealed class GetMeEndpoint(GetCurrentUser getCurrent, IUserContext user)
@@ -37,6 +39,7 @@ public sealed class GetMeEndpoint(GetCurrentUser getCurrent, IUserContext user)
                 profile.UserName,
                 profile.Email,
                 profile.Role,
+                profile.Kind,
                 profile.EmailVerified));
     }
 }

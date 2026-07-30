@@ -6,11 +6,21 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
+public sealed class GetChallengeHintRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+    public Guid HintId { get; set; }
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
+}
+
 public sealed class GetChallengeHintEndpoint(
     ManageChallengeHints hints,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeHintResponse>, NotFound, ForbidHttpResult>>
+    : Endpoint<GetChallengeHintRequest,
+        Results<Ok<ChallengeHintResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
@@ -25,6 +35,7 @@ public sealed class GetChallengeHintEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeHintResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
+        GetChallengeHintRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
@@ -32,8 +43,9 @@ public sealed class GetChallengeHintEndpoint(
             return TypedResults.Forbid();
         var result = await hints.GetAsync(
             competitionId,
-            Route<Guid>("competitionChallengeId"),
-            Route<Guid>("hintId"),
+            request.CompetitionChallengeId,
+            request.HintId,
+            request.IncludeDeleted,
             ct);
         return result is null
             ? TypedResults.NotFound()

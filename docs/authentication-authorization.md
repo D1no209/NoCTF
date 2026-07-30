@@ -4,17 +4,25 @@
 
 首版使用 HMAC-SHA-256，部署 `JwtSigningKey` 至少 32 随机 bytes；Issuer 是部署配置的稳定绝对 URI。固定 audience 为 `noctf-access-v1`、`noctf-refresh-v1`、`noctf-internal-v1`，三个 ASP.NET Core Authentication Scheme 各只接受自己的 audience/token_type，校验 issuer、signature、exp 且 `ClockSkew=TimeSpan.Zero`。它们可以读取同一签名 Key，但不能共享验证配置或 forward 到彼此。
 
-## 用户密码
+## 用户类型与密码
 
-公开注册创建 User 角色。用户名 3..64、邮箱最大 320，分别以 Normalized 值做大小写不敏感唯一。密码 8..1024 字符，不 Trim、不 Unicode 归一化、不强制字符组合。
+公开注册只创建 `UserKind.Human` 和 `UserRole.User`。Human 用户名 3..64、邮箱最大 320，分别以 Normalized 值做大小写不敏感唯一。密码 8..1024 字符，不 Trim、不 Unicode 归一化、不强制字符组合。
 
 使用 ASP.NET Core `IPasswordHasher<User>` / Identity V3：PBKDF2-HMAC-SHA512，IterationCount=210000。成功验证返回 SuccessRehashNeeded 时更新 Hash。密码修改递增 TokenVersion；首版不提供“忘记密码”Token/Endpoint。
 
+`UserKind.Bot` 只能由 Administrator 创建。Bot 的 Email、NormalizedEmail 和 PasswordHash
+仍为非空：服务端生成 `bot-<user-id-N>@bot.invalid`，并用一次性随机 GUID 生成 dummy
+PasswordHash 后立即丢弃明文。Bot 不能调用 Login、ChangePassword、Refresh 或邮箱验证流程；
+即使 dummy password 泄露也必须按 UserKind 拒绝。Bot 登录尝试与普通错误凭据使用相同响应。
+Bot 与 Human 共用 UserRole、TokenVersion 和资源授权；比赛 GitOps Bot 通常使用 Organizer
+角色并被显式加入目标 Competition.ManagerIds。
+
 ## Access JWT
 
-- 生命周期 15 分钟；通过登录/刷新 JSON 返回，不放 Cookie。
+- Human 登录/刷新签发的生命周期固定为 15 分钟；通过 JSON 返回，不放 Cookie。
+- Administrator 可以为 Bot 签发指定正数有效时长的普通 Access JWT；它使用相同 access audience 和 `token_type=access`，不建立仓库专用认证 Scheme。
 - 客户端在内存持有，以 Bearer Header 使用。
-- Claims 至少含 sub、role、token_version、CSPRNG jti、iat、exp、aud 与 `token_type=access`。
+- Claims 至少含 sub、role、user_kind、token_version、CSPRNG jti、iat、exp、aud 与 `token_type=access`。
 - 每个认证请求比较当前 TokenVersion：Redis 命中直接比较，未命中查 PostgreSQL 回填；Redis 故障回退数据库，不能绕过。
 - 角色/密码/全局退出修改 TokenVersion，并通过 Outbox 失效缓存。
 
@@ -22,6 +30,7 @@ Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未�
 
 ## Refresh JWT
 
+- 只向 Human 签发，Bot 永远没有 Refresh JWT。
 - 固定 30 天；使用相同签名密钥、独立 refresh audience 与 `token_type=refresh`。
 - Claims：sub、CSPRNG jti、iat、exp、token_version、aud 与 `token_type=refresh`。
 - Cookie：`__Secure-noctf_refresh`、HttpOnly、Secure、SameSite=Strict、Path=/api/v1/auth，不设置 Domain。浏览器只会把它发送给 v1 认证路由，不会随普通业务请求发送。
@@ -32,7 +41,7 @@ Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未�
 
 ## 邮箱验证
 
-部署可开关。开启时新账号在 EmailVerifiedAt 前不能登录。验证 Token 只保存 SHA-256、单次使用且有过期时间。Resend 对未知、已验证、冷却中与待验证地址返回同样 Accepted，避免枚举。
+部署可开关。开启时新 Human 账号在 EmailVerifiedAt 前不能登录。Bot 不参与邮箱验证。验证 Token 只保存 SHA-256、单次使用且有过期时间。Resend 对未知、已验证、冷却中与待验证地址返回同样 Accepted，避免枚举。
 
 ## 平台与比赛授权
 

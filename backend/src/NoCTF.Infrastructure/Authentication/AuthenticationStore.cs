@@ -16,9 +16,10 @@ public sealed class AuthenticationStore(
     {
         var normalized = login.Trim().ToUpperInvariant();
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(
-            item => item.NormalizedEmail == normalized
+            item => item.Kind == UserKind.Human
+                && (item.NormalizedEmail == normalized
                 || item.NormalizedUserName == normalized
-                || item.Id.ToString() == login,
+                || item.Id.ToString() == login),
             ct);
         return ToAuthenticated(user);
     }
@@ -29,7 +30,7 @@ public sealed class AuthenticationStore(
         CancellationToken ct)
     {
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
-        if (user is null)
+        if (user is null || user.Kind != UserKind.Human)
             return false;
         var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
@@ -52,7 +53,8 @@ public sealed class AuthenticationStore(
                 user.Id,
                 user.UserName,
                 user.Email,
-                user.Role.ToString(),
+                user.Role,
+                user.Kind,
                 user.EmailVerifiedAt != null))
             .SingleOrDefaultAsync(ct);
 
@@ -78,6 +80,7 @@ public sealed class AuthenticationStore(
             NormalizedUserName = normalizedUserName,
             Email = email,
             NormalizedEmail = normalizedEmail,
+            Kind = UserKind.Human,
             Role = UserRole.User,
             CreatedAt = now,
             UpdatedAt = now
@@ -108,6 +111,7 @@ public sealed class AuthenticationStore(
     {
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null
+            || user.Kind != UserKind.Human
             || passwordHasher.VerifyHashedPassword(
                 user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
             return false;
@@ -133,5 +137,5 @@ public sealed class AuthenticationStore(
     private static AuthenticatedUser? ToAuthenticated(User? user) =>
         user is null
             ? null
-            : new(user.Id, user.UserName, user.Role.ToString(), user.TokenVersion);
+            : new(user.Id, user.UserName, user.Role, user.Kind, user.TokenVersion);
 }

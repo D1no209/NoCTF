@@ -8,6 +8,7 @@ public sealed record ChallengeHintView(
     string Content,
     long Cost,
     DateTimeOffset? PublishedAt,
+    DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -15,10 +16,22 @@ public sealed record SaveChallengeHintCommand(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid? HintId,
+    bool IsCreate,
     string Content,
     long Cost,
     DateTimeOffset? PublishedAt,
     DateTimeOffset Now);
+
+public enum ChallengeHintSaveFailure
+{
+    ScopeNotFound,
+    HintNotFound,
+    ResourceIdConflict
+}
+
+public sealed record ChallengeHintSaveResult(
+    ChallengeHintView? Hint,
+    ChallengeHintSaveFailure? Failure = null);
 
 public sealed record HintUnlockResult(ChallengeHintView Hint, bool Created);
 
@@ -41,16 +54,24 @@ public interface IChallengeHintStore
     Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        bool includeDeleted,
         CancellationToken cancellationToken);
     Task<ChallengeHintView?> FindAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
+        bool includeDeleted,
         CancellationToken cancellationToken);
-    Task<ChallengeHintView?> SaveAsync(
+    Task<ChallengeHintSaveResult> SaveAsync(
         SaveChallengeHintCommand command,
         CancellationToken cancellationToken);
     Task<bool> DeleteAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid hintId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<bool> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
@@ -70,15 +91,22 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
     public Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.ListAsync(competitionId, competitionChallengeId, ct);
+        store.ListAsync(competitionId, competitionChallengeId, includeDeleted, ct);
 
     public Task<ChallengeHintView?> GetAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.FindAsync(competitionId, competitionChallengeId, hintId, ct);
+        store.FindAsync(
+            competitionId,
+            competitionChallengeId,
+            hintId,
+            includeDeleted,
+            ct);
 
     public async Task<OperationResult<ChallengeHintView>> SaveAsync(
         SaveChallengeHintCommand command,
@@ -89,9 +117,18 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
         if (command.Cost < 0)
             return OperationResult<ChallengeHintView>.Failure("invalid_hint_cost", "Hint cost cannot be negative.");
         var result = await store.SaveAsync(command with { Content = command.Content.Trim() }, ct);
-        return result is null
-            ? OperationResult<ChallengeHintView>.Failure("hint_not_found", "Competition challenge or hint was not found.")
-            : OperationResult<ChallengeHintView>.Success(result);
+        return result.Failure switch
+        {
+            ChallengeHintSaveFailure.ResourceIdConflict =>
+                OperationResult<ChallengeHintView>.Failure(
+                    "resource_id_conflict",
+                    "The requested hint ID is already in use."),
+            ChallengeHintSaveFailure.ScopeNotFound or ChallengeHintSaveFailure.HintNotFound =>
+                OperationResult<ChallengeHintView>.Failure(
+                    "hint_not_found",
+                    "Competition challenge or hint was not found."),
+            _ => OperationResult<ChallengeHintView>.Success(result.Hint!)
+        };
     }
 
     public async Task<OperationResult> DeleteAsync(
@@ -103,6 +140,21 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
         await store.DeleteAsync(competitionId, competitionChallengeId, hintId, now, ct)
             ? OperationResult.Success()
             : OperationResult.Failure("hint_not_found", "Hint was not found.");
+
+    public async Task<OperationResult> RestoreAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid hintId,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        await store.RestoreAsync(
+            competitionId,
+            competitionChallengeId,
+            hintId,
+            now,
+            ct)
+            ? OperationResult.Success()
+            : OperationResult.Failure("hint_not_found", "Deleted hint was not found.");
 }
 
 public sealed class UnlockChallengeHint(IChallengeHintStore store)
