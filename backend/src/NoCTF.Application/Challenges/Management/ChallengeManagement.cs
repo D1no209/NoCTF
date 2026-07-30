@@ -11,7 +11,8 @@ public sealed record CreateCompetitionChallengeCommand(
     Guid ChallengeId,
     long BaseScore,
     int Order,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid? Id = null);
 
 public sealed record UpdateCompetitionChallengeCommand(
     Guid CompetitionId,
@@ -34,7 +35,8 @@ public sealed record ChallengeView(
     bool IsPublished,
     int Revision,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? DeletedAt);
 
 public enum ChallengeMutationFailure
 {
@@ -63,10 +65,12 @@ public interface IChallengeManagementStore
         Guid competitionId,
         Guid competitionChallengeId,
         bool includeUnpublished,
+        bool includeDeleted,
         CancellationToken cancellationToken);
     Task<IReadOnlyList<ChallengeView>> ListAsync(
         Guid competitionId,
         bool includeUnpublished,
+        bool includeDeleted,
         CancellationToken cancellationToken);
     Task<ChallengeMutationResult> UpdateAsync(
         UpdateCompetitionChallengeCommand command,
@@ -107,6 +111,10 @@ public sealed class CreateChallenge(
     {
         if (command.ChallengeId == Guid.Empty)
             return OperationResult<ChallengeView>.Failure("invalid_challenge_id", "ChallengeId is required.");
+        if (command.Id == Guid.Empty)
+            return OperationResult<ChallengeView>.Failure(
+                "invalid_competition_challenge_id",
+                "Id must be omitted or contain a non-empty UUID.");
         if (command.BaseScore < 0)
             return OperationResult<ChallengeView>.Failure("invalid_base_score", "BaseScore cannot be negative.");
         if (command.Order < 0)
@@ -140,8 +148,14 @@ public sealed class GetChallenge(IChallengeManagementStore store)
         Guid competitionId,
         Guid competitionChallengeId,
         bool includeUnpublished,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.FindAsync(competitionId, competitionChallengeId, includeUnpublished, ct);
+        store.FindAsync(
+            competitionId,
+            competitionChallengeId,
+            includeUnpublished,
+            includeDeleted,
+            ct);
 }
 
 public sealed class ListChallenges(IChallengeManagementStore store)
@@ -149,8 +163,9 @@ public sealed class ListChallenges(IChallengeManagementStore store)
     public Task<IReadOnlyList<ChallengeView>> ExecuteAsync(
         Guid competitionId,
         bool includeUnpublished,
+        bool includeDeleted = false,
         CancellationToken ct = default) =>
-        store.ListAsync(competitionId, includeUnpublished, ct);
+        store.ListAsync(competitionId, includeUnpublished, includeDeleted, ct);
 }
 
 public sealed class UpdateChallenge(

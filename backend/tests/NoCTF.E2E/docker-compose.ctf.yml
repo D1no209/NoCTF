@@ -150,7 +150,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
-      - "0"
+      - "${NOCTF_E2E_DOCKER_GID}"
     depends_on:
       migration:
         condition: service_completed_successfully

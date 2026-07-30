@@ -78,12 +78,11 @@ Runtime Namespace 只放置 `rt-*` Runtime 资源；如确需平台资源，名�
 
 Runtime 网段与平台数据网隔离；默认拒绝横向访问和云元数据。Runner 仅允许必要 PostgreSQL/Redis/Provider/内部 API 流量；Patch archive 通过绑定单 Submission 的内部 API 读取，不开放对象存储通用网络/凭据。
 
-Docker 公开 Runtime 不把题目容器直接接入 `noctf-network`。每个 Runtime 的题目容器只在
-独立 `internal` network；平台托管的 HAProxy ingress 容器同时连接该 network 与
-`noctf-network`，并只转发配置中声明的 TCP URL Binding。代理开销计入 Runner capacity，
-receipt 保存其资源 ID，Stop/Reset/失败回滚会一并删除。生产节点必须预先准备受信任的
-`Runtime__Docker__IngressProxyImage`，或确保 Docker Compose/daemon 可从受信任 registry
-拉取该镜像。
+Docker 公开 Runtime 不把题目容器接入 `noctf-network`。每个 Runtime 使用独立的普通
+user-defined bridge network；题目 Container/Compose service 直接发布配置中声明的 TCP
+端口，宿主端口固定请求 `0`，由 Docker 分配随机端口。Runner 从实际端口映射展开公开
+URL，Stop/Reset/失败回滚按 Runtime identity 清理容器、Compose project 与独立 network。
+当前架构不创建 HAProxy/ingress proxy，也不要求部署 ingress proxy 镜像。
 
 ## 请求大小
 

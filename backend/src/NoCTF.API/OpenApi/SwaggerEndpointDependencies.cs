@@ -134,6 +134,9 @@ internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
     public IssuedAccessToken Issue(AuthenticatedUser user) =>
         new("swagger-export-token", DateTimeOffset.UtcNow.AddMinutes(15));
 
+    public IssuedAccessToken Issue(AuthenticatedUser user, TimeSpan lifetime) =>
+        new("swagger-export-token", DateTimeOffset.UtcNow.Add(lifetime));
+
     public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
         new("swagger-export-refresh-token", DateTimeOffset.UtcNow.AddDays(30));
 

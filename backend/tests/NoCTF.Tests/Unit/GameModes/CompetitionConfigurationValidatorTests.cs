@@ -66,4 +66,17 @@ public class CompetitionConfigurationValidatorTests
 
         await Assert.That(parse).Throws<NoCTF.GameModes.Registration.GameModeConfigurationException>();
     }
+
+    [Test]
+    public async Task AwdpCompetitionConfiguration_RejectsChallengeDefinitionFields()
+    {
+        const string invalid =
+            """{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"runtime":null}""";
+
+        var errors = new GameModeCompetitionConfigurationValidator().Validate(
+            GameMode.Awdp,
+            invalid);
+
+        await Assert.That(errors).IsNotEmpty();
+    }
 }

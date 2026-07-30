@@ -7,11 +7,17 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
+public sealed class GetAdminChallengeRequest
+{
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
+}
+
 public sealed class GetChallengeEndpoint(
     GetChallenge get,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult>>
+    : Endpoint<GetAdminChallengeRequest, Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
@@ -26,6 +32,7 @@ public sealed class GetChallengeEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
+        GetAdminChallengeRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
@@ -36,6 +43,7 @@ public sealed class GetChallengeEndpoint(
             competitionId,
             Route<Guid>("competitionChallengeId"),
             includeUnpublished: true,
+            request.IncludeDeleted,
             ct);
 
         return item is null

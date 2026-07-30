@@ -42,6 +42,7 @@ public interface IUserAuthenticationStore
 public interface IAccessTokenIssuer
 {
     IssuedAccessToken Issue(AuthenticatedUser user);
+    IssuedAccessToken Issue(AuthenticatedUser user, TimeSpan lifetime);
     IssuedRefreshToken IssueRefresh(AuthenticatedUser user);
     RefreshTokenPrincipal? ValidateRefresh(string token);
 }

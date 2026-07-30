@@ -42,6 +42,25 @@ public class JwtIssuerTests
     }
 
     [Test]
+    public async Task Issue_accepts_an_explicit_Bot_lifetime()
+    {
+        var issuer = new JwtIssuer(Configuration(new Dictionary<string, string?>
+        {
+            ["Authentication:SigningKey"] = "test-signing-key-with-at-least-32-bytes!"
+        }));
+
+        var issued = issuer.Issue(
+            new AuthenticatedUser(Guid.NewGuid(), "repository-bot", "Organizer", 4),
+            TimeSpan.FromDays(365));
+        var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
+
+        await Assert.That(token.Claims.Single(claim => claim.Type == "token_type").Value)
+            .IsEqualTo("access");
+        await Assert.That(issued.ExpiresAt - DateTimeOffset.UtcNow)
+            .IsGreaterThan(TimeSpan.FromDays(364));
+    }
+
+    [Test]
     public async Task IssueRefresh_UsesDistinctAudienceAndThirtyDayLifetime()
     {
         var config = Configuration(new Dictionary<string, string?>

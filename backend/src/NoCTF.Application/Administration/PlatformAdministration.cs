@@ -6,6 +6,7 @@ public sealed record PlatformUserView(
     Guid Id,
     string UserName,
     string Email,
+    UserKind Kind,
     UserRole Role,
     int TokenVersion,
     bool EmailVerified,

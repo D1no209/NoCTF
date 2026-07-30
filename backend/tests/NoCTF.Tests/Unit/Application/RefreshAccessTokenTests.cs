@@ -61,6 +61,9 @@ public sealed class RefreshAccessTokenTests
         public IssuedAccessToken Issue(AuthenticatedUser user) =>
             new("access-token", DateTimeOffset.UtcNow.AddMinutes(15));
 
+        public IssuedAccessToken Issue(AuthenticatedUser user, TimeSpan lifetime) =>
+            new("access-token", DateTimeOffset.UtcNow.Add(lifetime));
+
         public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
             new("new-refresh-token", DateTimeOffset.UtcNow.AddDays(30));
 

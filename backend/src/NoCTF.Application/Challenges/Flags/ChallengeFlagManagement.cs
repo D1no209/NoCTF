@@ -25,7 +25,8 @@ public sealed record ChallengeFlagView(
     Guid? SpecificationId,
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidUntil,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? DeletedAt);
 
 public sealed record SaveChallengeFlagCommand(
     ChallengeFlagScope Scope,
@@ -36,7 +37,8 @@ public sealed record SaveChallengeFlagCommand(
     Guid? SpecificationId,
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidUntil,
-    DateTimeOffset Now);
+    DateTimeOffset Now,
+    Guid? RequestedId = null);
 
 public interface IChallengeFlagStore
 {
@@ -44,13 +46,15 @@ public interface IChallengeFlagStore
         ChallengeFlagScope scope,
         Guid? actorId,
         bool isAdministrator,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool includeDeleted = false);
     Task<ChallengeFlagView?> FindAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
         bool isAdministrator,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool includeDeleted = false);
     Task<ChallengeFlagView?> SaveAsync(
         SaveChallengeFlagCommand command,
         Guid? actorId,
@@ -63,6 +67,12 @@ public interface IChallengeFlagStore
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+    Task<bool> RestoreAsync(
+        ChallengeFlagScope scope,
+        Guid flagId,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken cancellationToken);
 }
 
 public sealed class ManageChallengeFlags(IChallengeFlagStore store)
@@ -71,16 +81,18 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         ChallengeFlagScope scope,
         Guid? actorId,
         bool isAdministrator,
-        CancellationToken ct = default) =>
-        store.ListAsync(scope, actorId, isAdministrator, ct);
+        CancellationToken ct = default,
+        bool includeDeleted = false) =>
+        store.ListAsync(scope, actorId, isAdministrator, ct, includeDeleted);
 
     public Task<ChallengeFlagView?> GetAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
         bool isAdministrator,
-        CancellationToken ct = default) =>
-        store.FindAsync(scope, flagId, actorId, isAdministrator, ct);
+        CancellationToken ct = default,
+        bool includeDeleted = false) =>
+        store.FindAsync(scope, flagId, actorId, isAdministrator, ct, includeDeleted);
 
     public async Task<OperationResult<ChallengeFlagView>> SaveAsync(
         SaveChallengeFlagCommand command,
@@ -89,6 +101,10 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         CancellationToken ct = default)
     {
         var bytes = Encoding.UTF8.GetBytes(command.Flag);
+        if (command.RequestedId == Guid.Empty)
+            return OperationResult<ChallengeFlagView>.Failure(
+                "invalid_flag_id",
+                "Id must be omitted or contain a non-empty UUID.");
         if (bytes.Length is < 1 or > 4096 || bytes.Contains((byte)0))
             return OperationResult<ChallengeFlagView>.Failure(
                 "invalid_flag",
@@ -126,6 +142,18 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         await store.DeleteAsync(scope, flagId, actorId, isAdministrator, now, ct)
             ? OperationResult.Success()
             : OperationResult.Failure("flag_not_found", "Flag was not found or access was denied.");
+
+    public async Task<OperationResult> RestoreAsync(
+        ChallengeFlagScope scope,
+        Guid flagId,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken ct = default) =>
+        await store.RestoreAsync(scope, flagId, actorId, isAdministrator, ct)
+            ? OperationResult.Success()
+            : OperationResult.Failure(
+                "flag_not_found",
+                "Deleted flag was not found or access was denied.");
 
     private static bool teamOrWindowPresent(SaveChallengeFlagCommand command) =>
         command.TeamId is not null || command.ValidStart is not null || command.ValidUntil is not null;

@@ -1426,8 +1426,8 @@
         "tags": [
           "Api"
         ],
-        "summary": "Records a claim-bound AWD checker result.",
-        "description": "Runtime, generation, processing version, checker sequence, and deadline come exclusively from the internal JWT.",
+        "summary": "Updates the status reported by an AWD checker.",
+        "description": "Each accepted update replaces the runtime's previous checker status. Runtime identity and generation come from the internal JWT.",
         "operationId": "NoCTFAPIEndpointsInternalRecordAwdCheckResultEndpoint",
         "requestBody": {
           "x-name": "RecordAwdCheckResultRequest",
@@ -3708,6 +3708,74 @@
         ]
       }
     },
+    "/api/v1/admin/platform/bots": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Creates a non-interactive Organizer Bot.",
+        "description": "Creates a Bot identity with no password-login or refresh-token capability.",
+        "operationId": "AdminPlatformCreateBot",
+        "requestBody": {
+          "x-name": "CreatePlatformBotRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformCreatePlatformBotRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/dead-letters/{messageId}": {
       "get": {
         "tags": [
@@ -3841,6 +3909,77 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/bots/{botUserId}/tokens": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Issues a bounded-lifetime Access JWT for a Bot.",
+        "description": "The JWT uses the ordinary Access scheme and is revoked by the Bot's TokenVersion.",
+        "operationId": "AdminPlatformIssueBotToken",
+        "parameters": [
+          {
+            "name": "botUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "IssuePlatformBotTokenRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformBotAccessTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
           }
         },
         "security": [
@@ -5141,6 +5280,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5396,6 +5543,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5504,6 +5659,14 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -6212,6 +6375,61 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/restore": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Restores a soft-deleted competition challenge hint.",
+        "description": "Restores the Hint under its original CompetitionChallenge.",
+        "operationId": "AdminRestoreCompetitionChallengeHint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hintId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/challenges/{challengeId}/flags": {
       "post": {
         "tags": [
@@ -6294,6 +6512,14 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -6764,6 +6990,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6887,6 +7121,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6975,6 +7217,100 @@
           },
           "404": {
             "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/restore": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Restores a soft-deleted challenge attachment.",
+        "description": "Restores immutable attachment metadata and its retained object reference.",
+        "operationId": "AdminChallengeBankRestoreAttachment",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/challenges/{challengeId}/flags/{flagId}/restore": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Restores a soft-deleted template flag.",
+        "description": "Restores protected static flag material within its original template scope.",
+        "operationId": "AdminChallengeBankRestoreFlag",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -8029,12 +8365,18 @@
         "type": "string",
         "description": "",
         "x-enumNames": [
+          "Unknown",
           "Up",
-          "Down"
+          "Down",
+          "CheckerAbnormalExit",
+          "CheckerTimedOut"
         ],
         "enum": [
+          "Unknown",
           "Up",
-          "Down"
+          "Down",
+          "CheckerAbnormalExit",
+          "CheckerTimedOut"
         ]
       },
       "NoCTFAPIEndpointsInternalRecordAwdpCheckResultRequest": {
@@ -8439,6 +8781,11 @@
             "type": "string",
             "format": "date-time"
           },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "controlFlag": {
             "type": "string",
             "nullable": true
@@ -8496,6 +8843,11 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -8546,6 +8898,11 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -8970,6 +9327,87 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserKind"
+          },
+          "role": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+          },
+          "tokenVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFDomainIdentityUserKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Human",
+          "Bot"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFDomainIdentityUserRole": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "User",
+          "Organizer",
+          "Administrator"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformCreatePlatformBotRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "userName"
+        ],
+        "properties": {
+          "userName": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0,
+            "nullable": false
+          },
+          "role": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -8996,53 +9434,30 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse": {
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformBotAccessTokenResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "userName": {
+          "accessToken": {
             "type": "string"
           },
-          "email": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
-          },
-          "tokenVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "emailVerified": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
+          "expiresAt": {
             "type": "string",
             "format": "date-time"
           }
         }
       },
-      "NoCTFDomainIdentityUserRole": {
-        "type": "integer",
-        "description": "",
-        "x-enumNames": [
-          "User",
-          "Organizer",
-          "Administrator"
-        ],
-        "enum": [
-          0,
-          1,
-          2
-        ]
+      "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expiresInSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 31536000.0,
+            "minimum": 60.0
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationPlatformDeadLetterListResponse": {
         "type": "object",
@@ -9332,6 +9747,11 @@
           "challengeId"
         ],
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
           "challengeId": {
             "type": "string",
             "format": "guid",
@@ -9402,6 +9822,11 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -9428,6 +9853,11 @@
           "flag"
         ],
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
           "teamId": {
             "type": "string",
             "format": "guid",
@@ -9471,6 +9901,11 @@
           "content"
         ],
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
           "content": {
             "type": "string",
             "minLength": 1,
@@ -9519,6 +9954,14 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationChallengesGetAdminChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesListAdminChallengesRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -9542,6 +9985,10 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesListChallengeHintsRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeConfigurationRequest": {
         "type": "object",
@@ -9605,6 +10052,9 @@
               "format": "guid"
             }
           },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+          },
           "visibility": {
             "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility"
           },
@@ -9618,6 +10068,9 @@
           "direction": {
             "type": "string"
           },
+          "definitionJson": {
+            "type": "string"
+          },
           "revision": {
             "type": "integer",
             "format": "int32"
@@ -9629,6 +10082,15 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "activeCompetitionReferenceCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -9649,9 +10111,18 @@
         "additionalProperties": false,
         "required": [
           "title",
-          "direction"
+          "direction",
+          "definitionJson"
         ],
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+          },
           "visibility": {
             "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility"
           },
@@ -9670,8 +10141,25 @@
             "maxLength": 96,
             "minLength": 0,
             "nullable": false
+          },
+          "definitionJson": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": false
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeTemplateRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankListChallengeAttachmentsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankListChallengeFlagsRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateListResponse": {
         "type": "object",
@@ -9732,9 +10220,13 @@
         "additionalProperties": false,
         "required": [
           "title",
-          "direction"
+          "direction",
+          "definitionJson"
         ],
         "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+          },
           "visibility": {
             "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility"
           },
@@ -9752,6 +10244,11 @@
             "type": "string",
             "maxLength": 96,
             "minLength": 0,
+            "nullable": false
+          },
+          "definitionJson": {
+            "type": "string",
+            "minLength": 1,
             "nullable": false
           },
           "expectedRevision": {
@@ -9791,6 +10288,11 @@
           "file"
         ],
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
           "file": {
             "type": "string",
             "format": "binary",

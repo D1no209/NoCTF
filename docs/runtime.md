@@ -120,9 +120,10 @@ Command null 使用镜像默认。`FlagSource=PerTeam` 时
 该策略只表达地址级的 `DenyAll`/公网 IPv4 二选一，不提供域名、FQDN、目的端口白名单，
 也不把 DNS 命名隔离视为安全边界。
 
-本阶段威胁模型信任平台管理员、管理员配置与平台托管 ingress 镜像，不防管理员内鬼；
-题目业务容器和选手输入仍按不可信处理。可信入口代理不改变 Checker 可由管理员配置并
-同时连接题目网络和 `noctf-network` 的既定模型。
+本阶段威胁模型信任平台管理员和管理员配置，不防管理员内鬼；题目业务容器和选手输入
+仍按不可信处理。Checker 是平台信任、由管理员配置的容器，可按任务需要同时连接题目
+网络和 `noctf-network`；公开题目端口仍由题目 Container/Compose service 直接映射到
+Docker 随机宿主端口。
 
 ## Compose
 

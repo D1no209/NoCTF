@@ -10,6 +10,7 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class SaveChallengeHintRequest
 {
+    public Guid? Id { get; set; }
     public string Content { get; set; } = string.Empty;
     public long Cost { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
@@ -20,6 +21,9 @@ public sealed class SaveChallengeHintValidator : Validator<SaveChallengeHintRequ
     public SaveChallengeHintValidator()
     {
         RuleFor(request => request.Content).NotEmpty();
+        RuleFor(request => request.Id)
+            .NotEqual(Guid.Empty)
+            .When(request => request.Id is not null);
         RuleFor(request => request.Cost).GreaterThanOrEqualTo(0);
     }
 }
@@ -53,7 +57,7 @@ public sealed class CreateChallengeHintEndpoint(
         var challengeId = Route<Guid>("competitionChallengeId");
         var result = await hints.SaveAsync(new(
             competitionId, challengeId, null, request.Content, request.Cost,
-            request.PublishedAt, DateTimeOffset.UtcNow), ct);
+            request.PublishedAt, DateTimeOffset.UtcNow, request.Id), ct);
         if (result.ErrorCode == "hint_not_found")
             return TypedResults.NotFound();
         if (!result.Succeeded)

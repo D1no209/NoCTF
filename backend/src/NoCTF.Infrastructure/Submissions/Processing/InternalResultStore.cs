@@ -124,15 +124,33 @@ public sealed class InternalResultStore(
                 challenge => challenge.CompetitionId,
                 competition => competition.Id,
                 (challenge, competition) => new { Challenge = challenge, Competition = competition })
+            .Join(
+                db.Challenges,
+                scope => scope.Challenge.ChallengeId,
+                challenge => challenge.Id,
+                (scope, challenge) => new
+                {
+                    scope.Challenge,
+                    scope.Competition,
+                    DefinitionRevision = challenge.Revision
+                })
             .SingleAsync(ct);
         if (context.Competition.Mode != GameMode.Awdp || submission.Kind != SubmissionKind.Fix)
             return InternalResultDisposition.NotFound;
+        var configurationWasSuperseded =
+            runtime.SourceCompetitionConfigurationRevision
+                != context.Competition.ConfigurationRevision
+            || runtime.SourceCompetitionChallengeRevision != context.Challenge.Revision
+            || runtime.SourceChallengeDefinitionRevision != context.DefinitionRevision;
         var decision = AwdpFixOutcomeMapper.Map(result.Outcome);
-        if (decision.Result == ScoringResult.PlatformFailed)
+        if (configurationWasSuperseded
+            || decision.Result == ScoringResult.PlatformFailed)
         {
             submission.EvaluationState = SubmissionEvaluationState.PlatformFailed;
             submission.EvaluationFailureCode =
-                decision.FailureCode ?? ScoringFailureCode.CheckerPlatformError;
+                configurationWasSuperseded
+                    ? ScoringFailureCode.CheckerPlatformError
+                    : decision.FailureCode ?? ScoringFailureCode.CheckerPlatformError;
         }
         else
         {
@@ -179,6 +197,8 @@ public sealed class InternalResultStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
-        return InternalResultDisposition.Applied;
+        return configurationWasSuperseded
+            ? InternalResultDisposition.Superseded
+            : InternalResultDisposition.Applied;
     }
 }

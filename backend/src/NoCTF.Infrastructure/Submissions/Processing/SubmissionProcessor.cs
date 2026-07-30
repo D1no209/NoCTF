@@ -72,6 +72,16 @@ public sealed class SubmissionProcessor(
                     Competition = competition,
                     CompetitionChallenge = challenge
                 })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                scope => scope.CompetitionChallenge.ChallengeId,
+                challenge => challenge.Id,
+                (scope, challenge) => new
+                {
+                    scope.Competition,
+                    scope.CompetitionChallenge,
+                    Challenge = challenge
+                })
             .SingleAsync(cancellationToken);
         var rules = admissionModePolicy.GetRules(
             configuration.Competition.Mode,
@@ -102,7 +112,8 @@ public sealed class SubmissionProcessor(
                         submission.ReceivedAt,
                         "attempt-limit-v2"),
                     configuration.Competition.ConfigurationRevision,
-                    configuration.CompetitionChallenge.Revision);
+                    configuration.CompetitionChallenge.Revision,
+                    configuration.Challenge.Revision);
         }
 
         var priorEvents = await db.ScoringEvents.AsNoTracking()
@@ -147,7 +158,8 @@ public sealed class SubmissionProcessor(
         return new(
             decision,
             configuration.Competition.ConfigurationRevision,
-            configuration.CompetitionChallenge.Revision);
+            configuration.CompetitionChallenge.Revision,
+            configuration.Challenge.Revision);
     }
 
     private async Task CompleteAsync(
@@ -244,6 +256,9 @@ public sealed class SubmissionProcessor(
                             placementPolicy.Resolve(template.RuntimeKind),
                             generation,
                             submission.ProcessingVersion,
+                            evaluation.CompetitionRevision,
+                            evaluation.CompetitionChallengeRevision,
+                            evaluation.ChallengeDefinitionRevision,
                             now);
                         db.RuntimeInstances.Add(target);
                         await outbox.PublishAsync(new DispatchRuntime(
@@ -309,5 +324,6 @@ public sealed class SubmissionProcessor(
     private sealed record Evaluation(
         ScoringEventDecision Decision,
         int CompetitionRevision,
-        int CompetitionChallengeRevision);
+        int CompetitionChallengeRevision,
+        int ChallengeDefinitionRevision);
 }

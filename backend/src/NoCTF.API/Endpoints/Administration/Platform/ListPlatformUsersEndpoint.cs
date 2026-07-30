@@ -9,6 +9,7 @@ public sealed record PlatformUserResponse(
     Guid Id,
     string UserName,
     string Email,
+    UserKind Kind,
     UserRole Role,
     int TokenVersion,
     bool EmailVerified,
@@ -21,7 +22,7 @@ internal static class PlatformUserMapping
 {
     public static PlatformUserResponse ToResponse(PlatformUserView view) =>
         new(
-            view.Id, view.UserName, view.Email, view.Role, view.TokenVersion,
+            view.Id, view.UserName, view.Email, view.Kind, view.Role, view.TokenVersion,
             view.EmailVerified, view.CreatedAt, view.UpdatedAt);
 }
 

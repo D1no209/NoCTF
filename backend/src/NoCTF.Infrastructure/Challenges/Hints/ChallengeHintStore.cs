@@ -18,14 +18,15 @@ public sealed class ChallengeHintStore(
     public async Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool includeDeleted = false)
     {
         if (!await ScopeExistsAsync(competitionId, competitionChallengeId, ct))
             return null;
         var entity = await db.CompetitionChallenges
             .Include(challenge => challenge.Hints)
             .SingleAsync(challenge => challenge.Id == competitionChallengeId, ct);
-        return entity.Hints.Where(hint => hint.DeletedAt == null)
+        return entity.Hints.Where(hint => includeDeleted || hint.DeletedAt == null)
             .OrderBy(hint => hint.CreatedAt).ThenBy(hint => hint.Id)
             .Select(Map).ToArray();
     }
@@ -34,14 +35,16 @@ public sealed class ChallengeHintStore(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool includeDeleted = false)
     {
         if (!await ScopeExistsAsync(competitionId, competitionChallengeId, ct))
             return null;
         var entity = await db.CompetitionChallenges
             .Include(challenge => challenge.Hints)
             .SingleAsync(challenge => challenge.Id == competitionChallengeId, ct);
-        var hint = entity.Hints.SingleOrDefault(item => item.Id == hintId && item.DeletedAt == null);
+        var hint = entity.Hints.SingleOrDefault(item =>
+            item.Id == hintId && (includeDeleted || item.DeletedAt == null));
         return hint is null ? null : Map(hint);
     }
 
@@ -68,7 +71,7 @@ public sealed class ChallengeHintStore(
         {
             hint = new CompetitionChallengeHint
             {
-                Id = Guid.CreateVersion7(command.Now),
+                Id = command.RequestedId ?? Guid.CreateVersion7(command.Now),
                 CompetitionChallengeId = command.CompetitionChallengeId,
                 CreatedAt = command.Now
             };
@@ -101,6 +104,32 @@ public sealed class ChallengeHintStore(
         if (hint is null)
             return false;
         hint.DeletedAt = now;
+        hint.UpdatedAt = now;
+        challenge!.Revision = checked(challenge.Revision + 1);
+        challenge.UpdatedAt = now;
+        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> RestoreAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid hintId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var challenge = await db.CompetitionChallenges
+            .Include(item => item.Hints)
+            .SingleOrDefaultAsync(item =>
+                item.Id == competitionChallengeId
+                && item.CompetitionId == competitionId,
+                ct);
+        var hint = challenge?.Hints.SingleOrDefault(item =>
+            item.Id == hintId && item.DeletedAt != null);
+        if (hint is null)
+            return false;
+        hint.DeletedAt = null;
         hint.UpdatedAt = now;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
@@ -262,5 +291,5 @@ public sealed class ChallengeHintStore(
     private static ChallengeHintView Map(CompetitionChallengeHint hint) =>
         new(
             hint.Id, hint.CompetitionChallengeId, hint.Content, hint.Cost,
-            hint.PublishedAt, hint.CreatedAt, hint.UpdatedAt);
+            hint.PublishedAt, hint.CreatedAt, hint.UpdatedAt, hint.DeletedAt);
 }

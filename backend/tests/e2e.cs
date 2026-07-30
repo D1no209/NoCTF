@@ -93,7 +93,12 @@ internal sealed class ModeEnvironment(
             "tests",
             "NoCTF.E2E",
             $"docker-compose.{modeName}.yml");
-        var environment = CreateEnvironment(projectName, networkName, runnerPool);
+        var dockerSocketGroupId = await ResolveDockerSocketGroupIdAsync(cancellationToken);
+        var environment = CreateEnvironment(
+            projectName,
+            networkName,
+            runnerPool,
+            dockerSocketGroupId);
         var compose = new ComposeRunner(runner, projectName, composeFile, environment);
         var succeeded = false;
 
@@ -167,7 +172,7 @@ internal sealed class ModeEnvironment(
             }
             else
             {
-                await CleanupAsync(compose, networkName);
+                await CleanupAsync(compose, projectName);
             }
         }
     }
@@ -175,11 +180,13 @@ internal sealed class ModeEnvironment(
     private Dictionary<string, string> CreateEnvironment(
         string projectName,
         string networkName,
-        string runnerPool)
+        string runnerPool,
+        string dockerSocketGroupId)
     {
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["NOCTF_E2E_NETWORK"] = networkName,
+            ["NOCTF_E2E_DOCKER_GID"] = dockerSocketGroupId,
             ["NOCTF_E2E_RUNTIME_PROVIDER"] = "Docker",
             ["NOCTF_E2E_RUNNER_POOL"] = runnerPool,
             ["NOCTF_E2E_CALLBACK_CONTAINER"] =
@@ -215,6 +222,25 @@ internal sealed class ModeEnvironment(
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
         }
         return environment;
+    }
+
+    private async Task<string> ResolveDockerSocketGroupIdAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!OperatingSystem.IsLinux())
+            return "0";
+
+        var result = await runner.RunAsync(
+            "stat",
+            ["-c", "%g", "/var/run/docker.sock"],
+            cancellationToken,
+            displayOutput: false);
+        result.EnsureSuccess("Resolving the Docker socket group id");
+        var groupId = result.StandardOutput.Trim();
+        return uint.TryParse(groupId, out _)
+            ? groupId
+            : throw new InvalidOperationException(
+                $"Docker socket returned an invalid group id: '{groupId}'.");
     }
 
     private static string[] FixtureServices(E2EMode mode) => mode switch
@@ -417,14 +443,19 @@ internal sealed class ModeEnvironment(
         }
     }
 
-    private async Task CleanupAsync(ComposeRunner compose, string networkName)
+    private async Task CleanupAsync(ComposeRunner compose, string projectName)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         try
         {
             var resources = await runner.RunAsync(
                 "docker",
-                ["ps", "-aq", "--filter", $"network={networkName}"],
+                [
+                    "ps",
+                    "-aq",
+                    "--filter",
+                    $"label=com.docker.compose.project={projectName}"
+                ],
                 timeout.Token,
                 displayOutput: false);
             var ids = resources.StandardOutput

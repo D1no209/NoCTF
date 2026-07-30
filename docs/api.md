@@ -154,12 +154,18 @@ GET  /api/v1/admin/challenges/{challengeId}/attachments
 POST /api/v1/admin/challenges/{challengeId}/attachments
 PUT  /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}
 DELETE /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}
+POST /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/restore
 GET  /api/v1/admin/challenges/{challengeId}/flags
 POST /api/v1/admin/challenges/{challengeId}/flags
 GET  /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 PUT  /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 DELETE /api/v1/admin/challenges/{challengeId}/flags/{flagId}
+POST /api/v1/admin/challenges/{challengeId}/flags/{flagId}/restore
 ```
+
+GitOps 可在创建 Challenge、Attachment 和 Flag 时提交非空稳定 UUID。单项和列表管理读取
+可用 `includeDeleted=true` 读取软删除资源；恢复保留原 UUID。Challenge 管理响应包含
+`ActiveCompetitionReferenceCount`，仓库工具只在其为 0 时软删除模板。
 
 ## Admin Runtime
 
@@ -193,12 +199,17 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}
 PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/restore
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
 PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
 ```
+
+GitOps 可在创建 CompetitionChallenge 和 Hint 时提交非空稳定 UUID。CompetitionChallenge、
+Hint 列表支持 `includeDeleted=true`；恢复沿用原 UUID，并继续经过比赛管理权限和 revision
+更新边界。
 
 ## Admin Submission 与判定
 
@@ -231,10 +242,17 @@ GET  /api/v1/admin/platform/users
 GET  /api/v1/admin/platform/users/{userId}
 PUT  /api/v1/admin/platform/users/{userId}/role
 POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
+POST /api/v1/admin/platform/bots
+POST /api/v1/admin/platform/bots/{botUserId}/tokens
 GET  /api/v1/admin/platform/dead-letters
 GET  /api/v1/admin/platform/dead-letters/{messageId}
 POST /api/v1/admin/platform/dead-letters/{messageId}/requeue
 ```
+
+Bot 创建只接受 `UserRole.Organizer`。Bot 是 `UserKind.Bot`，服务端生成不可用 `.invalid`
+Email 与随机 dummy PasswordHash；密码登录、改密和 Refresh 均拒绝 Bot。Token Endpoint
+签发 60 秒到 31,536,000 秒的普通 Access JWT，不引入独立 audience 或 token type；
+管理员通过现有 invalidate Endpoint 递增 Bot 的 User.TokenVersion，立即撤销旧 Token。
 
 Role 更新与 token invalidate 原子递增 User.TokenVersion。Dead Letter DTO 隐去 JWT、Flag/Submission 原文和 archive 内容；requeue 创建新的 durable delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作 DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
 

@@ -17,9 +17,12 @@ public sealed record ChallengeTemplateView(
     string DefinitionJson,
     int Revision,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? DeletedAt,
+    int ActiveCompetitionReferenceCount);
 
 public sealed record CreateChallengeTemplateCommand(
+    Guid? Id,
     Guid OwnerId,
     GameMode Mode,
     ChallengeVisibility Visibility,
@@ -99,6 +102,10 @@ public sealed class CreateChallengeTemplate(
             return OperationResult<ChallengeTemplateView>.Failure(
                 "invalid_definition",
                 string.Join(" ", definitionErrors));
+        if (command.Id == Guid.Empty)
+            return OperationResult<ChallengeTemplateView>.Failure(
+                "invalid_challenge_id",
+                "Id must be omitted or contain a non-empty UUID.");
         var result = await store.CreateAsync(command with
         {
             Title = command.Title.Trim(),

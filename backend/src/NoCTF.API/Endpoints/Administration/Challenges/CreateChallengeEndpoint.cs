@@ -11,6 +11,7 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class CreateChallengeRequest
 {
+    public Guid? Id { get; set; }
     public Guid ChallengeId { get; set; }
     public long BaseScore { get; set; }
     public int Order { get; set; }
@@ -21,6 +22,9 @@ public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
     public CreateChallengeValidator()
     {
         RuleFor(request => request.ChallengeId).NotEmpty();
+        RuleFor(request => request.Id)
+            .NotEqual(Guid.Empty)
+            .When(request => request.Id is not null);
         RuleFor(request => request.BaseScore).GreaterThanOrEqualTo(0);
         RuleFor(request => request.Order).GreaterThanOrEqualTo(0);
     }
@@ -60,7 +64,8 @@ public sealed class CreateChallengeEndpoint(
             request.ChallengeId,
             request.BaseScore,
             request.Order,
-            DateTimeOffset.UtcNow), ct);
+            DateTimeOffset.UtcNow,
+            request.Id), ct);
         if (result.ErrorCode is "competition_not_found" or "challenge_template_not_found")
             return TypedResults.NotFound();
         if (!result.Succeeded)

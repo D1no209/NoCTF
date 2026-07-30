@@ -9,13 +9,19 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class UploadChallengeAttachmentRequest
 {
+    public Guid? Id { get; set; }
     public IFormFile File { get; set; } = null!;
 }
 
 public sealed class UploadChallengeAttachmentValidator : Validator<UploadChallengeAttachmentRequest>
 {
-    public UploadChallengeAttachmentValidator() =>
+    public UploadChallengeAttachmentValidator()
+    {
         RuleFor(request => request.File).NotNull();
+        RuleFor(request => request.Id)
+            .NotEqual(Guid.Empty)
+            .When(request => request.Id is not null);
+    }
 }
 
 public sealed class UploadChallengeAttachmentEndpoint(
@@ -48,6 +54,7 @@ public sealed class UploadChallengeAttachmentEndpoint(
             request.File.FileName,
             request.File.ContentType,
             content,
+            request.Id,
             DateTimeOffset.UtcNow,
             ct);
         if (result.ErrorCode == "challenge_not_found")

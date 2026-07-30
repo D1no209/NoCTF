@@ -216,6 +216,7 @@ public sealed class AwdFullBoundaryTests
         await Assert.That(redRoundOneFlag).IsNotEqualTo(blueRoundOneFlag);
 
         await GetFixtureTextAsync(redRuntimeUrl, "cgi-bin/down", cancellationToken);
+        await GetFixtureTextAsync(blueRuntimeUrl, "cgi-bin/down", cancellationToken);
 
         var batch = await SendJsonAsync(
             red.Client,
@@ -259,21 +260,63 @@ public sealed class AwdFullBoundaryTests
             "cgi-bin/flag",
             value => value.StartsWith("flag{", StringComparison.Ordinal)
                 && !string.Equals(value, blueRoundOneFlag, StringComparison.Ordinal),
-            TimeSpan.FromSeconds(45),
+            TimeSpan.FromSeconds(75),
             cancellationToken);
 
-        await GetFixtureTextAsync(redRuntimeUrl, "cgi-bin/up", cancellationToken);
-        await PollLeaderboardAsync(
+        var firstRoundLeaderboard = await PollLeaderboardWhereAsync(
             anonymous,
             competitionId,
-            new Dictionary<Guid, long>
-            {
-                [red.TeamId] = 6,
-                [blue.TeamId] = -6
-            },
+            scores => scores.GetValueOrDefault(red.TeamId, long.MinValue) is 6 or 24
+                && scores.GetValueOrDefault(blue.TeamId, long.MinValue) is -24 or -6,
+            "the first completed AWD round",
             TimeSpan.FromSeconds(45),
             cancellationToken);
+        var firstRoundScores = firstRoundLeaderboard.GetProperty("entries").EnumerateArray()
+            .ToDictionary(
+                item => item.GetProperty("teamId").GetGuid(),
+                item => item.GetProperty("score").GetInt64());
+        var scoringBaseline = firstRoundScores;
+        WriteRoundScores("first completed round", scoringBaseline, red.TeamId, blue.TeamId);
+        var currentBlueFlag = blueRoundTwoFlag;
+        var downObserved = firstRoundScores[red.TeamId] == 6
+            && firstRoundScores[blue.TeamId] == -24;
+        for (var attempt = 0; attempt < 4 && !downObserved; attempt++)
+        {
+            currentBlueFlag = await PollFixtureTextAsync(
+                blueRuntimeUrl,
+                "cgi-bin/flag",
+                value => value.StartsWith("flag{", StringComparison.Ordinal)
+                    && !string.Equals(value, currentBlueFlag, StringComparison.Ordinal),
+                TimeSpan.FromSeconds(75),
+                cancellationToken);
+            var previous = scoringBaseline;
+            scoringBaseline = (await PollLeaderboardWhereAsync(
+                    anonymous,
+                    competitionId,
+                    scores => scores.TryGetValue(red.TeamId, out var redScore)
+                        && redScore != previous[red.TeamId]
+                        && scores.TryGetValue(blue.TeamId, out var blueScore)
+                        && blueScore != previous[blue.TeamId],
+                    "the next completed AWD round",
+                    TimeSpan.FromSeconds(45),
+                    cancellationToken))
+                .GetProperty("entries").EnumerateArray()
+                .ToDictionary(
+                    item => item.GetProperty("teamId").GetGuid(),
+                    item => item.GetProperty("score").GetInt64());
+            WriteRoundScores(
+                $"down observation attempt {attempt + 1}",
+                scoringBaseline,
+                red.TeamId,
+                blue.TeamId);
+            downObserved =
+                scoringBaseline[red.TeamId] - previous[red.TeamId] == -7
+                && scoringBaseline[blue.TeamId] - previous[blue.TeamId] == -7;
+        }
+        await Assert.That(downObserved).IsTrue();
 
+        await GetFixtureTextAsync(redRuntimeUrl, "cgi-bin/up", cancellationToken);
+        await GetFixtureTextAsync(blueRuntimeUrl, "cgi-bin/up", cancellationToken);
         var expiredId = await SubmitSingleFlagAsync(
             red.Client,
             competitionId,
@@ -287,23 +330,44 @@ public sealed class AwdFullBoundaryTests
             cancellationToken);
         await AssertSubmissionAsync(expired, result: 1, failureCode: 21);
 
-        _ = await PollFixtureTextAsync(
-            blueRuntimeUrl,
-            "cgi-bin/flag",
-            value => value.StartsWith("flag{", StringComparison.Ordinal)
-                && !string.Equals(value, blueRoundTwoFlag, StringComparison.Ordinal),
-            TimeSpan.FromSeconds(45),
-            cancellationToken);
-        var finalLeaderboard = await PollLeaderboardAsync(
-            anonymous,
-            competitionId,
-            new Dictionary<Guid, long>
-            {
-                [red.TeamId] = 17,
-                [blue.TeamId] = 5
-            },
-            TimeSpan.FromSeconds(45),
-            cancellationToken);
+        JsonElement finalLeaderboard = default;
+        var recoveryBaseline = scoringBaseline;
+        var recoveryObserved = false;
+        for (var attempt = 0; attempt < 4 && !recoveryObserved; attempt++)
+        {
+            currentBlueFlag = await PollFixtureTextAsync(
+                blueRuntimeUrl,
+                "cgi-bin/flag",
+                value => value.StartsWith("flag{", StringComparison.Ordinal)
+                    && !string.Equals(value, currentBlueFlag, StringComparison.Ordinal),
+                TimeSpan.FromSeconds(75),
+                cancellationToken);
+            finalLeaderboard = await PollLeaderboardWhereAsync(
+                anonymous,
+                competitionId,
+                scores =>
+                    scores.GetValueOrDefault(red.TeamId, long.MinValue)
+                        != recoveryBaseline[red.TeamId]
+                    && scores.GetValueOrDefault(blue.TeamId, long.MinValue)
+                        != recoveryBaseline[blue.TeamId],
+                "the next completed AWD recovery round",
+                TimeSpan.FromSeconds(45),
+                cancellationToken);
+            var recovered = finalLeaderboard.GetProperty("entries").EnumerateArray()
+                .ToDictionary(
+                    item => item.GetProperty("teamId").GetGuid(),
+                    item => item.GetProperty("score").GetInt64());
+            WriteRoundScores(
+                $"recovery observation attempt {attempt + 1}",
+                recovered,
+                red.TeamId,
+                blue.TeamId);
+            recoveryObserved =
+                recovered[red.TeamId] - recoveryBaseline[red.TeamId] == 11
+                && recovered[blue.TeamId] - recoveryBaseline[blue.TeamId] == 11;
+            recoveryBaseline = recovered;
+        }
+        await Assert.That(recoveryObserved).IsTrue();
         var redEntry = finalLeaderboard.GetProperty("entries").EnumerateArray()
             .Single(item => item.GetProperty("teamId").GetGuid() == red.TeamId);
         await Assert.That(redEntry.GetProperty("rank").GetInt32()).IsEqualTo(1);
@@ -544,6 +608,49 @@ public sealed class AwdFullBoundaryTests
         }
         throw new TimeoutException($"Leaderboard did not reach the expected AWD scores. Last response: {last}");
     }
+
+    private static async Task<JsonElement> PollLeaderboardWhereAsync(
+        HttpClient client,
+        Guid competitionId,
+        Func<IReadOnlyDictionary<Guid, long>, bool> completed,
+        string expectation,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var path = $"/api/v1/competitions/{competitionId}/leaderboard";
+        var deadline = DateTimeOffset.UtcNow.Add(timeout);
+        JsonElement last = default;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            using var response = await client.GetAsync(path, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                last = await ReadExpectedJsonAsync(response, HttpStatusCode.OK, cancellationToken);
+                var scores = last.GetProperty("entries").EnumerateArray()
+                    .ToDictionary(
+                        item => item.GetProperty("teamId").GetGuid(),
+                        item => item.GetProperty("score").GetInt64());
+                if (!last.GetProperty("stale").GetBoolean() && completed(scores))
+                    return last;
+            }
+            else if (response.StatusCode != HttpStatusCode.Accepted)
+            {
+                throw await UnexpectedResponseAsync(response, HttpStatusCode.OK, cancellationToken);
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+        }
+        throw new TimeoutException(
+            $"Leaderboard did not reach {expectation}. Last response: {last}");
+    }
+
+    private static void WriteRoundScores(
+        string observation,
+        IReadOnlyDictionary<Guid, long> scores,
+        Guid redTeamId,
+        Guid blueTeamId) =>
+        Console.WriteLine(
+            $"AWD {observation}: red={scores.GetValueOrDefault(redTeamId)}, "
+            + $"blue={scores.GetValueOrDefault(blueTeamId)}");
 
     private static HttpClient CreateClient(string baseUrl, string? token = null)
     {

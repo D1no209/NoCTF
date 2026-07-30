@@ -1,4 +1,4 @@
-FROM python:3.11.9-slim-bookworm
+FROM python:3.12-slim-bookworm
 
 COPY server.py /app/server.py
 USER 10001:10001

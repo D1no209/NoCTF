@@ -19,18 +19,6 @@ public static class AwdpConfigurationValidator
             errors.Add("Penalty values cannot be negative.");
         if (!Enum.IsDefined(configuration.EvaluationDispatchMode))
             errors.Add("EvaluationDispatchMode is invalid.");
-        ValidatePatchEntrypoint(configuration.PatchEntrypoint, errors);
-        if (configuration.PatchTimeoutSeconds <= 0)
-            errors.Add("PatchTimeoutSeconds must be positive.");
-        if (configuration.ReadyTimeoutSeconds <= 0)
-            errors.Add("ReadyTimeoutSeconds must be positive.");
-        errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(
-            configuration.Runtime));
-        errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(
-            configuration.Checker,
-            "Checker"));
-        ValidateRuntime(configuration.Runtime, errors);
-        ValidateChecker(configuration.Checker, errors);
         return errors;
     }
 

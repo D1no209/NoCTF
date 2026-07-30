@@ -24,13 +24,7 @@ public sealed record AwdpConfiguration(
     long FixFailurePenalty = 0,
     int MaxBreakSubmissions = 10,
     int MaxFixSubmissions = 10,
-    EvaluationDispatchMode EvaluationDispatchMode = EvaluationDispatchMode.Automatic,
-    ChallengeRuntimeTemplate? Runtime = null,
-    string PatchEntrypoint = "fix.sh",
-    IReadOnlyList<string>? PatchCommand = null,
-    int PatchTimeoutSeconds = 60,
-    RunnerJobConfiguration? Checker = null,
-    int ReadyTimeoutSeconds = 30)
+    EvaluationDispatchMode EvaluationDispatchMode = EvaluationDispatchMode.Automatic)
 {
     public const int CurrentSchemaVersion = 1;
 }
