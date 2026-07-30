@@ -19,7 +19,8 @@ public static class EndpointRegistration
                 return problem;
             };
         });
-        app.UseSwaggerGen();
+        app.UseSwaggerGen(settings =>
+            settings.PostProcess = (document, _) => document.Servers.Clear());
         return app;
     }
 }

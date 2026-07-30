@@ -70,7 +70,7 @@ if (exportSwagger)
     var staticDirectory = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "openapi");
     Directory.CreateDirectory(artifactDirectory);
     Directory.CreateDirectory(staticDirectory);
-    var json = document.ToJson().ReplaceLineEndings("\n");
+    var json = document.ToJson().ReplaceLineEndings("\n").TrimEnd() + "\n";
     await File.WriteAllTextAsync(Path.Combine(artifactDirectory, "swagger.json"), json);
     await File.WriteAllTextAsync(Path.Combine(staticDirectory, "v1.json"), json);
     await app.StopAsync();
