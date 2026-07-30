@@ -133,7 +133,7 @@ async function handleLogout() {
       </SidebarFooter>
     </Sidebar>
 
-    <SidebarInset>
+    <SidebarInset class="min-w-0">
       <header class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-white/[0.85] px-4 backdrop-blur-xl">
         <SidebarTrigger class="-ml-1" />
         <div class="h-4 w-px bg-border mx-2" />
@@ -155,7 +155,7 @@ async function handleLogout() {
         </div>
       </header>
       
-      <main class="flex-1 p-4 md:p-6 lg:p-8">
+      <main class="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
         <RouterView v-slot="{ Component }">
           <transition
             name="fade"
