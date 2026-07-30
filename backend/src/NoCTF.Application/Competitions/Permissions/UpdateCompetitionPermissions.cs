@@ -1,5 +1,3 @@
-using NoCTF.Application.Common;
-
 namespace NoCTF.Application.Competitions.Permissions;
 
 public sealed record UpdateCompetitionPermissionsCommand(
@@ -11,7 +9,7 @@ public sealed record UpdateCompetitionPermissionsCommand(
 
 public interface ICompetitionPermissionStore
 {
-    Task<CompetitionPermissionUpdateState> UpdateAsync(
+    Task<CompetitionPermissionUpdateResult> UpdateAsync(
         UpdateCompetitionPermissionsCommand command,
         CancellationToken cancellationToken);
 }
@@ -21,12 +19,19 @@ public enum CompetitionPermissionUpdateState
     Updated,
     NotFound,
     Forbidden,
-    InvalidUser
+    RolesOverlap,
+    OwnerIncluded,
+    UserNotFound,
+    RoleNotEligible
 }
+
+public sealed record CompetitionPermissionUpdateResult(
+    CompetitionPermissionUpdateState State,
+    IReadOnlyList<Guid>? UserIds = null);
 
 public sealed class UpdateCompetitionPermissions(ICompetitionPermissionStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public Task<CompetitionPermissionUpdateResult> ExecuteAsync(
         UpdateCompetitionPermissionsCommand command,
         CancellationToken ct = default)
     {
@@ -35,20 +40,10 @@ public sealed class UpdateCompetitionPermissions(ICompetitionPermissionStore sto
             .Concat(command.ObserverIds)
             .ToArray();
         if (all.Length != all.Distinct().Count())
-            return OperationResult.Failure(
-                "permission_roles_overlap",
-                "A user can have only one competition permission role.");
-
-        var state = await store.UpdateAsync(command, ct);
-        return state switch
         {
-            CompetitionPermissionUpdateState.Updated => OperationResult.Success(),
-            CompetitionPermissionUpdateState.NotFound => OperationResult.Failure(
-                "competition_not_found", "Competition was not found."),
-            CompetitionPermissionUpdateState.Forbidden => OperationResult.Failure(
-                "competition_forbidden", "Only the owner or a platform administrator can update permissions."),
-            _ => OperationResult.Failure(
-                "permission_user_not_found", "At least one permission user was not found.")
-        };
+            return Task.FromResult(new CompetitionPermissionUpdateResult(
+                CompetitionPermissionUpdateState.RolesOverlap));
+        }
+        return store.UpdateAsync(command, ct);
     }
 }

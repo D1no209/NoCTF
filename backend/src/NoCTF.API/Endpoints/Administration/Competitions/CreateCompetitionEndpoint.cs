@@ -32,7 +32,12 @@ public sealed class CreateCompetitionValidator : Validator<CreateCompetitionRequ
 }
 
 public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserContext user)
-    : Endpoint<CreateCompetitionRequest, Results<Created<CompetitionResponse>, ProblemHttpResult>>
+    : Endpoint<
+        CreateCompetitionRequest,
+        Results<
+            Created<CompetitionResponse>,
+            Conflict<CompetitionResourceManagerConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -47,7 +52,11 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
         });
     }
 
-    public override async Task<Results<Created<CompetitionResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<
+        Results<
+            Created<CompetitionResponse>,
+            Conflict<CompetitionResourceManagerConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         CreateCompetitionRequest request,
         CancellationToken ct)
     {
@@ -61,15 +70,29 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
             request.MaxTeamMembers,
             user.UserId,
             DateTimeOffset.UtcNow), ct);
-        if (!result.Succeeded)
+        return result.State switch
         {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Competition was not created.",
-                detail: result.ErrorMessage);
-        }
-
-        var response = CompetitionMapper.ToResponse(result.Value!);
-        return TypedResults.Created($"/api/v1/admin/competitions/{response.Id}", response);
+            CompetitionCreationState.Created =>
+                TypedResults.Created(
+                    $"/api/v1/admin/competitions/{result.Competition!.Id}",
+                    CompetitionMapper.ToResponse(result.Competition)),
+            CompetitionCreationState.InvalidRequest =>
+                TypedResults.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Competition was not created.",
+                    detail: result.Detail),
+            CompetitionCreationState.UserNotFound =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.UserNotFound,
+                        result.UserIds)),
+            CompetitionCreationState.RoleNotEligible =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.RoleNotEligible,
+                        result.UserIds)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported competition creation state: {result.State}.")
+        };
     }
 }

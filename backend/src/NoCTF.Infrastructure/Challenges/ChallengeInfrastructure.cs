@@ -30,6 +30,7 @@ internal static class ChallengeInfrastructure
         services.AddScoped<GetChallengeTemplate>();
         services.AddScoped<UpdateChallengeTemplate>();
         services.AddScoped<DeleteChallengeTemplate>();
+        services.AddScoped<RestoreChallengeTemplate>();
         services.AddScoped<UpdateChallengeTemplatePermissions>();
         services.AddScoped<TransferChallengeTemplateOwner>();
         services.AddScoped<IChallengeAttachmentStore, ChallengeAttachmentStore>();

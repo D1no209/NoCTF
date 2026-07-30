@@ -795,7 +795,7 @@ export const adminPlatformRequeueDeadLetter = <ThrowOnError extends boolean = fa
 /**
  * Updates a platform role and invalidates existing tokens.
  *
- * Atomically changes the bounded user role and increments the token version.
+ * Atomically changes the bounded user role and increments the token version unless active owner or manager assignments block a downgrade.
  */
 export const adminPlatformUpdateUserRole = <ThrowOnError extends boolean = false>(options: Options<AdminPlatformUpdateUserRoleData, ThrowOnError>) => (options.client ?? client).put<AdminPlatformUpdateUserRoleResponses, AdminPlatformUpdateUserRoleErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -1488,7 +1488,7 @@ export const adminChallengeBankRestoreFlag = <ThrowOnError extends boolean = fal
 /**
  * Restores a soft-deleted global challenge template.
  *
- * Restores a reusable template for its owner or a platform administrator.
+ * Restores a reusable template for its owner, a manager, or a platform administrator.
  */
 export const adminChallengeBankRestoreTemplate = <ThrowOnError extends boolean = false>(options: Options<AdminChallengeBankRestoreTemplateData, ThrowOnError>) => (options.client ?? client).post<AdminChallengeBankRestoreTemplateResponses, AdminChallengeBankRestoreTemplateErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

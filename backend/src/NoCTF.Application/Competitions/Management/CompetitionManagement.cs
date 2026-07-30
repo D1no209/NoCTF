@@ -27,6 +27,23 @@ public sealed record CompetitionView(
     int MaxTeamMembers,
     Guid OwnerId);
 
+public enum CompetitionCreationState
+{
+    Created,
+    InvalidRequest,
+    UserNotFound,
+    RoleNotEligible
+}
+
+public sealed record CompetitionCreationResult(
+    CompetitionCreationState State,
+    CompetitionView? Competition = null,
+    IReadOnlyList<Guid>? UserIds = null,
+    string? Detail = null)
+{
+    public bool Succeeded => State == CompetitionCreationState.Created;
+}
+
 public sealed record UpdateCompetitionCommand(
     Guid CompetitionId,
     string Title,
@@ -40,7 +57,9 @@ public sealed record UpdateCompetitionCommand(
 
 public interface ICompetitionManagementStore
 {
-    Task<CompetitionView> CreateAsync(CreateCompetitionCommand command, CancellationToken cancellationToken);
+    Task<CompetitionCreationResult> CreateAsync(
+        CreateCompetitionCommand command,
+        CancellationToken cancellationToken);
     Task<CompetitionView?> FindAsync(Guid competitionId, bool includeDraft, CancellationToken cancellationToken);
     Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken cancellationToken);
     Task<CompetitionView?> UpdateAsync(UpdateCompetitionCommand command, CompetitionStatus expectedStatus, CancellationToken cancellationToken);
@@ -66,20 +85,31 @@ public static class CompetitionManagementPolicy
 
 public sealed class CreateCompetition(ICompetitionManagementStore store)
 {
-    public Task<OperationResult<CompetitionView>> ExecuteAsync(CreateCompetitionCommand command, CancellationToken cancellationToken = default)
+    public Task<CompetitionCreationResult> ExecuteAsync(
+        CreateCompetitionCommand command,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(command.Title) || command.Title.Length > 160)
-            return Task.FromResult(OperationResult<CompetitionView>.Failure("invalid_title", "Competition title is required and must be at most 160 characters."));
+        {
+            return Task.FromResult(new CompetitionCreationResult(
+                CompetitionCreationState.InvalidRequest,
+                Detail: "Competition title is required and must be at most 160 characters."));
+        }
         if (command.MaxTeamMembers < 1)
-            return Task.FromResult(OperationResult<CompetitionView>.Failure("invalid_team_size", "MaxTeamMembers must be greater than zero."));
+        {
+            return Task.FromResult(new CompetitionCreationResult(
+                CompetitionCreationState.InvalidRequest,
+                Detail: "MaxTeamMembers must be greater than zero."));
+        }
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
-            return Task.FromResult(OperationResult<CompetitionView>.Failure(schedule.ErrorCode!, schedule.ErrorMessage!));
-        return ExecuteStoreAsync(command, cancellationToken);
+        {
+            return Task.FromResult(new CompetitionCreationResult(
+                CompetitionCreationState.InvalidRequest,
+                Detail: schedule.ErrorMessage));
+        }
+        return store.CreateAsync(command, cancellationToken);
     }
-
-    private async Task<OperationResult<CompetitionView>> ExecuteStoreAsync(CreateCompetitionCommand command, CancellationToken ct) =>
-        OperationResult<CompetitionView>.Success(await store.CreateAsync(command, ct));
 }
 
 public sealed class GetCompetition(ICompetitionManagementStore store)

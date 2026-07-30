@@ -2,6 +2,32 @@ using NoCTF.Application.Common;
 
 namespace NoCTF.Application.Competitions.Management;
 
+public enum CompetitionRestoreState
+{
+    Restored,
+    NotFound,
+    UserNotFound,
+    RoleNotEligible
+}
+
+public sealed record CompetitionRestoreResult(
+    CompetitionRestoreState State,
+    IReadOnlyList<Guid>? UserIds = null);
+
+public enum CompetitionOwnerTransferState
+{
+    Transferred,
+    InvalidOwnerId,
+    NotFound,
+    UserNotFound,
+    RoleNotEligible
+}
+
+public sealed record CompetitionOwnerTransferResult(
+    CompetitionOwnerTransferState State,
+    CompetitionView? Competition = null,
+    IReadOnlyList<Guid>? UserIds = null);
+
 public interface IAdminCompetitionStore
 {
     Task<IReadOnlyList<CompetitionView>> ListAsync(
@@ -14,7 +40,7 @@ public interface IAdminCompetitionStore
         bool isAdministrator,
         bool includeDeleted,
         CancellationToken cancellationToken);
-    Task<bool> RestoreAsync(
+    Task<CompetitionRestoreResult> RestoreAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
@@ -25,7 +51,7 @@ public interface IAdminCompetitionStore
         Guid actorId,
         bool isAdministrator,
         CancellationToken cancellationToken);
-    Task<CompetitionView?> TransferOwnerAsync(
+    Task<CompetitionOwnerTransferResult> TransferOwnerAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
@@ -56,15 +82,13 @@ public sealed class GetAdminCompetition(IAdminCompetitionStore store)
 
 public sealed class RestoreCompetition(IAdminCompetitionStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public Task<CompetitionRestoreResult> ExecuteAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken ct = default) =>
-        await store.RestoreAsync(competitionId, actorId, isAdministrator, now, ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure("competition_not_found", "Competition was not found or access was denied.");
+        store.RestoreAsync(competitionId, actorId, isAdministrator, now, ct);
 }
 
 public sealed class HardDeleteCompetition(IAdminCompetitionStore store)
@@ -83,7 +107,7 @@ public sealed class HardDeleteCompetition(IAdminCompetitionStore store)
 
 public sealed class TransferCompetitionOwner(IAdminCompetitionStore store)
 {
-    public async Task<OperationResult<CompetitionView>> ExecuteAsync(
+    public Task<CompetitionOwnerTransferResult> ExecuteAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
@@ -92,13 +116,16 @@ public sealed class TransferCompetitionOwner(IAdminCompetitionStore store)
         CancellationToken ct = default)
     {
         if (ownerId == Guid.Empty)
-            return OperationResult<CompetitionView>.Failure("invalid_owner_id", "OwnerId is required.");
-        var result = await store.TransferOwnerAsync(
-            competitionId, actorId, isAdministrator, ownerId, now, ct);
-        return result is null
-            ? OperationResult<CompetitionView>.Failure(
-                "competition_not_found",
-                "Competition was not found or access was denied.")
-            : OperationResult<CompetitionView>.Success(result);
+        {
+            return Task.FromResult(new CompetitionOwnerTransferResult(
+                CompetitionOwnerTransferState.InvalidOwnerId));
+        }
+        return store.TransferOwnerAsync(
+            competitionId,
+            actorId,
+            isAdministrator,
+            ownerId,
+            now,
+            ct);
     }
 }

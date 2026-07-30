@@ -30,7 +30,6 @@ public sealed class DeleteChallengeTemplateEndpoint(
             Route<Guid>("challengeId"),
             user.UserId,
             user.IsAdministrator,
-            restore: false,
             DateTimeOffset.UtcNow,
             ct);
         if (result.Succeeded)

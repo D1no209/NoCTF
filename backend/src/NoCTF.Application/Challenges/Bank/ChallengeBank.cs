@@ -21,6 +21,28 @@ public sealed record ChallengeTemplateView(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+public enum ChallengeTemplateWriteState
+{
+    Succeeded,
+    InvalidRequest,
+    InvalidDefinition,
+    ResourceIdConflict,
+    NotFoundOrForbidden,
+    RevisionConflict,
+    OwnerIncludedInManagerSet,
+    UserNotFound,
+    RoleNotEligible
+}
+
+public sealed record ChallengeTemplateWriteResult(
+    ChallengeTemplateWriteState State,
+    ChallengeTemplateView? Template = null,
+    IReadOnlyList<Guid>? UserIds = null,
+    string? Detail = null)
+{
+    public bool Succeeded => State == ChallengeTemplateWriteState.Succeeded;
+}
+
 public sealed record CreateChallengeTemplateCommand(
     Guid? ChallengeId,
     Guid OwnerId,
@@ -47,7 +69,9 @@ public sealed record UpdateChallengeTemplateCommand(
 
 public interface IChallengeBankStore
 {
-    Task<ChallengeTemplateView?> CreateAsync(CreateChallengeTemplateCommand command, CancellationToken cancellationToken);
+    Task<ChallengeTemplateWriteResult> CreateAsync(
+        CreateChallengeTemplateCommand command,
+        CancellationToken cancellationToken);
     Task<IReadOnlyList<ChallengeTemplateView>> ListAsync(
         Guid actorId,
         bool isAdministrator,
@@ -61,9 +85,28 @@ public interface IChallengeBankStore
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task<bool> RestoreAsync(Guid challengeId, Guid actorId, bool isAdministrator, DateTimeOffset now, CancellationToken cancellationToken);
-    Task<ChallengeTemplateView?> UpdatePermissionsAsync(Guid challengeId, Guid actorId, bool isAdministrator, Guid[] managerIds, int expectedRevision, DateTimeOffset now, CancellationToken cancellationToken);
-    Task<ChallengeTemplateView?> TransferOwnerAsync(Guid challengeId, Guid actorId, bool isAdministrator, Guid ownerId, int expectedRevision, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<ChallengeTemplateWriteResult> RestoreAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<ChallengeTemplateWriteResult> UpdatePermissionsAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        Guid[] managerIds,
+        int expectedRevision,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<ChallengeTemplateWriteResult> TransferOwnerAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        Guid ownerId,
+        int expectedRevision,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }
 
 public enum ChallengeTemplateDeleteFailure
@@ -99,7 +142,7 @@ public sealed class CreateChallengeTemplate(
     IChallengeBankStore store,
     IChallengeConfigurationCatalog configurations)
 {
-    public async Task<OperationResult<ChallengeTemplateView>> ExecuteAsync(
+    public async Task<ChallengeTemplateWriteResult> ExecuteAsync(
         CreateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
@@ -109,25 +152,26 @@ public sealed class CreateChallengeTemplate(
             command.Direction,
             command.DefinitionJson);
         if (!validation.Succeeded)
-            return OperationResult<ChallengeTemplateView>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
+        {
+            return new(
+                ChallengeTemplateWriteState.InvalidRequest,
+                Detail: validation.ErrorMessage);
+        }
         var definitionErrors = configurations.ValidateDefinition(
             command.Mode,
             command.DefinitionJson);
         if (definitionErrors.Count > 0)
-            return OperationResult<ChallengeTemplateView>.Failure(
-                "invalid_definition",
-                string.Join(" ", definitionErrors));
-        var result = await store.CreateAsync(command with
+        {
+            return new(
+                ChallengeTemplateWriteState.InvalidDefinition,
+                Detail: string.Join(" ", definitionErrors));
+        }
+        return await store.CreateAsync(command with
         {
             Title = command.Title.Trim(),
             Description = command.Description?.Trim(),
             Direction = command.Direction.Trim()
         }, ct);
-        if (result is null)
-            return OperationResult<ChallengeTemplateView>.Failure(
-                "resource_id_conflict",
-                "The requested challenge ID is already in use.");
-        return OperationResult<ChallengeTemplateView>.Success(result);
     }
 }
 
@@ -193,17 +237,9 @@ public sealed class DeleteChallengeTemplate(IChallengeBankStore store)
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
-        bool restore,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
-        if (restore)
-            return await store.RestoreAsync(challengeId, actorId, isAdministrator, now, ct)
-                ? OperationResult.Success()
-                : OperationResult.Failure(
-                    "challenge_not_found",
-                    "Challenge was not found or access was denied.");
-
         var failure = await store.SoftDeleteAsync(
             challengeId,
             actorId,
@@ -223,9 +259,20 @@ public sealed class DeleteChallengeTemplate(IChallengeBankStore store)
     }
 }
 
+public sealed class RestoreChallengeTemplate(IChallengeBankStore store)
+{
+    public Task<ChallengeTemplateWriteResult> ExecuteAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        store.RestoreAsync(challengeId, actorId, isAdministrator, now, ct);
+}
+
 public sealed class UpdateChallengeTemplatePermissions(IChallengeBankStore store)
 {
-    public async Task<OperationResult<ChallengeTemplateView>> ExecuteAsync(
+    public Task<ChallengeTemplateWriteResult> ExecuteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
@@ -235,10 +282,12 @@ public sealed class UpdateChallengeTemplatePermissions(IChallengeBankStore store
         CancellationToken ct = default)
     {
         if (expectedRevision < 0 || managerIds.Any(id => id == Guid.Empty))
-            return OperationResult<ChallengeTemplateView>.Failure(
-                "invalid_permissions",
-                "ManagerIds and ExpectedRevision are invalid.");
-        var result = await store.UpdatePermissionsAsync(
+        {
+            return Task.FromResult(new ChallengeTemplateWriteResult(
+                ChallengeTemplateWriteState.InvalidRequest,
+                Detail: "ManagerIds and ExpectedRevision are invalid."));
+        }
+        return store.UpdatePermissionsAsync(
             challengeId,
             actorId,
             isAdministrator,
@@ -246,17 +295,12 @@ public sealed class UpdateChallengeTemplatePermissions(IChallengeBankStore store
             expectedRevision,
             now,
             ct);
-        return result is null
-            ? OperationResult<ChallengeTemplateView>.Failure(
-                "challenge_not_found_or_revision_conflict",
-                "Challenge was not found, access was denied, or its revision changed.")
-            : OperationResult<ChallengeTemplateView>.Success(result);
     }
 }
 
 public sealed class TransferChallengeTemplateOwner(IChallengeBankStore store)
 {
-    public async Task<OperationResult<ChallengeTemplateView>> ExecuteAsync(
+    public Task<ChallengeTemplateWriteResult> ExecuteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
@@ -266,10 +310,12 @@ public sealed class TransferChallengeTemplateOwner(IChallengeBankStore store)
         CancellationToken ct = default)
     {
         if (ownerId == Guid.Empty || expectedRevision < 0)
-            return OperationResult<ChallengeTemplateView>.Failure(
-                "invalid_owner_transfer",
-                "OwnerId and ExpectedRevision are invalid.");
-        var result = await store.TransferOwnerAsync(
+        {
+            return Task.FromResult(new ChallengeTemplateWriteResult(
+                ChallengeTemplateWriteState.InvalidRequest,
+                Detail: "OwnerId and ExpectedRevision are invalid."));
+        }
+        return store.TransferOwnerAsync(
             challengeId,
             actorId,
             isAdministrator,
@@ -277,10 +323,5 @@ public sealed class TransferChallengeTemplateOwner(IChallengeBankStore store)
             expectedRevision,
             now,
             ct);
-        return result is null
-            ? OperationResult<ChallengeTemplateView>.Failure(
-                "challenge_not_found_or_revision_conflict",
-                "Challenge was not found, access was denied, or its revision changed.")
-            : OperationResult<ChallengeTemplateView>.Success(result);
     }
 }

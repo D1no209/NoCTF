@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Attachments;
+using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Management;
+using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -102,17 +104,20 @@ public sealed class OwnershipTransferPersistenceTests
                 transferredAt,
                 cancellationToken);
 
-            await Assert.That(competition).IsNotNull();
-            await Assert.That(challenge).IsNotNull();
-            await Assert.That(challenge!.Revision).IsEqualTo(5);
-            await Assert.That(await new ChallengeBankStore(db).TransferOwnerAsync(
+            await Assert.That(competition.State)
+                .IsEqualTo(CompetitionOwnerTransferState.Transferred);
+            await Assert.That(challenge.State)
+                .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
+            await Assert.That(challenge.Template!.Revision).IsEqualTo(5);
+            await Assert.That((await new ChallengeBankStore(db).TransferOwnerAsync(
                 challengeId,
                 newOwnerId,
                 false,
                 Guid.NewGuid(),
                 5,
                 transferredAt.AddSeconds(1),
-                cancellationToken)).IsNull();
+                cancellationToken)).State)
+                .IsEqualTo(ChallengeTemplateWriteState.UserNotFound);
 
             db.ChangeTracker.Clear();
             var persistedCompetition = await db.Competitions
@@ -198,7 +203,9 @@ public sealed class OwnershipTransferPersistenceTests
                 firstTransferTask,
                 secondTransferTask);
 
-            await Assert.That(concurrentTransfers.Count(result => result is not null)).IsEqualTo(1);
+            await Assert.That(concurrentTransfers.Count(
+                    result => result.State == ChallengeTemplateWriteState.Succeeded))
+                .IsEqualTo(1);
             db.ChangeTracker.Clear();
             var concurrentChallenge = await db.Challenges
                 .AsNoTracking()
@@ -307,7 +314,9 @@ public sealed class OwnershipTransferPersistenceTests
                 cancellationToken);
             var transfers = await Task.WhenAll(firstTransferTask, secondTransferTask);
 
-            await Assert.That(transfers.All(result => result is not null)).IsTrue();
+            await Assert.That(transfers.All(
+                    result => result.State == CompetitionOwnerTransferState.Transferred))
+                .IsTrue();
             db.ChangeTracker.Clear();
             var persisted = await db.Competitions
                 .AsNoTracking()
@@ -536,7 +545,8 @@ public sealed class OwnershipTransferPersistenceTests
 
             await Assert.That(await attachmentTask)
                 .IsEqualTo(AddChallengeAttachmentState.Added);
-            await Assert.That(await transferTask).IsNull();
+            await Assert.That((await transferTask).State)
+                .IsEqualTo(ChallengeTemplateWriteState.RevisionConflict);
             db.ChangeTracker.Clear();
             var persisted = await db.Challenges
                 .AsNoTracking()
@@ -546,6 +556,101 @@ public sealed class OwnershipTransferPersistenceTests
             await Assert.That(await db.Set<ChallengeAttachment>().AsNoTracking()
                     .AnyAsync(item => item.Id == attachmentId, cancellationToken))
                 .IsTrue();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Competition_restore_and_hard_delete_are_serialized(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_competition_restore_hard_delete")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+
+            var now = DateTimeOffset.UtcNow;
+            var ownerId = Guid.CreateVersion7();
+            var competitionId = Guid.CreateVersion7();
+            db.Users.Add(Organizer(ownerId, "restore-hard-delete-owner", now));
+            db.Competitions.Add(new Competition
+            {
+                Id = competitionId,
+                OwnerId = ownerId,
+                Title = "Restore and hard delete serialization",
+                Mode = GameMode.Ctf,
+                ConfigurationJson = """{"schemaVersion":1}""",
+                ConfigurationUpdatedAt = now,
+                FlagDerivationSecret = new byte[32],
+                StartAt = now.AddHours(1),
+                EndAt = now.AddHours(2),
+                Status = CompetitionStatus.Draft,
+                DeletedAt = now,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                CREATE FUNCTION noctf_delay_competition_restore()
+                RETURNS trigger
+                LANGUAGE plpgsql
+                AS $$
+                BEGIN
+                    IF OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN
+                        PERFORM pg_sleep(1);
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$;
+                """,
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TRIGGER noctf_delay_competition_restore
+                BEFORE UPDATE ON competitions
+                FOR EACH ROW
+                EXECUTE FUNCTION noctf_delay_competition_restore();
+                """,
+                cancellationToken);
+
+            await using var restoreDb = new NoCtfDbContext(options);
+            await using var hardDeleteDb = new NoCtfDbContext(options);
+            var restoreTask = new AdminCompetitionStore(restoreDb).RestoreAsync(
+                competitionId,
+                ownerId,
+                false,
+                now.AddMinutes(1),
+                cancellationToken);
+            await WaitForPostgresSleepAsync(db, cancellationToken);
+            var hardDeleteTask = new AdminCompetitionStore(hardDeleteDb).HardDeleteAsync(
+                competitionId,
+                ownerId,
+                false,
+                cancellationToken);
+            await Task.WhenAll(restoreTask, hardDeleteTask);
+
+            await Assert.That((await restoreTask).State)
+                .IsEqualTo(CompetitionRestoreState.Restored);
+            await Assert.That(await hardDeleteTask).IsFalse();
+            db.ChangeTracker.Clear();
+            var persisted = await db.Competitions.IgnoreQueryFilters()
+                .AsNoTracking()
+                .SingleAsync(
+                    competition => competition.Id == competitionId,
+                    cancellationToken);
+            await Assert.That(persisted.DeletedAt).IsNull();
         });
     }
 

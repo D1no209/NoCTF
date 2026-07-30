@@ -8,7 +8,11 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 public sealed class RestoreCompetitionEndpoint(
     RestoreCompetition restore,
     IUserContext user)
-    : EndpointWithoutRequest<Results<NoContent, NotFound>>
+    : EndpointWithoutRequest<
+        Results<
+            NoContent,
+            NotFound,
+            Conflict<CompetitionResourceManagerConflictResponse>>>
 {
     public override void Configure()
     {
@@ -22,7 +26,12 @@ public sealed class RestoreCompetitionEndpoint(
         });
     }
 
-    public override async Task<Results<NoContent, NotFound>> ExecuteAsync(CancellationToken ct)
+    public override async Task<
+        Results<
+            NoContent,
+            NotFound,
+            Conflict<CompetitionResourceManagerConflictResponse>>> ExecuteAsync(
+        CancellationToken ct)
     {
         var result = await restore.ExecuteAsync(
             Route<Guid>("competitionId"),
@@ -30,6 +39,22 @@ public sealed class RestoreCompetitionEndpoint(
             user.IsAdministrator,
             DateTimeOffset.UtcNow,
             ct);
-        return result.Succeeded ? TypedResults.NoContent() : TypedResults.NotFound();
+        return result.State switch
+        {
+            CompetitionRestoreState.Restored => TypedResults.NoContent(),
+            CompetitionRestoreState.NotFound => TypedResults.NotFound(),
+            CompetitionRestoreState.UserNotFound =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.UserNotFound,
+                        result.UserIds)),
+            CompetitionRestoreState.RoleNotEligible =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.RoleNotEligible,
+                        result.UserIds)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported competition restore state: {result.State}.")
+        };
     }
 }

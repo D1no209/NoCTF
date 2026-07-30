@@ -14,6 +14,23 @@ public sealed record PlatformUserView(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+public enum UpdatePlatformRoleState
+{
+    Updated,
+    UserNotFound,
+    InvalidBotRole,
+    ActiveOwnerOrManagerAssignments
+}
+
+public sealed record PlatformRoleAssignmentBlockers(
+    IReadOnlyList<Guid> CompetitionIds,
+    IReadOnlyList<Guid> ChallengeIds);
+
+public sealed record UpdatePlatformRoleResult(
+    UpdatePlatformRoleState State,
+    PlatformUserView? User = null,
+    PlatformRoleAssignmentBlockers? Blockers = null);
+
 public enum CreateBotState
 {
     Created,
@@ -60,7 +77,7 @@ public interface IPlatformAdministrationStore
         UserRole role,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task<PlatformUserView?> UpdateRoleAsync(
+    Task<UpdatePlatformRoleResult> UpdateRoleAsync(
         Guid userId,
         UserRole role,
         DateTimeOffset now,
@@ -143,7 +160,7 @@ public sealed class ManagePlatform(
             return new(null, IssueBotTokenFailure.InvalidLifetime);
         }
     }
-    public Task<PlatformUserView?> UpdateRoleAsync(
+    public Task<UpdatePlatformRoleResult> UpdateRoleAsync(
         Guid userId,
         UserRole role,
         DateTimeOffset now,

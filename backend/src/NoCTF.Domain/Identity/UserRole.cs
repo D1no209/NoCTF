@@ -7,3 +7,9 @@ public enum UserRole
     Organizer,
     Administrator
 }
+
+public static class UserRolePolicy
+{
+    public static bool CanManageResources(this UserRole role) =>
+        role is UserRole.Organizer or UserRole.Administrator;
+}

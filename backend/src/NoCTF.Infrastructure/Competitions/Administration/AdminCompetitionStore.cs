@@ -2,6 +2,7 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Competitions;
+using NoCTF.Infrastructure.Administration;
 
 namespace NoCTF.Infrastructure.Competitions.Administration;
 
@@ -39,25 +40,43 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
             .SingleOrDefaultAsync(ct);
     }
 
-    public async Task<bool> RestoreAsync(
+    public async Task<CompetitionRestoreResult> RestoreAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var entity = await Authorized(
-                db.Competitions.IgnoreQueryFilters(),
-                actorId,
-                isAdministrator)
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await CompetitionWriteLock.AcquireTransactionLockAsync(db, competitionId, ct);
+        var entity = await db.Competitions.IgnoreQueryFilters()
             .SingleOrDefaultAsync(competition =>
-                competition.Id == competitionId && competition.DeletedAt != null, ct);
+                competition.Id == competitionId &&
+                competition.DeletedAt != null &&
+                (isAdministrator || competition.OwnerId == actorId), ct);
         if (entity is null)
-            return false;
+            return new(CompetitionRestoreState.NotFound);
+        var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
+            db,
+            entity.ManagerIds.Append(entity.OwnerId),
+            ct);
+        if (eligibility.MissingUserIds.Length > 0)
+        {
+            return new(
+                CompetitionRestoreState.UserNotFound,
+                eligibility.MissingUserIds);
+        }
+        if (eligibility.RoleIneligibleUserIds.Length > 0)
+        {
+            return new(
+                CompetitionRestoreState.RoleNotEligible,
+                eligibility.RoleIneligibleUserIds);
+        }
         entity.DeletedAt = null;
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return true;
+        await transaction.CommitAsync(ct);
+        return new(CompetitionRestoreState.Restored);
     }
 
     public async Task<bool> HardDeleteAsync(
@@ -66,12 +85,13 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
         bool isAdministrator,
         CancellationToken ct)
     {
-        var entity = await Authorized(
-                db.Competitions.IgnoreQueryFilters(),
-                actorId,
-                isAdministrator)
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await CompetitionWriteLock.AcquireTransactionLockAsync(db, competitionId, ct);
+        var entity = await db.Competitions.IgnoreQueryFilters()
             .SingleOrDefaultAsync(competition =>
-                competition.Id == competitionId && competition.DeletedAt != null, ct);
+                competition.Id == competitionId &&
+                competition.DeletedAt != null &&
+                (isAdministrator || competition.OwnerId == actorId), ct);
         if (entity is null)
             return false;
         var hasDependents =
@@ -85,10 +105,11 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
             return false;
         db.Competitions.Remove(entity);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return true;
     }
 
-    public async Task<CompetitionView?> TransferOwnerAsync(
+    public async Task<CompetitionOwnerTransferResult> TransferOwnerAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
@@ -98,20 +119,37 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
-            return null;
+            return new(CompetitionOwnerTransferState.NotFound);
         var entity = await db.Competitions.SingleOrDefaultAsync(competition =>
             competition.Id == competitionId &&
             (isAdministrator || competition.OwnerId == actorId), ct);
-        if (entity is null || !await db.Users.AnyAsync(user => user.Id == ownerId, ct))
-            return null;
+        if (entity is null)
+            return new(CompetitionOwnerTransferState.NotFound);
         var previousOwnerId = entity.OwnerId;
-        entity.OwnerId = ownerId;
-        entity.ManagerIds = entity.ManagerIds
+        var managerIds = entity.ManagerIds
             .Append(previousOwnerId)
             .Where(id => id != ownerId)
             .Distinct()
             .Order()
             .ToArray();
+        var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
+            db,
+            managerIds.Append(ownerId),
+            ct);
+        if (eligibility.MissingUserIds.Length > 0)
+        {
+            return new(
+                CompetitionOwnerTransferState.UserNotFound,
+                UserIds: eligibility.MissingUserIds);
+        }
+        if (eligibility.RoleIneligibleUserIds.Length > 0)
+        {
+            return new(
+                CompetitionOwnerTransferState.RoleNotEligible,
+                UserIds: eligibility.RoleIneligibleUserIds);
+        }
+        entity.OwnerId = ownerId;
+        entity.ManagerIds = managerIds;
         entity.JudgeIds = entity.JudgeIds
             .Where(id => id != ownerId)
             .Distinct()
@@ -125,7 +163,7 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return Map(entity);
+        return new(CompetitionOwnerTransferState.Transferred, Map(entity));
     }
 
     private static IQueryable<Competition> Authorized(

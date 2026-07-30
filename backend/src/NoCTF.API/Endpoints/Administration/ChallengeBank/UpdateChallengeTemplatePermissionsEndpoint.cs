@@ -27,14 +27,17 @@ public sealed class UpdateChallengeTemplatePermissionsEndpoint(
     UpdateChallengeTemplatePermissions update,
     IUserContext user)
     : Endpoint<UpdateChallengeTemplatePermissionsRequest,
-        Results<Ok<ChallengeTemplateResponse>, ProblemHttpResult>>
+        Results<
+            Ok<ChallengeTemplateResponse>,
+            NotFound,
+            Conflict<ChallengeTemplateConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
         Put("/admin/challenges/{challengeId}/permissions");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminChallengeBankUpdatePermissions")
-            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Description(builder => builder.WithName("AdminChallengeBankUpdatePermissions"));
         Summary(summary =>
         {
             summary.Summary = "Replaces the challenge template manager set.";
@@ -42,7 +45,12 @@ public sealed class UpdateChallengeTemplatePermissionsEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeTemplateResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<
+        Results<
+            Ok<ChallengeTemplateResponse>,
+            NotFound,
+            Conflict<ChallengeTemplateConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         UpdateChallengeTemplatePermissionsRequest request,
         CancellationToken ct)
     {
@@ -54,11 +62,23 @@ public sealed class UpdateChallengeTemplatePermissionsEndpoint(
             request.ExpectedRevision,
             DateTimeOffset.UtcNow,
             ct);
-        return result.Succeeded
-            ? TypedResults.Ok(ChallengeTemplateMapper.ToResponse(result.Value!))
-            : TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
+        return result.State switch
+        {
+            ChallengeTemplateWriteState.Succeeded =>
+                TypedResults.Ok(ChallengeTemplateMapper.ToResponse(result.Template!)),
+            ChallengeTemplateWriteState.NotFoundOrForbidden => TypedResults.NotFound(),
+            ChallengeTemplateWriteState.InvalidRequest => TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
                 title: "Challenge template permissions were not updated.",
-                detail: result.ErrorMessage);
+                detail: result.Detail),
+            ChallengeTemplateWriteState.RevisionConflict
+                or ChallengeTemplateWriteState.OwnerIncludedInManagerSet
+                or ChallengeTemplateWriteState.UserNotFound
+                or ChallengeTemplateWriteState.RoleNotEligible =>
+                TypedResults.Conflict(
+                    ChallengeTemplateWriteResponseMapper.ToConflict(result)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported challenge template permission state: {result.State}.")
+        };
     }
 }
