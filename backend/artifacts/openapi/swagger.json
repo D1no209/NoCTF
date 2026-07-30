@@ -3714,7 +3714,7 @@
           "Admin"
         ],
         "summary": "Creates a non-interactive Organizer Bot.",
-        "description": "Creates a Bot identity with no password-login or refresh-token capability.",
+        "description": "Creates a Bot identity that cannot use password login or refresh tokens.",
         "operationId": "AdminPlatformCreateBot",
         "requestBody": {
           "x-name": "CreatePlatformBotRequest",
@@ -3755,16 +3755,6 @@
           },
           "403": {
             "description": "Forbidden"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -3920,17 +3910,17 @@
         ]
       }
     },
-    "/api/v1/admin/platform/bots/{botUserId}/tokens": {
+    "/api/v1/admin/platform/bots/{userId}/tokens": {
       "post": {
         "tags": [
           "Admin"
         ],
         "summary": "Issues a bounded-lifetime Access JWT for a Bot.",
-        "description": "The JWT uses the ordinary Access scheme and is revoked by the Bot's TokenVersion.",
+        "description": "Uses the ordinary Access scheme and is revoked by the Bot's TokenVersion.",
         "operationId": "AdminPlatformIssueBotToken",
         "parameters": [
           {
-            "name": "botUserId",
+            "name": "userId",
             "in": "path",
             "required": true,
             "schema": {
@@ -3957,7 +3947,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformBotAccessTokenResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenResponse"
                 }
               }
             }
@@ -5278,7 +5268,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5404,7 +5395,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5412,7 +5404,16 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -5533,7 +5534,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5541,7 +5543,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5650,7 +5653,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5658,7 +5662,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5850,7 +5855,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5858,7 +5864,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5866,7 +5873,16 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -6048,7 +6064,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -6056,7 +6073,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -6064,7 +6082,16 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -6375,13 +6402,68 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}/restore": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Restores a deleted competition-scoped flag.",
+        "description": "Restores a soft-deleted flag owned by the selected competition challenge.",
+        "operationId": "AdminRestoreCompetitionChallengeFlag",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/restore": {
       "post": {
         "tags": [
           "Admin"
         ],
-        "summary": "Restores a soft-deleted competition challenge hint.",
-        "description": "Restores the Hint under its original CompetitionChallenge.",
+        "summary": "Restores a deleted competition challenge hint.",
+        "description": "Restores a soft-deleted hint owned by the selected competition challenge.",
         "operationId": "AdminRestoreCompetitionChallengeHint",
         "parameters": [
           {
@@ -6511,7 +6593,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -6616,6 +6699,16 @@
         "summary": "Lists visible challenge templates.",
         "description": "Returns owned, managed, shared, or platform-administrator-visible templates.",
         "operationId": "AdminChallengeBankListTemplates",
+        "parameters": [
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -6822,7 +6915,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -6830,7 +6924,16 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -6988,7 +7091,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -7119,7 +7223,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -7231,8 +7336,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Restores a soft-deleted challenge attachment.",
-        "description": "Restores immutable attachment metadata and its retained object reference.",
+        "summary": "Restores a deleted challenge attachment.",
+        "description": "Restores attachment metadata while preserving its stored object and stable ID.",
         "operationId": "AdminChallengeBankRestoreAttachment",
         "parameters": [
           {
@@ -7278,8 +7383,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Restores a soft-deleted template flag.",
-        "description": "Restores protected static flag material within its original template scope.",
+        "summary": "Restores a deleted template flag.",
+        "description": "Restores a soft-deleted template-scoped static flag by stable ID.",
         "operationId": "AdminChallengeBankRestoreFlag",
         "parameters": [
           {
@@ -7913,23 +8018,19 @@
       },
       "FastEndpointsErrorResponse": {
         "type": "object",
-        "description": "the dto used to send an error response to the client",
         "additionalProperties": false,
         "properties": {
           "statusCode": {
             "type": "integer",
-            "description": "the http status code sent to the client. default is 400.",
             "format": "int32",
             "default": 400
           },
           "message": {
             "type": "string",
-            "description": "the message for the error response",
             "default": "One or more errors occurred!"
           },
           "errors": {
             "type": "object",
-            "description": "the collection of errors for the current context",
             "additionalProperties": {
               "type": "array",
               "items": {
@@ -8773,6 +8874,11 @@
             "type": "integer",
             "format": "int32"
           },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -8780,11 +8886,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "deletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
           },
           "controlFlag": {
             "type": "string",
@@ -8840,14 +8941,14 @@
           "sha256": {
             "type": "string"
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
           "deletedAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -8891,6 +8992,11 @@
             "format": "date-time",
             "nullable": true
           },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -8898,11 +9004,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "deletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
           }
         }
       },
@@ -8943,12 +9044,41 @@
             "type": "string"
           },
           "role": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserKind"
           },
           "emailVerified": {
             "type": "boolean"
           }
         }
+      },
+      "NoCTFDomainIdentityUserRole": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "User",
+          "Organizer",
+          "Administrator"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFDomainIdentityUserKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Human",
+          "Bot"
+        ],
+        "enum": [
+          0,
+          1
+        ]
       },
       "NoCTFAPIEndpointsAuthenticationLoginResponse": {
         "type": "object",
@@ -9364,32 +9494,6 @@
           }
         }
       },
-      "NoCTFDomainIdentityUserKind": {
-        "type": "integer",
-        "description": "",
-        "x-enumNames": [
-          "Human",
-          "Bot"
-        ],
-        "enum": [
-          0,
-          1
-        ]
-      },
-      "NoCTFDomainIdentityUserRole": {
-        "type": "integer",
-        "description": "",
-        "x-enumNames": [
-          "User",
-          "Organizer",
-          "Administrator"
-        ],
-        "enum": [
-          0,
-          1,
-          2
-        ]
-      },
       "NoCTFAPIEndpointsAdministrationPlatformCreatePlatformBotRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -9400,13 +9504,28 @@
           "userName": {
             "type": "string",
             "maxLength": 64,
-            "minLength": 0,
+            "minLength": 3,
+            "pattern": "^[A-Za-z0-9_-]+$",
             "nullable": false
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole2"
           }
         }
+      },
+      "NoCTFDomainIdentityUserRole2": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "User",
+          "Organizer",
+          "Administrator"
+        ],
+        "enum": [
+          "User",
+          "Organizer",
+          "Administrator"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse": {
         "type": "object",
@@ -9434,7 +9553,7 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationPlatformPlatformBotAccessTokenResponse": {
+      "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -9453,7 +9572,7 @@
         "properties": {
           "expiresInSeconds": {
             "type": "integer",
-            "format": "int32",
+            "format": "int64",
             "maximum": 31536000.0,
             "minimum": 60.0
           }
@@ -9819,14 +9938,14 @@
             "format": "date-time",
             "nullable": true
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
           "deletedAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -9958,6 +10077,14 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationChallengesGetCompetitionChallengeFlagRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesGetChallengeHintRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationChallengesListAdminChallengesRequest": {
         "type": "object",
         "additionalProperties": false
@@ -9973,6 +10100,10 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesListCompetitionChallengeFlagsRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengesChallengeHintListResponse": {
         "type": "object",
@@ -10075,14 +10206,6 @@
             "type": "integer",
             "format": "int32"
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
           "deletedAt": {
             "type": "string",
             "format": "date-time",
@@ -10091,6 +10214,14 @@
           "activeCompetitionReferenceCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -10121,10 +10252,10 @@
             "nullable": true
           },
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode2"
           },
           "visibility": {
-            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility"
+            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility2"
           },
           "title": {
             "type": "string",
@@ -10149,6 +10280,38 @@
           }
         }
       },
+      "NoCTFDomainCompetitionsGameMode2": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Ctf",
+          "Awd",
+          "Awdp",
+          "Koh"
+        ],
+        "enum": [
+          "Ctf",
+          "Awd",
+          "Awdp",
+          "Koh"
+        ]
+      },
+      "NoCTFDomainChallengesChallengeVisibility2": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Private",
+          "Shared"
+        ],
+        "enum": [
+          "Private",
+          "Shared"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeFlagRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeTemplateRequest": {
         "type": "object",
         "additionalProperties": false
@@ -10172,6 +10335,10 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankListChallengeTemplatesRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankTransferChallengeTemplateOwnerRequest": {
         "type": "object",
@@ -10225,10 +10392,10 @@
         ],
         "properties": {
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode2"
           },
           "visibility": {
-            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility"
+            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility2"
           },
           "title": {
             "type": "string",

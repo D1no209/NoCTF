@@ -155,10 +155,7 @@ public sealed class AwdCheckerPersistenceTests
                     expectedCompetitionConfigurationRevision: 0,
                     JsonSerializer.Serialize(new AwdChallengeConfiguration(
                         AwdChallengeConfiguration.CurrentSchemaVersion,
-                        Checker: new AwdCheckerConfiguration(
-                            new RunnerJobConfiguration("checker:v2",
-                                ["/checker"],
-                                TimeoutSeconds: 10))), JsonOptions),
+                        CheckerIntervalSeconds: 15), JsonOptions),
                     configurationUpdatedAt,
                     cancellationToken);
                 await Assert.That(update.Failure).IsNull();
@@ -179,10 +176,11 @@ public sealed class AwdCheckerPersistenceTests
             await using var verify = new NoCtfDbContext(options);
             var events = await verify.ScoringEvents.AsNoTracking()
                 .Where(item => item.Kind == ScoringEventKind.AwdServiceStatus)
+                .OrderBy(item => item.OccurredAt)
                 .ToListAsync(cancellationToken);
             await Assert.That(events).Count().IsEqualTo(2);
-            await Assert.That(events.Select(item => item.Result).ToArray())
-                .IsEquivalentTo([ScoringResult.Wrong, ScoringResult.Correct]);
+            await Assert.That(events[0].Result).IsEqualTo(ScoringResult.Wrong);
+            await Assert.That(events[1].Result).IsEqualTo(ScoringResult.Correct);
             var runtimeState = await verify.RuntimeInstances.AsNoTracking().SingleAsync(cancellationToken);
             await Assert.That(runtimeState.CheckerSequence).IsEqualTo(5);
             await Assert.That(runtimeState.LastAppliedCheckerSequence).IsEqualTo(4);
@@ -240,6 +238,7 @@ public sealed class AwdCheckerPersistenceTests
         {
             Id = challengeId,
             OwnerId = ownerId,
+            Mode = GameMode.Awd,
             Title = "service",
             DefinitionJson = JsonSerializer.Serialize(new AwdChallengeConfiguration(
                 AwdChallengeConfiguration.CurrentSchemaVersion,

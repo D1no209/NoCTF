@@ -1,5 +1,6 @@
 using FastEndpoints;
 using FluentValidation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Administration;
 using NoCTF.Domain.Identity;
@@ -18,7 +19,8 @@ public sealed class UpdatePlatformUserRoleValidator : Validator<UpdatePlatformUs
 }
 
 public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
-    : Endpoint<UpdatePlatformUserRoleRequest, Results<Ok<PlatformUserResponse>, NotFound>>
+    : Endpoint<UpdatePlatformUserRoleRequest,
+        Results<Ok<PlatformUserResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -33,12 +35,22 @@ public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
         });
     }
 
-    public override async Task<Results<Ok<PlatformUserResponse>, NotFound>> ExecuteAsync(
+    public override async Task<
+        Results<Ok<PlatformUserResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         UpdatePlatformUserRoleRequest request,
         CancellationToken ct)
     {
+        var userId = Route<Guid>("userId");
+        var existing = await platform.GetUserAsync(userId, ct);
+        if (existing is null)
+            return TypedResults.NotFound();
+        if (existing.Kind == UserKind.Bot && request.Role != UserRole.Organizer)
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Role is not valid for a bot.",
+                detail: "GitOps Bots must use the Organizer role.");
         var user = await platform.UpdateRoleAsync(
-            Route<Guid>("userId"), request.Role, DateTimeOffset.UtcNow, ct);
+            userId, request.Role, DateTimeOffset.UtcNow, ct);
         return user is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(PlatformUserMapping.ToResponse(user));

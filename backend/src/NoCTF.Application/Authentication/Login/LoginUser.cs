@@ -1,5 +1,6 @@
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Common;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.Application.Authentication.Login;
 
@@ -8,7 +9,7 @@ public sealed record LoginCommand(string Login, string Password);
 public sealed record LoginResult(
     Guid UserId,
     string UserName,
-    string Role,
+    UserRole Role,
     string AccessToken,
     DateTimeOffset AccessTokenExpiresAt,
     string RefreshToken);
@@ -20,10 +21,12 @@ public sealed class LoginUser(IUserAuthenticationStore store, IAccessTokenIssuer
         CancellationToken cancellationToken = default)
     {
         var user = await store.FindByLoginAsync(command.Login.Trim(), cancellationToken);
-        if (user is null || !await store.VerifyPasswordAsync(user.Id, command.Password, cancellationToken))
+        if (user is null
+            || user.Kind != UserKind.Human
+            || !await store.VerifyPasswordAsync(user.Id, command.Password, cancellationToken))
             return OperationResult<LoginResult>.Failure("invalid_credentials", "Invalid credentials.");
 
-        var token = issuer.Issue(user);
+        var token = issuer.Issue(user, DateTimeOffset.UtcNow);
         var refreshToken = issuer.IssueRefresh(user);
         return OperationResult<LoginResult>.Success(new(
             user.Id, user.UserName, user.Role, token.Token, token.ExpiresAt, refreshToken.Token));

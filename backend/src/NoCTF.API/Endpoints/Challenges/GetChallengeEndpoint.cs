@@ -17,9 +17,9 @@ public sealed record ChallengeResponse(
     int Order,
     bool IsPublished,
     int Revision,
+    DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? DeletedAt,
     string? ControlFlag = null,
     IReadOnlyList<string>? Urls = null);
 
@@ -41,9 +41,9 @@ internal static class ChallengeMapper
             view.Order,
             view.IsPublished,
             view.Revision,
+            view.DeletedAt,
             view.CreatedAt,
             view.UpdatedAt,
-            view.DeletedAt,
             koh?.ControlFlag,
             koh?.Urls);
 
@@ -77,7 +77,8 @@ public sealed class GetChallengeEndpoint(
             Route<Guid>("competitionId"),
             Route<Guid>("competitionChallengeId"),
             includeUnpublished: false,
-            ct: ct);
+            includeDeleted: false,
+            ct);
 
         if (item is null)
             return TypedResults.NotFound();

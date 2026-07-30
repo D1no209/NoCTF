@@ -36,6 +36,7 @@ namespace NoCTF.Infrastructure.Migrations
                     email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     normalized_email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     password_hash = table.Column<string>(type: "text", nullable: false),
+                    kind = table.Column<short>(type: "smallint", nullable: false),
                     role = table.Column<short>(type: "smallint", nullable: false),
                     token_version = table.Column<int>(type: "integer", nullable: false),
                     email_verified_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -45,6 +46,7 @@ namespace NoCTF.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_users", x => x.id);
+                    table.CheckConstraint("ck_users_bot_role", "\"kind\" <> 1 OR \"role\" IN (0, 1)");
                 });
 
             migrationBuilder.CreateTable(

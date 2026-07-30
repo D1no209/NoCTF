@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Application.Administration.Bots;
+using NoCTF.Application.Administration;
 using NoCTF.Application.Challenges.Attachments;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Flags;
@@ -12,7 +12,6 @@ using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
-using NoCTF.Infrastructure.Administration.Bots;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Challenges.Attachments;
 using NoCTF.Infrastructure.Challenges.Bank;
@@ -54,20 +53,28 @@ public sealed class GitOpsPersistenceContractTests
             await db.SaveChangesAsync(cancellationToken);
 
             var passwordHasher = new PasswordHasher<User>();
-            var botStore = new PlatformBotStore(db, passwordHasher);
             var botId = Guid.CreateVersion7(now.AddMilliseconds(1));
-            var botResult = await botStore.CreateAsync(
-                new(botId, "repository-bot", UserRole.Organizer, now),
-                cancellationToken);
+            var bot = new User
+            {
+                Id = botId,
+                UserName = "repository-bot",
+                NormalizedUserName = "REPOSITORY-BOT",
+                Email = BotIdentity.DummyEmail(botId),
+                NormalizedEmail = BotIdentity.DummyEmail(botId).ToUpperInvariant(),
+                Kind = UserKind.Bot,
+                Role = UserRole.Organizer,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            bot.PasswordHash = passwordHasher.HashPassword(
+                bot,
+                Guid.NewGuid().ToString("N"));
+            db.Users.Add(bot);
+            await db.SaveChangesAsync(cancellationToken);
 
-            await Assert.That(botResult.State).IsEqualTo(CreatePlatformBotState.Created);
-            await Assert.That(botResult.Bot!.Id).IsEqualTo(botId);
-            await Assert.That(botResult.Bot.Kind).IsEqualTo(UserKind.Bot);
             await Assert.That(await new AuthenticationStore(db, passwordHasher)
                 .FindByLoginAsync("repository-bot", cancellationToken)).IsNull();
-            await Assert.That((await botStore.FindTokenSubjectAsync(
-                botId,
-                cancellationToken))!.TokenVersion).IsEqualTo(0);
+            await Assert.That(bot.TokenVersion).IsEqualTo(0);
 
             var competitionId = Guid.CreateVersion7(now.AddMilliseconds(2));
             db.Competitions.Add(new Competition
@@ -103,18 +110,18 @@ public sealed class GitOpsPersistenceContractTests
                     """{"schemaVersion":1}""",
                     now),
                 cancellationToken);
-            await Assert.That(challenge.Id).IsEqualTo(challengeId);
+            await Assert.That(challenge!.Id).IsEqualTo(challengeId);
 
             var competitionChallengeId = Guid.CreateVersion7(now.AddMilliseconds(4));
             var competitionChallenges = new ChallengeManagementStore(db);
             var linked = await competitionChallenges.CreateAsync(
                 new(
+                    competitionChallengeId,
                     competitionId,
                     challengeId,
                     500,
                     1,
-                    now,
-                    competitionChallengeId),
+                    now),
                 """{"schemaVersion":1}""",
                 cancellationToken);
             await Assert.That(linked.Challenge!.Id).IsEqualTo(competitionChallengeId);
@@ -139,7 +146,7 @@ public sealed class GitOpsPersistenceContractTests
                     7,
                     new string('0', 64)),
                 now,
-                cancellationToken)).IsTrue();
+                cancellationToken)).IsEqualTo(AddChallengeAttachmentState.Added);
             await Assert.That(await attachmentStore.DeleteAsync(
                 challengeId,
                 attachmentId,
@@ -166,20 +173,20 @@ public sealed class GitOpsPersistenceContractTests
             var flagScope = ChallengeFlagScope.Template(challengeId);
             var flag = await flagStore.SaveAsync(
                 new(
-                    flagScope,
-                    null,
-                    null,
-                    "flag{gitops}",
-                    null,
-                    null,
-                    null,
-                    null,
-                    now,
-                    flagId),
+                    Scope: flagScope,
+                    FlagId: flagId,
+                    IsCreate: true,
+                    TeamId: null,
+                    Flag: "flag{gitops}",
+                    SpecificationKind: null,
+                    SpecificationId: null,
+                    ValidStart: null,
+                    ValidUntil: null,
+                    Now: now),
                 botId,
                 false,
                 cancellationToken);
-            await Assert.That(flag!.Id).IsEqualTo(flagId);
+            await Assert.That(flag.Flag!.Id).IsEqualTo(flagId);
             await Assert.That(await flagStore.DeleteAsync(
                 flagScope,
                 flagId,
@@ -191,13 +198,14 @@ public sealed class GitOpsPersistenceContractTests
                 flagScope,
                 botId,
                 false,
-                cancellationToken,
-                true))!.Single().DeletedAt).IsNotNull();
+                true,
+                cancellationToken))!.Single().DeletedAt).IsNotNull();
             await Assert.That(await flagStore.RestoreAsync(
                 flagScope,
                 flagId,
                 botId,
                 false,
+                now,
                 cancellationToken)).IsTrue();
 
             var hintId = Guid.CreateVersion7(now.AddMilliseconds(7));
@@ -207,16 +215,16 @@ public sealed class GitOpsPersistenceContractTests
                 Substitute.For<ITransactionalMessageOutbox>());
             var hint = await hintStore.SaveAsync(
                 new(
-                    competitionId,
-                    competitionChallengeId,
-                    null,
-                    "Read the source.",
-                    10,
-                    null,
-                    now,
-                    hintId),
+                    CompetitionId: competitionId,
+                    CompetitionChallengeId: competitionChallengeId,
+                    HintId: hintId,
+                    IsCreate: true,
+                    Content: "Read the source.",
+                    Cost: 10,
+                    PublishedAt: null,
+                    Now: now),
                 cancellationToken);
-            await Assert.That(hint!.Id).IsEqualTo(hintId);
+            await Assert.That(hint.Hint!.Id).IsEqualTo(hintId);
             await Assert.That(await hintStore.DeleteAsync(
                 competitionId,
                 competitionChallengeId,
@@ -226,8 +234,8 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That((await hintStore.ListAsync(
                 competitionId,
                 competitionChallengeId,
-                cancellationToken,
-                true))!.Single().DeletedAt).IsNotNull();
+                true,
+                cancellationToken))!.Single().DeletedAt).IsNotNull();
             await Assert.That(await hintStore.RestoreAsync(
                 competitionId,
                 competitionChallengeId,

@@ -71,7 +71,7 @@ public sealed class RegisterEndpoint(RegisterUser register)
                 profile.Id,
                 profile.UserName,
                 profile.Email,
-                profile.Role,
+                profile.Role.ToString(),
                 profile.EmailVerified));
     }
 }

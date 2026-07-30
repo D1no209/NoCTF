@@ -1,5 +1,6 @@
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Common;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.Application.Authentication.Account;
 
@@ -27,7 +28,7 @@ public sealed class RegisterUser(IUserAuthenticationStore store)
                     : "username_conflict",
                 "The requested account identifier is already in use.");
         return OperationResult<UserProfile>.Success(
-            new(id, userName, email, "User", false));
+            new(id, userName, email, UserRole.User, UserKind.Human, false));
     }
 }
 

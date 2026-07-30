@@ -18,8 +18,8 @@ public sealed class ChallengeHintStore(
     public async Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        CancellationToken ct,
-        bool includeDeleted = false)
+        bool includeDeleted,
+        CancellationToken ct)
     {
         if (!await ScopeExistsAsync(competitionId, competitionChallengeId, ct))
             return null;
@@ -35,8 +35,8 @@ public sealed class ChallengeHintStore(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
-        CancellationToken ct,
-        bool includeDeleted = false)
+        bool includeDeleted,
+        CancellationToken ct)
     {
         if (!await ScopeExistsAsync(competitionId, competitionChallengeId, ct))
             return null;
@@ -48,7 +48,7 @@ public sealed class ChallengeHintStore(
         return hint is null ? null : Map(hint);
     }
 
-    public async Task<ChallengeHintView?> SaveAsync(
+    public async Task<ChallengeHintSaveResult> SaveAsync(
         SaveChallengeHintCommand command,
         CancellationToken ct)
     {
@@ -58,20 +58,24 @@ public sealed class ChallengeHintStore(
                 item.Id == command.CompetitionChallengeId &&
                 item.CompetitionId == command.CompetitionId, ct);
         if (challenge is null)
-            return null;
+            return new(null, ChallengeHintSaveFailure.ScopeNotFound);
         CompetitionChallengeHint hint;
-        if (command.HintId is Guid hintId)
+        if (!command.IsCreate && command.HintId is Guid hintId)
         {
             hint = challenge.Hints.SingleOrDefault(item => item.Id == hintId && item.DeletedAt == null)
                 ?? null!;
             if (hint is null)
-                return null;
+                return new(null, ChallengeHintSaveFailure.HintNotFound);
         }
         else
         {
+            var requestedId = command.HintId ?? Guid.CreateVersion7(command.Now);
+            if (await db.Set<CompetitionChallengeHint>().IgnoreQueryFilters().AsNoTracking()
+                    .AnyAsync(item => item.Id == requestedId, ct))
+                return new(null, ChallengeHintSaveFailure.ResourceIdConflict);
             hint = new CompetitionChallengeHint
             {
-                Id = command.RequestedId ?? Guid.CreateVersion7(command.Now),
+                Id = requestedId,
                 CompetitionChallengeId = command.CompetitionChallengeId,
                 CreatedAt = command.Now
             };
@@ -84,8 +88,15 @@ public sealed class ChallengeHintStore(
         challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = command.Now;
         await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
-        await db.SaveChangesAsync(ct);
-        return Map(hint);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return new(Map(hint));
+        }
+        catch (DbUpdateException) when (command.IsCreate)
+        {
+            return new(null, ChallengeHintSaveFailure.ResourceIdConflict);
+        }
     }
 
     public async Task<bool> DeleteAsync(
@@ -122,9 +133,8 @@ public sealed class ChallengeHintStore(
         var challenge = await db.CompetitionChallenges
             .Include(item => item.Hints)
             .SingleOrDefaultAsync(item =>
-                item.Id == competitionChallengeId
-                && item.CompetitionId == competitionId,
-                ct);
+                item.Id == competitionChallengeId &&
+                item.CompetitionId == competitionId, ct);
         var hint = challenge?.Hints.SingleOrDefault(item =>
             item.Id == hintId && item.DeletedAt != null);
         if (hint is null)
@@ -291,5 +301,5 @@ public sealed class ChallengeHintStore(
     private static ChallengeHintView Map(CompetitionChallengeHint hint) =>
         new(
             hint.Id, hint.CompetitionChallengeId, hint.Content, hint.Cost,
-            hint.PublishedAt, hint.CreatedAt, hint.UpdatedAt, hint.DeletedAt);
+            hint.PublishedAt, hint.DeletedAt, hint.CreatedAt, hint.UpdatedAt);
 }

@@ -9,6 +9,8 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class GetAdminChallengeRequest
 {
+    public Guid CompetitionId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
     [QueryParam]
     public bool IncludeDeleted { get; set; }
 }
@@ -41,7 +43,7 @@ public sealed class GetChallengeEndpoint(
 
         var item = await get.ExecuteAsync(
             competitionId,
-            Route<Guid>("competitionChallengeId"),
+            request.CompetitionChallengeId,
             includeUnpublished: true,
             request.IncludeDeleted,
             ct);

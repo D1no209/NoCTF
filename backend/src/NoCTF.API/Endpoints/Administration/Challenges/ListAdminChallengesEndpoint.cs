@@ -9,6 +9,7 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class ListAdminChallengesRequest
 {
+    public Guid CompetitionId { get; set; }
     [QueryParam]
     public bool IncludeDeleted { get; set; }
 }

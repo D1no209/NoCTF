@@ -57,7 +57,7 @@ public sealed class LoginEndpoint(LoginUser login)
         return TypedResults.Ok(new LoginResponse(
             result.Value!.UserId,
             result.Value.UserName,
-            result.Value.Role,
+            result.Value.Role.ToString(),
             result.Value.AccessToken,
             result.Value.AccessTokenExpiresAt));
     }

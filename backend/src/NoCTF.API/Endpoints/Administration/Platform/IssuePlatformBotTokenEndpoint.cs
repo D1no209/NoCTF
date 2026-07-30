@@ -2,35 +2,34 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using NoCTF.Application.Administration.Bots;
+using NoCTF.Application.Administration;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
 public sealed class IssuePlatformBotTokenRequest
 {
-    public int ExpiresInSeconds { get; set; }
+    public long ExpiresInSeconds { get; set; }
 }
 
-public sealed record PlatformBotAccessTokenResponse(
+public sealed record IssuePlatformBotTokenResponse(
     string AccessToken,
     DateTimeOffset ExpiresAt);
 
 public sealed class IssuePlatformBotTokenValidator : Validator<IssuePlatformBotTokenRequest>
 {
     public IssuePlatformBotTokenValidator() =>
-        RuleFor(request => request.ExpiresInSeconds)
-            .InclusiveBetween(
-                IssuePlatformBotToken.MinimumLifetimeSeconds,
-                IssuePlatformBotToken.MaximumLifetimeSeconds);
+        RuleFor(request => request.ExpiresInSeconds).InclusiveBetween(
+            ManagePlatform.MinimumBotTokenLifetimeSeconds,
+            ManagePlatform.MaximumBotTokenLifetimeSeconds);
 }
 
-public sealed class IssuePlatformBotTokenEndpoint(IssuePlatformBotToken issue)
+public sealed class IssuePlatformBotTokenEndpoint(ManagePlatform platform)
     : Endpoint<IssuePlatformBotTokenRequest,
-        Results<Ok<PlatformBotAccessTokenResponse>, NotFound, ProblemHttpResult>>
+        Results<Ok<IssuePlatformBotTokenResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
-        Post("/admin/platform/bots/{botUserId}/tokens");
+        Post("/admin/platform/bots/{userId}/tokens");
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformIssueBotToken"));
@@ -38,29 +37,34 @@ public sealed class IssuePlatformBotTokenEndpoint(IssuePlatformBotToken issue)
         {
             summary.Summary = "Issues a bounded-lifetime Access JWT for a Bot.";
             summary.Description =
-                "The JWT uses the ordinary Access scheme and is revoked by the Bot's TokenVersion.";
+                "Uses the ordinary Access scheme and is revoked by the Bot's TokenVersion.";
         });
     }
 
     public override async Task<
-        Results<Ok<PlatformBotAccessTokenResponse>, NotFound, ProblemHttpResult>>
-        ExecuteAsync(IssuePlatformBotTokenRequest request, CancellationToken ct)
+        Results<Ok<IssuePlatformBotTokenResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+        IssuePlatformBotTokenRequest request,
+        CancellationToken ct)
     {
-        var result = await issue.ExecuteAsync(
-            Route<Guid>("botUserId"),
+        var result = await platform.IssueBotTokenAsync(
+            Route<Guid>("userId"),
             request.ExpiresInSeconds,
+            DateTimeOffset.UtcNow,
             ct);
-        if (result.ErrorCode == "bot_not_found")
-            return TypedResults.NotFound();
-        if (!result.Succeeded)
+        return result.Failure switch
         {
-            return TypedResults.Problem(
+            IssueBotTokenFailure.UserNotFound => TypedResults.NotFound(),
+            IssueBotTokenFailure.UserIsNotBot => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Bot token was not issued.",
-                detail: result.ErrorMessage);
-        }
-        return TypedResults.Ok(new PlatformBotAccessTokenResponse(
-            result.Value!.Token,
-            result.Value.ExpiresAt));
+                title: "Token was not issued.",
+                detail: "The selected user is not a bot."),
+            IssueBotTokenFailure.InvalidLifetime => TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token was not issued.",
+                detail: "ExpiresInSeconds is outside the supported date range."),
+            _ => TypedResults.Ok(new IssuePlatformBotTokenResponse(
+                result.Token!.Token,
+                result.Token.ExpiresAt))
+        };
     }
 }

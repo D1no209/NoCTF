@@ -5,10 +5,18 @@ using NoCTF.Application.Challenges.Flags;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
+public sealed class GetChallengeFlagRequest
+{
+    public Guid ChallengeId { get; set; }
+    public Guid FlagId { get; set; }
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
+}
+
 public sealed class GetChallengeFlagEndpoint(
     ManageChallengeFlags flags,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeFlagResponse>, NotFound>>
+    : Endpoint<GetChallengeFlagRequest, Results<Ok<ChallengeFlagResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -23,13 +31,15 @@ public sealed class GetChallengeFlagEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeFlagResponse>, NotFound>> ExecuteAsync(
+        GetChallengeFlagRequest request,
         CancellationToken ct)
     {
         var result = await flags.GetAsync(
-            ChallengeFlagScope.Template(Route<Guid>("challengeId")),
-            Route<Guid>("flagId"),
+            ChallengeFlagScope.Template(request.ChallengeId),
+            request.FlagId,
             user.UserId,
             user.IsAdministrator,
+            request.IncludeDeleted,
             ct);
         return result is null
             ? TypedResults.NotFound()

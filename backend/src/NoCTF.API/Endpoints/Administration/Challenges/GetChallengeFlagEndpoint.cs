@@ -7,11 +7,21 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
+public sealed class GetCompetitionChallengeFlagRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+    public Guid FlagId { get; set; }
+    [QueryParam]
+    public bool IncludeDeleted { get; set; }
+}
+
 public sealed class GetChallengeFlagEndpoint(
     ManageChallengeFlags flags,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeFlagResponse>, NotFound, ForbidHttpResult>>
+    : Endpoint<GetCompetitionChallengeFlagRequest,
+        Results<Ok<ChallengeFlagResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
@@ -26,16 +36,18 @@ public sealed class GetChallengeFlagEndpoint(
     }
 
     public override async Task<Results<Ok<ChallengeFlagResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
+        GetCompetitionChallengeFlagRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var result = await flags.GetAsync(
-            ChallengeFlagScope.Competition(competitionId, Route<Guid>("competitionChallengeId")),
-            Route<Guid>("flagId"),
+            ChallengeFlagScope.Competition(competitionId, request.CompetitionChallengeId),
+            request.FlagId,
             actorId: null,
             isAdministrator: true,
+            request.IncludeDeleted,
             ct);
         return result is null
             ? TypedResults.NotFound()

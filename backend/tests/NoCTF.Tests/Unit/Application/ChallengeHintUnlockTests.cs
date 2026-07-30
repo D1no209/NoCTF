@@ -33,9 +33,9 @@ public sealed class ChallengeHintUnlockTests
             "First clue",
             0,
             DateTimeOffset.UtcNow,
+            null,
             DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow,
-            null);
+            DateTimeOffset.UtcNow);
         var result = await new UnlockChallengeHint(new Store(
                 HintUnlockAttempt.Success(new HintUnlockResult(hint, true))))
             .ExecuteAsync(
@@ -54,19 +54,19 @@ public sealed class ChallengeHintUnlockTests
         public Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
             Guid competitionId,
             Guid competitionChallengeId,
-            CancellationToken cancellationToken,
-            bool includeDeleted = false) =>
+            bool includeDeleted,
+            CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task<ChallengeHintView?> FindAsync(
             Guid competitionId,
             Guid competitionChallengeId,
             Guid hintId,
-            CancellationToken cancellationToken,
-            bool includeDeleted = false) =>
+            bool includeDeleted,
+            CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<ChallengeHintView?> SaveAsync(
+        public Task<ChallengeHintSaveResult> SaveAsync(
             SaveChallengeHintCommand command,
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();

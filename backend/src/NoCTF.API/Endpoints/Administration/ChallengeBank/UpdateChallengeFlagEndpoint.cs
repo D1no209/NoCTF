@@ -32,6 +32,7 @@ public sealed class UpdateChallengeFlagEndpoint(
                 request,
                 ChallengeFlagScope.Template(Route<Guid>("challengeId")),
                 Route<Guid>("flagId"),
+                isCreate: false,
                 DateTimeOffset.UtcNow),
             user.UserId,
             user.IsAdministrator,

@@ -72,9 +72,7 @@ public class ChallengeManagementTests
     {
         var store = new Store();
 
-        await new ListChallenges(store).ExecuteAsync(
-            Guid.NewGuid(),
-            includeUnpublished: false);
+        await new ListChallenges(store).ExecuteAsync(Guid.NewGuid(), includeUnpublished: false);
 
         await Assert.That(store.LastIncludeUnpublished).IsFalse();
     }
@@ -84,10 +82,7 @@ public class ChallengeManagementTests
     {
         var store = new Store();
 
-        await new GetChallenge(store).ExecuteAsync(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            includeUnpublished: true);
+        await new GetChallenge(store).ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), includeUnpublished: true);
 
         await Assert.That(store.LastIncludeUnpublished).IsTrue();
     }
@@ -144,6 +139,7 @@ public class ChallengeManagementTests
     }
 
     private static CreateCompetitionChallengeCommand CreateCommand(Guid? competitionId = null) => new(
+        null,
         competitionId ?? Guid.NewGuid(),
         Guid.NewGuid(),
         100,
@@ -172,9 +168,9 @@ public class ChallengeManagementTests
             1,
             false,
             0,
+            null,
             DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow,
-            null);
+            DateTimeOffset.UtcNow);
 
         public CompetitionStatus? Status { get; init; } = CompetitionStatus.Draft;
         public ChallengeMutationResult? CreateResult { get; init; }

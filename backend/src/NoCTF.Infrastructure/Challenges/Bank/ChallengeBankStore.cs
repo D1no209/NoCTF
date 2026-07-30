@@ -7,11 +7,13 @@ namespace NoCTF.Infrastructure.Challenges.Bank;
 
 public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
 {
-    public async Task<ChallengeTemplateView> CreateAsync(CreateChallengeTemplateCommand command, CancellationToken ct)
+    public async Task<ChallengeTemplateView?> CreateAsync(
+        CreateChallengeTemplateCommand command,
+        CancellationToken ct)
     {
         var entity = new Challenge
         {
-            Id = command.Id ?? Guid.CreateVersion7(command.CreatedAt),
+            Id = command.ChallengeId ?? Guid.CreateVersion7(command.CreatedAt),
             OwnerId = command.OwnerId,
             Mode = command.Mode,
             Visibility = command.Visibility,
@@ -23,23 +25,33 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             UpdatedAt = command.CreatedAt
         };
         db.Challenges.Add(entity);
-        await db.SaveChangesAsync(ct);
-        return await MapAsync(entity, ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return await Project(db.Challenges.AsNoTracking()
+                    .Where(challenge => challenge.Id == entity.Id))
+                .SingleAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(entity).State = EntityState.Detached;
+            return null;
+        }
     }
 
     public async Task<IReadOnlyList<ChallengeTemplateView>> ListAsync(
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken ct) =>
-        await Authorized(db.Challenges.AsNoTracking(), actorId, isAdministrator)
+        await Project(Authorized(
+                includeDeleted
+                    ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
+                    : db.Challenges.AsNoTracking(),
+                actorId,
+                isAdministrator))
             .OrderByDescending(challenge => challenge.UpdatedAt)
             .ThenBy(challenge => challenge.Id)
-            .Select(challenge => new ChallengeTemplateView(
-                challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Mode, challenge.Visibility,
-                challenge.Title, challenge.Description, challenge.Direction, challenge.DefinitionJson, challenge.Revision,
-                challenge.CreatedAt, challenge.UpdatedAt, challenge.DeletedAt,
-                db.CompetitionChallenges.IgnoreQueryFilters().Count(instance =>
-                    instance.ChallengeId == challenge.Id && instance.DeletedAt == null)))
             .ToListAsync(ct);
 
     public Task<ChallengeTemplateView?> FindAsync(
@@ -52,14 +64,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         var source = includeDeleted
             ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
             : db.Challenges.AsNoTracking();
-        return Authorized(source, actorId, isAdministrator)
-            .Where(challenge => challenge.Id == challengeId)
-            .Select(challenge => new ChallengeTemplateView(
-                challenge.Id, challenge.OwnerId, challenge.ManagerIds, challenge.Mode, challenge.Visibility,
-                challenge.Title, challenge.Description, challenge.Direction, challenge.DefinitionJson, challenge.Revision,
-                challenge.CreatedAt, challenge.UpdatedAt, challenge.DeletedAt,
-                db.CompetitionChallenges.IgnoreQueryFilters().Count(instance =>
-                    instance.ChallengeId == challenge.Id && instance.DeletedAt == null)))
+        return Project(Authorized(source, actorId, isAdministrator)
+                .Where(challenge => challenge.Id == challengeId))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -82,16 +88,26 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
         await db.SaveChangesAsync(ct);
-        return await MapAsync(entity, ct);
+        return await Project(db.Challenges.AsNoTracking()
+                .Where(challenge => challenge.Id == entity.Id))
+            .SingleAsync(ct);
     }
 
-    public Task<bool> SoftDeleteAsync(
+    public async Task<ChallengeTemplateDeleteFailure?> SoftDeleteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
         DateTimeOffset now,
-        CancellationToken ct) =>
-        SetDeletedAsync(challengeId, actorId, isAdministrator, now, restore: false, ct);
+        CancellationToken ct)
+    {
+        if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(
+                item => item.ChallengeId == challengeId && item.DeletedAt == null,
+                ct))
+            return ChallengeTemplateDeleteFailure.InUse;
+        return await SetDeletedAsync(challengeId, actorId, isAdministrator, now, restore: false, ct)
+            ? null
+            : ChallengeTemplateDeleteFailure.NotFound;
+    }
 
     public Task<bool> RestoreAsync(
         Guid challengeId,
@@ -121,7 +137,9 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return await MapAsync(entity, ct);
+        return await Project(db.Challenges.AsNoTracking()
+                .Where(challenge => challenge.Id == entity.Id))
+            .SingleAsync(ct);
     }
 
     public async Task<ChallengeTemplateView?> TransferOwnerAsync(
@@ -144,7 +162,9 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return await MapAsync(entity, ct);
+        return await Project(db.Challenges.AsNoTracking()
+                .Where(challenge => challenge.Id == entity.Id))
+            .SingleAsync(ct);
     }
 
     private async Task<bool> SetDeletedAsync(
@@ -190,18 +210,8 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
                 challenge.OwnerId == actorId ||
                 challenge.ManagerIds.Contains(actorId));
 
-    private async Task<ChallengeTemplateView> MapAsync(
-        Challenge challenge,
-        CancellationToken ct)
-    {
-        var activeCompetitionReferenceCount = await db.CompetitionChallenges
-            .IgnoreQueryFilters()
-            .CountAsync(
-                instance =>
-                    instance.ChallengeId == challenge.Id
-                    && instance.DeletedAt == null,
-                ct);
-        return new(
+    private IQueryable<ChallengeTemplateView> Project(IQueryable<Challenge> source) =>
+        source.Select(challenge => new ChallengeTemplateView(
             challenge.Id,
             challenge.OwnerId,
             challenge.ManagerIds,
@@ -212,10 +222,10 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             challenge.Direction,
             challenge.DefinitionJson,
             challenge.Revision,
-            challenge.CreatedAt,
-            challenge.UpdatedAt,
             challenge.DeletedAt,
-            activeCompetitionReferenceCount);
-    }
+            db.CompetitionChallenges.IgnoreQueryFilters().Count(item =>
+                item.ChallengeId == challenge.Id && item.DeletedAt == null),
+            challenge.CreatedAt,
+            challenge.UpdatedAt));
 
 }
