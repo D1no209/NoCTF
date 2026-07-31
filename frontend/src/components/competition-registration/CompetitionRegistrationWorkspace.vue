@@ -1,45 +1,29 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, Copy, KeyRound, Loader2, Lock, UserPlus, Users } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { RouterLink, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
+import ErrorState from '@/components/state/ErrorState.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Panel } from '@/components/ui/panel'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import ErrorState from '@/components/state/ErrorState.vue'
-import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, Copy, KeyRound, Loader2, Lock, UserPlus, Users } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const route = useRoute()
 const queryClient = useQueryClient()
 const competitionId = computed(() => route.params.id as string)
 const newTeamName = ref('')
-const selectedTrackName = ref('')
 const joinToken = ref('')
-
-interface Competition {
-  id: string
-  title: string
-  description?: string | null
-  status: string
-  startTime: string
-  endTime: string
-  gameModeType: string
-  maxTeamMembers: number
-  teamRegistrationAutoApprove: boolean
-  tracksEnabled: boolean
-  trackNames: string[]
-}
 
 interface MyCompetitionTeam {
   id: string
@@ -50,14 +34,13 @@ interface MyCompetitionTeam {
   isLocked: boolean
   isBanned: boolean
   bannedReason?: string | null
-  trackName?: string | null
   registrationStatus: string
   isCaptain: boolean
 }
 
 const { data: competition, isLoading: loadingCompetition, isError: competitionError, refetch: refetchCompetition } = useQuery({
   queryKey: computed(() => queryKeys.competition(competitionId.value)),
-  queryFn: () => competitionApi.get<Competition>(competitionId.value),
+  queryFn: () => competitionApi.get(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
@@ -74,11 +57,9 @@ const createTeamMutation = useMutation({
   mutationFn: () => teamApi.create<MyCompetitionTeam>({
     competitionId: competitionId.value,
     name: newTeamName.value.trim(),
-    trackName: competition.value?.tracksEnabled ? selectedTrackName.value : undefined,
   }),
   onSuccess: () => {
     newTeamName.value = ''
-    selectedTrackName.value = ''
     queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(competitionId.value) })
     queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
     toast.success(t('teams.createSuccess'))
@@ -100,9 +81,12 @@ const joinByTokenMutation = useMutation({
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const s = status.toLowerCase()
-  if (s === 'running' || s === 'approved') return 'default'
-  if (s === 'rejected') return 'destructive'
-  if (s === 'finished') return 'outline'
+  if (s === 'running' || s === 'approved')
+    return 'default'
+  if (s === 'rejected')
+    return 'destructive'
+  if (s === 'finished')
+    return 'outline'
   return 'secondary'
 }
 
@@ -150,7 +134,7 @@ async function copyToken(token: string) {
               <template #actions>
                 <div class="flex flex-wrap gap-2">
                   <Badge :variant="statusVariant(competition.status)">{{ competition.status }}</Badge>
-                  <Badge variant="secondary">{{ competition.gameModeType }}</Badge>
+                  <Badge variant="secondary">{{ competition.mode.toUpperCase() }}</Badge>
                   <Badge variant="outline">{{ t('teams.maxMembers', { count: competition.maxTeamMembers }) }}</Badge>
                 </div>
               </template>
@@ -194,7 +178,6 @@ async function copyToken(token: string) {
                           <Badge :variant="statusVariant(currentTeam.registrationStatus)">
                             {{ currentTeam.registrationStatus }}
                           </Badge>
-                          <Badge v-if="currentTeam.trackName" variant="outline">{{ currentTeam.trackName }}</Badge>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                           <span>{{ currentTeam.memberCount }} / {{ competition.maxTeamMembers }} {{ t('common.members') }}</span>
@@ -235,21 +218,9 @@ async function copyToken(token: string) {
                       {{ t('teams.createForCompetition') }}
                     </div>
                     <Input v-model="newTeamName" :placeholder="t('teams.teamNamePlaceholder')" />
-                    <Select
-                      v-if="competition.tracksEnabled"
-                      v-model="selectedTrackName"
-                    >
-                      <SelectTrigger>
-                        <SelectValue :placeholder="t('teams.selectTrack')" />
-                      </SelectTrigger>
-                      <SelectContent :body-lock="false" :disable-outside-pointer-events="false">
-                        <SelectItem value="">{{ t('teams.selectTrack') }}</SelectItem>
-                        <SelectItem v-for="track in competition.trackNames" :key="track" :value="track">{{ track }}</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <Button
                       class="w-full"
-                      :disabled="!newTeamName.trim() || (competition.tracksEnabled && !selectedTrackName) || createTeamMutation.isPending.value"
+                      :disabled="!newTeamName.trim() || createTeamMutation.isPending.value"
                       @click="createTeamMutation.mutate()"
                     >
                       <Loader2 v-if="createTeamMutation.isPending.value" class="mr-2 size-4 animate-spin" />
@@ -288,9 +259,6 @@ async function copyToken(token: string) {
                 </Panel>
                 <Panel class="p-4">
                   {{ competition.teamRegistrationAutoApprove ? t('teams.ruleAutoApprove') : t('teams.ruleManualReview') }}
-                </Panel>
-                <Panel class="p-4">
-                  {{ competition.tracksEnabled ? t('teams.ruleTrackRequired') : t('teams.ruleNoTrack') }}
                 </Panel>
               </div>
             </div>

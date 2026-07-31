@@ -72,11 +72,6 @@ const router = createRouter({
           name: 'koh-dashboard',
           component: () => import('@/views/KohDashboardView.vue'),
         },
-        {
-          path: 'penetration',
-          name: 'penetration-dashboard',
-          component: () => import('@/views/PenetrationView.vue'),
-        },
       ],
     },
     {

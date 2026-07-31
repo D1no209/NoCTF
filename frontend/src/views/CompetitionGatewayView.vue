@@ -1,22 +1,16 @@
 <script setup lang="ts">
+import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useQuery } from '@tanstack/vue-query'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import DataState from '@/components/state/DataState.vue'
-import CompetitionDetailView from './CompetitionDetailView.vue'
 import AwdDashboardView from './AwdDashboardView.vue'
+import CompetitionDetailView from './CompetitionDetailView.vue'
 import KohDashboardView from './KohDashboardView.vue'
-import PenetrationView from './PenetrationView.vue'
 
 const route = useRoute()
 const id = computed(() => route.params.id as string)
-
-interface CompetitionDetail {
-  id: string
-  gameModeType: string
-}
 
 const {
   data: competition,
@@ -26,11 +20,11 @@ const {
   refetch,
 } = useQuery({
   queryKey: computed(() => queryKeys.competition(id.value)),
-  queryFn: () => competitionApi.get<CompetitionDetail>(id.value),
+  queryFn: () => competitionApi.get(id.value),
   enabled: computed(() => !!id.value),
 })
 
-const mode = computed(() => competition.value?.gameModeType?.toLowerCase())
+const mode = computed(() => competition.value?.mode)
 </script>
 
 <template>
@@ -49,13 +43,12 @@ const mode = computed(() => competition.value?.gameModeType?.toLowerCase())
       @retry="refetch"
     />
     <DataState
-      v-else-if="mode !== 'ctf' && mode !== 'awdp' && mode !== 'awd' && mode !== 'koh' && mode !== 'penetration'"
+      v-else-if="mode !== 'ctf' && mode !== 'awdp' && mode !== 'awd' && mode !== 'koh'"
       class="w-full"
       unsupported
     />
     <CompetitionDetailView v-else-if="mode === 'ctf' || mode === 'awdp'" class="w-full" />
     <AwdDashboardView v-else-if="mode === 'awd'" class="w-full" />
-    <KohDashboardView v-else-if="mode === 'koh'" class="w-full" />
-    <PenetrationView v-else class="w-full" />
+    <KohDashboardView v-else class="w-full" />
   </div>
 </template>

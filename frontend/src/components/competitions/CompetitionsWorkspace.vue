@@ -1,23 +1,13 @@
 <script setup lang="ts">
+import type { PublicCompetition } from '@/api/competitionPresentation'
 import { onMounted, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { competitionApi } from '@/api/noctf'
+import CompetitionsExplorer from '@/components/competitions/CompetitionsExplorer.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import CompetitionsExplorer from '@/components/competitions/CompetitionsExplorer.vue'
 
 const { t } = useI18n()
-
-interface Competition {
-  id: string
-  title: string
-  description?: string | null
-  status: string
-  gameModeType?: string | null
-  startTime: string
-  endTime: string
-  registeredTeamCount?: number | null
-}
 
 type LoadState = 'loading' | 'error' | 'empty' | 'filtered-empty' | 'ready'
 
@@ -25,8 +15,8 @@ const state = reactive({
   search: '',
   statusFilter: 'all',
   modeFilter: 'all',
-  competitions: [] as Competition[],
-  visibleCompetitions: [] as Competition[],
+  competitions: [] as PublicCompetition[],
+  visibleCompetitions: [] as PublicCompetition[],
   loadState: 'loading' as LoadState,
 })
 
@@ -40,8 +30,7 @@ async function loadCompetitions() {
   state.loadState = 'loading'
 
   try {
-    const response = await competitionApi.list<Competition[]>()
-    state.competitions = Array.isArray(response) ? response : []
+    state.competitions = await competitionApi.list()
     updateListState()
   }
   catch {
@@ -55,8 +44,8 @@ function updateListState() {
   const q = state.search.trim().toLowerCase()
   state.visibleCompetitions = state.competitions.filter((competition) => {
     const matchesSearch = !q || competition.title.toLowerCase().includes(q) || (competition.description ?? '').toLowerCase().includes(q)
-    const matchesStatus = state.statusFilter === 'all' || competition.status.toLowerCase() === state.statusFilter
-    const matchesMode = state.modeFilter === 'all' || (competition.gameModeType ?? '').toLowerCase() === state.modeFilter
+    const matchesStatus = state.statusFilter === 'all' || competition.status === state.statusFilter
+    const matchesMode = state.modeFilter === 'all' || competition.mode === state.modeFilter
     return matchesSearch && matchesStatus && matchesMode
   })
 

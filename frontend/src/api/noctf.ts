@@ -23,6 +23,7 @@ import type {
 } from './generated/types.gen'
 import { translate as tt } from '@/i18n'
 import { configureAuthSessionRefresh, readAuthSession } from './auth-session'
+import { toPublicCompetition } from './competitionPresentation'
 import { client } from './generated/client.gen'
 import * as generatedSdk from './generated/sdk.gen'
 
@@ -312,14 +313,23 @@ export const authApi = {
 }
 
 export const competitionApi = {
-  async list<T = unknown[]>() {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/competitions' }), tt('errors.loadCompetitions'))
+  async list() {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsCompetitionsListCompetitionsEndpoint(),
+      tt('errors.loadCompetitions'),
+    )
+    if (!response.items)
+      throw new ApiError(tt('errors.loadCompetitions'))
+    return response.items.map(toPublicCompetition)
   },
-  async get<T = unknown>(id: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}',
-      path: { id },
-    }), tt('errors.loadCompetition'))
+  async get(competitionId: string) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsCompetitionsGetCompetitionEndpoint({
+        path: { competitionId },
+      }),
+      tt('errors.loadCompetition'),
+    )
+    return toPublicCompetition(response)
   },
   async create(body: Record<string, unknown>) {
     return unwrap(await sdk.noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint({ body }), tt('errors.createCompetition'))
@@ -488,54 +498,13 @@ export const competitionApi = {
   },
 }
 
-export const penetrationApi = {
-  async detail(competitionId: string, challengeId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsGetPenetrationChallengeEndpoint({
-      path: { id: competitionId, challengeId },
-    }), tt('errors.loadChallenges'))
-  },
-  async instance(competitionId: string, challengeId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsGetPenetrationInstanceEndpoint({
-      path: { id: competitionId, challengeId },
-    }), tt('errors.loadInstance'))
-  },
-  async start(competitionId: string, challengeId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsStartPenetrationInstanceEndpoint({
-      path: { id: competitionId, challengeId },
-    }), tt('errors.createInstance'))
-  },
-  async stop(competitionId: string, challengeId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsStopPenetrationInstanceEndpoint({
-      path: { id: competitionId, challengeId },
-    }), tt('errors.destroyInstance'))
-  },
-  async reset(competitionId: string, challengeId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsResetPenetrationInstanceEndpoint({
-      path: { id: competitionId, challengeId },
-    }), tt('errors.requestFailed'))
-  },
-  async destroy(competitionId: string, challengeId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsDestroyPenetrationInstanceEndpoint({
-      path: { id: competitionId, challengeId },
-    }), tt('errors.destroyInstance'))
-  },
-  async submitFlag(competitionId: string, challengeId: string, flag: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsSubmitPenetrationFlagEndpoint({
-      path: { id: competitionId, challengeId },
-      // The generated schema combines an empty base request with the body,
-      // producing an impossible intersection. Keep the workaround localized.
-      body: { flag } as unknown as Record<string, unknown>,
-    }), tt('errors.submitFlag'))
-  },
-}
-
 export const teamApi = {
   async mine<T = unknown[]>() {
     return unwrap(await client.get<{ 200: T }, unknown, false>({
       url: '/api/teams/mine',
     }), tt('errors.loadMyTeams'))
   },
-  async create<T = unknown>(body: { competitionId: string; name: string; avatarUrl?: string; trackName?: string }) {
+  async create<T = unknown>(body: { competitionId: string, name: string, avatarUrl?: string }) {
     return unwrap(await client.post<{ 201: T }, unknown, false>({
       url: '/api/teams',
       body,

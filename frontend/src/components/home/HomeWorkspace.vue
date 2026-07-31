@@ -1,32 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useQuery } from '@tanstack/vue-query'
+import { LayoutDashboard, ListChecks, Trophy, Users } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
-import { useAuthStore } from '@/stores/auth'
-import AppLayout from '@/components/layout/AppLayout.vue'
 import HomeCompetitionList from '@/components/home/HomeCompetitionList.vue'
 import HomeStatusCard from '@/components/home/HomeStatusCard.vue'
 import HomeTeamList from '@/components/home/HomeTeamList.vue'
+import AppLayout from '@/components/layout/AppLayout.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { LayoutDashboard, ListChecks, Trophy, Users } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const auth = useAuthStore()
-
-interface Competition {
-  id: string
-  title: string
-  description?: string | null
-  status: string
-  gameModeType?: string | null
-  startTime: string
-  endTime: string
-}
 
 interface MyTeam {
   id: string
@@ -45,7 +35,7 @@ const canManage = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
 
 const { data: competitions, isLoading: loadingCompetitions } = useQuery({
   queryKey: queryKeys.competitions,
-  queryFn: () => competitionApi.list<Competition[]>(),
+  queryFn: () => competitionApi.list(),
 })
 
 const { data: teams, isLoading: loadingTeams } = useQuery({
@@ -57,16 +47,18 @@ const activeCompetitions = computed(() => {
   const priority = new Map([
     ['running', 0],
     ['published', 1],
-    ['draft', 2],
-    ['paused', 3],
-    ['finished', 4],
+    ['visible', 2],
+    ['draft', 3],
+    ['paused', 4],
+    ['finished', 5],
   ])
 
   return [...(competitions.value ?? [])]
     .sort((a, b) => {
-      const statusA = priority.get(a.status.toLowerCase()) ?? 5
-      const statusB = priority.get(b.status.toLowerCase()) ?? 5
-      if (statusA !== statusB) return statusA - statusB
+      const statusA = priority.get(a.status) ?? 6
+      const statusB = priority.get(b.status) ?? 6
+      if (statusA !== statusB)
+        return statusA - statusB
       return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     })
     .slice(0, 3)

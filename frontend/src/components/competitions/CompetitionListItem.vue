@@ -1,60 +1,47 @@
 <script setup lang="ts">
+import type { Component } from 'vue'
+import type { PublicCompetition, PublicCompetitionMode, PublicCompetitionStatus } from '@/api/competitionPresentation'
+import { ArrowRight, Calendar, Plug, Shield, Target, Trophy } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { ArrowRight, Calendar, Plug, Shield, Target, Trophy, Users } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Panel } from '@/components/ui/panel'
-import type { Component } from 'vue'
-
-interface Competition {
-  id: string
-  title: string
-  description?: string | null
-  status: string
-  gameModeType?: string | null
-  startTime: string
-  endTime: string
-  registeredTeamCount?: number | null
-}
 
 const props = defineProps<{
-  competition: Competition
+  competition: PublicCompetition
 }>()
 
 const { t } = useI18n()
 
-function modeLabel(mode?: string | null) {
-  return (mode || 'CTF').toUpperCase()
+function modeLabel(mode: PublicCompetitionMode) {
+  return mode.toUpperCase()
 }
 
 const modeMeta = computed(() => {
-  const key = (props.competition.gameModeType || 'ctf').toLowerCase()
-  const map: Record<string, { bg: string, fg: string, icon: Component }> = {
+  const map: Record<PublicCompetitionMode, { bg: string, fg: string, icon: Component }> = {
     ctf: { bg: 'bg-primary', fg: 'text-primary-foreground', icon: Trophy },
     awd: { bg: 'bg-muted', fg: 'text-foreground', icon: Shield },
     awdp: { bg: 'bg-accent', fg: 'text-accent-foreground', icon: Plug },
     koh: { bg: 'bg-secondary', fg: 'text-secondary-foreground', icon: Target },
   }
-  return map[key] || { bg: 'bg-muted', fg: 'text-foreground', icon: Trophy }
+  return map[props.competition.mode]
 })
 
-function statusLabel(status: string) {
-  const key = status.toLowerCase()
-  return t(`competitions.status.${key}`, status)
+function statusLabel(status: PublicCompetitionStatus) {
+  return t(`competitions.status.${status}`, status)
 }
 
-function statusToneClass(status: string) {
-  const key = status.toLowerCase()
-  if (key === 'running' || key === 'active')
+function statusToneClass(status: PublicCompetitionStatus) {
+  if (status === 'running')
     return 'border-border bg-primary text-primary-foreground'
-  if (key === 'published' || key === 'upcoming')
+  if (status === 'published' || status === 'visible')
     return 'border-border bg-secondary text-secondary-foreground'
-  if (key === 'paused' || key === 'pending')
+  if (status === 'paused')
     return 'border-border bg-accent text-accent-foreground'
-  if (key === 'finished' || key === 'ended')
+  if (status === 'finished')
     return 'border-border bg-muted text-muted-foreground'
   return 'border-border bg-card text-card-foreground'
 }
@@ -93,7 +80,7 @@ function formatDate(iso: string) {
           aria-hidden="true"
         />
         <component :is="modeMeta.icon" class="relative z-10 size-10" />
-        <span class="relative z-10 text-xs font-bold uppercase tracking-[0.2em] opacity-80">{{ modeLabel(competition.gameModeType) }}</span>
+        <span class="relative z-10 text-xs font-bold uppercase tracking-[0.2em] opacity-80">{{ modeLabel(competition.mode) }}</span>
       </div>
 
       <div class="flex flex-1 flex-col gap-3 p-4">
@@ -111,10 +98,6 @@ function formatDate(iso: string) {
             <div class="flex items-center gap-1.5">
               <Calendar class="size-3.5 text-muted-foreground" />
               <span>{{ formatDate(competition.startTime) }} ~ {{ formatDate(competition.endTime) }}</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-              <Users class="size-3.5 text-muted-foreground" />
-              <span>{{ competition.registeredTeamCount ?? 0 }} {{ t('competitions.registeredTeams') }}</span>
             </div>
           </div>
 

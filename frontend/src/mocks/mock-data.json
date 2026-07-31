@@ -28,40 +28,48 @@
     },
     {
       "method": "GET",
-      "path": "/api/competitions",
+      "path": "/api/v1/competitions",
       "status": 200,
-      "body": [
-        {
-          "id": "comp-2026-awdp",
-          "title": "NoCTF 2026 AWDP Invitational",
-          "description": "Development mock competition for the AWDP workspace and command screen.",
-          "status": "running",
-          "gameModeType": "AWDP",
-          "startTime": "2026-07-05T09:00:00Z",
-          "endTime": "2026-07-05T17:00:00Z",
-          "registeredTeamCount": 12
-        },
-        {
-          "id": "comp-2026-koh",
-          "title": "NoCTF 2026 King of the Hill",
-          "description": "Mock KoH competition for dashboard and registration flow checks.",
-          "status": "published",
-          "gameModeType": "KoH",
-          "startTime": "2026-07-06T09:00:00Z",
-          "endTime": "2026-07-06T15:00:00Z",
-          "registeredTeamCount": 6
-        },
-        {
-          "id": "comp-2026-ctf",
-          "title": "NoCTF 2026 Classic Qualifier",
-          "description": "Mock classic jeopardy event for list and card rendering.",
-          "status": "draft",
-          "gameModeType": "CTF",
-          "startTime": "2026-07-12T09:00:00Z",
-          "endTime": "2026-07-12T18:00:00Z",
-          "registeredTeamCount": 0
-        }
-      ]
+      "body": {
+        "items": [
+          {
+            "id": "comp-2026-awdp",
+            "title": "NoCTF 2026 AWDP Invitational",
+            "description": "Development mock competition for the AWDP workspace and command screen.",
+            "mode": 2,
+            "startTime": "2026-07-05T09:00:00Z",
+            "endTime": "2026-07-05T17:00:00Z",
+            "status": 3,
+            "teamRegistrationAutoApprove": true,
+            "maxTeamMembers": 5,
+            "ownerId": "mock-owner"
+          },
+          {
+            "id": "comp-2026-koh",
+            "title": "NoCTF 2026 King of the Hill",
+            "description": "Mock KoH competition for dashboard and registration flow checks.",
+            "mode": 3,
+            "startTime": "2026-07-06T09:00:00Z",
+            "endTime": "2026-07-06T15:00:00Z",
+            "status": 2,
+            "teamRegistrationAutoApprove": false,
+            "maxTeamMembers": 4,
+            "ownerId": "mock-owner"
+          },
+          {
+            "id": "comp-2026-ctf",
+            "title": "NoCTF 2026 Classic Qualifier",
+            "description": "Mock classic jeopardy event for list and card rendering.",
+            "mode": 0,
+            "startTime": "2026-07-12T09:00:00Z",
+            "endTime": "2026-07-12T18:00:00Z",
+            "status": 0,
+            "teamRegistrationAutoApprove": true,
+            "maxTeamMembers": 5,
+            "ownerId": "mock-owner"
+          }
+        ]
+      }
     },
     {
       "method": "GET",
@@ -228,50 +236,53 @@
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-awdp",
+      "path": "/api/v1/competitions/comp-2026-awdp",
       "status": 200,
       "body": {
         "id": "comp-2026-awdp",
         "title": "NoCTF 2026 AWDP Invitational",
         "description": "Development mock competition for the AWDP workspace and command screen.",
-        "status": "running",
-        "gameModeType": "AWDP",
+        "mode": 2,
         "startTime": "2026-07-05T09:00:00Z",
         "endTime": "2026-07-05T17:00:00Z",
-        "tracksEnabled": true,
-        "trackNames": ["Open", "Campus"]
+        "status": 3,
+        "teamRegistrationAutoApprove": true,
+        "maxTeamMembers": 5,
+        "ownerId": "mock-owner"
       }
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-koh",
+      "path": "/api/v1/competitions/comp-2026-koh",
       "status": 200,
       "body": {
         "id": "comp-2026-koh",
         "title": "NoCTF 2026 King of the Hill",
         "description": "Mock KoH competition for dashboard and registration flow checks.",
-        "status": "published",
-        "gameModeType": "KoH",
+        "mode": 3,
         "startTime": "2026-07-06T09:00:00Z",
         "endTime": "2026-07-06T15:00:00Z",
-        "tracksEnabled": false,
-        "trackNames": []
+        "status": 2,
+        "teamRegistrationAutoApprove": false,
+        "maxTeamMembers": 4,
+        "ownerId": "mock-owner"
       }
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-ctf",
+      "path": "/api/v1/competitions/comp-2026-ctf",
       "status": 200,
       "body": {
         "id": "comp-2026-ctf",
         "title": "NoCTF 2026 Classic Qualifier",
         "description": "Mock classic jeopardy event for list and card rendering.",
-        "status": "draft",
-        "gameModeType": "CTF",
+        "mode": 0,
         "startTime": "2026-07-12T09:00:00Z",
         "endTime": "2026-07-12T18:00:00Z",
-        "tracksEnabled": false,
-        "trackNames": []
+        "status": 0,
+        "teamRegistrationAutoApprove": true,
+        "maxTeamMembers": 5,
+        "ownerId": "mock-owner"
       }
     },
     {

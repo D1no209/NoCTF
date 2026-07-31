@@ -297,6 +297,7 @@
       "ended": "Ended",
       "finished": "Finished",
       "draft": "Draft",
+      "visible": "Visible",
       "published": "Published",
       "paused": "Paused"
     }
