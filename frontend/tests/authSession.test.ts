@@ -11,6 +11,7 @@ import {
   saveAuthSession,
   shouldRefreshToken,
 } from '../src/api/auth-session'
+import { PLATFORM_USER_ROLE } from '../src/api/userRole'
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>()
@@ -74,11 +75,11 @@ describe('auth session refresh', () => {
     const newToken = jwt(now + 60 * 60_000, 'new')
     let requests = 0
 
-    saveAuthSession({ accessToken: oldToken, userName: 'admin', role: 'Admin' })
+    saveAuthSession({ accessToken: oldToken, userName: 'admin', role: PLATFORM_USER_ROLE.administrator })
     configureAuthSessionRefresh(async () => {
       requests += 1
       return {
-        data: { accessToken: newToken, userName: 'admin', role: 'Admin' },
+        data: { accessToken: newToken, userName: 'admin', role: PLATFORM_USER_ROLE.administrator },
         error: undefined,
         response: Response.json({}),
       }
@@ -97,7 +98,7 @@ describe('auth session refresh', () => {
 
   test('clears a session rejected by the refresh endpoint', async () => {
     const token = jwt(Date.now() + 30_000, 'revoked')
-    saveAuthSession({ accessToken: token, userName: 'admin', role: 'Admin' })
+    saveAuthSession({ accessToken: token, userName: 'admin', role: PLATFORM_USER_ROLE.administrator })
     configureAuthSessionRefresh(async () => ({
       data: undefined,
       error: {},

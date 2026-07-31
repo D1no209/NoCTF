@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { canManagePlatformResources, isPlatformAdministrator } from '@/api/userRole'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -188,10 +189,10 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-  if (to.meta.requiresAdminOrOrganizer && !['Admin', 'Organizer'].includes(auth.userRole)) {
+  if (to.meta.requiresAdminOrOrganizer && !canManagePlatformResources(auth.userRole)) {
     return { name: 'competitions' }
   }
-  if (to.meta.requiresAdmin && auth.userRole !== 'Admin') {
+  if (to.meta.requiresAdmin && !isPlatformAdministrator(auth.userRole)) {
     return { name: 'competitions' }
   }
 })

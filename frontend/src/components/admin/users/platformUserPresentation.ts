@@ -3,6 +3,9 @@ import type {
   NoCtfDomainIdentityUserRole,
 } from '@/api/generated/types.gen'
 import type { PlatformUser } from '@/api/noctf'
+import { PLATFORM_USER_ROLE } from '@/api/userRole'
+
+export { PLATFORM_USER_ROLE } from '@/api/userRole'
 
 const BOT_USER_NAME_PATTERN = /^[\w-]{3,64}$/
 
@@ -10,12 +13,6 @@ export const PLATFORM_USER_KIND = {
   human: 0,
   bot: 1,
 } as const satisfies Record<string, NoCtfDomainIdentityUserKind>
-
-export const PLATFORM_USER_ROLE = {
-  user: 0,
-  organizer: 1,
-  administrator: 2,
-} as const satisfies Record<string, NoCtfDomainIdentityUserRole>
 
 export const BOT_TOKEN_LIFETIMES = [
   { seconds: 86_400, labelKey: 'admin.users.tokenLifetimeDay' },

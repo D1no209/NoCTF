@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRouter } from 'vue-router'
+import { canManagePlatformResources } from '@/api/userRole'
 import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
 import { Button } from '@/components/ui/button'
@@ -17,7 +18,7 @@ const scoreStore = useScoreStore()
 const router = useRouter()
 
 const displayName = computed(() => auth.user?.userName ?? '')
-const canManage = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
+const canManage = computed(() => canManagePlatformResources(auth.userRole))
 const menuOpen = ref(false)
 
 async function handleLogout() {

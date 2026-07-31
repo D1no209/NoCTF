@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
+import { isPlatformAdministrator } from '@/api/userRole'
 import { useAuthStore } from '@/stores/auth'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
@@ -40,7 +41,7 @@ const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const isAdmin = computed(() => auth.userRole === 'Admin')
+const isAdmin = computed(() => isPlatformAdministrator(auth.userRole))
 
 const navItems = computed(() => {
   const items = [

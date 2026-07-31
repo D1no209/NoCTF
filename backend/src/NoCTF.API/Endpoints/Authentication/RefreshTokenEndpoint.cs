@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.RefreshJwt;
+using NoCTF.Domain.Identity;
 using Microsoft.Extensions.Configuration;
 
 namespace NoCTF.API.Endpoints.Authentication;
@@ -8,7 +9,7 @@ namespace NoCTF.API.Endpoints.Authentication;
 public sealed record RefreshTokenResponse(
     Guid UserId,
     string UserName,
-    string Role,
+    UserRole Role,
     string AccessToken,
     DateTimeOffset ExpiresAt);
 
@@ -50,7 +51,7 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
         return TypedResults.Ok(new RefreshTokenResponse(
             result.Value.UserId,
             result.Value.UserName,
-            result.Value.Role.ToString(),
+            result.Value.Role,
             result.Value.AccessToken,
             result.Value.AccessTokenExpiresAt));
     }

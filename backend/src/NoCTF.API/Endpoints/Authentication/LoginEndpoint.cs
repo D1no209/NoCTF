@@ -2,6 +2,7 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.Login;
+using NoCTF.Domain.Identity;
 using Microsoft.AspNetCore.Http;
 
 namespace NoCTF.API.Endpoints.Authentication;
@@ -9,7 +10,7 @@ namespace NoCTF.API.Endpoints.Authentication;
 public sealed record LoginResponse(
     Guid UserId,
     string UserName,
-    string Role,
+    UserRole Role,
     string AccessToken,
     DateTimeOffset ExpiresAt);
 
@@ -57,7 +58,7 @@ public sealed class LoginEndpoint(LoginUser login)
         return TypedResults.Ok(new LoginResponse(
             result.Value!.UserId,
             result.Value.UserName,
-            result.Value.Role.ToString(),
+            result.Value.Role,
             result.Value.AccessToken,
             result.Value.AccessTokenExpiresAt));
     }

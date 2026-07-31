@@ -421,7 +421,7 @@ export type NoCtfDomainIdentityUserKind = 0 | 1;
 export type NoCtfapiEndpointsAuthenticationLoginResponse = {
     userId?: string;
     userName?: string;
-    role?: string;
+    role?: NoCtfDomainIdentityUserRole;
     accessToken?: string;
     expiresAt?: string;
 };
@@ -434,7 +434,7 @@ export type NoCtfapiEndpointsAuthenticationLoginRequest = {
 export type NoCtfapiEndpointsAuthenticationRefreshTokenResponse = {
     userId?: string;
     userName?: string;
-    role?: string;
+    role?: NoCtfDomainIdentityUserRole;
     accessToken?: string;
     expiresAt?: string;
 };
@@ -443,7 +443,7 @@ export type NoCtfapiEndpointsAuthenticationRegisterResponse = {
     userId?: string;
     userName?: string;
     email?: string;
-    role?: string;
+    role?: NoCtfDomainIdentityUserRole;
     emailVerified?: boolean;
 };
 

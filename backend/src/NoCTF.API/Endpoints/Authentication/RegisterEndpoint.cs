@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Domain.Identity;
 using MvcProblemDetails = Microsoft.AspNetCore.Mvc.ProblemDetails;
 
 namespace NoCTF.API.Endpoints.Authentication;
@@ -18,7 +19,7 @@ public sealed record RegisterResponse(
     Guid UserId,
     string UserName,
     string Email,
-    string Role,
+    UserRole Role,
     bool EmailVerified);
 
 public sealed class RegisterValidator : Validator<RegisterRequest>
@@ -71,7 +72,7 @@ public sealed class RegisterEndpoint(RegisterUser register)
                 profile.Id,
                 profile.UserName,
                 profile.Email,
-                profile.Role.ToString(),
+                profile.Role,
                 profile.EmailVerified));
     }
 }

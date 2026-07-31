@@ -6,6 +6,7 @@ import {
 } from '../src/api/auth-session'
 import { client } from '../src/api/generated/client.gen'
 import { adminApi, authApi } from '../src/api/noctf'
+import { PLATFORM_USER_ROLE } from '../src/api/userRole'
 
 const apiBaseUrl = 'https://api.noctf.test'
 const originalClientConfig = client.getConfig()
@@ -24,7 +25,7 @@ const contractFetch: typeof fetch = async (input, init) => {
       body: {
         userId: 'user-1',
         userName: 'operator',
-        role: 'Administrator',
+        role: PLATFORM_USER_ROLE.administrator,
         accessToken: 'login-token',
         expiresAt: '2026-08-01T00:00:00Z',
       },
@@ -34,7 +35,7 @@ const contractFetch: typeof fetch = async (input, init) => {
       body: {
         userId: 'user-1',
         userName: 'operator',
-        role: 'Administrator',
+        role: PLATFORM_USER_ROLE.administrator,
         accessToken: 'refresh-token',
         expiresAt: '2026-08-01T01:00:00Z',
       },
@@ -45,7 +46,7 @@ const contractFetch: typeof fetch = async (input, init) => {
         userId: 'user-2',
         userName: 'new-user',
         email: 'new@example.test',
-        role: 'User',
+        role: PLATFORM_USER_ROLE.user,
         emailVerified: false,
       },
       status: 201,
@@ -124,7 +125,7 @@ describe('generated authentication and health contracts', () => {
     saveAuthSession({
       accessToken: 'expiring-token',
       userName: 'operator',
-      role: 'Administrator',
+      role: PLATFORM_USER_ROLE.administrator,
     })
 
     const response = await refreshAuthSessionIfNeeded(true)

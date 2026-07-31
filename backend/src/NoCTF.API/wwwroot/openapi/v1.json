@@ -9435,7 +9435,7 @@
             "type": "string"
           },
           "role": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
           },
           "accessToken": {
             "type": "string"
@@ -9480,7 +9480,7 @@
             "type": "string"
           },
           "role": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
           },
           "accessToken": {
             "type": "string"
@@ -9506,7 +9506,7 @@
             "type": "string"
           },
           "role": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
           },
           "emailVerified": {
             "type": "boolean"

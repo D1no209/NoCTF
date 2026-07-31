@@ -10,6 +10,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { challengeApi, competitionApi, submissionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { solvedCompetitionChallengeIds } from '@/api/submissionPresentation'
+import { canManagePlatformResources } from '@/api/userRole'
 import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
 import ScoreboardView from '@/components/game/ScoreboardView.vue'
@@ -177,7 +178,7 @@ const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
 const isAwdMode = computed(() => competition.value?.mode === 'awd')
 const isAwdpMode = computed(() => competition.value?.mode === 'awdp')
 const isKohMode = computed(() => competition.value?.mode === 'koh')
-const canManageCompetition = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
+const canManageCompetition = computed(() => canManagePlatformResources(auth.userRole))
 const canUseParticipantActions = computed(() => Boolean(approvedTeam.value))
 const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value))
 const canDownloadAttachments = computed(() =>

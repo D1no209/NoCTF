@@ -1,9 +1,13 @@
-import type { NoCtfapiEndpointsAuthenticationRefreshTokenResponse } from './generated/types.gen'
+import type {
+  NoCtfapiEndpointsAuthenticationRefreshTokenResponse,
+  NoCtfDomainIdentityUserRole,
+} from './generated/types.gen'
+import { isPlatformUserRole } from './userRole'
 
 export interface AuthSession {
   accessToken: string
   userName: string
-  role: string
+  role: NoCtfDomainIdentityUserRole
 }
 
 const AUTH_REFRESH_WINDOW_MS = 2 * 60 * 1000
@@ -130,7 +134,7 @@ async function refreshAuthSession(session: AuthSession): Promise<AuthSession | n
       !data
       || typeof data.accessToken !== 'string'
       || typeof data.userName !== 'string'
-      || typeof data.role !== 'string'
+      || !isPlatformUserRole(data.role)
     ) {
       throw new TypeError('Session refresh returned an invalid response.')
     }

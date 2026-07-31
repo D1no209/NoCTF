@@ -7,7 +7,7 @@
       "body": {
         "accessToken": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJleHAiOjQxMDAwMDAwMDAsInN1YiI6Im1vY2stdXNlciIsInVzZXJOYW1lIjoibW9jay1hZG1pbiIsInJvbGUiOiJBZG1pbiJ9.mock",
         "userName": "mock-admin",
-        "role": "Admin"
+        "role": 2
       }
     },
     {
@@ -23,7 +23,7 @@
       "body": {
         "accessToken": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJleHAiOjQxMDAwMDAwMDAsInN1YiI6Im1vY2stdXNlciIsInVzZXJOYW1lIjoibW9jay1hZG1pbiIsInJvbGUiOiJBZG1pbiJ9.mock",
         "userName": "mock-admin",
-        "role": "Admin"
+        "role": 2
       }
     },
     {
