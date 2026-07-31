@@ -95,7 +95,10 @@ HintUnlock 以当前 Hint.Cost 扣分。解锁前在 Team/Competition 锁内用�
 
 ## 按需 Redis 快照
 
-每个影响排名的事务只 `LeaderboardRevision++` 并发布 invalidation。
+每个影响排名的事务只在数据库内原子执行 `LeaderboardRevision++` 并发布 invalidation。
+不同 Submission、Runtime、Team、KoH observation 与生命周期事务可以同时影响同一
+Competition；禁止用 tracked entity 的客户端 `R -> R+1` 写回，否则旧 Redis 快照可能与
+数据库 target revision 相等而被误报为 fresh。
 
 - Redis 维护活跃 leaderboard subscriber TTL。
 - 有订阅者时 Worker 合并 invalidation，投影到最新 revision。

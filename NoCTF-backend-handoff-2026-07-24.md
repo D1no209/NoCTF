@@ -1653,7 +1653,7 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
   完成。Docker `DenyAll/InternetOnly` 的实现仍等待用户在 host firewall executor/sidecar
   与 transparent egress gateway 间选择，不自行发明 dataplane。
 
-### 6.29 Backend AWD checker callback 持久化栅栏（2026-07-31，当前最新 Backend）
+### 6.29 Backend AWD checker callback 持久化栅栏（2026-07-31）
 
 本节完成 6.28 指定的下一项安全纵切。原 token issuer 与 API auth policy 已写入并要求
 `checker_sequence` / `processing_version`，但 Endpoint 丢弃这两个 claim，Application 结果
@@ -1720,6 +1720,79 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
   executor/sidecar 与 transparent egress gateway 间取得用户决定；TargetPort ACL 与
   callback-only gateway 仍按独立决策处理。
 
+### 6.30 Backend LeaderboardRevision 全写路径原子化（2026-07-31，当前最新 Backend）
+
+6.29 修复 AWD callback 后，对所有运行时 `LeaderboardRevision` 写点继续做了窄范围审计。
+仓库共有 24 个实际写点：18 个已调用数据库原子 helper、Competition configuration 有 1 个
+等价的数据库表达式，另有 5 个 tracked entity 的客户端 `R -> R+1`。后五条在同一
+Competition 的不同 Submission、AWDP Runtime、Team hint unlock、KoH observation 或
+lifecycle 与计分事务并发时，都可把两次已提交事实压成一个 revision。现在不保留该行为。
+
+#### 五条写路径与统一数据库原子递增
+
+- `SubmissionProcessor.CompleteAsync`、`InternalResultStore.RecordAwdpAsync`、
+  `ChallengeHintStore.UnlockAsync`、`KohObservationHandler.Handle` 与
+  `CompetitionLifecycleStore.TryTransitionWithAuditAsync` 均移除 tracked Competition 的
+  常量 revision 写回，改为在原业务事务、原有效分支内调用
+  `LeaderboardRevision.IncrementAsync`。
+- Submission processing version、AWDP Runtime `FOR UPDATE`、Hint 的
+  `(Competition, Team)` advisory lock 只能串行同一局部资源；不同资源仍可同时改变同一
+  Competition。修复不扩大这些锁，也不把计分热路径塞进全 Competition advisory lock，
+  而是让 PostgreSQL 的 `SET revision = revision + 1` 行更新按最新已提交值求值。
+- Lifecycle 的 `CompetitionWriteLock` 是合作式 advisory lock，不是 Competition 行锁；
+  其他计分写入并不统一获取它。Wolverine ambient transaction 下 lifecycle 也不会自建
+  Serializable transaction，因此原 tracked 写回同样存在真实 ReadCommitted 丢更新。
+  Lifecycle 现与其他四条路径使用同一原子 helper。
+- Worker 需要调用该 Infrastructure-owned helper，因此 helper 类型由 assembly-internal
+  调整为 public；方法职责仍只是在指定 Competition 存在时做一次数据库表达式递增，
+  影响行数不是 1 时 fail closed。
+- ScoringEvent、Submission/Runtime 状态、lifecycle audit、revision 与 transactional
+  Outbox 仍处于原事务中；无效、superseded、重复、余额不足或无状态变化分支不会推进
+  revision。没有新增锁、表、migration、消息字段或 API contract。
+
+#### 确定性并发回归与投影语义
+
+- 新增共享 `CompetitionLeaderboardUpdateBarrier`，只在测试启用后拦截真正包含
+  `UPDATE competitions ... leaderboard_revision` 的 SQL statement，并在执行数据库写入前
+  同步两个事务；它不会把 SELECT 中的 `updated_at` 误判为 UPDATE。
+- 四个真实 PostgreSQL/Testcontainers 并发用例覆盖五条旧写路径：
+  - 两个普通 Submission 同时完成；
+  - 两个独立 AWDP Fix Submission/Runtime 同时回调；
+  - 两个不同 Team 同时解锁 Hint；
+  - 合法 KoH observation 与同一 Competition 的 `Running -> Paused` lifecycle 同时提交。
+- 四个用例都先在旧实现上稳定得到“两条事实/转换均成功，但最终 revision 只有
+  `R+1`”；原子化后均为 `R+2`，并断言对应业务事实、状态/audit 与两条
+  `ProjectLeaderboard`。
+- `ProjectLeaderboard` 只携带 CompetitionId 并全量重算，不会把重复消息计成重复分数。
+  丢 revision 的可观测问题在于较旧投影可能最后覆盖 Redis，却与数据库 target 使用同一
+  revision 而被误报 fresh。原子化后旧投影最多标为 `R+1`，数据库 target 为 `R+2`，
+  `snapshotRevision < targetRevision` 会正确返回 stale。投影端若要完全禁止旧快照后写，
+  仍属于独立 CAS/single-flight 范围，不阻塞本节。
+
+#### 验证、OpenAPI、Frontend 与下一步
+
+- WSL 原生干净副本、.NET SDK 10.0.301、真实 Docker/Testcontainers：
+  - 四个新增并发用例：4/4 passed；
+  - non-Integration：447/447 passed；
+  - Integration：74 total，72 passed、0 failed、2 skipped；两个 skip 仍是未启用的真实
+    Kubernetes dataplane 与未配置 fixture 的真实 Libvirt opt-in；
+  - Release `NoCTF.slnx` build：0 warning、0 error；
+  - 全 solution analyzer、本轮 C# scoped whitespace、EF pending model 与
+    `git diff --check` passed。
+- OpenAPI 仍为 134 endpoints；两份 artifact 两次导出 byte-stable，SHA-256 均为
+  `3429B4071BA6BF302C422EEAC36B5F4331D0234E33CB2494F32B67EDFEA1763C`。
+  本节没有 route、request/response、generated contract 或 URL 变化，因此无需重建
+  Frontend SDK，也没有页面适配。
+- GitHub compare 再次确认远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`，与本地 `origin/main` identical，且该
+  commit 已是当前 HEAD 的祖先；没有远端冲突，也不制造空 merge commit。
+- 本节作为独立 Backend 本地提交，提交说明为
+  `fix(scoring): atomically advance leaderboard revisions`；不 push、不创建 PR。保护文件
+  继续沿用 6.18。
+- 当前又回到产品/运维决策边界：Docker `InternetOnly` 必须先用 `$grill-me` 在 host
+  firewall executor/sidecar 与 transparent egress gateway 间取得用户决定；正式
+  Kubernetes/Libvirt 验收仍需对应环境，不自行声称完成。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1729,6 +1802,7 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
 - Docker 直接随机宿主端口、E2E socket GID/清理修正和 shell fixture LF 约束；
 - Kubernetes Container 动态 NodePort、强 identity replay 与 UID-precondition 清理；
 - AWD checker callback sequence/version 的 PostgreSQL 行锁 fence 与旧 token 无副作用拒绝；
+- 全部 LeaderboardRevision 运行时写路径的 PostgreSQL 原子递增与确定性并发回归；
 - 四模式全边界、真实 PostgreSQL、EF、OpenAPI 和 solution 门禁。
 
 仍未完成/不属于本轮已部署：
@@ -1743,8 +1817,9 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
 - 未推送远端、未创建 PR、未生产部署。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境；
   Kubernetes Container 动态 NodePort 与重放安全已按 6.28 完成，AWD checker callback
-  持久化 fence 已按 6.29 完成；Docker `InternetOnly`、TargetPort ACL 和 callback-only
-  gateway 仍是已记录的后续加固，不阻塞本轮架构迁移。
+  持久化 fence 已按 6.29 完成，LeaderboardRevision 全写路径原子化已按 6.30 完成；
+  Docker `InternetOnly`、TargetPort ACL 和 callback-only gateway 仍是已记录的后续加固，
+  不阻塞本轮架构迁移。
 
 ## 7. 建议的下一交接顺序
 
@@ -1785,8 +1860,9 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
    generated-SDK 适配已按 6.24/6.25 完成；Challenge template Mode 活动引用 invariant
    Backend 与最小 Frontend decoder 已按 6.26/6.27 完成；Kubernetes Container 动态
    NodePort 与重放安全按 6.28 完成；AWD checker callback sequence/version 持久化 fence
-   按 6.29 完成。引用权限 Backend 测试数量时使用 6.22，引用最新 Backend 状态时使用
-   6.29，引用最新 Frontend 状态时使用 6.27。
+   按 6.29 完成；LeaderboardRevision 全写路径原子化按 6.30 完成。引用权限 Backend
+   测试数量时使用 6.22，引用最新 Backend 状态时使用 6.30，引用最新 Frontend 状态时
+   使用 6.27。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

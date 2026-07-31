@@ -190,8 +190,10 @@ public sealed class InternalResultStore(
             submission.CurrentScoringEventId = scoringEvent.Id;
             submission.EvaluationState = SubmissionEvaluationState.Completed;
             submission.EvaluationFailureCode = null;
-            context.Competition.LeaderboardRevision =
-                checked(context.Competition.LeaderboardRevision + 1);
+            await LeaderboardRevision.IncrementAsync(
+                db,
+                submission.CompetitionId,
+                ct);
             await outbox.PublishAsync(new ProjectLeaderboard(submission.CompetitionId));
         }
         submission.EvaluationResultBodySha256 = result.BodySha256;

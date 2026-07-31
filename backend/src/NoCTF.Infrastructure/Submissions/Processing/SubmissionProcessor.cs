@@ -312,9 +312,10 @@ public sealed class SubmissionProcessor(
         submission.EvaluationState = SubmissionEvaluationState.Completed;
         submission.EvaluationFailureCode = null;
         submission.EvaluationUpdatedAt = now;
-        var competition = await db.Competitions.SingleAsync(
-            item => item.Id == submission.CompetitionId, cancellationToken);
-        competition.LeaderboardRevision = checked(competition.LeaderboardRevision + 1);
+        await LeaderboardRevision.IncrementAsync(
+            db,
+            submission.CompetitionId,
+            cancellationToken);
         await outbox.PublishAsync(new ProjectLeaderboard(submission.CompetitionId));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

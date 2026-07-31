@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
@@ -14,9 +15,11 @@ using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Registration;
-using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Koh;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Messages;
+using NoCTF.Tests.Fixtures;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
@@ -361,6 +364,110 @@ public sealed class KohPollingPersistenceTests
                         cancellationToken);
                 await Assert.That(staleEpoch).IsNull();
             }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Observation_and_pause_atomically_advance_the_shared_leaderboard_revision(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_koh_revision")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var barrier = new CompetitionLeaderboardUpdateBarrier();
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(barrier)
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var observationOutbox = new RecordingOutbox();
+            var lifecycleOutbox = new RecordingOutbox();
+            var clock = new MutableTimeProvider(fixture.DueAt.AddSeconds(1));
+            var observation = new RecordKohObservation(
+                fixture.CompetitionId,
+                fixture.CompetitionChallengeId,
+                fixture.TeamId,
+                ScoringResult.Correct,
+                null,
+                0,
+                0,
+                fixture.DueAt,
+                fixture.DueAt,
+                clock.GetUtcNow());
+
+            async Task RecordObservationAsync()
+            {
+                await using var observationDb = new NoCtfDbContext(options);
+                await new KohObservationHandler(
+                    observationDb,
+                    observationOutbox,
+                    new KohProducerConfigurationCatalog(),
+                    clock).Handle(observation, cancellationToken);
+            }
+
+            async Task<bool> PauseCompetitionAsync()
+            {
+                await using var lifecycleDb = new NoCtfDbContext(options);
+                await using var transaction = await lifecycleDb.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.ReadCommitted,
+                    cancellationToken);
+                var applied = await new CompetitionLifecycleStore(
+                    lifecycleDb,
+                    null!,
+                    lifecycleOutbox).TryTransitionWithAuditAsync(
+                        fixture.CompetitionId,
+                        CompetitionStatus.Running,
+                        CompetitionStatus.Paused,
+                        fixture.OwnerId,
+                        "pause",
+                        false,
+                        CompetitionLifecycleEffects.ProjectLeaderboard,
+                        cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return applied;
+            }
+
+            barrier.Enable();
+            var observationTask = RecordObservationAsync();
+            var lifecycleTask = PauseCompetitionAsync();
+            await Task.WhenAll(observationTask, lifecycleTask);
+
+            await Assert.That(await lifecycleTask).IsTrue();
+            await Assert.That(barrier.Arrivals).IsEqualTo(2);
+            await using (var verify = new NoCtfDbContext(options))
+            {
+                var competition = await verify.Competitions.AsNoTracking()
+                    .SingleAsync(
+                        item => item.Id == fixture.CompetitionId,
+                        cancellationToken);
+                await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Paused);
+                await Assert.That(competition.LeaderboardRevision).IsEqualTo(2);
+                var fact = await verify.ScoringEvents.AsNoTracking()
+                    .SingleAsync(cancellationToken);
+                await Assert.That(fact.Kind).IsEqualTo(ScoringEventKind.KohObservation);
+                var transition = await verify.Set<CompetitionLifecycleAudit>()
+                    .AsNoTracking()
+                    .SingleAsync(
+                        audit => audit.CompetitionId == fixture.CompetitionId,
+                        cancellationToken);
+                await Assert.That(transition.From).IsEqualTo(CompetitionStatus.Running);
+                await Assert.That(transition.To).IsEqualTo(CompetitionStatus.Paused);
+            }
+
+            var projections = observationOutbox.Published
+                .Concat(lifecycleOutbox.Published)
+                .OfType<ProjectLeaderboard>()
+                .ToArray();
+            await Assert.That(projections).Count().IsEqualTo(2);
+            await Assert.That(projections.All(
+                projection => projection.CompetitionId == fixture.CompetitionId)).IsTrue();
         });
     }
 

@@ -160,7 +160,10 @@ public sealed class CompetitionLifecycleStore(
         };
         competition.LifecycleAudits.Add(lifecycleAudit);
         db.Entry(lifecycleAudit).State = EntityState.Added;
-        competition.LeaderboardRevision = checked(competition.LeaderboardRevision + 1);
+        await LeaderboardRevision.IncrementAsync(
+            db,
+            competitionId,
+            cancellationToken);
         if (effects.HasFlag(CompetitionLifecycleEffects.ProjectLeaderboard))
             await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.ProvisionRuntimes))
