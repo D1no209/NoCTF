@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PublicChallenge } from '@/api/challengePresentation'
 import type { NoCtfApplicationScoringLeaderboardLeaderboardResponse } from '@/api/generated/types.gen'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
@@ -6,7 +7,7 @@ import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, Puzzl
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
-import { competitionApi } from '@/api/noctf'
+import { challengeApi, competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
@@ -30,22 +31,6 @@ const queryClient = useQueryClient()
 const auth = useAuthStore()
 const scoreStore = useScoreStore()
 const competitionId = computed(() => route.params.id as string)
-
-interface Challenge {
-  id: string
-  title: string
-  typeId: string
-  direction: string
-  points: number
-  solveCount: number
-  deploymentType?: string | number | null
-  description?: string | null
-  descriptionFormat?: string | null
-  hints?: string[]
-  attachmentUrl?: string | null
-  patchTemplateUrl?: string | null
-  firstBloods?: { rank: number, teamName: string, solvedAt?: string }[]
-}
 
 interface SubmissionItem {
   challengeId: string
@@ -136,7 +121,7 @@ const { data: competition, isLoading: loadingComp } = useQuery({
 
 const { data: challenges, isLoading: loadingChallenges } = useQuery({
   queryKey: computed(() => queryKeys.challenges(competitionId.value)),
-  queryFn: () => competitionApi.challenges<Challenge[]>(competitionId.value),
+  queryFn: () => challengeApi.list(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
@@ -154,13 +139,13 @@ const { data: myTeams, isLoading: loadingMyTeams } = useQuery({
 
 const solvedIds = computed(() => new Set((submissionsResponse.value?.solvedChallenges ?? []).map(s => s.challengeId)))
 
-const effectiveChallenges = computed<Challenge[]>(() => {
+const effectiveChallenges = computed<PublicChallenge[]>(() => {
   return challenges.value ?? []
 })
 
 // UI State
 const modalOpen = ref(false)
-const selectedChallenge = ref<Challenge | null>(null)
+const selectedChallenge = ref<PublicChallenge | null>(null)
 const ui = reactive({
   activeTab: 'challenges' as 'challenges' | 'scoreboard',
 })
@@ -169,7 +154,7 @@ const hideSolved = ref(false)
 const instanceChallengeIds = ref(new Set<string>())
 const defenseChallengeIds = ref(new Set<string>())
 
-function openChallenge(challenge: Challenge) {
+function openChallenge(challenge: PublicChallenge) {
   selectedChallenge.value = challenge
   modalOpen.value = true
 }
@@ -211,6 +196,30 @@ const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.regi
 const currentTeam = computed(() => approvedTeam.value ?? myTeams.value?.[0] ?? null)
 const canUseParticipantActions = computed(() => Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
 const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
+const canDownloadAttachments = computed(() =>
+  canUseParticipantActions.value && competition.value?.status === 'running',
+)
+
+const { data: selectedChallengeDetail } = useQuery({
+  queryKey: computed(() => queryKeys.challenge(
+    competitionId.value,
+    selectedChallenge.value?.id ?? '',
+  )),
+  queryFn: () => challengeApi.get(
+    competitionId.value,
+    selectedChallenge.value!.id,
+  ),
+  enabled: computed(() =>
+    modalOpen.value
+    && Boolean(competitionId.value)
+    && Boolean(selectedChallenge.value?.id),
+  ),
+})
+const activeChallengeDetail = computed(() =>
+  selectedChallengeDetail.value?.id === selectedChallenge.value?.id
+    ? selectedChallengeDetail.value
+    : null,
+)
 
 const { data: headerLeaderboard } = useQuery<
   NoCtfApplicationScoringLeaderboardLeaderboardResponse | null
@@ -294,7 +303,7 @@ async function recalcConnectionLines() {
   if (!container)
     return
   const containerRect = container.getBoundingClientRect()
-  const groups = new Map<string, Challenge[]>()
+  const groups = new Map<string, PublicChallenge[]>()
   for (const challenge of filteredChallenges.value) {
     const dir = normalizeDirection(challenge.direction)
     if (!groups.has(dir))
@@ -430,20 +439,6 @@ function rotationClass(id: string) {
     hash = id.charCodeAt(i) + ((hash << 5) - hash)
   const rotations = ['-rotate-2', '-rotate-1', 'rotate-0', 'rotate-1', 'rotate-2']
   return rotations[Math.abs(hash) % rotations.length]
-}
-
-function firstBloodsFor(challenge: Challenge) {
-  if (challenge.firstBloods?.length)
-    return challenge.firstBloods.slice(0, 3)
-  return []
-}
-
-function bloodStampClass(rank: number) {
-  if (rank === 1)
-    return '-rotate-6'
-  if (rank === 2)
-    return 'rotate-3 bg-destructive/80'
-  return '-rotate-12 bg-destructive/60'
 }
 </script>
 
@@ -713,13 +708,10 @@ function bloodStampClass(rank: number) {
 
                     <div class="flex flex-1 flex-col items-center justify-center py-2">
                       <span class="text-3xl font-black tabular-nums text-foreground">
-                        {{ challenge.points }}
+                        {{ challenge.baseScore }}
                       </span>
                     </div>
 
-                    <div class="flex items-center justify-between text-xs text-muted-foreground">
-                      <span class="tabular-nums font-medium text-foreground">{{ challenge.solveCount }} solves</span>
-                    </div>
                     <span
                       class="pointer-events-none absolute bottom-1 right-2 select-none text-2xl font-black uppercase tracking-[0.15em] text-foreground/30 rotate-[-12deg]"
                     >
@@ -733,17 +725,6 @@ function bloodStampClass(rank: number) {
                   <p class="line-clamp-2 text-xs text-muted-foreground">
                     {{ challenge.description || t('challenges.noDescription') }}
                   </p>
-                  <div v-if="firstBloodsFor(challenge).length" class="mt-2 flex flex-wrap gap-1">
-                    <Badge
-                      v-for="blood in firstBloodsFor(challenge)"
-                      :key="blood.rank"
-                      variant="destructive"
-                      class="text-[10px] shadow-sm"
-                      :class="bloodStampClass(blood.rank)"
-                    >
-                      {{ blood.rank }}. {{ blood.teamName }}
-                    </Badge>
-                  </div>
                 </div>
 
                 <!-- Solved stamp overlay (PNG sticker above the card) -->
@@ -785,7 +766,7 @@ function bloodStampClass(rank: number) {
     <ChallengeModal
       v-if="selectedChallenge"
       v-model:open="modalOpen"
-      :challenge="selectedChallenge"
+      :challenge="activeChallengeDetail ?? selectedChallenge"
       :competition-id="competitionId"
       :solved="solvedIds.has(selectedChallenge.id)"
       :game-mode-type="competition?.mode ?? 'ctf'"
@@ -799,6 +780,8 @@ function bloodStampClass(rank: number) {
       :can-create-instance="canUseParticipantActions"
       :can-submit-flag="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canSubmitFlag !== false)"
       :can-request-defense="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canRequestDefense !== false)"
+      :can-download-attachments="canDownloadAttachments"
+      :has-challenge-detail="Boolean(activeChallengeDetail)"
       @create-instance="handleInstanceCreated(selectedChallenge.id)"
       @request-defense="markDefenseRequested(selectedChallenge.id)"
       @patch-uploaded="handlePatchUploaded"

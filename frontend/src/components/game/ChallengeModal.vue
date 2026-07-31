@@ -1,7 +1,19 @@
 <script setup lang="ts">
+import type {
+  PublicChallenge,
+  PublicChallengeAttachment,
+  PublicChallengeDownload,
+} from '@/api/challengePresentation'
+import { useQuery } from '@tanstack/vue-query'
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ApiError, competitionApi } from '@/api/noctf'
+import {
+  ApiError,
+  challengeApi,
+  competitionApi,
+} from '@/api/noctf'
+import { shouldOfferRandomAttachment } from '@/api/challengePresentation'
+import { queryKeys } from '@/api/queryKeys'
 import { useScoreStore } from '@/stores/score'
 import {
   Dialog,
@@ -22,21 +34,6 @@ import { challengeTypeLabel } from '@/lib/challengeLabels'
 import { normalizeDirection } from '@/lib/challengeDirections'
 import { toast } from 'vue-sonner'
 import { Activity, CheckCircle2, Copy, Crosshair, Download, FileArchive, Loader2, Shield, ShieldCheck, Server, Timer, Trash2, Upload } from 'lucide-vue-next'
-
-interface Challenge {
-  id: string
-  title: string
-  typeId: string
-  direction: string
-  points: number
-  solveCount: number
-  deploymentType?: string | number | null
-  description?: string | null
-  descriptionFormat?: string | null
-  hints?: string[]
-  attachmentUrl?: string | null
-  patchTemplateUrl?: string | null
-}
 
 interface SubmitResponse {
   correct: boolean
@@ -104,7 +101,7 @@ interface InstanceResponse {
 
 const props = defineProps<{
   open: boolean
-  challenge: Challenge | null
+  challenge: PublicChallenge | null
   competitionId: string
   solved: boolean
   gameModeType?: string
@@ -118,6 +115,8 @@ const props = defineProps<{
   canCreateInstance?: boolean
   canSubmitFlag?: boolean
   canRequestDefense?: boolean
+  canDownloadAttachments?: boolean
+  hasChallengeDetail?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -144,6 +143,7 @@ const instanceLoading = ref(false)
 const instance = ref<InstanceResponse | null>(null)
 const instanceStatus = ref<string | null>(null)
 const instanceError = ref<string | null>(null)
+const downloadingAttachmentId = ref<string | null>(null)
 const nowMs = ref(Date.now())
 let clockTimer: ReturnType<typeof setInterval> | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -159,12 +159,8 @@ const renderedDescription = computed(() => {
 })
 const challengeType = computed(() => challengeTypeLabel(props.challenge?.direction))
 
-const visibleHints = computed(() => props.challenge?.hints?.filter(Boolean) ?? [])
 const patchStatuses = computed(() => props.patchSubmissions ?? [])
 const isDynamicContainer = computed(() => {
-  const dt = props.challenge?.deploymentType
-  if (dt === 2) return true
-  if (typeof dt === 'string' && dt.toLowerCase() === 'dynamiccontainer') return true
   const dir = normalizeDirection(props.challenge?.direction)
   if (dir === 'WEB' || dir === 'PWN') return true
   return false
@@ -225,6 +221,56 @@ const awdpBlockedMessage = computed(() => {
   return ''
 })
 
+type AttachmentAvailability = {
+  policy: 'all'
+  items: PublicChallengeAttachment[]
+} | {
+  policy: 'random'
+  items: []
+}
+
+const {
+  data: attachmentAvailability,
+  isError: attachmentListFailed,
+  isLoading: loadingAttachments,
+} = useQuery<AttachmentAvailability>({
+  queryKey: computed(() => queryKeys.challengeAttachments(
+    props.competitionId,
+    props.challenge?.id ?? '',
+  )),
+  queryFn: async () => {
+    try {
+      return {
+        policy: 'all',
+        items: await challengeApi.listAttachments(
+          props.competitionId,
+          props.challenge!.id,
+        ),
+      }
+    }
+    catch (error) {
+      if (
+        error instanceof ApiError
+        && shouldOfferRandomAttachment(
+          error.status,
+          props.canDownloadAttachments === true,
+          props.hasChallengeDetail === true,
+        )
+      ) {
+        return { policy: 'random', items: [] }
+      }
+      throw error
+    }
+  },
+  enabled: computed(() =>
+    props.open
+    && props.canDownloadAttachments === true
+    && props.hasChallengeDetail === true
+    && Boolean(props.challenge?.id),
+  ),
+  retry: false,
+})
+
 function onOpenChange(v: boolean) {
   if (!v) {
     flagInput.value = ''
@@ -232,9 +278,73 @@ function onOpenChange(v: boolean) {
     submitError.value = null
     patchFile.value = null
     instanceError.value = null
+    downloadingAttachmentId.value = null
     stopInstancePolling()
   }
   emit('update:open', v)
+}
+
+function saveChallengeDownload(
+  download: PublicChallengeDownload,
+  fallbackFileName: string,
+) {
+  const objectUrl = URL.createObjectURL(download.content)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = download.fileName ?? fallbackFileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
+async function downloadAttachment(attachment: PublicChallengeAttachment) {
+  if (!props.challenge || downloadingAttachmentId.value)
+    return
+
+  downloadingAttachmentId.value = attachment.id
+  try {
+    const download = await challengeApi.downloadAttachment(
+      props.competitionId,
+      props.challenge.id,
+      attachment.id,
+    )
+    saveChallengeDownload(download, attachment.fileName)
+  }
+  catch {
+    toast.error(t('challenges.attachmentDownloadFailed'))
+  }
+  finally {
+    downloadingAttachmentId.value = null
+  }
+}
+
+async function downloadRandomAttachment() {
+  if (!props.challenge || downloadingAttachmentId.value)
+    return
+
+  downloadingAttachmentId.value = 'random'
+  try {
+    const download = await challengeApi.downloadRandomAttachment(
+      props.competitionId,
+      props.challenge.id,
+    )
+    saveChallengeDownload(download, t('challenges.attachmentFileName'))
+  }
+  catch {
+    toast.error(t('challenges.attachmentDownloadFailed'))
+  }
+  finally {
+    downloadingAttachmentId.value = null
+  }
+}
+
+function formatFileSize(byteLength: number) {
+  if (byteLength < 1024)
+    return `${byteLength} B`
+  if (byteLength < 1024 * 1024)
+    return `${(byteLength / 1024).toFixed(1)} KB`
+  return `${(byteLength / (1024 * 1024)).toFixed(1)} MB`
 }
 
 watch(
@@ -505,9 +615,7 @@ function getApiErrorDetail(error: unknown) {
           <div class="min-w-0">
             <DialogTitle class="text-xl leading-tight">{{ challenge?.title }}</DialogTitle>
             <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span class="font-medium text-foreground">{{ challenge?.points }}pt</span>
-              <span>·</span>
-              <span>{{ challenge?.solveCount }} {{ t('challenges.solves', { count: challenge?.solveCount ?? 0 }) }}</span>
+              <span class="font-medium text-foreground">{{ challenge?.baseScore }}pt</span>
             </div>
           </div>
         </div>
@@ -770,40 +878,56 @@ function getApiErrorDetail(error: unknown) {
           </Panel>
         </Card>
 
-        <Card v-if="visibleHints.length" class="p-1">
-          <Panel class="p-3">
-            <div class="mb-2 text-xs font-medium uppercase text-muted-foreground">{{ t('challenges.hints') }}</div>
-            <ol class="list-decimal space-y-1 pl-4 text-sm leading-relaxed">
-              <li v-for="(hint, index) in visibleHints" :key="`${index}-${hint}`">
-                {{ hint }}
-              </li>
-            </ol>
+        <Card v-if="canDownloadAttachments && hasChallengeDetail" class="p-1">
+          <Panel class="gap-3 p-3">
+            <div class="text-xs font-medium uppercase text-muted-foreground">
+              {{ t('challenges.attachments') }}
+            </div>
+            <div v-if="loadingAttachments" class="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 class="size-4 animate-spin" />
+              {{ t('common.loading') }}
+            </div>
+            <Alert v-else-if="attachmentListFailed" variant="destructive">
+              {{ t('challenges.attachmentsUnavailable') }}
+            </Alert>
+            <Button
+              v-else-if="attachmentAvailability?.policy === 'random'"
+              type="button"
+              variant="outline"
+              class="justify-start"
+              :disabled="Boolean(downloadingAttachmentId)"
+              @click="downloadRandomAttachment"
+            >
+              <Loader2 v-if="downloadingAttachmentId === 'random'" class="size-4 animate-spin" />
+              <Download v-else class="size-4" />
+              {{ t('challenges.downloadAssignedAttachment') }}
+            </Button>
+            <div
+              v-else-if="attachmentAvailability?.policy === 'all' && attachmentAvailability.items.length"
+              class="grid gap-2"
+            >
+              <Button
+                v-for="attachment in attachmentAvailability.items"
+                :key="attachment.id"
+                type="button"
+                variant="outline"
+                class="h-auto justify-between gap-3 py-2"
+                :disabled="Boolean(downloadingAttachmentId)"
+                @click="downloadAttachment(attachment)"
+              >
+                <span class="min-w-0 truncate">{{ attachment.fileName }}</span>
+                <span class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                  {{ formatFileSize(attachment.byteLength) }}
+                  <Loader2 v-if="downloadingAttachmentId === attachment.id" class="size-4 animate-spin" />
+                  <Download v-else class="size-4" />
+                </span>
+              </Button>
+            </div>
+            <p v-else class="text-sm text-muted-foreground">
+              {{ t('challenges.noAttachments') }}
+            </p>
           </Panel>
         </Card>
-
-        <div v-if="challenge?.attachmentUrl" class="text-sm">
-          <a
-            :href="challenge.attachmentUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-primary underline-offset-4 hover:underline"
-          >
-            <Download class="mr-1 inline size-4" />
-            {{ t('challenges.downloadAttachment') }}
-          </a>
-        </div>
-
-        <div v-if="isAwdpMode && challenge?.patchTemplateUrl" class="text-sm">
-          <a
-            :href="challenge.patchTemplateUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-primary underline-offset-4 hover:underline"
-          >
-            <Download class="mr-1 inline size-4" />
-            {{ t('awdp.downloadPatchTemplate') }}
-          </a>
-        </div>
 
         <Card v-if="isAwdMode" class="p-1">
           <Panel class="gap-3 p-3">

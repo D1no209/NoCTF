@@ -73,39 +73,45 @@
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-awdp/challenges",
+      "path": "/api/v1/competitions/comp-2026-awdp/challenges",
       "status": 200,
-      "body": [
-        { "id": "awdp-web-1", "title": "WEB-upload", "typeId": "web", "points": 500, "solveCount": 12, "deploymentType": "DynamicContainer", "description": "Patch the upload pipeline and keep the service online.", "descriptionFormat": "markdown", "hints": ["Look at file extension handling.", "Verify service status after patching."], "patchTemplateUrl": "/mock/patch-template.zip" },
-        { "id": "awdp-pwn-1", "title": "PWN-baby", "typeId": "pwn", "points": 460, "solveCount": 8, "deploymentType": "DynamicContainer", "description": "Harden the binary service and preserve availability.", "descriptionFormat": "markdown", "hints": ["Check bounds around packet parsing."] },
-        { "id": "awdp-rev-1", "title": "REV-portal", "typeId": "reverse", "points": 420, "solveCount": 6, "deploymentType": "DynamicContainer", "description": "Reverse the control flow, then submit a fix script.", "descriptionFormat": "markdown", "hints": ["The license branch is inverted."] },
-        { "id": "awdp-crypto-1", "title": "CRYPTO-lock", "typeId": "crypto", "points": 400, "solveCount": 4, "deploymentType": "DynamicContainer", "description": "Repair key validation without breaking the round service.", "descriptionFormat": "markdown", "hints": ["Compare expected key length and actual slice boundaries."] },
-        { "id": "awdp-misc-1", "title": "MISC-agent", "typeId": "misc", "points": 380, "solveCount": 3, "deploymentType": "DynamicContainer", "description": "Stabilize the agent workflow under repeated submissions.", "descriptionFormat": "markdown", "hints": ["Inspect temporary-file cleanup."] }
-      ]
+      "body": {
+        "items": [
+          { "id": "awdp-web-1", "competitionId": "comp-2026-awdp", "challengeId": "template-awdp-web-1", "title": "WEB-upload", "description": "Patch the upload pipeline and keep the service online.", "direction": "WEB", "baseScore": 500, "order": 1, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "awdp-pwn-1", "competitionId": "comp-2026-awdp", "challengeId": "template-awdp-pwn-1", "title": "PWN-baby", "description": "Harden the binary service and preserve availability.", "direction": "PWN", "baseScore": 460, "order": 2, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "awdp-rev-1", "competitionId": "comp-2026-awdp", "challengeId": "template-awdp-rev-1", "title": "REV-portal", "description": "Reverse the control flow, then submit a fix script.", "direction": "REVERSE", "baseScore": 420, "order": 3, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "awdp-crypto-1", "competitionId": "comp-2026-awdp", "challengeId": "template-awdp-crypto-1", "title": "CRYPTO-lock", "description": "Repair key validation without breaking the round service.", "direction": "CRYPTO", "baseScore": 400, "order": 4, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "awdp-misc-1", "competitionId": "comp-2026-awdp", "challengeId": "template-awdp-misc-1", "title": "MISC-agent", "description": "Stabilize the agent workflow under repeated submissions.", "direction": "MISC", "baseScore": 380, "order": 5, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null }
+        ]
+      }
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-koh/challenges",
+      "path": "/api/v1/competitions/comp-2026-koh/challenges",
       "status": 200,
-      "body": [
-        { "id": "koh-web-1", "title": "WEB-hill", "typeId": "web", "points": 300, "solveCount": 5, "description": "Capture the web hill and retain control.", "descriptionFormat": "markdown", "hints": ["Session fixation matters here."] },
-        { "id": "koh-pwn-1", "title": "PWN-hill", "typeId": "pwn", "points": 320, "solveCount": 4, "description": "Win the process race and own the hill.", "descriptionFormat": "markdown", "hints": ["A signal handler changes the timing window."] },
-        { "id": "koh-rev-1", "title": "REV-hill", "typeId": "reverse", "points": 280, "solveCount": 2, "description": "Reverse the challenge client and keep the token stream flowing.", "descriptionFormat": "markdown", "hints": ["The key schedule is static."] },
-        { "id": "koh-crypto-1", "title": "CRYPTO-hill", "typeId": "crypto", "points": 340, "solveCount": 3, "description": "Break the weak cipher to take hill control.", "descriptionFormat": "markdown", "hints": ["Nonce reuse is visible."], "attachmentUrl": "/mock/koh-crypto.zip" },
-        { "id": "koh-misc-1", "title": "MISC-hill", "typeId": "misc", "points": 260, "solveCount": 1, "description": "Exploit the scoreboard helper to gain control ticks.", "descriptionFormat": "markdown", "hints": ["Look for untrusted plugin input."] }
-      ]
+      "body": {
+        "items": [
+          { "id": "koh-web-1", "competitionId": "comp-2026-koh", "challengeId": "template-koh-web-1", "title": "WEB-hill", "description": "Capture the web hill and retain control.", "direction": "WEB", "baseScore": 300, "order": 1, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "koh-pwn-1", "competitionId": "comp-2026-koh", "challengeId": "template-koh-pwn-1", "title": "PWN-hill", "description": "Win the process race and own the hill.", "direction": "PWN", "baseScore": 320, "order": 2, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "koh-rev-1", "competitionId": "comp-2026-koh", "challengeId": "template-koh-rev-1", "title": "REV-hill", "description": "Reverse the challenge client and keep the token stream flowing.", "direction": "REVERSE", "baseScore": 280, "order": 3, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "koh-crypto-1", "competitionId": "comp-2026-koh", "challengeId": "template-koh-crypto-1", "title": "CRYPTO-hill", "description": "Break the weak cipher to take hill control.", "direction": "CRYPTO", "baseScore": 340, "order": 4, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "koh-misc-1", "competitionId": "comp-2026-koh", "challengeId": "template-koh-misc-1", "title": "MISC-hill", "description": "Exploit the scoreboard helper to gain control ticks.", "direction": "MISC", "baseScore": 260, "order": 5, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null }
+        ]
+      }
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-ctf/challenges",
+      "path": "/api/v1/competitions/comp-2026-ctf/challenges",
       "status": 200,
-      "body": [
-        { "id": "ctf-web-1", "title": "WEB-notes", "typeId": "web", "points": 500, "solveCount": 15, "deploymentType": "DynamicContainer", "description": "Find the auth bypass in the notes service.", "descriptionFormat": "markdown", "hints": ["The role check happens after data fetch."] },
-        { "id": "ctf-pwn-1", "title": "PWN-echo", "typeId": "pwn", "points": 470, "solveCount": 11, "deploymentType": "DynamicContainer", "description": "Turn the echo loop into code execution.", "descriptionFormat": "markdown", "hints": ["Saved return pointers are reachable."] },
-        { "id": "ctf-rev-1", "title": "REV-pocket", "typeId": "reverse", "points": 430, "solveCount": 7, "description": "Extract the hidden unlock path from the handheld binary.", "descriptionFormat": "markdown", "hints": ["One branch table is shifted by one index."] },
-        { "id": "ctf-crypto-1", "title": "CRYPTO-slab", "typeId": "crypto", "points": 410, "solveCount": 5, "description": "Recover the flag from a malformed padding oracle.", "descriptionFormat": "markdown", "hints": ["Error timing differs by 1 block."] },
-        { "id": "ctf-misc-1", "title": "MISC-parser", "typeId": "misc", "points": 390, "solveCount": 6, "description": "Abuse the parser to leak the hidden token.", "descriptionFormat": "markdown", "hints": ["Nested delimiters produce an unexpected fallback."] }
-      ]
+      "body": {
+        "items": [
+          { "id": "ctf-web-1", "competitionId": "comp-2026-ctf", "challengeId": "template-ctf-web-1", "title": "WEB-notes", "description": "Find the auth bypass in the notes service.", "direction": "WEB", "baseScore": 500, "order": 1, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "ctf-pwn-1", "competitionId": "comp-2026-ctf", "challengeId": "template-ctf-pwn-1", "title": "PWN-echo", "description": "Turn the echo loop into code execution.", "direction": "PWN", "baseScore": 470, "order": 2, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "ctf-rev-1", "competitionId": "comp-2026-ctf", "challengeId": "template-ctf-rev-1", "title": "REV-pocket", "description": "Extract the hidden unlock path from the handheld binary.", "direction": "REVERSE", "baseScore": 430, "order": 3, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "ctf-crypto-1", "competitionId": "comp-2026-ctf", "challengeId": "template-ctf-crypto-1", "title": "CRYPTO-slab", "description": "Recover the flag from a malformed padding oracle.", "direction": "CRYPTO", "baseScore": 410, "order": 4, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null },
+          { "id": "ctf-misc-1", "competitionId": "comp-2026-ctf", "challengeId": "template-ctf-misc-1", "title": "MISC-parser", "description": "Abuse the parser to leak the hidden token.", "direction": "MISC", "baseScore": 390, "order": 5, "isPublished": true, "revision": 1, "deletedAt": null, "createdAt": "2026-07-01T00:00:00Z", "updatedAt": "2026-07-01T00:00:00Z", "controlFlag": null, "urls": null }
+        ]
+      }
     },
     {
       "method": "GET",
