@@ -1296,7 +1296,7 @@ hint 子资源或 Runtime lifecycle。
   Owner/Manager/Judge/Observer 权限集合，完成 OpenAPI/client 与后端验证后，再用生成 SDK
   实现 Frontend 全量替换权限 UI。不得恢复旧 `/collaborators`。
 
-### 6.22 Competition 权限快照、候选目录与独立并发栅栏（2026-07-31，当前最新）
+### 6.22 Competition 权限快照、候选目录与独立并发栅栏（2026-07-31）
 
 本节按 `$grill-me` 明确选择的方案 A 完成 6.21 的 Backend 前置纵切。没有扩张匿名
 Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend 必须在本节完整契约和
@@ -1358,6 +1358,54 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
   重取权限快照和候选目录并从最新 revision 重建 payload；随后删除旧
   `AdminCollaborators` route/view/workspace/API/query key 与 copy，不保留兼容层。
 
+### 6.23 Frontend Competition 权限完整集合管理（2026-07-31，当前最新）
+
+本节完成 6.22 的 Frontend 纵切。权限 UI 只消费生成 SDK 的资源作用域快照和候选目录，
+旧 `/collaborators` 协议、页面、路由、query key 与 copy 已全部删除，不保留兼容跳转。
+
+#### 完整快照、候选资格与并发处理
+
+- Competition detail 新增 `permissions` section；Competition inventory 的权限入口直接进入
+  该 section。Owner 只读展示，Manager/Judge/Observer 使用完整集合增、移、删。
+- 所有读写分别使用生成 SDK 的 `adminGetCompetitionPermissions`、
+  `adminListCompetitionPermissionCandidates` 与 `adminUpdateCompetitionPermissions`，没有
+  手写 URL。快照缺失 Competition/Owner/任一角色数组/非负整数 revision、角色集合重叠、
+  Owner 混入或 UUID 无效时均 fail-closed；候选响应缺失完整 `items` 或必要元数据时同样
+  fail-closed，不会以空数组替换服务端事实。
+- Manager 候选只接受 Organizer/Administrator 的 Human 或 Bot；Judge/Observer 候选必须
+  EmailVerified，Owner 始终排除。候选目录未返回某个已分配成员时仍按 ID 保留其当前角色，
+  可以安全移除但不能臆测资格后移动。
+- mutation 执行时从 QueryClient 重新取得最新完整快照，发送全部三组角色 ID 和该快照的
+  `expectedPermissionRevision`；不做 optimistic overwrite，也不从过期组件状态构造 payload。
+- 任意 409（包括未知 typed code）都会重新拉取权限快照和候选目录，不自动重试，也不解析
+  ProblemDetails 文本；选择项仅在最新候选事实中失效时清除。403/404 mutation 同样刷新并
+  撤销写能力。成功后先取得 canonical server state，再清除选择。
+- 查询进行中（包括已有缓存的 background reauthorization）隐藏完整名单并关闭写操作，
+  防止跨登录会话短暂显示旧的 Owner/Manager/Judge/Observer 缓存。
+
+#### 验证、远端基线与 Git
+
+- `bun test`：59/59 passed，333 assertions；新增覆盖完整快照 fail-closed、UUID/重叠/
+  Owner 约束、全量角色编辑、资格筛选、缺失候选元数据保留和 typed 409 解码。
+- `bun run build`：`vue-tsc --noEmit` 与 Vite production build passed；仅保留依赖 PURE
+  annotation 和既有大 chunk 警告。
+- 本轮新增/干净目标文件 scoped ESLint passed。`src/api/noctf.ts` 的 11 项、
+  `AdminCompetitionsWorkspace.vue` 的 1 项及 `AdminLayout.vue` 的既有告警已逐一与 HEAD
+  baseline 比对，本轮没有新增 lint debt，也没有格式化无关旧代码。
+- locale JSON parse、旧 collaborator/手写 permission URL 静态扫描与
+  `git diff --check` passed；两项独立只读审查确认 fail-closed、资格、完整集合、revision、
+  409/403/404 refetch 和缓存隐藏无提交阻断。
+- 提交前通过 GitHub compare 再次核验远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`，与本地已合并基线 `identical`；当前 HEAD
+  已包含该提交，因此没有新冲突或需要制造空 merge commit。
+- 本节对应独立 Frontend 本地提交，提交说明为
+  `feat(admin): manage competition permissions`；不 push、不创建 PR。保护文件继续沿用
+  6.18，尤其不得混入 Wolverine outbox、Runner Properties、本地端口 compose、
+  instance-operation/query 文件或 `scripts/`。
+- 下一安全纵切回到 Backend：为 CompetitionChallenge 的 typed 409 和 delete/restore
+  增加 revision fence，再重建 OpenAPI/client 并用生成 SDK 适配 Frontend；前端不得解析
+  错误字符串代替强类型冲突。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1369,9 +1417,9 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 
 仍未完成/不属于本轮已部署：
 
-- Frontend 的 Bot、Challenge lifecycle inventory、typed role 409 与 Challenge Bot
-  Manager 授权、CompetitionChallenge 稳定 ID 与 lifecycle 已完成；Competition 权限
-  Backend 契约、并发栅栏与生成 SDK 已完成，Frontend 完整集合 UI 仍待本地实现。
+- Frontend 的 Bot、Challenge lifecycle inventory、typed role 409、Challenge Bot
+  Manager 授权、CompetitionChallenge 稳定 ID/lifecycle 与 Competition 权限完整集合 UI
+  均已完成；下一项是 CompetitionChallenge typed 409 与 delete/restore revision fence。
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
   环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
@@ -1381,15 +1429,11 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 
 ## 7. 建议的下一交接顺序
 
-1. Frontend 只使用生成 SDK 实现 Competition 权限全量替换；必须保留最新完整集合和
-   `PermissionRevision`，缺字段时 fail-closed，409 后重取两个资源作用域事实源，不得以
-   空数组覆盖，也不得恢复已废弃的 `/collaborators` 协议。
-2. 删除旧 `AdminCollaborators` route/view/workspace/API/query key 与中英文 copy；Competition
-   列表中的权限入口改到 Competition detail 的 permissions section，不保留兼容跳转。
-3. CompetitionChallenge typed 409 与 delete/restore revision fence 是可独立评估的后端
-   协议加固，不得由前端解析错误字符串代替。
-4. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
-5. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
+1. 在 Backend 为 CompetitionChallenge update/delete/restore 补齐稳定 typed 409，并给
+   delete/restore 增加以当前 revision 为依据的并发栅栏；重建 OpenAPI/client 后再适配
+   Frontend，不得解析错误字符串。
+2. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
+3. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
 决策的只读审计，但不能自行发明新协议。
@@ -1414,10 +1458,11 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；Frontend typed 409 与
-   Bot Manager 授权、CompetitionChallenge lifecycle 也已完成，Competition 权限 Backend
-   契约和生成 SDK 已在 6.22 完成。下一阶段从 6.22 和第 7 节记录的 Frontend 完整集合 UI
-   开始；引用后端测试数量时使用 6.22，引用 Frontend 状态时使用 6.21。
+4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；Frontend typed 409、
+   Bot Manager 授权、CompetitionChallenge lifecycle 与 Competition 权限完整集合 UI
+   均已完成。下一阶段从 6.23 和第 7 节记录的 CompetitionChallenge typed 409 与
+   delete/restore revision fence 开始；引用权限 Backend 测试数量时使用 6.22，引用最新
+   Frontend 状态时使用 6.23。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

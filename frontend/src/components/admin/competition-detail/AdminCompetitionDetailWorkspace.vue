@@ -10,6 +10,7 @@ import { queryKeys } from '@/api/queryKeys'
 import AdminCompetitionChallengesPanel from '@/components/admin/competition-detail/AdminCompetitionChallengesPanel.vue'
 import AdminCompetitionCheatIncidentsPanel from '@/components/admin/competition-detail/AdminCompetitionCheatIncidentsPanel.vue'
 import AdminCompetitionLogsPanel from '@/components/admin/competition-detail/AdminCompetitionLogsPanel.vue'
+import AdminCompetitionPermissionsPanel from '@/components/admin/competition-detail/AdminCompetitionPermissionsPanel.vue'
 import AdminCompetitionSettingsPanel from '@/components/admin/competition-detail/AdminCompetitionSettingsPanel.vue'
 import AdminCompetitionTeamsPanel from '@/components/admin/competition-detail/AdminCompetitionTeamsPanel.vue'
 import { Badge } from '@/components/ui/badge'
@@ -113,6 +114,7 @@ const { t } = useI18n()
 const competitionId = computed(() => String(route.params.id))
 const competitionDetailSections = [
   { key: 'settings', labelKey: 'admin.competitionDetail.navSettings' },
+  { key: 'permissions', labelKey: 'admin.competitionDetail.navPermissions' },
   { key: 'challenges', labelKey: 'admin.competitionDetail.navChallenges' },
   { key: 'teams', labelKey: 'admin.competitionDetail.navTeams' },
   { key: 'cheats', labelKey: 'admin.competitionDetail.navCheats' },
@@ -462,6 +464,13 @@ function sectionRoute(section: CompetitionDetailSection) {
               :competition-form="competitionForm"
               :saving="saveCompetitionMutation.isPending.value"
               @save="saveCompetitionMutation.mutate()"
+            />
+          </TabsContent>
+
+          <TabsContent value="permissions">
+            <AdminCompetitionPermissionsPanel
+              v-if="activeSection === 'permissions'"
+              :competition-id="competitionId"
             />
           </TabsContent>
 

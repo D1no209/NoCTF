@@ -4,6 +4,12 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
   NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest,
   NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
@@ -43,6 +49,11 @@ export interface PlatformRoleAssignmentBlockers {
 
 export interface ChallengeTemplateConflict {
   code: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode
+  userIds: string[]
+}
+
+export interface CompetitionPermissionsConflict {
+  code: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode
   userIds: string[]
 }
 
@@ -123,6 +134,33 @@ export function readChallengeTemplateConflict(error: unknown): ChallengeTemplate
     = error.details as NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse
   if (!details.code || !challengeTemplateConflictCodes.has(details.code))
     return null
+
+  return {
+    code: details.code,
+    userIds: normalizedIds(details.userIds),
+  }
+}
+
+const competitionPermissionsConflictCodes
+  = new Set<NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode>([
+    'RevisionConflict',
+    'EmailNotVerified',
+    'RolesOverlap',
+    'OwnerIncluded',
+    'UserNotFound',
+    'RoleNotEligible',
+  ])
+
+export function readCompetitionPermissionsConflict(
+  error: unknown,
+): CompetitionPermissionsConflict | undefined {
+  if (!(error instanceof ApiError) || error.status !== 409 || !isRecord(error.details))
+    return undefined
+
+  const details
+    = error.details as NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse
+  if (!details.code || !competitionPermissionsConflictCodes.has(details.code))
+    return undefined
 
   return {
     code: details.code,
@@ -554,6 +592,14 @@ export const penetrationAdminApi = {
 export type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
 export type AdminCompetition = NoCtfapiEndpointsCompetitionsCompetitionResponse
 export type CompetitionChallenge = NoCtfapiEndpointsChallengesChallengeResponse
+export type CompetitionPermissions
+  = NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse
+export type CompetitionPermissionCandidate
+  = NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse
+export type CompetitionPermissionCandidates
+  = NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse
+export type UpdateCompetitionPermissionsRequest
+  = NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest
 
 export const competitionAdminApi = {
   async get(competitionId: string): Promise<AdminCompetition> {
@@ -562,6 +608,37 @@ export const competitionAdminApi = {
         path: { competitionId },
       }),
       tt('errors.loadCompetition'),
+    )
+  },
+}
+
+export const competitionPermissionsAdminApi = {
+  async get(competitionId: string): Promise<CompetitionPermissions> {
+    return unwrap(
+      await generatedSdk.adminGetCompetitionPermissions({
+        path: { competitionId },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async candidates(competitionId: string): Promise<CompetitionPermissionCandidates> {
+    return unwrap(
+      await generatedSdk.adminListCompetitionPermissionCandidates({
+        path: { competitionId },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async update(
+    competitionId: string,
+    body: UpdateCompetitionPermissionsRequest,
+  ): Promise<void> {
+    await requireSuccess(
+      generatedSdk.adminUpdateCompetitionPermissions({
+        path: { competitionId },
+        body,
+      }),
+      tt('errors.requestFailed'),
     )
   },
 }
@@ -864,25 +941,6 @@ export const adminApi = {
       url: '/api/admin/competitions/{competitionId}/cheat-incidents',
       path: { competitionId },
     }), tt('errors.loadCheatIncidents'))
-  },
-  async collaborators<T = unknown[]>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/admin/competitions/{competitionId}/collaborators',
-      path: { competitionId },
-    }), tt('errors.loadCollaborators'))
-  },
-  async addCollaborator(competitionId: string, body: unknown) {
-    await requireSuccess(client.post({
-      url: '/api/admin/competitions/{competitionId}/collaborators',
-      path: { competitionId },
-      body,
-    }), tt('errors.requestFailed'))
-  },
-  async removeCollaborator(competitionId: string, userId: string) {
-    await requireSuccess(client.delete({
-      url: '/api/admin/competitions/{competitionId}/collaborators/{userId}',
-      path: { competitionId, userId },
-    }), tt('errors.requestFailed'))
   },
   async containers<T = unknown[]>() {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/containers' }), tt('errors.loadContainers'))

@@ -16,8 +16,8 @@ import {
   Loader2,
   MoreHorizontal,
   Settings,
+  ShieldCheck,
   Trash2,
-  Users2,
 } from 'lucide-vue-next'
 import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -171,8 +171,12 @@ function openDelete(comp: CompetitionAdminDto) {
   deleteDialog.value = true
 }
 
-function goCollaborators(comp: CompetitionAdminDto) {
-  router.push({ name: 'admin-collaborators', query: { competitionId: comp.id, competitionTitle: comp.title } })
+function goPermissions(comp: CompetitionAdminDto) {
+  router.push({
+    name: 'admin-competition-detail',
+    params: { id: comp.id },
+    query: { section: 'permissions' },
+  })
 }
 
 function goManage(comp: CompetitionAdminDto) {
@@ -315,9 +319,9 @@ const table = useVueTable({
                     <Settings class="mr-2 size-4" />
                     {{ t('admin.competitions.manage') }}
                   </DropdownMenuItem>
-                  <DropdownMenuItem @click="goCollaborators(row.original)">
-                    <Users2 class="mr-2 size-4" />
-                    {{ t('admin.competitions.collaborators') }}
+                  <DropdownMenuItem @click="goPermissions(row.original)">
+                    <ShieldCheck class="mr-2 size-4" />
+                    {{ t('admin.competitions.permissions') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="router.push(`/competitions/${row.original.id}`)">
