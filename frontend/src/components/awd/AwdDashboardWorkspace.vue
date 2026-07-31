@@ -1,23 +1,29 @@
 <script setup lang="ts">
 import type { AttackLogDto } from '@/components/game/AttackLogFeed.vue'
-import type { AwdAwarenessEvent } from '@/components/game/AwdBattlefieldCore.vue'
 import type { ServiceStatus } from '@/components/game/ServiceStatusGrid.vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { challengeApi, competitionApi, teamApi } from '@/api/noctf'
+import { challengeApi, competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import {
+  getSubmissionOutcome,
+  isSubmissionTerminal,
+  submissionMessageKey,
+  SubmissionOutcome,
+} from '@/api/submissionPresentation'
+import AwdFlagSubmissionCard from '@/components/awd/AwdFlagSubmissionCard.vue'
+import AwdpPatchStatusList from '@/components/awdp/AwdpPatchStatusList.vue'
+import AwdpPatchUploadCard from '@/components/awdp/AwdpPatchUploadCard.vue'
 import AttackLogFeed from '@/components/game/AttackLogFeed.vue'
 import AwdBattlefieldCore from '@/components/game/AwdBattlefieldCore.vue'
 import RoundTimer from '@/components/game/RoundTimer.vue'
 import ServiceStatusGrid from '@/components/game/ServiceStatusGrid.vue'
-import AwdFlagSubmissionCard from '@/components/awd/AwdFlagSubmissionCard.vue'
-import AwdpPatchStatusList from '@/components/awdp/AwdpPatchStatusList.vue'
-import AwdpPatchUploadCard from '@/components/awdp/AwdpPatchUploadCard.vue'
-import { useSignalR } from '@/composables/useSignalR'
 import { Card } from '@/components/ui/card'
+import { useFlagSubmission } from '@/composables/useFlagSubmission'
+import { useSignalR } from '@/composables/useSignalR'
 import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
 
@@ -60,12 +66,6 @@ const { data: dashboard, refetch: refetchDashboard } = useQuery({
   refetchInterval: 10_000,
 })
 
-const { data: teams } = useQuery({
-  queryKey: computed(() => queryKeys.teams(competitionId.value)),
-  queryFn: () => teamApi.list(competitionId.value),
-  enabled: computed(() => !!competitionId.value),
-})
-
 const { data: challenges } = useQuery({
   queryKey: computed(() => queryKeys.challenges(competitionId.value)),
   queryFn: () => challengeApi.list(competitionId.value),
@@ -85,7 +85,6 @@ const totalSeconds = computed(() => dashboard.value?.roundDurationSeconds ?? 300
 const services = computed<ServiceStatus[]>(() => dashboard.value?.services ?? [])
 
 const attackLogs = ref<AttackLogDto[]>([])
-const localAwarenessEvents = ref<AwdAwarenessEvent[]>([])
 const signalR = useSignalR({
   hubUrl: `/hubs/game?competitionId=${competitionId.value}`,
   accessToken: () => auth.accessToken,
@@ -140,61 +139,64 @@ async function submitPatch() {
   }
 }
 
-const selectedVictim = ref('')
 const selectedChallenge = ref('')
 const flagInput = ref('')
-const flagLoading = ref(false)
+const {
+  accepted: acceptedSubmission,
+  status: submissionStatus,
+  isSubmitting: flagLoading,
+  submit: submitFlagAndWait,
+} = useFlagSubmission()
+const flagStatusMessage = computed(() => {
+  if (acceptedSubmission.value && !submissionStatus.value)
+    return t('challenges.submissionQueued')
+  if (!submissionStatus.value)
+    return undefined
+  if (!isSubmissionTerminal(submissionStatus.value))
+    return t('challenges.submissionEvaluating')
+  return t(submissionMessageKey(submissionStatus.value))
+})
 
 async function submitFlag() {
   if (!flagInput.value.trim() || !selectedChallenge.value)
     return
-  flagLoading.value = true
   try {
-    const data = await competitionApi.submitFlag<{ correct?: boolean, message?: string }>(
+    const terminalStatus = await submitFlagAndWait(
       competitionId.value,
-      scoreStore.teamId ?? '',
       selectedChallenge.value,
       flagInput.value.trim(),
     )
-    if (data?.correct) {
-      toast.success(t('challenges.correctFlag'))
+    if (!terminalStatus)
+      return
+
+    qc.invalidateQueries({
+      queryKey: queryKeys.submissions(competitionId.value),
+    })
+    const outcome = getSubmissionOutcome(terminalStatus)
+    const message = t(submissionMessageKey(terminalStatus))
+    if (outcome === SubmissionOutcome.Correct) {
+      toast.success(message)
       flagInput.value = ''
+      qc.invalidateQueries({
+        queryKey: queryKeys.leaderboard(competitionId.value),
+      })
+      qc.invalidateQueries({
+        queryKey: queryKeys.awdDashboard(competitionId.value),
+      })
+      qc.invalidateQueries({
+        queryKey: queryKeys.awdpState(competitionId.value),
+      })
+    }
+    else if (outcome === SubmissionOutcome.Duplicate) {
+      toast.warning(message)
     }
     else {
-      enqueueAttackFailed(data?.message ?? t('challenges.incorrectFlag'))
-      toast.error(data?.message ?? t('challenges.incorrectFlag'))
+      toast.error(message)
     }
   }
   catch {
     toast.error(t('challenges.submissionFailed'))
   }
-  finally {
-    flagLoading.value = false
-  }
-}
-
-function enqueueAttackFailed(reason: string) {
-  const timestamp = new Date().toISOString()
-  const victim = teams.value?.find(team => team.id === selectedVictim.value)
-  const challenge = challenges.value?.find(item => item.id === selectedChallenge.value)
-
-  localAwarenessEvents.value.unshift({
-    id: `local-attack-failed:${competitionId.value}:${selectedVictim.value || 'unknown'}:${selectedChallenge.value}:${timestamp}`,
-    type: 'attack',
-    result: 'failed',
-    attackerTeamId: scoreStore.teamId ?? undefined,
-    attackerTeamName: scoreStore.myTeamName ?? auth.user?.userName ?? t('awd.currentTeam'),
-    victimTeamId: victim?.id ?? selectedVictim.value,
-    victimTeamName: victim?.name ?? t('awd.selectedTarget'),
-    challengeId: challenge?.id ?? selectedChallenge.value,
-    challengeName: challenge?.title ?? t('awd.selectedService'),
-    round: round.value,
-    timestamp,
-    reason,
-  })
-
-  if (localAwarenessEvents.value.length > 50)
-    localAwarenessEvents.value.splice(50)
 }
 </script>
 
@@ -212,7 +214,6 @@ function enqueueAttackFailed(reason: string) {
       :round="round"
       :services="services"
       :attack-logs="attackLogs"
-      :external-events="localAwarenessEvents"
     />
 
     <div class="grid w-full grid-cols-12 gap-6">
@@ -225,12 +226,11 @@ function enqueueAttackFailed(reason: string) {
 
       <div class="col-span-12 space-y-6 lg:col-span-6">
         <AwdFlagSubmissionCard
-          v-model:selected-victim="selectedVictim"
           v-model:selected-challenge="selectedChallenge"
           v-model:flag-input="flagInput"
-          :teams="teams ?? []"
           :challenges="challenges ?? []"
           :loading="flagLoading"
+          :status-message="flagStatusMessage"
           @submit="submitFlag"
         />
 

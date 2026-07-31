@@ -23,6 +23,7 @@ import type {
   NoCtfapiEndpointsTeamsCreateTeamRequest,
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
+import type { PublicSubmissionListItem } from './submissionPresentation'
 import { translate as tt } from '@/i18n'
 import { configureAuthSessionRefresh, readAuthSession } from './auth-session'
 import {
@@ -33,6 +34,11 @@ import {
 import { toPublicCompetition } from './competitionPresentation'
 import { client } from './generated/client.gen'
 import * as generatedSdk from './generated/sdk.gen'
+import {
+  toAcceptedFlagSubmission,
+  toPublicSubmissionPage,
+  toPublicSubmissionStatus,
+} from './submissionPresentation'
 import { toPublicTeam } from './teamPresentation'
 
 // Some legacy screens still call optional endpoints that are not part of the
@@ -358,12 +364,6 @@ export const competitionApi = {
   async create(body: Record<string, unknown>) {
     return unwrap(await sdk.noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint({ body }), tt('errors.createCompetition'))
   },
-  async submissions<T = unknown>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/submissions',
-      path: { id: competitionId },
-    }), tt('errors.loadSubmissions'))
-  },
   async leaderboard(
     competitionId: string,
   ): Promise<NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse> {
@@ -373,13 +373,6 @@ export const competitionApi = {
       }),
       tt('errors.loadLeaderboard'),
     )
-  },
-  async submitFlag<T = unknown>(competitionId: string, teamId: string, challengeId: string, flag: string) {
-    return postJson<T>(`/competitions/${competitionId}/submissions/flags`, {
-      teamId,
-      challengeId,
-      flag,
-    })
   },
   async createInstance<T = unknown>(competitionId: string, challengeId: string) {
     return unwrap(await client.post<{ 200: T }, unknown, false>({
@@ -501,6 +494,85 @@ export const competitionApi = {
     return unwrap(await sdk.noCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpoint({
       path: { id: competitionId },
     }), tt('errors.loadLeaderboard'))
+  },
+}
+
+async function listSubmissionPage(
+  competitionId: string,
+  options: { limit: number, cursor?: string | null },
+  signal?: AbortSignal,
+) {
+  const response = unwrap(
+    await generatedSdk.noCtfapiEndpointsSubmissionsListSubmissionsEndpoint({
+      path: { competitionId },
+      query: {
+        limit: options.limit,
+        cursor: options.cursor,
+      },
+      signal,
+    }),
+    tt('errors.loadSubmissions'),
+  )
+  return toPublicSubmissionPage(response)
+}
+
+export const submissionApi = {
+  listPage: listSubmissionPage,
+  async listAll(
+    competitionId: string,
+    signal?: AbortSignal,
+  ): Promise<PublicSubmissionListItem[]> {
+    const submissions: PublicSubmissionListItem[] = []
+    const seenCursors = new Set<string>()
+    let cursor: string | null | undefined
+
+    do {
+      const page = await listSubmissionPage(
+        competitionId,
+        { limit: 200, cursor },
+        signal,
+      )
+      submissions.push(...page.items)
+      cursor = page.nextCursor
+
+      if (cursor !== null) {
+        if (seenCursors.has(cursor))
+          throw new TypeError('Submission list returned a repeated cursor.')
+        seenCursors.add(cursor)
+      }
+    } while (cursor !== null)
+
+    return submissions
+  },
+  async submitFlag(
+    competitionId: string,
+    competitionChallengeId: string,
+    flag: string,
+    signal?: AbortSignal,
+  ) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsSubmissionsSubmitFlagEndpoint({
+        path: { competitionId, competitionChallengeId },
+        body: { flag },
+        signal,
+      }),
+      tt('errors.submitFlag'),
+    )
+    return toAcceptedFlagSubmission(response)
+  },
+  async getStatus(
+    competitionId: string,
+    submissionId: string,
+    signal?: AbortSignal,
+  ) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsSubmissionsGetSubmissionStatusEndpoint({
+        path: { competitionId, submissionId },
+        signal,
+      }),
+      tt('errors.loadSubmissionStatus'),
+    )
+    return toPublicSubmissionStatus(response)
   },
 }
 

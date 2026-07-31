@@ -115,21 +115,68 @@
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-awdp/submissions",
+      "path": "/api/v1/competitions/comp-2026-awdp/submissions",
       "status": 200,
-      "body": { "competitionId": "comp-2026-awdp", "teamId": "team-open-alpha", "solvedChallenges": [{ "challengeId": "awdp-web-1" }] }
+      "body": {
+        "items": [
+          {
+            "id": "mock-awdp-break",
+            "competitionId": "comp-2026-awdp",
+            "competitionChallengeId": "awdp-web-1",
+            "teamId": "team-open-alpha",
+            "submittedByUserId": "mock-user-1",
+            "kind": 1,
+            "evaluationState": 3,
+            "result": 0,
+            "failureCode": null,
+            "receivedAt": "2026-07-05T10:20:00Z",
+            "processingVersion": 1
+          }
+        ],
+        "nextCursor": null
+      }
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-koh/submissions",
+      "path": "/api/v1/competitions/comp-2026-koh/submissions",
       "status": 200,
-      "body": { "competitionId": "comp-2026-koh", "teamId": "team-hill-watch", "solvedChallenges": [{ "challengeId": "koh-web-1" }] }
+      "body": { "items": [], "nextCursor": null }
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-ctf/submissions",
+      "path": "/api/v1/competitions/comp-2026-ctf/submissions",
       "status": 200,
-      "body": { "competitionId": "comp-2026-ctf", "teamId": "team-ctf-mock", "solvedChallenges": [{ "challengeId": "ctf-web-1" }, { "challengeId": "ctf-misc-1" }] }
+      "body": {
+        "items": [
+          {
+            "id": "mock-ctf-web-solve",
+            "competitionId": "comp-2026-ctf",
+            "competitionChallengeId": "ctf-web-1",
+            "teamId": "team-ctf-mock",
+            "submittedByUserId": "mock-user-1",
+            "kind": 0,
+            "evaluationState": 3,
+            "result": 0,
+            "failureCode": null,
+            "receivedAt": "2026-07-12T10:20:00Z",
+            "processingVersion": 1
+          },
+          {
+            "id": "mock-ctf-misc-solve",
+            "competitionId": "comp-2026-ctf",
+            "competitionChallengeId": "ctf-misc-1",
+            "teamId": "team-ctf-mock",
+            "submittedByUserId": "mock-user-1",
+            "kind": 0,
+            "evaluationState": 3,
+            "result": 0,
+            "failureCode": null,
+            "receivedAt": "2026-07-12T10:10:00Z",
+            "processingVersion": 1
+          }
+        ],
+        "nextCursor": null
+      }
     },
     {
       "method": "GET",
@@ -279,21 +326,59 @@
     },
     {
       "method": "POST",
-      "path": "/api/competitions/comp-2026-awdp/challenges/:challengeId/submit",
+      "path": "/api/v1/competitions/comp-2026-awdp/challenges/:competitionChallengeId/flag-submissions",
+      "status": 202,
+      "body": {
+        "submissionId": "mock-awdp-flag-submission",
+        "statusUrl": "/api/v1/competitions/comp-2026-awdp/submissions/mock-awdp-flag-submission",
+        "submissions": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/competitions/comp-2026-awdp/submissions/:submissionId",
       "status": 200,
-      "body": { "correct": true, "alreadySolved": false }
+      "body": {
+        "submissionId": "mock-awdp-flag-submission",
+        "competitionId": "comp-2026-awdp",
+        "teamId": "team-open-alpha",
+        "competitionChallengeId": "awdp-pwn-1",
+        "kind": 1,
+        "evaluationState": 3,
+        "result": 0,
+        "failureCode": null,
+        "receivedAt": "2026-07-05T10:40:00Z",
+        "evaluationUpdatedAt": "2026-07-05T10:40:01Z",
+        "processingVersion": 1
+      }
     },
     {
       "method": "POST",
-      "path": "/api/competitions/comp-2026-koh/challenges/:challengeId/submit",
-      "status": 200,
-      "body": { "correct": true, "alreadySolved": false }
+      "path": "/api/v1/competitions/comp-2026-ctf/challenges/:competitionChallengeId/flag-submissions",
+      "status": 202,
+      "body": {
+        "submissionId": "mock-ctf-flag-submission",
+        "statusUrl": "/api/v1/competitions/comp-2026-ctf/submissions/mock-ctf-flag-submission",
+        "submissions": null
+      }
     },
     {
-      "method": "POST",
-      "path": "/api/competitions/comp-2026-ctf/challenges/:challengeId/submit",
+      "method": "GET",
+      "path": "/api/v1/competitions/comp-2026-ctf/submissions/:submissionId",
       "status": 200,
-      "body": { "correct": true, "alreadySolved": false }
+      "body": {
+        "submissionId": "mock-ctf-flag-submission",
+        "competitionId": "comp-2026-ctf",
+        "teamId": "team-ctf-mock",
+        "competitionChallengeId": "ctf-pwn-1",
+        "kind": 0,
+        "evaluationState": 3,
+        "result": 0,
+        "failureCode": null,
+        "receivedAt": "2026-07-12T10:40:00Z",
+        "evaluationUpdatedAt": "2026-07-12T10:40:01Z",
+        "processingVersion": 1
+      }
     },
     {
       "method": "POST",
