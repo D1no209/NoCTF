@@ -7,7 +7,7 @@ import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, Puzzl
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
-import { challengeApi, competitionApi } from '@/api/noctf'
+import { challengeApi, competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
@@ -101,18 +101,6 @@ interface AwdpStateData {
   challenges: AwdpChallengeState[]
 }
 
-interface MyCompetitionTeam {
-  id: string
-  name: string
-  inviteToken: string
-  memberCount: number
-  isLocked: boolean
-  isBanned: boolean
-  bannedReason?: string | null
-  registrationStatus: string
-  isCaptain: boolean
-}
-
 const { data: competition, isLoading: loadingComp } = useQuery({
   queryKey: computed(() => queryKeys.competition(competitionId.value)),
   queryFn: () => competitionApi.get(competitionId.value),
@@ -131,9 +119,9 @@ const { data: submissionsResponse, refetch: refetchSubmissions } = useQuery({
   enabled: computed(() => !!competitionId.value),
 })
 
-const { data: myTeams, isLoading: loadingMyTeams } = useQuery({
-  queryKey: computed(() => queryKeys.myCompetitionTeams(competitionId.value)),
-  queryFn: () => competitionApi.myTeams<MyCompetitionTeam[]>(competitionId.value),
+const { data: currentTeam, isLoading: loadingMyTeam } = useQuery({
+  queryKey: computed(() => queryKeys.myCompetitionTeam(competitionId.value)),
+  queryFn: () => teamApi.getMy(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
@@ -192,10 +180,11 @@ const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
 const isAwdMode = computed(() => competition.value?.mode === 'awd')
 const isAwdpMode = computed(() => competition.value?.mode === 'awdp')
 const canManageCompetition = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
-const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.registrationStatus === 'approved') ?? null)
-const currentTeam = computed(() => approvedTeam.value ?? myTeams.value?.[0] ?? null)
-const canUseParticipantActions = computed(() => Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
-const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
+const approvedTeam = computed(() =>
+  currentTeam.value?.registrationStatus === 'approved' ? currentTeam.value : null,
+)
+const canUseParticipantActions = computed(() => Boolean(approvedTeam.value))
+const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value))
 const canDownloadAttachments = computed(() =>
   canUseParticipantActions.value && competition.value?.status === 'running',
 )
@@ -530,7 +519,7 @@ function rotationClass(id: string) {
           </Badge>
         </div>
 
-        <div v-if="loadingMyTeams" class="text-sm text-muted-foreground">
+        <div v-if="loadingMyTeam" class="text-sm text-muted-foreground">
           <Loader2 class="mr-2 inline size-4 animate-spin" />
           {{ t('common.loading') }}
         </div>
@@ -545,12 +534,10 @@ function rotationClass(id: string) {
                 <Lock class="size-3" />
                 {{ currentTeam.isLocked ? t('teams.locked') : t('teams.unlocked') }}
               </span>
-              <span v-if="currentTeam.isBanned" class="font-medium text-destructive">{{ t('teams.banned') }}</span>
-              <code>{{ currentTeam.inviteToken }}</code>
             </div>
           </div>
           <div v-if="!canAccessChallenges" class="space-y-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-            <div>{{ currentTeam.isBanned ? t('teams.bannedDetail') : t('teams.waitingApproval') }}</div>
+            <div>{{ currentTeam.registrationStatus === 'rejected' ? t('teams.rejectedDetail') : t('teams.waitingApproval') }}</div>
             <Button variant="outline" size="sm" as-child>
               <RouterLink :to="`/competitions/${competitionId}/register`">
                 {{ t('teams.manageRegistration') }}

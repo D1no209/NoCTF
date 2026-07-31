@@ -4,11 +4,9 @@ import { LayoutDashboard, ListChecks, Trophy, Users } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { competitionApi, teamApi } from '@/api/noctf'
+import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import HomeCompetitionList from '@/components/home/HomeCompetitionList.vue'
-import HomeStatusCard from '@/components/home/HomeStatusCard.vue'
-import HomeTeamList from '@/components/home/HomeTeamList.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,29 +16,11 @@ import { useAuthStore } from '@/stores/auth'
 const { t } = useI18n()
 const auth = useAuthStore()
 
-interface MyTeam {
-  id: string
-  competitionId: string
-  name: string
-  competitionTitle: string
-  registrationStatus: string
-  memberCount: number
-  maxTeamMembers: number
-  isLocked: boolean
-  isBanned: boolean
-  gameModeType: string
-}
-
 const canManage = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
 
 const { data: competitions, isLoading: loadingCompetitions } = useQuery({
   queryKey: queryKeys.competitions,
   queryFn: () => competitionApi.list(),
-})
-
-const { data: teams, isLoading: loadingTeams } = useQuery({
-  queryKey: queryKeys.myTeams,
-  queryFn: () => teamApi.mine<MyTeam[]>(),
 })
 
 const activeCompetitions = computed(() => {
@@ -63,16 +43,12 @@ const activeCompetitions = computed(() => {
     })
     .slice(0, 3)
 })
-
-const recentTeams = computed(() => (teams.value ?? []).slice(0, 3))
-const approvedTeams = computed(() => (teams.value ?? []).filter(team => team.registrationStatus === 'approved').length)
-const pendingTeams = computed(() => (teams.value ?? []).filter(team => team.registrationStatus === 'pending').length)
 </script>
 
 <template>
   <AppLayout>
     <div class="mx-auto w-full max-w-[1600px] space-y-4 px-4 py-6 md:px-6 lg:px-8">
-      <section class="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <section>
         <Card class="h-full px-5 py-5 md:px-6">
           <div class="space-y-5">
             <div class="flex items-center gap-2 border-b-2 border-border pb-3">
@@ -93,12 +69,6 @@ const pendingTeams = computed(() => (teams.value ?? []).filter(team => team.regi
                   {{ t('home.browseCompetitions') }}
                 </RouterLink>
               </Button>
-              <Button variant="outline" as-child>
-                <RouterLink to="/teams">
-                  <Users class="size-4" />
-                  {{ t('home.manageTeams') }}
-                </RouterLink>
-              </Button>
               <Button v-if="canManage" variant="secondary" as-child>
                 <RouterLink to="/admin">
                   <LayoutDashboard class="size-4" />
@@ -108,30 +78,13 @@ const pendingTeams = computed(() => (teams.value ?? []).filter(team => team.regi
             </div>
           </div>
         </Card>
-
-        <section class="home-hero-side">
-          <HomeStatusCard
-            :joined-teams="teams?.length ?? 0"
-            :ready-teams="approvedTeams"
-            :pending-review="pendingTeams"
-          />
-        </section>
       </section>
 
-      <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <section class="home-content-main">
-          <HomeCompetitionList
-            :competitions="activeCompetitions"
-            :loading="loadingCompetitions"
-          />
-        </section>
-
-        <section class="home-content-side">
-          <HomeTeamList
-            :teams="recentTeams"
-            :loading="loadingTeams"
-          />
-        </section>
+      <section>
+        <HomeCompetitionList
+          :competitions="activeCompetitions"
+          :loading="loadingCompetitions"
+        />
       </section>
 
       <section class="grid gap-4 md:grid-cols-3">

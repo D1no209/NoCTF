@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, Copy, KeyRound, Loader2, Lock, UserPlus, Users } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, KeyRound, Loader2, Lock, LogOut, UserPlus, Users } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
@@ -25,58 +25,51 @@ const competitionId = computed(() => route.params.id as string)
 const newTeamName = ref('')
 const joinToken = ref('')
 
-interface MyCompetitionTeam {
-  id: string
-  competitionId: string
-  name: string
-  inviteToken: string
-  memberCount: number
-  isLocked: boolean
-  isBanned: boolean
-  bannedReason?: string | null
-  registrationStatus: string
-  isCaptain: boolean
-}
-
 const { data: competition, isLoading: loadingCompetition, isError: competitionError, refetch: refetchCompetition } = useQuery({
   queryKey: computed(() => queryKeys.competition(competitionId.value)),
   queryFn: () => competitionApi.get(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
-const { data: myTeams, isLoading: loadingTeams } = useQuery({
-  queryKey: computed(() => queryKeys.myCompetitionTeams(competitionId.value)),
-  queryFn: () => competitionApi.myTeams<MyCompetitionTeam[]>(competitionId.value),
+const { data: currentTeam, isLoading: loadingTeams } = useQuery({
+  queryKey: computed(() => queryKeys.myCompetitionTeam(competitionId.value)),
+  queryFn: () => teamApi.getMy(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
-const currentTeam = computed(() => myTeams.value?.[0] ?? null)
-const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.registrationStatus === 'approved') ?? null)
+const approvedTeam = computed(() =>
+  currentTeam.value?.registrationStatus === 'approved' ? currentTeam.value : null,
+)
 
 const createTeamMutation = useMutation({
-  mutationFn: () => teamApi.create<MyCompetitionTeam>({
-    competitionId: competitionId.value,
+  mutationFn: () => teamApi.create(competitionId.value, {
     name: newTeamName.value.trim(),
   }),
   onSuccess: () => {
     newTeamName.value = ''
-    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(competitionId.value) })
-    queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
+    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeam(competitionId.value) })
     toast.success(t('teams.createSuccess'))
   },
   onError: () => toast.error(t('teams.actionError')),
 })
 
 const joinByTokenMutation = useMutation({
-  mutationFn: () => teamApi.joinByToken<MyCompetitionTeam>(joinToken.value.trim()),
-  onSuccess: (team) => {
+  mutationFn: () => teamApi.join(competitionId.value, joinToken.value.trim()),
+  onSuccess: () => {
     joinToken.value = ''
-    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(competitionId.value) })
-    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(team.competitionId) })
-    queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
+    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeam(competitionId.value) })
     toast.success(t('teams.joinSuccess'))
   },
   onError: () => toast.error(t('teams.actionError')),
+})
+
+const leaveTeamMutation = useMutation({
+  mutationFn: () => teamApi.leave(competitionId.value),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeam(competitionId.value) })
+    toast.success(t('teams.leaveSuccess'))
+  },
+  onError: () => toast.error(t('teams.leaveError')),
 })
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -97,11 +90,6 @@ function formatDate(iso: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-async function copyToken(token: string) {
-  await navigator.clipboard.writeText(token)
-  toast.success(t('teams.tokenCopied'))
 }
 </script>
 
@@ -185,28 +173,30 @@ async function copyToken(token: string) {
                             <Lock class="size-3.5" />
                             {{ currentTeam.isLocked ? t('teams.locked') : t('teams.unlocked') }}
                           </span>
-                          <span>{{ currentTeam.isCaptain ? t('teams.captain') : t('teams.member') }}</span>
                         </div>
                       </div>
-                      <Button v-if="approvedTeam && !currentTeam.isBanned" as-child>
-                        <RouterLink :to="`/competitions/${competition.id}`">
-                          {{ t('competitions.enter') }}
-                          <ArrowRight class="size-4" />
-                        </RouterLink>
-                      </Button>
+                      <div class="flex flex-wrap gap-2">
+                        <Button v-if="approvedTeam" as-child>
+                          <RouterLink :to="`/competitions/${competition.id}`">
+                            {{ t('competitions.enter') }}
+                            <ArrowRight class="size-4" />
+                          </RouterLink>
+                        </Button>
+                        <Button
+                          v-if="!currentTeam.isLocked"
+                          variant="outline"
+                          :disabled="leaveTeamMutation.isPending.value"
+                          @click="leaveTeamMutation.mutate()"
+                        >
+                          <Loader2 v-if="leaveTeamMutation.isPending.value" class="size-4 animate-spin" />
+                          <LogOut v-else class="size-4" />
+                          {{ t('teams.leave') }}
+                        </Button>
+                      </div>
                     </div>
-                    <Panel class="mt-4 flex-row items-center justify-between gap-3 px-3 py-2">
-                      <code class="truncate text-xs">{{ currentTeam.inviteToken }}</code>
-                      <Button variant="ghost" size="icon-sm" @click="copyToken(currentTeam.inviteToken)">
-                        <Copy class="size-4" />
-                      </Button>
-                    </Panel>
                   </Panel>
 
-                  <div v-if="currentTeam.isBanned" class="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                    {{ t('teams.bannedDetail') }}
-                  </div>
-                  <div v-else-if="currentTeam.registrationStatus !== 'approved'" class="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+                  <div v-if="currentTeam.registrationStatus !== 'approved'" class="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
                     {{ currentTeam.registrationStatus === 'rejected' ? t('teams.rejectedDetail') : t('teams.waitingApproval') }}
                   </div>
                 </div>

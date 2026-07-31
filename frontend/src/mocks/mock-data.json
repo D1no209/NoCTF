@@ -133,21 +133,82 @@
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-awdp/teams/mine",
+      "path": "/api/v1/competitions/comp-2026-awdp/teams/me",
       "status": 200,
-      "body": [{ "id": "team-open-alpha", "name": "OpenAlpha", "inviteToken": "MOCK-OPEN-ALPHA", "memberCount": 4, "isLocked": false, "isBanned": false, "trackName": "Open", "registrationStatus": "approved", "isCaptain": true }]
+      "body": {
+        "id": "team-open-alpha",
+        "competitionId": "comp-2026-awdp",
+        "name": "OpenAlpha",
+        "avatarUrl": null,
+        "captainId": "mock-user-1",
+        "memberIds": ["mock-user-1", "mock-user-2", "mock-user-3", "mock-user-4"],
+        "registrationStatus": 1,
+        "isLocked": false,
+        "registeredAt": "2026-07-01T00:00:00Z"
+      }
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-koh/teams/mine",
+      "path": "/api/v1/competitions/comp-2026-koh/teams/me",
       "status": 200,
-      "body": [{ "id": "team-hill-watch", "name": "HillWatch", "inviteToken": "MOCK-HILL-WATCH", "memberCount": 3, "isLocked": false, "isBanned": false, "trackName": null, "registrationStatus": "approved", "isCaptain": true }]
+      "body": {
+        "id": "team-hill-watch",
+        "competitionId": "comp-2026-koh",
+        "name": "HillWatch",
+        "avatarUrl": null,
+        "captainId": "mock-user-1",
+        "memberIds": ["mock-user-1", "mock-user-2", "mock-user-3"],
+        "registrationStatus": 1,
+        "isLocked": false,
+        "registeredAt": "2026-07-02T00:00:00Z"
+      }
     },
     {
       "method": "GET",
-      "path": "/api/competitions/comp-2026-ctf/teams/mine",
+      "path": "/api/v1/competitions/comp-2026-ctf/teams/me",
       "status": 200,
-      "body": [{ "id": "team-ctf-mock", "name": "ByteGuild", "inviteToken": "MOCK-CTF-GUILD", "memberCount": 5, "isLocked": false, "isBanned": false, "trackName": null, "registrationStatus": "approved", "isCaptain": true }]
+      "body": {
+        "id": "team-ctf-mock",
+        "competitionId": "comp-2026-ctf",
+        "name": "ByteGuild",
+        "avatarUrl": null,
+        "captainId": "mock-user-1",
+        "memberIds": ["mock-user-1", "mock-user-2", "mock-user-3", "mock-user-4", "mock-user-5"],
+        "registrationStatus": 1,
+        "isLocked": false,
+        "registeredAt": "2026-07-03T00:00:00Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/competitions/comp-2026-awdp/teams",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "team-open-alpha",
+            "competitionId": "comp-2026-awdp",
+            "name": "OpenAlpha",
+            "avatarUrl": null,
+            "captainId": "mock-user-1",
+            "memberIds": ["mock-user-1", "mock-user-2", "mock-user-3", "mock-user-4"],
+            "registrationStatus": 1,
+            "isLocked": false,
+            "registeredAt": "2026-07-01T00:00:00Z"
+          },
+          {
+            "id": "team-red-orbit",
+            "competitionId": "comp-2026-awdp",
+            "name": "RedOrbit",
+            "avatarUrl": null,
+            "captainId": "mock-user-6",
+            "memberIds": ["mock-user-6", "mock-user-7", "mock-user-8"],
+            "registrationStatus": 1,
+            "isLocked": false,
+            "registeredAt": "2026-07-01T00:05:00Z"
+          }
+        ]
+      }
     },
     {
       "method": "GET",
@@ -290,45 +351,6 @@
         "maxTeamMembers": 5,
         "ownerId": "mock-owner"
       }
-    },
-    {
-      "method": "GET",
-      "path": "/api/teams/mine",
-      "status": 200,
-      "body": [
-        {
-          "id": "team-open-alpha",
-          "competitionId": "comp-2026-awdp",
-          "name": "OpenAlpha",
-          "competitionTitle": "NoCTF 2026 AWDP Invitational",
-          "competitionStatus": "running",
-          "registrationStatus": "approved",
-          "memberCount": 4,
-          "maxTeamMembers": 6,
-          "isLocked": false,
-          "isBanned": false,
-          "isCaptain": true,
-          "trackName": "Open",
-          "inviteToken": "MOCK-OPEN-ALPHA",
-          "gameModeType": "AWDP"
-        },
-        {
-          "id": "team-hill-watch",
-          "competitionId": "comp-2026-koh",
-          "name": "HillWatch",
-          "competitionTitle": "NoCTF 2026 King of the Hill",
-          "competitionStatus": "published",
-          "registrationStatus": "pending",
-          "memberCount": 3,
-          "maxTeamMembers": 5,
-          "isLocked": false,
-          "isBanned": false,
-          "isCaptain": false,
-          "trackName": null,
-          "inviteToken": "MOCK-HILL-WATCH",
-          "gameModeType": "KoH"
-        }
-      ]
     },
     {
       "method": "POST",

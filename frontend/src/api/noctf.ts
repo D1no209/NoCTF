@@ -20,6 +20,7 @@ import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
   NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse,
+  NoCtfapiEndpointsTeamsCreateTeamRequest,
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
 import { translate as tt } from '@/i18n'
@@ -32,6 +33,7 @@ import {
 import { toPublicCompetition } from './competitionPresentation'
 import { client } from './generated/client.gen'
 import * as generatedSdk from './generated/sdk.gen'
+import { toPublicTeam } from './teamPresentation'
 
 // Some legacy screens still call optional endpoints that are not part of the
 // current public competition contract. Keep their failure typed and contained
@@ -423,18 +425,6 @@ export const competitionApi = {
       path: { id: competitionId, viewKey },
     }), tt('errors.loadCompetitionView'))
   },
-  async teams<T = unknown[]>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/teams',
-      path: { id: competitionId },
-    }), tt('errors.loadAdminTeams'))
-  },
-  async myTeams<T = unknown[]>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/teams/mine',
-      path: { id: competitionId },
-    }), tt('errors.loadMyTeams'))
-  },
   async submitPatch<T = unknown>(competitionId: string, teamId: string, challengeId: string, file: File) {
     const checksum = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())))
       .map(byte => byte.toString(16).padStart(2, '0'))
@@ -573,47 +563,54 @@ export const challengeApi = {
 }
 
 export const teamApi = {
-  async mine<T = unknown[]>() {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/teams/mine',
-    }), tt('errors.loadMyTeams'))
+  async list(competitionId: string) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsTeamsListCompetitionTeamsEndpoint({
+        path: { competitionId },
+      }),
+      tt('errors.loadTeams'),
+    )
+    if (!response.items)
+      throw new ApiError(tt('errors.loadTeams'))
+    return response.items.map(toPublicTeam)
   },
-  async create<T = unknown>(body: { competitionId: string, name: string, avatarUrl?: string }) {
-    return unwrap(await client.post<{ 201: T }, unknown, false>({
-      url: '/api/teams',
-      body,
-    }), tt('errors.createTeam'))
+  async getMy(competitionId: string) {
+    const result = await generatedSdk.noCtfapiEndpointsTeamsGetMyTeamEndpoint({
+      path: { competitionId },
+    })
+    if (result.response?.status === 404)
+      return null
+    return toPublicTeam(unwrap(result, tt('errors.loadMyTeams')))
   },
-  async join<T = unknown>(teamId: string) {
-    return unwrap(await client.post<{ 200: T }, unknown, false>({
-      url: '/api/teams/{teamId}/join',
-      path: { teamId },
-    }), tt('errors.joinTeam'))
+  async create(
+    competitionId: string,
+    body: NoCtfapiEndpointsTeamsCreateTeamRequest & { name: string },
+  ) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsTeamsCreateTeamEndpoint({
+        path: { competitionId },
+        body,
+      }),
+      tt('errors.createTeam'),
+    )
+    return toPublicTeam(response)
   },
-  async joinByToken<T = unknown>(token: string) {
-    return unwrap(await client.post<{ 200: T }, unknown, false>({
-      url: '/api/teams/join-by-token',
-      body: { token },
-    }), tt('errors.joinTeam'))
+  async join(competitionId: string, invitationToken: string) {
+    await requireSuccess(
+      generatedSdk.noCtfapiEndpointsTeamsJoinTeamByInvitationEndpoint({
+        path: { competitionId },
+        body: { invitationToken },
+      }),
+      tt('errors.joinTeam'),
+    )
   },
-  async leave(teamId: string) {
-    await requireSuccess(client.post({ url: '/api/teams/{teamId}/leave', path: { teamId } }), tt('errors.requestFailed'))
-  },
-  async update(id: string, body: Record<string, unknown>) {
-    return unwrap(await sdk.noCtfapiEndpointsTeamsUpdateTeamEndpoint({ path: { id }, body }), tt('errors.updateTeam'))
-  },
-  async transferCaptain(teamId: string, newCaptainUserId: string) {
-    await requireSuccess(client.post({
-      url: '/api/teams/{teamId}/transfer-captain',
-      path: { teamId },
-      body: { newCaptainUserId },
-    }), tt('errors.requestFailed'))
-  },
-  async removeMember(teamId: string, userId: string) {
-    await requireSuccess(client.delete({
-      url: '/api/teams/{teamId}/members/{userId}',
-      path: { teamId, userId },
-    }), tt('errors.requestFailed'))
+  async leave(competitionId: string) {
+    await requireSuccess(
+      generatedSdk.noCtfapiEndpointsTeamsLeaveTeamEndpoint({
+        path: { competitionId },
+      }),
+      tt('errors.requestFailed'),
+    )
   },
 }
 
