@@ -5,9 +5,7 @@ import { useRoute } from 'vue-router'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import DataState from '@/components/state/DataState.vue'
-import AwdDashboardView from './AwdDashboardView.vue'
 import CompetitionDetailView from './CompetitionDetailView.vue'
-import KohDashboardView from './KohDashboardView.vue'
 
 const route = useRoute()
 const id = computed(() => route.params.id as string)
@@ -47,8 +45,6 @@ const mode = computed(() => competition.value?.mode)
       class="w-full"
       unsupported
     />
-    <CompetitionDetailView v-else-if="mode === 'ctf' || mode === 'awdp'" class="w-full" />
-    <AwdDashboardView v-else-if="mode === 'awd'" class="w-full" />
-    <KohDashboardView v-else class="w-full" />
+    <CompetitionDetailView v-else class="w-full" />
   </div>
 </template>

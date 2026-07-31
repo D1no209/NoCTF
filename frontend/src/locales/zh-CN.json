@@ -82,8 +82,6 @@
     "loadInstance": "加载实例失败",
     "destroyInstance": "销毁实例失败",
     "extendInstance": "延期实例失败",
-    "loadAwdDashboard": "加载 AWD 控制台失败",
-    "loadKohDashboard": "加载 KoH 控制台失败",
     "loadCompetitionView": "加载比赛视图失败",
     "loadTeams": "加载队伍失败",
     "loadMyTeams": "加载我的队伍失败",
@@ -120,8 +118,7 @@
     "awdpScreenLoad": "加载 AWDP 大屏数据失败",
     "awdpScreenNonJson": "AWDP 大屏接口未返回 JSON。请重建或重启后端，确保 /api/awdp/screen/snapshot 已注册。",
     "awdpScreenInvalidJson": "AWDP 大屏接口返回了无效 JSON",
-    "loadNotifications": "加载通知失败",
-    "updateNotifications": "更新通知失败"
+    "loadNotifications": "加载通知失败"
   },
   "nav": {
     "home": "首页",
@@ -133,50 +130,51 @@
     "score": "分"
   },
   "notifications": {
-    "title": "通知",
-    "open": "打开通知",
-    "openUnread": "打开通知，有 {count} 条未读",
-    "unreadSummary": "{count} 条未读",
-    "markAllRead": "全部已读",
-    "loadFailed": "暂时无法加载通知",
-    "empty": "暂无未处理通知",
-    "emptyHint": "比赛动态会显示在这里。",
+    "title": "事件记录",
+    "open": "打开事件记录",
+    "historySummary": "已加载 {count} 条事件",
+    "refresh": "刷新事件记录",
+    "loadOlder": "加载更早事件",
+    "loadOlderFailed": "暂时无法加载更早事件。",
+    "loadFailed": "暂时无法加载事件记录",
+    "empty": "尚无事件记录",
+    "emptyHint": "永久保存的比赛与平台事件会显示在这里。",
     "events": {
-      "competitionStarted": {
-        "title": "比赛已开始",
-        "body": "{competition_name} 已正式开始。"
+      "competitionLifecycleChanged": {
+        "title": "比赛生命周期已变化",
+        "body": "本场比赛记录了一次生命周期事件。"
       },
-      "challengePublished": {
-        "title": "新题发布：{problem_title}",
-        "body": "新的 {problem_category} 题目现已开放。"
+      "teamRegistrationChanged": {
+        "title": "队伍报名状态已变化",
+        "body": "系统记录了一次队伍报名事件。"
       },
-      "hintPublished": {
-        "title": "新增提示：{problem_title}",
-        "body": "{hint_title}：{hint_content}"
+      "submissionEvaluated": {
+        "title": "提交已完成评测",
+        "body": "系统记录了一次提交评测事件。"
       },
-      "firstBlood": {
-        "title": "一血诞生",
-        "body": "{team_name} 解出了 {problem_title}。"
+      "runtimeStateChanged": {
+        "title": "运行实例状态已变化",
+        "body": "系统记录了一次题目运行实例状态事件。"
       },
-      "secondBlood": {
-        "title": "二血诞生",
-        "body": "{team_name} 解出了 {problem_title}。"
+      "startGateFailed": {
+        "title": "比赛启动检查失败",
+        "body": "本场比赛未通过启动前检查。"
       },
-      "thirdBlood": {
-        "title": "三血诞生",
-        "body": "{team_name} 解出了 {problem_title}。"
+      "managementFailure": {
+        "title": "比赛运维告警",
+        "body": "系统记录了一次比赛管理故障。"
       },
-      "teamPenalized": {
-        "title": "比赛处罚通知",
-        "body": "{team_name}：{penalty_type}"
+      "awdFlagInjectionFailed": {
+        "title": "AWD Flag 注入失败",
+        "body": "Flag 未能注入题目运行实例，请检查比赛运维状态。"
       },
-      "announcement": {
-        "title": "{announcement_title}",
-        "body": "{announcement_content}"
+      "awdCheckerCallbackMissing": {
+        "title": "AWD Checker 回调缺失",
+        "body": "Checker 未在截止时间前回报，请检查运行实例与 Runner 健康状态。"
       },
       "unknown": {
-        "title": "比赛动态",
-        "body": "有一条新的比赛动态。"
+        "title": "系统事件",
+        "body": "系统记录了一条暂不支持展示类型的事件。"
       }
     }
   },
@@ -423,83 +421,12 @@
     "selectChallenge": "选择题目",
     "flag": "Flag",
     "uploadPatch": "上传 Patch",
-    "patchArchive": "Patch 压缩包（.zip、.tar.gz）",
     "dropFile": "拖放文件到此处或点击浏览",
     "submitPatch": "提交 Patch",
     "patchStatus": "Patch 状态",
     "patchSubmitted": "Patch 已提交，正在验证",
-    "uploadFailed": "上传失败 ({status})",
     "patchUploadFailed": "Patch 上传失败",
-    "patchFileHint": ".tar.gz 或 .tgz，最大 10MB",
-    "patchSubmissionId": "提交 ID：{id}",
-    "currentTeam": "当前队伍",
-    "selectedService": "所选题目",
-    "defensePhase": "防御阶段",
-    "serviceStatus": "服务状态",
-    "attackLog": "攻击日志",
-    "realtimeActivity": "实时动态",
-    "noAttacks": "暂无攻击",
-    "noServices": "暂无服务",
-    "teamHeader": "队伍",
-    "statusUp": "正常",
-    "statusDown": "宕机",
-    "statusUnknown": "未知",
-    "battlefield": {
-      "kicker": "AWD 实时态势",
-      "title": "中心攻击场",
-      "metricRound": "轮次",
-      "metricQueue": "队列",
-      "metricSla": "SLA",
-      "railTeams": "队伍",
-      "railServices": "服务",
-      "emptyTeams": "等待 GameBox 遥测",
-      "emptyServices": "等待题目服务",
-      "coreRoundLabel": "轮次",
-      "stateIdle": "空闲模式",
-      "statePlayback": "事件回放",
-      "stateMonitoring": "正在监控服务检查与 Flag 提交",
-      "emptyPlayed": "本视图暂无已回放事件。",
-      "healthAllUp": "全部正常",
-      "healthDown": "{count} 宕机",
-      "healthUnknown": "{count} 未知",
-      "serviceHealthDown": "{down}/{total} 宕机",
-      "serviceHealthUnknown": "{unknown}/{total} 未知",
-      "serviceHealthUp": "{healthy}/{total} 正常",
-      "defaults": {
-        "service": "服务",
-        "attacker": "攻击者",
-        "target": "目标",
-        "team": "队伍"
-      },
-      "events": {
-        "attackSuccess": "攻击成功",
-        "attackFailed": "攻击失败",
-        "serviceDown": "服务宕机",
-        "serviceRecovered": "服务恢复",
-        "roundStart": "第 {round} 轮开始",
-        "flagRefreshed": "Flag 已轮换",
-        "checkerError": "检查器异常",
-        "gameboxRestarting": "GAMEBOX 重启中"
-      },
-      "summary": {
-        "attack": "{attacker} -> {victim} / {challenge}",
-        "teamChallenge": "{team} / {challenge}",
-        "checkerError": "{challenge} / {reason}",
-        "flagRotation": "第 {round} 轮 Flag 轮换",
-        "round": "第 {round} 轮"
-      },
-      "logLine": {
-        "attack": "{time} {attacker} 攻击 {victim} / {challenge} {result}",
-        "resultSuccess": "成功",
-        "resultFailed": "失败",
-        "serviceDown": "{time} {team} / {challenge} 服务宕机",
-        "serviceRecovered": "{time} {team} / {challenge} 服务恢复",
-        "roundStart": "{time} 第 {round} 轮开始",
-        "flagRefresh": "{time} 第 {round} 轮 Flag 已轮换",
-        "checkerError": "{time} {challenge} 检查器异常",
-        "gameboxRestart": "{time} {team} / {challenge} GAMEBOX 重启中"
-      }
-    }
+    "patchFileHint": ".tar.gz 或 .tgz，最大 10MB"
   },
   "awdp": {
     "screenEntry": "中控大屏",
@@ -700,23 +627,6 @@
       "scoreUpdated": "{round} / {team} 本轮分数已结算",
       "rankChanged": "{round} / {team} 排名变更"
     }
-  },
-  "koh": {
-    "badge": "KoH",
-    "kingOfTheHill": "占山为王",
-    "subtitle": "占领题目控制权，并按持续时间获得积分。",
-    "challengeCount": "{count} 道题目",
-    "challengeCount_plural": "{count} 道题目",
-    "loading": "正在加载 KoH 控制台...",
-    "empty": "暂无可用的题目",
-    "emptyDetail": "本场比赛尚未配置山头题目。",
-    "loadError": "加载 KoH 控制台失败。",
-    "loadErrorDetail": "请刷新控制台，或检查比赛是否仍在运行。",
-    "controlled": "已被占领",
-    "uncontested": "无人占领",
-    "controller": "占领者",
-    "history": "历史",
-    "noHistory": "暂无占领记录"
   },
   "admin": {
     "users": {

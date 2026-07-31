@@ -1,33 +1,42 @@
-import type { UserNotification } from '@/api/noctf'
+import type { PublicNotification } from '@/api/notificationPresentation'
+import { NotificationKind } from '@/api/notificationPresentation'
 
 export interface NotificationCopy {
   titleKey: string
   bodyKey: string
-  params: Record<string, string>
 }
 
-export function notificationCopy(notification: UserNotification): NotificationCopy {
-  const params = notification.data ?? {}
+export function notificationCopy(notification: PublicNotification): NotificationCopy {
+  const payloadCode = readPayloadCode(notification.payload)
 
-  switch (notification.type) {
-    case 'competition.started':
-      return copy('competitionStarted', params)
-    case 'challenge.published':
-      return copy('challengePublished', params)
-    case 'hint.published':
-      return copy('hintPublished', params)
-    case 'blood.first':
-      return copy('firstBlood', params)
-    case 'blood.second':
-      return copy('secondBlood', params)
-    case 'blood.third':
-      return copy('thirdBlood', params)
-    case 'team.penalized':
-      return copy('teamPenalized', params)
-    case 'announcement':
-      return copy('announcement', params)
+  if (
+    notification.kind === NotificationKind.RuntimeStateChanged
+    && payloadCode === 'awd_flag_injection_failed'
+  ) {
+    return copy('awdFlagInjectionFailed')
+  }
+  if (
+    notification.kind === NotificationKind.ManagementFailure
+    && payloadCode === 'awd_checker_callback_missing'
+  ) {
+    return copy('awdCheckerCallbackMissing')
+  }
+
+  switch (notification.kind) {
+    case NotificationKind.CompetitionLifecycleChanged:
+      return copy('competitionLifecycleChanged')
+    case NotificationKind.TeamRegistrationChanged:
+      return copy('teamRegistrationChanged')
+    case NotificationKind.SubmissionEvaluated:
+      return copy('submissionEvaluated')
+    case NotificationKind.RuntimeStateChanged:
+      return copy('runtimeStateChanged')
+    case NotificationKind.StartGateFailed:
+      return copy('startGateFailed')
+    case NotificationKind.ManagementFailure:
+      return copy('managementFailure')
     default:
-      return copy('unknown', {})
+      return copy('unknown')
   }
 }
 
@@ -44,10 +53,26 @@ export function formatNotificationTime(value: string, locale: string) {
   }).format(date)
 }
 
-function copy(name: string, params: Record<string, string>): NotificationCopy {
+function copy(name: string): NotificationCopy {
   return {
     titleKey: `notifications.events.${name}.title`,
     bodyKey: `notifications.events.${name}.body`,
-    params,
+  }
+}
+
+function readPayloadCode(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+    return undefined
+  try {
+    const prototype = Object.getPrototypeOf(payload)
+    if (prototype !== Object.prototype && prototype !== null)
+      return undefined
+    const descriptor = Object.getOwnPropertyDescriptor(payload, 'code')
+    return descriptor && 'value' in descriptor && typeof descriptor.value === 'string'
+      ? descriptor.value
+      : undefined
+  }
+  catch {
+    return undefined
   }
 }

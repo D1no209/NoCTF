@@ -4,17 +4,6 @@ import { apiUrl } from '@/api/noctf'
 
 export const COMPETITION_HUB_PATH = '/hubs/v1/competitions'
 
-export interface AttackLogDto {
-  attackerTeamId: string
-  attackerTeamName: string
-  victimTeamId: string
-  victimTeamName: string
-  challengeId: string
-  challengeName: string
-  roundNumber: number
-  timestamp: string
-}
-
 export interface UseSignalROptions {
   hubUrl: string
   accessToken?: () => string | null
@@ -93,25 +82,5 @@ export function useSignalR(options: UseSignalROptions) {
     stop()
   })
 
-  function onRoundStarted(callback: (roundNumber: number) => void) {
-    conn.on('ReceiveRoundStarted', (dto: { roundNumber: number }) => callback(dto.roundNumber))
-  }
-
-  function onAttackLog(callback: (log: AttackLogDto) => void) {
-    conn.on('ReceiveAttackLog', (log: AttackLogDto) => callback(log))
-  }
-
-  function onKohUpdate(callback: (dto: {
-    challengeId: string
-    controllerTeamId: string | null
-    timestamp: string
-  }) => void) {
-    conn.on('ReceiveKohUpdate', (dto: {
-      challengeId: string
-      controllerTeamId: string | null
-      timestamp: string
-    }) => callback(dto))
-  }
-
-  return { connection, isConnected, error, start, stop, onRoundStarted, onAttackLog, onKohUpdate }
+  return { connection, isConnected, error, start, stop }
 }
