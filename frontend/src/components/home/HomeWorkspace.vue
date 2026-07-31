@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import { canManagePlatformResources } from '@/api/userRole'
 import HomeCompetitionList from '@/components/home/HomeCompetitionList.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +17,7 @@ import { useAuthStore } from '@/stores/auth'
 const { t } = useI18n()
 const auth = useAuthStore()
 
-const canManage = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
+const canManage = computed(() => canManagePlatformResources(auth.userRole))
 
 const { data: competitions, isLoading: loadingCompetitions } = useQuery({
   queryKey: queryKeys.competitions,

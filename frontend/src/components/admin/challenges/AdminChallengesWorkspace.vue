@@ -28,6 +28,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { challengeBankAdminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import { isPlatformAdministrator } from '@/api/userRole'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -84,7 +85,7 @@ const lifecycleDialog = ref(false)
 const copiedId = ref<string | null>(null)
 const gitOpsAccessDialog = ref(false)
 const gitOpsAccessTemplate = ref<ChallengeTemplate | null>(null)
-const isAdministrator = computed(() => auth.userRole === 'Admin')
+const isAdministrator = computed(() => isPlatformAdministrator(auth.userRole))
 
 const challengeTemplatesQueryKey = computed(() => [
   ...queryKeys.adminChallenges,
