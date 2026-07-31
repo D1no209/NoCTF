@@ -22,7 +22,7 @@ import type {
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
 import { translate as tt } from '@/i18n'
-import { readAuthSession } from './auth-session'
+import { configureAuthSessionRefresh, readAuthSession } from './auth-session'
 import { client } from './generated/client.gen'
 import * as generatedSdk from './generated/sdk.gen'
 
@@ -35,6 +35,16 @@ const sdk: any = new Proxy(generatedSdk, {
     return async () => ({ data: undefined, error: new Error(`Unsupported API operation: ${property}`) })
   },
 })
+
+function requestAuthenticationRefresh(signal?: AbortSignal) {
+  return generatedSdk.noCtfapiEndpointsAuthenticationRefreshTokenEndpoint({
+    credentials: 'include',
+    headers: { Authorization: null },
+    signal,
+  })
+}
+
+configureAuthSessionRefresh(requestAuthenticationRefresh)
 
 export class ApiError extends Error {
   readonly status?: number
@@ -273,13 +283,16 @@ export const notificationApi = {
 
 export const authApi = {
   async login(email: string, password: string) {
-    return postJson<{ userId: string, userName: string, role: string, accessToken: string, accessTokenExpiresAt: string }>(
-      '/auth/login',
-      { login: email, password },
-    )
+    return unwrap(await generatedSdk.noCtfapiEndpointsAuthenticationLoginEndpoint({
+      body: { login: email, password },
+      credentials: 'include',
+    }), tt('errors.login'))
   },
   async register(userName: string, email: string, password: string) {
-    return unwrap(await sdk.noCtfapiEndpointsAuthRegisterEndpoint({ body: { userName, email, password } }), tt('errors.registration'))
+    return unwrap(await generatedSdk.noCtfapiEndpointsAuthenticationRegisterEndpoint({
+      body: { userName, email, password },
+      credentials: 'include',
+    }), tt('errors.registration'))
   },
   async verifyEmail(token: string) {
     return unwrap(await client.post<{ 200: { status: string } }, unknown, false>({
@@ -294,7 +307,7 @@ export const authApi = {
     }), tt('errors.resendVerification'))
   },
   async refresh() {
-    return postJson<{ accessToken: string, accessTokenExpiresAt: string }>('/auth/refresh')
+    return unwrap(await requestAuthenticationRefresh(), tt('errors.refreshToken'))
   },
 }
 
@@ -995,8 +1008,8 @@ export const adminApi = {
   async auditLogs<T = unknown>(query: Record<string, unknown>) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/audit-logs', query }), tt('errors.loadAuditLogs'))
   },
-  async health<T = unknown>() {
-    return unwrap(await sdk.getApiHealth(), tt('errors.loadHealth')) as T
+  async health() {
+    return unwrap(await generatedSdk.noCtfapiEndpointsHealthEndpoint(), tt('errors.loadHealth'))
   },
   async infrastructure() {
     return unwrap(await sdk.noCtfapiEndpointsAdminGetInfrastructureEndpoint(), tt('errors.loadHealth'))

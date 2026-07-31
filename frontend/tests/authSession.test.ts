@@ -77,8 +77,12 @@ describe('auth session refresh', () => {
     saveAuthSession({ accessToken: oldToken, userName: 'admin', role: 'Admin' })
     configureAuthSessionRefresh(async () => {
       requests += 1
-      return Response.json({ accessToken: newToken, userName: 'admin', role: 'Admin' })
-    }, '')
+      return {
+        data: { accessToken: newToken, userName: 'admin', role: 'Admin' },
+        error: undefined,
+        response: Response.json({}),
+      }
+    })
 
     const [first, second] = await Promise.all([
       refreshAuthSessionIfNeeded(),
@@ -94,7 +98,11 @@ describe('auth session refresh', () => {
   test('clears a session rejected by the refresh endpoint', async () => {
     const token = jwt(Date.now() + 30_000, 'revoked')
     saveAuthSession({ accessToken: token, userName: 'admin', role: 'Admin' })
-    configureAuthSessionRefresh(async () => new Response(null, { status: 401 }), '')
+    configureAuthSessionRefresh(async () => ({
+      data: undefined,
+      error: {},
+      response: new Response(null, { status: 401 }),
+    }))
 
     expect(await refreshAuthSessionIfNeeded()).toBeNull()
     expect(readAuthSession()).toBeNull()
