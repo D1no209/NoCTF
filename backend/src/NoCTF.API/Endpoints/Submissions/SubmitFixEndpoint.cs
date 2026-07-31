@@ -28,7 +28,13 @@ public sealed class SubmitFixEndpoint(SubmitFix submitFix, IUserContext userCont
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/fix-submissions");
         AuthSchemes("Bearer");
-        Options(options => options.WithMetadata(new EnableRateLimitingAttribute("submission")));
+        Options(options => options
+            .WithMetadata(new EnableRateLimitingAttribute("submission"))
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status403Forbidden)
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status429TooManyRequests));
         Summary(summary =>
         {
             summary.Summary = "Consume a PatchUpload and create a Fix attempt.";

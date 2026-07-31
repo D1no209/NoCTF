@@ -27,6 +27,9 @@ public sealed class ExtendRuntimeEndpoint(
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/extend");
         AuthSchemes("Bearer");
+        Options(options => options
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status503ServiceUnavailable));
         Summary(summary => summary.Summary = "Extends a running CTF runtime.");
     }
 
