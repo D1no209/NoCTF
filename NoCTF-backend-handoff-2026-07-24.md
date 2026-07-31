@@ -5,9 +5,9 @@
 ## 1. 下一会话目标
 
 2026-07-31 本轮 outcome、上传补偿、Runtime scope、Patch draft、Runtime cleanup/
-replacement 与团队并发额度纵切已在本机闭合；Frontend 正继续按生成 OpenAPI 契约逐项
+replacement、团队并发额度与 CTF 排行榜前三血纵切已在本机闭合；Frontend 正继续按生成 OpenAPI 契约逐项
 迁移。此前第 7 节列出的三个高置信 Backend 问题均已由 `a234ee6` 完成，最新状态以
-6.33 至 6.47 和第 7 节为准：
+6.33 至 6.48 和第 7 节为准：
 
 - Docker Container/Compose 公开服务最终采用题目容器直接映射 Docker 随机宿主端口；
 - 24 条 `LeaderboardRevision` 写路径均在同一事务发布 invalidation；
@@ -24,9 +24,9 @@ replacement 与团队并发额度纵切已在本机闭合；Frontend 正继续�
 - PatchUpload 已按既定规范恢复为可替换 draft，替换与 Fix 消费共用事务锁，旧对象通过
   Wolverine durable outbox 清理；
 - 当前环境可执行的后端测试（含真实 PostgreSQL/Redis/Wolverine/Docker 集成）均通过：
-  495/495 non-Integration、117/117 可执行 Integration，0 failed；需要目标环境的
+  497/497 non-Integration、118/118 可执行 Integration，0 failed；需要目标环境的
   Kubernetes/Libvirt 各 1 项保持显式 skip。EF 无 pending model，OpenAPI 两份 artifact
-  字节一致，详见 6.47。
+  字节一致，详见 6.48。
 
 2026-07-30 已验证 GitOps 模板 `2571893` 可构建，`validate` 与 `self-test` 均通过。用户经
 `$grill-me` 明确选择方案 A：使用普通 Organizer Bot、普通长生命周期 Access JWT、现有
@@ -47,6 +47,7 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - 6.45 至 6.47 已完成 provider cleanup/capacity 收敛、replacement/自动 provision
   状态机，以及 `MaxConcurrentRuntimeInstancesPerTeam` 事务额度、方案 A API 与 AWD
   start gate。
+- 6.48 已完成 CTF 排行榜一血、二血、三血的统一强类型投影与 OpenAPI 契约；计分公式未改。
 - 用户已明确授权 push；`codex/backend-gitops-completion` 已推送，不创建 PR、不合入
   `main`。Frontend 后续优化由协作者并行推进，本会话避免再修改 Frontend。
 - 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
@@ -64,7 +65,8 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - 用户已明确要求 push。2026-07-31 通过 GitHub CLI 认证的 HTTPS fetch 确认
   `origin/main` 仍为当前分支祖先，behind 0，无冲突也无需空 merge。
 - `5660dc3` 的首次推送已通过 GitHub API 核对远端 ref；6.42 至 6.44 的后续 bug fix 与
-  handoff 已推送到同一工作分支。`a234ee6` 是本轮 Runtime cleanup/quota 代码提交。
+  handoff 已推送到同一工作分支。`a234ee6` 是 Runtime cleanup/quota 代码提交；
+  `f9216b9` 是 CTF 排行榜前三血代码提交。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
 - 本轮只更新工作分支；没有创建 PR、直接推送 `main` 或执行部署。
@@ -2181,6 +2183,30 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   `DF37E8152FBC3DBFE7C53F13DE2D9EE71BE4629C0243C3AD50054203F73D9749`。本轮未生成或
   修改 Frontend；协作者需从该 OpenAPI 重新生成强类型客户端。
 
+### 6.48 CTF 排行榜一血、二血、三血（2026-07-31）
+
+- 本地提交：`f9216b9 fix(leaderboard): expose first three bloods`。
+- CTF 计分器原本已经按有效 solve 的 `ReceivedAt + SubmissionId` 给一血、二血、三血发放
+  BloodReward；缺陷只在展示投影，旧 `BuildFirstBloods` 每题直接取 `.First()`，导致响应
+  只有一血。本轮没有改计分公式、Submission/ScoringEvent 事实或数据库模型。
+- Leaderboard 公共响应将语义错误的 `firstBloods[]` 改为 `bloods[]`；每项通过强类型
+  `LeaderboardBloodRank.First/Second/Third`（OpenAPI 数值 1/2/3）携带 Team、slot 与时间。
+  `subjects[].slots[]` 同步使用 nullable `bloodRank`/`bloodAt`，顶层与队伍题目槽位来自同一
+  投影结果。
+- 每题先按 TeamId 去重、取该队最早 Correct，再按 `ReceivedAt + SubmissionId` 排序取前三；
+  同队重判/重复 Correct 不会占多个血位，第四名以后没有 blood rank。只有 CTF Flag solve
+  eligible；AWD、AWDP、KoH 维持无 blood 语义。
+- Redis leaderboard snapshot key 升为 `leaderboard:v2:{competitionId}:state`，新进程不会把
+  旧 `firstBloods` JSON 当成当前契约；旧 key 按原 TTL 自然过期。新增真实 Redis 往返测试
+  固定三个血位的序列化结果。
+- 最终门禁：Release solution 与独立 E2E project 均 0 warning/0 error；497/497
+  non-Integration passed；Integration 共发现 120 项，118/118 可执行项 passed、0 failed，
+  Kubernetes/Libvirt 各 1 项因目标环境未提供而 skipped。EF 无 pending model changes。
+  OpenAPI 仍为 134 endpoints，两份 artifact 字节一致，SHA-256 均为
+  `AE632F758047EDEE3C37E59CE902BAEB5494BD77FF771747C5B280112DB0A1AB`。
+- 本轮未改 Frontend，也未运行 Frontend SDK generator；协作者需要从新 OpenAPI 重新生成，
+  将旧 `firstBloods` 消费改为 `bloods` 并在排行榜 UI 展示 First/Second/Third。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2197,6 +2223,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - Runtime provider cleanup/capacity 的完整 identity fence、replacement cleanup 状态机与
   离线 `Provisioning + no receipt` fail-closed；
 - 团队 logical Runtime slot 事务额度、方案 A 必填 API 和 AWD start-time completeness。
+- CTF 排行榜按题公开一血、二血、三血，顶层 blood summary 与队伍 slot 强类型一致。
 
 当前尚未执行的交付边界：
 
@@ -2211,9 +2238,11 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 
 Frontend 协作者正在并行优化，本会话不再修改 Frontend。其待办以当前生成 OpenAPI 为准：
 
-1. 先从 6.47 的最新 OpenAPI 重新生成客户端；Competition Create/Update 必须提交
+1. 先从 6.47/6.48 的最新 OpenAPI 重新生成客户端；Competition Create/Update 必须提交
    `maxConcurrentRuntimeInstancesPerTeam`，读取使用 response 的强类型 `int`。继续通过
    生成 SDK 与既有运行时配置解析 API base URL，不得在页面或 composable 写死 URL。
+   Leaderboard 将旧 `firstBloods[]` 改为 `bloods[]`，必须展示每题
+   `First/Second/Third`，并可使用 subject slot 的 `bloodRank`/`bloodAt`。
 2. 迁移 Runtime start/get/reset/stop/extend、numeric state 与 `urls[]`；不能用 Challenge
    direction 猜 capability，Extend 的 seconds/TTL 产品语义若仍有冲突必须先 `$grill-me`。
 3. 按 6.44 的可替换 draft 实现 multipart Patch upload → Submit Fix → status polling；
@@ -2270,8 +2299,8 @@ Docker port mapping，host port 固定请求 `0`。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
 4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做。最新 Frontend 迁移状态
    使用 6.34 至 6.40；最新 outcome、上传补偿、Runtime scope 和 Patch draft Backend 状态
-   使用 6.41 至 6.44；Runtime cleanup/replacement/quota 使用 6.45 至 6.47。Frontend
-   协作者正在并行工作，本会话避免修改 Frontend 文件。
+   使用 6.41 至 6.44；Runtime cleanup/replacement/quota 使用 6.45 至 6.47；CTF 排行榜
+   三血契约使用 6.48。Frontend 协作者正在并行工作，本会话避免修改 Frontend 文件。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
