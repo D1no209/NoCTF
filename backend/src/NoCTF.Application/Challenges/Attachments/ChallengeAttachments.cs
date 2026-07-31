@@ -121,11 +121,30 @@ public sealed class ManageChallengeAttachments(
             string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
             content,
             ct);
-        var saved = await store.AddAsync(
-            challengeId, actorId, isAdministrator, attachmentId, stored, now, ct);
+        AddChallengeAttachmentState saved;
+        var added = false;
+        try
+        {
+            saved = await store.AddAsync(
+                challengeId, actorId, isAdministrator, attachmentId, stored, now, ct);
+            added = saved == AddChallengeAttachmentState.Added;
+        }
+        finally
+        {
+            if (!added)
+            {
+                try
+                {
+                    await objects.DeleteAsync(stored.ObjectKey, CancellationToken.None);
+                }
+                catch
+                {
+                    // Compensating cleanup is best-effort and must preserve the primary outcome.
+                }
+            }
+        }
         if (saved != AddChallengeAttachmentState.Added)
         {
-            await objects.DeleteAsync(objectKey, ct);
             return OperationResult<ChallengeAttachmentView>.Failure(
                 saved == AddChallengeAttachmentState.ResourceIdConflict
                     ? "resource_id_conflict"
