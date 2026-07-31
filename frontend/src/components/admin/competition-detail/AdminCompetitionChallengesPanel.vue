@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import type {
+  CompetitionChallengeLifecycleAction,
+  CompetitionChallengeLifecycleMutation,
+} from './competitionChallengeLifecycle'
 import type { CompetitionChallenge } from '@/api/noctf'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -15,7 +19,11 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { ApiError, competitionChallengeAdminApi } from '@/api/noctf'
+import {
+  ApiError,
+  competitionChallengeAdminApi,
+  readCompetitionChallengeConflict,
+} from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,9 +44,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { normalizeDirection } from '@/lib/challengeDirections'
-import { isDeletedCompetitionChallenge } from './competitionChallengeLifecycle'
-
-type LifecycleAction = 'delete' | 'restore'
+import {
+  buildCompetitionChallengeLifecycleMutation,
+  buildCompetitionChallengeLifecycleRequest,
+  isDeletedCompetitionChallenge,
+} from './competitionChallengeLifecycle'
 
 const props = defineProps<{
   competitionId: string
@@ -51,7 +61,7 @@ const direction = ref(allDirections)
 const includeDeleted = ref(false)
 const copiedId = ref('')
 const lifecycleDialog = ref(false)
-const lifecycleAction = ref<LifecycleAction | null>(null)
+const lifecycleAction = ref<CompetitionChallengeLifecycleAction | null>(null)
 const selectedChallenge = ref<CompetitionChallenge | null>(null)
 
 const challengeQueryKey = computed(() => [
@@ -84,19 +94,15 @@ const lifecycleMutation = useMutation({
   mutationFn: async ({
     action,
     competitionChallengeId,
-  }: {
-    action: LifecycleAction
-    competitionChallengeId: string
-  }) => {
+    query,
+  }: CompetitionChallengeLifecycleMutation) => {
     if (action === 'restore')
-      await competitionChallengeAdminApi.restore(props.competitionId, competitionChallengeId)
+      await competitionChallengeAdminApi.restore(props.competitionId, competitionChallengeId, query)
     else
-      await competitionChallengeAdminApi.delete(props.competitionId, competitionChallengeId)
+      await competitionChallengeAdminApi.delete(props.competitionId, competitionChallengeId, query)
   },
   onSuccess: (_, variables) => {
-    lifecycleDialog.value = false
-    selectedChallenge.value = null
-    lifecycleAction.value = null
+    resetLifecycleDialog()
     void queryClient.invalidateQueries({
       queryKey: queryKeys.adminCompetitionChallenges(props.competitionId),
     })
@@ -107,19 +113,30 @@ const lifecycleMutation = useMutation({
     )
   },
   onError: async (error, variables) => {
-    const staleLifecycleState
-      = error instanceof ApiError && (error.status === 404 || error.status === 409)
+    const status = error instanceof ApiError ? error.status : undefined
+    const conflict = readCompetitionChallengeConflict(error)
+    const staleLifecycleState = status === 404 || status === 409
+    if (staleLifecycleState)
+      resetLifecycleDialog()
+
     if (staleLifecycleState) {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.adminCompetitionChallenges(props.competitionId),
       })
+      toast.error(
+        t(
+          status === 409 && conflict?.code === 'RevisionConflict'
+            ? 'admin.competitionDetail.challengeRevisionConflict'
+            : 'admin.competitionDetail.challengeLifecycleConflict',
+        ),
+      )
+      return
     }
+
     toast.error(
-      staleLifecycleState
-        ? t('admin.competitionDetail.challengeLifecycleConflict')
-        : variables.action === 'restore'
-          ? t('admin.competitionDetail.restoreChallengeError')
-          : t('admin.competitionDetail.removeChallengeError'),
+      variables.action === 'restore'
+        ? t('admin.competitionDetail.restoreChallengeError')
+        : t('admin.competitionDetail.removeChallengeError'),
     )
   },
 })
@@ -146,8 +163,11 @@ async function copyStableId(id?: string) {
   }
 }
 
-function openLifecycleDialog(challenge: CompetitionChallenge, action: LifecycleAction) {
-  if (!challenge.id || (action === 'restore') !== isDeletedCompetitionChallenge(challenge))
+function openLifecycleDialog(
+  challenge: CompetitionChallenge,
+  action: CompetitionChallengeLifecycleAction,
+) {
+  if (!challenge.id || !buildCompetitionChallengeLifecycleRequest(challenge, action))
     return
 
   selectedChallenge.value = challenge
@@ -161,7 +181,23 @@ function confirmLifecycleAction() {
   if (!competitionChallengeId || !action)
     return
 
-  lifecycleMutation.mutate({ action, competitionChallengeId })
+  const latestChallenges
+    = queryClient.getQueryData<CompetitionChallenge[]>(challengeQueryKey.value)
+  const mutation = buildCompetitionChallengeLifecycleMutation(
+    latestChallenges,
+    competitionChallengeId,
+    action,
+  )
+  if (!mutation) {
+    resetLifecycleDialog()
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.adminCompetitionChallenges(props.competitionId),
+    })
+    toast.error(t('admin.competitionDetail.challengeLifecycleConflict'))
+    return
+  }
+
+  lifecycleMutation.mutate(mutation)
 }
 
 function onLifecycleDialogChange(open: boolean) {
@@ -169,10 +205,14 @@ function onLifecycleDialogChange(open: boolean) {
     return
 
   lifecycleDialog.value = open
-  if (!open) {
-    selectedChallenge.value = null
-    lifecycleAction.value = null
-  }
+  if (!open)
+    resetLifecycleDialog()
+}
+
+function resetLifecycleDialog() {
+  lifecycleDialog.value = false
+  selectedChallenge.value = null
+  lifecycleAction.value = null
 }
 </script>
 

@@ -10,6 +10,7 @@ import {
   challengeBankAdminApi,
   competitionAdminApi,
   competitionChallengeAdminApi,
+  readCompetitionChallengeConflict,
 } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { challengeModeLabelKey } from '@/components/admin/challenges/challengeTemplatePresentation'
@@ -222,9 +223,9 @@ const saveMutation = useMutation({
     await returnToChallenges()
   },
   onError: async (error) => {
-    const staleEditorState
-      = error instanceof ApiError
-        && (error.status === 409 || error.status === 404)
+    const status = error instanceof ApiError ? error.status : undefined
+    const conflict = readCompetitionChallengeConflict(error)
+    const staleEditorState = status === 409 || status === 404
     if (staleEditorState) {
       if (editing.value) {
         await challengeQuery.refetch()
@@ -237,7 +238,13 @@ const saveMutation = useMutation({
         ])
       }
 
-      toast.error(t('admin.competitionDetail.challengeRevisionConflict'))
+      toast.error(
+        t(
+          conflict?.code === 'RevisionConflict'
+            ? 'admin.competitionDetail.challengeRevisionConflict'
+            : 'admin.competitionDetail.challengeLifecycleConflict',
+        ),
+      )
       return
     }
 

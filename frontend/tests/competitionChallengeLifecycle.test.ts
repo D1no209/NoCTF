@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { createI18n } from 'vue-i18n'
 import {
   buildCompetitionChallengeCreateRequest,
+  buildCompetitionChallengeLifecycleMutation,
+  buildCompetitionChallengeLifecycleRequest,
   buildCompetitionChallengeUpdateRequest,
   isAvailableCompetitionChallengeTemplate,
   isDeletedCompetitionChallenge,
@@ -109,6 +111,87 @@ describe('competition challenge lifecycle', () => {
       buildCompetitionChallengeUpdateRequest(
         { ...challenge, deletedAt: '2026-07-31T00:00:00Z' },
         draft,
+      ),
+    ).toBeNull()
+  })
+
+  test('builds revision-fenced lifecycle queries only in the matching state direction', () => {
+    expect(
+      buildCompetitionChallengeLifecycleRequest(
+        { revision: 0, deletedAt: null },
+        'delete',
+      ),
+    ).toEqual({
+      action: 'delete',
+      query: { expectedRevision: 0 },
+    })
+    expect(
+      buildCompetitionChallengeLifecycleRequest(
+        { revision: 9, deletedAt: '2026-07-31T00:00:00Z' },
+        'restore',
+      ),
+    ).toEqual({
+      action: 'restore',
+      query: { expectedRevision: 9 },
+    })
+
+    expect(
+      buildCompetitionChallengeLifecycleRequest(
+        { revision: 9, deletedAt: '2026-07-31T00:00:00Z' },
+        'delete',
+      ),
+    ).toBeNull()
+    expect(
+      buildCompetitionChallengeLifecycleRequest(
+        { revision: 9, deletedAt: null },
+        'restore',
+      ),
+    ).toBeNull()
+  })
+
+  test.each([
+    [{ revision: undefined, deletedAt: null }, 'missing revision'],
+    [{ revision: -1, deletedAt: null }, 'negative revision'],
+    [{ revision: 1.5, deletedAt: null }, 'fractional revision'],
+    [{ revision: Number.MAX_SAFE_INTEGER + 1, deletedAt: null }, 'unsafe revision'],
+    [{ revision: 1, deletedAt: undefined }, 'missing lifecycle state'],
+  ])('fails closed for lifecycle input with %s (%s)', (challenge) => {
+    expect(buildCompetitionChallengeLifecycleRequest(challenge, 'delete')).toBeNull()
+  })
+
+  test('builds lifecycle mutations from exactly one latest cached fact', () => {
+    const active = {
+      id: '019fb3f0-4fbc-76e0-8430-1b7395120ace',
+      revision: 12,
+      deletedAt: null,
+    }
+    expect(
+      buildCompetitionChallengeLifecycleMutation(
+        [active],
+        active.id,
+        'delete',
+      ),
+    ).toEqual({
+      action: 'delete',
+      competitionChallengeId: active.id,
+      query: { expectedRevision: 12 },
+    })
+
+    expect(
+      buildCompetitionChallengeLifecycleMutation([], active.id, 'delete'),
+    ).toBeNull()
+    expect(
+      buildCompetitionChallengeLifecycleMutation(
+        [{ ...active, deletedAt: '2026-07-31T00:00:00Z' }],
+        active.id,
+        'delete',
+      ),
+    ).toBeNull()
+    expect(
+      buildCompetitionChallengeLifecycleMutation(
+        [active, { ...active }],
+        active.id,
+        'delete',
       ),
     ).toBeNull()
   })

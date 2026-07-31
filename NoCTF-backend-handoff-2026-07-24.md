@@ -1406,7 +1406,7 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
   增加 revision fence，再重建 OpenAPI/client 并用生成 SDK 适配 Frontend；前端不得解析
   错误字符串代替强类型冲突。
 
-### 6.24 Backend CompetitionChallenge 强类型冲突与生命周期并发栅栏（2026-07-31，当前最新）
+### 6.24 Backend CompetitionChallenge 强类型冲突与生命周期并发栅栏（2026-07-31）
 
 本节完成 6.23 与第 7 节首项的 Backend 协议和持久化部分；旧通用 ProblemDetails 字符串、
 无条件 delete/restore 和错误唯一约束归类均不保留。没有新增或修改 EF migration。
@@ -1465,6 +1465,51 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
   从最新 QueryClient fact fail-closed 构造 mutation，并按 typed conflict 处理 404/409；
   不得手写 URL 或解析错误文本。
 
+### 6.25 Frontend CompetitionChallenge typed conflict 与最新 revision 适配（2026-07-31，当前最新）
+
+本节完成 6.24 的 Frontend 纵切。delete/restore 不再使用无条件旧调用；没有手写 URL、
+兼容层或 ProblemDetails 文本解析。
+
+#### 最新事实、fail-closed 与冲突处理
+
+- API wrapper 的 delete/restore query 直接使用 generated
+  `AdminDeleteCompetitionChallengeData['query']` 与
+  `AdminRestoreCompetitionChallengeData['query']`，必传 `expectedRevision`；请求只经
+  `adminDeleteCompetitionChallenge` / `adminRestoreCompetitionChallenge` generated SDK。
+- lifecycle builder 只接受 non-negative safe integer revision，并严格区分 active
+  `deletedAt === null` 与非空 deleted timestamp。确认操作时不复用弹窗打开时的对象，而是按
+  stable ID 从当前 inventory QueryClient key 重读；必须恰好有一个匹配且生命周期方向仍有效
+  才构造 mutation。缓存缺失、重复 ID、revision 缺失或状态翻转均关闭弹窗、刷新清单且不发
+  mutation。
+- 409 decoder 只接受 `ApiError` status 409、对象 response 与 generated 七值 enum。
+  `RevisionConflict` 使用既有 revision 提示；其他已知或未知 409、404 使用通用 lifecycle
+  stale 提示，不解析 error message。delete/restore 的 404/409 都在等待 invalidate/refetch
+  前清空旧弹窗，避免 mutation pending 时锁住失效对象。
+- editor 的 update 404/409 会 refetch detail/inventory；只有 typed
+  `RevisionConflict` 使用 revision copy，其余冲突统一提示重新核对服务端状态。
+
+#### 验证、远端基线与 Git
+
+- `bun test`：67/67 passed，357 assertions，13 个测试文件；新增覆盖七值 typed decoder、
+  lifecycle safe-integer/state direction、从唯一最新 cache fact 取 revision，以及缓存缺失、
+  状态翻转和重复 ID fail-closed。
+- `bun run build`：`vue-tsc --noEmit` 与 Vite production build passed；仅保留依赖 PURE
+  annotation 和既有大 chunk 警告。
+- lifecycle helper、两个 Vue 组件和两个测试文件 scoped ESLint 0 error/0 warning；
+  `src/api/noctf.ts` 的 11 项规则/消息与 HEAD baseline 完全一致，只因新增代码后移行号，
+  本轮没有新增 lint debt。
+- 目标文件 `git diff --check`、无手写 lifecycle URL/错误文本解析静态扫描 passed；独立
+  只读审查发现的 404 dialog 残留与最新 cache 协调测试盲区均已修正，最终复审无阻断。
+- 提交前通过 GitHub compare 再次核验远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`，与本地已合并基线 `identical`；没有新冲突，
+  也不制造空 merge commit。
+- 本节作为独立 Frontend 本地提交，提交说明为
+  `feat(admin): adapt challenge lifecycle conflicts`；不 push、不创建 PR。保护文件继续
+  沿用 6.18。
+- 下一安全纵切回到 Backend：关闭 Challenge template mode 更新可绕过活动
+  CompetitionChallenge mode invariant 的缺口；应给出 typed state/409、真实 PostgreSQL
+  覆盖与 OpenAPI/client，再适配 Frontend，不得只依赖 start gate 晚拒绝。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1478,8 +1523,8 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 
 - Frontend 的 Bot、Challenge lifecycle inventory、typed role 409、Challenge Bot
   Manager 授权、CompetitionChallenge 稳定 ID/lifecycle 与 Competition 权限完整集合 UI
-  均已完成；CompetitionChallenge typed 409 与 delete/restore revision fence 的 Backend
-  已完成，下一项是仅使用本轮 generated SDK 的 Frontend lifecycle 并发适配。
+  均已完成；CompetitionChallenge typed 409、delete/restore revision fence 与其 Frontend
+  generated-SDK 并发适配也已完成。下一项是 Challenge template mode 更新的活动引用 invariant。
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
   环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
@@ -1489,9 +1534,9 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 
 ## 7. 建议的下一交接顺序
 
-1. 在 Frontend 使用 6.24 generated SDK 适配 CompetitionChallenge delete/restore
-   expectedRevision 与 typed conflict；确认时必须从最新缓存事实构造请求，不得手写 URL、
-   复用对话框旧 revision 或解析错误字符串。
+1. 在 Backend 阻止 Challenge template 在存在活动 CompetitionChallenge 引用时改变
+   GameMode；补稳定 typed conflict、真实 PostgreSQL 失败原子性与 OpenAPI/client，然后
+   适配 Frontend。不得只依赖比赛启动时再发现 mode mismatch。
 2. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
 3. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
 
@@ -1520,10 +1565,10 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
 4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；Frontend typed 409、
    Bot Manager 授权、CompetitionChallenge lifecycle 与 Competition 权限完整集合 UI
-   均已完成。CompetitionChallenge typed 409 与 delete/restore revision fence 的 Backend
-   已按 6.24 完成；下一阶段只做其 Frontend generated-SDK 适配。引用权限 Backend 测试数量
-   时使用 6.22，引用最新 Backend 状态时使用 6.24，引用已提交 Frontend 权限状态时使用
-   6.23。
+   均已完成。CompetitionChallenge typed 409、delete/restore revision fence 与 Frontend
+   generated-SDK 适配已按 6.24/6.25 完成；下一阶段处理 Challenge template mode 更新的活动
+   引用 invariant。引用权限 Backend 测试数量时使用 6.22，引用最新 Backend 状态时使用
+   6.24，引用最新 Frontend 状态时使用 6.25。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

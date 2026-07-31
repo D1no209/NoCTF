@@ -1,4 +1,6 @@
 import type {
+  AdminDeleteCompetitionChallengeData,
+  AdminRestoreCompetitionChallengeData,
   NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest,
   NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest,
 } from '@/api/generated/types.gen'
@@ -14,6 +16,20 @@ export interface CompetitionChallengeDraft {
   baseScore: number
   order: number
   isPublished: boolean
+}
+
+export type CompetitionChallengeLifecycleAction = 'delete' | 'restore'
+
+export interface CompetitionChallengeLifecycleRequest {
+  action: CompetitionChallengeLifecycleAction
+  query:
+    & AdminDeleteCompetitionChallengeData['query']
+    & AdminRestoreCompetitionChallengeData['query']
+}
+
+export interface CompetitionChallengeLifecycleMutation
+  extends CompetitionChallengeLifecycleRequest {
+  competitionChallengeId: string
 }
 
 function hasValidNumbers(draft: CompetitionChallengeDraft) {
@@ -75,6 +91,56 @@ export function buildCompetitionChallengeUpdateRequest(
     isPublished: draft.isPublished,
     expectedRevision: challenge.revision,
   }
+}
+
+export function buildCompetitionChallengeLifecycleRequest(
+  challenge: CompetitionChallenge,
+  action: CompetitionChallengeLifecycleAction,
+): CompetitionChallengeLifecycleRequest | null {
+  const revision = challenge.revision
+  if (
+    typeof revision !== 'number'
+    || !Number.isSafeInteger(revision)
+    || revision < 0
+  ) {
+    return null
+  }
+
+  const state = challenge.deletedAt === null
+    ? 'active'
+    : typeof challenge.deletedAt === 'string' && challenge.deletedAt.trim()
+      ? 'deleted'
+      : null
+  if (
+    state === null
+    || (action === 'delete' && state !== 'active')
+    || (action === 'restore' && state !== 'deleted')
+  ) {
+    return null
+  }
+
+  return {
+    action,
+    query: { expectedRevision: revision },
+  }
+}
+
+export function buildCompetitionChallengeLifecycleMutation(
+  challenges: CompetitionChallenge[] | undefined,
+  competitionChallengeId: string,
+  action: CompetitionChallengeLifecycleAction,
+): CompetitionChallengeLifecycleMutation | null {
+  const matches = challenges?.filter(
+    challenge => challenge.id === competitionChallengeId,
+  )
+  const challenge = matches?.[0]
+  if (!challenge || matches.length !== 1)
+    return null
+
+  const request = buildCompetitionChallengeLifecycleRequest(challenge, action)
+  return request
+    ? { competitionChallengeId, ...request }
+    : null
 }
 
 export function nextCompetitionChallengeOrder(challenges: CompetitionChallenge[]) {
