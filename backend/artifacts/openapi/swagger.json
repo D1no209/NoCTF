@@ -8362,9 +8362,6 @@
       "NoCTFAPIEndpointsSubmissionsSubmitFlagRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "flags"
-        ],
         "properties": {
           "flag": {
             "type": "string",
@@ -8372,7 +8369,7 @@
           },
           "flags": {
             "type": "array",
-            "nullable": false,
+            "nullable": true,
             "items": {
               "type": "string"
             }

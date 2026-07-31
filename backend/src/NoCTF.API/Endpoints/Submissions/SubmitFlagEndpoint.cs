@@ -1,4 +1,5 @@
 using FastEndpoints;
+using FastEndpoints.Swagger;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.RateLimiting;
@@ -86,7 +87,8 @@ public sealed class SubmitFlagRequestValidator : Validator<SubmitFlagRequest>
             .Must(request => request.Flag is not null ^ request.Flags is not null)
             .WithMessage("Exactly one of flag or flags is required.");
         RuleForEach(request => request.Flags)
-            .NotNull();
+            .NotNull()
+            .SwaggerIgnore();
     }
 }
 

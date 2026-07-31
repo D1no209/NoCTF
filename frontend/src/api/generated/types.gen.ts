@@ -154,7 +154,7 @@ export type NoCtfapiEndpointsSubmissionsFlagSubmissionItem = {
 
 export type NoCtfapiEndpointsSubmissionsSubmitFlagRequest = {
     flag?: string | null;
-    flags: Array<string>;
+    flags?: Array<string> | null;
 };
 
 export type NoCtfapiEndpointsSubmissionsUploadPatchResponse = {
