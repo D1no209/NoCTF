@@ -56,6 +56,8 @@ internal static class CompetitionInfrastructure
         services.AddScoped<GetCompetitionConfiguration>();
         services.AddScoped<UpdateCompetitionConfiguration>();
         services.AddScoped<ICompetitionPermissionStore, CompetitionPermissionStore>();
+        services.AddScoped<GetCompetitionPermissions>();
+        services.AddScoped<ListCompetitionPermissionCandidates>();
         services.AddScoped<UpdateCompetitionPermissions>();
         services.AddScoped<NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase>();
         services.AddScoped<TransitionCompetitionLifecycle>();

@@ -4679,6 +4679,123 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/permissions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets the complete competition permission snapshot.",
+        "description": "Returns owner, manager, judge, and observer assignments only to the competition owner or a platform administrator.",
+        "operationId": "AdminGetCompetitionPermissions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replaces competition permission assignments.",
+        "description": "Assigns mutually exclusive manager, judge, and observer user arrays.",
+        "operationId": "AdminUpdateCompetitionPermissions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateCompetitionPermissionsRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/hard-delete": {
       "delete": {
         "tags": [
@@ -4716,6 +4833,52 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/permission-candidates": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists eligible competition permission candidates.",
+        "description": "Returns a resource-scoped, minimal user projection only to the competition owner or a platform administrator.",
+        "operationId": "AdminListCompetitionPermissionCandidates",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -5060,79 +5223,6 @@
                 }
               }
             }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/competitions/{competitionId}/permissions": {
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Replaces competition permission assignments.",
-        "description": "Assigns mutually exclusive manager, judge, and observer user arrays.",
-        "operationId": "AdminUpdateCompetitionPermissions",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "UpdateCompetitionPermissionsRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
           },
           "400": {
             "description": "Bad Request",
@@ -9737,13 +9827,17 @@
           "RolesOverlap",
           "OwnerIncluded",
           "UserNotFound",
-          "RoleNotEligible"
+          "RoleNotEligible",
+          "EmailNotVerified",
+          "RevisionConflict"
         ],
         "enum": [
           "RolesOverlap",
           "OwnerIncluded",
           "UserNotFound",
-          "RoleNotEligible"
+          "RoleNotEligible",
+          "EmailNotVerified",
+          "RevisionConflict"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionRequest": {
@@ -9844,6 +9938,45 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "managerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "judgeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "observerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "permissionRevision": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsAdminCompetitionListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -9853,6 +9986,40 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionResponse"
             }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserKind"
+          },
+          "role": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+          },
+          "emailVerified": {
+            "type": "boolean"
           }
         }
       },
@@ -9932,11 +10099,13 @@
         "required": [
           "managerIds",
           "judgeIds",
-          "observerIds"
+          "observerIds",
+          "expectedPermissionRevision"
         ],
         "properties": {
           "managerIds": {
             "type": "array",
+            "minLength": 1,
             "nullable": false,
             "items": {
               "type": "string",
@@ -9945,6 +10114,7 @@
           },
           "judgeIds": {
             "type": "array",
+            "minLength": 1,
             "nullable": false,
             "items": {
               "type": "string",
@@ -9953,11 +10123,18 @@
           },
           "observerIds": {
             "type": "array",
+            "minLength": 1,
             "nullable": false,
             "items": {
               "type": "string",
               "format": "guid"
             }
+          },
+          "expectedPermissionRevision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "nullable": false
           }
         }
       },

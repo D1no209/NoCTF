@@ -265,7 +265,8 @@ public sealed class ResourceManagerRolePersistenceTests
                     administratorId,
                     [ordinaryUserId],
                     [],
-                    []),
+                    [],
+                    0),
                 cancellationToken);
             await Assert.That(rejectedManager.State)
                 .IsEqualTo(CompetitionPermissionUpdateState.RoleNotEligible);
@@ -277,7 +278,8 @@ public sealed class ResourceManagerRolePersistenceTests
                     administratorId,
                     [organizerId],
                     [ordinaryUserId],
-                    []),
+                    [],
+                    0),
                 cancellationToken);
             await Assert.That(acceptedJudge.State)
                 .IsEqualTo(CompetitionPermissionUpdateState.Updated);
@@ -422,7 +424,8 @@ public sealed class ResourceManagerRolePersistenceTests
                     administratorId,
                     [targetId],
                     [],
-                    []),
+                    [],
+                    0),
                 cancellationToken);
             await Task.WhenAll(downgradeTask, assignmentTask);
 
@@ -486,7 +489,8 @@ public sealed class ResourceManagerRolePersistenceTests
                         administratorId,
                         [targetId],
                         [],
-                        []),
+                        [],
+                        0),
                     cancellationToken);
             await WaitForPostgresSleepAsync(db, cancellationToken);
             var downgradeSecondTask = new PlatformAdministrationStore(

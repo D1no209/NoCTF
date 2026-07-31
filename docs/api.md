@@ -119,13 +119,21 @@ POST /api/v1/admin/competitions/{competitionId}/start
 POST /api/v1/admin/competitions/{competitionId}/pause
 POST /api/v1/admin/competitions/{competitionId}/resume
 POST /api/v1/admin/competitions/{competitionId}/finish
+GET  /api/v1/admin/competitions/{competitionId}/permissions
 PUT  /api/v1/admin/competitions/{competitionId}/permissions
+GET  /api/v1/admin/competitions/{competitionId}/permission-candidates
 POST /api/v1/admin/competitions/{competitionId}/owner/transfer
 GET  /api/v1/admin/competitions/{competitionId}/start-validation
 POST /api/v1/admin/competitions/{competitionId}/flags/generate-missing
 ```
 
 Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍是独立文件/路由/TypedResults。
+
+权限 snapshot 与候选用户只允许 Competition Owner 或平台 Administrator 读取。候选响应仅含
+Id、UserName、Kind、Role 与 EmailVerified，不开放平台用户目录中的 Email、TokenVersion。
+权限全量替换必须携带 `expectedPermissionRevision`；成功后专用 PermissionRevision 加一，
+Owner transfer 也递增该 revision。Manager 必须是 Organizer/Administrator，Judge/Observer
+必须完成邮箱验证；revision 或资格冲突返回 typed 409。
 
 `start-validation` 是只读 GET，返回当前完整结构化错误数组。`flags/generate-missing` 在 Competition advisory lock 下同步只补 CTF PerTeam/KoH 缺失 Flag，成功返回 200 与 `failures` 数组；每项包含 CompetitionChallengeId、TeamId、稳定 code 和说明。响应不返回 Flag 原文、FlagId、生成/现有数量；空数组表示全部目标已满足。请求不处理 RandomOne 或 AWD Round。
 

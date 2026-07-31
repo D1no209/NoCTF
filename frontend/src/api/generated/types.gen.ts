@@ -589,7 +589,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManage
     userIds?: Array<string>;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode = 'RolesOverlap' | 'OwnerIncluded' | 'UserNotFound' | 'RoleNotEligible';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode = 'RolesOverlap' | 'OwnerIncluded' | 'UserNotFound' | 'RoleNotEligible' | 'EmailNotVerified' | 'RevisionConflict';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest = {
     title: string;
@@ -621,8 +621,29 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationR
     updatedAt?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse = {
+    competitionId?: string;
+    ownerId?: string;
+    managerIds?: Array<string>;
+    judgeIds?: Array<string>;
+    observerIds?: Array<string>;
+    permissionRevision?: number;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionListResponse = {
     items?: Array<NoCtfapiEndpointsCompetitionsCompetitionResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse = {
+    id?: string;
+    userName?: string;
+    kind?: NoCtfDomainIdentityUserKind;
+    role?: NoCtfDomainIdentityUserRole;
+    emailVerified?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsTransferCompetitionOwnerRequest = {
@@ -647,6 +668,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissi
     managerIds: Array<string>;
     judgeIds: Array<string>;
     observerIds: Array<string>;
+    expectedPermissionRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsStartValidationResponse = {
@@ -3592,6 +3614,79 @@ export type AdminCompetitionConfigurationUpdateResponses = {
 
 export type AdminCompetitionConfigurationUpdateResponse = AdminCompetitionConfigurationUpdateResponses[keyof AdminCompetitionConfigurationUpdateResponses];
 
+export type AdminGetCompetitionPermissionsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/permissions';
+};
+
+export type AdminGetCompetitionPermissionsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetCompetitionPermissionsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse;
+};
+
+export type AdminGetCompetitionPermissionsResponse = AdminGetCompetitionPermissionsResponses[keyof AdminGetCompetitionPermissionsResponses];
+
+export type AdminUpdateCompetitionPermissionsData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/permissions';
+};
+
+export type AdminUpdateCompetitionPermissionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: FastEndpointsErrorResponse;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse;
+};
+
+export type AdminUpdateCompetitionPermissionsError = AdminUpdateCompetitionPermissionsErrors[keyof AdminUpdateCompetitionPermissionsErrors];
+
+export type AdminUpdateCompetitionPermissionsResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminUpdateCompetitionPermissionsResponse = AdminUpdateCompetitionPermissionsResponses[keyof AdminUpdateCompetitionPermissionsResponses];
+
 export type AdminHardDeleteCompetitionData = {
     body?: never;
     path: {
@@ -3623,6 +3718,39 @@ export type AdminHardDeleteCompetitionResponses = {
 };
 
 export type AdminHardDeleteCompetitionResponse = AdminHardDeleteCompetitionResponses[keyof AdminHardDeleteCompetitionResponses];
+
+export type AdminListCompetitionPermissionCandidatesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/permission-candidates';
+};
+
+export type AdminListCompetitionPermissionCandidatesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListCompetitionPermissionCandidatesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse;
+};
+
+export type AdminListCompetitionPermissionCandidatesResponse = AdminListCompetitionPermissionCandidatesResponses[keyof AdminListCompetitionPermissionCandidatesResponses];
 
 export type AdminMakeCompetitionVisibleData = {
     body?: never;
@@ -3879,46 +4007,6 @@ export type AdminTransferCompetitionOwnerResponses = {
 };
 
 export type AdminTransferCompetitionOwnerResponse = AdminTransferCompetitionOwnerResponses[keyof AdminTransferCompetitionOwnerResponses];
-
-export type AdminUpdateCompetitionPermissionsData = {
-    body: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest;
-    path: {
-        competitionId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/competitions/{competitionId}/permissions';
-};
-
-export type AdminUpdateCompetitionPermissionsErrors = {
-    /**
-     * Bad Request
-     */
-    400: FastEndpointsErrorResponse;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse;
-};
-
-export type AdminUpdateCompetitionPermissionsError = AdminUpdateCompetitionPermissionsErrors[keyof AdminUpdateCompetitionPermissionsErrors];
-
-export type AdminUpdateCompetitionPermissionsResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type AdminUpdateCompetitionPermissionsResponse = AdminUpdateCompetitionPermissionsResponses[keyof AdminUpdateCompetitionPermissionsResponses];
 
 export type AdminValidateCompetitionStartData = {
     body?: never;
