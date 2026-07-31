@@ -23,7 +23,6 @@ import {
   ClipboardList,
   Container,
   FileText,
-  Handshake,
   Plug,
   Puzzle,
   Network,
@@ -47,7 +46,6 @@ const navItems = computed(() => {
   const items = [
     { to: '/admin/competitions', label: t('admin.nav.competitions'), icon: Trophy },
     { to: '/admin/teams', label: t('admin.nav.teams'), icon: Users },
-    { to: '/admin/collaborators', label: t('admin.nav.collaborators'), icon: Handshake },
     { to: '/admin/challenges', label: t('admin.nav.challenges'), icon: Puzzle },
     { to: '/admin/containers', label: t('admin.nav.containers'), icon: Container },
     { to: '/admin/plugins', label: t('admin.nav.plugins'), icon: Plug },

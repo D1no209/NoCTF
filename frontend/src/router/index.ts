@@ -131,12 +131,6 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
-          path: 'collaborators',
-          name: 'admin-collaborators',
-          component: () => import('@/views/admin/AdminCollaboratorsView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
-        },
-        {
           path: 'challenges',
           name: 'admin-challenges',
           component: () => import('@/views/admin/AdminChallengesView.vue'),
