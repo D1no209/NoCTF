@@ -194,7 +194,7 @@ public sealed class KohObservationHandler(
                 db,
                 message.CompetitionId,
                 cancellationToken);
-            await outbox.PublishAsync(new ProjectLeaderboard(message.CompetitionId));
+            await outbox.PublishAsync(new InvalidateLeaderboard(message.CompetitionId));
         }
 
         var nextDue = KohPollSchedule.NextDue(

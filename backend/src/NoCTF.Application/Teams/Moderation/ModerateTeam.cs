@@ -1,6 +1,4 @@
 using NoCTF.Application.Common;
-using NoCTF.Application.Messaging;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Teams.Moderation;
@@ -41,7 +39,7 @@ public interface ICompetitionModerationAuthorizer
 }
 
 /// <summary>Applies a relational ban ruling and schedules an in-process reconstruction.</summary>
-public sealed class ModerateTeam(ITeamModerationStore store, ILeaderboardCache cache, IBackendMessagePublisher messages)
+public sealed class ModerateTeam(ITeamModerationStore store)
 {
     public async Task<OperationResult> ExecuteAsync(
         TeamModerationCommand command,
@@ -64,8 +62,6 @@ public sealed class ModerateTeam(ITeamModerationStore store, ILeaderboardCache c
             _ => OperationResult.Failure("team_moderation_failed", "Team moderation failed.")
         };
 
-        await cache.InvalidateAsync(command.CompetitionId, cancellationToken);
-        await messages.RebuildCompetitionAsync(command.CompetitionId, cancellationToken);
         return OperationResult.Success();
     }
 }

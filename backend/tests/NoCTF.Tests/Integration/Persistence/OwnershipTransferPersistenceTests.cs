@@ -3,6 +3,7 @@ using NoCTF.Application.Challenges.Attachments;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Management;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -12,6 +13,7 @@ using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Management;
 using NoCTF.Infrastructure.Competitions.Administration;
 using NoCTF.Infrastructure.Persistence;
+using NSubstitute;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -417,7 +419,9 @@ public sealed class OwnershipTransferPersistenceTests
                 now.AddMinutes(1),
                 cancellationToken);
             await WaitForPostgresSleepAsync(db, cancellationToken);
-            var createTask = new ChallengeManagementStore(createDb).CreateAsync(
+            var createTask = new ChallengeManagementStore(
+                createDb,
+                Substitute.For<ITransactionalMessageOutbox>()).CreateAsync(
                 new CreateCompetitionChallengeCommand(
                     Guid.CreateVersion7(),
                     competitionId,

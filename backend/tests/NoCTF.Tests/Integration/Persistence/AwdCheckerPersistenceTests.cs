@@ -211,7 +211,7 @@ public sealed class AwdCheckerPersistenceTests
                     .Select(competition => competition.LeaderboardRevision)
                     .SingleAsync(cancellationToken);
                 await Assert.That(leaderboardRevision).IsEqualTo(2);
-                await Assert.That(outbox.Published.OfType<ProjectLeaderboard>().Count())
+                await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count())
                     .IsEqualTo(2);
             }
             await using (var deadlineDb = new NoCtfDbContext(options))
@@ -332,7 +332,7 @@ public sealed class AwdCheckerPersistenceTests
                 .Select(competition => competition.LeaderboardRevision)
                 .SingleAsync(cancellationToken);
             await Assert.That(leaderboardRevision).IsEqualTo(2);
-            await Assert.That(outbox.Published.OfType<ProjectLeaderboard>().Count())
+            await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count())
                 .IsEqualTo(2);
         });
     }

@@ -33,7 +33,12 @@ public sealed class GetLeaderboardEndpoint(
         if (await getCompetition.ExecuteAsync(request.CompetitionId, false, cancellationToken) is null)
             return TypedResults.NotFound();
         var snapshot = await leaderboard.GetAsync(request.CompetitionId, cancellationToken);
-        if (snapshot is not null) return TypedResults.Ok(snapshot);
+        if (snapshot is not null)
+        {
+            if (snapshot.Stale)
+                await messages.ProjectLeaderboardAsync(request.CompetitionId, cancellationToken);
+            return TypedResults.Ok(snapshot);
+        }
         var status = await leaderboard.GetStatusAsync(request.CompetitionId, cancellationToken);
         if (status.LastFailureAt is not null)
             return TypedResults.Problem(

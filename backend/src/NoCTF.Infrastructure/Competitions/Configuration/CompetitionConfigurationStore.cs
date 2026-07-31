@@ -66,7 +66,7 @@ public sealed class CompetitionConfigurationStore(
                 .SetProperty(x => x.LeaderboardRevision, x => checked(x.LeaderboardRevision + 1))
                 .SetProperty(x => x.ConfigurationUpdatedAt, now), ct);
         if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.RevisionConflict);
-        await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         if (mode == GameMode.Awd && status == CompetitionStatus.Running)
         {
             await db.RuntimeInstances

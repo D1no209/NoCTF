@@ -95,7 +95,9 @@ public sealed class ChallengeHintStore(
         {
             await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
+            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
             await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
             return new(Map(hint));
         }
         catch (DbUpdateException) when (command.IsCreate)
@@ -129,7 +131,9 @@ public sealed class ChallengeHintStore(
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return true;
     }
 
@@ -159,7 +163,9 @@ public sealed class ChallengeHintStore(
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return true;
     }
 
@@ -226,9 +232,9 @@ public sealed class ChallengeHintStore(
             OccurredAt = now,
             CreatedAt = now
         });
-        await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return HintUnlockAttempt.Success(new(Map(hint), true));

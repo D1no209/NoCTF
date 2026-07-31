@@ -115,7 +115,9 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(challenge.Template!.Id).IsEqualTo(challengeId);
 
             var competitionChallengeId = Guid.CreateVersion7(now.AddMilliseconds(4));
-            var competitionChallenges = new ChallengeManagementStore(db);
+            var competitionChallenges = new ChallengeManagementStore(
+                db,
+                Substitute.For<ITransactionalMessageOutbox>());
             var linked = await competitionChallenges.CreateAsync(
                 new(
                     competitionChallengeId,

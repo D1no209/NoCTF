@@ -272,7 +272,7 @@ public sealed class AwdpFixResultPersistenceTests
                 .SingleAsync(cancellationToken);
             await Assert.That(leaderboardRevision).IsEqualTo(2);
             await Assert.That(firstOutbox.Published.Concat(secondOutbox.Published)
-                    .OfType<ProjectLeaderboard>().Count())
+                    .OfType<InvalidateLeaderboard>().Count())
                 .IsEqualTo(2);
         });
     }

@@ -4,11 +4,14 @@ using NoCTF.Application.Challenges.Management;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Challenges;
+using NoCTF.Application.Messaging;
 using Npgsql;
 
 namespace NoCTF.Infrastructure.Challenges.Management;
 
-public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeManagementStore
+public sealed class ChallengeManagementStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox outbox) : IChallengeManagementStore
 {
     public Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking()
@@ -56,7 +59,9 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         {
             await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
+            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
             await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
             return new(Map(entity, template));
         }
         catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
@@ -112,7 +117,9 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         {
             await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
+            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
             await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
             var template = await db.Challenges.AsNoTracking()
                 .SingleAsync(challenge => challenge.Id == entity.ChallengeId, ct);
             return new(Map(entity, template));
@@ -197,7 +204,9 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         {
             await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+            await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
             await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
             return null;
         }
         catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))

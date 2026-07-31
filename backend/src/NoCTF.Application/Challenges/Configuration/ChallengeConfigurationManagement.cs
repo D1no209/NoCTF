@@ -1,6 +1,4 @@
-using NoCTF.Application.Messaging;
 using NoCTF.Application.Common;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Challenges.Configuration;
@@ -80,9 +78,7 @@ public sealed class GetChallengeConfiguration(IChallengeConfigurationStore store
 
 public sealed class UpdateChallengeConfiguration(
     IChallengeConfigurationStore store,
-    IChallengeConfigurationCatalog catalog,
-    ILeaderboardCache cache,
-    IBackendMessagePublisher messages)
+    IChallengeConfigurationCatalog catalog)
 {
     public async Task<OperationResult<ChallengeConfigurationView>> ExecuteAsync(
         Guid competitionId,
@@ -142,8 +138,6 @@ public sealed class UpdateChallengeConfiguration(
             });
         }
 
-        await cache.InvalidateAsync(competitionId, ct);
-        await messages.RebuildCompetitionAsync(competitionId, ct);
         return OperationResult<ChallengeConfigurationView>.Success(result.Configuration);
     }
 }

@@ -1,11 +1,14 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Infrastructure.Teams.Moderation;
 
-public sealed class TeamModerationStore(NoCtfDbContext db) : ITeamModerationStore
+public sealed class TeamModerationStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox outbox) : ITeamModerationStore
 {
     public Task<CompetitionStatus?> GetCompetitionStatusAsync(Guid competitionId, CancellationToken cancellationToken) =>
         db.Competitions.AsNoTracking().Where(item => item.Id == competitionId && item.DeletedAt == null)
@@ -35,7 +38,9 @@ public sealed class TeamModerationStore(NoCtfDbContext db) : ITeamModerationStor
         team.BanReason = command.Ban ? command.Reason : null;
         await db.SaveChangesAsync(cancellationToken);
         await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, cancellationToken);
+        await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
         await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
         return new();
     }
 }

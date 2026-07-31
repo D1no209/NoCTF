@@ -1,10 +1,13 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Membership;
 
 namespace NoCTF.Infrastructure.Teams.Membership;
 
-public sealed class TeamMembershipStore(NoCtfDbContext db) : ITeamMembershipStore
+public sealed class TeamMembershipStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox outbox) : ITeamMembershipStore
 {
     public async Task<TeamMembershipFailure?> JoinByInvitationAsync(
         Guid competitionId,
@@ -44,7 +47,9 @@ public sealed class TeamMembershipStore(NoCtfDbContext db) : ITeamMembershipStor
         team.MemberIds = [.. team.MemberIds, userId];
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return null;
     }
 
@@ -88,7 +93,9 @@ public sealed class TeamMembershipStore(NoCtfDbContext db) : ITeamMembershipStor
         team.MemberIds = team.MemberIds.Where(id => id != targetUserId).ToArray();
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return null;
     }
 
@@ -112,7 +119,9 @@ public sealed class TeamMembershipStore(NoCtfDbContext db) : ITeamMembershipStor
         team.MemberIds = team.MemberIds.Where(id => id != userId).ToArray();
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return null;
     }
 
@@ -136,7 +145,9 @@ public sealed class TeamMembershipStore(NoCtfDbContext db) : ITeamMembershipStor
         team.CaptainId = newCaptainId;
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return null;
     }
 

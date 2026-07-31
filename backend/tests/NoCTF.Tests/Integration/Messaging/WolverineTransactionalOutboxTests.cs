@@ -676,6 +676,8 @@ public sealed class WolverineTransactionalOutboxTests
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<ProjectLeaderboard>()
                 .ToPostgresqlQueue("outbox-probe");
+            options.PublishMessage<InvalidateLeaderboard>()
+                .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<AdvanceAwdRound>()
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<GenerateAwdFlags>()
@@ -837,7 +839,7 @@ public sealed class LifecycleTransitionProbeHandler
             null,
             "integration_probe",
             true,
-            CompetitionLifecycleEffects.ProjectLeaderboard,
+            CompetitionLifecycleEffects.None,
             cancellationToken);
         if (!applied)
             throw new InvalidOperationException("The lifecycle transition was not applied.");
@@ -851,7 +853,7 @@ public sealed class LifecycleTransitionProbeHandler
 public sealed class ObserveLifecycleProjectionHandler
 {
     public static async Task Handle(
-        ProjectLeaderboard message,
+        InvalidateLeaderboard message,
         NoCtfDbContext db,
         CancellationToken cancellationToken)
     {

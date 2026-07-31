@@ -1,24 +1,21 @@
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
-using NoCTF.Application.Scoring.Leaderboard;
 
 namespace NoCTF.Tests.Unit.Application;
 
 public class TeamModerationTests
 {
     [Test]
-    public async Task ExecuteAsync_FinishedCompetition_DoesNotMutateOrRebuild()
+    public async Task ExecuteAsync_FinishedCompetition_DoesNotMutate()
     {
         var store = new Store { Status = CompetitionStatus.Finished };
-        var scheduler = new Scheduler();
-        var useCase = new ModerateTeam(store, new Cache(), scheduler);
+        var useCase = new ModerateTeam(store);
 
         var result = await useCase.ExecuteAsync(new(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), true, "reason", DateTimeOffset.UtcNow));
 
         await Assert.That(result.ErrorCode).IsEqualTo("competition_finished");
         await Assert.That(store.ApplyCalls).IsEqualTo(0);
-        await Assert.That(scheduler.RebuildCompetitionId).IsNull();
     }
 
     private sealed class Store : ITeamModerationStore
@@ -34,22 +31,4 @@ public class TeamModerationTests
         }
     }
 
-    private sealed class Cache : ILeaderboardCache
-    {
-        public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(null);
-        public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-
-    private sealed class Scheduler : NoCTF.Application.Messaging.IBackendMessagePublisher
-    {
-        public Guid? RebuildCompetitionId { get; private set; }
-        public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-        public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken)
-        {
-            RebuildCompetitionId = competitionId;
-            return ValueTask.CompletedTask;
-        }
-    }
 }

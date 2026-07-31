@@ -1,7 +1,5 @@
-using NoCTF.Application.Messaging;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Challenges.Management;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -101,10 +99,8 @@ public class ChallengeManagementTests
     public async Task Mutation_ActiveCompetition_IsAllowed(ChallengeMutation mutation)
     {
         var store = new Store { Status = CompetitionStatus.Running };
-        var cache = new Cache();
-        var scheduler = new Scheduler();
 
-        var error = await ExecuteMutationAsync(mutation, store, cache, scheduler);
+        var error = await ExecuteMutationAsync(mutation, store);
 
         await Assert.That(error).IsNull();
         await Assert.That(store.MutationCalls).IsEqualTo(1);
@@ -114,24 +110,18 @@ public class ChallengeManagementTests
     [Arguments(ChallengeMutation.Update)]
     [Arguments(ChallengeMutation.Delete)]
     [Arguments(ChallengeMutation.Restore)]
-    public async Task Mutation_Succeeds_InvalidatesAndQueuesCompetitionRebuild(ChallengeMutation mutation)
+    public async Task Mutation_Succeeds_UsesExpectedRevision(ChallengeMutation mutation)
     {
         var competitionId = Guid.NewGuid();
         var store = new Store();
-        var cache = new Cache();
-        var scheduler = new Scheduler();
 
         var failure = await ExecuteMutationAsync(
             mutation,
             store,
-            cache,
-            scheduler,
             competitionId);
 
         await Assert.That(failure).IsNull();
         await Assert.That(store.LastExpectedRevision).IsEqualTo(0);
-        await Assert.That(cache.InvalidatedCompetitionId).IsEqualTo(competitionId);
-        await Assert.That(scheduler.RebuildCompetitionId).IsEqualTo(competitionId);
     }
 
     [Test]
@@ -142,20 +132,14 @@ public class ChallengeManagementTests
         ChallengeMutation mutation)
     {
         var store = new Store();
-        var cache = new Cache();
-        var scheduler = new Scheduler();
 
         var failure = await ExecuteMutationAsync(
             mutation,
             store,
-            cache,
-            scheduler,
             expectedRevision: -1);
 
         await Assert.That(failure).IsEqualTo(ChallengeMutationFailure.InvalidRevision);
         await Assert.That(store.MutationCalls).IsEqualTo(0);
-        await Assert.That(cache.InvalidatedCompetitionId).IsNull();
-        await Assert.That(scheduler.RebuildCompetitionId).IsNull();
     }
 
     [Test]
@@ -175,20 +159,16 @@ public class ChallengeManagementTests
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeTemplateConflict)]
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.RevisionConflict)]
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.LifecycleStateConflict)]
-    public async Task Mutation_TypedFailure_DoesNotInvalidateOrQueueRebuild(
+    public async Task Mutation_TypedFailure_IsPropagated(
         ChallengeMutation mutation,
         ChallengeMutationFailure expectedFailure)
     {
         var store = new Store { MutationFailure = expectedFailure };
-        var cache = new Cache();
-        var scheduler = new Scheduler();
 
-        var failure = await ExecuteMutationAsync(mutation, store, cache, scheduler);
+        var failure = await ExecuteMutationAsync(mutation, store);
 
         await Assert.That(failure).IsEqualTo(expectedFailure);
         await Assert.That(store.MutationCalls).IsEqualTo(1);
-        await Assert.That(cache.InvalidatedCompetitionId).IsNull();
-        await Assert.That(scheduler.RebuildCompetitionId).IsNull();
     }
 
     public enum ChallengeMutation
@@ -201,26 +181,24 @@ public class ChallengeManagementTests
     private static async Task<ChallengeMutationFailure?> ExecuteMutationAsync(
         ChallengeMutation mutation,
         Store store,
-        Cache cache,
-        Scheduler scheduler,
         Guid? competitionId = null,
         int expectedRevision = 0)
     {
         var actualCompetitionId = competitionId ?? Guid.NewGuid();
         return mutation switch
         {
-            ChallengeMutation.Update => (await new UpdateChallenge(store, cache, scheduler)
+            ChallengeMutation.Update => (await new UpdateChallenge(store)
                 .ExecuteAsync(UpdateCommand(actualCompetitionId) with
                 {
                     ExpectedRevision = expectedRevision
                 })).Failure,
-            ChallengeMutation.Delete => await new DeleteChallenge(store, cache, scheduler)
+            ChallengeMutation.Delete => await new DeleteChallenge(store)
                 .ExecuteAsync(
                     actualCompetitionId,
                     Guid.NewGuid(),
                     expectedRevision,
                     DateTimeOffset.UtcNow),
-            ChallengeMutation.Restore => await new DeleteChallenge(store, cache, scheduler)
+            ChallengeMutation.Restore => await new DeleteChallenge(store)
                 .RestoreAsync(
                     actualCompetitionId,
                     Guid.NewGuid(),
@@ -354,39 +332,4 @@ public class ChallengeManagementTests
             int eligibleTeamCount) => [];
     }
 
-    private sealed class Cache : ILeaderboardCache
-    {
-        public Guid? InvalidatedCompetitionId { get; private set; }
-
-        public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(null);
-
-        public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
-
-        public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken)
-        {
-            InvalidatedCompetitionId = competitionId;
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class Scheduler : IBackendMessagePublisher
-    {
-        public Guid? RebuildCompetitionId { get; private set; }
-
-        public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
-
-        public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
-
-        public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
-
-        public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken)
-        {
-            RebuildCompetitionId = competitionId;
-            return ValueTask.CompletedTask;
-        }
-    }
 }

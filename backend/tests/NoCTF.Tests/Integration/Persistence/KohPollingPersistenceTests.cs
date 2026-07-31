@@ -313,8 +313,8 @@ public sealed class KohPollingPersistenceTests
             await Assert.That(next.At).IsEqualTo(fixture.DueAt.AddSeconds(20));
             await Assert.That(next.Message).IsTypeOf<PollKohChallenge>();
             var projection = outbox.Published.Single();
-            await Assert.That(projection).IsTypeOf<ProjectLeaderboard>();
-            await Assert.That(((ProjectLeaderboard)projection).CompetitionId)
+            await Assert.That(projection).IsTypeOf<InvalidateLeaderboard>();
+            await Assert.That(((InvalidateLeaderboard)projection).CompetitionId)
                 .IsEqualTo(fixture.CompetitionId);
             await Assert.That(outbox.FlushCount).IsEqualTo(1);
 
@@ -428,7 +428,7 @@ public sealed class KohPollingPersistenceTests
                         fixture.OwnerId,
                         "pause",
                         false,
-                        CompetitionLifecycleEffects.ProjectLeaderboard,
+                        CompetitionLifecycleEffects.None,
                         cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return applied;
@@ -463,7 +463,7 @@ public sealed class KohPollingPersistenceTests
 
             var projections = observationOutbox.Published
                 .Concat(lifecycleOutbox.Published)
-                .OfType<ProjectLeaderboard>()
+                .OfType<InvalidateLeaderboard>()
                 .ToArray();
             await Assert.That(projections).Count().IsEqualTo(2);
             await Assert.That(projections.All(
