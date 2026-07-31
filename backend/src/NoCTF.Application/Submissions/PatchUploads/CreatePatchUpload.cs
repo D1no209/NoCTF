@@ -94,7 +94,16 @@ public sealed class CreatePatchUpload(
         finally
         {
             if (!saved)
-                await objects.DeleteAsync(stored.ObjectKey, CancellationToken.None);
+            {
+                try
+                {
+                    await objects.DeleteAsync(stored.ObjectKey, CancellationToken.None);
+                }
+                catch
+                {
+                    // Object cleanup is best-effort here; storage lifecycle handles orphaned uploads.
+                }
+            }
         }
         return saved
             ? OperationResult<CreatedPatchUpload>.Success(new(id))
