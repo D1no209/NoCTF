@@ -1,3 +1,4 @@
+import type { PublicChallengeDownload } from './challengePresentation'
 import type {
   AdminDeleteCompetitionChallengeData,
   AdminRestoreCompetitionChallengeData,
@@ -23,6 +24,11 @@ import type {
 } from './generated/types.gen'
 import { translate as tt } from '@/i18n'
 import { configureAuthSessionRefresh, readAuthSession } from './auth-session'
+import {
+  readDownloadFileName,
+  toPublicChallenge,
+  toPublicChallengeAttachment,
+} from './challengePresentation'
 import { toPublicCompetition } from './competitionPresentation'
 import { client } from './generated/client.gen'
 import * as generatedSdk from './generated/sdk.gen'
@@ -92,6 +98,22 @@ function unwrap<T>(result: ApiResult<T>, fallback = tt('errors.requestFailed')):
     throw new ApiError(fallback, status, details)
   }
   return result.data as T
+}
+
+function unwrapChallengeDownload(
+  result: ApiResult<unknown>,
+  fallback: string,
+): PublicChallengeDownload {
+  const content = unwrap(result, fallback)
+  if (!(content instanceof Blob))
+    throw new ApiError(fallback, result.response?.status)
+
+  return {
+    content,
+    fileName: readDownloadFileName(
+      result.response?.headers.get('Content-Disposition') ?? null,
+    ),
+  }
 }
 
 async function requireSuccess<T>(request: Promise<ApiResult<T>>, fallback?: string): Promise<T> {
@@ -334,12 +356,6 @@ export const competitionApi = {
   async create(body: Record<string, unknown>) {
     return unwrap(await sdk.noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint({ body }), tt('errors.createCompetition'))
   },
-  async challenges<T = unknown[]>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges',
-      path: { id: competitionId },
-    }), tt('errors.loadChallenges'))
-  },
   async submissions<T = unknown>(competitionId: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({
       url: '/api/competitions/{id}/submissions',
@@ -495,6 +511,64 @@ export const competitionApi = {
     return unwrap(await sdk.noCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpoint({
       path: { id: competitionId },
     }), tt('errors.loadLeaderboard'))
+  },
+}
+
+export const challengeApi = {
+  async list(competitionId: string) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsChallengesListChallengesEndpoint({
+        path: { competitionId },
+      }),
+      tt('errors.loadChallenges'),
+    )
+    if (!response.items)
+      throw new ApiError(tt('errors.loadChallenges'))
+    return response.items.map(toPublicChallenge)
+  },
+  async get(competitionId: string, competitionChallengeId: string) {
+    return toPublicChallenge(unwrap(
+      await generatedSdk.noCtfapiEndpointsChallengesGetChallengeEndpoint({
+        path: { competitionId, competitionChallengeId },
+      }),
+      tt('errors.loadChallenges'),
+    ))
+  },
+  async listAttachments(competitionId: string, competitionChallengeId: string) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsChallengesListChallengeAttachmentsEndpoint({
+        path: { competitionId, competitionChallengeId },
+      }),
+      tt('errors.loadChallenges'),
+    )
+    if (!response.items)
+      throw new ApiError(tt('errors.loadChallenges'))
+    return response.items.map(toPublicChallengeAttachment)
+  },
+  async downloadAttachment(
+    competitionId: string,
+    competitionChallengeId: string,
+    attachmentId: string,
+  ) {
+    return unwrapChallengeDownload(
+      await generatedSdk.noCtfapiEndpointsChallengesDownloadChallengeAttachmentEndpoint({
+        path: { competitionId, competitionChallengeId, attachmentId },
+        parseAs: 'blob',
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async downloadRandomAttachment(
+    competitionId: string,
+    competitionChallengeId: string,
+  ) {
+    return unwrapChallengeDownload(
+      await generatedSdk.noCtfapiEndpointsChallengesDownloadRandomChallengeAttachmentEndpoint({
+        path: { competitionId, competitionChallengeId },
+        parseAs: 'blob',
+      }),
+      tt('errors.requestFailed'),
+    )
   },
 }
 

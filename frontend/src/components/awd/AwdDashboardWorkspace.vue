@@ -7,7 +7,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { competitionApi } from '@/api/noctf'
+import { challengeApi, competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import AttackLogFeed from '@/components/game/AttackLogFeed.vue'
 import AwdBattlefieldCore from '@/components/game/AwdBattlefieldCore.vue'
@@ -45,11 +45,6 @@ interface Team {
   name: string
 }
 
-interface Challenge {
-  id: string
-  title: string
-}
-
 interface PatchSubmissionStatus {
   id?: string
   submissionId?: string
@@ -78,7 +73,7 @@ const { data: teams } = useQuery({
 
 const { data: challenges } = useQuery({
   queryKey: computed(() => queryKeys.challenges(competitionId.value)),
-  queryFn: () => competitionApi.challenges<Challenge[]>(competitionId.value),
+  queryFn: () => challengeApi.list(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 

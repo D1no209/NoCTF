@@ -3,6 +3,14 @@ export const queryKeys = {
   competitions: ['competitions'] as const,
   competition: (id: string) => ['competition', id] as const,
   challenges: (competitionId: string) => ['challenges', competitionId] as const,
+  challenge: (
+    competitionId: string,
+    competitionChallengeId: string,
+  ) => ['challenge', competitionId, competitionChallengeId] as const,
+  challengeAttachments: (
+    competitionId: string,
+    competitionChallengeId: string,
+  ) => ['challenge-attachments', competitionId, competitionChallengeId] as const,
   submissions: (competitionId: string) => ['submissions', competitionId] as const,
   leaderboard: (competitionId: string) => ['leaderboard', competitionId] as const,
   awdDashboard: (competitionId: string) => ['awd-dashboard', competitionId] as const,
