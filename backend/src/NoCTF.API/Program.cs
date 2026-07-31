@@ -45,6 +45,7 @@ builder.UseWolverine(options =>
         options.PublishMessage<StopRuntime>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<DrainSubmissions>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<SendEmailVerification>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<CleanupObject>().ToPostgresqlQueue("noctf-worker");
     }
 });
 

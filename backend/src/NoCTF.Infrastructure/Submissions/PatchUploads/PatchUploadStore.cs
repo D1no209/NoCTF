@@ -1,13 +1,20 @@
-using NoCTF.Infrastructure.Persistence;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Submissions.PatchUploads;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Submissions.Intake;
 
 namespace NoCTF.Infrastructure.Submissions.PatchUploads;
 
-public sealed class PatchUploadStore(NoCtfDbContext db) : IPatchUploadStore
+public sealed class PatchUploadStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox outbox,
+    ILogger<PatchUploadStore> logger) : IPatchUploadStore
 {
     public async Task<PatchUploadScope?> ResolveScopeAsync(
         Guid competitionId,
@@ -53,6 +60,32 @@ public sealed class PatchUploadStore(NoCtfDbContext db) : IPatchUploadStore
         DateTimeOffset uploadedAt,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted,
+            ct);
+        await SubmissionAttemptLock.AcquireAsync(
+            db,
+            scope.TeamId,
+            scope.CompetitionChallengeId,
+            SubmissionKind.Fix,
+            ct);
+
+        var previous = await db.PatchUploads.AsNoTracking()
+            .Where(upload => upload.TeamId == scope.TeamId
+                && upload.CompetitionChallengeId == scope.CompetitionChallengeId
+                && upload.ConsumedAt == null)
+            .Select(upload => new { upload.Id, upload.ObjectKey })
+            .SingleOrDefaultAsync(ct);
+        if (previous is not null)
+        {
+            var deleted = await db.PatchUploads
+                .Where(upload => upload.Id == previous.Id
+                    && upload.ConsumedAt == null)
+                .ExecuteDeleteAsync(ct);
+            if (deleted != 1)
+                return false;
+        }
+
         db.PatchUploads.Add(new PatchUpload
         {
             Id = patchUploadId,
@@ -69,7 +102,21 @@ public sealed class PatchUploadStore(NoCtfDbContext db) : IPatchUploadStore
         });
         try
         {
+            if (previous is not null)
+                await outbox.PublishAsync(new CleanupObject(previous.ObjectKey));
             await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            try
+            {
+                await outbox.FlushOutgoingMessagesAsync();
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Patch upload {PatchUploadId} committed, but its durable cleanup message was not flushed immediately.",
+                    patchUploadId);
+            }
             return true;
         }
         catch (DbUpdateException)

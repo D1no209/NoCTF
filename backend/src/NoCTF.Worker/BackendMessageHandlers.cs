@@ -1,4 +1,5 @@
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Storage;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Platform;
@@ -30,6 +31,12 @@ public static class BackendMessageHandlers
     private static readonly TimeSpan RunnerDependencyRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan CompetitionLifecycleInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan AwdCheckerDispatchInterval = TimeSpan.FromSeconds(1);
+
+    public static Task Handle(
+        CleanupObject message,
+        IObjectStorage objects,
+        CancellationToken cancellationToken) =>
+        objects.DeleteAsync(message.ObjectKey, cancellationToken);
 
     public static async Task Handle(
         DispatchAwdCheckers message,

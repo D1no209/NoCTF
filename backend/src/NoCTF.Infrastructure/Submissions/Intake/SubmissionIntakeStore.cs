@@ -41,7 +41,8 @@ public sealed class SubmissionIntakeStore(
             return [];
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
-        await AcquireAttemptLockAsync(
+        await SubmissionAttemptLock.AcquireAsync(
+            db,
             received[0].TeamId,
             received[0].CompetitionChallengeId,
             received[0].Kind,
@@ -95,7 +96,8 @@ public sealed class SubmissionIntakeStore(
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
-        await AcquireAttemptLockAsync(
+        await SubmissionAttemptLock.AcquireAsync(
+            db,
             received.TeamId, received.CompetitionChallengeId, SubmissionKind.Fix, cancellationToken);
         var current = await LoadAdmissionAsync(
             received.CompetitionId, received.CompetitionChallengeId, received.UserId, cancellationToken);
@@ -139,13 +141,4 @@ public sealed class SubmissionIntakeStore(
         await outbox.FlushOutgoingMessagesAsync();
         return new(SubmissionAcceptanceState.Created, entity.Id, entity.ReceivedAt);
     }
-
-    private Task AcquireAttemptLockAsync(
-        Guid teamId,
-        Guid competitionChallengeId,
-        SubmissionKind kind,
-        CancellationToken cancellationToken) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({'s' + teamId.ToString("N") + competitionChallengeId.ToString("N") + ((short)kind).ToString()}, 0))",
-            cancellationToken);
 }
