@@ -129,9 +129,18 @@ public sealed class AwdCheckerWorkReader(
             || string.IsNullOrWhiteSpace(target.Runtime.AwdCheckerTargetHost)
             || target.Runtime.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
             return null;
-        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"] ?? "http://noctf-api";
-        if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri))
-            throw new InvalidOperationException("RunnerScoring:CallbackBaseUrl must be an absolute URI.");
+        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"];
+        if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri)
+            || (!string.Equals(
+                    baseUri.Scheme,
+                    Uri.UriSchemeHttp,
+                    StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(
+                    baseUri.Scheme,
+                    Uri.UriSchemeHttps,
+                    StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException(
+                "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
         var callbackUrl = new Uri(baseUri, "/api/internal/v1/awd/check-results");
         var issuedAt = timeProvider.GetUtcNow();
         var remaining = message.Deadline - issuedAt;

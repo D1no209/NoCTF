@@ -1,11 +1,6 @@
-using Amazon.S3;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Storage;
-using NoCTF.Application.Submissions.PatchUploads;
-
-using NoCTF.Infrastructure.Storage;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Runtime.Docker;
@@ -33,6 +28,7 @@ public static class ServiceRegistration
 {
     public static IServiceCollection AddNoCtfRunner(this IServiceCollection services, IConfiguration configuration)
     {
+        ValidateRunnerScoringCallbackBaseUrl(configuration);
         services.AddHttpClient();
         var configuredProvider = configuration["Runner:Provider"];
         var provider = Enum.TryParse<RuntimeProvider>(
@@ -186,22 +182,23 @@ public static class ServiceRegistration
         services.AddSingleton<IAwdCheckerExecutor, AwdCheckerExecutor>();
         services.AddSingleton<IAwdpFixWorkReader, AwdpFixWorkReader>();
         services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
+        services.AddSingleton<AwdpFixArchiveDownloader>();
         services.AddSingleton<FixArchivePreparer>();
-        if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(new AmazonS3Config
-            {
-                ServiceURL = configuration["Storage:S3:ServiceUrl"],
-                ForcePathStyle = configuration.GetValue("Storage:S3:ForcePathStyle", true)
-            }));
-            services.AddSingleton<IObjectStorage, S3ObjectStorage>();
-        }
-        else
-        {
-            services.AddSingleton<IObjectStorage, LocalObjectStorage>();
-        }
         services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();
         return services;
+    }
+
+    private static void ValidateRunnerScoringCallbackBaseUrl(IConfiguration configuration)
+    {
+        var value = configuration["RunnerScoring:CallbackBaseUrl"];
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(
+                    uri.Scheme,
+                    Uri.UriSchemeHttps,
+                    StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException(
+                "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
     }
 
     private static long ReadRequiredPositiveLong(

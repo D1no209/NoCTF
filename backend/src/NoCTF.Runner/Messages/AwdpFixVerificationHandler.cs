@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
-using NoCTF.Application.Storage;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
@@ -31,10 +30,7 @@ public sealed record AwdpCheckerWork(
     TimeSpan Timeout);
 
 public sealed record AwdpFixWork(
-    string ObjectKey,
-    string OriginalFileName,
-    long ByteLength,
-    byte[] Sha256,
+    AwdpFixArchive Archive,
     ContainerReceipt TargetReceipt,
     string PatchEntrypoint,
     IReadOnlyList<string> PatchCommand,
@@ -181,11 +177,18 @@ public sealed class AwdpFixWorkReader(
             || receipt.InternalHost is not { Length: > 0 } targetHost)
             return null;
 
-        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"]
-            ?? "http://noctf-awdp-callback:8080";
-        if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri))
+        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"];
+        if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri)
+            || (!string.Equals(
+                    baseUri.Scheme,
+                    Uri.UriSchemeHttp,
+                    StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(
+                    baseUri.Scheme,
+                    Uri.UriSchemeHttps,
+                    StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException(
-                "RunnerScoring:CallbackBaseUrl must be an absolute URI.");
+                "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
         var now = timeProvider.GetUtcNow();
         var remaining = message.Deadline - now;
         if (remaining <= TimeSpan.Zero)
@@ -201,14 +204,23 @@ public sealed class AwdpFixWorkReader(
             message.RuntimeProcessingVersion,
             message.Deadline,
             now));
+        var archiveToken = tokens.IssueFixArchiveRead(
+            message.RunnerId,
+            message.PatchUploadId,
+            message.SubmissionId,
+            now);
         var patchCommand = AwdpPatchCommand.Create(
             settings.PatchCommand,
             settings.PatchEntrypoint);
         return new(
-            target.Upload.ObjectKey,
-            target.Upload.OriginalFileName,
-            target.Upload.ByteLength,
-            target.Upload.Sha256,
+            new(
+                new Uri(
+                    baseUri,
+                    $"/api/internal/v1/awdp/fix-archives/{message.SubmissionId:D}"),
+                archiveToken,
+                target.Upload.OriginalFileName,
+                target.Upload.ByteLength,
+                target.Upload.Sha256),
             receipt,
             settings.PatchEntrypoint,
             patchCommand,
@@ -297,7 +309,7 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
 [NonTransactional]
 public sealed class AwdpFixVerificationHandler(
     IAwdpFixWorkReader reader,
-    IObjectStorage objects,
+    AwdpFixArchiveDownloader archives,
     FixArchivePreparer preparer,
     IRuntimeProviderCatalog providers,
     IAwdpCheckerExecutor checker,
@@ -325,24 +337,23 @@ public sealed class AwdpFixVerificationHandler(
             "noctf-awdp",
             $"{message.SubmissionId:N}-{message.RuntimeInstanceId:N}");
         var workDirectory = Path.Combine(operationDirectory, "work");
+        var archivePath = Path.Combine(operationDirectory, "fix.tar.gz");
         var tarPath = Path.Combine(operationDirectory, "fix.tar");
         try
         {
-            var stored = await objects.InspectAsync(work.ObjectKey, cancellationToken);
-            if (stored is null
-                || stored.Length != work.ByteLength
-                || !CryptographicOperations.FixedTimeEquals(
-                    Convert.FromHexString(stored.Sha256), work.Sha256))
+            if (!await archives.DownloadAsync(
+                    work.Archive,
+                    archivePath,
+                    cancellationToken))
             {
                 outcome = AwdpFixOutcome.PlatformFailed;
             }
             else
             {
-                await using var source = await objects.OpenReadAsync(
-                    work.ObjectKey, cancellationToken);
+                await using var source = File.OpenRead(archivePath);
                 await preparer.PrepareTarAsync(
                     source,
-                    work.OriginalFileName,
+                    work.Archive.OriginalFileName,
                     work.PatchEntrypoint,
                     workDirectory,
                     tarPath,
