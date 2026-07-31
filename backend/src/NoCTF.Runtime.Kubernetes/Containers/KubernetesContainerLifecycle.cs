@@ -16,6 +16,10 @@ public sealed class KubernetesContainerLifecycle(
     IAttachedOneShotJobRunner, IContainerSandboxLifecycle
 {
     private const int ExecTimeoutExitCode = 124;
+    private const string ResourceRoleLabel = "noctf.io/resource-role";
+    private const string InternalServiceRole = "dns";
+    private const string PublicServiceRole = "public";
+    private const string PublicServiceSuffix = "-public";
     private const string ExecTimeoutScript = """
         duration=$1
         shift
@@ -44,20 +48,21 @@ public sealed class KubernetesContainerLifecycle(
     {
         if (request.Provider != RuntimeProvider.Kubernetes)
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Kubernetes runtime cannot create another provider.");
+        ValidateContainerRequest(request);
 
         var name = $"noctf-{request.OperationId:N}";
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
         labels["noctf.io/runtime-id"] = name;
         if (request.NetworkName is not null) labels["noctf.io/sandbox"] = request.NetworkName;
-        if (request.AllowInternalCallback)
-        {
-            labels["noctf.io/managed"] = "true";
-            labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
-            labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
-                ?? request.OperationId).ToString("D");
-            labels["noctf.io/generation"] = request.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
-        }
+        labels["noctf.io/managed"] = "true";
+        labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
+        labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
+            ?? request.OperationId).ToString("D");
+        labels["noctf.io/generation"] = request.Generation.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        if (request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
+            && request.PortMappings.Count == 0)
+            await EnsurePublicServiceAbsentAsync(name, request, cancellationToken);
         var pod = new V1Pod
         {
             Metadata = new V1ObjectMeta
@@ -103,15 +108,33 @@ public sealed class KubernetesContainerLifecycle(
                 RestartPolicy = "Never"
             }
         };
+        V1Pod? createdPod = null;
+        var createdCallbackPolicies = new List<V1NetworkPolicy>();
+        var createdServices = new List<V1Service>();
         try
         {
-            await client.CoreV1.CreateNamespacedPodAsync(
-                pod, options.Namespace, cancellationToken: cancellationToken);
+            var podCreation = await CreateOrReadBackPodAsync(
+                pod,
+                request,
+                cancellationToken);
+            if (podCreation.Created)
+                createdPod = podCreation.Resource;
             if (request.AllowInternalCallback)
-                await EnsureInternalCallbackPolicyAsync(name, labels, request, cancellationToken);
-            var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
+                _ = await EnsureInternalCallbackPolicyAsync(
+                    name,
+                    labels,
+                    request,
+                    cancellationToken,
+                    createdCallbackPolicies);
+            var services = await EnsureServicesAsync(
+                name,
+                labels,
+                request,
+                cancellationToken,
+                createdServices);
             return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending,
-                request.PortMappings, options.PublicHost, internalHost ?? $"{name}.{options.Namespace}.svc",
+                services.PublishedPorts, options.PublicHost,
+                services.InternalHost ?? $"{name}.{options.Namespace}.svc",
                 RuntimeInstanceId: request.RuntimeInstanceId,
                 Generation: request.Generation);
         }
@@ -121,18 +144,15 @@ public sealed class KubernetesContainerLifecycle(
                 RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
             try
             {
-                await DestroyAsync(new ContainerReceipt(
-                    request.OperationId,
-                    RuntimeProvider.Kubernetes,
-                    name,
-                    RuntimeStatus.Failed,
-                    request.PortMappings,
-                    options.PublicHost,
-                    null), cleanupSource.Token);
+                await CleanupCreatedResourcesAsync(
+                    createdPod,
+                    createdCallbackPolicies,
+                    createdServices,
+                    cleanupSource.Token);
             }
             catch
             {
-                // The failed create has no durable receipt; surface the cleanup failure.
+                // Preserve the create failure; cleanup only targets resources confirmed created here.
             }
             throw;
         }
@@ -145,6 +165,7 @@ public sealed class KubernetesContainerLifecycle(
         if (request.Provider != RuntimeProvider.Kubernetes)
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider,
                 "Kubernetes runtime cannot reconcile another provider.");
+        ValidateContainerRequest(request);
 
         var name = $"noctf-{request.OperationId:N}";
         V1Pod? pod;
@@ -161,6 +182,8 @@ public sealed class KubernetesContainerLifecycle(
             pod = null;
         }
 
+        if (pod is not null)
+            ValidatePod(pod, name, request);
         if (pod is null)
         {
             _ = await CreateAsync(request, cancellationToken);
@@ -178,6 +201,7 @@ public sealed class KubernetesContainerLifecycle(
             await WaitUntilDeletedAsync(
                 name,
                 request.OperationTimeout ?? TimeSpan.FromMinutes(2),
+                request.AllowInternalCallback,
                 cancellationToken);
             _ = await CreateAsync(request, cancellationToken);
         }
@@ -185,7 +209,19 @@ public sealed class KubernetesContainerLifecycle(
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
         labels["noctf.io/runtime-id"] = name;
         if (request.NetworkName is not null) labels["noctf.io/sandbox"] = request.NetworkName;
-        var internalHost = await EnsureServiceAsync(name, labels, request, cancellationToken);
+        labels["noctf.io/managed"] = "true";
+        labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
+        labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
+            ?? request.OperationId).ToString("D");
+        labels["noctf.io/generation"] = request.Generation.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        if (request.AllowInternalCallback)
+            _ = await EnsureInternalCallbackPolicyAsync(
+                name,
+                labels,
+                request,
+                cancellationToken);
+        var services = await EnsureServicesAsync(name, labels, request, cancellationToken);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(request.OperationTimeout ?? TimeSpan.FromMinutes(2));
         try
@@ -200,9 +236,9 @@ public sealed class KubernetesContainerLifecycle(
                 RuntimeProvider.Kubernetes,
                 name,
                 RuntimeStatus.Failed,
-                request.PortMappings,
+                services.PublishedPorts,
                 options.PublicHost,
-                internalHost), cancellationToken);
+                services.InternalHost), cancellationToken);
             throw new TimeoutException("Kubernetes runtime did not reach Running before the operation deadline.");
         }
         return new ContainerReceipt(
@@ -210,9 +246,9 @@ public sealed class KubernetesContainerLifecycle(
             RuntimeProvider.Kubernetes,
             name,
             RuntimeStatus.Running,
-            request.PortMappings,
+            services.PublishedPorts,
             options.PublicHost,
-            internalHost ?? $"{name}.{options.Namespace}.svc",
+            services.InternalHost ?? $"{name}.{options.Namespace}.svc",
             RuntimeInstanceId: request.RuntimeInstanceId,
             Generation: request.Generation);
     }
@@ -220,16 +256,21 @@ public sealed class KubernetesContainerLifecycle(
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
         var failures = new List<Exception>();
-        await TryDeleteAsync(() => client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
-                $"{receipt.ResourceId}-callback",
-                options.Namespace,
-                body: new V1DeleteOptions(),
-                cancellationToken: cancellationToken));
+        await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedServiceAsync(
+            $"{receipt.ResourceId}{PublicServiceSuffix}",
+            options.Namespace,
+            body: new V1DeleteOptions(),
+            cancellationToken: cancellationToken));
         await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedServiceAsync(
             receipt.ResourceId,
             options.Namespace,
             body: new V1DeleteOptions(),
             cancellationToken: cancellationToken));
+        await TryDeleteAsync(() => client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
+                $"{receipt.ResourceId}-callback",
+                options.Namespace,
+                body: new V1DeleteOptions(),
+                cancellationToken: cancellationToken));
         await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedPodAsync(
                 receipt.ResourceId,
                 options.Namespace,
@@ -628,67 +669,491 @@ public sealed class KubernetesContainerLifecycle(
         _ => RuntimeStatus.Failed
     };
 
-    private async Task<string?> EnsureServiceAsync(
-        string name,
-        IReadOnlyDictionary<string, string> labels,
+    private async Task<CreatedResource<V1Pod>> CreateOrReadBackPodAsync(
+        V1Pod desired,
         ContainerRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.NetworkName is null || request.ContainerPorts.Count == 0)
-            return null;
+        try
+        {
+            var created = await client.CoreV1.CreateNamespacedPodAsync(
+                desired,
+                options.Namespace,
+                cancellationToken: cancellationToken);
+            created.Metadata ??= new V1ObjectMeta();
+            if (string.IsNullOrWhiteSpace(created.Metadata.Name))
+                created.Metadata.Name = desired.Metadata.Name;
+            return new(created, true);
+        }
+        catch (Exception creationException) when (!cancellationToken.IsCancellationRequested)
+        {
+            V1Pod existing;
+            try
+            {
+                existing = await client.CoreV1.ReadNamespacedPodAsync(
+                    desired.Metadata.Name,
+                    options.Namespace,
+                    cancellationToken: cancellationToken);
+            }
+            catch
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo
+                    .Capture(creationException)
+                    .Throw();
+                throw;
+            }
+            ValidatePod(existing, desired.Metadata.Name, request);
+            return new(existing, false);
+        }
+    }
 
+    private async Task CleanupCreatedResourcesAsync(
+        V1Pod? pod,
+        IReadOnlyList<V1NetworkPolicy> callbackPolicies,
+        IReadOnlyList<V1Service> services,
+        CancellationToken cancellationToken)
+    {
+        var failures = new List<Exception>();
+        foreach (var service in services.Reverse())
+        {
+            if (string.IsNullOrWhiteSpace(service.Metadata?.Name))
+                continue;
+            await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedServiceAsync(
+                service.Metadata.Name,
+                options.Namespace,
+                body: CreatedDeleteOptions(service.Metadata),
+                cancellationToken: cancellationToken));
+        }
+        foreach (var callbackPolicy in callbackPolicies.Reverse())
+        {
+            if (string.IsNullOrWhiteSpace(callbackPolicy.Metadata?.Name))
+                continue;
+            await TryDeleteAsync(() => client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
+                callbackPolicy.Metadata.Name,
+                options.Namespace,
+                body: CreatedDeleteOptions(callbackPolicy.Metadata),
+                cancellationToken: cancellationToken));
+        }
+        if (!string.IsNullOrWhiteSpace(pod?.Metadata?.Name))
+        {
+            await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedPodAsync(
+                pod.Metadata.Name,
+                options.Namespace,
+                body: CreatedDeleteOptions(pod.Metadata, "Foreground"),
+                cancellationToken: cancellationToken));
+        }
+        if (failures.Count > 0)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+
+        async Task TryDeleteAsync(Func<Task> delete)
+        {
+            try
+            {
+                await delete();
+            }
+            catch (k8s.Autorest.HttpOperationException exception)
+                when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound
+                    || exception.Response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                // The created resource is absent or its UID precondition no longer matches.
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+        }
+    }
+
+    private static V1DeleteOptions CreatedDeleteOptions(
+        V1ObjectMeta metadata,
+        string? propagationPolicy = null)
+    {
+        var delete = new V1DeleteOptions { PropagationPolicy = propagationPolicy };
+        if (string.IsNullOrWhiteSpace(metadata.Uid))
+            throw new InvalidOperationException(
+                "A created Kubernetes resource cannot be safely deleted without its UID.");
+        delete.Preconditions = new V1Preconditions { Uid = metadata.Uid };
+        return delete;
+    }
+
+    private async Task<ContainerServices> EnsureServicesAsync(
+        string name,
+        IReadOnlyDictionary<string, string> labels,
+        ContainerRequest request,
+        CancellationToken cancellationToken,
+        ICollection<V1Service>? createdServices = null)
+    {
+        if (request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
+            && request.PortMappings.Count == 0)
+            await EnsurePublicServiceAbsentAsync(name, request, cancellationToken);
+        if (request.ContainerPorts.Count == 0)
+            return new(null, new Dictionary<int, int>());
+        if (request.NetworkName is null)
+            throw new InvalidOperationException(
+                "A Kubernetes Container service requires an isolated Runtime network.");
+
+        var identity = new RuntimeResourceIdentity(
+            request.RuntimeInstanceId ?? request.OperationId,
+            request.Generation);
+        var internalService = await EnsureServiceAsync(
+            name,
+            name,
+            labels,
+            identity,
+            InternalServiceRole,
+            "ClusterIP",
+            request.ContainerPorts,
+            requireAssignedNodePorts: false,
+            cancellationToken,
+            createdServices);
+        IReadOnlyDictionary<int, int> publishedPorts = new Dictionary<int, int>();
+        if (request.PortMappings.Count > 0)
+        {
+            var publicService = await EnsureServiceAsync(
+                $"{name}{PublicServiceSuffix}",
+                name,
+                labels,
+                identity,
+                PublicServiceRole,
+                "NodePort",
+                request.PortMappings.Keys.Order().ToArray(),
+                requireAssignedNodePorts: true,
+                cancellationToken,
+                createdServices);
+            publishedPorts = publicService.Spec.Ports.ToDictionary(
+                port => port.Port,
+                port => port.NodePort!.Value);
+        }
+        return new(internalService.Spec.ClusterIP, publishedPorts);
+    }
+
+    private async Task<V1Service> EnsureServiceAsync(
+        string name,
+        string podName,
+        IReadOnlyDictionary<string, string> labels,
+        RuntimeResourceIdentity identity,
+        string role,
+        string type,
+        IReadOnlyList<int> ports,
+        bool requireAssignedNodePorts,
+        CancellationToken cancellationToken,
+        ICollection<V1Service>? createdServices)
+    {
         try
         {
             var existing = await client.CoreV1.ReadNamespacedServiceAsync(
                 name,
                 options.Namespace,
                 cancellationToken: cancellationToken);
-            return existing.Spec.ClusterIP;
+            var selector = ServiceSelector(podName, identity, JobKindFromLabels(labels));
+            ValidateService(
+                existing,
+                name,
+                identity,
+                role,
+                type,
+                selector,
+                ports,
+                requireAssignedNodePorts);
+            return existing;
         }
         catch (k8s.Autorest.HttpOperationException exception)
             when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            var service = await client.CoreV1.CreateNamespacedServiceAsync(new V1Service
+            var jobKind = JobKindFromLabels(labels);
+            var selector = ServiceSelector(podName, identity, jobKind);
+            var serviceLabels = PlatformServiceLabels(
+                labels,
+                podName,
+                identity,
+                jobKind,
+                role);
+            var desired = new V1Service
             {
                 Metadata = new V1ObjectMeta
                 {
                     Name = name,
                     NamespaceProperty = options.Namespace,
-                    Labels = labels.ToDictionary(pair => pair.Key, pair => pair.Value)
+                    Labels = serviceLabels
                 },
                 Spec = new V1ServiceSpec
                 {
-                    Selector = new Dictionary<string, string> { ["noctf.io/runtime-id"] = name },
-                    Ports = request.ContainerPorts.Select(port => new V1ServicePort
+                    Selector = selector,
+                    Ports = ports.Select(port => new V1ServicePort
                     {
                         Name = $"tcp-{port}",
                         Port = port,
-                        TargetPort = port
+                        TargetPort = port,
+                        Protocol = "TCP"
                     }).ToList(),
-                    Type = "ClusterIP"
+                    Type = type
                 }
-            }, options.Namespace, cancellationToken: cancellationToken);
-            return service.Spec.ClusterIP;
+            };
+            V1Service service;
+            try
+            {
+                service = await client.CoreV1.CreateNamespacedServiceAsync(
+                    desired,
+                    options.Namespace,
+                    cancellationToken: cancellationToken);
+                createdServices?.Add(service);
+            }
+            catch (Exception creationException) when (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    service = await client.CoreV1.ReadNamespacedServiceAsync(
+                        name,
+                        options.Namespace,
+                        cancellationToken: cancellationToken);
+                }
+                catch
+                {
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo
+                        .Capture(creationException)
+                        .Throw();
+                    throw;
+                }
+            }
+            ValidateService(
+                service,
+                name,
+                identity,
+                role,
+                type,
+                selector,
+                ports,
+                requireAssignedNodePorts);
+            return service;
         }
     }
 
-    private async Task EnsureInternalCallbackPolicyAsync(
+    private static void ValidateService(
+        V1Service service,
         string name,
-        IReadOnlyDictionary<string, string> labels,
+        RuntimeResourceIdentity identity,
+        string role,
+        string type,
+        IReadOnlyDictionary<string, string> expectedSelector,
+        IReadOnlyList<int> expectedPorts,
+        bool requireAssignedNodePorts)
+    {
+        var spec = service.Spec
+            ?? throw new InvalidOperationException(
+                $"Kubernetes Service '{name}' has no specification.");
+        if (!string.Equals(service.Metadata?.Name, name, StringComparison.Ordinal)
+            || !HasResourceIdentity(service.Metadata?.Labels, identity)
+            || !HasLabel(service.Metadata?.Labels, ResourceRoleLabel, role)
+            || !HasLabel(
+                service.Metadata?.Labels,
+                "noctf.io/job-kind",
+                expectedSelector["noctf.io/job-kind"])
+            || !HasLabel(
+                service.Metadata?.Labels,
+                "noctf.io/runtime-id",
+                expectedSelector["noctf.io/runtime-id"])
+            || !string.Equals(spec.Type, type, StringComparison.Ordinal)
+            || !HasExactLabels(spec.Selector, expectedSelector)
+            || spec.ExternalIPs?.Count > 0
+            || !string.IsNullOrWhiteSpace(spec.ExternalName)
+            || !string.IsNullOrWhiteSpace(spec.LoadBalancerIP))
+            throw new InvalidOperationException(
+                $"Kubernetes Service '{name}' has a different ownership identity or role.");
+
+        var expected = expectedPorts.Order().ToArray();
+        var actual = spec.Ports?.OrderBy(port => port.Port).ToArray() ?? [];
+        if (actual.Length != expected.Length
+            || !actual.Select(port => port.Port).SequenceEqual(expected))
+            throw new InvalidOperationException(
+                $"Kubernetes Service '{name}' has a different port contract.");
+        foreach (var port in actual)
+        {
+            if (!string.Equals(port.Name, $"tcp-{port.Port}", StringComparison.Ordinal)
+                || port.TargetPort?.Value
+                    != port.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                || !string.Equals(port.Protocol, "TCP", StringComparison.Ordinal)
+                || type == "ClusterIP" && port.NodePort is not null
+                || requireAssignedNodePorts && port.NodePort is not (>= 1 and <= 65535))
+                throw new InvalidOperationException(
+                    $"Kubernetes Service '{name}' has a different port contract.");
+        }
+        if (type == "ClusterIP"
+            && (string.IsNullOrWhiteSpace(spec.ClusterIP)
+                || string.Equals(spec.ClusterIP, "None", StringComparison.OrdinalIgnoreCase))
+            || requireAssignedNodePorts
+                && actual.Select(port => port.NodePort!.Value).Distinct().Count()
+                    != actual.Length)
+            throw new InvalidOperationException(
+                $"Kubernetes Service '{name}' has a different port contract.");
+    }
+
+    private static void ValidateContainerRequest(ContainerRequest request)
+    {
+        var identity = new RuntimeResourceIdentity(
+            request.RuntimeInstanceId ?? request.OperationId,
+            request.Generation);
+        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+            throw new InvalidOperationException(
+                "A Kubernetes Container requires a valid Runtime identity.");
+        if (request.ContainerPorts.Any(port => port is < 1 or > 65535)
+            || request.PortMappings.Any(mapping => mapping.Value != 0))
+            throw new InvalidOperationException(
+                "Kubernetes Container public ports require a valid container port and dynamic NodePort allocation.");
+        if (request.ContainerPorts.Count == 0)
+            return;
+        if (request.NetworkName is null)
+            throw new InvalidOperationException(
+                "A Kubernetes Container service requires a valid Runtime network identity.");
+        if (request.PortMappings.Count > 0
+            && request.NetworkPurpose != ContainerNetworkPurpose.PersistentRuntime)
+            throw new InvalidOperationException(
+                "Only a persistent Kubernetes Container Runtime may publish NodePorts.");
+    }
+
+    private async Task EnsurePublicServiceAbsentAsync(
+        string podName,
         ContainerRequest request,
         CancellationToken cancellationToken)
     {
-        var callbackPort = GetCallbackPort(request);
-        var purpose = labels.TryGetValue("noctf.io/purpose", out var configuredPurpose)
-            && configuredPurpose is "awd-checker" or "awdp-checker"
-                ? configuredPurpose
+        V1Service existing;
+        try
+        {
+            existing = await client.CoreV1.ReadNamespacedServiceAsync(
+                $"{podName}{PublicServiceSuffix}",
+                options.Namespace,
+                cancellationToken: cancellationToken);
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return;
+        }
+        var identity = new RuntimeResourceIdentity(
+            request.RuntimeInstanceId ?? request.OperationId,
+            request.Generation);
+        var publicName = $"{podName}{PublicServiceSuffix}";
+        var metadata = existing.Metadata;
+        if (metadata is null
+            || !string.Equals(metadata.Name, publicName, StringComparison.Ordinal)
+            || !HasResourceIdentity(metadata.Labels, identity)
+            || !HasLabel(metadata.Labels, ResourceRoleLabel, PublicServiceRole)
+            || !HasLabel(
+                metadata.Labels,
+                "noctf.io/job-kind",
+                JobKind(request.NetworkPurpose))
+            || !HasLabel(metadata.Labels, "noctf.io/runtime-id", podName))
+            throw new InvalidOperationException(
+                $"Kubernetes Service '{publicName}' has a different ownership identity or role.");
+        await client.CoreV1.DeleteNamespacedServiceAsync(
+            publicName,
+            options.Namespace,
+            body: CreatedDeleteOptions(metadata),
+            cancellationToken: cancellationToken);
+        var deadline = DateTimeOffset.UtcNow.Add(
+            request.OperationTimeout ?? TimeSpan.FromMinutes(2));
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                _ = await client.CoreV1.ReadNamespacedServiceAsync(
+                    publicName,
+                    options.Namespace,
+                    cancellationToken: cancellationToken);
+            }
+            catch (k8s.Autorest.HttpOperationException exception)
+                when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return;
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+        }
+        throw new TimeoutException(
+            $"Kubernetes Service '{publicName}' was not deleted before reconciliation.");
+    }
+
+    private static void ValidatePod(V1Pod pod, string name, ContainerRequest request)
+    {
+        var identity = new RuntimeResourceIdentity(
+            request.RuntimeInstanceId ?? request.OperationId,
+            request.Generation);
+        if (!string.Equals(pod.Metadata?.Name, name, StringComparison.Ordinal)
+            || !HasResourceIdentity(pod.Metadata?.Labels, identity)
+            || !HasLabel(pod.Metadata?.Labels, "noctf.io/runtime-id", name)
+            || !HasLabel(
+                pod.Metadata?.Labels,
+                "noctf.io/job-kind",
+                JobKind(request.NetworkPurpose))
+            || request.NetworkName is not null
+                && !HasLabel(
+                    pod.Metadata?.Labels,
+                    "noctf.io/sandbox",
+                    request.NetworkName)
+            || request.AllowInternalCallback
+                && !HasLabel(
+                    pod.Metadata?.Labels,
+                    "noctf.io/purpose",
+                    CallbackPurpose(request)))
+            throw new InvalidOperationException(
+                $"Kubernetes Pod '{name}' has a different ownership identity or network.");
+    }
+
+    private static Dictionary<string, string> ServiceSelector(
+        string podName,
+        RuntimeResourceIdentity identity,
+        string jobKind) =>
+        new(StringComparer.Ordinal)
+        {
+            ["noctf.io/runtime-id"] = podName,
+            ["noctf.io/managed"] = "true",
+            ["noctf.io/job-kind"] = jobKind,
+            ["noctf.io/runtime-instance-id"] = identity.RuntimeInstanceId.ToString("D"),
+            ["noctf.io/generation"] = identity.Generation.ToString(
+                System.Globalization.CultureInfo.InvariantCulture)
+        };
+
+    private static Dictionary<string, string> PlatformServiceLabels(
+        IReadOnlyDictionary<string, string> configured,
+        string podName,
+        RuntimeResourceIdentity identity,
+        string jobKind,
+        string role)
+    {
+        var labels = configured.ToDictionary(pair => pair.Key, pair => pair.Value);
+        foreach (var pair in ServiceSelector(podName, identity, jobKind))
+            labels[pair.Key] = pair.Value;
+        labels[ResourceRoleLabel] = role;
+        return labels;
+    }
+
+    private static string JobKindFromLabels(IReadOnlyDictionary<string, string> labels) =>
+        labels.TryGetValue("noctf.io/job-kind", out var jobKind)
+            && jobKind is "persistent-runtime" or "awdp-verification" or "awd-checker"
+                ? jobKind
                 : throw new InvalidOperationException(
-                    "A scoring checker requires a supported purpose label.");
-        await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(new V1NetworkPolicy
+                    "A Kubernetes Container service requires a supported job kind.");
+
+    private static bool HasExactLabels(
+        IDictionary<string, string>? actual,
+        IReadOnlyDictionary<string, string> expected) =>
+        actual is not null
+        && actual.Count == expected.Count
+        && expected.All(pair => HasLabel(actual, pair.Key, pair.Value));
+
+    private async Task<CreatedResource<V1NetworkPolicy>> EnsureInternalCallbackPolicyAsync(
+        string name,
+        IReadOnlyDictionary<string, string> labels,
+        ContainerRequest request,
+        CancellationToken cancellationToken,
+        ICollection<V1NetworkPolicy>? createdPolicies = null)
+    {
+        var callbackPort = GetCallbackPort(request);
+        var purpose = CallbackPurpose(request);
+        var policyName = $"{name}-callback";
+        var desired = new V1NetworkPolicy
         {
             Metadata = new V1ObjectMeta
             {
-                Name = $"{name}-callback",
+                Name = policyName,
                 NamespaceProperty = options.Namespace,
                 Labels = labels.ToDictionary(pair => pair.Key, pair => pair.Value)
             },
@@ -767,8 +1232,155 @@ public sealed class KubernetesContainerLifecycle(
                     }
                 ]
             }
-        }, options.Namespace, cancellationToken: cancellationToken);
+        };
+        try
+        {
+            var existing = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
+                policyName,
+                options.Namespace,
+                cancellationToken: cancellationToken);
+            ValidateCallbackPolicy(existing, name, request, purpose, callbackPort);
+            return new(existing, false);
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // The deterministic callback policy has not been created yet.
+        }
+
+        V1NetworkPolicy policy;
+        try
+        {
+            policy = await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(
+                desired,
+                options.Namespace,
+                cancellationToken: cancellationToken);
+            createdPolicies?.Add(policy);
+        }
+        catch (Exception creationException) when (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                policy = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
+                    policyName,
+                    options.Namespace,
+                    cancellationToken: cancellationToken);
+            }
+            catch
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo
+                    .Capture(creationException)
+                    .Throw();
+                throw;
+            }
+            ValidateCallbackPolicy(policy, name, request, purpose, callbackPort);
+            return new(policy, false);
+        }
+        ValidateCallbackPolicy(policy, name, request, purpose, callbackPort);
+        return new(policy, true);
     }
+
+    private static string CallbackPurpose(ContainerRequest request) =>
+        request.Labels.TryGetValue("noctf.io/purpose", out var purpose)
+            && purpose is "awd-checker" or "awdp-checker"
+                ? purpose
+                : throw new InvalidOperationException(
+                    "A scoring checker requires a supported purpose label.");
+
+    private void ValidateCallbackPolicy(
+        V1NetworkPolicy policy,
+        string podName,
+        ContainerRequest request,
+        string purpose,
+        int callbackPort)
+    {
+        var identity = new RuntimeResourceIdentity(
+            request.RuntimeInstanceId ?? request.OperationId,
+            request.Generation);
+        var spec = policy.Spec;
+        if (!string.Equals(
+                policy.Metadata?.Name,
+                $"{podName}-callback",
+                StringComparison.Ordinal)
+            || !HasResourceIdentity(policy.Metadata?.Labels, identity)
+            || !HasLabel(
+                policy.Metadata?.Labels,
+                "noctf.io/job-kind",
+                JobKind(request.NetworkPurpose))
+            || !HasLabel(policy.Metadata?.Labels, "noctf.io/purpose", purpose)
+            || spec is null
+            || !HasExactSelector(
+                spec.PodSelector,
+                new Dictionary<string, string>
+                {
+                    ["noctf.io/runtime-id"] = podName,
+                    ["noctf.io/purpose"] = purpose
+                })
+            || spec.PolicyTypes?.Count != 1
+            || !string.Equals(spec.PolicyTypes[0], "Egress", StringComparison.Ordinal)
+            || spec.Ingress?.Count > 0
+            || spec.Egress?.Count != 2
+            || spec.Egress.Count(rule =>
+                IsCallbackRule(rule, callbackPort)) != 1
+            || spec.Egress.Count(IsDnsRule) != 1)
+            throw new InvalidOperationException(
+                $"Kubernetes NetworkPolicy '{podName}-callback' has a different ownership identity or callback contract.");
+    }
+
+    private bool IsCallbackRule(
+        V1NetworkPolicyEgressRule rule,
+        int callbackPort)
+    {
+        if (rule.To?.Count != 1 || rule.Ports?.Count != 1)
+            return false;
+        var peer = rule.To[0];
+        var port = rule.Ports[0];
+        return peer.NamespaceSelector is null
+            && peer.IpBlock is null
+            && HasExactSelector(
+                peer.PodSelector,
+                new Dictionary<string, string>
+                {
+                    [options.CallbackPodLabelKey] = options.CallbackPodLabelValue
+                })
+            && string.Equals(port.Protocol, "TCP", StringComparison.Ordinal)
+            && port.EndPort is null
+            && port.Port?.Value
+                == callbackPort.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static bool IsDnsRule(V1NetworkPolicyEgressRule rule)
+    {
+        if (rule.To?.Count != 1 || rule.Ports?.Count != 2)
+            return false;
+        var peer = rule.To[0];
+        return peer.IpBlock is null
+            && HasExactSelector(
+                peer.NamespaceSelector,
+                new Dictionary<string, string>
+                {
+                    ["kubernetes.io/metadata.name"] = "kube-system"
+                })
+            && HasExactSelector(
+                peer.PodSelector,
+                new Dictionary<string, string>
+                {
+                    ["k8s-app"] = "kube-dns"
+                })
+            && rule.Ports.All(port => port.EndPort is null)
+            && rule.Ports
+                .Select(port => $"{port.Protocol}:{port.Port?.Value}")
+                .Order(StringComparer.Ordinal)
+                .SequenceEqual(["TCP:53", "UDP:53"]);
+    }
+
+    private static bool HasExactSelector(
+        V1LabelSelector? selector,
+        IReadOnlyDictionary<string, string> expectedLabels) =>
+        selector is not null
+        && selector.MatchExpressions is null or { Count: 0 }
+        && HasExactLabels(selector.MatchLabels, expectedLabels);
 
     private static int GetCallbackPort(ContainerRequest request)
     {
@@ -783,6 +1395,7 @@ public sealed class KubernetesContainerLifecycle(
     private async Task WaitUntilDeletedAsync(
         string name,
         TimeSpan timeout,
+        bool waitForCallbackPolicy,
         CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow.Add(timeout);
@@ -790,6 +1403,8 @@ public sealed class KubernetesContainerLifecycle(
         {
             var podExists = true;
             var serviceExists = true;
+            var publicServiceExists = true;
+            var callbackPolicyExists = waitForCallbackPolicy;
             try
             {
                 _ = await client.CoreV1.ReadNamespacedPodAsync(
@@ -814,12 +1429,48 @@ public sealed class KubernetesContainerLifecycle(
             {
                 serviceExists = false;
             }
-            if (!podExists && !serviceExists)
+            try
+            {
+                _ = await client.CoreV1.ReadNamespacedServiceAsync(
+                    $"{name}{PublicServiceSuffix}",
+                    options.Namespace,
+                    cancellationToken: cancellationToken);
+            }
+            catch (k8s.Autorest.HttpOperationException exception)
+                when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                publicServiceExists = false;
+            }
+            if (waitForCallbackPolicy)
+            {
+                try
+                {
+                    _ = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
+                        $"{name}-callback",
+                        options.Namespace,
+                        cancellationToken: cancellationToken);
+                }
+                catch (k8s.Autorest.HttpOperationException exception)
+                    when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    callbackPolicyExists = false;
+                }
+            }
+            if (!podExists
+                && !serviceExists
+                && !publicServiceExists
+                && !callbackPolicyExists)
                 return;
             await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
         }
         throw new TimeoutException("Kubernetes terminal resources were not deleted before recreation.");
     }
+
+    private sealed record ContainerServices(
+        string? InternalHost,
+        IReadOnlyDictionary<int, int> PublishedPorts);
+
+    private sealed record CreatedResource<T>(T Resource, bool Created);
 
     private async Task WaitUntilRunningAsync(string podName, CancellationToken cancellationToken)
     {
