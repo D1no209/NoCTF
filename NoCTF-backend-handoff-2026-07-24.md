@@ -1510,7 +1510,7 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
   CompetitionChallenge mode invariant 的缺口；应给出 typed state/409、真实 PostgreSQL
   覆盖与 OpenAPI/client，再适配 Frontend，不得只依赖 start gate 晚拒绝。
 
-### 6.26 Backend Challenge template Mode 活动引用不变量（2026-07-31，当前最新 Backend）
+### 6.26 Backend Challenge template Mode 活动引用不变量（2026-07-31）
 
 本节完成 6.25 指定的 Backend 纵切。Challenge template update 不再把不存在、无权限和
 revision 冲突合并成不可判定字符串，也不能在活动 CompetitionChallenge 仍引用时改变 Mode。
@@ -1587,6 +1587,73 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
 - 本节作为独立 Frontend 本地提交，提交说明为
   `feat(admin): decode template mode conflicts`；不 push、不创建 PR。保护文件继续沿用 6.18。
 
+### 6.28 Backend Kubernetes Container 动态 NodePort 与重放安全（2026-07-31，当前最新 Backend）
+
+本节完成 runtime 网络审计中不依赖产品取舍的 Kubernetes Container 公网端口缺口。原实现只
+创建 ClusterIP Service，并把请求中的 `containerPort -> 0` 原样写入 receipt，导致 persistent
+Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/NetworkPolicy。现在不保留该行为，
+没有新增 API、OpenAPI contract、EF migration 或 Frontend 适配。
+
+#### 双 Service 与实际端口回填
+
+- Kubernetes Container 的 public `PortMappings` 只接受合法 container port 且值严格为 `0`，
+  并只允许 `PersistentRuntime`；固定 host port、无效 identity/generation 或缺少 isolated
+  Runtime network 都在任何 Pod/Service create 前 fail closed。
+- 每个有端口的 Container 使用两个确定性 Service：
+  - `{resourceId}` 是 ClusterIP，只包含 public + internal 的完整 container ports；
+  - `{resourceId}-public` 是 NodePort，只包含 public `PortMappings.Keys`，创建请求不指定
+    NodePort，由 apiserver 动态分配。
+- receipt 不再回传零值，而是从 NodePort Service 精确构造
+  `containerPort -> assignedNodePort`；internal host 继续使用已校验的 ClusterIP。
+  AWDP disposable target 只创建 internal ClusterIP，不会意外创建 public Service。
+- Service 的 platform labels 与 selector 固定包含 managed、job-kind、runtime instance、
+  generation 与 runtime-id；internal/public role、type、精确 ports、TCP、name、targetPort、
+  NodePort 唯一性、ClusterIP 及额外暴露字段全部在 create response 与 replay 时校验。
+
+#### 幂等重放、stale exposure 与安全清理
+
+- Pod、Service 与 callback NetworkPolicy 的 create 409/响应丢失都先 read-back，并只在完整
+  identity/shape contract 匹配时继续；异主或 drift 资源不 patch、不覆盖、不删除。
+- 所有 Pod 都写入同一套 platform identity labels；existing Pod 重放校验 runtime-id、
+  job-kind、generation、sandbox，callback workload 还必须匹配 checker purpose。
+- 预期无 public port 时，无论 `NetworkName` 是否为空，都会检查 `{resourceId}-public`：
+  异主资源 fail closed，同 identity stale NodePort 使用 UID precondition 删除并等待实际消失，
+  防止 Container 未声明 port 时仍被旧 Service 转发。
+- callback NetworkPolicy 的 Pod selector、callback peer、DNS peer 均拒绝 MatchExpressions；
+  policy types、Ingress、两条 Egress、protocol/port 与 `EndPort == null` 全部精确校验，避免
+  “policy 存在但不选择 checker Pod”或端口范围扩大后退化为无限制 egress。
+- create 失败只清理由本次调用明确创建的资源；删除必须携带 apiserver UID precondition，
+  不再按确定性名称盲删并发赢家或异主资源。普通 destroy 先撤销 public Service，再清理
+  internal Service、callback policy 与 Pod；terminal recreation 等待这四类资源全部消失。
+
+#### 验证、远端边界与下一步
+
+- WSL 原生干净副本、.NET SDK 10.0.301、真实 Docker/Testcontainers：
+  - `KubernetesContainerLifecycleTests`：24/24 passed，覆盖动态 NodePort、AWDP internal-only、
+    fixed port 前置拒绝、合法 replay、identity/selector/port-range drift、response-loss
+    read-back、zero-port stale exposure、UID 清理与双 Service destroy；
+  - Release `NoCTF.slnx` build：0 warning、0 error；
+  - non-Integration：443/443 passed；
+  - Integration：69 total，67 passed、0 failed、2 skipped；两个 skip 仍是未启用的真实
+    Kubernetes dataplane 与未配置 fixture 的真实 Libvirt opt-in；
+  - 全 solution analyzer、本轮 C# whitespace、EF pending model 与 `git diff --check`
+    passed；独立只读复核最终无 P1/P2 blocker。
+- OpenAPI 仍为 134 endpoints；两份 artifact 字节一致且两次导出 byte-stable，SHA-256 均为
+  `3429B4071BA6BF302C422EEAC36B5F4331D0234E33CB2494F32B67EDFEA1763C`，因此无需重建
+  Frontend generated SDK，也没有 Frontend URL 适配。
+- 真实 Kubernetes `DNS + NetworkPolicy + NodePort + cleanup` dataplane 用例仍需设置
+  `NOCTF_KUBERNETES_INTEGRATION` 并在目标集群执行；本节不把 opt-in skip 误报为实机通过。
+- 提交前通过 GitHub compare 再次核验远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`，与本地已合并基线 `identical`；没有新冲突，
+  也不制造空 merge commit。
+- 本节作为独立 Backend 本地提交，提交说明为
+  `fix(runtime): reconcile kubernetes node ports`；不 push、不创建 PR。保护文件继续沿用
+  6.18。
+- 下一项不依赖 Docker egress 产品决策的 Backend 安全纵切，是让 AWD checker callback 的
+  `checker_sequence` / `processing_version` 真正参与持久化 fence，防止同 generation 的旧
+  token 覆盖较新的 checker 状态。Docker `DenyAll/InternetOnly` 的实现仍等待用户在 host
+  firewall executor/sidecar 与 transparent egress gateway 间选择，不自行发明 dataplane。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1594,6 +1661,7 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
 - AWDP disposable target 同时固化 Competition configuration、CompetitionChallenge 和
   Challenge definition 三个 revision，任一变化均 PlatformFailed、清理且不自动重跑；
 - Docker 直接随机宿主端口、E2E socket GID/清理修正和 shell fixture LF 约束；
+- Kubernetes Container 动态 NodePort、强 identity replay 与 UID-precondition 清理；
 - 四模式全边界、真实 PostgreSQL、EF、OpenAPI 和 solution 门禁。
 
 仍未完成/不属于本轮已部署：
@@ -1607,14 +1675,15 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
   环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境；
-  Docker `InternetOnly`、TargetPort ACL 和 callback-only gateway 是已记录的后续加固，
-  不阻塞本轮架构迁移。
+  Kubernetes Container 动态 NodePort 与重放安全已按 6.28 完成；Docker `InternetOnly`、
+  TargetPort ACL 和 callback-only gateway 仍是已记录的后续加固，不阻塞本轮架构迁移。
 
 ## 7. 建议的下一交接顺序
 
 1. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
-2. Docker `InternetOnly`、TargetPort ACL 与 callback-only gateway 属后续安全加固；先做
-   只读边界审计并以现有 contract/test 为准，不自行扩展产品协议。
+2. 先完成 AWD checker callback 的 sequence/version persistence fence；Docker
+   `InternetOnly` 等待用户选择 dataplane，TargetPort ACL 与 callback-only gateway 继续按
+   已记录边界逐项决策，不自行扩展产品协议。
 3. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
@@ -1644,9 +1713,9 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
    Bot Manager 授权、CompetitionChallenge lifecycle 与 Competition 权限完整集合 UI
    均已完成。CompetitionChallenge typed 409、delete/restore revision fence 与 Frontend
    generated-SDK 适配已按 6.24/6.25 完成；Challenge template Mode 活动引用 invariant
-   Backend 与最小 Frontend decoder 已按 6.26/6.27 完成。引用权限 Backend
-   测试数量时使用 6.22，引用最新 Backend 状态时使用 6.26，引用最新 Frontend 状态时使用
-   6.27。
+   Backend 与最小 Frontend decoder 已按 6.26/6.27 完成；Kubernetes Container 动态
+   NodePort 与重放安全按 6.28 完成。引用权限 Backend 测试数量时使用 6.22，引用最新
+   Backend 状态时使用 6.28，引用最新 Frontend 状态时使用 6.27。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
