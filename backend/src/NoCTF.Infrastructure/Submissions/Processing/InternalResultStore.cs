@@ -27,6 +27,15 @@ public sealed class InternalResultStore(
             return InternalResultDisposition.NotFound;
         if (runtime.Generation != result.Generation)
             return InternalResultDisposition.Superseded;
+        if (runtime.ProcessingVersion < result.ProcessingVersion
+            || runtime.CheckerSequence < result.CheckerSequence)
+            return InternalResultDisposition.Conflict;
+        if (runtime.ProcessingVersion > result.ProcessingVersion
+            || runtime.CheckerSequence > result.CheckerSequence)
+            return InternalResultDisposition.Superseded;
+        var appliedAt = NextAppliedAt(
+            result.OccurredAt,
+            runtime.CheckerStatusUpdatedAt);
 
         var revisions = await db.CompetitionChallenges
             .Where(challenge => challenge.Id == runtime.CompetitionChallengeId)
@@ -60,25 +69,26 @@ public sealed class InternalResultStore(
         {
             db.ScoringEvents.Add(new ScoringEvent
             {
-                Id = Guid.CreateVersion7(result.OccurredAt),
+                Id = Guid.CreateVersion7(appliedAt),
                 CompetitionId = runtime.CompetitionId,
                 CompetitionChallengeId = runtime.CompetitionChallengeId,
                 TeamId = runtime.TeamId,
                 Kind = ScoringEventKind.AwdServiceStatus,
                 Result = scoringResult,
-                ProcessingVersion = runtime.CheckerSequence,
                 CompetitionConfigurationRevision = revisions.Competition.ConfigurationRevision,
                 CompetitionChallengeRevision = revisions.ChallengeRevision,
-                OccurredAt = result.OccurredAt,
+                OccurredAt = appliedAt,
                 CreatedAt = DateTimeOffset.UtcNow
             });
-            revisions.Competition.LeaderboardRevision =
-                checked(revisions.Competition.LeaderboardRevision + 1);
+            await LeaderboardRevision.IncrementAsync(
+                db,
+                runtime.CompetitionId,
+                ct);
             await outbox.PublishAsync(new ProjectLeaderboard(runtime.CompetitionId));
         }
         runtime.CheckerStatus = result.State;
-        runtime.CheckerStatusUpdatedAt = result.OccurredAt;
-        runtime.LastAppliedCheckerSequence = runtime.CheckerSequence;
+        runtime.CheckerStatusUpdatedAt = appliedAt;
+        runtime.LastAppliedCheckerSequence = result.CheckerSequence;
         runtime.CheckerDeadlineAt = null;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -201,4 +211,20 @@ public sealed class InternalResultStore(
             ? InternalResultDisposition.Superseded
             : InternalResultDisposition.Applied;
     }
+
+    private static DateTimeOffset NextAppliedAt(
+        DateTimeOffset receivedAt,
+        DateTimeOffset? previousAppliedAt)
+    {
+        var candidate = ToPostgresPrecision(receivedAt);
+        if (previousAppliedAt is not { } previous)
+            return candidate;
+        previous = ToPostgresPrecision(previous);
+        return candidate > previous
+            ? candidate
+            : previous.AddTicks(TimeSpan.TicksPerMicrosecond);
+    }
+
+    private static DateTimeOffset ToPostgresPrecision(DateTimeOffset value) =>
+        value.AddTicks(-(value.Ticks % TimeSpan.TicksPerMicrosecond));
 }

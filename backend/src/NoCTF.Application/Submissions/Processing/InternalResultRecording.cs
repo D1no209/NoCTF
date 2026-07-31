@@ -17,15 +17,25 @@ public enum InternalResultDisposition
 public sealed record AwdCheckResult(
     Guid RuntimeInstanceId,
     int Generation,
+    long CheckerSequence,
+    long ProcessingVersion,
     AwdServiceState State,
     DateTimeOffset OccurredAt)
 {
     public static AwdCheckResult Create(
         Guid runtimeInstanceId,
         int generation,
+        long checkerSequence,
+        long processingVersion,
         AwdServiceState state,
         DateTimeOffset occurredAt) =>
-        new(runtimeInstanceId, generation, state, occurredAt);
+        new(
+            runtimeInstanceId,
+            generation,
+            checkerSequence,
+            processingVersion,
+            state,
+            occurredAt);
 }
 
 public static class AwdServiceStateTransition

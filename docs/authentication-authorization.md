@@ -60,7 +60,9 @@ Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未�
 
 内部 Scheme 必须验证精确 audience、permission、资源 Claims 与 exp，不能接受用户 Access/Refresh audience。Token 绑定具体 SubmissionId 或 RuntimeInstanceId/Generation；请求体不能覆盖 Claims 身份。
 
-AWD Checker callback 只绑定 Runtime identity/generation 和最小写权限。一次执行可以多次更新状态，后一次覆盖前一次；请求体不能覆盖 Token 中的资源身份。
+AWD Checker callback 绑定 Runtime identity/generation、checker sequence、runtime processing
+version 和最小写权限。只有 sequence/version 与 Runtime 当前值精确匹配时才可写入；同一次执行
+可以多次更新状态，后一次覆盖前一次。请求体不能覆盖 Token 中的资源身份或 fence。
 
 ## 日志中的敏感内容
 

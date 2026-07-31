@@ -280,11 +280,17 @@ GET  /api/internal/v1/awdp/fix-archives/{submissionId}
 
 全部使用独立 JWT Scheme、精确 audience/permission 与资源 Claims。Request body 不能包含可覆盖 Claims 的 Competition/Team/Submission Id。JWT 由调度该 durable Job 的可信进程签发，不提供公开“任意换 Token”接口。
 
-- AWD callback permission=`awd:check-result:write`，绑定 RuntimeInstanceId、Generation 与 deadline；请求只提交 typed checker status，后一次覆盖前一次。
+- AWD callback permission=`awd:check-result:write`，绑定 RuntimeInstanceId、Generation、
+  checker sequence、runtime processing version 与 deadline；请求只提交 typed checker
+  status。sequence/version 与 Runtime 当前值精确匹配的同一次执行可以多次写，后一次覆盖
+  前一次。
 - AWDP callback permission=`awdp:fix-result:write`，绑定 SubmissionId、ProcessingVersion、deadline。
 - Archive permission=`awdp:fix-archive:read`，只绑定一个 SubmissionId；Runner 使用它读取 archive，Checker callback Token 不含此权限。S3 可返回短时预签名地址，LocalFileSystem 可流式返回。
 
-callback 成功且当前时返回 200；完全相同重放返回相同 200；过时版本/序号返回 202 superseded；同版本不同规范化 body 返回 409；Token/claim 不符返回 401/403；资源对该 Token 不存在返回 404。过时结果可写结构化日志，但不建审计业务表。
+callback 成功且当前时返回 200。AWD 当前 sequence/version 下的重复或后续 typed status
+更新均返回 200；过时 sequence/version 返回 202 superseded，任一未来 fence 返回 409。
+AWDP 完全相同重放返回相同 200，同版本不同规范化 body 返回 409。Token/claim 不符返回
+401/403；资源对该 Token 不存在返回 404。过时结果可写结构化日志，但不建审计业务表。
 
 Runner 自身通过 Wolverine 读写，不需要 HTTP callback Endpoint。
 

@@ -262,7 +262,9 @@ Redis 容量丢失但该节点仍有 `Provisioning | Running | Stopping` assignm
 AWD Checker 不建立 Operation 表。Checker 与目标加入同一内部网络；单 Container 目标使用稳定 DNS `target`，Compose 目标使用 compose service name。Checker 自己知道目标服务端口，Challenge/Competition 不需要为 Checker 再配置或发现公开端口。`ControlCheckUrl` 仍只属于 KoH。
 
 1. Worker 到期后写 Runner Outbox；Runner 从该 Runtime Generation 的 receipt 构造 attached target；
-2. Checker 通过 `POST /api/internal/v1/awd/check-results` 主动写 `Up` 或 `Down`，同一次执行可以多次写，后一次状态直接覆盖前一次；
+2. Checker 通过 `POST /api/internal/v1/awd/check-results` 主动写 `Up` 或 `Down`；callback
+   Token 绑定当前 checker sequence 与 Runtime processing version，持久化仅接受精确 fence。
+   同一次执行可以多次写，后一次状态直接覆盖前一次；
 3. 正常退出但从未回报时保持/写入 `Unknown`；非零异常退出写 `CheckerAbnormalExit`；超时写 `CheckerTimedOut`；
 4. Runner 只用退出结果区分 Checker 自身是否异常或超时，绝不把退出码解释为服务 Up/Down；
 5. 只有 `Up`/`Down` 的变化产生服务计分事实，`Unknown`、`CheckerAbnormalExit`、`CheckerTimedOut` 是诊断状态；
