@@ -4,16 +4,28 @@
 
 ## 1. 下一会话目标
 
-2026-07-31 已完成当前可在本机闭合的代码与验证工作。最新状态以 6.31 Backend 排行榜
-按需刷新闭环、6.32 Frontend 强类型实时适配和第 7 节为准：
+2026-07-31 本轮 outcome、上传补偿、Runtime scope 和 Patch draft 纵切已在本机闭合；
+Frontend 正继续按生成 OpenAPI 契约逐项迁移。Backend 仍有第 7 节列出的三个高置信
+状态机/额度问题，最新状态以 6.33 至 6.44 和第 7 节为准：
 
 - Docker Container/Compose 公开服务最终采用题目容器直接映射 Docker 随机宿主端口；
 - 24 条 `LeaderboardRevision` 写路径均在同一事务发布 invalidation；
 - Redis snapshot CAS、dirty/failure、订阅 TTL、首次订阅/GET 和 stale refresh 已闭环；
 - Frontend 已使用生成的 OpenAPI 排行榜类型、正确 Hub 路径、重连 Join、heartbeat 和 polling
   fallback；
-- 后端完整门禁、真实 PostgreSQL/Redis/Wolverine/Docker 集成、Frontend 测试/构建、EF 与
-  OpenAPI 漂移检查均通过。
+- AWDP Runner 已改为通过 API 最小权限下载 Fix archive，不再持有对象存储凭据；
+- Frontend Authentication、Health、Competition、Challenge、Team 与 Flag submission
+  公共链路已改用生成客户端；公开 Penetration 假模式、全局 Team 和同步 Flag 结果均已删除；
+- Notification 已改为不可变事件历史，伪 read/unread 与不存在的 AWD/KoH dashboard、实时
+  事件均已删除；
+- Submission/Runtime 的真实 403/409/429/503 outcome 已进入 OpenAPI，认证用户限流分区
+  不再退化为 anonymous+IP；
+- PatchUpload 已按既定规范恢复为可替换 draft，替换与 Fix 消费共用事务锁，旧对象通过
+  Wolverine durable outbox 清理；
+- 当前环境可执行的后端测试（含真实 PostgreSQL/Redis/Wolverine/Docker 集成）均通过，
+  Frontend 测试/构建、EF 与 OpenAPI 漂移检查也通过；需要目标环境的
+  Kubernetes/Libvirt 用例保持显式 skip，统一 Integration 命令因此触发 minimum-policy
+  violation，而非测试失败，详见 6.44。
 
 2026-07-30 已验证 GitOps 模板 `2571893` 可构建，`validate` 与 `self-test` 均通过。用户经
 `$grill-me` 明确选择方案 A：使用普通 Organizer Bot、普通长生命周期 Access JWT、现有
@@ -26,8 +38,15 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - 6.31 排行榜 Backend 代码与本地验证范围已闭合；不存在遗漏的 revision invalidation 写点。
 - 6.32 排行榜 Frontend OpenAPI/SignalR 适配已闭合；此前记录的 GitOps、权限与 challenge
   lifecycle Frontend 纵切也均已完成。
-- 当前明确余项仅为需要目标环境的正式 Kubernetes/Libvirt/生产运维验收，以及等待用户明确
-  指令后的远端 push/PR；不要把已废弃或已否决的旧条目重新列为待办。
+- 6.33 至 6.40 已完成 AWDP archive 权限收口，以及 Authentication/Health、
+  Competition、Challenge、Team、异步 Flag submission、Notification 和真实 Hub surface
+  的 generated-SDK/契约适配。
+- 6.41 至 6.44 已完成 outcome OpenAPI、上传失败补偿清理、participant Runtime 可见性和
+  PatchUpload replacement 的 Backend 修复。
+- 用户已明确授权 push；`codex/backend-gitops-completion` 已推送，不创建 PR、不合入
+  `main`。Frontend 后续优化由协作者并行推进，本会话避免再修改 Frontend。
+- 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
+  的旧条目重新列为待办。
 - “后端 100%”不表示已经生产部署，也不表示 Kubernetes/Libvirt 所有可选基础设施已在
   当前机器再次实测；第 6 节明确区分代码、测试、本地部署和生产部署状态。
 
@@ -36,13 +55,15 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - 仓库：`E:\SourceCode\NoCTF`
 - 当前远端基线：`origin/main` = `1687acbd6c81944cbad2672698b3b3c1002c98da`。
 - 6.31/6.32 开始前本地 HEAD：`cf8d6820ee39`；`origin/main` 是其祖先，当时
-  ahead 20、behind 0，不存在待合并的 remote-only commit 或冲突。
+  ahead 20、behind 0。这是历史计数；6.31/6.32 随后由 `4b47ab5` 完成。
 - 当前本地工作分支：`codex/backend-gitops-completion`
-- 本轮仍遵循“先本地提交，只有用户明确要求后才推送”；当前不得推送远端。
+- 用户已明确要求 push。2026-07-31 通过 GitHub CLI 认证的 HTTPS fetch 确认
+  `origin/main` 仍为当前分支祖先，behind 0，无冲突也无需空 merge。
+- `5660dc3` 的首次推送已通过 GitHub API 核对远端 ref；6.42 至 6.44 的后续 bug fix 与
+  本文也在最终核验后推送到同一工作分支。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
-- 当前分支未设置 upstream；本轮只创建本地提交，不推送、不创建 PR。
-- 前序实现均先做本地提交；当前用户规则是只有收到明确推送指令后才能推送远端。
+- 本轮只更新工作分支；没有创建 PR、直接推送 `main` 或执行部署。
 - 本交接分支已包含远端 `main`，随后增加 Runtime、GitOps、并发栅栏与排行榜闭环纵切。
 - 原目标架构远程分支：`origin/codex/backend-target-architecture`。
 - 2026-07-27 推送前通过 GitHub CLI 认证的 HTTPS fetch 复核：
@@ -56,13 +77,16 @@ git log --oneline 003b75c..2c6b4ce -- backend
 
 以下工作树内容属于用户或仅为换行差异，未纳入后端提交；后续不得顺手清理或暂存：
 
-- `backend/src/NoCTF.Infrastructure/Messaging/WolverineTransactionalMessageOutbox.cs`：仅换行状态。
+- `backend/src/NoCTF.Infrastructure/Messaging/WolverineTransactionalMessageOutbox.cs`：
+  当前 clean；因前序用户所有权记录继续视为保护文件。
 - `backend/src/NoCTF.Runner/Properties/`
 - `deploy/docker-compose.local-ports.yml`
 - `frontend/src/composables/useInstanceOperationState.ts`
 - `frontend/src/lib/queryClient.ts`
 - `frontend/tests/useInstanceOperationState.test.ts`
 - `scripts/`
+- 中断的 AWDP screen 清理保存在名为 `codex-wip-awdp-screen-removal` 的本地 stash；Frontend
+  已交由协作者优化，未经用户明确要求不要 apply 或 drop。索引可能变化，应按名称查找。
 
 提交前始终使用显式路径 `git add -- <files>`，不要使用 `git add .`。
 
@@ -117,10 +141,10 @@ git log --oneline 003b75c..2c6b4ce -- backend
     JWT；同步逐个调用既有细粒度管理 API。Manifest UUID 是稳定资源身份，删除后可通过
     `includeDeleted` 找回并恢复。不增加 Repository 专用身份、专用 JWT 或原子 bundle API。
 
-## 4. 当前门禁状态与 2026-07-28 历史记录
+## 4. 2026-07-28 至 2026-07-31 早期门禁历史
 
-> 本节后续带旧提交号的明细是历史记录。以下列表是
-> `codex/backend-gitops-completion` 当前工作树在本地提交前的最新结果。
+> 本节全部是 2026-07-28 至 2026-07-31 早期的历史门禁记录，不代表当前工作树。
+> 最新纵切与验证数字以 6.31 及其后续章节为准；不要把本节旧计数称为最终门禁。
 
 - solution build：0 warning、0 error。
 - 非 Integration：371 passed、0 failed、0 skipped。
@@ -702,8 +726,9 @@ AWDP 完整边界已由 `e24bfac` 独立完成。不要退回共享 target、进
   Patch 失败、精确 Fix rejudge、三个独立 disposable target 及其 checker/network cleanup。
 - 实测分数依次为错误 Break `-7`、正确 Break `+40`、首次 Fix `+60`、Patch 失败 `-11`；
   首次 Fix 后 leaderboard 为 93，最终和 rejudge 后为 82。
-- Runner 按既有 `Storage:Provider` 选择 `S3ObjectStorage`，因此独立 Runner 可从 MinIO 读取
-  PatchUpload；没有新增 storage port 或 adapter。
+- 该轮历史实现曾让 Runner 按 `Storage:Provider` 直连 MinIO。此权限边界已由 6.33
+  取代：Runner 不再注册 `IObjectStorage` 或持有对象存储凭据，Fix archive 只通过绑定
+  Submission 的最小权限内部 JWT 从 API 下载。
 - 显式 EF 事务内的业务事实先 commit，再 flush Wolverine outgoing messages；修正范围为
   AWD/AWDP result 与 Competition/Challenge configuration 三个既有 store。真实 PostgreSQL
   回归用第二连接证明 flush 时评分事实和 Runtime 状态已提交。
@@ -942,10 +967,10 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 
 ### 6.17 `origin/main` 后端整合（2026-07-31，按用户要求暂停）
 
-本节是下一位协作者必须优先阅读的最新状态。用户要求先整合协作者更新后的 `main`，
-完成后端第一阶段并本地提交；随后在全套测试运行中途明确要求暂停，写清 handoff 后交接。
-因此不得把本节记录为“完整门禁已通过”，也不得自行继续部署、GitOps 实机演练或前端功能
-整合。
+本节仅保留 2026-07-31 当时的暂停过程；6.18 及其后续章节已经取代这里的状态与下一步。
+用户当时要求先整合协作者更新后的 `main`，完成后端第一阶段并本地提交；随后在全套测试
+运行中途明确要求暂停，写清 handoff 后交接。不得再用本节的中途状态否定后续已完成门禁，
+也不得据此重复合并或恢复当时的旧待办。
 
 #### 已整合的来源和取舍
 
@@ -1792,13 +1817,16 @@ lifecycle 与计分事务并发时，都可把两次已提交事实压成一个 
 - 6.30 后继续完成了 6.31/6.32。Docker firewall/gateway/ACL 旧待办已经废弃；正式
   Kubernetes/Libvirt 验收仍需对应环境，不自行声称完成。
 
-### 6.31 Backend 排行榜按需刷新闭环（2026-07-31，当前最新 Backend）
+### 6.31 Backend 排行榜按需刷新闭环（2026-07-31，阶段记录）
 
 6.30 只完成了 `LeaderboardRevision` 原子递增，尚未闭合 revision 到 Redis snapshot 的
 完整因果链。继续审计发现：普通 revision mutation 仍混用强制 `ProjectLeaderboard` 与
 Application 层 post-commit 补偿；部分写点没有 durable 消息；cache invalidation 没有记录
 dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；SignalR 订阅没有服务端 TTL。
 本节不保留这些行为。
+
+本节 Backend 与 6.32 Frontend 作为同一闭环由本地提交
+`4b47ab5 fix(scoring): close leaderboard refresh loop` 完成。
 
 #### 事务 invalidation 与强制 projection 分离
 
@@ -1861,8 +1889,9 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   byte-identical，SHA-256 都是
   `3429B4071BA6BF302C422EEAC36B5F4331D0234E33CB2494F32B67EDFEA1763C`。
 
-### 6.32 Frontend 排行榜强类型与实时适配（2026-07-31，当前最新 Frontend）
+### 6.32 Frontend 排行榜强类型与实时适配（2026-07-31，阶段记录）
 
+- 本节与 6.31 同属本地提交 `4b47ab5 fix(scoring): close leaderboard refresh loop`。
 - `competitionApi.leaderboard` 明确返回 OpenAPI 生成的 200/202 union；移除后端不存在的
   legacy `leaderboardTrend` 与 `leaderboardTeam` 请求，不再让它们通过 `Promise.all`
   拖垮真实排行榜。
@@ -1876,11 +1905,212 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 首次连接和自动重连都会重新 `JoinCompetition`；每 30 秒调用
   `HeartbeatCompetition`。进入 reconnecting、断连、Join/heartbeat 失败时立即启用 10 秒
   polling；Join/heartbeat 成功后停止 fallback。组件卸载和断连都会停止 heartbeat。
-- 受版本控制 Frontend 测试 67/67 passed；排行榜 contract 新增 2 项并通过；`vue-tsc` 与
+- 受版本控制 Frontend 测试共 67/67 passed，其中包含新增的 2 项排行榜 contract；
+  `vue-tsc` 与
   Vite production build passed。Rollup 只有既有 dependency PURE comment 与大 chunk
   warning，无 TypeScript/build error。
 - HTTP OpenAPI 未变化，因此无需重新生成 SDK；本节只让现有生成 SDK 成为唯一排行榜
   transport 类型来源。
+
+### 6.33 AWDP Fix archive 最小权限下载（2026-07-31）
+
+- 本地提交：`817b204 fix(runtime): download awdp archives through api`。
+- Runner 已删除 AWS/S3/Local `IObjectStorage` 注册，不再接收 MinIO/S3 endpoint、bucket
+  或访问凭据。API/Worker 仍按职责访问对象存储。
+- `AwdpFixWorkReader` 使用既有 `IssueFixArchiveRead` 签发绑定
+  `PatchUploadId`/`SubmissionId` 的 5 分钟内部 JWT，并通过既有
+  `DownloadFixArchiveEndpoint` 取得归档；Work payload 不再携带对象存储 key。
+- 新 downloader 使用 `ResponseHeadersRead` 流式落盘，再按 PostgreSQL 中的长度和
+  SHA-256 做固定时序复核；404、长度或摘要不匹配均不会进入解包/执行。
+- `RunnerScoring:CallbackBaseUrl` 现在必须显式配置为绝对 HTTP(S) URI；缺失、相对 URI
+  或非 HTTP(S) scheme 在 Runner 注册时 fail-fast，不存在默认 host、scheme 或 port。
+- 验证：Release solution build 0 warning/0 error；462/462 non-Integration passed；
+  analyzer、whitespace、`git diff --check` passed；无 Runner 存储凭据的真实 AWDP
+  API/Worker/Runner + PostgreSQL/Redis/MinIO/Docker E2E 1/1 passed，隔离资源已清理。
+- 本节不猜测正式 Kubernetes service DNS 或 NetworkPolicy。Runner 到 API 的允许规则要在
+  用户提供真实环境部署细则后按实际命名空间、Service 与 CIDR 落地。
+
+### 6.34 Frontend Authentication/Health 生成契约适配（2026-07-31）
+
+- 本地提交：`27ed39f fix(frontend): bind auth and health contracts`。
+- login、register、显式 refresh 与 store 自动续期统一使用生成 SDK 的
+  Authentication endpoints；不再调用旧 `/auth/*` 路径或自行拼接 base URL。
+- Refresh 使用 HttpOnly cookie 的 `credentials: include`，并显式移除继承的旧
+  Authorization header，避免 `timeoutFetch` 递归触发续期；refresh operation 通过
+  type-only 强类型回调注入，不形成 generated client 的运行时循环依赖。
+- Admin health 使用生成的 `/health` contract。页面只展示真实 `{ status }`，已删除后端
+  不提供的 `checks[]`、组件数量和伪子系统状态。
+- 新增精确 request path/body/credentials/header contract 测试，并覆盖自动续期。
+  受版本控制测试加本节测试共 72/72 passed；`vue-tsc`、Vite production build、
+  相关文件 scoped lint 与 `git diff --check` passed。生成文件无改动。
+
+### 6.35 Frontend Competition 公共读取生成契约适配（2026-07-31）
+
+- 本地提交：`080051c refactor(frontend): bind public competition reads`。
+- `competitionApi.list/get` 统一使用生成的
+  `/api/v1/competitions` 与 `/api/v1/competitions/{competitionId}` operation；list
+  正确解包 `{ items }`。
+- 新增单一 presentation boundary，将生成的数字 `GameMode` 0/1/2/3 映射到
+  CTF/AWD/AWDP/KoH，将 0..5 lifecycle status 映射到
+  Draft/Visible/Published/Running/Paused/Finished。缺少 id、标题、Owner、时间、人数或
+  auto-approve 等必要事实时 fail-closed，不回填 mock 默认值。
+- Competition list、Home、Registration、Detail 和 Teams 中的真实消费者已适配。
+  删除后端不存在的 `registeredTeamCount`、tracks/`trackName` 与默认五人假设；保留真实
+  `maxTeamMembers` 和 `teamRegistrationAutoApprove`。
+- Penetration 是普通 CTF 内容，因此公开 Penetration API、路由、gateway、view/workspace
+  已删除；本节未扩展到仍待后续迁移的管理页面。
+- 开发 mock 已改为 v1 envelope、数字 enum 与真实字段。新增 contract test 后，
+  受版本控制测试加本节测试共 76/76 passed；`vue-tsc`、Vite production build、
+  scoped lint 与 `git diff --check` passed。生成文件无改动。
+
+### 6.36 SubmitFlag alternatives OpenAPI 契约修正（2026-07-31）
+
+- 本地提交：`4afe33f fix(api): document flag submission alternatives`。
+- `SubmitFlagRequest` 的运行时规则仍要求 `flag` 与 `flags` 恰好提供一个，且批量元素不得
+  为 null；没有放宽业务校验或改变 endpoint 行为。
+- FastEndpoints Swagger 只忽略 `RuleForEach(...).NotNull()` 对 required/nullability 的
+  错误推断。OpenAPI 现在将 `flag` 和 `flags` 都描述为 optional nullable，由运行时 XOR
+  validator 决定组合合法性。
+- 两份 OpenAPI artifact 已统一导出且完全一致；生成 TypeScript 请求成为
+  `flag?: string | null` 与 `flags?: string[] | null`，不再强迫单 Flag 请求同时携带
+  `flags`。
+- 新增 5 项 validator 协议测试与 1 项 artifact 架构测试。最终 468/468
+  non-Integration passed；Release solution build 0 warning/0 error；analyzer、Frontend
+  Bun build、固定版本 OpenAPI/client 漂移检查和 scoped `diff-check` passed。
+
+### 6.37 Frontend Challenge 公共读取与附件生成契约适配（2026-07-31）
+
+- 本地提交：`2e42808 refactor(frontend): bind public challenge reads`。
+- Challenge list/get 统一使用生成的 v1 operation；list 正确解包 `{ items }`。
+  Presentation boundary 对 id、Competition/模板身份、标题、方向、`baseScore`、顺序、
+  publication、revision、时间及 URL 等真实字段 fail-closed。
+- Competition Detail、Challenge Modal 与 AWD 消费者已改用 `baseScore` 和稳定
+  CompetitionChallenge id；删除后端不提供的 `typeId`、`points`、`solveCount`、
+  `firstBloods`、`deploymentType`、`descriptionFormat`、hint 列表、`attachmentUrl` 与
+  `patchTemplateUrl`。
+- All-policy attachment list、指定附件下载与 RandomOnePerTeam 下载均使用生成 operation，
+  不拼接 DTO URL。只有当前队伍已获批、比赛 Running、challenge detail 存在且 list 返回
+  404 时才展示随机附件操作；401/403 不降级，随机分配只由用户点击触发，不预取。
+- 三组开发 mock 已改为 v1 path、`{ items }` envelope 与真实 ChallengeResponse 字段。
+  新增 7 项 contract test；最终 Frontend 83/83 passed，`vue-tsc` 与 Vite production
+  build passed，新增/叶文件 lint 0，旧文件 lint 未恶化且总数下降，`git diff --check`
+  passed。
+
+### 6.38 Frontend Team competition-scope 生成契约适配（2026-07-31）
+
+- 本地提交：`cd3f8b0 refactor(frontend): scope teams to competitions`。
+- Team list/get-my/create/join/leave 统一使用生成的
+  `/api/v1/competitions/{competitionId}/teams...` operation；list 解包 `{ items }`，
+  get-my 将 generated 404 映射为无当前队伍，join/leave 正确处理 204 void。
+- Presentation boundary 将数字 registration status 0/1/2 映射为
+  Pending/Approved/Rejected，严格校验稳定身份、Captain、MemberIds、锁定状态和报名时间，
+  `memberCount` 只由 `memberIds.length` 派生。
+- Registration、Competition Detail、Game Layout 与 AWD 消费者已改为单个
+  competition-scoped current team。join 不读取虚构返回值，leave 已迁入比赛报名页；
+  客户端不再用后端未返回的 ban、持久 invitation token、track 或 `isCaptain` 字段作门禁。
+- 后端没有跨比赛“我的全部队伍”聚合，因此公开 `/teams` route/nav/view/workspaces 与
+  Home team aggregate/statistics/list 已删除；没有用 N+1 或新后端协议补造该页面。
+  Admin team surface 不在本节范围。
+- 开发 mock 已改为 v1 get-my 单对象和 list envelope；中英文文案同步删除旧 tracks/token/
+  ban/global-team 语义。新增 5 项 contract test；最终 Frontend 88/88 passed，
+  `vue-tsc` 与 Vite production build passed，新文件 lint 0，6 个 legacy touched 文件
+  lint 与 HEAD 基线一致，generated drift 0，`git diff --check` passed。
+
+### 6.39 Frontend Flag submission 异步判定适配（2026-07-31）
+
+- 本地提交：`423fa65 refactor(frontend): poll flag submission outcomes`。
+- 单 Flag 统一调用生成的
+  `/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions`
+  operation，请求体只有 `{ flag }`。不再传 `teamId`、模板 Challenge id 或 victim team；
+  AWD/AWDP 的目标由服务端从 Flag 推导。
+- 202 只表示 attempt 已受理。客户端保存 `submissionId`/`statusUrl` 元数据，但状态读取始终
+  使用生成的 competition-scoped status operation；每秒轮询 Pending/Queued/Processing，
+  只在 Completed 或 PlatformFailed 终止，关闭弹窗、切题、卸载或新提交时取消旧请求。
+- 新增完整数字枚举 presentation boundary：SubmissionKind、EvaluationState、
+  ScoringResult 与 29 个 ScoringFailureCode 均 fail-closed；只有
+  `Completed + Correct + (Flag | Break)` 派生 solved，Fix、错误、排队与平台失败均不会
+  误标已解。
+- Submission history 使用生成的签名游标分页，opaque cursor 原样传递并防重复游标死循环；
+  当前已批准队伍才加载自己的历史。正确终态才刷新排行榜/AWDP 状态，其他终态只展示真实
+  判定结果。
+- AWD 已删除 victim/team selector 和本地伪造 attack-failed 事件；KoH 不再展示 Flag
+  提交。开发 mock 改为真实 v1 list/202/status 三段契约。
+- 新增 9 项 contract tests；最终受版本控制 Frontend 测试加本节测试 97/97 passed，
+  520 assertions。`vue-tsc`、Vite production build、JSON/whitespace 和
+  `git diff --check` passed；新增文件及 AWD 文件 lint 0，`noctf.ts` 与 Competition
+  Detail 旧基线不变，Challenge Modal lint error 从 83 降至 77。
+
+### 6.40 Frontend 不可变事件历史与真实实时 surface（2026-07-31）
+
+- 本地提交：`a28e761 refactor(frontend): align event surfaces with public contracts`。
+- Notification 统一调用生成的 `/api/v1/notifications` operation，使用签名 opaque cursor
+  分页并防重复 cursor/重复事件；后端没有 read/unread 状态，因此 badge、mark-read 和
+  mark-all mutations 均已删除。
+- NotificationKind 只接受 0..5，任意 payload 不进入翻译插值；只有后端当前真实产生的
+  `awd_flag_injection_failed` 与 `awd_checker_callback_missing` 使用专门文案，其余合法
+  kind 使用中性事件文案。
+- 删除后端不存在的 AWD/KoH dashboard、GameHub path 与
+  `ReceiveRoundStarted`/`ReceiveAttackLog`/`ReceiveKohUpdate`/`ReceiveScoreUpdate`。
+  四种模式统一进入真实 Competition Detail；Scoreboard 只保留
+  `/hubs/v1/competitions`、Join/Heartbeat、leaderboard/lifecycle 事件和 polling fallback。
+- 最终 Frontend 103/103 tests、562 assertions passed；production build passed；新增/改动
+  叶文件 lint 0，旧 `noctf.ts` 仍为既有 8 条、未恶化；JSON 与 `git diff --check` passed。
+
+### 6.41 Submission/Runtime outcome 与认证限流契约（2026-07-31）
+
+- 本地提交：`5660dc3 fix(api): publish submission and runtime outcomes`。
+- SubmitFlag/SubmitFix 的业务 403/409 ProblemDetails 和空体 429 已进入 OpenAPI；四个
+  Runtime mutation 的真实 503 ProblemDetails 也已公开。没有 producer 的
+  `background_work_unavailable` 字符串映射已删除。
+- ASP.NET RateLimiter rejection 现在明确为 429；Authentication 在 RateLimiter 前执行，
+  partition 使用认证 subject+IP，不再把所有用户错误合并到 anonymous+IP。
+- 新增 HTTP 回归证明不同 subject 配额独立且第 31 次请求返回空体 429；新增 outcome matrix
+  架构测试固定 status/body media type/schema。
+- Release solution build 0 warning/0 error，470/470 non-Integration passed；两份 OpenAPI
+  artifact SHA-256 均为
+  `5F1786A1AD1B13B7433B75FD39658C0A86B3DB1A2A0897CC3849680EBA171370`；
+  生成客户端二次生成完全幂等，Frontend 103/103 tests 与 production build passed。
+
+### 6.42 Challenge attachment 写入失败补偿清理（2026-07-31）
+
+- 本地提交：`bb2881e fix(storage): clean up failed attachment uploads`。
+- 对象存储 Put 成功后，只要 metadata Add 返回非 Added、抛数据库/其他异常或请求取消，
+  都以 `CancellationToken.None` 对实际 `stored.ObjectKey` 做一次 best-effort 补偿删除。
+- 补偿删除失败不会覆盖原本的业务拒绝、异常或取消；metadata Added 时绝不删除对象。
+- 新增 6 项单元测试覆盖成功、两种拒绝、DbUpdateException、任意异常、请求取消及 cleanup
+  自身失败；6/6 passed。
+
+### 6.43 Participant Runtime 可见性边界（2026-07-31）
+
+- 本地提交：`10d87a7 fix(runtime): enforce participant challenge visibility`。
+- Participant runtime Find/Mutation 只接受 published CompetitionChallenge，并显式排除
+  已软删除 Competition、CompetitionChallenge、Challenge template 和 Team。
+- AWD target reader 使用同一边界，并通过 Challenge join 拒绝已删除模板；对手列表不再
+  暴露软删除 Team。
+- 新增真实 PostgreSQL 回归覆盖 unpublished/soft-deleted 五类 scope、Find、Reset 和
+  targets 的拒绝，以及有效 AWD scope 正向行为；1/1 passed。
+
+### 6.44 PatchUpload replacement 与 durable cleanup（2026-07-31）
+
+- 本地提交：`44b90e4 fix(submissions): replace unconsumed patch drafts`。
+- 恢复 `docs/storage-attachments.md`、`docs/submissions-rejudging.md` 和
+  `docs/database.md` 已规定的行为：每队每题最多一个未消费 draft，新上传成功后原子替换
+  旧行；已消费 archive 保持不可变并保留。
+- Replacement 与 SubmitFix 使用同一个
+  `(TeamId, CompetitionChallengeId, SubmissionKind.Fix)` PostgreSQL advisory lock；
+  并发只能得到“旧 draft 被消费、新 draft 保留”或“旧 draft 被替换、旧 Id 不可消费”两种
+  合法终态，不会产生唯一索引错误或清理已消费对象。
+- 旧 ObjectKey 在替换事务内写入 Wolverine durable outbox，API 将 `CleanupObject` 路由到
+  Worker；Worker 通过幂等 `IObjectStorage.DeleteAsync` 清理。新对象若数据库写入失败仍做
+  best-effort 补偿删除，cleanup 失败不掩盖原拒绝。
+- 新增 2 个真实 PostgreSQL+Wolverine+LocalObjectStorage 集成测试和 2 个单元测试；顺序
+  replacement/consume、durable 删除和双方同时等待同一 advisory lock 均通过。
+- 最终核验：Release solution build 0 warning/0 error；478/478 non-Integration passed；
+  Integration 共发现 86 项，当前环境可执行的 84/84 passed、0 failed，真实 Kubernetes
+  与 Libvirt 各 1 项因未提供目标环境而显式 skipped。原命令的
+  `--minimum-expected-tests 86` 不把 skipped 计入最低执行数，因此返回的是 minimum-policy
+  violation，而非测试或 teardown failure。EF 无 pending model changes；OpenAPI 导出
+  134 个 endpoint 且两份 artifact 无漂移；`git diff --check` passed。
 
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
@@ -1901,22 +2131,48 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
-- 未推送远端、未创建 PR、未生产部署。
+- 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
   不属于剩余工作。
 
 ## 7. 建议的下一交接顺序
 
-1. 有正式 Kubernetes 环境后执行 `NOCTF_KUBERNETES_INTEGRATION` 的 Cilium
-   DNS/NetworkPolicy/NodePort/cleanup dataplane，并完成 Runner Pool 运维验收。
-2. 有真实 Libvirt 环境与 fixture disk 后设置 `NOCTF_LIBVIRT_DISK_PATH`，执行 OVA
-   import/public URL/exact cleanup 与生产式生命周期演练。
-3. 在目标生产环境执行部署、监控、备份恢复和运维验收；本地代码通过不等于生产部署。
-4. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
+Frontend 协作者正在并行优化，本会话不再修改 Frontend。其待办以当前生成 OpenAPI 为准：
 
-当前没有另一个不依赖上述目标环境或用户新增范围的明确代码待办。不要重新引入
-HAProxy/ingress、firewall executor/sidecar、transparent gateway、TargetPort ACL 或
-callback-only gateway。
+1. 迁移 Runtime start/get/reset/stop/extend、numeric state 与 `urls[]`；不能用 Challenge
+   direction 猜 capability，Extend 的 seconds/TTL 产品语义若仍有冲突必须先 `$grill-me`。
+2. 按 6.44 的可替换 draft 实现 multipart Patch upload → Submit Fix → status polling；
+   不再使用 pre-signed PUT、teamId、checksum 或 `/patch-submissions` 假协议。
+3. 删除无后端契约的 AWDP screen/SSE 原型，以及 QQBot、Plugins、Penetration Operations、
+   live logs、global audit logs、dynamic SMTP/Infrastructure 等管理入口；Containers 不能
+   硬接 `/api/admin/containers`，应另行重建为 competition-scoped Runtime surface。
+4. 逐页把仍有真实语义的 Competition、Challenge Bank、CompetitionChallenge 和 Team
+   管理调用改为生成 SDK，最后删除 `sdk: any` Proxy，让缺失 operation 在编译期失败。
+5. 每个纵切继续先写失败 contract test，再跑受版本控制 Frontend tests、`vue-tsc`、
+   production build、scoped lint 与 `git diff --check`，独立提交。
+
+Backend 下一步按高置信 bug 继续：
+
+1. 修复 Provisioning 中 Stop/Reset 对迟到 receipt 的握手，避免 provider resource 与无 TTL
+   Redis capacity claim 泄漏。
+2. 修复 Runtime replacement cleanup 失败后新 generation 永久 Queued 的状态机。
+3. 补 `MaxConcurrentRuntimeInstancesPerTeam` 事务内额度执行，以及 AWD start gate 对 published
+   challenge Runtime completeness 的验证；这两个切片均需真实 PostgreSQL/Redis 回归。
+
+用户稍后会提供真实环境部署细则。在此之前：
+
+1. 不猜测 Kubernetes namespace、Service DNS、NetworkPolicy/CIDR、Ingress/TLS、镜像
+   registry/tag、replica/resource、对象存储、备份、监控或密钥来源。
+2. 有正式 Kubernetes 环境后执行 `NOCTF_KUBERNETES_INTEGRATION` dataplane，并按真实
+   Runner→API 路径落地最小网络允许规则与 Runner Pool 运维验收。
+3. 有真实 Libvirt 环境与 fixture disk 后设置 `NOCTF_LIBVIRT_DISK_PATH`，执行 OVA
+   import/public URL/exact cleanup 与生产式生命周期演练。
+4. 在目标生产环境执行部署、监控、备份恢复和运维验收；本地代码通过不等于生产部署。
+5. 用户已授权本工作分支 push；仍不得自行创建 PR、合入 `main` 或执行生产部署。
+
+不要重新引入 HAProxy/ingress、firewall executor/sidecar、transparent gateway、
+TargetPort ACL 或 callback-only gateway。Docker Runtime 公开访问只使用题目服务自己的
+Docker port mapping，host port 固定请求 `0`。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
 决策的只读审计，但不能自行发明新协议。
@@ -1941,15 +2197,9 @@ callback-only gateway。
 1. 读取仓库 `AGENTS.md`、本文以及相关 `docs/`。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
-4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；Frontend typed 409、
-   Bot Manager 授权、CompetitionChallenge lifecycle 与 Competition 权限完整集合 UI
-   均已完成。CompetitionChallenge typed 409、delete/restore revision fence 与 Frontend
-   generated-SDK 适配已按 6.24/6.25 完成；Challenge template Mode 活动引用 invariant
-   Backend 与最小 Frontend decoder 已按 6.26/6.27 完成；Kubernetes Container 动态
-   NodePort 与重放安全按 6.28 完成；AWD checker callback sequence/version 持久化 fence
-   按 6.29 完成；LeaderboardRevision 原子化按 6.30 完成；排行榜 Backend 按需刷新闭环
-   按 6.31 完成；Frontend 强类型实时适配按 6.32 完成。引用权限 Backend 测试数量时使用
-   6.22，引用最新 Backend 状态时使用 6.31，引用最新 Frontend 状态时使用 6.32。
+4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做。最新 Frontend 迁移状态
+   使用 6.34 至 6.40；最新 outcome、上传补偿、Runtime scope 和 Patch draft Backend 状态
+   使用 6.41 至 6.44。Frontend 协作者正在并行工作，本会话避免修改 Frontend 文件。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

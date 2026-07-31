@@ -1,133 +1,110 @@
 # NoCTF
 
-A modern, extensible CTF/AWD/AWDP/KoH competition platform built with .NET 8 and Vue 3.
+NoCTF is a competition platform for CTF, AWD, AWDP, and KoH, built with .NET 10
+and Vue 3. The current product and architecture contract lives in
+[the authoritative documentation index](docs/README.md).
 
-## Features
+## Capabilities
 
-- **Multi-mode support**: CTF (Jeopardy), AWD (Attack with Defense), AWDP (Patch Defense), and KoH (King of the Hill)
-- **Penetration challenges**: CTF/Jeopardy challenge type for per-team Docker Compose ranges with staged flags
-- **Plugin-based architecture**: Game modes and challenge types load as plugins via `AssemblyLoadContext`
-- **Optional QQ broadcasts**: Per-competition, audited QQ group notifications through an outbound-only Milky agent
-- **Real-time experience**: SignalR hubs power live leaderboards, game notifications, and monitor streams
-- **Container-native challenge orchestration**: Docker-based containers for dynamic challenges and checkers
-- **Multi-tenancy**: Competitions are fully isolated with EF Core global query filters
+- Four built-in game modes: CTF, AWD, AWDP, and KoH.
+- Reusable challenge templates with competition-specific scoring, hints, and runtime configuration.
+- Durable submission evaluation, lifecycle, runtime, notification, and leaderboard workflows through Wolverine.
+- Docker, Kubernetes, and Libvirt runtime providers selected by deployment-level Runner pools.
+- On-demand leaderboard projection with PostgreSQL facts, Redis snapshots, and SignalR updates.
+- Strongly typed FastEndpoints contracts and a generated TypeScript OpenAPI client.
+- Stable-resource GitOps workflows through ordinary Organizer Bot identities and existing management APIs.
 
-## Tech Stack
+Penetration content is ordinary CTF content, not a separate game mode. Dynamic game-mode
+plugins, in-process business queues, and a supported single-process production mode are
+not part of the target architecture.
 
-- **Backend**: .NET 8, FastEndpoints, SignalR, EF Core + PostgreSQL
-- **Frontend**: Vue 3, Vite, Bun, Tailwind CSS, shadcn-vue
-- **Real-time / Cache**: Redis (SignalR backplane + leaderboard cache)
-- **Storage**: Local filesystem or S3-compatible (MinIO)
-- **Containers**: Docker
-- **Deployment**: Docker Compose or Kubernetes
+## Architecture
 
-## Quick Start
-
-1. Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-2. Edit `.env` with your secrets (at least `POSTGRES_PASSWORD` and `JWT_SECRET`).
-
-3. Start the platform with Docker Compose:
-
-```bash
-cd deploy && docker compose up --build -d
-```
-
-4. Check the API health endpoint:
-
-```bash
-curl http://localhost/api/health
-```
-
-5. Open the app in your browser:
-
-```
-http://localhost
-```
-
-## Project Structure
-
-```
-NoCTF/
-├── backend/
-│   ├── src/
-│   │   ├── NoCTF.API/              # Web API, SignalR hubs, auth, middleware
-│   │   ├── NoCTF.Application/      # Application services and DTOs
-│   │   ├── NoCTF.Core/             # Domain entities and enums
-│   │   ├── NoCTF.Infrastructure/   # EF Core, migrations, tenant context
-│   │   ├── NoCTF.PluginBase/       # Plugin interfaces (IGameMode, IChallengeType, etc.)
-│   │   ├── NoCTF.Container.Docker/ # Docker container manager
-│   │   ├── NoCTF.Plugins.CTF/      # CTF game mode plugin
-│   │   ├── NoCTF.Plugins.AWD/      # AWD game mode plugin
-│   │   ├── NoCTF.Plugins.AWDP/     # AWDP game mode plugin
-│   │   ├── NoCTF.Plugins.KoH/      # KoH game mode plugin
-│   │   ├── NoCTF.Plugins.QQBot/    # Optional QQ notification plugin
-│   │   └── NoCTF.Plugins.Penetration/ # Penetration challenge type plugin
-│   └── tests/NoCTF.Tests/          # Unit and integration tests
-├── frontend/                       # Vue 3 SPA
-├── deploy/
-│   ├── docker-compose.yml          # Local Docker Compose stack
-│   └── k8s/                        # Kubernetes manifests
-├── docs/
-│   ├── architecture.md             # System architecture and plugin design
-│   ├── handoff.md                  # Maintainer handoff and current project context
-│   ├── deployment.md               # Docker Compose and K8s deployment guides
-│   ├── development.md              # Local development setup
-│   ├── game-modes.md               # Game mode mechanics
-│   ├── quickstart-test.md          # Manual smoke-test flow
-│   └── api.md                      # API and SignalR reference
-├── .env.example                    # Example environment variables
-└── README.md                       # This file
-```
-
-## Architecture Overview
+Production uses three independent processes:
 
 ```mermaid
 flowchart LR
-    subgraph Client
-        Browser["Browser (Vue 3 + Vite)"]
-    end
+    Browser["Browser / API client"] --> API["NoCTF.API"]
+    API --> PostgreSQL[("PostgreSQL")]
+    API --> Redis[("Redis")]
+    PostgreSQL --> Worker["NoCTF.Worker"]
+    PostgreSQL --> Runner["NoCTF.Runner"]
+    Worker --> Redis
+    Runner --> Redis
+    Runner --> Providers["Docker / Kubernetes / Libvirt"]
+```
 
-    subgraph API["NoCTF API (.NET 8)"]
-        FE["FastEndpoints"]
-        Hubs["SignalR Hubs"]
-        Plugins["Plugins (CTF / AWD / AWDP / KoH)"]
-    end
+- `NoCTF.API` owns HTTP, authentication, authorization, and SignalR.
+- `NoCTF.Worker` owns durable business processing and leaderboard projection.
+- `NoCTF.Runner` owns provider operations and checker/patch execution.
+- PostgreSQL is the business source of truth and Wolverine persistence store.
+- Redis holds replaceable caches, rate limits, the SignalR backplane, subscriptions, and Runner presence/capacity.
 
-    subgraph Infra["Infrastructure"]
-        PG[(PostgreSQL)]
-        Redis[(Redis)]
-        Docker["Docker Engine"]
-        MinIO[(MinIO / S3)]
-    end
+Docker challenge services publish only their declared TCP ports and request host port
+`0`; Docker assigns the random host ports used to expand public URLs. The platform does
+not add an HAProxy or ingress-proxy layer for Docker runtimes.
 
-    Browser -->|HTTP / WebSocket| FE
-    Browser -->|WebSocket| Hubs
-    FE --> Plugins
-    Hubs --> Redis
-    Plugins --> PG
-    Plugins --> Redis
-    Plugins --> Docker
-    Plugins --> MinIO
+## Technology
+
+- Backend: .NET 10, FastEndpoints, EF Core 10, Npgsql/PostgreSQL, Wolverine, SignalR.
+- Frontend: Vue 3, TypeScript, Vite, Bun, Tailwind CSS, generated OpenAPI SDK.
+- Infrastructure: PostgreSQL, Redis, local or S3-compatible object storage.
+- Runtime providers: Docker Container/Compose, Kubernetes Container/Compose, Libvirt/OVA.
+- Tests: TUnit, NSubstitute, and Testcontainers against real dependencies.
+
+## Local Docker Compose
+
+The checked-in Compose stack is for local development and validation, not a production
+deployment template.
+
+```bash
+cp .env.example .env
+# Set POSTGRES_PASSWORD, JWT_SECRET, SEED_ADMIN_PASSWORD, and other local values.
+docker compose --env-file .env -f deploy/docker-compose.yml up --build --wait
+```
+
+Verify the API and open the bundled frontend:
+
+```bash
+curl http://localhost/health
+```
+
+Open `http://localhost/` in a browser. Stop the stack without deleting its data volumes:
+
+```bash
+docker compose --env-file .env -f deploy/docker-compose.yml down
+```
+
+For Docker Runner deployments, set `DOCKER_SOCKET_GID` to the numeric group ID of the
+host Docker socket when it is not `0`.
+
+## Repository layout
+
+```text
+backend/
+  src/
+    NoCTF.API/             HTTP, auth, SignalR
+    NoCTF.Worker/          durable application processing
+    NoCTF.Runner/          runtime-provider execution
+    NoCTF.Domain/          domain model and policies
+    NoCTF.Application/     capability-oriented use cases
+    NoCTF.Infrastructure/  persistence and infrastructure adapters
+  tests/NoCTF.Tests/       unit, architecture, and integration tests
+frontend/                  Vue SPA and generated API client
+deploy/                    local Compose and Kubernetes manifests
+docs/                      authoritative product and engineering specifications
 ```
 
 ## Documentation
 
-- [Collaborator Handoff](docs/handoff.md)
-- [Architecture](docs/architecture.md)
-- [Deployment Guide](docs/deployment.md)
-- [QQBot Integration](docs/qqbot-integration.md)
-- [Development Guide](docs/development.md)
-- [Game Modes](docs/game-modes.md)
-- [Penetration Challenges](docs/penetration-challenges.md)
-- [Penetration Operations](docs/penetration-operations.md)
-- [API Reference](docs/api.md)
-- [Quickstart Test Guide](docs/quickstart-test.md)
-
-## License
-
-MIT
+- [Documentation index and authority](docs/README.md)
+- [Product and domain model](docs/product-domain.md)
+- [System architecture](docs/architecture.md)
+- [Processes, messaging, and concurrency](docs/processes-messaging.md)
+- [Runtime contract](docs/runtime.md)
+- [API reference](docs/api.md)
+- [Deployment boundary](docs/deployment.md)
+- [Development guide](docs/development.md)
+- [Testing guide](docs/testing.md)
+- [Challenge repository GitOps](docs/challenge-repository-gitops.md)
+- [Current backend handoff](NoCTF-backend-handoff-2026-07-24.md)
