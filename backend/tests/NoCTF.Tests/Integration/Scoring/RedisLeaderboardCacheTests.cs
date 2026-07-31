@@ -356,6 +356,46 @@ public sealed class RedisLeaderboardCacheTests
         }, cancellationToken);
     }
 
+    [Test]
+    [Timeout(300_000)]
+    public async Task Ranked_blood_summaries_round_trip_through_the_snapshot(
+        CancellationToken cancellationToken)
+    {
+        await RunAsync("noctf_leaderboard_bloods", async fixture =>
+        {
+            var occurredAt = DateTimeOffset.Parse("2026-07-31T00:00:00Z");
+            var challengeId = Guid.NewGuid();
+            var teams = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+            var bloods = teams.Select((teamId, index) => new LeaderboardBloodSummary(
+                $"challenge:{challengeId:N}",
+                LeaderboardSlotKind.Challenge,
+                (LeaderboardBloodRank)(index + 1),
+                teamId,
+                $"team-{index + 1}",
+                occurredAt.AddSeconds(index)))
+                .ToList();
+            await using var db = new NoCtfDbContext(fixture.Options);
+            var cache = CreateCache(
+                db,
+                new FixedProjectionEngine(bloods),
+                new RecordingPublisher(),
+                fixture.Redis);
+
+            await cache.RefreshAsync(fixture.CompetitionId, cancellationToken);
+            var snapshot = await cache.GetAsync(
+                fixture.CompetitionId,
+                cancellationToken);
+
+            await Assert.That(snapshot).IsNotNull();
+            await Assert.That(snapshot!.Bloods).Count().IsEqualTo(3);
+            for (var index = 0; index < bloods.Count; index++)
+            {
+                await Assert.That(snapshot.Bloods[index])
+                    .IsEqualTo(bloods[index]);
+            }
+        }, cancellationToken);
+    }
+
     private static RedisLeaderboardCache CreateCache(
         NoCtfDbContext db,
         ILeaderboardProjectionEngine engine,
@@ -461,7 +501,7 @@ public sealed class RedisLeaderboardCacheTests
         };
 
     private static RedisKey StateKey(Guid competitionId) =>
-        $"leaderboard:{{{competitionId:N}}}:state";
+        $"leaderboard:v2:{{{competitionId:N}}}:state";
 
     private static async Task RunAsync(
         string databaseName,
@@ -556,6 +596,14 @@ public sealed class RedisLeaderboardCacheTests
             Teams = input.Teams;
             return new([], [], []);
         }
+    }
+
+    private sealed class FixedProjectionEngine(
+        IReadOnlyList<LeaderboardBloodSummary> bloods)
+        : ILeaderboardProjectionEngine
+    {
+        public LeaderboardProjectionResult Project(LeaderboardProjectionInput input) =>
+            new([], [], bloods);
     }
 
     private sealed class ThrowingProjectionEngine : ILeaderboardProjectionEngine

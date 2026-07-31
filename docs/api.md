@@ -44,6 +44,8 @@ Team response 使用 CaptainId 与 MemberIds 数组，不返回成员顺序。
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
 
 Leaderboard GET 的 statusUrl 指回自身：无快照且投影中返回 202+targetRevision+Retry-After；有旧快照返回 200 并标 stale/revision；无快照且最后投影失败返回 503 ProblemDetails。它不创建独立 ProjectionOperation。
+CTF Leaderboard 的 `bloods[]` 同时返回每题一血、二血、三血，每项带强类型 `bloodRank`；
+`subjects[].slots[]` 以 nullable `bloodRank`/`bloodAt` 表示该队在该题是否获得前三血。
 
 ## Player Challenge
 

@@ -12,13 +12,21 @@ public enum LeaderboardSlotKind
     Stage
 }
 
+public enum LeaderboardBloodRank
+{
+    First = 1,
+    Second = 2,
+    Third = 3
+}
+
 public sealed record LeaderboardSlotSummary(
     string SlotKey,
     LeaderboardSlotKind Kind,
     string Label,
     int SuccessCount,
     DateTimeOffset? LastOccurredAt,
-    DateTimeOffset? FirstBloodAt);
+    LeaderboardBloodRank? BloodRank,
+    DateTimeOffset? BloodAt);
 
 public sealed record LeaderboardSubjectSummary(
     Guid SubjectId,
@@ -27,9 +35,10 @@ public sealed record LeaderboardSubjectSummary(
     int SuccessCount,
     IReadOnlyList<LeaderboardSlotSummary> Slots);
 
-public sealed record LeaderboardFirstBloodSummary(
+public sealed record LeaderboardBloodSummary(
     string SlotKey,
     LeaderboardSlotKind SlotKind,
+    LeaderboardBloodRank BloodRank,
     Guid TeamId,
     string TeamName,
     DateTimeOffset OccurredAt);

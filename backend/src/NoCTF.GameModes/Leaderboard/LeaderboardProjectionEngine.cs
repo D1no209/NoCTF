@@ -11,22 +11,30 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
     {
         var entries = projectors.Get(input.Mode).Project(input);
         var observations = BuildObservations(input);
-        var firstBloods = BuildFirstBloods(input, observations);
-        var firstBloodTimes = firstBloods.ToDictionary(
+        var bloods = BuildBloods(input, observations);
+        var bloodsByTeamAndSlot = bloods.ToDictionary(
             item => (item.TeamId, item.SlotKey),
-            item => item.OccurredAt);
+            item => item);
         var subjects = entries.Select(entry =>
         {
             var slots = observations
                 .Where(item => item.TeamId == entry.TeamId)
                 .GroupBy(item => new { item.SlotKey, item.Kind, item.Label })
-                .Select(group => new LeaderboardSlotSummary(
-                    group.Key.SlotKey,
-                    group.Key.Kind,
-                    group.Key.Label,
-                    group.Count(item => item.Succeeded),
-                    group.Max(item => (DateTimeOffset?)item.OccurredAt),
-                    FirstBloodAt(firstBloodTimes, entry.TeamId, group.Key.SlotKey)))
+                .Select(group =>
+                {
+                    var blood = BloodAt(
+                        bloodsByTeamAndSlot,
+                        entry.TeamId,
+                        group.Key.SlotKey);
+                    return new LeaderboardSlotSummary(
+                        group.Key.SlotKey,
+                        group.Key.Kind,
+                        group.Key.Label,
+                        group.Count(item => item.Succeeded),
+                        group.Max(item => (DateTimeOffset?)item.OccurredAt),
+                        blood?.BloodRank,
+                        blood?.OccurredAt);
+                })
                 .OrderBy(slot => slot.Kind)
                 .ThenBy(slot => slot.SlotKey, StringComparer.Ordinal)
                 .ToList();
@@ -37,14 +45,14 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
                 slots.Sum(slot => slot.SuccessCount),
                 slots);
         }).ToList();
-        return new(entries, subjects, firstBloods);
+        return new(entries, subjects, bloods);
     }
 
-    private static DateTimeOffset? FirstBloodAt(
-        IReadOnlyDictionary<(Guid TeamId, string SlotKey), DateTimeOffset> firstBloodTimes,
+    private static LeaderboardBloodSummary? BloodAt(
+        IReadOnlyDictionary<(Guid TeamId, string SlotKey), LeaderboardBloodSummary> bloods,
         Guid teamId,
         string slotKey) =>
-        firstBloodTimes.TryGetValue((teamId, slotKey), out var occurredAt) ? occurredAt : null;
+        bloods.GetValueOrDefault((teamId, slotKey));
 
     private static IReadOnlyList<SlotObservation> BuildObservations(LeaderboardProjectionInput input)
     {
@@ -120,22 +128,32 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
         };
     }
 
-    private static IReadOnlyList<LeaderboardFirstBloodSummary> BuildFirstBloods(
+    private static IReadOnlyList<LeaderboardBloodSummary> BuildBloods(
         LeaderboardProjectionInput input,
         IReadOnlyList<SlotObservation> observations)
     {
         var names = input.Teams.ToDictionary(team => team.Id, team => team.Name);
-        return observations.Where(item => item.FirstBloodEligible && item.Succeeded)
+        return observations.Where(item => item.BloodEligible && item.Succeeded)
             .GroupBy(item => new { item.SlotKey, item.Kind })
-            .Select(group => group.OrderBy(item => item.OccurredAt).ThenBy(item => item.StableId).First())
-            .Select(item => new LeaderboardFirstBloodSummary(
-                item.SlotKey,
-                item.Kind,
-                item.TeamId,
-                names.GetValueOrDefault(item.TeamId) ?? string.Empty,
-                item.OccurredAt))
+            .SelectMany(group => group
+                .GroupBy(item => item.TeamId)
+                .Select(team => team
+                    .OrderBy(item => item.OccurredAt)
+                    .ThenBy(item => item.StableId)
+                    .First())
+                .OrderBy(item => item.OccurredAt)
+                .ThenBy(item => item.StableId)
+                .Take(3)
+                .Select((item, index) => new LeaderboardBloodSummary(
+                    item.SlotKey,
+                    item.Kind,
+                    (LeaderboardBloodRank)(index + 1),
+                    item.TeamId,
+                    names.GetValueOrDefault(item.TeamId) ?? string.Empty,
+                    item.OccurredAt)))
             .OrderBy(item => item.OccurredAt)
             .ThenBy(item => item.SlotKey, StringComparer.Ordinal)
+            .ThenBy(item => item.BloodRank)
             .ToList();
     }
 
@@ -147,8 +165,8 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
         DateTimeOffset occurredAt,
         Guid stableId,
         bool succeeded,
-        bool firstBloodEligible) =>
-        new(teamId, key, kind, label, occurredAt, stableId, succeeded, firstBloodEligible);
+        bool bloodEligible) =>
+        new(teamId, key, kind, label, occurredAt, stableId, succeeded, bloodEligible);
 
     private sealed record SlotObservation(
         Guid TeamId,
@@ -158,5 +176,5 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
         DateTimeOffset OccurredAt,
         Guid StableId,
         bool Succeeded,
-        bool FirstBloodEligible);
+        bool BloodEligible);
 }

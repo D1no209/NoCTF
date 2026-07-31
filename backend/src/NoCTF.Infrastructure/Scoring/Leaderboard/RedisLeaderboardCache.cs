@@ -295,7 +295,7 @@ public sealed class RedisLeaderboardCache(
             response = new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
             {
                 Subjects = projection.Subjects,
-                FirstBloods = projection.FirstBloods,
+                Bloods = projection.Bloods,
                 SnapshotRevision = competition.LeaderboardRevision,
                 TargetRevision = competition.LeaderboardRevision,
                 Stale = false
@@ -395,5 +395,5 @@ public sealed class RedisLeaderboardCache(
             out revision);
 
     private static RedisKey StateKey(Guid competitionId) =>
-        $"leaderboard:{{{competitionId:N}}}:state";
+        $"leaderboard:v2:{{{competitionId:N}}}:state";
 }

@@ -50,6 +50,10 @@ InitialPoints=CompetitionChallenge.BaseScore。Competition 提供 MinimumPoints�
 
 一血、二血、三血按 ReceivedAt+SubmissionId；Ban/删除队伍排除。RewardKind：FixedPoints、InitialPointsPercentage、SolveValuePercentage。百分比 0..100、奖励非负。SolveValuePercentage 以血位 solveCount 调表达式；奖励不随以后人数变化，但配置/重判重新投影。
 
+排行榜公开每题前三血，而不是只公开一血：顶层 `bloods[]` 的每项带
+`First/Second/Third` 强类型血位（OpenAPI 数值 1/2/3），队伍 slot 同步带血位与时间。
+同一队伍重判产生的多条 Correct 只占其最早血位。
+
 ## Wrong 与 Hint
 
 Competition `WrongSubmissionPenalty`，题目可覆盖，非负。只扣当前 Wrong；其他结果不扣。HintUnlock 按当前 Cost 扣分且解锁前必须有足够权威总分。总分可因后续配置/重判变负。

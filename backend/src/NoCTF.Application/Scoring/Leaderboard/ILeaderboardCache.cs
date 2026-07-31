@@ -3,7 +3,7 @@ namespace NoCTF.Application.Scoring.Leaderboard;
 public sealed record LeaderboardResponse(Guid CompetitionId, DateTimeOffset GeneratedAt, IReadOnlyList<LeaderboardEntry> Entries)
 {
     public IReadOnlyList<LeaderboardSubjectSummary> Subjects { get; init; } = [];
-    public IReadOnlyList<LeaderboardFirstBloodSummary> FirstBloods { get; init; } = [];
+    public IReadOnlyList<LeaderboardBloodSummary> Bloods { get; init; } = [];
     public long SnapshotRevision { get; init; }
     public long TargetRevision { get; init; }
     public bool Stale { get; init; }

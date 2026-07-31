@@ -8918,10 +8918,10 @@
               "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSubjectSummary"
             }
           },
-          "firstBloods": {
+          "bloods": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardFirstBloodSummary"
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodSummary"
             }
           },
           "snapshotRevision": {
@@ -9044,7 +9044,15 @@
             "format": "date-time",
             "nullable": true
           },
-          "firstBloodAt": {
+          "bloodRank": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodRank"
+              }
+            ]
+          },
+          "bloodAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -9071,7 +9079,21 @@
           5
         ]
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardFirstBloodSummary": {
+      "NoCTFApplicationScoringLeaderboardLeaderboardBloodRank": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "First",
+          "Second",
+          "Third"
+        ],
+        "enum": [
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFApplicationScoringLeaderboardLeaderboardBloodSummary": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -9080,6 +9102,9 @@
           },
           "slotKind": {
             "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSlotKind"
+          },
+          "bloodRank": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodRank"
           },
           "teamId": {
             "type": "string",
