@@ -37,6 +37,11 @@ public interface IChallengeConfigurationCatalog
         GameMode mode,
         string json) =>
         Validate(mode, json, "{}", 1);
+
+    IReadOnlyList<string> ValidateDefinitionForStart(
+        GameMode mode,
+        string json) =>
+        ValidateDefinition(mode, json);
 }
 
 public interface IChallengeConfigurationStore

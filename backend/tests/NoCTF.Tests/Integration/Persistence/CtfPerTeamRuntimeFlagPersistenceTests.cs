@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Flags;
+using NoCTF.Application.Competitions.Awd;
+using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -129,6 +131,148 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 .Select(flag => flag.Flag)
                 .ToArrayAsync(cancellationToken);
             await Assert.That(resetFlags).IsEquivalentTo([initialFlag.Flag]);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Provisioning_fallback_dispatches_only_roots_or_replacements_with_stopped_predecessors(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_ctf_provisioning_fence")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var additionalTeamIds = Enumerable.Range(0, 4)
+                .Select(_ => Guid.CreateVersion7())
+                .ToArray();
+            var rootId = Guid.CreateVersion7();
+            var stoppedPredecessorId = Guid.CreateVersion7();
+            var stoppedWaiterId = Guid.CreateVersion7();
+            var stoppingPredecessorId = Guid.CreateVersion7();
+            var stoppingWaiterId = Guid.CreateVersion7();
+            var failedPredecessorId = Guid.CreateVersion7();
+            var failedWaiterId = Guid.CreateVersion7();
+            var missingPredecessorId = Guid.CreateVersion7();
+            var missingWaiterId = Guid.CreateVersion7();
+
+            await using (var arrange = new NoCtfDbContext(options))
+            {
+                arrange.Teams.AddRange(additionalTeamIds.Select((teamId, index) => new Team
+                {
+                    Id = teamId,
+                    CompetitionId = fixture.CompetitionId,
+                    Name = $"Fence {index}",
+                    NormalizedName = $"FENCE {index}",
+                    CaptainId = fixture.UserId,
+                    MemberIds = [fixture.UserId],
+                    InvitationToken = teamId.ToString("N"),
+                    RegistrationStatus = TeamRegistrationStatus.Approved,
+                    RegisteredAt = fixture.Now
+                }));
+                arrange.RuntimeInstances.AddRange(
+                    Runtime(rootId, fixture, fixture.TeamId, 1, RuntimeState.Queued),
+                    Runtime(
+                        stoppedPredecessorId,
+                        fixture,
+                        additionalTeamIds[0],
+                        1,
+                        RuntimeState.Stopped),
+                    Runtime(
+                        stoppedWaiterId,
+                        fixture,
+                        additionalTeamIds[0],
+                        2,
+                        RuntimeState.Queued,
+                        stoppedPredecessorId),
+                    Runtime(
+                        stoppingPredecessorId,
+                        fixture,
+                        additionalTeamIds[1],
+                        1,
+                        RuntimeState.Stopping),
+                    Runtime(
+                        stoppingWaiterId,
+                        fixture,
+                        additionalTeamIds[1],
+                        2,
+                        RuntimeState.Queued,
+                        stoppingPredecessorId),
+                    Runtime(
+                        failedPredecessorId,
+                        fixture,
+                        additionalTeamIds[2],
+                        1,
+                        RuntimeState.Failed,
+                        hasReceipt: true),
+                    Runtime(
+                        failedWaiterId,
+                        fixture,
+                        additionalTeamIds[2],
+                        2,
+                        RuntimeState.Queued,
+                        failedPredecessorId),
+                    Runtime(
+                        missingPredecessorId,
+                        fixture,
+                        additionalTeamIds[3],
+                        1,
+                        RuntimeState.Stopped),
+                    Runtime(
+                        missingWaiterId,
+                        fixture,
+                        additionalTeamIds[3],
+                        2,
+                        RuntimeState.Queued,
+                        missingPredecessorId));
+                await arrange.SaveChangesAsync(cancellationToken);
+
+                await arrange.Database.OpenConnectionAsync(cancellationToken);
+                try
+                {
+                    await arrange.Database.ExecuteSqlRawAsync(
+                        "SET session_replication_role = replica",
+                        cancellationToken);
+                    await arrange.RuntimeInstances
+                        .Where(runtime => runtime.Id == missingPredecessorId)
+                        .ExecuteDeleteAsync(cancellationToken);
+                }
+                finally
+                {
+                    await arrange.Database.ExecuteSqlRawAsync(
+                        "SET session_replication_role = origin",
+                        cancellationToken);
+                    await arrange.Database.CloseConnectionAsync();
+                }
+            }
+
+            var outbox = new RecordingOutbox();
+            await using var db = new NoCtfDbContext(options);
+            await BackendMessageHandlers.Handle(
+                new ProvisionCompetitionRuntimes(fixture.CompetitionId),
+                new FixedAwdProvisioner(AwdRuntimeProvisioningOutcome.NotApplicable),
+                new FixedKohProvisioner(KohRuntimeProvisioningOutcome.NotApplicable),
+                db,
+                outbox,
+                cancellationToken);
+
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()
+                    .Select(message => message.RuntimeInstanceId))
+                .IsEquivalentTo([rootId, stoppedWaiterId]);
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()
+                    .Any(message => message.RuntimeInstanceId == stoppingWaiterId
+                        || message.RuntimeInstanceId == failedWaiterId
+                        || message.RuntimeInstanceId == missingWaiterId))
+                .IsFalse();
         });
     }
 
@@ -295,6 +439,50 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
         Guid StartChallengeId,
         Guid BatchChallengeId,
         Guid StaticChallengeId);
+
+    private static RuntimeInstance Runtime(
+        Guid id,
+        Fixture fixture,
+        Guid teamId,
+        int generation,
+        RuntimeState state,
+        Guid? replacesRuntimeInstanceId = null,
+        bool hasReceipt = false) => new()
+        {
+            Id = id,
+            CompetitionId = fixture.CompetitionId,
+            CompetitionChallengeId = fixture.StartChallengeId,
+            TeamId = teamId,
+            Purpose = RuntimePurpose.Player,
+            Generation = generation,
+            RuntimeKind = RuntimeKind.Container,
+            RuntimeProvider = RuntimeProvider.Docker,
+            RunnerPool = "default",
+            RunnerId = hasReceipt ? "runner-a" : null,
+            State = state,
+            FailureCode = state == RuntimeState.Failed
+                ? RuntimeFailureCode.CleanupFailed
+                : null,
+            ReplacesRuntimeInstanceId = replacesRuntimeInstanceId,
+            ProviderReceiptJson = hasReceipt ? "{}" : null,
+            CreatedAt = fixture.Now
+        };
+
+    private sealed class FixedAwdProvisioner(AwdRuntimeProvisioningOutcome outcome)
+        : IAwdRuntimeProvisioner
+    {
+        public Task<AwdRuntimeProvisioningOutcome> EnsureAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult(outcome);
+    }
+
+    private sealed class FixedKohProvisioner(KohRuntimeProvisioningOutcome outcome)
+        : IKohRuntimeProvisioner
+    {
+        public Task<KohRuntimeProvisioningOutcome> EnsureAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult(outcome);
+    }
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {

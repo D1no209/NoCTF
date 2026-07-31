@@ -39,10 +39,12 @@ public sealed class OvaRuntimeHandlerTests
     {
         var runtime = new RecordingOvaRuntime();
         var capacity = new RecordingCapacity();
+        var reconciler = new RecordingResourceReconciler();
         var handler = CreateHandler(
             runtime,
             capacity,
-            new FixedWorkReader(RuntimeProvisionWorkStatus.Current));
+            new FixedWorkReader(RuntimeProvisionWorkStatus.Current),
+            reconciler);
         var original = CreateProvisionMessage();
         var message = original with
         {
@@ -61,10 +63,13 @@ public sealed class OvaRuntimeHandlerTests
 
         var result = await handler.Handle(message, CancellationToken.None);
 
-        await Assert.That(result).IsTypeOf<RuntimeProvisionFailed>();
-        await Assert.That(((RuntimeProvisionFailed)result).FailureCode)
+        await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
+        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
-        await Assert.That(runtime.DestroyCount).IsEqualTo(1);
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(
+                message.RuntimeInstanceId,
+                message.Generation)]);
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
@@ -97,10 +102,41 @@ public sealed class OvaRuntimeHandlerTests
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
 
+    [Test]
+    public async Task Stop_capacity_owner_mismatch_fails_closed_after_provider_cleanup()
+    {
+        var runtime = new RecordingOvaRuntime();
+        var capacity = new RecordingCapacity(
+            RunnerCapacityReleaseOutcome.OwnerMismatch);
+        var receipt = runtime.CreateReceipt();
+        var handler = CreateHandler(
+            runtime,
+            capacity,
+            new FixedWorkReader(
+                RuntimeProvisionWorkStatus.Current,
+                new(
+                    RuntimeProvider.Libvirt,
+                    System.Text.Json.JsonSerializer.Serialize(receipt))));
+        var message = new StopOvaRuntime(
+            receipt.OperationId,
+            8,
+            "default",
+            "runner-a");
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
+        await Assert.That(result).IsNotTypeOf<RuntimeStopped>();
+        await Assert.That(runtime.DestroyCount).IsEqualTo(1);
+        await Assert.That(capacity.ReleasedRuntimeIds)
+            .IsEquivalentTo([message.RuntimeInstanceId]);
+    }
+
     private static RuntimeProviderHandler CreateHandler(
         IOvaRuntime runtime,
         IRunnerCapacityGate capacity,
-        IRuntimeNodeWorkReader reader)
+        IRuntimeNodeWorkReader reader,
+        RecordingResourceReconciler? reconciler = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -111,6 +147,7 @@ public sealed class OvaRuntimeHandlerTests
             .Build();
         return new(
             new RecordingProviderCatalog(runtime),
+            [reconciler ?? new RecordingResourceReconciler()],
             configuration,
             capacity,
             reader);
@@ -219,7 +256,9 @@ public sealed class OvaRuntimeHandlerTests
             Task.FromResult(stop);
     }
 
-    private sealed class RecordingCapacity : IRunnerCapacityGate
+    private sealed class RecordingCapacity(
+        RunnerCapacityReleaseOutcome releaseOutcome = RunnerCapacityReleaseOutcome.Released)
+        : IRunnerCapacityGate
     {
         public List<Guid> ReleasedRuntimeIds { get; } = [];
 
@@ -253,7 +292,25 @@ public sealed class OvaRuntimeHandlerTests
             CancellationToken cancellationToken)
         {
             ReleasedRuntimeIds.Add(runtimeInstanceId);
-            return Task.FromResult(RunnerCapacityReleaseOutcome.Released);
+            return Task.FromResult(releaseOutcome);
+        }
+    }
+
+    private sealed class RecordingResourceReconciler : IRuntimeManagedResourceReconciler
+    {
+        public RuntimeProvider Provider => RuntimeProvider.Libvirt;
+        public List<RuntimeResourceIdentity> Destroyed { get; } = [];
+
+        public Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<RuntimeResourceIdentity>>([]);
+
+        public Task DestroyByIdentityAsync(
+            RuntimeResourceIdentity identity,
+            CancellationToken cancellationToken)
+        {
+            Destroyed.Add(identity);
+            return Task.CompletedTask;
         }
     }
 }

@@ -21,18 +21,27 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
                 candidate.Generation,
                 candidate.State,
                 candidate.RunnerPool,
-                candidate.RunnerId
+                candidate.RunnerId,
+                candidate.RunnerAssignmentReleaseToken,
+                candidate.ProviderReceiptJson
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (assignment is null
             || !string.Equals(assignment.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(assignment.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return RuntimeProvisionWorkStatus.AssignmentAbsent;
-        return assignment.ProcessingVersion == message.ProcessingVersion
-            && assignment.Generation == message.Generation
-            && assignment.State == RuntimeState.Provisioning
-            ? RuntimeProvisionWorkStatus.Current
-            : RuntimeProvisionWorkStatus.AssignmentRetained;
+        if (assignment.Generation == message.Generation
+            && assignment.ProcessingVersion == message.ProcessingVersion
+            && assignment.State == RuntimeState.Provisioning)
+            return RuntimeProvisionWorkStatus.Current;
+        if (assignment.Generation == message.Generation
+            && message.ProcessingVersion < long.MaxValue
+            && assignment.ProcessingVersion > message.ProcessingVersion
+            && assignment.State == RuntimeState.Stopping
+            && assignment.RunnerAssignmentReleaseToken == null
+            && assignment.ProviderReceiptJson == null)
+            return RuntimeProvisionWorkStatus.StopRequested;
+        return RuntimeProvisionWorkStatus.AssignmentRetained;
     }
 
     public async Task<RuntimeStopWork?> ReadStopAsync(

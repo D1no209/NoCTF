@@ -19,7 +19,8 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
                 item.Id,
                 item.Mode,
                 item.Status,
-                item.ConfigurationJson
+                item.ConfigurationJson,
+                item.MaxConcurrentRuntimeInstancesPerTeam
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
@@ -50,6 +51,7 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
             competition.Status,
             competition.ConfigurationJson,
             challenges,
-            teams);
+            teams,
+            competition.MaxConcurrentRuntimeInstancesPerTeam);
     }
 }

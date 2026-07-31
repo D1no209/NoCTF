@@ -1,6 +1,8 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -10,11 +12,19 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Teams;
+using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.GameModes.Registration;
+using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Runner.Composition;
 using NoCTF.Runner.Messages;
 using NoCTF.Worker;
+using StackExchange.Redis;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
 
 namespace NoCTF.Tests.Integration.Runtime;
 
@@ -23,7 +33,159 @@ public sealed class RunnerAssignmentReconciliationTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Offline_assignments_recover_without_stealing_node_local_receipts(
+    public async Task Offline_provisioning_without_cleanup_proof_keeps_its_assignment_and_capacity(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await using var redisContainer = new RedisBuilder("redis:7-alpine").Build();
+            await Task.WhenAll(
+                postgres.StartAsync(cancellationToken),
+                redisContainer.StartAsync(cancellationToken));
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(
+                redisContainer.GetConnectionString());
+            var redisDatabase = redis.GetDatabase();
+            const string pool = "pool-a";
+            const string runner = "runner-a";
+            await redisDatabase.SetAddAsync($"runner-pool:{pool}:members", runner);
+            await redisDatabase.StringSetAsync(
+                $"runner:{runner}:heartbeat",
+                "alive",
+                TimeSpan.FromMinutes(1));
+            await redisDatabase.HashSetAsync(
+                $"runner:{runner}:capacity",
+                [
+                    new("availableMemoryBytes", 1024),
+                    new("availableNanoCpus", 100),
+                    new("availablePids", 10),
+                    new("totalMemoryBytes", 1024),
+                    new("totalNanoCpus", 100),
+                    new("totalPids", 10)
+                ]);
+            var capacity = new RedisRunnerCapacityGate(redis);
+            var claim = await capacity.TryClaimForRunnerAsync(
+                new RunnerCapacityRequest(fixture.RedispatchId, pool, 256, 25, 2),
+                runner,
+                cancellationToken);
+            await Assert.That(claim.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
+            await redisDatabase.KeyDeleteAsync($"runner:{runner}:heartbeat");
+
+            var outbox = new RecordingTransactionalOutbox();
+            await using (var db = new NoCtfDbContext(options))
+            {
+                await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    db,
+                    capacity,
+                    outbox,
+                    cancellationToken);
+            }
+
+            await using (var verify = new NoCtfDbContext(options))
+            {
+                var retained = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                await Assert.That(retained.State).IsEqualTo(RuntimeState.Provisioning);
+                await Assert.That(retained.RunnerId).IsEqualTo(runner);
+                await Assert.That(retained.RunnerAssignmentReleaseToken).IsNull();
+                await Assert.That(retained.ProcessingVersion).IsEqualTo(7);
+            }
+            await Assert.That(outbox.Published.OfType<ReleaseRunnerCapacity>()).IsEmpty();
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            await Assert.That(await redisDatabase.KeyExistsAsync(
+                $"runner-claim:{fixture.RedispatchId:N}")).IsTrue();
+            await Assert.That((long)(await redisDatabase.HashGetAsync(
+                $"runner:{runner}:capacity",
+                "availableMemoryBytes"))!).IsEqualTo(768);
+
+            var legacyReleaseToken = Guid.CreateVersion7();
+            await using (var prepareLegacyMessage = new NoCtfDbContext(options))
+            {
+                var retained = await prepareLegacyMessage.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                retained.RunnerAssignmentReleaseToken = legacyReleaseToken;
+                retained.ProcessingVersion = 8;
+                await prepareLegacyMessage.SaveChangesAsync(cancellationToken);
+            }
+            await using (var releaseDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerCapacityReleaseAsync(
+                    new ReleaseRunnerCapacity(
+                        fixture.RedispatchId,
+                        8,
+                        pool,
+                        runner,
+                        legacyReleaseToken),
+                    releaseDb,
+                    capacity,
+                    outbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Superseded);
+            }
+            await using (var verifyObsoleteRelease = new NoCtfDbContext(options))
+            {
+                var retained = await verifyObsoleteRelease.RuntimeInstances.AsNoTracking().SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                await Assert.That(retained.State).IsEqualTo(RuntimeState.Provisioning);
+                await Assert.That(retained.RunnerId).IsEqualTo(runner);
+                await Assert.That(retained.RunnerAssignmentReleaseToken)
+                    .IsEqualTo(legacyReleaseToken);
+                await Assert.That(retained.ProcessingVersion).IsEqualTo(8);
+            }
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            await Assert.That(await redisDatabase.KeyExistsAsync(
+                $"runner-claim:{fixture.RedispatchId:N}")).IsTrue();
+            await Assert.That((long)(await redisDatabase.HashGetAsync(
+                $"runner:{runner}:capacity",
+                "availableMemoryBytes"))!).IsEqualTo(768);
+            await using (var provisionWriteBackDb = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisioned(
+                        fixture.RedispatchId,
+                        8,
+                        1,
+                        runner,
+                        RuntimeProvider.Docker,
+                        "{\"id\":\"late-provider-resource\"}",
+                        [],
+                        [],
+                        null),
+                    provisionWriteBackDb,
+                    outbox,
+                    cancellationToken);
+            }
+            await using (var verifyLegacyMessage = new NoCtfDbContext(options))
+            {
+                var retained = await verifyLegacyMessage.RuntimeInstances.AsNoTracking().SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                await Assert.That(retained.State).IsEqualTo(RuntimeState.Running);
+                await Assert.That(retained.RunnerId).IsEqualTo(runner);
+                await Assert.That(retained.RunnerAssignmentReleaseToken).IsNull();
+                await Assert.That(JsonNode.DeepEquals(
+                    JsonNode.Parse(retained.ProviderReceiptJson!),
+                    JsonNode.Parse("{\"id\":\"late-provider-resource\"}"))).IsTrue();
+                await Assert.That(retained.ProcessingVersion).IsEqualTo(9);
+            }
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            await Assert.That(await redisDatabase.KeyExistsAsync(
+                $"runner-claim:{fixture.RedispatchId:N}")).IsTrue();
+            await Assert.That((long)(await redisDatabase.HashGetAsync(
+                $"runner:{runner}:capacity",
+                "availableMemoryBytes"))!).IsEqualTo(768);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Offline_assignments_preserve_unproven_provisioning_and_stop_receipt_owners(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -32,8 +194,34 @@ public sealed class RunnerAssignmentReconciliationTests
             await postgres.StartAsync(cancellationToken);
             var options = CreateOptions(postgres.GetConnectionString());
             var fixture = await SeedAsync(options, cancellationToken);
+            var receiptReleaseToken = Guid.CreateVersion7();
+            await using (var prepare = new NoCtfDbContext(options))
+            {
+                var retained = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                retained.RunnerAssignmentReleaseToken = receiptReleaseToken;
+                retained.RunnerUnavailableAt = fixture.Now.AddMinutes(-1);
+                await prepare.SaveChangesAsync(cancellationToken);
+            }
             var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Offline);
             var outbox = new RecordingTransactionalOutbox();
+            await using (var guardedReleaseDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerCapacityReleaseAsync(
+                    new ReleaseRunnerCapacity(
+                        fixture.RetainReceiptId,
+                        7,
+                        "pool-a",
+                        "runner-c",
+                        receiptReleaseToken),
+                    guardedReleaseDb,
+                    capacity,
+                    outbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Superseded);
+            }
+            await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
 
             await using (var db = new NoCtfDbContext(options))
             {
@@ -48,18 +236,19 @@ public sealed class RunnerAssignmentReconciliationTests
 
             await using (var verify = new NoCtfDbContext(options))
             {
-                var redispatched = await verify.RuntimeInstances.AsNoTracking()
+                var provisioning = await verify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
-                await Assert.That(redispatched.State).IsEqualTo(RuntimeState.Provisioning);
-                await Assert.That(redispatched.RunnerId).IsEqualTo("runner-a");
-                await Assert.That(redispatched.RunnerAssignmentReleaseToken).IsNotNull();
-                await Assert.That(redispatched.ProcessingVersion).IsEqualTo(8);
+                await Assert.That(provisioning.State).IsEqualTo(RuntimeState.Provisioning);
+                await Assert.That(provisioning.RunnerId).IsEqualTo("runner-a");
+                await Assert.That(provisioning.RunnerAssignmentReleaseToken).IsNull();
+                await Assert.That(provisioning.ProcessingVersion).IsEqualTo(7);
 
-                var completed = await verify.RuntimeInstances.AsNoTracking()
+                var pendingStop = await verify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(instance => instance.Id == fixture.CompleteStopId, cancellationToken);
-                await Assert.That(completed.State).IsEqualTo(RuntimeState.Stopped);
-                await Assert.That(completed.StoppedAt).IsEqualTo(fixture.Now);
-                await Assert.That(completed.ProcessingVersion).IsEqualTo(8);
+                await Assert.That(pendingStop.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(pendingStop.StoppedAt).IsNull();
+                await Assert.That(pendingStop.RunnerAssignmentReleaseToken).IsNull();
+                await Assert.That(pendingStop.ProcessingVersion).IsEqualTo(7);
 
                 var retained = await verify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(instance => instance.Id == fixture.RetainReceiptId, cancellationToken);
@@ -71,42 +260,33 @@ public sealed class RunnerAssignmentReconciliationTests
                     JsonNode.Parse("""{"id":"local"}"""))).IsTrue();
                 await Assert.That(retained.FailureCode).IsNull();
                 await Assert.That(retained.RunnerUnavailableAt).IsEqualTo(fixture.Now);
+                await Assert.That(retained.RunnerAssignmentReleaseToken).IsNull();
                 await Assert.That(retained.ProcessingVersion).IsEqualTo(8);
             }
 
             await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
-            var releases = outbox.Published.OfType<ReleaseRunnerCapacity>().ToArray();
-            await Assert.That(releases.Select(message => message.RuntimeInstanceId))
-                .IsEquivalentTo([fixture.RedispatchId, fixture.CompleteStopId]);
+            await Assert.That(outbox.Published.OfType<ReleaseRunnerCapacity>()).IsEmpty();
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
             var cleanup = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>().Single();
             await Assert.That(cleanup.RuntimeInstanceId).IsEqualTo(fixture.RetainReceiptId);
             await Assert.That(cleanup.RunnerId).IsEqualTo("runner-c");
             await Assert.That(cleanup.ProcessingVersion).IsEqualTo(8);
 
-            foreach (var release in releases)
+            await using (var retainedVerify = new NoCtfDbContext(options))
             {
-                await using var releaseDb = new NoCtfDbContext(options);
-                var outcome = await BackendMessageHandlers.ExecuteRunnerCapacityReleaseAsync(
-                    release,
-                    releaseDb,
-                    capacity,
-                    outbox,
-                    cancellationToken);
-                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
-            }
-            await Assert.That(capacity.ReleasedRuntimeIds)
-                .IsEquivalentTo([fixture.RedispatchId, fixture.CompleteStopId]);
-            var dispatch = outbox.Published.OfType<DispatchRuntime>().Single();
-            await Assert.That(dispatch.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
-            await Assert.That(dispatch.ProcessingVersion).IsEqualTo(9);
-            await using (var releasedVerify = new NoCtfDbContext(options))
-            {
-                var released = await releasedVerify.RuntimeInstances.AsNoTracking()
+                var provisioning = await retainedVerify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
-                await Assert.That(released.State).IsEqualTo(RuntimeState.Queued);
-                await Assert.That(released.RunnerId).IsNull();
-                await Assert.That(released.RunnerAssignmentReleaseToken).IsNull();
-                await Assert.That(released.ProcessingVersion).IsEqualTo(9);
+                await Assert.That(provisioning.State).IsEqualTo(RuntimeState.Provisioning);
+                await Assert.That(provisioning.RunnerId).IsEqualTo("runner-a");
+                await Assert.That(provisioning.RunnerAssignmentReleaseToken).IsNull();
+                await Assert.That(provisioning.ProcessingVersion).IsEqualTo(7);
+
+                var waitingForOwner = await retainedVerify.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(instance => instance.Id == fixture.CompleteStopId, cancellationToken);
+                await Assert.That(waitingForOwner.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(waitingForOwner.StoppedAt).IsNull();
+                await Assert.That(waitingForOwner.RunnerAssignmentReleaseToken).IsNull();
+                await Assert.That(waitingForOwner.ProcessingVersion).IsEqualTo(7);
             }
 
             await using (var duplicateDb = new NoCtfDbContext(options))
@@ -214,7 +394,7 @@ public sealed class RunnerAssignmentReconciliationTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Reset_waits_for_pending_capacity_release_before_dispatching_replacement(
+    public async Task Stop_invalidates_pending_release_and_original_provision_cleanup_dispatches_replacement(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -224,18 +404,41 @@ public sealed class RunnerAssignmentReconciliationTests
             var options = CreateOptions(postgres.GetConnectionString());
             var fixture = await SeedAsync(options, cancellationToken);
             var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Offline);
-            var reconciliationOutbox = new RecordingTransactionalOutbox();
-            await using (var db = new NoCtfDbContext(options))
+            var releaseToken = Guid.CreateVersion7();
+            await using (var prepare = new NoCtfDbContext(options))
             {
-                await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now, 1),
-                    db,
-                    capacity,
-                    reconciliationOutbox,
+                var runtime = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
                     cancellationToken);
+                runtime.RunnerAssignmentReleaseToken = releaseToken;
+                runtime.ProcessingVersion = 8;
+                await prepare.SaveChangesAsync(cancellationToken);
             }
-            var release = reconciliationOutbox.Published.OfType<ReleaseRunnerCapacity>()
-                .Single(message => message.RuntimeInstanceId == fixture.RedispatchId);
+            var release = new ReleaseRunnerCapacity(
+                fixture.RedispatchId,
+                8,
+                "pool-a",
+                "runner-a",
+                releaseToken);
+            var services = new ServiceCollection();
+            services.AddDbContext<NoCtfDbContext>(builder => builder
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention());
+            await using var provider = services.BuildServiceProvider();
+            var reader = new RuntimeNodeWorkReader(
+                provider.GetRequiredService<IServiceScopeFactory>());
+            var originalProvision = new ProvisionContainerRuntime(
+                fixture.RedispatchId,
+                7,
+                1,
+                "pool-a",
+                "runner-a",
+                null!);
+            await Assert.That(await reader.ReadProvisionStatusAsync(
+                    originalProvision,
+                    cancellationToken))
+                .IsEqualTo(RuntimeProvisionWorkStatus.AssignmentRetained);
+
             var replacementId = Guid.CreateVersion7();
             await using (var resetDb = new NoCtfDbContext(options))
             {
@@ -243,6 +446,7 @@ public sealed class RunnerAssignmentReconciliationTests
                     instance => instance.Id == fixture.RedispatchId,
                     cancellationToken);
                 old.State = RuntimeState.Stopping;
+                old.RunnerAssignmentReleaseToken = null;
                 old.ProcessingVersion = checked(old.ProcessingVersion + 1);
                 resetDb.RuntimeInstances.Add(new RuntimeInstance
                 {
@@ -260,6 +464,10 @@ public sealed class RunnerAssignmentReconciliationTests
                 });
                 await resetDb.SaveChangesAsync(cancellationToken);
             }
+            await Assert.That(await reader.ReadProvisionStatusAsync(
+                    originalProvision,
+                    cancellationToken))
+                .IsEqualTo(RuntimeProvisionWorkStatus.StopRequested);
 
             var continuationOutbox = new RecordingTransactionalOutbox();
             await using (var stopDb = new NoCtfDbContext(options))
@@ -280,8 +488,23 @@ public sealed class RunnerAssignmentReconciliationTests
                     capacity,
                     continuationOutbox,
                     cancellationToken);
-                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Superseded);
             }
+            await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
+            await Assert.That(continuationOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            await using (var canceledDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisionCanceled(
+                        fixture.RedispatchId,
+                        7,
+                        1,
+                        "pool-a",
+                        "runner-a"),
+                    canceledDb,
+                    continuationOutbox,
+                    cancellationToken);
+
             var replacementDispatch = continuationOutbox.Published.OfType<DispatchRuntime>().Single();
             await Assert.That(replacementDispatch.RuntimeInstanceId).IsEqualTo(replacementId);
             await using var verify = new NoCtfDbContext(options);
@@ -290,6 +513,622 @@ public sealed class RunnerAssignmentReconciliationTests
                 cancellationToken);
             await Assert.That(stopped.State).IsEqualTo(RuntimeState.Stopped);
             await Assert.That(stopped.RunnerAssignmentReleaseToken).IsNull();
+            await Assert.That(stopped.ProcessingVersion).IsEqualTo(10);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Offline_stopping_assignment_waits_for_late_receipt_cleanup_before_dispatching_replacement(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            var resetOutbox = new RecordingTransactionalOutbox();
+            Guid replacementId;
+            await using (var resetDb = new NoCtfDbContext(options))
+            {
+                var target = await resetDb.RuntimeInstances.AsNoTracking()
+                    .Where(instance => instance.Id == fixture.RedispatchId)
+                    .Select(instance => new
+                    {
+                        instance.CompetitionId,
+                        instance.CompetitionChallengeId
+                    })
+                    .SingleAsync(cancellationToken);
+                var userId = await resetDb.Competitions.AsNoTracking()
+                    .Where(competition => competition.Id == target.CompetitionId)
+                    .Select(competition => competition.OwnerId)
+                    .SingleAsync(cancellationToken);
+                var store = new RuntimeInstanceStore(
+                    resetDb,
+                    new ChallengeRuntimeTemplateCatalog(),
+                    new FixedRuntimePlacementPolicy(runnerPool: "pool-a"),
+                    new PostgresPerTeamRuntimeFlagStore(resetDb),
+                    resetOutbox);
+                var reset = await store.MutatePlayerRuntimeAsync(
+                    new RuntimeMutationCommand(
+                        target.CompetitionId,
+                        target.CompetitionChallengeId,
+                        userId,
+                        RuntimeAction.Reset,
+                        null,
+                        fixture.Now.AddSeconds(1)),
+                    cancellationToken);
+                await Assert.That(reset.Failure).IsNull();
+                await Assert.That(reset.Runtime).IsNotNull();
+                replacementId = reset.Runtime!.Id;
+            }
+            var stop = resetOutbox.Published.OfType<StopRuntime>().Single();
+            await Assert.That(stop.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
+            await Assert.That(stop.ProcessingVersion).IsEqualTo(8);
+            await Assert.That(resetOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            var capacity = new ReconciliationCapacityGate(runnerId =>
+                runnerId == "runner-a"
+                    ? RunnerHeartbeatStatus.Offline
+                    : RunnerHeartbeatStatus.Online);
+            var outbox = new RecordingTransactionalOutbox();
+            await using (var reconcileDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    reconcileDb,
+                    capacity,
+                    outbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Idempotent);
+            }
+            await Assert.That(outbox.Published.OfType<ReleaseRunnerCapacity>()).IsEmpty();
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            await using (var pendingDb = new NoCtfDbContext(options))
+            {
+                var pending = await pendingDb.RuntimeInstances.AsNoTracking().SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                await Assert.That(pending.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(pending.StoppedAt).IsNull();
+                await Assert.That(pending.RunnerAssignmentReleaseToken).IsNull();
+                await Assert.That(pending.ProcessingVersion).IsEqualTo(8);
+            }
+
+            const string lateReceipt = """{"resourceId":"late-offline"}""";
+            await using (var successDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisioned(
+                        fixture.RedispatchId,
+                        7,
+                        1,
+                        "runner-a",
+                        RuntimeProvider.Docker,
+                        lateReceipt,
+                        [],
+                        [],
+                        null),
+                    successDb,
+                    outbox,
+                    cancellationToken);
+
+            var typedStop = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>()
+                .Single(message => message.RuntimeInstanceId == fixture.RedispatchId);
+            await Assert.That(typedStop.ProcessingVersion).IsEqualTo(9);
+            await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            await using (var completeDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeStopped(fixture.RedispatchId, 9),
+                    completeDb,
+                    outbox,
+                    cancellationToken);
+
+            var dispatch = outbox.Published.OfType<DispatchRuntime>().Single();
+            await Assert.That(dispatch.RuntimeInstanceId).IsEqualTo(replacementId);
+            await using var verify = new NoCtfDbContext(options);
+            var stopped = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+                instance => instance.Id == fixture.RedispatchId,
+                cancellationToken);
+            await Assert.That(stopped.State).IsEqualTo(RuntimeState.Stopped);
+            await Assert.That(stopped.StoppedAt).IsNotNull();
+            await Assert.That(stopped.RunnerAssignmentReleaseToken).IsNull();
+            await Assert.That(stopped.ProcessingVersion).IsEqualTo(10);
+            var replacement = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+                instance => instance.Id == replacementId,
+                cancellationToken);
+            await Assert.That(replacement.State).IsEqualTo(RuntimeState.Queued);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Provision_cleanup_acknowledgements_are_exact_idempotent_and_dispatch_replacements(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            var replacementId = Guid.CreateVersion7();
+            var terminatedReplacementId = Guid.CreateVersion7();
+            var outbox = new RecordingTransactionalOutbox();
+
+            await using (var provisioningDb = new NoCtfDbContext(options))
+            {
+                var provisioning = await provisioningDb.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                provisioning.State = RuntimeState.Provisioning;
+                provisioning.ProviderReceiptJson = null;
+                await provisioningDb.SaveChangesAsync(cancellationToken);
+            }
+            var failed = new RuntimeProvisionTerminated(
+                fixture.RetainReceiptId,
+                7,
+                1,
+                "pool-a",
+                "runner-c",
+                RuntimeFailureCode.ProviderRejected);
+            await using (var failedDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    failed,
+                    failedDb,
+                    outbox,
+                    cancellationToken);
+            await using (var failedReplayDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    failed,
+                    failedReplayDb,
+                    outbox,
+                    cancellationToken);
+
+            await using (var mismatchedFailureDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisionFailed(
+                        fixture.RedispatchId,
+                        7,
+                        RuntimeFailureCode.ProviderRejected,
+                        "runner-z"),
+                    mismatchedFailureDb,
+                    cancellationToken);
+            await using (var cleanupDb = new NoCtfDbContext(options))
+            {
+                var competitionId = await cleanupDb.RuntimeInstances.AsNoTracking()
+                    .Where(instance => instance.Id == fixture.RedispatchId)
+                    .Select(instance => instance.CompetitionId)
+                    .SingleAsync(cancellationToken);
+                await BackendMessageHandlers.Handle(
+                    new CleanupCompetitionRuntimes(competitionId),
+                    cleanupDb,
+                    outbox,
+                    cancellationToken);
+            }
+            var cleanupStop = outbox.Published.OfType<StopRuntime>()
+                .Single(message => message.RuntimeInstanceId == fixture.RedispatchId);
+            await Assert.That(cleanupStop.ProcessingVersion).IsEqualTo(8);
+
+            await using (var prepare = new NoCtfDbContext(options))
+            {
+                var stopped = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                prepare.RuntimeInstances.Add(CreateReplacement(
+                    stopped,
+                    replacementId,
+                    fixture.Now.AddMinutes(4)));
+                var stopping = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.CompleteStopId,
+                    cancellationToken);
+                prepare.RuntimeInstances.Add(CreateReplacement(
+                    stopping,
+                    terminatedReplacementId,
+                    fixture.Now.AddMinutes(5)));
+                await prepare.SaveChangesAsync(cancellationToken);
+            }
+
+            var services = new ServiceCollection();
+            services.AddDbContext<NoCtfDbContext>(builder => builder
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention());
+            await using var provider = services.BuildServiceProvider();
+            var reader = new RuntimeNodeWorkReader(
+                provider.GetRequiredService<IServiceScopeFactory>());
+            var provisionMessage = new ProvisionContainerRuntime(
+                fixture.RedispatchId,
+                7,
+                1,
+                "pool-a",
+                "runner-a",
+                null!);
+            var status = await reader.ReadProvisionStatusAsync(
+                provisionMessage,
+                cancellationToken);
+            await Assert.That(status).IsEqualTo(RuntimeProvisionWorkStatus.StopRequested);
+
+            await using (var stopDb = new NoCtfDbContext(options))
+            {
+                await BackendMessageHandlers.Handle(
+                    new StopRuntime(fixture.RedispatchId, 8),
+                    stopDb,
+                    outbox,
+                    cancellationToken);
+            }
+
+            await using (var stoppedTooEarly = new NoCtfDbContext(options))
+            {
+                var waiting = await stoppedTooEarly.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
+                await Assert.That(waiting.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(waiting.ProcessingVersion).IsEqualTo(8);
+                await Assert.That(waiting.ProviderReceiptJson).IsNull();
+                await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            }
+
+            var invalidAcks = new[]
+            {
+                new RuntimeProvisionCanceled(
+                    fixture.RedispatchId,
+                    6,
+                    1,
+                    "pool-a",
+                    "runner-a"),
+                new RuntimeProvisionCanceled(
+                    fixture.RedispatchId,
+                    7,
+                    2,
+                    "pool-a",
+                    "runner-a"),
+                new RuntimeProvisionCanceled(
+                    fixture.RedispatchId,
+                    7,
+                    1,
+                    "pool-b",
+                    "runner-a"),
+                new RuntimeProvisionCanceled(
+                    fixture.RedispatchId,
+                    7,
+                    1,
+                    "pool-a",
+                    "runner-b")
+            };
+            foreach (var invalidAck in invalidAcks)
+            {
+                await using var invalidDb = new NoCtfDbContext(options);
+                await RuntimeWriteBackHandler.Handle(
+                    invalidAck,
+                    invalidDb,
+                    outbox,
+                    cancellationToken);
+            }
+
+            var canceled = new RuntimeProvisionCanceled(
+                fixture.RedispatchId,
+                7,
+                1,
+                "pool-a",
+                "runner-a");
+            await using (var canceledDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    canceled,
+                    canceledDb,
+                    outbox,
+                    cancellationToken);
+            await using (var replayDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    canceled,
+                    replayDb,
+                    outbox,
+                    cancellationToken);
+
+            var terminated = new RuntimeProvisionTerminated(
+                fixture.CompleteStopId,
+                6,
+                1,
+                "pool-a",
+                "runner-b",
+                RuntimeFailureCode.ProviderRejected);
+            await using (var terminatedDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    terminated,
+                    terminatedDb,
+                    outbox,
+                    cancellationToken);
+            await using (var terminatedReplayDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    terminated,
+                    terminatedReplayDb,
+                    outbox,
+                    cancellationToken);
+
+            await using var verify = new NoCtfDbContext(options);
+            var result = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
+            await Assert.That(result.State).IsEqualTo(RuntimeState.Stopped);
+            await Assert.That(result.ProcessingVersion).IsEqualTo(9);
+            await Assert.That(result.ProviderReceiptJson).IsNull();
+            var terminatedResult = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(
+                    instance => instance.Id == fixture.CompleteStopId,
+                    cancellationToken);
+            await Assert.That(terminatedResult.State).IsEqualTo(RuntimeState.Stopped);
+            await Assert.That(terminatedResult.ProcessingVersion).IsEqualTo(8);
+            await Assert.That(terminatedResult.FailureCode).IsNull();
+            var failedResult = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+            await Assert.That(failedResult.State).IsEqualTo(RuntimeState.Failed);
+            await Assert.That(failedResult.ProcessingVersion).IsEqualTo(8);
+            await Assert.That(failedResult.FailureCode)
+                .IsEqualTo(RuntimeFailureCode.ProviderRejected);
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()
+                .Select(message => message.RuntimeInstanceId))
+                .IsEquivalentTo([replacementId, terminatedReplacementId]);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Late_provision_success_persists_receipt_until_typed_stop_completes(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            var replacementId = Guid.CreateVersion7();
+            var outbox = new RecordingTransactionalOutbox();
+
+            var invalidReplies = new[]
+            {
+                new RuntimeProvisioned(
+                    fixture.RedispatchId,
+                    7,
+                    2,
+                    "runner-a",
+                    RuntimeProvider.Docker,
+                    "{}",
+                    [],
+                    [],
+                    null),
+                new RuntimeProvisioned(
+                    fixture.RedispatchId,
+                    7,
+                    1,
+                    "runner-z",
+                    RuntimeProvider.Docker,
+                    "{}",
+                    [],
+                    [],
+                    null),
+                new RuntimeProvisioned(
+                    fixture.RedispatchId,
+                    7,
+                    1,
+                    "runner-a",
+                    RuntimeProvider.Libvirt,
+                    "{}",
+                    [],
+                    [],
+                    null)
+            };
+            foreach (var invalidReply in invalidReplies)
+            {
+                await using var invalidDb = new NoCtfDbContext(options);
+                await RuntimeWriteBackHandler.Handle(
+                    invalidReply,
+                    invalidDb,
+                    outbox,
+                    cancellationToken);
+            }
+            await using (var invalidVerify = new NoCtfDbContext(options))
+            {
+                var unchanged = await invalidVerify.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(
+                        instance => instance.Id == fixture.RedispatchId,
+                        cancellationToken);
+                await Assert.That(unchanged.State).IsEqualTo(RuntimeState.Provisioning);
+                await Assert.That(unchanged.ProcessingVersion).IsEqualTo(7);
+                await Assert.That(unchanged.ProviderReceiptJson).IsNull();
+            }
+
+            await using (var cleanupDb = new NoCtfDbContext(options))
+            {
+                var competitionId = await cleanupDb.RuntimeInstances.AsNoTracking()
+                    .Where(instance => instance.Id == fixture.RedispatchId)
+                    .Select(instance => instance.CompetitionId)
+                    .SingleAsync(cancellationToken);
+                await BackendMessageHandlers.Handle(
+                    new CleanupCompetitionRuntimes(competitionId),
+                    cleanupDb,
+                    outbox,
+                    cancellationToken);
+            }
+            await using (var prepare = new NoCtfDbContext(options))
+            {
+                var stopped = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RedispatchId,
+                    cancellationToken);
+                prepare.RuntimeInstances.Add(CreateReplacement(
+                    stopped,
+                    replacementId,
+                    fixture.Now.AddMinutes(4)));
+                await prepare.SaveChangesAsync(cancellationToken);
+            }
+
+            var services = new ServiceCollection();
+            services.AddDbContext<NoCtfDbContext>(builder => builder
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention());
+            await using var provider = services.BuildServiceProvider();
+            var reader = new RuntimeNodeWorkReader(
+                provider.GetRequiredService<IServiceScopeFactory>());
+            var provisionMessage = new ProvisionContainerRuntime(
+                fixture.RedispatchId,
+                7,
+                1,
+                "pool-a",
+                "runner-a",
+                null!);
+            var status = await reader.ReadProvisionStatusAsync(
+                provisionMessage,
+                cancellationToken);
+            await Assert.That(status).IsEqualTo(RuntimeProvisionWorkStatus.StopRequested);
+
+            await using (var stopDb = new NoCtfDbContext(options))
+                await BackendMessageHandlers.Handle(
+                    new StopRuntime(fixture.RedispatchId, 8),
+                    stopDb,
+                    outbox,
+                    cancellationToken);
+
+            const string lateReceipt = """{"resourceId":"late"}""";
+            await using (var successDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisioned(
+                        fixture.RedispatchId,
+                        7,
+                        1,
+                        "runner-a",
+                        RuntimeProvider.Docker,
+                        lateReceipt,
+                        [],
+                        [],
+                        null),
+                    successDb,
+                    outbox,
+                    cancellationToken);
+
+            status = await reader.ReadProvisionStatusAsync(provisionMessage, cancellationToken);
+            await Assert.That(status).IsEqualTo(RuntimeProvisionWorkStatus.AssignmentRetained);
+            var directStop = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>().Single();
+            await Assert.That(directStop.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
+            await Assert.That(directStop.ProcessingVersion).IsEqualTo(9);
+            await Assert.That(directStop.RunnerId).IsEqualTo("runner-a");
+
+            await using (var receiptFenceDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisionCanceled(
+                        fixture.RedispatchId,
+                        7,
+                        1,
+                        "pool-a",
+                        "runner-a"),
+                    receiptFenceDb,
+                    outbox,
+                    cancellationToken);
+            await using (var terminatedReceiptFenceDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisionTerminated(
+                        fixture.RedispatchId,
+                        7,
+                        1,
+                        "pool-a",
+                        "runner-a",
+                        RuntimeFailureCode.ProviderRejected),
+                    terminatedReceiptFenceDb,
+                    outbox,
+                    cancellationToken);
+            await using (var staleFailureDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisionFailed(
+                        fixture.RedispatchId,
+                        7,
+                        RuntimeFailureCode.RunnerUnavailable,
+                        "runner-a"),
+                    staleFailureDb,
+                    cancellationToken);
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            await using (var completeDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeStopped(fixture.RedispatchId, 9),
+                    completeDb,
+                    outbox,
+                    cancellationToken);
+
+            await using var verify = new NoCtfDbContext(options);
+            var result = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
+            await Assert.That(result.State).IsEqualTo(RuntimeState.Stopped);
+            await Assert.That(result.ProcessingVersion).IsEqualTo(10);
+            await Assert.That(JsonNode.DeepEquals(
+                JsonNode.Parse(result.ProviderReceiptJson!),
+                JsonNode.Parse(lateReceipt))).IsTrue();
+            var dispatch = outbox.Published.OfType<DispatchRuntime>().Single();
+            await Assert.That(dispatch.RuntimeInstanceId).IsEqualTo(replacementId);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Failed_cleanup_owner_is_audited_offline_but_not_when_heartbeat_is_unavailable(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var prepare = new NoCtfDbContext(options))
+            {
+                var failed = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                failed.State = RuntimeState.Failed;
+                failed.FailureCode = RuntimeFailureCode.CleanupFailed;
+                await prepare.SaveChangesAsync(cancellationToken);
+            }
+
+            var unavailableOutbox = new RecordingTransactionalOutbox();
+            var inventory = new Func<string, RunnerPoolInventory>(pool => new(
+                RunnerPoolInventoryAvailability.Available,
+                pool == "pool-a" ? ["runner-c"] : []));
+            await using (var unavailableDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    unavailableDb,
+                    new ReconciliationCapacityGate(
+                        runnerId => runnerId == "runner-c"
+                            ? RunnerHeartbeatStatus.Unavailable
+                            : RunnerHeartbeatStatus.Online,
+                        inventory),
+                    unavailableOutbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.DeferredCapacity);
+            }
+            await Assert.That(unavailableOutbox.RunnerNodeMessages).IsEmpty();
+
+            var offlineOutbox = new RecordingTransactionalOutbox();
+            await using (var offlineDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now.AddSeconds(1), 2),
+                    offlineDb,
+                    new ReconciliationCapacityGate(
+                        runnerId => runnerId == "runner-c"
+                            ? RunnerHeartbeatStatus.Offline
+                            : RunnerHeartbeatStatus.Online,
+                        inventory),
+                    offlineOutbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
+            }
+            var audit = offlineOutbox.RunnerNodeMessages
+                .OfType<ReconcileRuntimeResources>()
+                .Single();
+            await Assert.That(audit.RunnerPool).IsEqualTo("pool-a");
+            await Assert.That(audit.RunnerId).IsEqualTo("runner-c");
+            await Assert.That(audit.RequestedAt).IsEqualTo(fixture.Now.AddSeconds(1));
         });
     }
 
@@ -376,11 +1215,13 @@ public sealed class RunnerAssignmentReconciliationTests
                     ["Runner:Provider"] = nameof(RuntimeProvider.Libvirt)
                 })
                 .Build();
+            var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Online);
             await using var db = new NoCtfDbContext(options);
             var handler = new RuntimeResourceReconciliationHandler(
                 db,
                 [provider],
-                configuration);
+                configuration,
+                capacity);
 
             await handler.Handle(
                 new ReconcileRuntimeResources(
@@ -395,6 +1236,228 @@ public sealed class RunnerAssignmentReconciliationTests
                     new RuntimeResourceIdentity(fixture.RedispatchId, 2),
                     new RuntimeResourceIdentity(orphanId, 1)
                 ]);
+            await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([orphanId]);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Successful_failed_assignment_cleanup_commits_before_unrelated_orphan_failure(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            var releaseToken = Guid.CreateVersion7();
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                var runtime = await seed.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                runtime.State = RuntimeState.Failed;
+                runtime.FailureCode = RuntimeFailureCode.CleanupFailed;
+                runtime.RunnerAssignmentReleaseToken = releaseToken;
+                runtime.RunnerUnavailableAt = fixture.Now;
+                await seed.SaveChangesAsync(cancellationToken);
+            }
+
+            var orphan = new RuntimeResourceIdentity(Guid.CreateVersion7(), 1);
+            var reconciler = new RecordingResourceReconciler(
+                RuntimeProvider.Docker,
+                [orphan],
+                failedIdentity: orphan);
+            var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Online);
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Runner:Pool"] = "pool-a",
+                    ["Runner:Id"] = "runner-c",
+                    ["Runner:Provider"] = nameof(RuntimeProvider.Docker)
+                })
+                .Build();
+            var message = new ReconcileRuntimeResources(
+                "pool-a",
+                "runner-c",
+                fixture.Now);
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var handler = new RuntimeResourceReconciliationHandler(
+                    db,
+                    [reconciler],
+                    configuration,
+                    capacity);
+                Func<Task> action = () => handler.Handle(message, cancellationToken);
+                await Assert.That(action).Throws<InvalidOperationException>();
+            }
+            await using (var replayDb = new NoCtfDbContext(options))
+            {
+                var handler = new RuntimeResourceReconciliationHandler(
+                    replayDb,
+                    [reconciler],
+                    configuration,
+                    capacity);
+                Func<Task> action = () => handler.Handle(message, cancellationToken);
+                await Assert.That(action).Throws<InvalidOperationException>();
+            }
+
+            await Assert.That(reconciler.Destroyed)
+                .IsEquivalentTo(
+                [
+                    new RuntimeResourceIdentity(fixture.RetainReceiptId, 1),
+                    orphan,
+                    orphan
+                ]);
+            await Assert.That(capacity.ReleasedRuntimeIds)
+                .IsEquivalentTo([fixture.RetainReceiptId]);
+            await using var verify = new NoCtfDbContext(options);
+            var cleaned = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+            await Assert.That(cleaned.State).IsEqualTo(RuntimeState.Failed);
+            await Assert.That(cleaned.FailureCode)
+                .IsEqualTo(RuntimeFailureCode.CleanupFailed);
+            await Assert.That(cleaned.ProviderReceiptJson).IsNull();
+            await Assert.That(cleaned.RunnerId).IsNull();
+            await Assert.That(cleaned.RunnerAssignmentReleaseToken).IsNull();
+            await Assert.That(cleaned.RunnerUnavailableAt).IsNull();
+            await Assert.That(cleaned.ProcessingVersion).IsEqualTo(8);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Failed_receipt_reconciliation_retries_until_cleanup_and_capacity_release_converge(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            var releaseToken = Guid.CreateVersion7();
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                var runtime = await seed.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                runtime.RuntimeKind = RuntimeKind.OvaVm;
+                runtime.RuntimeProvider = RuntimeProvider.Libvirt;
+                runtime.RunnerId = "runner-a";
+                runtime.State = RuntimeState.Failed;
+                runtime.FailureCode = RuntimeFailureCode.CleanupFailed;
+                runtime.RunnerAssignmentReleaseToken = releaseToken;
+                runtime.RunnerUnavailableAt = fixture.Now;
+                await seed.SaveChangesAsync(cancellationToken);
+            }
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Runner:Pool"] = "pool-a",
+                    ["Runner:Id"] = "runner-a",
+                    ["Runner:Provider"] = nameof(RuntimeProvider.Libvirt)
+                })
+                .Build();
+            var cleanupFailure = new RecordingResourceReconciler(
+                RuntimeProvider.Libvirt,
+                [],
+                failCleanup: true);
+            var cleanupCapacity = new ReconciliationCapacityGate(
+                _ => RunnerHeartbeatStatus.Online);
+            await using (var cleanupDb = new NoCtfDbContext(options))
+            {
+                var handler = new RuntimeResourceReconciliationHandler(
+                    cleanupDb,
+                    [cleanupFailure],
+                    configuration,
+                    cleanupCapacity);
+                Func<Task> action = () => handler.Handle(
+                    new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now),
+                    cancellationToken);
+                await Assert.That(action).Throws<InvalidOperationException>();
+            }
+            await Assert.That(cleanupCapacity.ReleasedRuntimeIds).IsEmpty();
+
+            var reconciler = new RecordingResourceReconciler(RuntimeProvider.Libvirt, []);
+            var mismatchedCapacity = new ReconciliationCapacityGate(
+                _ => RunnerHeartbeatStatus.Online,
+                release: (_, _) => RunnerCapacityReleaseOutcome.OwnerMismatch);
+            await using (var mismatchDb = new NoCtfDbContext(options))
+            {
+                var handler = new RuntimeResourceReconciliationHandler(
+                    mismatchDb,
+                    [reconciler],
+                    configuration,
+                    mismatchedCapacity);
+                Func<Task> action = () => handler.Handle(
+                    new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now),
+                    cancellationToken);
+                await Assert.That(action).Throws<InvalidOperationException>();
+            }
+            await using (var unchangedDb = new NoCtfDbContext(options))
+            {
+                var unchanged = await unchangedDb.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(
+                        instance => instance.Id == fixture.RetainReceiptId,
+                        cancellationToken);
+                await Assert.That(unchanged.State).IsEqualTo(RuntimeState.Failed);
+                await Assert.That(unchanged.FailureCode)
+                    .IsEqualTo(RuntimeFailureCode.CleanupFailed);
+                await Assert.That(unchanged.ProviderReceiptJson).IsNotNull();
+                await Assert.That(unchanged.RunnerId).IsEqualTo("runner-a");
+                await Assert.That(unchanged.RunnerAssignmentReleaseToken)
+                    .IsEqualTo(releaseToken);
+                await Assert.That(unchanged.RunnerUnavailableAt).IsEqualTo(fixture.Now);
+                await Assert.That(unchanged.ProcessingVersion).IsEqualTo(7);
+            }
+
+            var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Online);
+            var message = new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now);
+            await using (var convergeDb = new NoCtfDbContext(options))
+            {
+                var handler = new RuntimeResourceReconciliationHandler(
+                    convergeDb,
+                    [reconciler],
+                    configuration,
+                    capacity);
+                await handler.Handle(message, cancellationToken);
+            }
+            await using (var replayDb = new NoCtfDbContext(options))
+            {
+                var handler = new RuntimeResourceReconciliationHandler(
+                    replayDb,
+                    [reconciler],
+                    configuration,
+                    capacity);
+                await handler.Handle(message, cancellationToken);
+            }
+
+            await Assert.That(reconciler.Destroyed)
+                .IsEquivalentTo(
+                [
+                    new RuntimeResourceIdentity(fixture.RetainReceiptId, 1),
+                    new RuntimeResourceIdentity(fixture.RetainReceiptId, 1)
+                ]);
+            await Assert.That(capacity.ReleasedRuntimeIds)
+                .IsEquivalentTo([fixture.RetainReceiptId]);
+            await using var verify = new NoCtfDbContext(options);
+            var converged = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+            await Assert.That(converged.State).IsEqualTo(RuntimeState.Failed);
+            await Assert.That(converged.FailureCode)
+                .IsEqualTo(RuntimeFailureCode.CleanupFailed);
+            await Assert.That(converged.ProviderReceiptJson).IsNull();
+            await Assert.That(converged.RunnerId).IsNull();
+            await Assert.That(converged.RunnerAssignmentReleaseToken).IsNull();
+            await Assert.That(converged.RunnerUnavailableAt).IsNull();
+            await Assert.That(converged.ProcessingVersion).IsEqualTo(8);
         });
     }
 
@@ -411,6 +1474,25 @@ public sealed class RunnerAssignmentReconciliationTests
             .UseSnakeCaseNamingConvention()
             .Options;
 
+    private static RuntimeInstance CreateReplacement(
+        RuntimeInstance replaced,
+        Guid replacementId,
+        DateTimeOffset createdAt) =>
+        new()
+        {
+            Id = replacementId,
+            CompetitionId = replaced.CompetitionId,
+            CompetitionChallengeId = replaced.CompetitionChallengeId,
+            TeamId = replaced.TeamId,
+            Generation = checked(replaced.Generation + 1),
+            RuntimeKind = replaced.RuntimeKind,
+            RuntimeProvider = replaced.RuntimeProvider,
+            RunnerPool = replaced.RunnerPool,
+            State = RuntimeState.Queued,
+            ReplacesRuntimeInstanceId = replaced.Id,
+            CreatedAt = createdAt
+        };
+
     private static async Task<ReconciliationFixture> SeedAsync(
         DbContextOptions<NoCtfDbContext> options,
         CancellationToken cancellationToken)
@@ -422,6 +1504,18 @@ public sealed class RunnerAssignmentReconciliationTests
             -(observedAt.Ticks % TimeSpan.TicksPerMicrosecond));
         var ownerId = Guid.CreateVersion7();
         var competitionId = Guid.CreateVersion7();
+        var teamId = Guid.CreateVersion7();
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition("registry.example/reconciliation:v1"),
+            new RuntimeResourceLimits(67_108_864, 100_000_000, 64));
+        var definitionJson = JsonSerializer.Serialize(
+            new CtfChallengeConfiguration(
+                CtfChallengeConfiguration.CurrentSchemaVersion,
+                null,
+                null,
+                Runtime: runtime),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
         db.Users.Add(new User
         {
             Id = ownerId,
@@ -447,6 +1541,18 @@ public sealed class RunnerAssignmentReconciliationTests
             UpdatedAt = now,
             ConfigurationUpdatedAt = now
         });
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = competitionId,
+            Name = "Reconciliation Team",
+            NormalizedName = "RECONCILIATION TEAM",
+            CaptainId = ownerId,
+            MemberIds = [ownerId],
+            InvitationToken = "0123456789abcdef0123456789abcdef",
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegisteredAt = now
+        });
 
         var runtimeIds = Enumerable.Range(0, 3)
             .Select(_ => Guid.CreateVersion7())
@@ -461,7 +1567,9 @@ public sealed class RunnerAssignmentReconciliationTests
             {
                 Id = challengeId,
                 OwnerId = ownerId,
+                Mode = GameMode.Ctf,
                 Title = $"Challenge {index}",
+                DefinitionJson = definitionJson,
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -471,6 +1579,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 CompetitionId = competitionId,
                 ChallengeId = challengeId,
                 Order = index,
+                IsPublished = true,
                 UpdatedAt = now
             });
             db.RuntimeInstances.Add(new RuntimeInstance
@@ -478,6 +1587,8 @@ public sealed class RunnerAssignmentReconciliationTests
                 Id = runtimeIds[index],
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
+                TeamId = teamId,
+                Purpose = RuntimePurpose.Player,
                 Generation = 1,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
@@ -501,7 +1612,8 @@ public sealed class RunnerAssignmentReconciliationTests
 
     private sealed class ReconciliationCapacityGate(
         Func<string, RunnerHeartbeatStatus> heartbeat,
-        Func<string, RunnerPoolInventory>? inventory = null) : IRunnerCapacityGate
+        Func<string, RunnerPoolInventory>? inventory = null,
+        Func<Guid, string, RunnerCapacityReleaseOutcome>? release = null) : IRunnerCapacityGate
     {
         public List<Guid> ReleasedRuntimeIds { get; } = [];
 
@@ -533,7 +1645,8 @@ public sealed class RunnerAssignmentReconciliationTests
             CancellationToken cancellationToken)
         {
             ReleasedRuntimeIds.Add(runtimeInstanceId);
-            return Task.FromResult(RunnerCapacityReleaseOutcome.Released);
+            return Task.FromResult(release?.Invoke(runtimeInstanceId, runnerId)
+                ?? RunnerCapacityReleaseOutcome.Released);
         }
     }
 
@@ -580,7 +1693,9 @@ public sealed class RunnerAssignmentReconciliationTests
 
     private sealed class RecordingResourceReconciler(
         RuntimeProvider provider,
-        IReadOnlyList<RuntimeResourceIdentity> managed)
+        IReadOnlyList<RuntimeResourceIdentity> managed,
+        bool failCleanup = false,
+        RuntimeResourceIdentity? failedIdentity = null)
         : IRuntimeManagedResourceReconciler
     {
         public RuntimeProvider Provider { get; } = provider;
@@ -596,7 +1711,9 @@ public sealed class RunnerAssignmentReconciliationTests
             CancellationToken cancellationToken)
         {
             Destroyed.Add(identity);
-            return Task.CompletedTask;
+            return failCleanup || identity == failedIdentity
+                ? Task.FromException(new InvalidOperationException("cleanup failed"))
+                : Task.CompletedTask;
         }
     }
 

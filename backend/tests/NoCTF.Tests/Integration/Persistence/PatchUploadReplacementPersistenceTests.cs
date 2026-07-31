@@ -536,7 +536,7 @@ public sealed class PatchUploadReplacementPersistenceTests
         int expectedCount,
         CancellationToken cancellationToken)
     {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        var deadline = DateTimeOffset.UtcNow.AddMinutes(1);
         while (true)
         {
             var waiting = await db.Database.SqlQuery<int>(

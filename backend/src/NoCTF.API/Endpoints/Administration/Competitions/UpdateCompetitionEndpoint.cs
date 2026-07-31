@@ -17,6 +17,7 @@ public sealed class UpdateCompetitionRequest
     public DateTimeOffset EndTime { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; }
     public int MaxTeamMembers { get; set; }
+    public int? MaxConcurrentRuntimeInstancesPerTeam { get; set; }
 }
 
 public sealed class UpdateCompetitionValidator : Validator<UpdateCompetitionRequest>
@@ -26,6 +27,7 @@ public sealed class UpdateCompetitionValidator : Validator<UpdateCompetitionRequ
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.EndTime).GreaterThan(request => request.StartTime);
         RuleFor(request => request.MaxTeamMembers).GreaterThan(0);
+        RuleFor(request => request.MaxConcurrentRuntimeInstancesPerTeam).NotNull();
     }
 }
 
@@ -66,6 +68,7 @@ public sealed class UpdateCompetitionEndpoint(
             request.EndTime,
             request.TeamRegistrationAutoApprove,
             request.MaxTeamMembers,
+            request.MaxConcurrentRuntimeInstancesPerTeam!.Value,
             user.UserId,
             DateTimeOffset.UtcNow), ct);
         if (result.ErrorCode == "competition_not_found")

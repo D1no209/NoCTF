@@ -18,6 +18,7 @@ using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Competitions.Koh;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Runtime.Administration;
 using NoCTF.Runner.Messages;
 using NoCTF.Tests.Fixtures;
 using NoCTF.Worker;
@@ -96,9 +97,32 @@ public sealed class KohPollingPersistenceTests
             await Assert.That(replayOutbox.Published).IsEmpty();
             await Assert.That(replayOutbox.FlushCount).IsEqualTo(0);
 
-            await using (var stop = new NoCtfDbContext(options))
+            await using (var stopping = new NoCtfDbContext(options))
             {
-                await stop.RuntimeInstances.ExecuteUpdateAsync(
+                await stopping.RuntimeInstances.ExecuteUpdateAsync(
+                    setters => setters.SetProperty(runtime => runtime.State, RuntimeState.Stopping),
+                    cancellationToken);
+            }
+            var deferredOutbox = new RecordingOutbox();
+            await using (var deferred = new NoCtfDbContext(options))
+            {
+                var outcome = await new PostgresKohRuntimeProvisioner(
+                    deferred,
+                    new ChallengeRuntimeTemplateCatalog(),
+                    new FixedRuntimePlacementPolicy(),
+                    deferredOutbox,
+                    new MutableTimeProvider(fixture.DueAt.AddSeconds(2))).EnsureAsync(
+                        fixture.CompetitionId,
+                        cancellationToken);
+                await Assert.That(outcome).IsEqualTo(KohRuntimeProvisioningOutcome.DeferredCleanup);
+                await Assert.That(await deferred.RuntimeInstances.CountAsync(cancellationToken))
+                    .IsEqualTo(1);
+            }
+            await Assert.That(deferredOutbox.Published).IsEmpty();
+            await Assert.That(deferredOutbox.FlushCount).IsEqualTo(0);
+            await using (var stopped = new NoCtfDbContext(options))
+            {
+                await stopped.RuntimeInstances.ExecuteUpdateAsync(
                     setters => setters.SetProperty(runtime => runtime.State, RuntimeState.Stopped),
                     cancellationToken);
             }
@@ -109,7 +133,7 @@ public sealed class KohPollingPersistenceTests
                     new ChallengeRuntimeTemplateCatalog(),
                     new FixedRuntimePlacementPolicy(),
                     new RecordingOutbox(),
-                    new MutableTimeProvider(fixture.DueAt.AddSeconds(2))).EnsureAsync(
+                    new MutableTimeProvider(fixture.DueAt.AddSeconds(3))).EnsureAsync(
                         fixture.CompetitionId,
                         cancellationToken);
                 await Assert.That(outcome).IsEqualTo(KohRuntimeProvisioningOutcome.Applied);
@@ -122,6 +146,188 @@ public sealed class KohPollingPersistenceTests
                     .ToArrayAsync(cancellationToken);
                 await Assert.That(generations).IsEquivalentTo([1, 2]);
             }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Failed_shared_runtime_waits_for_cleanup_and_retries_without_early_dispatch(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_koh_runtime_cleanup")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+
+            await using var db = new NoCtfDbContext(options);
+            var old = await db.RuntimeInstances.SingleAsync(cancellationToken);
+            old.State = RuntimeState.Failed;
+            old.FailureCode = RuntimeFailureCode.ProviderUnavailable;
+            old.ProviderReceiptJson = "{}";
+            old.RunnerAssignmentReleaseToken = Guid.CreateVersion7();
+            old.ProcessingVersion = 7;
+            await db.SaveChangesAsync(cancellationToken);
+            var firstOutbox = new RecordingOutbox();
+
+            var first = await new PostgresKohRuntimeProvisioner(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(),
+                firstOutbox,
+                new MutableTimeProvider(fixture.DueAt.AddSeconds(1))).EnsureAsync(
+                    fixture.CompetitionId,
+                    cancellationToken);
+
+            await Assert.That(first).IsEqualTo(KohRuntimeProvisioningOutcome.DeferredCleanup);
+            db.ChangeTracker.Clear();
+            var firstPass = await db.RuntimeInstances.AsNoTracking()
+                .OrderBy(runtime => runtime.Generation)
+                .ToListAsync(cancellationToken);
+            await Assert.That(firstPass.Count).IsEqualTo(2);
+            var stopping = firstPass[0];
+            var failedWaiter = firstPass[1];
+            await Assert.That(stopping.State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(stopping.FailureCode).IsNull();
+            await Assert.That(stopping.RunnerAssignmentReleaseToken).IsNull();
+            await Assert.That(stopping.ProcessingVersion).IsEqualTo(8);
+            await Assert.That(failedWaiter.State).IsEqualTo(RuntimeState.Queued);
+            await Assert.That(failedWaiter.ReplacesRuntimeInstanceId).IsEqualTo(stopping.Id);
+            await Assert.That(firstOutbox.Published.OfType<StopRuntime>()
+                    .Select(message => message.RuntimeInstanceId))
+                .IsEquivalentTo([stopping.Id]);
+            await Assert.That(firstOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            await RuntimeWriteBackHandler.Handle(
+                new RuntimeStopFailed(
+                    stopping.Id,
+                    stopping.ProcessingVersion,
+                    RuntimeFailureCode.CleanupFailed),
+                db,
+                cancellationToken);
+            db.ChangeTracker.Clear();
+            var failed = await db.RuntimeInstances.AsNoTracking()
+                .OrderBy(runtime => runtime.Generation)
+                .ToListAsync(cancellationToken);
+            await Assert.That(failed.All(runtime => runtime.State == RuntimeState.Failed
+                && runtime.FailureCode == RuntimeFailureCode.CleanupFailed)).IsTrue();
+
+            var retryOutbox = new RecordingOutbox();
+            var retry = await new PostgresKohRuntimeProvisioner(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(),
+                retryOutbox,
+                new MutableTimeProvider(fixture.DueAt.AddSeconds(2))).EnsureAsync(
+                    fixture.CompetitionId,
+                    cancellationToken);
+
+            await Assert.That(retry).IsEqualTo(KohRuntimeProvisioningOutcome.DeferredCleanup);
+            db.ChangeTracker.Clear();
+            var retried = await db.RuntimeInstances.AsNoTracking()
+                .OrderBy(runtime => runtime.Generation)
+                .ToListAsync(cancellationToken);
+            await Assert.That(retried.Count).IsEqualTo(3);
+            var retriedOld = retried[0];
+            var retryWaiter = retried[2];
+            await Assert.That(retriedOld.State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(retriedOld.FailureCode).IsNull();
+            await Assert.That(retriedOld.RunnerAssignmentReleaseToken).IsNull();
+            await Assert.That(retriedOld.ProcessingVersion).IsEqualTo(10);
+            await Assert.That(retryWaiter.State).IsEqualTo(RuntimeState.Queued);
+            await Assert.That(retryWaiter.ReplacesRuntimeInstanceId).IsEqualTo(retriedOld.Id);
+            await Assert.That(retryOutbox.Published.OfType<StopRuntime>()
+                    .Select(message => message.RuntimeInstanceId))
+                .IsEquivalentTo([retriedOld.Id]);
+            await Assert.That(retryOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            var acknowledgementOutbox = new RecordingOutbox();
+            await RuntimeWriteBackHandler.Handle(
+                new RuntimeStopped(retriedOld.Id, retriedOld.ProcessingVersion),
+                db,
+                acknowledgementOutbox,
+                cancellationToken);
+            await Assert.That(acknowledgementOutbox.Published.OfType<DispatchRuntime>()
+                    .Select(message => message.RuntimeInstanceId))
+                .IsEquivalentTo([retryWaiter.Id]);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Auto_provisioning_and_admin_start_share_the_exact_shared_scope_lock(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_koh_shared_runtime_lock")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var cleanup = new NoCtfDbContext(options))
+            {
+                await cleanup.RuntimeInstances.ExecuteDeleteAsync(cancellationToken);
+            }
+
+            await using var holderDb = new NoCtfDbContext(options);
+            await using var holderTransaction = await holderDb.Database
+                .BeginTransactionAsync(cancellationToken);
+            var lockKey = $"{fixture.CompetitionChallengeId}:shared";
+            await holderDb.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
+                cancellationToken);
+            var autoOutbox = new RecordingOutbox();
+            var adminOutbox = new RecordingOutbox();
+
+            var autoProvision = EnsureSharedRuntimeAsync(
+                options,
+                fixture,
+                autoOutbox,
+                cancellationToken);
+            var adminStart = StartSharedRuntimeAsAdminAsync(
+                options,
+                fixture,
+                adminOutbox,
+                cancellationToken);
+
+            await WaitForAdvisoryWaitersAsync(holderDb, 2, cancellationToken);
+            await Assert.That(autoProvision.IsCompleted).IsFalse();
+            await Assert.That(adminStart.IsCompleted).IsFalse();
+            await holderTransaction.CommitAsync(cancellationToken);
+
+            var autoOutcome = await autoProvision;
+            var adminResult = await adminStart;
+            var validSerialization = adminResult.Runtime is not null
+                ? autoOutcome == KohRuntimeProvisioningOutcome.Idempotent
+                    && adminResult.Failure is null
+                : autoOutcome == KohRuntimeProvisioningOutcome.Applied
+                    && adminResult.Failure == RuntimeMutationFailure.InvalidState;
+            await Assert.That(validSerialization).IsTrue();
+            await Assert.That(autoOutbox.Published.OfType<DispatchRuntime>().Count()
+                    + adminOutbox.Published.OfType<DispatchRuntime>().Count())
+                .IsEqualTo(1);
+            await using var verify = new NoCtfDbContext(options);
+            await Assert.That(await verify.RuntimeInstances.AsNoTracking()
+                    .CountAsync(runtime =>
+                        runtime.CompetitionChallengeId == fixture.CompetitionChallengeId
+                        && runtime.TeamId == null,
+                        cancellationToken))
+                .IsEqualTo(1);
         });
     }
 
@@ -253,6 +459,7 @@ public sealed class KohPollingPersistenceTests
                     new RuntimeProvisioned(
                         fixture.RuntimeId,
                         0,
+                        1,
                         "runner-a",
                         RuntimeProvider.Docker,
                         "{}",
@@ -604,6 +811,67 @@ public sealed class KohPollingPersistenceTests
         Guid TeamId,
         Guid RuntimeId,
         string Flag);
+
+    private static async Task<KohRuntimeProvisioningOutcome> EnsureSharedRuntimeAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        RecordingOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        return await new PostgresKohRuntimeProvisioner(
+            db,
+            new ChallengeRuntimeTemplateCatalog(),
+            new FixedRuntimePlacementPolicy(),
+            outbox,
+            new MutableTimeProvider(fixture.DueAt.AddSeconds(1))).EnsureAsync(
+                fixture.CompetitionId,
+                cancellationToken);
+    }
+
+    private static async Task<RuntimeMutationResult> StartSharedRuntimeAsAdminAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        RecordingOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        return await new AdminRuntimeStore(
+            db,
+            new ChallengeRuntimeTemplateCatalog(),
+            new FixedRuntimePlacementPolicy(),
+            null!,
+            outbox).MutateAsync(
+                fixture.CompetitionId,
+                fixture.CompetitionChallengeId,
+                null,
+                RuntimeAction.Start,
+                null,
+                fixture.DueAt.AddSeconds(1),
+                cancellationToken);
+    }
+
+    private static async Task WaitForAdvisoryWaitersAsync(
+        NoCtfDbContext db,
+        int expectedCount,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (true)
+        {
+            var waiting = await db.Database.SqlQuery<int>(
+                    $"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND wait_event = 'advisory'")
+                .SingleAsync(cancellationToken);
+            if (waiting >= expectedCount)
+                return;
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new TimeoutException(
+                    $"Expected {expectedCount} operations to wait on the shared Runtime advisory lock, but observed {waiting}.");
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
+        }
+    }
 
     private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {

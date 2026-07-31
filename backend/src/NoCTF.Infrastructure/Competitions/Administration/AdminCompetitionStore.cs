@@ -18,7 +18,8 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
             .Select(competition => new CompetitionView(
                 competition.Id, competition.Title, competition.Description, competition.Mode,
                 competition.StartAt, competition.EndAt, competition.Status,
-                competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers, competition.OwnerId))
+                competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers,
+                competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId))
             .ToListAsync(ct);
 
     public Task<CompetitionView?> FindAsync(
@@ -36,7 +37,8 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
             .Select(competition => new CompetitionView(
                 competition.Id, competition.Title, competition.Description, competition.Mode,
                 competition.StartAt, competition.EndAt, competition.Status,
-                competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers, competition.OwnerId))
+                competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers,
+                competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -183,6 +185,7 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
         new(
             competition.Id, competition.Title, competition.Description, competition.Mode,
             competition.StartAt, competition.EndAt, competition.Status,
-            competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers, competition.OwnerId);
+            competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers,
+            competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId);
 
 }

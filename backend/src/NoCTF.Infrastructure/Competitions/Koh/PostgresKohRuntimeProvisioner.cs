@@ -5,6 +5,7 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Runtime.Instances;
 
 namespace NoCTF.Infrastructure.Competitions.Koh;
 
@@ -49,20 +50,26 @@ public sealed class PostgresKohRuntimeProvisioner(
                 })
             .ToListAsync(cancellationToken);
         var challengeIds = challenges.Select(challenge => challenge.Id).ToArray();
-        var existing = await db.RuntimeInstances.AsNoTracking()
-            .Where(runtime => challengeIds.Contains(runtime.CompetitionChallengeId)
+        foreach (var challengeId in challengeIds.Order())
+        {
+            await SharedRuntimeScopeLock.AcquireAsync(
+                db,
+                challengeId,
+                cancellationToken);
+        }
+        var existing = await db.RuntimeInstances
+            .Where(runtime => runtime.CompetitionId == competitionId
+                && runtime.Purpose == RuntimePurpose.Player
+                && challengeIds.Contains(runtime.CompetitionChallengeId)
                 && runtime.TeamId == null)
-            .Select(runtime => new
-            {
-                runtime.CompetitionChallengeId,
-                runtime.Generation,
-                runtime.State
-            })
             .ToListAsync(cancellationToken);
+        if (existing.Any(runtime => runtime.State == RuntimeState.Stopping))
+            return KohRuntimeProvisioningOutcome.DeferredCleanup;
         var active = existing
             .Where(runtime => runtime.State is RuntimeState.Queued
                 or RuntimeState.Provisioning
-                or RuntimeState.Running)
+                or RuntimeState.Running
+                or RuntimeState.Stopping)
             .Select(runtime => runtime.CompetitionChallengeId)
             .ToHashSet();
         var maximumGenerations = existing
@@ -72,6 +79,56 @@ public sealed class PostgresKohRuntimeProvisioner(
                 group => group.Max(runtime => runtime.Generation));
 
         var createdAt = timeProvider.GetUtcNow();
+        var cleanupTargets = existing
+            .Where(runtime => runtime.State == RuntimeState.Failed
+                && runtime.ProviderReceiptJson != null)
+            .GroupBy(runtime => runtime.CompetitionChallengeId)
+            .Where(group => !active.Contains(group.Key))
+            .Select(group => group
+                .OrderByDescending(runtime => runtime.Generation)
+                .First())
+            .ToList();
+        if (cleanupTargets.Count > 0)
+        {
+            var challengesById = challenges.ToDictionary(challenge => challenge.Id);
+            foreach (var cleanupTarget in cleanupTargets)
+            {
+                var challenge = challengesById[cleanupTarget.CompetitionChallengeId];
+                var template = templates.Get(GameMode.Koh, challenge.DefinitionJson)
+                    ?? throw new InvalidOperationException(
+                        $"Published KoH challenge '{challenge.Id}' has no Runtime template.");
+                var placement = placementPolicy.Resolve(template.RuntimeKind);
+                cleanupTarget.State = RuntimeState.Stopping;
+                cleanupTarget.FailureCode = null;
+                cleanupTarget.RunnerAssignmentReleaseToken = null;
+                cleanupTarget.ProcessingVersion = checked(cleanupTarget.ProcessingVersion + 1);
+                var replacement = new RuntimeInstance
+                {
+                    Id = Guid.CreateVersion7(createdAt),
+                    CompetitionId = competitionId,
+                    CompetitionChallengeId = cleanupTarget.CompetitionChallengeId,
+                    TeamId = null,
+                    Purpose = RuntimePurpose.Player,
+                    Generation = checked(maximumGenerations.GetValueOrDefault(
+                        cleanupTarget.CompetitionChallengeId) + 1),
+                    RuntimeKind = template.RuntimeKind,
+                    RuntimeProvider = placement.Provider,
+                    RunnerPool = placement.RunnerPool,
+                    State = RuntimeState.Queued,
+                    ReplacesRuntimeInstanceId = cleanupTarget.Id,
+                    CreatedAt = createdAt
+                };
+                db.RuntimeInstances.Add(replacement);
+                await outbox.PublishAsync(new StopRuntime(
+                    cleanupTarget.Id,
+                    cleanupTarget.ProcessingVersion));
+            }
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
+            return KohRuntimeProvisioningOutcome.DeferredCleanup;
+        }
+
         var created = new List<RuntimeInstance>();
         foreach (var challenge in challenges)
         {

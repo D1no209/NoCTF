@@ -39,6 +39,17 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                 1)
         ];
 
+    public IReadOnlyList<string> ValidateDefinitionForStart(GameMode mode, string json)
+    {
+        var errors = ValidateDefinition(mode, json).ToList();
+        if (errors.Count > 0 || mode != GameMode.Awd)
+            return errors;
+
+        if (AwdConfigurationUpgrader.ParseChallenge(json).Runtime is null)
+            errors.Add("Runtime is required before an AWD competition can start.");
+        return errors;
+    }
+
     private static int CurrentSchemaVersion(GameMode mode) => mode switch
     {
         GameMode.Ctf => CtfChallengeConfiguration.CurrentSchemaVersion,

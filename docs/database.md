@@ -303,7 +303,8 @@ created_at, running_at?, expires_at?, stopped_at?
 - FailureCode 必须且只能在 State=Failed 非空；对玩家只返回 code，管理详情另可返回脱敏 receipt/error。
 - URL 是展开后的完整受保护字符串；只有 Running 才返回选手。
 - ControlCheckUrl 只允许 KoH，Running 时必须是展开后的绝对 URL；只供 Worker 轮询，绝不进入玩家 DTO/SignalR/日志。
-- Failed 保留 receipt 供清理但不返回 URL。
+- Failed 在资源尚未收敛时保留 receipt 供幂等清理但不返回 URL；原 Runner 的资源审计确认
+  identity cleanup 与容量释放都成功后清除 receipt/assignment marker，FailureCode 仍保留。
 - 不软删除，不存在 runtime_operations 表。
 
 ## 外键与删除规则

@@ -5,6 +5,7 @@ public enum KohRuntimeProvisioningOutcome
     NotApplicable,
     Applied,
     Idempotent,
+    DeferredCleanup,
     RejectedBusiness
 }
 

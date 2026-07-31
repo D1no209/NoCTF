@@ -17,7 +17,8 @@ public sealed record CompetitionStartGateSnapshot(
     CompetitionStatus Status,
     string ConfigurationJson,
     IReadOnlyList<StartGateChallenge> Challenges,
-    int ApprovedTeamCount);
+    int ApprovedTeamCount,
+    int MaxConcurrentRuntimeInstancesPerTeam);
 
 public sealed record StartGateError(
     string Code,
@@ -71,6 +72,16 @@ public sealed class CompetitionStartGate(
                 "approved_team_required",
                 null,
                 "At least one approved team is required."));
+        var publishedChallengeCount = snapshot.Challenges.Count(challenge => challenge.Published);
+        if (snapshot.Mode == GameMode.Awd
+            && snapshot.MaxConcurrentRuntimeInstancesPerTeam > 0
+            && publishedChallengeCount > snapshot.MaxConcurrentRuntimeInstancesPerTeam)
+        {
+            errors.Add(new(
+                "RuntimeQuotaInsufficient",
+                null,
+                $"MaxConcurrentRuntimeInstancesPerTeam must be at least {publishedChallengeCount} for the published AWD challenges."));
+        }
         foreach (var challenge in snapshot.Challenges.Where(item => item.Published))
         {
             if (challenge.ChallengeMode != snapshot.Mode)
@@ -90,11 +101,11 @@ public sealed class CompetitionStartGate(
                     "challenge_rules_invalid",
                     challenge.CompetitionChallengeId,
                     message));
-            foreach (var message in challengeConfigurations.ValidateDefinition(
+            foreach (var message in challengeConfigurations.ValidateDefinitionForStart(
                          snapshot.Mode,
                          challenge.DefinitionJson))
                 errors.Add(new(
-                    "challenge_definition_invalid",
+                    "RuntimeDefinitionInvalid",
                     challenge.CompetitionChallengeId,
                     message));
         }

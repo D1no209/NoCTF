@@ -150,6 +150,7 @@ public sealed class AwdRoundCoordinationTests
                 new RuntimeProvisioned(
                     greenRuntimeId,
                     0,
+                    1,
                     "runner-a",
                     RuntimeProvider.Docker,
                     JsonSerializer.Serialize(new ContainerReceipt(

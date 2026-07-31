@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
@@ -6,6 +7,9 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Teams;
+using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using Testcontainers.PostgreSql;
@@ -15,6 +19,71 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class CompetitionLifecyclePersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Awd_start_rejects_a_published_challenge_without_a_runtime(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_awd_start_gate")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedIncompleteAwdAsync(options, cancellationToken);
+            var outbox = new RecordingOutbox();
+            var configurations = new GameModeChallengeConfigurationCatalog();
+
+            await using var db = new NoCtfDbContext(options);
+            var gate = new CompetitionStartGate(
+                new CompetitionStartGateStore(db),
+                new GameModeCompetitionConfigurationValidator(),
+                configurations);
+            var errors = await gate.ValidateAsync(
+                fixture.CompetitionId,
+                cancellationToken);
+
+            await Assert.That(errors).IsNotNull();
+            var runtimeError = errors!.Single(error =>
+                error.Code == "RuntimeDefinitionInvalid" &&
+                error.CompetitionChallengeId == fixture.CompetitionChallengeId);
+            await Assert.That(runtimeError.Message)
+                .IsEqualTo("Runtime is required before an AWD competition can start.");
+
+            var store = new CompetitionLifecycleStore(db, gate, outbox);
+            var transitioned = await store.TryTransitionWithAuditAsync(
+                fixture.CompetitionId,
+                CompetitionStatus.Published,
+                CompetitionStatus.Running,
+                fixture.OwnerId,
+                "manual_start",
+                false,
+                CompetitionLifecycleEffects.ProvisionRuntimes,
+                cancellationToken);
+
+            await Assert.That(transitioned).IsFalse();
+            db.ChangeTracker.Clear();
+            await Assert.That(await db.Competitions.AsNoTracking()
+                    .Where(competition => competition.Id == fixture.CompetitionId)
+                    .Select(competition => competition.Status)
+                    .SingleAsync(cancellationToken))
+                .IsEqualTo(CompetitionStatus.Published);
+            await Assert.That(await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
+                    .AnyAsync(audit => audit.CompetitionId == fixture.CompetitionId, cancellationToken))
+                .IsFalse();
+            await Assert.That(await db.RuntimeInstances.AsNoTracking()
+                    .AnyAsync(runtime => runtime.CompetitionId == fixture.CompetitionId, cancellationToken))
+                .IsFalse();
+            await Assert.That(outbox.Published).IsEmpty();
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Awd_pause_and_resume_freeze_checkers_and_extend_the_current_flag_window(
@@ -99,6 +168,82 @@ public sealed class CompetitionLifecyclePersistenceTests
             await Assert.That(outbox.Published.OfType<ProvisionCompetitionRuntimes>().Count())
                 .IsEqualTo(1);
         });
+    }
+
+    private static async Task<IncompleteAwdFixture> SeedIncompleteAwdAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        await db.Database.MigrateAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        var ownerId = Guid.CreateVersion7(now);
+        var competitionId = Guid.CreateVersion7(now);
+        var challengeId = Guid.CreateVersion7(now);
+        var competitionChallengeId = Guid.CreateVersion7(now);
+        var teamId = Guid.CreateVersion7(now);
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        db.Users.Add(new User
+        {
+            Id = ownerId,
+            UserName = "awd-owner",
+            NormalizedUserName = "AWD-OWNER",
+            Email = "awd-owner@example.test",
+            NormalizedEmail = "AWD-OWNER@EXAMPLE.TEST",
+            PasswordHash = "test",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            Title = "Incomplete AWD",
+            OwnerId = ownerId,
+            Mode = GameMode.Awd,
+            Status = CompetitionStatus.Published,
+            ConfigurationJson = JsonSerializer.Serialize(
+                AwdConfiguration.Default,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            StartAt = now.AddMinutes(-1),
+            EndAt = now.AddHours(1),
+            FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
+            CreatedAt = now,
+            UpdatedAt = now,
+            ConfigurationUpdatedAt = now
+        });
+        db.Challenges.Add(new Challenge
+        {
+            Id = challengeId,
+            OwnerId = ownerId,
+            Mode = GameMode.Awd,
+            Title = "Missing runtime",
+            DefinitionJson = configurations.GetDefaultDefinitionJson(GameMode.Awd),
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.CompetitionChallenges.Add(new CompetitionChallenge
+        {
+            Id = competitionChallengeId,
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            IsPublished = true,
+            RulesJson = configurations.GetDefaultJson(GameMode.Awd),
+            UpdatedAt = now
+        });
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = competitionId,
+            Name = "AWD Team",
+            NormalizedName = "AWD TEAM",
+            CaptainId = ownerId,
+            MemberIds = [ownerId],
+            InvitationToken = new string('a', 32),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegisteredAt = now
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return new(ownerId, competitionId, competitionChallengeId);
     }
 
     private static async Task<LifecycleFixture> SeedAsync(
@@ -202,6 +347,11 @@ public sealed class CompetitionLifecyclePersistenceTests
         Guid RuntimeId,
         Guid FlagId,
         DateTimeOffset OriginalValidUntil);
+
+    private sealed record IncompleteAwdFixture(
+        Guid OwnerId,
+        Guid CompetitionId,
+        Guid CompetitionChallengeId);
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {
