@@ -1,3 +1,5 @@
+using NoCTF.Application.Runtime.Provisioning;
+
 namespace NoCTF.Runtime.Docker.Containers;
 
 public sealed record DockerRuntimeOptions(
@@ -6,4 +8,9 @@ public sealed record DockerRuntimeOptions(
     string PublicHost = "localhost",
     string CallbackContainerName = "noctf-awdp-callback",
     string CallbackContainerLabelKey = "noctf.io/internal-role",
-    string CallbackContainerLabelValue = "awdp-callback-gateway");
+    string CallbackContainerLabelValue = "awdp-callback-gateway",
+    RuntimePublishedPortRange? PublishedPortRange = null)
+{
+    public RuntimePublishedPortRange EffectivePublishedPortRange { get; } =
+        PublishedPortRange ?? new();
+}

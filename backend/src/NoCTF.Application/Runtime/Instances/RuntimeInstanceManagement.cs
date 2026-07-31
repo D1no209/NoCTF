@@ -31,7 +31,14 @@ public sealed record RuntimeInstanceView(
     DateTimeOffset? StoppedAt,
     string? RunnerId = null,
     string? ProviderReceiptJson = null,
-    string? ControlCheckUrl = null);
+    string? ControlCheckUrl = null,
+    IReadOnlyList<RuntimePublishedPortView>? PublishedPorts = null);
+
+public sealed record RuntimePublishedPortView(
+    string? ServiceName,
+    int ContainerPort,
+    int HostPort,
+    DateTimeOffset AllocatedAt);
 
 public sealed record RuntimeMutationCommand(
     Guid CompetitionId,

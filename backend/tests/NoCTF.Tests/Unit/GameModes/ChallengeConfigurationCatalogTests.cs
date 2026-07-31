@@ -530,6 +530,25 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Container_runtime_rejects_author_selected_host_ports()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 61000 }));
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains(
+                "Runtime host port for container port 8080 must be 0 because the platform allocates published ports.");
+    }
+
+    [Test]
     public async Task Awd_runtime_rejects_shared_allocation_and_ova()
     {
         var catalog = new GameModeChallengeConfigurationCatalog();

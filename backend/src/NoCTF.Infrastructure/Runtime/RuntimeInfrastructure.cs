@@ -29,6 +29,8 @@ internal static class RuntimeInfrastructure
         });
         services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
         services.AddSingleton<IRuntimePlacementPolicy, ConfiguredRuntimePlacementPolicy>();
+        services.AddSingleton(new RuntimePublishedPortRange());
+        services.AddScoped<IRuntimePublishedPortAllocator, PostgresRuntimePublishedPortAllocator>();
 
         services.AddScoped<IRuntimeInstanceStore, RuntimeInstanceStore>();
         services.AddScoped<GetPlayerRuntime>();

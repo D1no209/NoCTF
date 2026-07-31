@@ -33,7 +33,20 @@ public enum RuntimeFailureCode : short
     ProvisionTimeout,
     ProviderRejected,
     CleanupFailed,
-    UrlExpansionFailed
+    UrlExpansionFailed,
+    PublishedPortRangeExhausted
+}
+
+public sealed class RuntimePublishedPort
+{
+    public Guid Id { get; set; }
+    public Guid RuntimeInstanceId { get; set; }
+    public Guid CompetitionId { get; set; }
+    [MaxLength(63)]
+    public string? ServiceName { get; set; }
+    public int ContainerPort { get; set; }
+    public int HostPort { get; set; }
+    public DateTimeOffset AllocatedAt { get; set; }
 }
 
 public sealed class RuntimeInstance
@@ -77,4 +90,5 @@ public sealed class RuntimeInstance
     public DateTimeOffset? RunningAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }
     public DateTimeOffset? StoppedAt { get; set; }
+    public List<RuntimePublishedPort> PublishedPorts { get; set; } = [];
 }

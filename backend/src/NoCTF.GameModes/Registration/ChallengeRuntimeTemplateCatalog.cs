@@ -72,8 +72,9 @@ internal static class ChallengeRuntimeTemplateValidator
                 {
                     if (port.Key is < 1 or > 65535)
                         errors.Add($"Runtime container port {port.Key} is invalid.");
-                    if (port.Value is < 0 or > 65535)
-                        errors.Add($"Runtime host port {port.Value} is invalid.");
+                    if (port.Value != 0)
+                        errors.Add(
+                            $"Runtime host port for container port {port.Key} must be 0 because the platform allocates published ports.");
                 }
                 if (container.InternalPorts?.Any(port => port is < 1 or > 65535) == true)
                     errors.Add("Runtime internal ports must be between 1 and 65535.");

@@ -24,6 +24,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                 "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
         });
         builder.HasKey(instance => instance.Id);
+        builder.HasAlternateKey(instance => new { instance.Id, instance.CompetitionId });
         builder.Property(instance => instance.RuntimeKind).HasConversion<short>();
         builder.Property(instance => instance.Purpose).HasConversion<short>();
         builder.Property(instance => instance.RuntimeProvider).HasConversion<short>();
@@ -67,5 +68,30 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             .HasForeignKey(instance => instance.SubmissionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RuntimeInstance>().WithMany()
             .HasForeignKey(instance => instance.ReplacesRuntimeInstanceId).OnDelete(DeleteBehavior.Restrict);
+        builder.OwnsMany(instance => instance.PublishedPorts, ports =>
+        {
+            ports.ToTable("runtime_published_ports", table =>
+            {
+                table.HasCheckConstraint(
+                    "ck_runtime_published_ports_container_port",
+                    "container_port BETWEEN 1 AND 65535");
+                table.HasCheckConstraint(
+                    "ck_runtime_published_ports_host_port",
+                    "host_port BETWEEN 61000 AND 64999");
+            });
+            ports.WithOwner()
+                .HasForeignKey(port => new { port.RuntimeInstanceId, port.CompetitionId })
+                .HasPrincipalKey(instance => new { instance.Id, instance.CompetitionId });
+            ports.HasKey(port => port.Id);
+            ports.Property(port => port.Id).ValueGeneratedNever();
+            ports.Property(port => port.ServiceName).HasMaxLength(63);
+            ports.HasIndex(port => new { port.CompetitionId, port.HostPort }).IsUnique();
+            ports.HasIndex(port => new
+            {
+                port.RuntimeInstanceId,
+                port.ServiceName,
+                port.ContainerPort
+            }).IsUnique().AreNullsDistinct(false);
+        });
     }
 }

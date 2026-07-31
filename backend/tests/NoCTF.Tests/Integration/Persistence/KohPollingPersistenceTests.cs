@@ -19,6 +19,7 @@ using NoCTF.Infrastructure.Competitions.Koh;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Runtime.Administration;
+using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Runner.Messages;
 using NoCTF.Tests.Fixtures;
 using NoCTF.Worker;
@@ -430,6 +431,9 @@ public sealed class KohPollingPersistenceTests
                     new DispatchRuntime(fixture.RuntimeId, 0),
                     dispatchDb,
                     new ChallengeRuntimeTemplateCatalog(),
+                    new PostgresRuntimePublishedPortAllocator(
+                        dispatchDb,
+                        new RuntimePublishedPortRange()),
                     dispatchOutbox,
                     cancellationToken);
             }

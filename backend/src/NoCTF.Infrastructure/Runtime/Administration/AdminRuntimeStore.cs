@@ -42,6 +42,8 @@ public sealed class AdminRuntimeStore(
             query = query.Where(item => item.State == state);
         if (filter.ExpiresBefore is DateTimeOffset expires)
             query = query.Where(item => item.ExpiresAt < expires);
+        if (filter.HostPort is int hostPort)
+            query = query.Where(item => item.PublishedPorts.Any(port => port.HostPort == hostPort));
         if (beforeCreatedAt is DateTimeOffset createdAt && beforeId is Guid id)
             query = query.Where(item =>
                 item.CreatedAt < createdAt ||
@@ -55,7 +57,16 @@ public sealed class AdminRuntimeStore(
                 item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
                 item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
-                item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl))
+                item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
+                item.PublishedPorts
+                    .OrderBy(port => port.ServiceName)
+                    .ThenBy(port => port.ContainerPort)
+                    .Select(port => new RuntimePublishedPortView(
+                        port.ServiceName,
+                        port.ContainerPort,
+                        port.HostPort,
+                        port.AllocatedAt))
+                    .ToArray()))
             .ToListAsync(ct);
     }
 
@@ -70,7 +81,16 @@ public sealed class AdminRuntimeStore(
                 item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
                 item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
-                item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl))
+                item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
+                item.PublishedPorts
+                    .OrderBy(port => port.ServiceName)
+                    .ThenBy(port => port.ContainerPort)
+                    .Select(port => new RuntimePublishedPortView(
+                        port.ServiceName,
+                        port.ContainerPort,
+                        port.HostPort,
+                        port.AllocatedAt))
+                    .ToArray()))
             .SingleOrDefaultAsync(ct);
 
     public async Task<RuntimeMutationResult> MutateAsync(
@@ -291,5 +311,14 @@ public sealed class AdminRuntimeStore(
             item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
             item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
             item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
-            item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl);
+            item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
+            item.PublishedPorts
+                .OrderBy(port => port.ServiceName, StringComparer.Ordinal)
+                .ThenBy(port => port.ContainerPort)
+                .Select(port => new RuntimePublishedPortView(
+                    port.ServiceName,
+                    port.ContainerPort,
+                    port.HostPort,
+                    port.AllocatedAt))
+                .ToArray());
 }

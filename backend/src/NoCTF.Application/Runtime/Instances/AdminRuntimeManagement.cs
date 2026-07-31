@@ -11,7 +11,8 @@ public sealed record AdminRuntimeFilter(
     string? RunnerPool,
     string? RunnerId,
     RuntimeState? State,
-    DateTimeOffset? ExpiresBefore);
+    DateTimeOffset? ExpiresBefore,
+    int? HostPort);
 
 public interface IAdminRuntimeStore
 {
