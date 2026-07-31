@@ -14,6 +14,9 @@ public sealed class StopRuntimeEndpoint(
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/stop");
         AuthSchemes("Bearer");
+        Options(options => options
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status503ServiceUnavailable));
         Summary(summary => summary.Summary = "Queues a team runtime stop.");
     }
 

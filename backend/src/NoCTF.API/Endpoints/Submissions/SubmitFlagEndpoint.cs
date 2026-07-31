@@ -56,7 +56,6 @@ internal static class SubmissionProblemDetails
         "team_banned" or "team_forbidden" => StatusCodes.Status403Forbidden,
         "competition_finished" or "competition_not_started" or "break_required" =>
             StatusCodes.Status409Conflict,
-        "background_work_unavailable" => StatusCodes.Status503ServiceUnavailable,
         _ => StatusCodes.Status400BadRequest
     };
 
@@ -107,7 +106,13 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions");
         AuthSchemes("Bearer");
-        Options(options => options.WithMetadata(new EnableRateLimitingAttribute("submission")));
+        Options(options => options
+            .WithMetadata(new EnableRateLimitingAttribute("submission"))
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status403Forbidden)
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status429TooManyRequests));
         Summary(summary =>
         {
             summary.Summary = "Submit one Flag or an ordered AWD Flag collection.";

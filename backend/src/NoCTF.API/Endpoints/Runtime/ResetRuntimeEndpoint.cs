@@ -14,6 +14,9 @@ public sealed class ResetRuntimeEndpoint(
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset");
         AuthSchemes("Bearer");
+        Options(options => options
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status503ServiceUnavailable));
         Summary(summary => summary.Summary = "Queues an atomic replacement runtime.");
     }
 

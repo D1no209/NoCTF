@@ -1389,7 +1389,12 @@ export type NoCtfapiEndpointsSubmissionsSubmitFixEndpointErrors = {
     /**
      * Forbidden
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    409: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: unknown;
 };
 
 export type NoCtfapiEndpointsSubmissionsSubmitFixEndpointError = NoCtfapiEndpointsSubmissionsSubmitFixEndpointErrors[keyof NoCtfapiEndpointsSubmissionsSubmitFixEndpointErrors];
@@ -1425,7 +1430,12 @@ export type NoCtfapiEndpointsSubmissionsSubmitFlagEndpointErrors = {
     /**
      * Forbidden
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    409: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: unknown;
 };
 
 export type NoCtfapiEndpointsSubmissionsSubmitFlagEndpointError = NoCtfapiEndpointsSubmissionsSubmitFlagEndpointErrors[keyof NoCtfapiEndpointsSubmissionsSubmitFlagEndpointErrors];
@@ -1508,6 +1518,7 @@ export type NoCtfapiEndpointsRuntimeExtendRuntimeEndpointErrors = {
      */
     404: unknown;
     409: unknown;
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type NoCtfapiEndpointsRuntimeExtendRuntimeEndpointError = NoCtfapiEndpointsRuntimeExtendRuntimeEndpointErrors[keyof NoCtfapiEndpointsRuntimeExtendRuntimeEndpointErrors];
@@ -1613,7 +1624,10 @@ export type NoCtfapiEndpointsRuntimeResetRuntimeEndpointErrors = {
      */
     404: unknown;
     409: unknown;
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
+
+export type NoCtfapiEndpointsRuntimeResetRuntimeEndpointError = NoCtfapiEndpointsRuntimeResetRuntimeEndpointErrors[keyof NoCtfapiEndpointsRuntimeResetRuntimeEndpointErrors];
 
 export type NoCtfapiEndpointsRuntimeResetRuntimeEndpointResponses = {
     /**
@@ -1648,7 +1662,10 @@ export type NoCtfapiEndpointsRuntimeStartRuntimeEndpointErrors = {
      */
     404: unknown;
     409: unknown;
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
+
+export type NoCtfapiEndpointsRuntimeStartRuntimeEndpointError = NoCtfapiEndpointsRuntimeStartRuntimeEndpointErrors[keyof NoCtfapiEndpointsRuntimeStartRuntimeEndpointErrors];
 
 export type NoCtfapiEndpointsRuntimeStartRuntimeEndpointResponses = {
     /**
@@ -1683,7 +1700,10 @@ export type NoCtfapiEndpointsRuntimeStopRuntimeEndpointErrors = {
      */
     404: unknown;
     409: unknown;
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
+
+export type NoCtfapiEndpointsRuntimeStopRuntimeEndpointError = NoCtfapiEndpointsRuntimeStopRuntimeEndpointErrors[keyof NoCtfapiEndpointsRuntimeStopRuntimeEndpointErrors];
 
 export type NoCtfapiEndpointsRuntimeStopRuntimeEndpointResponses = {
     /**

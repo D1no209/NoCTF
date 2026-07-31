@@ -1,5 +1,6 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.Application.Authentication.Login;
@@ -110,9 +111,12 @@ public static class ServiceRegistration
         }
         services.AddRateLimiter(options =>
         {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.AddPolicy("submission", context =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    $"{context.User.FindFirst("sub")?.Value ?? "anonymous"}:{context.Connection.RemoteIpAddress}",
+                    $"{context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                        ?? context.User.FindFirstValue("sub")
+                        ?? "anonymous"}:{context.Connection.RemoteIpAddress}",
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 30,

@@ -8,8 +8,8 @@ public static class PipelineConfiguration
         app.UseStaticFiles();
         app.UseExceptionHandler();
         app.UseHttpsRedirection();
-        app.UseRateLimiter();
         app.UseAuthentication();
+        app.UseRateLimiter();
         app.UseAuthorization();
         app.Use(async (context, next) =>
         {
