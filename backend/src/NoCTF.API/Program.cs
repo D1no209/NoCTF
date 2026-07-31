@@ -34,6 +34,7 @@ builder.UseWolverine(options =>
         options.PersistMessagesWithPostgresql(postgres, WolverinePersistenceSchemas.Api);
         options.UseEntityFrameworkCoreTransactions();
         options.PublishMessage<EvaluateSubmission>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<InvalidateLeaderboard>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<CleanupCompetitionRuntimes>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ProvisionCompetitionRuntimes>().ToPostgresqlQueue("noctf-worker");

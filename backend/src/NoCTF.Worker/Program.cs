@@ -42,6 +42,7 @@ builder.UseWolverine(options =>
     options.PublishMessage<AwdCheckerCallbackMissing>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<PollKohChallenge>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<RecordKohObservation>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<InvalidateLeaderboard>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue("noctf-worker");
 });
 

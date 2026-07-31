@@ -84,7 +84,7 @@ public sealed class InternalResultStore(
                 db,
                 runtime.CompetitionId,
                 ct);
-            await outbox.PublishAsync(new ProjectLeaderboard(runtime.CompetitionId));
+            await outbox.PublishAsync(new InvalidateLeaderboard(runtime.CompetitionId));
         }
         runtime.CheckerStatus = result.State;
         runtime.CheckerStatusUpdatedAt = appliedAt;
@@ -194,7 +194,7 @@ public sealed class InternalResultStore(
                 db,
                 submission.CompetitionId,
                 ct);
-            await outbox.PublishAsync(new ProjectLeaderboard(submission.CompetitionId));
+            await outbox.PublishAsync(new InvalidateLeaderboard(submission.CompetitionId));
         }
         submission.EvaluationResultBodySha256 = result.BodySha256;
         submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;

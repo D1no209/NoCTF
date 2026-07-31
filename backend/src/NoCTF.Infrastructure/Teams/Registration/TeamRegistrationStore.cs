@@ -1,5 +1,6 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Competitions;
@@ -7,7 +8,9 @@ using NoCTF.Domain.Identity;
 
 namespace NoCTF.Infrastructure.Teams.Registration;
 
-public sealed class TeamRegistrationStore(NoCtfDbContext db) : ITeamRegistrationStore
+public sealed class TeamRegistrationStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox outbox) : ITeamRegistrationStore
 {
     public Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
@@ -44,7 +47,9 @@ public sealed class TeamRegistrationStore(NoCtfDbContext db) : ITeamRegistration
         {
             await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
+            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
             await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
             return new(Map(team), null);
         }
         catch (DbUpdateException)
@@ -75,8 +80,12 @@ public sealed class TeamRegistrationStore(NoCtfDbContext db) : ITeamRegistration
                 && x.RegistrationStatus == TeamRegistrationStatus.Pending)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
         if (changed == 1)
+        {
             await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+            await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        }
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return changed == 1 ? new(true) : new(false, TeamRegistrationFailure.TeamReviewConflict);
     }
 
@@ -104,8 +113,12 @@ public sealed class TeamRegistrationStore(NoCtfDbContext db) : ITeamRegistration
                     TeamRegistrationStatus.Pending),
                 ct);
         if (changed == 1)
+        {
             await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+            await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        }
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return changed == 1
             ? new(true)
             : new(false, TeamRegistrationFailure.TeamReviewConflict);
@@ -152,7 +165,9 @@ public sealed class TeamRegistrationStore(NoCtfDbContext db) : ITeamRegistration
         {
             await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
+            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
             await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
         }
         catch (DbUpdateException) { return new(null, TeamRegistrationFailure.TeamConflict); }
         return new(Map(entity));
@@ -171,7 +186,9 @@ public sealed class TeamRegistrationStore(NoCtfDbContext db) : ITeamRegistration
         entity.DeletedAt = deletedAt;
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return null;
     }
 

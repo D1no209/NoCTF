@@ -1,6 +1,4 @@
 using NoCTF.Application.Challenges.Configuration;
-using NoCTF.Application.Messaging;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Challenges.Management;
@@ -147,10 +145,7 @@ public sealed class ListChallenges(IChallengeManagementStore store)
         store.ListAsync(competitionId, includeUnpublished, includeDeleted, ct);
 }
 
-public sealed class UpdateChallenge(
-    IChallengeManagementStore store,
-    ILeaderboardCache cache,
-    IBackendMessagePublisher messages)
+public sealed class UpdateChallenge(IChallengeManagementStore store)
 {
     public async Task<ChallengeMutationResult> ExecuteAsync(
         UpdateCompetitionChallengeCommand command,
@@ -167,16 +162,11 @@ public sealed class UpdateChallenge(
         if (result.Challenge is null)
             return result;
 
-        await cache.InvalidateAsync(command.CompetitionId, ct);
-        await messages.RebuildCompetitionAsync(command.CompetitionId, ct);
         return result;
     }
 }
 
-public sealed class DeleteChallenge(
-    IChallengeManagementStore store,
-    ILeaderboardCache cache,
-    IBackendMessagePublisher messages)
+public sealed class DeleteChallenge(IChallengeManagementStore store)
 {
     public Task<ChallengeMutationFailure?> ExecuteAsync(
         Guid competitionId,
@@ -233,8 +223,6 @@ public sealed class DeleteChallenge(
         if (failure is not null)
             return failure;
 
-        await cache.InvalidateAsync(competitionId, ct);
-        await messages.RebuildCompetitionAsync(competitionId, ct);
         return null;
     }
 }

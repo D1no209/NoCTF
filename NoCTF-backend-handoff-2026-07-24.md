@@ -4,15 +4,16 @@
 
 ## 1. 下一会话目标
 
-2026-07-30 已切换到协作者更新后的 `main`（基线 `a186d5f`），当前工作不是单纯交接
-复核，而是完成协作者引入的后端收尾：
+2026-07-31 已完成当前可在本机闭合的代码与验证工作。最新状态以 6.31 Backend 排行榜
+按需刷新闭环、6.32 Frontend 强类型实时适配和第 7 节为准：
 
-- Docker Container/Compose 公开服务直接请求随机宿主端口，删除旧 HAProxy 假设；
-- 完成 Challenge.DefinitionJson 与 CompetitionChallenge.RulesJson 的严格所有权边界；
-- 对齐 `D1no209/NoCTF-Challenge-Template` 的 GitOps Manifest 与后端 API；
-- 修正 GitOps、部署和本交接文档；
-- 重新执行真实依赖、OpenAPI、EF 与四模式边界测试；
-- 后端稳定并本地提交后，再评估 Frontend 整合。Frontend 分支当前不得提前合并。
+- Docker Container/Compose 公开服务最终采用题目容器直接映射 Docker 随机宿主端口；
+- 24 条 `LeaderboardRevision` 写路径均在同一事务发布 invalidation；
+- Redis snapshot CAS、dirty/failure、订阅 TTL、首次订阅/GET 和 stale refresh 已闭环；
+- Frontend 已使用生成的 OpenAPI 排行榜类型、正确 Hub 路径、重连 Join、heartbeat 和 polling
+  fallback；
+- 后端完整门禁、真实 PostgreSQL/Redis/Wolverine/Docker 集成、Frontend 测试/构建、EF 与
+  OpenAPI 漂移检查均通过。
 
 2026-07-30 已验证 GitOps 模板 `2571893` 可构建，`validate` 与 `self-test` 均通过。用户经
 `$grill-me` 明确选择方案 A：使用普通 Organizer Bot、普通长生命周期 Access JWT、现有
@@ -22,29 +23,27 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 
 ### 当前完成度
 
-- 6.21 CompetitionChallenge 稳定 ID create/update、`includeDeleted` inventory、软删除与精确
-  restore 的 Frontend 管理纵切：代码和本地验证范围 100%。
-- 6.19 Owner/Manager 角色资格、降级阻塞、restore 重验及 restore/hard-delete 串行化的
-  代码和本地验证范围：100%；当前明确的 Frontend 前置后端阻断项已闭合。
-- NoCTF 整体交付估算：约 92%；主要余项是剩余 Frontend 对新 OpenAPI/GitOps 管理能力的整合、
-  更新后的本地 deploy 镜像重建验收，以及正式环境部署/运维验收。
+- 6.31 排行榜 Backend 代码与本地验证范围已闭合；不存在遗漏的 revision invalidation 写点。
+- 6.32 排行榜 Frontend OpenAPI/SignalR 适配已闭合；此前记录的 GitOps、权限与 challenge
+  lifecycle Frontend 纵切也均已完成。
+- 当前明确余项仅为需要目标环境的正式 Kubernetes/Libvirt/生产运维验收，以及等待用户明确
+  指令后的远端 push/PR；不要把已废弃或已否决的旧条目重新列为待办。
 - “后端 100%”不表示已经生产部署，也不表示 Kubernetes/Libvirt 所有可选基础设施已在
   当前机器再次实测；第 6 节明确区分代码、测试、本地部署和生产部署状态。
 
 ## 2. Git 基线与工作树保护
 
 - 仓库：`E:\SourceCode\NoCTF`
-- 2026-07-30 代码基线分支：`main`
-- 2026-07-30 代码基线 HEAD：`a186d5f`，与 `origin/main` 一致。
+- 当前远端基线：`origin/main` = `1687acbd6c81944cbad2672698b3b3c1002c98da`。
+- 6.31/6.32 开始前本地 HEAD：`cf8d6820ee39`；`origin/main` 是其祖先，当时
+  ahead 20、behind 0，不存在待合并的 remote-only commit 或冲突。
 - 当前本地工作分支：`codex/backend-gitops-completion`
 - 本轮仍遵循“先本地提交，只有用户明确要求后才推送”；当前不得推送远端。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
 - 当前分支未设置 upstream；本轮只创建本地提交，不推送、不创建 PR。
 - 前序实现均先做本地提交；当前用户规则是只有收到明确推送指令后才能推送远端。
-- 本交接分支从上述 `main` HEAD 创建，随后增加 RuntimeKind definition/dispatch 与
-  Docker Compose 纵切。
-- 创建交接分支前，`main` 相对 `origin/main`：ahead 186。
+- 本交接分支已包含远端 `main`，随后增加 Runtime、GitOps、并发栅栏与排行榜闭环纵切。
 - 原目标架构远程分支：`origin/codex/backend-target-architecture`。
 - 2026-07-27 推送前通过 GitHub CLI 认证的 HTTPS fetch 复核：
   `origin/codex/backend-target-architecture-handoff` 为 `0ca38b6`，本地包含该提交；
@@ -75,8 +74,10 @@ git log --oneline 003b75c..2c6b4ce -- backend
 2. 平台网络名为 `noctf-network`；每个题目/目标另有独立网络。
 3. Checker 是可信、受管理员控制的容器，已受最小权限 JWT 约束。
 4. Checker 可以同时加入题目网络与 `noctf-network`；平台组件也可按部署需要挂载两个网络。
-5. Docker TargetPort ACL 与 callback-only gateway 属于后期网络加固，不是当前迁移阻塞项。
-   不得把它们重新标成 P1，也不得声称已经完成底层网络级 ACL。
+5. Docker 公开访问的最终方案就是题目服务直接映射 Docker 随机宿主端口。不得再添加或规划
+   HAProxy/ingress proxy、host firewall executor/sidecar、transparent gateway、
+   TargetPort ACL 或 callback-only gateway；除非用户以后明确改变范围，否则这些不是待办，
+   也不得再次用 `$grill-me` 追问。
 6. 每一次 AWDP Fix 都创建全新的即时 disposable target，不复用比赛长期 Runtime。
 7. Fix 执行期间如果 Competition/Challenge 配置 revision 改变：
    - 当前 Fix 记为 PlatformFailed；
@@ -591,15 +592,15 @@ routed network、URL、stop、replacement generation 与 identity cleanup 验证
 - 没有任何生产环境部署。本轮 `3227370`、`adce710` 与后续 handoff docs 提交仅保留在
   本地，尚未推送，未创建 PR；Git 提交和临时集群 smoke 都不代表生产部署。
 
-明确尚未实现：
+以下是当时记录的能力边界，不等于当前第 7 节待办：
 
-- Docker `InternetOnly`；没有 `DOCKER-USER` 宿主防火墙方案和 Egress Gateway。
+- Docker `InternetOnly` 没有宿主防火墙或 Egress Gateway 实现，且用户后续已明确不再推进。
 - OVA/Libvirt EgressPolicy。
 - IPv6 公网 egress、域名/FQDN allowlist、目的端口 allowlist。
 - Runner 不做持续 dataplane/Cilium 健康探测；启动检查只证明指定配置和基线资源存在，
   `NetworkPolicyRequired=true` 仍保留运维声明语义。
 - Pod/Service/node/management CIDR 自动发现；Pool 运维必须维护 `ProtectedCidrs`。
-- Docker TargetPort ACL 与 callback-only gateway；它们仍是后期加固，不阻塞当前迁移。
+- Docker TargetPort ACL 与 callback-only gateway 后续已被用户明确废弃，不再列为加固项。
 
 不得把可信管理员假设、JWT、label、DNS 名称或独立 network 单独描述成完整安全边界。
 
@@ -1241,7 +1242,7 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
 - 下一项进入 CompetitionChallenge 稳定 ID 的 create/update/delete/restore 管理流程；
   Competition permission UI 仍等待后端读取契约返回完整权限集合。
 
-### 6.21 Frontend CompetitionChallenge 稳定身份与生命周期（2026-07-31，当前最新）
+### 6.21 Frontend CompetitionChallenge 稳定身份与生命周期（2026-07-31）
 
 本节完成 6.20 和第 7 节原先排在首位的 CompetitionChallenge 管理纵切。旧
 `templateId`/description/pointsConfig/hints/AWDP payload 与不存在的
@@ -1465,7 +1466,7 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
   从最新 QueryClient fact fail-closed 构造 mutation，并按 typed conflict 处理 404/409；
   不得手写 URL 或解析错误文本。
 
-### 6.25 Frontend CompetitionChallenge typed conflict 与最新 revision 适配（2026-07-31，当前最新）
+### 6.25 Frontend CompetitionChallenge typed conflict 与最新 revision 适配（2026-07-31）
 
 本节完成 6.24 的 Frontend 纵切。delete/restore 不再使用无条件旧调用；没有手写 URL、
 兼容层或 ProblemDetails 文本解析。
@@ -1571,7 +1572,7 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
   editor；只让 generated conflict decoder 接受精确六值 enum（含
   `ActiveCompetitionModeConflict`）并补 fail-closed 测试，不得新增手写 URL 或解析错误文本。
 
-### 6.27 Frontend Challenge template Mode conflict decoder（2026-07-31，当前最新 Frontend）
+### 6.27 Frontend Challenge template Mode conflict decoder（2026-07-31）
 
 本节完成 6.26 指定的最小 Frontend 纵切，没有复活已删除的 template editor，也没有新增
 手写 URL、手写 response type 或错误文本解析。
@@ -1650,8 +1651,8 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
   `fix(runtime): reconcile kubernetes node ports`；不 push、不创建 PR。保护文件继续沿用
   6.18。
 - 本节记录的下一项 AWD checker callback sequence/version persistence fence 已在 6.29
-  完成。Docker `DenyAll/InternetOnly` 的实现仍等待用户在 host firewall executor/sidecar
-  与 transparent egress gateway 间选择，不自行发明 dataplane。
+  完成。此前记录的 Docker firewall/sidecar/gateway 选择已被用户后续决策废弃；以第 3 节
+  第 5、13 项的直接随机宿主端口方案为准，不再推进该 dataplane。
 
 ### 6.29 Backend AWD checker callback 持久化栅栏（2026-07-31）
 
@@ -1715,12 +1716,11 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
   不制造空 merge commit。
 - 本节作为独立 Backend 本地提交，提交说明为
   `fix(runtime): fence awd checker callbacks`；不 push、不创建 PR。保护文件继续沿用 6.18。
-- 当前没有另一项既不依赖正式 Kubernetes/Libvirt 环境、也不需要产品/运维选择的明确
-  Backend 纵切。下一步 Docker `InternetOnly` 必须先用 `$grill-me` 在 host firewall
-  executor/sidecar 与 transparent egress gateway 间取得用户决定；TargetPort ACL 与
-  callback-only gateway 仍按独立决策处理。
+- 本节之后发现并完成的明确 Backend 纵切是 6.30/6.31。此前记录的 Docker firewall、
+  sidecar、transparent gateway、TargetPort ACL 与 callback-only gateway 决策边界已经
+  被用户明确废弃；不要再推进或询问。
 
-### 6.30 Backend LeaderboardRevision 全写路径原子化（2026-07-31，当前最新 Backend）
+### 6.30 Backend LeaderboardRevision 全写路径原子化（2026-07-31）
 
 6.29 修复 AWD callback 后，对所有运行时 `LeaderboardRevision` 写点继续做了窄范围审计。
 仓库共有 24 个实际写点：18 个已调用数据库原子 helper、Competition configuration 有 1 个
@@ -1789,9 +1789,98 @@ lifecycle 与计分事务并发时，都可把两次已提交事实压成一个 
 - 本节作为独立 Backend 本地提交，提交说明为
   `fix(scoring): atomically advance leaderboard revisions`；不 push、不创建 PR。保护文件
   继续沿用 6.18。
-- 当前又回到产品/运维决策边界：Docker `InternetOnly` 必须先用 `$grill-me` 在 host
-  firewall executor/sidecar 与 transparent egress gateway 间取得用户决定；正式
+- 6.30 后继续完成了 6.31/6.32。Docker firewall/gateway/ACL 旧待办已经废弃；正式
   Kubernetes/Libvirt 验收仍需对应环境，不自行声称完成。
+
+### 6.31 Backend 排行榜按需刷新闭环（2026-07-31，当前最新 Backend）
+
+6.30 只完成了 `LeaderboardRevision` 原子递增，尚未闭合 revision 到 Redis snapshot 的
+完整因果链。继续审计发现：普通 revision mutation 仍混用强制 `ProjectLeaderboard` 与
+Application 层 post-commit 补偿；部分写点没有 durable 消息；cache invalidation 没有记录
+dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；SignalR 订阅没有服务端 TTL。
+本节不保留这些行为。
+
+#### 事务 invalidation 与强制 projection 分离
+
+- 新增 durable `InvalidateLeaderboard(CompetitionId)`，API/Worker Wolverine 路由均归属
+  `noctf-worker`。
+- 穷尽排除 migration/snapshot 后共有 24 个实际 revision 写点：
+  TeamRegistration 5、TeamModeration 1、TeamMembership 4、ChallengeManagement 3、
+  ChallengeHint 4、ChallengeConfiguration 1、CompetitionConfiguration 1、
+  CompetitionLifecycle 1、SubmissionProcessor 1、InternalResultStore 2、KoH 1。
+- 24/24 都在对应业务事务 commit 前 1:1 写入 transactional outbox invalidation；没有
+  missing，也没有 commit 后才 publish。事务拥有者在 commit 后 flush。
+- 删除 Team、Challenge、Competition configuration/lifecycle 等 Application use case 的
+  cache/message 补偿，避免“业务已提交但消息未持久化”的窗口和重复投影。
+- lifecycle 每次都会递增 leaderboard revision，因此同事务无条件 invalidation；runtime
+  provision/cleanup flags 保留，移除误导性的 `CompetitionLifecycleEffects.ProjectLeaderboard`。
+- 普通 revision mutation 不再强制全量投影。`ProjectLeaderboard` 只保留无快照/stale GET、
+  首个活跃订阅者和没有 revision mutation 的 AWD successor-round 时间边界。
+- Worker 收到 invalidation 后先记录 dirty；仅在该 Competition 有活跃订阅者时刷新。
+  `ProjectLeaderboard` 则始终执行强制按需刷新。
+
+#### Redis snapshot、CAS、失败状态与单航班
+
+- 每个 Competition 使用一个 `leaderboard:{competitionId}:state` Redis hash，保存
+  snapshot、snapshotRevision、dirtyRevision、failureRevision 与 failureAt。
+- 完整投影先获取 PostgreSQL Competition transaction-level advisory lock，再读取目标
+  revision；多个 Worker 对同一 Competition 只会有一个实际 projector 执行。
+- Lua CAS 拒绝旧 revision 和相同 revision 重放覆盖；只有实际接纳的新 snapshot 才广播
+  refresh。revision 使用十进制字符串长度与字典序比较，在 `2^53` 以上仍保持完整 Int64
+  精度，不依赖 Lua double。
+- dirty/failure 只允许被相同或更高 revision 的成功 snapshot 清除；较旧 failure 不覆盖较新
+  failure。调用方 cancellation 不会伪造 projection failure。
+- projection 只接收 `Approved` Team；Pending/Rejected Team 不进入排行榜事实。
+- cached snapshot 的 `stale` 与 target revision 仍以 PostgreSQL 为事实源。有旧 snapshot
+  且 stale 时 GET 立即返回 200，并 durable queue 强制刷新；无 snapshot 时沿用
+  202 + Retry-After/status URL，当前 target 的最后失败沿用 typed 503。
+
+#### 订阅 TTL 与 Hub
+
+- 新增 `ILeaderboardSubscriptionRegistry`；Redis 每 Competition 一个 ZSET，
+  member 为 SignalR ConnectionId、score 为过期时间，默认 TTL 90 秒。
+- Lua 使用 Redis `TIME`，避免多个 API 副本的主机时钟偏差；Touch/prune/first-active 判定
+  原子执行，并发 32 个首订阅者只会有一个触发强制投影。
+- `CompetitionHub.JoinCompetition` 在鉴权和 group join 后登记订阅；首个活跃订阅者发送
+  `ProjectLeaderboard`。`HeartbeatCompetition` 只能续期当前连接已加入的比赛；断连立即
+  remove，异常时仍有 TTL 兜底。
+
+#### Backend 验证与契约
+
+- 最终 WSL 原生隔离副本、.NET SDK 10.0.301、真实 Docker/Testcontainers：
+  - Release `NoCTF.slnx` build：0 warning、0 error；
+  - non-Integration：456/456 passed；
+  - Integration：83 total，81 passed、0 failed、2 skipped；
+  - 两个 skip 仅为未启用 `NOCTF_KUBERNETES_INTEGRATION` 的真实集群 dataplane 和未配置
+    `NOCTF_LIBVIRT_DISK_PATH` 的真实 Libvirt fixture；
+  - 全 solution analyzer、EF pending model 与 `git diff --check` passed。
+- 新增/扩展的真实依赖覆盖包括 24 写点 outbox、事务 rollback/replay、Redis snapshot
+  旧写拒绝、相同 revision 幂等、dirty/failure 单调、两个 Worker 单航班、`2^53` 以上
+  revision、队伍审批过滤，以及订阅 first-active/并发/disconnect/TTL。
+- 没有 EF model/migration 变化。OpenAPI 仍注册 134 endpoints；两份 artifact 与仓库基线
+  byte-identical，SHA-256 都是
+  `3429B4071BA6BF302C422EEAC36B5F4331D0234E33CB2494F32B67EDFEA1763C`。
+
+### 6.32 Frontend 排行榜强类型与实时适配（2026-07-31，当前最新 Frontend）
+
+- `competitionApi.leaderboard` 明确返回 OpenAPI 生成的 200/202 union；移除后端不存在的
+  legacy `leaderboardTrend` 与 `leaderboardTeam` 请求，不再让它们通过 `Promise.all`
+  拖垮真实排行榜。
+- `leaderboardPresentation.ts` 只把带 `entries` 的 200 响应视为 snapshot，并把生成字段
+  `score` / `solveCount` 映射到现有展示字段。202 Processing 不会清空最后一次成功快照。
+- `ScoreboardView`、`GameLayout` 与 `CompetitionDetailWorkspace` 三个消费者都改用生成类型；
+  删除 `as never`、手写 leaderboard DTO、`totalScore`/`solvedCount` 假契约与不存在的队伍
+  详情/趋势 UI。
+- Hub path 统一为相对路径 `/hubs/v1/competitions`，继续由现有 `apiUrl()` 展开部署 base URL；
+  没有写死 scheme、host 或 port。
+- 首次连接和自动重连都会重新 `JoinCompetition`；每 30 秒调用
+  `HeartbeatCompetition`。进入 reconnecting、断连、Join/heartbeat 失败时立即启用 10 秒
+  polling；Join/heartbeat 成功后停止 fallback。组件卸载和断连都会停止 heartbeat。
+- 受版本控制 Frontend 测试 67/67 passed；排行榜 contract 新增 2 项并通过；`vue-tsc` 与
+  Vite production build passed。Rollup 只有既有 dependency PURE comment 与大 chunk
+  warning，无 TypeScript/build error。
+- HTTP OpenAPI 未变化，因此无需重新生成 SDK；本节只让现有生成 SDK 成为唯一排行榜
+  transport 类型来源。
 
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
@@ -1803,33 +1892,31 @@ lifecycle 与计分事务并发时，都可把两次已提交事实压成一个 
 - Kubernetes Container 动态 NodePort、强 identity replay 与 UID-precondition 清理；
 - AWD checker callback sequence/version 的 PostgreSQL 行锁 fence 与旧 token 无副作用拒绝；
 - 全部 LeaderboardRevision 运行时写路径的 PostgreSQL 原子递增与确定性并发回归；
+- transactional invalidation、订阅感知刷新、Redis 单航班/CAS/失败恢复与 approved-team 投影；
+- Frontend 生成类型、正确 Hub path、rejoin/heartbeat/polling fallback 与 202 snapshot 保留；
 - 四模式全边界、真实 PostgreSQL、EF、OpenAPI 和 solution 门禁。
 
-仍未完成/不属于本轮已部署：
+当前尚未执行的交付边界：
 
-- Frontend 的 Bot、Challenge lifecycle inventory、typed role 409、Challenge Bot
-  Manager 授权、CompetitionChallenge 稳定 ID/lifecycle 与 Competition 权限完整集合 UI
-  均已完成；CompetitionChallenge typed 409、delete/restore revision fence 与其 Frontend
-  generated-SDK 并发适配也已完成；Challenge template Mode 活动引用 invariant 的 Backend
-  与最小 Frontend decoder 已按 6.26/6.27 完成。
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
-  环境部署与运维验收尚未执行。
+  环境部署、监控、备份恢复与运维验收尚未执行。
+- 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 未推送远端、未创建 PR、未生产部署。
-- 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境；
-  Kubernetes Container 动态 NodePort 与重放安全已按 6.28 完成，AWD checker callback
-  持久化 fence 已按 6.29 完成，LeaderboardRevision 全写路径原子化已按 6.30 完成；
-  Docker `InternetOnly`、TargetPort ACL 和 callback-only gateway 仍是已记录的后续加固，
-  不阻塞本轮架构迁移。
+- Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
+  不属于剩余工作。
 
 ## 7. 建议的下一交接顺序
 
-1. 先用 `$grill-me` 让用户选择 Docker `InternetOnly` dataplane：
-   host firewall executor/sidecar，或 transparent egress gateway；没有选择前只做只读审计，
-   不自行实现第三种协议。
-2. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
-3. TargetPort ACL 与 callback-only gateway 继续按已记录边界逐项决策，不与
-   `InternetOnly` 偷偷捆绑。
+1. 有正式 Kubernetes 环境后执行 `NOCTF_KUBERNETES_INTEGRATION` 的 Cilium
+   DNS/NetworkPolicy/NodePort/cleanup dataplane，并完成 Runner Pool 运维验收。
+2. 有真实 Libvirt 环境与 fixture disk 后设置 `NOCTF_LIBVIRT_DISK_PATH`，执行 OVA
+   import/public URL/exact cleanup 与生产式生命周期演练。
+3. 在目标生产环境执行部署、监控、备份恢复和运维验收；本地代码通过不等于生产部署。
 4. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
+
+当前没有另一个不依赖上述目标环境或用户新增范围的明确代码待办。不要重新引入
+HAProxy/ingress、firewall executor/sidecar、transparent gateway、TargetPort ACL 或
+callback-only gateway。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
 决策的只读审计，但不能自行发明新协议。
@@ -1860,9 +1947,9 @@ lifecycle 与计分事务并发时，都可把两次已提交事实压成一个 
    generated-SDK 适配已按 6.24/6.25 完成；Challenge template Mode 活动引用 invariant
    Backend 与最小 Frontend decoder 已按 6.26/6.27 完成；Kubernetes Container 动态
    NodePort 与重放安全按 6.28 完成；AWD checker callback sequence/version 持久化 fence
-   按 6.29 完成；LeaderboardRevision 全写路径原子化按 6.30 完成。引用权限 Backend
-   测试数量时使用 6.22，引用最新 Backend 状态时使用 6.30，引用最新 Frontend 状态时
-   使用 6.27。
+   按 6.29 完成；LeaderboardRevision 原子化按 6.30 完成；排行榜 Backend 按需刷新闭环
+   按 6.31 完成；Frontend 强类型实时适配按 6.32 完成。引用权限 Backend 测试数量时使用
+   6.22，引用最新 Backend 状态时使用 6.31，引用最新 Frontend 状态时使用 6.32。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

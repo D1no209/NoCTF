@@ -1,6 +1,4 @@
-using NoCTF.Application.Messaging;
 using NoCTF.Application.Challenges.Configuration;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -17,9 +15,7 @@ public class ChallengeConfigurationTests
         var store = new Store(View(status));
         var useCase = new UpdateChallengeConfiguration(
             store,
-            new Catalog(),
-            new Cache(),
-            new Scheduler());
+            new Catalog());
 
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
@@ -38,9 +34,7 @@ public class ChallengeConfigurationTests
         var store = new Store(View(CompetitionStatus.Draft));
         var useCase = new UpdateChallengeConfiguration(
             store,
-            new Catalog(["invalid challenge configuration"]),
-            new Cache(),
-            new Scheduler());
+            new Catalog(["invalid challenge configuration"]));
 
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
@@ -59,9 +53,7 @@ public class ChallengeConfigurationTests
         var store = new Store(View(CompetitionStatus.Published)) { Conflict = true };
         var useCase = new UpdateChallengeConfiguration(
             store,
-            new Catalog(),
-            new Cache(),
-            new Scheduler());
+            new Catalog());
 
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
@@ -74,13 +66,11 @@ public class ChallengeConfigurationTests
     }
 
     [Test]
-    public async Task UpdateChallengeConfiguration_Success_InvalidatesAndQueuesRebuild()
+    public async Task UpdateChallengeConfiguration_Success_PersistsConfiguration()
     {
         var current = View(CompetitionStatus.Draft);
         var store = new Store(current);
-        var cache = new Cache();
-        var scheduler = new Scheduler();
-        var useCase = new UpdateChallengeConfiguration(store, new Catalog(), cache, scheduler);
+        var useCase = new UpdateChallengeConfiguration(store, new Catalog());
 
         var result = await useCase.ExecuteAsync(
             current.CompetitionId,
@@ -90,8 +80,7 @@ public class ChallengeConfigurationTests
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
-        await Assert.That(cache.InvalidatedCompetitionId).IsEqualTo(current.CompetitionId);
-        await Assert.That(scheduler.RebuildCompetitionId).IsEqualTo(current.CompetitionId);
+        await Assert.That(store.UpdateCalls).IsEqualTo(1);
     }
 
     private const string ValidJson = """{"schemaVersion":1}""";
@@ -145,32 +134,4 @@ public class ChallengeConfigurationTests
             int eligibleTeamCount) => errors ?? [];
     }
 
-    private sealed class Cache : ILeaderboardCache
-    {
-        public Guid? InvalidatedCompetitionId { get; private set; }
-        public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(null);
-        public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken)
-        {
-            InvalidatedCompetitionId = competitionId;
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class Scheduler : IBackendMessagePublisher
-    {
-        public Guid? RebuildCompetitionId { get; private set; }
-        public ValueTask EnqueueSubmissionAsync(Guid submissionId, CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
-        public ValueTask EnqueueSystemEventAsync(Guid scoringEventId, CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
-        public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
-        public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken)
-        {
-            RebuildCompetitionId = competitionId;
-            return ValueTask.CompletedTask;
-        }
-    }
 }

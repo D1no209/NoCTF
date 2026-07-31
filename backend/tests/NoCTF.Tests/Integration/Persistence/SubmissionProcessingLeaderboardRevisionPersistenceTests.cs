@@ -101,7 +101,7 @@ public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
                 .Select(competition => competition.LeaderboardRevision)
                 .SingleAsync(cancellationToken);
             await Assert.That(leaderboardRevision).IsEqualTo(2);
-            await Assert.That(outbox.Published.OfType<ProjectLeaderboard>().Count())
+            await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count())
                 .IsEqualTo(2);
         });
     }

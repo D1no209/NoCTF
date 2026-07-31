@@ -1,6 +1,8 @@
-import { ref, onUnmounted } from 'vue'
 import * as signalR from '@microsoft/signalr'
+import { onUnmounted, ref } from 'vue'
 import { apiUrl } from '@/api/noctf'
+
+export const COMPETITION_HUB_PATH = '/hubs/v1/competitions'
 
 export interface AttackLogDto {
   attackerTeamId: string
@@ -19,6 +21,7 @@ export interface UseSignalROptions {
   automaticReconnect?: boolean
   onConnected?: () => void
   onDisconnected?: (err?: Error) => void
+  onReconnecting?: (err?: Error) => void
   onReconnected?: () => void
 }
 
@@ -45,7 +48,8 @@ export function useSignalR(options: UseSignalROptions) {
 
   conn.onclose((err) => {
     isConnected.value = false
-    if (err) error.value = err instanceof Error ? err : new Error(String(err))
+    if (err)
+      error.value = err instanceof Error ? err : new Error(String(err))
     options.onDisconnected?.(err instanceof Error ? err : err ? new Error(String(err)) : undefined)
   })
 
@@ -57,7 +61,9 @@ export function useSignalR(options: UseSignalROptions) {
 
   conn.onreconnecting((err) => {
     isConnected.value = false
-    if (err) error.value = err instanceof Error ? err : new Error(String(err))
+    if (err)
+      error.value = err instanceof Error ? err : new Error(String(err))
+    options.onReconnecting?.(err instanceof Error ? err : err ? new Error(String(err)) : undefined)
   })
 
   async function start() {
@@ -66,7 +72,8 @@ export function useSignalR(options: UseSignalROptions) {
       isConnected.value = true
       error.value = null
       options.onConnected?.()
-    } catch (err) {
+    }
+    catch (err) {
       isConnected.value = false
       error.value = err instanceof Error ? err : new Error(String(err))
       options.onDisconnected?.(error.value)
@@ -76,7 +83,8 @@ export function useSignalR(options: UseSignalROptions) {
   async function stop() {
     try {
       await conn.stop()
-    } finally {
+    }
+    finally {
       isConnected.value = false
     }
   }
@@ -93,8 +101,16 @@ export function useSignalR(options: UseSignalROptions) {
     conn.on('ReceiveAttackLog', (log: AttackLogDto) => callback(log))
   }
 
-  function onKohUpdate(callback: (dto: { challengeId: string; controllerTeamId: string | null; timestamp: string }) => void) {
-    conn.on('ReceiveKohUpdate', (dto: { challengeId: string; controllerTeamId: string | null; timestamp: string }) => callback(dto))
+  function onKohUpdate(callback: (dto: {
+    challengeId: string
+    controllerTeamId: string | null
+    timestamp: string
+  }) => void) {
+    conn.on('ReceiveKohUpdate', (dto: {
+      challengeId: string
+      controllerTeamId: string | null
+      timestamp: string
+    }) => callback(dto))
   }
 
   return { connection, isConnected, error, start, stop, onRoundStarted, onAttackLog, onKohUpdate }

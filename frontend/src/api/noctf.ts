@@ -18,6 +18,7 @@ import type {
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
+  NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse,
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
 import { translate as tt } from '@/i18n'
@@ -322,22 +323,15 @@ export const competitionApi = {
       path: { id: competitionId },
     }), tt('errors.loadSubmissions'))
   },
-  async leaderboard(competitionId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsGetLeaderboardEndpoint({
-      path: { competitionId },
-    }), tt('errors.loadLeaderboard'))
-  },
-  async leaderboardTrend<T = unknown>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{competitionId}/leaderboard/trend',
-      path: { competitionId },
-    }), tt('errors.loadLeaderboardTrend'))
-  },
-  async leaderboardTeam<T = unknown>(competitionId: string, teamId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{competitionId}/leaderboard/teams/{teamId}',
-      path: { competitionId, teamId },
-    }), tt('errors.loadLeaderboardTeam'))
+  async leaderboard(
+    competitionId: string,
+  ): Promise<NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse> {
+    return unwrap<NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse>(
+      await sdk.noCtfapiEndpointsCompetitionsGetLeaderboardEndpoint({
+        path: { competitionId },
+      }),
+      tt('errors.loadLeaderboard'),
+    )
   },
   async submitFlag<T = unknown>(competitionId: string, teamId: string, challengeId: string, flag: string) {
     return postJson<T>(`/competitions/${competitionId}/submissions/flags`, {

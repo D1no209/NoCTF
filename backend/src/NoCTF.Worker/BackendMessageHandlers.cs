@@ -331,6 +331,25 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken) =>
         leaderboard.RefreshAsync(message.CompetitionId, cancellationToken);
 
+    public static async Task Handle(
+        InvalidateLeaderboard message,
+        ILeaderboardCache leaderboard,
+        ILeaderboardSubscriptionRegistry subscriptions,
+        CancellationToken cancellationToken)
+    {
+        await leaderboard.InvalidateAsync(
+            message.CompetitionId,
+            cancellationToken);
+        if (await subscriptions.HasActiveAsync(
+                message.CompetitionId,
+                cancellationToken))
+        {
+            await leaderboard.RefreshAsync(
+                message.CompetitionId,
+                cancellationToken);
+        }
+    }
+
     public static Task Handle(
         AwdpFixResult message,
         IInternalResultStore results,

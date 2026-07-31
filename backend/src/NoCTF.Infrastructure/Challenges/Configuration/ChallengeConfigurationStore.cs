@@ -81,7 +81,7 @@ public sealed class ChallengeConfigurationStore(
 
         if (changed != 1) return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         if (competition.Mode == GameMode.Awd
             && status == CompetitionStatus.Running
             && published.Value)

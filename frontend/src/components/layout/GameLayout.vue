@@ -1,16 +1,18 @@
 <script setup lang="ts">
+import type { NoCtfApplicationScoringLeaderboardLeaderboardResponse } from '@/api/generated/types.gen'
 import { useQuery } from '@tanstack/vue-query'
+import { ChevronLeft, Users } from 'lucide-vue-next'
 import { computed, watch } from 'vue'
-import { useRoute, RouterView, RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
-import { useI18n } from 'vue-i18n'
-import { useAuthStore } from '@/stores/auth'
-import { useScoreStore } from '@/stores/score'
+import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
+import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import LanguageSwitch from '@/components/LanguageSwitch.vue'
-import { ChevronLeft, Users } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
+import { useScoreStore } from '@/stores/score'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -29,16 +31,6 @@ interface MyCompetitionTeam {
   isBanned: boolean
 }
 
-interface LeaderboardEntry {
-  teamId?: string | null
-  teamName?: string | null
-  totalScore?: number | null
-}
-
-interface LeaderboardResponse {
-  entries?: LeaderboardEntry[]
-}
-
 const { data: myTeams } = useQuery({
   queryKey: computed(() => queryKeys.myCompetitionTeams(competitionId.value)),
   queryFn: () => competitionApi.myTeams<MyCompetitionTeam[]>(competitionId.value),
@@ -49,9 +41,12 @@ const approvedTeam = computed(() =>
   (myTeams.value ?? []).find(team => team.registrationStatus === 'approved' && !team.isBanned) ?? null,
 )
 
-const { data: leaderboard } = useQuery({
+const { data: leaderboard } = useQuery<
+  NoCtfApplicationScoringLeaderboardLeaderboardResponse | null
+>({
   queryKey: computed(() => queryKeys.leaderboard(competitionId.value)),
-  queryFn: () => competitionApi.leaderboard(competitionId.value) as Promise<LeaderboardResponse>,
+  queryFn: async () =>
+    asLeaderboardSnapshot(await competitionApi.leaderboard(competitionId.value)) ?? null,
   enabled: computed(() => Boolean(competitionId.value) && Boolean(approvedTeam.value?.id)),
   refetchInterval: computed(() => approvedTeam.value?.id ? 10_000 : false),
 })
@@ -70,7 +65,7 @@ watch(
       competitionId.value,
       team.id,
       entry?.teamName ?? team.name,
-      entry?.totalScore ?? 0,
+      entry?.score ?? 0,
     )
   },
   { immediate: true },

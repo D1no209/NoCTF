@@ -2,12 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Nodes;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Management;
+using NoCTF.Application.Messaging;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Management;
 using NoCTF.Infrastructure.Persistence;
+using NSubstitute;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -104,7 +106,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
 
             await using (var deleteDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(deleteDb).SoftDeleteAsync(
+                var failure = await CreateManagementStore(deleteDb).SoftDeleteAsync(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
                     0,
@@ -130,7 +132,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
 
             await using (var mismatchDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(mismatchDb).RestoreAsync(
+                var failure = await CreateManagementStore(mismatchDb).RestoreAsync(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
                     1,
@@ -162,7 +164,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
 
             await using (var restoreDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(restoreDb).RestoreAsync(
+                var failure = await CreateManagementStore(restoreDb).RestoreAsync(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
                     1,
@@ -246,7 +248,8 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
 
         await using var createDb = new NoCtfDbContext(options);
         await using var updateDb = new NoCtfDbContext(options);
-        var createTask = new ChallengeManagementStore(createDb).CreateAsync(
+        var createOutbox = Substitute.For<ITransactionalMessageOutbox>();
+        var createTask = CreateManagementStore(createDb, createOutbox).CreateAsync(
             new(
                 fixture.ConcurrentCompetitionChallengeId,
                 fixture.ConcurrentCompetitionId,
@@ -272,6 +275,10 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         await Assert.That((await createTask).Failure).IsNull();
         await Assert.That((await updateTask).State)
             .IsEqualTo(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
+        await createOutbox.Received(1).PublishAsync(
+            Arg.Is<InvalidateLeaderboard>(message =>
+                message!.CompetitionId == fixture.ConcurrentCompetitionId));
+        await createOutbox.Received(1).FlushOutgoingMessagesAsync();
         await AssertTemplateAsync(
             options,
             fixture.ConcurrentChallengeId,
@@ -334,7 +341,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 now),
             cancellationToken);
         await WaitForPostgresSleepAsync(observerDb, cancellationToken);
-        var createTask = new ChallengeManagementStore(createDb).CreateAsync(
+        var createTask = CreateManagementStore(createDb).CreateAsync(
             new(
                 fixture.UpdateFirstCompetitionChallengeId,
                 fixture.UpdateFirstCompetitionId,
@@ -610,6 +617,11 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         await Assert.That(competitionChallenge.DeletedAt is not null)
             .IsEqualTo(isDeleted);
     }
+
+    private static ChallengeManagementStore CreateManagementStore(
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox? outbox = null) =>
+        new(db, outbox ?? Substitute.For<ITransactionalMessageOutbox>());
 
     private static async Task WaitForPostgresSleepAsync(
         NoCtfDbContext db,

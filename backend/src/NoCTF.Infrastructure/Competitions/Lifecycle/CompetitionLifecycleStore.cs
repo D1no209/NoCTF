@@ -164,8 +164,7 @@ public sealed class CompetitionLifecycleStore(
             db,
             competitionId,
             cancellationToken);
-        if (effects.HasFlag(CompetitionLifecycleEffects.ProjectLeaderboard))
-            await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
+        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.ProvisionRuntimes))
             await outbox.PublishAsync(new ProvisionCompetitionRuntimes(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.CleanupRuntimes))

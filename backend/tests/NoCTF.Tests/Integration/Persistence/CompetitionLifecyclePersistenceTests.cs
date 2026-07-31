@@ -45,7 +45,7 @@ public sealed class CompetitionLifecyclePersistenceTests
                     fixture.OwnerId,
                     "pause",
                     false,
-                    CompetitionLifecycleEffects.ProjectLeaderboard,
+                    CompetitionLifecycleEffects.None,
                     cancellationToken);
                 await Assert.That(applied).IsTrue();
             }
@@ -70,8 +70,7 @@ public sealed class CompetitionLifecyclePersistenceTests
                     fixture.OwnerId,
                     "resume",
                     false,
-                    CompetitionLifecycleEffects.ProjectLeaderboard
-                        | CompetitionLifecycleEffects.ProvisionRuntimes,
+                    CompetitionLifecycleEffects.ProvisionRuntimes,
                     cancellationToken);
                 await Assert.That(applied).IsTrue();
             }
@@ -96,7 +95,7 @@ public sealed class CompetitionLifecyclePersistenceTests
             await Assert.That(flag.ValidUntil).IsNotNull();
             await Assert.That(flag.ValidUntil!.Value)
                 .IsGreaterThan(fixture.OriginalValidUntil.AddMinutes(4));
-            await Assert.That(outbox.Published.OfType<ProjectLeaderboard>().Count()).IsEqualTo(2);
+            await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count()).IsEqualTo(2);
             await Assert.That(outbox.Published.OfType<ProvisionCompetitionRuntimes>().Count())
                 .IsEqualTo(1);
         });

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { NoCtfApplicationScoringLeaderboardLeaderboardResponse } from '@/api/generated/types.gen'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, Puzzle, Trophy, UserPlus, Users } from 'lucide-vue-next'
@@ -8,15 +9,16 @@ import { RouterLink, useRoute } from 'vue-router'
 import { competitionApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import ChallengeModal from '@/components/game/ChallengeModal.vue'
+import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
 import ScoreboardView from '@/components/game/ScoreboardView.vue'
+import StatTile from '@/components/layout/StatTile.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Panel } from '@/components/ui/panel'
 import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
-import StatTile from '@/components/layout/StatTile.vue'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { challengeDirections, normalizeDirection } from '@/lib/challengeDirections'
 import { challengeTypeLabel } from '@/lib/challengeLabels'
 import { useAuthStore } from '@/stores/auth'
@@ -141,17 +143,6 @@ interface MyCompetitionTeam {
   isCaptain: boolean
 }
 
-interface LeaderboardEntry {
-  teamId?: string | null
-  teamName?: string | null
-  totalScore?: number | null
-  score?: number | null
-}
-
-interface LeaderboardResponse {
-  entries?: LeaderboardEntry[]
-}
-
 const { data: competition, isLoading: loadingComp } = useQuery({
   queryKey: computed(() => queryKeys.competition(competitionId.value)),
   queryFn: () => competitionApi.get<Competition>(competitionId.value),
@@ -236,9 +227,12 @@ const currentTeam = computed(() => approvedTeam.value ?? myTeams.value?.[0] ?? n
 const canUseParticipantActions = computed(() => Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
 const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value && !approvedTeam.value.isBanned))
 
-const { data: headerLeaderboard } = useQuery({
+const { data: headerLeaderboard } = useQuery<
+  NoCtfApplicationScoringLeaderboardLeaderboardResponse | null
+>({
   queryKey: computed(() => [...queryKeys.leaderboard(competitionId.value), 'header-score']),
-  queryFn: () => competitionApi.leaderboard(competitionId.value) as Promise<LeaderboardResponse>,
+  queryFn: async () =>
+    asLeaderboardSnapshot(await competitionApi.leaderboard(competitionId.value)) ?? null,
   enabled: computed(() => !!competitionId.value && !!approvedTeam.value?.id),
   refetchInterval: computed(() => approvedTeam.value?.id ? 10_000 : false),
 })
@@ -268,7 +262,7 @@ watch(
       return
     }
 
-    scoreStore.updateFromLeaderboard(entries as never, approvedTeam.value.id, competitionId.value)
+    scoreStore.updateFromLeaderboard(entries, approvedTeam.value.id, competitionId.value)
   },
   { immediate: true },
 )

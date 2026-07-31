@@ -10,10 +10,10 @@ public sealed class WolverineBackendMessagePublisher(IMessageBus bus) : IBackend
         CancellationToken cancellationToken) =>
         await bus.SendAsync(new ProjectLeaderboard(competitionId));
 
-    public ValueTask RebuildCompetitionAsync(
+    public async ValueTask RebuildCompetitionAsync(
         Guid competitionId,
         CancellationToken cancellationToken) =>
-        ValueTask.CompletedTask;
+        await bus.SendAsync(new InvalidateLeaderboard(competitionId));
 
     public async ValueTask CleanupCompetitionRuntimesAsync(
         Guid competitionId,

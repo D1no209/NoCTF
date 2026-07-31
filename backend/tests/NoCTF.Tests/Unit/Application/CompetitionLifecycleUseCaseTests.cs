@@ -1,6 +1,4 @@
-using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Lifecycle;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -31,8 +29,7 @@ public class CompetitionLifecycleUseCaseTests
     {
         var competitionId = Guid.NewGuid();
         var store = new Store(CompetitionStatus.Paused);
-        var useCase = new TransitionCompetitionLifecycle(
-            store, new Cache());
+        var useCase = new TransitionCompetitionLifecycle(store);
 
         var result = await useCase.ExecuteAsync(
             competitionId, CompetitionStatus.Running, Guid.NewGuid(), "resume");
@@ -49,8 +46,7 @@ public class CompetitionLifecycleUseCaseTests
     {
         var competitionId = Guid.NewGuid();
         var store = new Store(CompetitionStatus.Running);
-        var useCase = new TransitionCompetitionLifecycle(
-            store, new Cache());
+        var useCase = new TransitionCompetitionLifecycle(store);
 
         var result = await useCase.ExecuteAsync(
             competitionId, CompetitionStatus.Finished, Guid.NewGuid(), "finish");
@@ -93,14 +89,6 @@ public class CompetitionLifecycleUseCaseTests
             LastEffects = effects;
             return Task.FromResult(true);
         }
-    }
-
-    private sealed class Cache : ILeaderboardCache
-    {
-        public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(null);
-        public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class AdvancingStore(CompetitionLifecycleSnapshot snapshot)

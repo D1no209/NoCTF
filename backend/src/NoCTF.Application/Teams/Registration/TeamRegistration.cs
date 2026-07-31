@@ -1,8 +1,6 @@
 using NoCTF.Application.Common;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
-using NoCTF.Application.Messaging;
-using NoCTF.Application.Scoring.Leaderboard;
 
 namespace NoCTF.Application.Teams.Registration;
 
@@ -114,7 +112,7 @@ public sealed class GetMyTeam(ITeamRegistrationStore store)
         store.FindForUserAsync(competitionId, userId, includePending, ct);
 }
 
-public sealed class UpdateTeam(ITeamRegistrationStore store, ILeaderboardCache cache, IBackendMessagePublisher messages)
+public sealed class UpdateTeam(ITeamRegistrationStore store)
 {
     public async Task<OperationResult<TeamView>> ExecuteAsync(UpdateTeamCommand command, CancellationToken ct = default)
     {
@@ -124,20 +122,16 @@ public sealed class UpdateTeam(ITeamRegistrationStore store, ILeaderboardCache c
         var result = await store.UpdateAsync(command with { Name = name }, ct);
         if (result.Team is null)
             return OperationResult<TeamView>.Failure(TeamRegistrationFailureProtocol.Code(result.Failure ?? TeamRegistrationFailure.TeamConflict), "Team was not found or can no longer be changed.");
-        await cache.InvalidateAsync(command.CompetitionId, ct);
-        await messages.ProjectLeaderboardAsync(command.CompetitionId, ct);
         return OperationResult<TeamView>.Success(result.Team);
     }
 }
 
-public sealed class DeleteTeam(ITeamRegistrationStore store, ILeaderboardCache cache, IBackendMessagePublisher messages)
+public sealed class DeleteTeam(ITeamRegistrationStore store)
 {
     public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset now, CancellationToken ct = default)
     {
         var failure = await store.SoftDeleteAsync(competitionId, teamId, actorId, now, ct);
         if (failure is not null) return OperationResult.Failure(TeamRegistrationFailureProtocol.Code(failure.Value), "Team was not deleted.");
-        await cache.InvalidateAsync(competitionId, ct);
-        await messages.RebuildCompetitionAsync(competitionId, ct);
         return OperationResult.Success();
     }
 }

@@ -1,7 +1,5 @@
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Common;
-using NoCTF.Application.Messaging;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Notifications;
 
 namespace NoCTF.Application.Competitions.Lifecycle;
@@ -33,9 +31,8 @@ public interface ICompetitionLifecycleStore
 public enum CompetitionLifecycleEffects
 {
     None = 0,
-    ProjectLeaderboard = 1,
-    ProvisionRuntimes = 2,
-    CleanupRuntimes = 4
+    ProvisionRuntimes = 1,
+    CleanupRuntimes = 2
 }
 
 /// <summary>Advances published and running competitions using wall-clock deadlines without extending pauses.</summary>
@@ -87,7 +84,7 @@ public sealed class AdvanceCompetitionLifecycleUseCase(
     }
 
     internal static CompetitionLifecycleEffects EffectsFor(CompetitionStatus target) =>
-        CompetitionLifecycleEffects.ProjectLeaderboard | target switch
+        target switch
         {
             CompetitionStatus.Running => CompetitionLifecycleEffects.ProvisionRuntimes,
             CompetitionStatus.Finished => CompetitionLifecycleEffects.CleanupRuntimes,
@@ -97,7 +94,6 @@ public sealed class AdvanceCompetitionLifecycleUseCase(
 
 public sealed class TransitionCompetitionLifecycle(
     ICompetitionLifecycleStore store,
-    ILeaderboardCache cache,
     ICompetitionLifecycleNotificationPublisher? notifications = null,
     CompetitionStartGate? startGate = null)
 {
@@ -136,7 +132,6 @@ public sealed class TransitionCompetitionLifecycle(
                 AdvanceCompetitionLifecycleUseCase.EffectsFor(target),
                 cancellationToken))
             return OperationResult.Failure("lifecycle_conflict", "Competition status changed concurrently.");
-        await cache.InvalidateAsync(competitionId, cancellationToken);
         if (notifications is not null)
             await notifications.PublishAsync(competitionId, current.Value, target, DateTimeOffset.UtcNow, cancellationToken);
         return OperationResult.Success();

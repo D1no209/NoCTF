@@ -316,7 +316,7 @@ public sealed class SubmissionProcessor(
             db,
             submission.CompetitionId,
             cancellationToken);
-        await outbox.PublishAsync(new ProjectLeaderboard(submission.CompetitionId));
+        await outbox.PublishAsync(new InvalidateLeaderboard(submission.CompetitionId));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();

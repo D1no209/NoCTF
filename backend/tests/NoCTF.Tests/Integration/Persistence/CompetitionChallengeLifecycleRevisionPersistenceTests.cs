@@ -36,10 +36,11 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
                 .Options;
             var fixture = await SeedAsync(options, cancellationToken);
             var now = fixture.Now.AddMinutes(1);
+            var lifecycleOutbox = Substitute.For<ITransactionalMessageOutbox>();
 
             await using (var deleteDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(deleteDb).SoftDeleteAsync(
+                var failure = await CreateManagementStore(deleteDb, lifecycleOutbox).SoftDeleteAsync(
                     fixture.RevisionCompetitionId,
                     fixture.RevisionCompetitionChallengeId,
                     0,
@@ -60,7 +61,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
             await using (var staleRestoreDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(staleRestoreDb).RestoreAsync(
+                var failure = await CreateManagementStore(staleRestoreDb).RestoreAsync(
                     fixture.RevisionCompetitionId,
                     fixture.RevisionCompetitionChallengeId,
                     0,
@@ -82,7 +83,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
             await using (var wrongStateDeleteDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(wrongStateDeleteDb).SoftDeleteAsync(
+                var failure = await CreateManagementStore(wrongStateDeleteDb).SoftDeleteAsync(
                     fixture.RevisionCompetitionId,
                     fixture.RevisionCompetitionChallengeId,
                     1,
@@ -104,7 +105,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
             await using (var restoreDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(restoreDb).RestoreAsync(
+                var failure = await CreateManagementStore(restoreDb, lifecycleOutbox).RestoreAsync(
                     fixture.RevisionCompetitionId,
                     fixture.RevisionCompetitionChallengeId,
                     1,
@@ -125,7 +126,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
             await using (var wrongStateRestoreDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(wrongStateRestoreDb).RestoreAsync(
+                var failure = await CreateManagementStore(wrongStateRestoreDb).RestoreAsync(
                     fixture.RevisionCompetitionId,
                     fixture.RevisionCompetitionChallengeId,
                     2,
@@ -147,7 +148,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
             await using (var updateDb = new NoCtfDbContext(options))
             {
-                var result = await new ChallengeManagementStore(updateDb).UpdateAsync(
+                var result = await CreateManagementStore(updateDb, lifecycleOutbox).UpdateAsync(
                     new UpdateCompetitionChallengeCommand(
                         fixture.RevisionCompetitionId,
                         fixture.RevisionCompetitionChallengeId,
@@ -173,7 +174,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
             await using (var staleDeleteDb = new NoCtfDbContext(options))
             {
-                var failure = await new ChallengeManagementStore(staleDeleteDb).SoftDeleteAsync(
+                var failure = await CreateManagementStore(staleDeleteDb).SoftDeleteAsync(
                     fixture.RevisionCompetitionId,
                     fixture.RevisionCompetitionChallengeId,
                     2,
@@ -192,6 +193,11 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
                 expectedBaseScore: 750,
                 expectedOrder: 2,
                 cancellationToken);
+
+            await lifecycleOutbox.Received(3).PublishAsync(
+                Arg.Is<InvalidateLeaderboard>(message =>
+                    message!.CompetitionId == fixture.RevisionCompetitionId));
+            await lifecycleOutbox.Received(3).FlushOutgoingMessagesAsync();
 
             await AssertRestoreFailureIsAtomicAsync(
                 options,
@@ -263,7 +269,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
     {
         await using (var mutationDb = new NoCtfDbContext(options))
         {
-            var failure = await new ChallengeManagementStore(mutationDb).RestoreAsync(
+            var failure = await CreateManagementStore(mutationDb).RestoreAsync(
                 competitionId,
                 competitionChallengeId,
                 expectedRevision,
@@ -293,13 +299,13 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
     {
         await using var firstDb = new NoCtfDbContext(options);
         await using var secondDb = new NoCtfDbContext(options);
-        var first = new ChallengeManagementStore(firstDb).SoftDeleteAsync(
+        var first = CreateManagementStore(firstDb).SoftDeleteAsync(
             competitionId,
             competitionChallengeId,
             0,
             now,
             cancellationToken);
-        var second = new ChallengeManagementStore(secondDb).SoftDeleteAsync(
+        var second = CreateManagementStore(secondDb).SoftDeleteAsync(
             competitionId,
             competitionChallengeId,
             0,
@@ -332,13 +338,13 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
     {
         await using var firstDb = new NoCtfDbContext(options);
         await using var secondDb = new NoCtfDbContext(options);
-        var first = new ChallengeManagementStore(firstDb).RestoreAsync(
+        var first = CreateManagementStore(firstDb).RestoreAsync(
             competitionId,
             competitionChallengeId,
             0,
             now,
             cancellationToken);
-        var second = new ChallengeManagementStore(secondDb).RestoreAsync(
+        var second = CreateManagementStore(secondDb).RestoreAsync(
             competitionId,
             competitionChallengeId,
             0,
@@ -370,9 +376,10 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
         CancellationToken cancellationToken)
     {
         var hintId = Guid.CreateVersion7(now);
+        var hintOutbox = Substitute.For<ITransactionalMessageOutbox>();
         await using (var saveDb = new NoCtfDbContext(options))
         {
-            var store = CreateHintStore(saveDb);
+            var store = CreateHintStore(saveDb, hintOutbox);
             var result = await RunWhileCompetitionLockHeldAsync(
                 options,
                 competitionId,
@@ -404,7 +411,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
         await using (var deleteDb = new NoCtfDbContext(options))
         {
-            var store = CreateHintStore(deleteDb);
+            var store = CreateHintStore(deleteDb, hintOutbox);
             var deleted = await RunWhileCompetitionLockHeldAsync(
                 options,
                 competitionId,
@@ -430,7 +437,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
         await using (var restoreDb = new NoCtfDbContext(options))
         {
-            var store = CreateHintStore(restoreDb);
+            var store = CreateHintStore(restoreDb, hintOutbox);
             var restored = await RunWhileCompetitionLockHeldAsync(
                 options,
                 competitionId,
@@ -446,7 +453,7 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 
         await using (var staleManagementDb = new NoCtfDbContext(options))
         {
-            var result = await new ChallengeManagementStore(staleManagementDb).UpdateAsync(
+            var result = await CreateManagementStore(staleManagementDb).UpdateAsync(
                 new(
                     competitionId,
                     competitionChallengeId,
@@ -478,13 +485,24 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
             .Select(hint => hint.DeletedAt)
             .SingleAsync(cancellationToken);
         await Assert.That(hintDeletedAt).IsNull();
+        await hintOutbox.Received(3).PublishAsync(
+            Arg.Is<InvalidateLeaderboard>(message =>
+                message!.CompetitionId == competitionId));
+        await hintOutbox.Received(3).FlushOutgoingMessagesAsync();
     }
 
-    private static ChallengeHintStore CreateHintStore(NoCtfDbContext db) =>
+    private static ChallengeHintStore CreateHintStore(
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox? outbox = null) =>
         new(
             db,
             Substitute.For<ILeaderboardProjectionEngine>(),
-            Substitute.For<ITransactionalMessageOutbox>());
+            outbox ?? Substitute.For<ITransactionalMessageOutbox>());
+
+    private static ChallengeManagementStore CreateManagementStore(
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox? outbox = null) =>
+        new(db, outbox ?? Substitute.For<ITransactionalMessageOutbox>());
 
     private static async Task<T> RunWhileCompetitionLockHeldAsync<T>(
         DbContextOptions<NoCtfDbContext> options,

@@ -1,6 +1,4 @@
-using NoCTF.Application.Messaging;
 using NoCTF.Application.Common;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Competitions.Configuration;
@@ -78,9 +76,7 @@ public sealed class GetCompetitionConfiguration(ICompetitionConfigurationStore s
 
 public sealed class UpdateCompetitionConfiguration(
     ICompetitionConfigurationStore store,
-    ICompetitionConfigurationValidator validator,
-    ILeaderboardCache cache,
-    IBackendMessagePublisher messages)
+    ICompetitionConfigurationValidator validator)
 {
     public async Task<OperationResult<CompetitionConfigurationView>> ExecuteAsync(
         Guid competitionId, int expectedRevision, string json, DateTimeOffset now, CancellationToken ct = default)
@@ -118,8 +114,6 @@ public sealed class UpdateCompetitionConfiguration(
                 _ => "Configuration revision changed concurrently."
             });
         }
-        await cache.InvalidateAsync(competitionId, ct);
-        await messages.RebuildCompetitionAsync(competitionId, ct);
         return OperationResult<CompetitionConfigurationView>.Success(result.Configuration);
     }
 }
