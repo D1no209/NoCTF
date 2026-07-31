@@ -160,6 +160,7 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
             .Distinct()
             .Order()
             .ToArray();
+        entity.PermissionRevision = checked(entity.PermissionRevision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

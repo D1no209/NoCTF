@@ -110,7 +110,9 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 | Observer | 与 Judge 相同的读取范围；无写权限 |
 | Player | 公开数据与本队数据；绝不能访问其他队 Flag、Submission 原文或内部诊断 |
 
-Owner/Manager 必须是 Organizer 或 Administrator；Judge/Observer 可为已验证 User。Owner 转让后，旧 Owner 自动进入 ManagerIds。
+Owner/Manager 必须是 Organizer 或 Administrator；Judge/Observer 必须完成邮箱验证。Owner
+转让后，旧 Owner 自动进入 ManagerIds。权限数组的全量替换由独立 PermissionRevision 防止
+陈旧覆盖；Owner transfer 也递增该 revision。
 
 Challenge 自身由 OwnerId/ManagerIds 控制。Shared 模板可被其他 Organizer 查看题面并引用，但其原始 Flag、对象键与内部 Runtime 配置只对模板管理者可见；Private 改为 Shared/反向修改不破坏既有引用。
 

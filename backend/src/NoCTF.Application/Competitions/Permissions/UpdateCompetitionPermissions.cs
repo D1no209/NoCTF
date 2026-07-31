@@ -1,3 +1,5 @@
+using NoCTF.Domain.Identity;
+
 namespace NoCTF.Application.Competitions.Permissions;
 
 public sealed record UpdateCompetitionPermissionsCommand(
@@ -5,10 +7,58 @@ public sealed record UpdateCompetitionPermissionsCommand(
     Guid ActorId,
     IReadOnlyList<Guid> ManagerIds,
     IReadOnlyList<Guid> JudgeIds,
-    IReadOnlyList<Guid> ObserverIds);
+    IReadOnlyList<Guid> ObserverIds,
+    int ExpectedPermissionRevision);
+
+public sealed record CompetitionPermissionSnapshot(
+    Guid CompetitionId,
+    Guid OwnerId,
+    IReadOnlyList<Guid> ManagerIds,
+    IReadOnlyList<Guid> JudgeIds,
+    IReadOnlyList<Guid> ObserverIds,
+    int PermissionRevision);
+
+public enum CompetitionPermissionSnapshotState
+{
+    Found,
+    NotFound,
+    Forbidden
+}
+
+public sealed record CompetitionPermissionSnapshotResult(
+    CompetitionPermissionSnapshotState State,
+    CompetitionPermissionSnapshot? Snapshot = null);
+
+public sealed record CompetitionPermissionCandidate(
+    Guid Id,
+    string UserName,
+    UserKind Kind,
+    UserRole Role,
+    bool EmailVerified);
+
+public enum CompetitionPermissionCandidateListState
+{
+    Listed,
+    NotFound,
+    Forbidden
+}
+
+public sealed record CompetitionPermissionCandidateListResult(
+    CompetitionPermissionCandidateListState State,
+    IReadOnlyList<CompetitionPermissionCandidate>? Candidates = null);
 
 public interface ICompetitionPermissionStore
 {
+    Task<CompetitionPermissionSnapshotResult> GetSnapshotAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken cancellationToken);
+    Task<CompetitionPermissionCandidateListResult> ListCandidatesAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken cancellationToken);
     Task<CompetitionPermissionUpdateResult> UpdateAsync(
         UpdateCompetitionPermissionsCommand command,
         CancellationToken cancellationToken);
@@ -22,7 +72,9 @@ public enum CompetitionPermissionUpdateState
     RolesOverlap,
     OwnerIncluded,
     UserNotFound,
-    RoleNotEligible
+    RoleNotEligible,
+    EmailNotVerified,
+    RevisionConflict
 }
 
 public sealed record CompetitionPermissionUpdateResult(
@@ -46,4 +98,24 @@ public sealed class UpdateCompetitionPermissions(ICompetitionPermissionStore sto
         }
         return store.UpdateAsync(command, ct);
     }
+}
+
+public sealed class GetCompetitionPermissions(ICompetitionPermissionStore store)
+{
+    public Task<CompetitionPermissionSnapshotResult> ExecuteAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct = default) =>
+        store.GetSnapshotAsync(competitionId, actorId, isAdministrator, ct);
+}
+
+public sealed class ListCompetitionPermissionCandidates(ICompetitionPermissionStore store)
+{
+    public Task<CompetitionPermissionCandidateListResult> ExecuteAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct = default) =>
+        store.ListCandidatesAsync(competitionId, actorId, isAdministrator, ct);
 }

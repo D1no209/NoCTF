@@ -8,6 +8,76 @@ namespace NoCTF.Infrastructure.Competitions.Permissions;
 
 public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetitionPermissionStore
 {
+    public async Task<CompetitionPermissionSnapshotResult> GetSnapshotAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        var snapshot = await db.Competitions.AsNoTracking()
+            .Where(competition =>
+                competition.Id == competitionId &&
+                competition.DeletedAt == null)
+            .Select(competition => new CompetitionPermissionSnapshot(
+                competition.Id,
+                competition.OwnerId,
+                competition.ManagerIds,
+                competition.JudgeIds,
+                competition.ObserverIds,
+                competition.PermissionRevision))
+            .SingleOrDefaultAsync(ct);
+        if (snapshot is null)
+            return new(CompetitionPermissionSnapshotState.NotFound);
+        if (!isAdministrator && snapshot.OwnerId != actorId)
+            return new(CompetitionPermissionSnapshotState.Forbidden);
+
+        return new(
+            CompetitionPermissionSnapshotState.Found,
+            snapshot with
+            {
+                ManagerIds = snapshot.ManagerIds.Distinct().Order().ToArray(),
+                JudgeIds = snapshot.JudgeIds.Distinct().Order().ToArray(),
+                ObserverIds = snapshot.ObserverIds.Distinct().Order().ToArray()
+            });
+    }
+
+    public async Task<CompetitionPermissionCandidateListResult> ListCandidatesAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        var ownerId = await db.Competitions.AsNoTracking()
+            .Where(competition =>
+                competition.Id == competitionId &&
+                competition.DeletedAt == null)
+            .Select(competition => (Guid?)competition.OwnerId)
+            .SingleOrDefaultAsync(ct);
+        if (ownerId is null)
+            return new(CompetitionPermissionCandidateListState.NotFound);
+        if (!isAdministrator && ownerId.Value != actorId)
+            return new(CompetitionPermissionCandidateListState.Forbidden);
+
+        var candidates = await db.Users.AsNoTracking()
+            .Where(user =>
+                user.Id != ownerId.Value &&
+                (user.Role == UserRole.Organizer ||
+                 user.Role == UserRole.Administrator ||
+                 user.EmailVerifiedAt != null))
+            .OrderBy(user => user.UserName)
+            .ThenBy(user => user.Id)
+            .Select(user => new CompetitionPermissionCandidate(
+                user.Id,
+                user.UserName,
+                user.Kind,
+                user.Role,
+                user.EmailVerifiedAt != null))
+            .ToArrayAsync(ct);
+        return new(
+            CompetitionPermissionCandidateListState.Listed,
+            candidates);
+    }
+
     public async Task<CompetitionPermissionUpdateResult> UpdateAsync(
         UpdateCompetitionPermissionsCommand command,
         CancellationToken ct)
@@ -25,6 +95,8 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
             ct);
         if (competition.OwnerId != command.ActorId && !administrator)
             return new(CompetitionPermissionUpdateState.Forbidden);
+        if (competition.PermissionRevision != command.ExpectedPermissionRevision)
+            return new(CompetitionPermissionUpdateState.RevisionConflict);
 
         var userIds = command.ManagerIds
             .Concat(command.JudgeIds)
@@ -56,22 +128,40 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
                 eligibility.RoleIneligibleUserIds);
         }
 
-        var normalizedUserIds = userIds.Distinct().Order().ToArray();
-        var existingUserIds = await db.Users.AsNoTracking()
-            .Where(user => normalizedUserIds.Contains(user.Id))
-            .Select(user => user.Id)
+        var judgeObserverIds = command.JudgeIds
+            .Concat(command.ObserverIds)
+            .Distinct()
+            .Order()
+            .ToArray();
+        var judgeObserverUsers = await db.Users.AsNoTracking()
+            .Where(user => judgeObserverIds.Contains(user.Id))
+            .Select(user => new { user.Id, user.EmailVerifiedAt })
             .ToArrayAsync(ct);
-        var missingUserIds = normalizedUserIds.Except(existingUserIds).ToArray();
+        var missingUserIds = judgeObserverIds
+            .Except(judgeObserverUsers.Select(user => user.Id))
+            .ToArray();
         if (missingUserIds.Length > 0)
         {
             return new(
                 CompetitionPermissionUpdateState.UserNotFound,
                 missingUserIds);
         }
+        var unverifiedUserIds = judgeObserverUsers
+            .Where(user => user.EmailVerifiedAt is null)
+            .Select(user => user.Id)
+            .Order()
+            .ToArray();
+        if (unverifiedUserIds.Length > 0)
+        {
+            return new(
+                CompetitionPermissionUpdateState.EmailNotVerified,
+                unverifiedUserIds);
+        }
 
         competition.ManagerIds = command.ManagerIds.Distinct().Order().ToArray();
         competition.JudgeIds = command.JudgeIds.Distinct().Order().ToArray();
         competition.ObserverIds = command.ObserverIds.Distinct().Order().ToArray();
+        competition.PermissionRevision = checked(competition.PermissionRevision + 1);
         competition.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

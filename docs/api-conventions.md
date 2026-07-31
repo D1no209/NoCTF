@@ -60,8 +60,10 @@
 CompetitionChallenge 聚合更新 DTO 必须带 expectedRevision。Competition 普通元数据更新使用
 当前状态作为并发栅栏，不引入通用 Revision。Competition 与 CompetitionChallenge 的模式配置
 更新分别携带对应配置的 expectedRevision；数据库条件更新成功后对应 Revision+1。冲突返回
-409，不自动合并。Attachment、Flag、Hint 没有独立 Revision；GitOps 通过稳定 UUID、内容和
-删除状态收敛，子资源 Endpoint 不要求伪造一套 ExpectedRevision 协议。
+409，不自动合并。Competition 权限数组使用独立 PermissionRevision，全量替换携带
+expectedPermissionRevision，Owner transfer 同样递增该 revision；它不得复用 ConfigurationRevision
+或扩展成通用 Competition Revision。Attachment、Flag、Hint 没有独立 Revision；GitOps 通过
+稳定 UUID、内容和删除状态收敛，子资源 Endpoint 不要求伪造一套 ExpectedRevision 协议。
 
 ## 限流
 

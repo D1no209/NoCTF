@@ -70,6 +70,7 @@ owner_id
 manager_ids uuid[]
 judge_ids uuid[]
 observer_ids uuid[]
+permission_revision
 mode
 status
 start_at, end_at
@@ -93,7 +94,7 @@ created_at, updated_at, deleted_at?
 - FlagDerivationSecret 创建时 CSPRNG 生成，之后不可修改、不可序列化到 DTO/日志。
 - RunningSince 只在 Running 非空。Pause/Finish 时把时间差累加到 AccumulatedRunningSeconds 并清空。
 - EffectiveRunningTime = AccumulatedRunningSeconds + 当前 Running 区间。
-- ConfigurationRevision 与 LeaderboardRevision 单调递增。
+- PermissionRevision、ConfigurationRevision 与 LeaderboardRevision 单调递增。
 
 对 owner_id 与三个 UUID 数组建查询索引；数组使用 GIN。
 

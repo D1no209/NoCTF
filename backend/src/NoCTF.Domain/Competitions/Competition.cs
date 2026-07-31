@@ -13,6 +13,7 @@ public sealed class Competition
     public Guid[] ManagerIds { get; set; } = [];
     public Guid[] JudgeIds { get; set; } = [];
     public Guid[] ObserverIds { get; set; } = [];
+    public int PermissionRevision { get; set; }
     public GameMode Mode { get; set; }
     public string ConfigurationJson { get; set; } = """{"schemaVersion":1}""";
     public int ConfigurationRevision { get; set; }

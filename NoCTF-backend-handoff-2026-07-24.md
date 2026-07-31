@@ -1296,6 +1296,68 @@ hint 子资源或 Runtime lifecycle。
   Owner/Manager/Judge/Observer 权限集合，完成 OpenAPI/client 与后端验证后，再用生成 SDK
   实现 Frontend 全量替换权限 UI。不得恢复旧 `/collaborators`。
 
+### 6.22 Competition 权限快照、候选目录与独立并发栅栏（2026-07-31，当前最新）
+
+本节按 `$grill-me` 明确选择的方案 A 完成 6.21 的 Backend 前置纵切。没有扩张匿名
+Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend 必须在本节完整契约和
+生成 SDK 上继续。
+
+#### 资源作用域读取与资格约束
+
+- 新增 `GET /admin/competitions/{competitionId}/permissions`，只允许 Competition Owner 或
+  平台 Administrator 读取完整 Owner、Manager、Judge、Observer 集合与
+  `PermissionRevision`。Manager/Judge/Observer 即使能读取其他 Admin Competition 元数据，
+  也不能通过该端点枚举完整权限名单。
+- 新增 `GET /admin/competitions/{competitionId}/permission-candidates`，使用相同授权边界，
+  仅返回 `Id`、`UserName`、`Kind`、`Role`、`EmailVerified`。Owner 从候选集中排除；
+  Manager 候选为 Organizer/Administrator Human 或 Bot，Judge/Observer 候选必须完成邮箱
+  验证。平台用户 Email、TokenVersion 等管理字段没有泄漏。
+- `PUT .../permissions` 继续执行完整集合替换，但现在强制携带非负
+  `expectedPermissionRevision`。只有 Owner 或数据库中当前仍为 Administrator 的用户可写；
+  Manager 必须是 Organizer/Administrator，Judge/Observer 必须完成邮箱验证。缺失用户、
+  角色不合格、邮箱未验证、Owner 混入、集合重叠与 revision 冲突均为 typed state/result，
+  新增稳定 code `EmailNotVerified` 与 `RevisionConflict`。
+- 权限写与 Owner transfer 共用 Competition advisory transaction lock。成功全量替换递增
+  `PermissionRevision`；Owner transfer 同样递增，因此转让前取得的权限快照不能覆盖新
+  Owner。该 revision 不复用 ConfigurationRevision，也没有扩张成通用 Competition
+  revision。
+
+#### EF、OpenAPI 与生成客户端
+
+- EF Core 迁移 `20260731001648_AddCompetitionPermissionRevision` 及 ModelSnapshot 完全由
+  `dotnet ef migrations add` 生成，没有手改 migration 或 snapshot。
+- OpenAPI 当前注册 134 endpoints；两份 artifact 完全一致，SHA-256 均为
+  `B38067B0A605E611751B940997C9C299954E300CA3CA77AC570462A5AFE4BD16`。
+- `@hey-api/openapi-ts 0.97.3` 已从 artifact 重建客户端并执行项目 patch；生成结果二次运行
+  无漂移。新增 generated 方法为 `adminGetCompetitionPermissions` 与
+  `adminListCompetitionPermissionCandidates`，现有 `adminUpdateCompetitionPermissions`
+  的 body 已强制包含 `expectedPermissionRevision`。没有手写 URL 或手改 SDK。
+- Public Competition schema 的 architecture test 明确禁止出现 Manager/Judge/Observer
+  数组或 PermissionRevision，避免匿名读取面被 Admin 权限功能污染。
+
+#### 验证、远端基线与 Git
+
+- WSL 原生干净副本、.NET SDK 10.0.301、真实 Docker/Testcontainers：
+  - Release `NoCTF.slnx` build：0 warning、0 error；
+  - non-Integration：391/391 passed；
+  - Integration：67 total，65 passed、0 failed、2 skipped；两个 skip 仍是未启用的真实
+    Kubernetes dataplane 与未配置 fixture 的真实 Libvirt opt-in；
+  - 新增真实 PostgreSQL 覆盖 Owner/Admin 读取边界、最小候选投影、相同 revision 并发只
+    允许一个写成功、未验证 Judge/Observer 原子拒绝，以及 Owner transfer 使旧写冲突；
+  - 全 solution analyzer `--severity warn`、全部本轮 C# 文件 whitespace、EF pending
+    model、OpenAPI artifact/client drift 与 `git diff --check` 均 passed；
+  - 生成 SDK 后 Frontend `vue-tsc --noEmit` 与 Vite production build passed，仅保留既有
+    依赖 PURE annotation 和大 chunk 警告。
+- 通过 GitHub compare 再次核验远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`，与本地已合并基线 `identical`；当前 HEAD
+  已包含该提交，因此没有新冲突或需要制造空 merge commit。
+- 本节作为独立 Backend 本地提交；不 push、不创建 PR。保护文件继续沿用 6.18，尤其不得
+  混入 Wolverine outbox、Runner Properties、本地端口 compose、三个
+  instance-operation/query 文件或 `scripts/`。
+- 下一纵切进入 Frontend：只使用本节生成 SDK 实现 Competition 权限完整集合 UI，409 后
+  重取权限快照和候选目录并从最新 revision 重建 payload；随后删除旧
+  `AdminCollaborators` route/view/workspace/API/query key 与 copy，不保留兼容层。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1308,8 +1370,8 @@ hint 子资源或 Runtime lifecycle。
 仍未完成/不属于本轮已部署：
 
 - Frontend 的 Bot、Challenge lifecycle inventory、typed role 409 与 Challenge Bot
-  Manager 授权、CompetitionChallenge 稳定 ID 与 lifecycle 已完成；Competition 权限 UI
-  仍等待后端读取契约返回完整权限集合。
+  Manager 授权、CompetitionChallenge 稳定 ID 与 lifecycle 已完成；Competition 权限
+  Backend 契约、并发栅栏与生成 SDK 已完成，Frontend 完整集合 UI 仍待本地实现。
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
   环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
@@ -1319,10 +1381,11 @@ hint 子资源或 Runtime lifecycle。
 
 ## 7. 建议的下一交接顺序
 
-1. Backend 先补齐强类型 Admin Competition 读取契约的完整 Owner/Manager/Judge/Observer
-   权限数组，执行后端测试、OpenAPI/client drift 与独立本地 commit。
-2. Frontend 随后只使用生成 SDK 实现 Competition 权限全量替换；必须保留最新完整集合和
-   revision，不得以空数组覆盖，也不得恢复已废弃的 `/collaborators` 协议。
+1. Frontend 只使用生成 SDK 实现 Competition 权限全量替换；必须保留最新完整集合和
+   `PermissionRevision`，缺字段时 fail-closed，409 后重取两个资源作用域事实源，不得以
+   空数组覆盖，也不得恢复已废弃的 `/collaborators` 协议。
+2. 删除旧 `AdminCollaborators` route/view/workspace/API/query key 与中英文 copy；Competition
+   列表中的权限入口改到 Competition detail 的 permissions section，不保留兼容跳转。
 3. CompetitionChallenge typed 409 与 delete/restore revision fence 是可独立评估的后端
    协议加固，不得由前端解析错误字符串代替。
 4. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
@@ -1352,9 +1415,9 @@ hint 子资源或 Runtime lifecycle。
 2. 查看 `git status --short --branch`，确认上述用户文件仍被保护。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
 4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；Frontend typed 409 与
-   Bot Manager 授权、CompetitionChallenge lifecycle 也已完成。下一阶段从 6.21 和第 7
-   节记录的 Admin Competition 权限读取契约开始；引用后端测试数量时使用 6.19，引用
-   Frontend 状态时使用 6.21。
+   Bot Manager 授权、CompetitionChallenge lifecycle 也已完成，Competition 权限 Backend
+   契约和生成 SDK 已在 6.22 完成。下一阶段从 6.22 和第 7 节记录的 Frontend 完整集合 UI
+   开始；引用后端测试数量时使用 6.22，引用 Frontend 状态时使用 6.21。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
