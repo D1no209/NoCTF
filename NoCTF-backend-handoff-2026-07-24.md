@@ -1571,6 +1571,22 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
   editor；只让 generated conflict decoder 接受精确六值 enum（含
   `ActiveCompetitionModeConflict`）并补 fail-closed 测试，不得新增手写 URL 或解析错误文本。
 
+### 6.27 Frontend Challenge template Mode conflict decoder（2026-07-31，当前最新 Frontend）
+
+本节完成 6.26 指定的最小 Frontend 纵切，没有复活已删除的 template editor，也没有新增
+手写 URL、手写 response type 或错误文本解析。
+
+- `readChallengeTemplateConflict` 的 allow-list 接受 generated OpenAPI enum 中精确六个
+  challenge template conflict code，新增 `ActiveCompetitionModeConflict`；仍只接受 HTTP
+  409 的结构化对象 body，并继续对未知 code、字符串 body、非 409 与普通 `Error` fail closed。
+- 测试以 generated enum 为键建立 exhaustive `Record`，OpenAPI 后续新增或删除 code 时会在
+  TypeScript 编译期要求同步 decoder 测试；所有 code 均验证 `userIds` 规范化与去重。
+- `bun test`：67/67 passed，364 assertions；`bun run build` passed；新改测试文件的定向
+  ESLint passed。`src/api/noctf.ts` 全文件仍有 11 个本轮之前已存在的 lint baseline，本节只在
+  typed allow-list 增加一个 generated enum 值，没有扩大该 baseline。
+- 本节作为独立 Frontend 本地提交，提交说明为
+  `feat(admin): decode template mode conflicts`；不 push、不创建 PR。保护文件继续沿用 6.18。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1586,7 +1602,7 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
   Manager 授权、CompetitionChallenge 稳定 ID/lifecycle 与 Competition 权限完整集合 UI
   均已完成；CompetitionChallenge typed 409、delete/restore revision fence 与其 Frontend
   generated-SDK 并发适配也已完成；Challenge template Mode 活动引用 invariant 的 Backend
-  也已按 6.26 完成。下一项是该 typed conflict 的最小 Frontend decoder 适配。
+  与最小 Frontend decoder 已按 6.26/6.27 完成。
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
   环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
@@ -1596,9 +1612,9 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
 
 ## 7. 建议的下一交接顺序
 
-1. 完成 Challenge template Mode typed conflict 的最小 Frontend decoder 适配；不得复活
-   已删除的旧 editor、增加手写 URL 或解析错误文本。
-2. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
+1. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
+2. Docker `InternetOnly`、TargetPort ACL 与 callback-only gateway 属后续安全加固；先做
+   只读边界审计并以现有 contract/test 为准，不自行扩展产品协议。
 3. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
@@ -1628,9 +1644,9 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
    Bot Manager 授权、CompetitionChallenge lifecycle 与 Competition 权限完整集合 UI
    均已完成。CompetitionChallenge typed 409、delete/restore revision fence 与 Frontend
    generated-SDK 适配已按 6.24/6.25 完成；Challenge template Mode 活动引用 invariant
-   Backend 已按 6.26 完成，下一阶段只做其最小 Frontend decoder 适配。引用权限 Backend
+   Backend 与最小 Frontend decoder 已按 6.26/6.27 完成。引用权限 Backend
    测试数量时使用 6.22，引用最新 Backend 状态时使用 6.26，引用最新 Frontend 状态时使用
-   6.25。
+   6.27。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
