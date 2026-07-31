@@ -2,6 +2,7 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Bank;
@@ -45,14 +46,15 @@ public enum ChallengeTemplateConflictCode
 {
     ResourceIdConflict,
     RevisionConflict,
+    ActiveCompetitionModeConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
     RoleNotEligible
 }
 
 public sealed record ChallengeTemplateConflictResponse(
-    ChallengeTemplateConflictCode Code,
-    IReadOnlyList<Guid> UserIds);
+    [property: Required, JsonRequired] ChallengeTemplateConflictCode Code,
+    [property: Required, JsonRequired] IReadOnlyList<Guid> UserIds);
 
 internal static class ChallengeTemplateWriteResponseMapper
 {
@@ -65,6 +67,8 @@ internal static class ChallengeTemplateWriteResponseMapper
                     ChallengeTemplateConflictCode.ResourceIdConflict,
                 ChallengeTemplateWriteState.RevisionConflict =>
                     ChallengeTemplateConflictCode.RevisionConflict,
+                ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
+                    ChallengeTemplateConflictCode.ActiveCompetitionModeConflict,
                 ChallengeTemplateWriteState.OwnerIncludedInManagerSet =>
                     ChallengeTemplateConflictCode.OwnerIncludedInManagerSet,
                 ChallengeTemplateWriteState.UserNotFound =>

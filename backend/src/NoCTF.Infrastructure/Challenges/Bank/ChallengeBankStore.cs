@@ -97,18 +97,27 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             .SingleOrDefaultAsync(ct);
     }
 
-    public async Task<ChallengeTemplateView?> UpdateAsync(
+    public async Task<ChallengeTemplateWriteResult> UpdateAsync(
         UpdateChallengeTemplateCommand command,
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await ChallengeWriteLock.AcquireAsync(db, command.ChallengeId, ct);
         var entity = await WriteAuthorized(db.Challenges, command.ActorId, command.IsAdministrator)
-            .SingleOrDefaultAsync(challenge =>
-                challenge.Id == command.ChallengeId &&
-                challenge.Revision == command.ExpectedRevision, ct);
+            .SingleOrDefaultAsync(challenge => challenge.Id == command.ChallengeId, ct);
         if (entity is null)
-            return null;
+            return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
+        if (entity.Revision != command.ExpectedRevision)
+            return new(ChallengeTemplateWriteState.RevisionConflict);
+        if (entity.Mode != command.Mode
+            && await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(item =>
+                    item.ChallengeId == command.ChallengeId
+                    && item.DeletedAt == null,
+                    ct))
+        {
+            return new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
+        }
         entity.Mode = command.Mode;
         entity.Visibility = command.Visibility;
         entity.Title = command.Title;
@@ -122,7 +131,7 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
         await transaction.CommitAsync(ct);
-        return result;
+        return new(ChallengeTemplateWriteState.Succeeded, result);
     }
 
     public async Task<ChallengeTemplateDeleteFailure?> SoftDeleteAsync(

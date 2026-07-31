@@ -29,6 +29,7 @@ public enum ChallengeTemplateWriteState
     ResourceIdConflict,
     NotFoundOrForbidden,
     RevisionConflict,
+    ActiveCompetitionModeConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
     RoleNotEligible
@@ -78,7 +79,9 @@ public interface IChallengeBankStore
         bool includeDeleted,
         CancellationToken cancellationToken);
     Task<ChallengeTemplateView?> FindAsync(Guid challengeId, Guid actorId, bool isAdministrator, bool includeDeleted, CancellationToken cancellationToken);
-    Task<ChallengeTemplateView?> UpdateAsync(UpdateChallengeTemplateCommand command, CancellationToken cancellationToken);
+    Task<ChallengeTemplateWriteResult> UpdateAsync(
+        UpdateChallengeTemplateCommand command,
+        CancellationToken cancellationToken);
     Task<ChallengeTemplateDeleteFailure?> SoftDeleteAsync(
         Guid challengeId,
         Guid actorId,
@@ -200,7 +203,7 @@ public sealed class UpdateChallengeTemplate(
     IChallengeBankStore store,
     IChallengeConfigurationCatalog configurations)
 {
-    public async Task<OperationResult<ChallengeTemplateView>> ExecuteAsync(
+    public async Task<ChallengeTemplateWriteResult> ExecuteAsync(
         UpdateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
@@ -211,23 +214,26 @@ public sealed class UpdateChallengeTemplate(
             command.DefinitionJson,
             command.ExpectedRevision);
         if (!validation.Succeeded)
-            return OperationResult<ChallengeTemplateView>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
+        {
+            return new(
+                ChallengeTemplateWriteState.InvalidRequest,
+                Detail: validation.ErrorMessage);
+        }
         var definitionErrors = configurations.ValidateDefinition(
             command.Mode,
             command.DefinitionJson);
         if (definitionErrors.Count > 0)
-            return OperationResult<ChallengeTemplateView>.Failure(
-                "invalid_definition",
-                string.Join(" ", definitionErrors));
-        var result = await store.UpdateAsync(command with
+        {
+            return new(
+                ChallengeTemplateWriteState.InvalidDefinition,
+                Detail: string.Join(" ", definitionErrors));
+        }
+        return await store.UpdateAsync(command with
         {
             Title = command.Title.Trim(),
             Description = command.Description?.Trim(),
             Direction = command.Direction.Trim()
         }, ct);
-        return result is null
-            ? OperationResult<ChallengeTemplateView>.Failure("challenge_not_found_or_revision_conflict", "Challenge was not found, access was denied, or its revision changed.")
-            : OperationResult<ChallengeTemplateView>.Success(result);
     }
 }
 

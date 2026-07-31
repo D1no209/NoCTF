@@ -105,16 +105,31 @@ export type NoCtfapiEndpointsSubmissionsSubmissionListItemResponse = {
     processingVersion?: number;
 };
 
-export type NoCtfapiEndpointsSubmissionsListSubmissionsRequest = {
-    [key: string]: never;
-};
-
-export type FastEndpointsErrorResponse = {
-    statusCode?: number;
-    message?: string;
+export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
     errors?: {
         [key: string]: Array<string>;
     };
+    [key: string]: unknown;
+};
+
+export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+};
+
+export type MicrosoftAspNetCoreMvcProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    [key: string]: unknown;
+};
+
+export type NoCtfapiEndpointsSubmissionsListSubmissionsRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsSubmissionsAcceptedSubmissionResponse = {
@@ -144,15 +159,6 @@ export type NoCtfapiEndpointsSubmissionsSubmitFlagRequest = {
 
 export type NoCtfapiEndpointsSubmissionsUploadPatchResponse = {
     patchUploadId?: string;
-};
-
-export type MicrosoftAspNetCoreMvcProblemDetails = {
-    type?: string | null;
-    title?: string | null;
-    status?: number | null;
-    detail?: string | null;
-    instance?: string | null;
-    [key: string]: unknown;
 };
 
 export type NoCtfapiEndpointsSubmissionsUploadPatchRequest = {
@@ -444,6 +450,14 @@ export type NoCtfapiEndpointsAuthenticationRegisterRequest = {
 
 export type NoCtfapiEndpointsAuthenticationVerifyEmailRequest = {
     token: string;
+};
+
+export type FastEndpointsErrorResponse = {
+    statusCode?: number;
+    message?: string;
+    errors?: {
+        [key: string]: Array<string>;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationTeamsBanTeamRequest = {
@@ -809,11 +823,11 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
 export type NoCtfDomainChallengesChallengeVisibility = 0 | 1;
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse = {
-    code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode;
-    userIds?: Array<string>;
+    code: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode;
+    userIds: Array<string>;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'RevisionConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible';
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'RevisionConflict' | 'ActiveCompetitionModeConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest = {
     id?: string | null;
@@ -864,13 +878,13 @@ export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeAttachmen
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeTemplateRequest = {
-    mode?: NoCtfDomainCompetitionsGameMode2;
-    visibility?: NoCtfDomainChallengesChallengeVisibility2;
+    mode: NoCtfDomainCompetitionsGameMode2;
+    visibility: NoCtfDomainChallengesChallengeVisibility2;
     title: string;
     description?: string | null;
     direction: string;
     definitionJson: string;
-    expectedRevision?: number;
+    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeTemplatePermissionsRequest = {
@@ -1327,7 +1341,7 @@ export type NoCtfapiEndpointsSubmissionsListSubmissionsEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1367,7 +1381,7 @@ export type NoCtfapiEndpointsSubmissionsSubmitFixEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1403,7 +1417,7 @@ export type NoCtfapiEndpointsSubmissionsSubmitFlagEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1439,7 +1453,7 @@ export type NoCtfapiEndpointsSubmissionsUploadPatchEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1480,7 +1494,7 @@ export type NoCtfapiEndpointsRuntimeExtendRuntimeEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1694,7 +1708,7 @@ export type NoCtfapiEndpointsNotificationsListNotificationsEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1751,7 +1765,7 @@ export type NoCtfapiEndpointsInternalRecordAwdCheckResultEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1793,7 +1807,7 @@ export type NoCtfapiEndpointsInternalRecordAwdpCheckResultEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -2074,7 +2088,7 @@ export type NoCtfapiEndpointsAuthenticationChangePasswordEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -2138,7 +2152,7 @@ export type NoCtfapiEndpointsAuthenticationLoginEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
 };
 
 export type NoCtfapiEndpointsAuthenticationLoginEndpointError = NoCtfapiEndpointsAuthenticationLoginEndpointErrors[keyof NoCtfapiEndpointsAuthenticationLoginEndpointErrors];
@@ -2226,7 +2240,7 @@ export type NoCtfapiEndpointsAuthenticationRegisterEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     409: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
@@ -2283,7 +2297,7 @@ export type NoCtfapiEndpointsAuthenticationVerifyEmailEndpointErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Not Found
      */
@@ -2352,7 +2366,7 @@ export type AdminBanTeamErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -2543,7 +2557,7 @@ export type AdminListSubmissionsErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -2578,7 +2592,7 @@ export type AdminQueueSubmissionEvaluationErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -2647,7 +2661,7 @@ export type AdminRejudgeSubmissionsErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -2684,7 +2698,7 @@ export type AdminExtendTeamRuntimeErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -2769,7 +2783,7 @@ export type AdminListRuntimesErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3027,7 +3041,7 @@ export type AdminPlatformCreateBotErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3161,7 +3175,7 @@ export type AdminPlatformIssueBotTokenErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3200,7 +3214,7 @@ export type AdminPlatformListDeadLettersErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3293,7 +3307,7 @@ export type AdminPlatformUpdateUserRoleErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3358,7 +3372,7 @@ export type AdminCreateCompetitionErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3463,7 +3477,7 @@ export type AdminUpdateCompetitionErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3601,7 +3615,7 @@ export type AdminCompetitionConfigurationUpdateErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3674,7 +3688,7 @@ export type AdminUpdateCompetitionPermissionsErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3995,7 +4009,7 @@ export type AdminTransferCompetitionOwnerErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4099,7 +4113,7 @@ export type AdminCreateCompetitionChallengeErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4176,7 +4190,7 @@ export type AdminCreateCompetitionChallengeFlagErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4252,7 +4266,7 @@ export type AdminCreateCompetitionChallengeHintErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4294,7 +4308,7 @@ export type AdminDeleteCompetitionChallengeErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4371,7 +4385,7 @@ export type AdminUpdateCompetitionChallengeErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4485,7 +4499,7 @@ export type AdminUpdateCompetitionChallengeFlagErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4598,7 +4612,7 @@ export type AdminUpdateCompetitionChallengeHintErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4672,7 +4686,7 @@ export type AdminChallengeConfigurationUpdateErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4715,7 +4729,7 @@ export type AdminRestoreCompetitionChallengeErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4860,7 +4874,7 @@ export type AdminChallengeBankCreateFlagErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4926,7 +4940,7 @@ export type AdminChallengeBankCreateTemplateErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -4997,7 +5011,7 @@ export type AdminChallengeBankUpdateAttachmentErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -5107,7 +5121,7 @@ export type AdminChallengeBankUpdateFlagErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -5214,7 +5228,7 @@ export type AdminChallengeBankUpdateTemplateErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -5227,7 +5241,7 @@ export type AdminChallengeBankUpdateTemplateErrors = {
      * Not Found
      */
     404: unknown;
-    409: FastEndpointsErrorResponse;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse;
 };
 
 export type AdminChallengeBankUpdateTemplateError = AdminChallengeBankUpdateTemplateErrors[keyof AdminChallengeBankUpdateTemplateErrors];
@@ -5289,7 +5303,7 @@ export type AdminChallengeBankUploadAttachmentErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -5432,7 +5446,7 @@ export type AdminChallengeBankTransferOwnerErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -5472,7 +5486,7 @@ export type AdminChallengeBankUpdatePermissionsErrors = {
     /**
      * Bad Request
      */
-    400: FastEndpointsErrorResponse;
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
