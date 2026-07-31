@@ -1,23 +1,23 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import type { PublicCompetition } from '@/api/competitionPresentation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { Users } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { teamApi, competitionApi } from '@/api/noctf'
+import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import { Button } from '@/components/ui/button'
-import { Users } from 'lucide-vue-next'
 import TeamsWorkspace from '@/components/teams/TeamsWorkspace.vue'
+import { Button } from '@/components/ui/button'
 
 const { t } = useI18n()
 const queryClient = useQueryClient()
 const joinToken = ref('')
 const newTeamName = ref('')
 const selectedCompetitionId = ref('')
-const selectedTrackName = ref('')
 
 interface MyTeam {
   id: string
@@ -33,21 +33,6 @@ interface MyTeam {
   isCaptain: boolean
   isLocked: boolean
   isBanned: boolean
-  trackName?: string | null
-}
-
-interface CompetitionListItem {
-  id: string
-  title: string
-  status: string
-  gameModeType: string
-}
-
-interface CompetitionDetail {
-  id: string
-  title: string
-  tracksEnabled: boolean
-  trackNames: string[]
 }
 
 const { data: teams, isLoading, isError, refetch } = useQuery({
@@ -57,23 +42,15 @@ const { data: teams, isLoading, isError, refetch } = useQuery({
 
 const { data: competitions, isLoading: loadingCompetitions } = useQuery({
   queryKey: queryKeys.competitions,
-  queryFn: () => competitionApi.list<CompetitionListItem[]>(),
-})
-
-const { data: selectedCompetitionDetail, isLoading: loadingSelectedCompetition } = useQuery({
-  queryKey: computed(() => queryKeys.competition(selectedCompetitionId.value)),
-  queryFn: () => competitionApi.get<CompetitionDetail>(selectedCompetitionId.value),
-  enabled: computed(() => !!selectedCompetitionId.value),
+  queryFn: () => competitionApi.list(),
 })
 
 const activeTeams = computed(() => (teams.value ?? []).filter(team => !team.isBanned))
 const bannedTeams = computed(() => (teams.value ?? []).filter(team => team.isBanned))
-const availableCompetitions = computed(() => competitions.value ?? [])
-const selectedCompetitionRequiresTrack = computed(() => Boolean(selectedCompetitionDetail.value?.tracksEnabled))
-const selectedCompetitionTracks = computed(() => selectedCompetitionDetail.value?.trackNames ?? [])
+const availableCompetitions = computed<PublicCompetition[]>(() => competitions.value ?? [])
 const canCreateTeam = computed(() => {
-  if (!selectedCompetitionId.value || !newTeamName.value.trim()) return false
-  if (selectedCompetitionRequiresTrack.value && !selectedTrackName.value) return false
+  if (!selectedCompetitionId.value || !newTeamName.value.trim())
+    return false
   return true
 })
 
@@ -81,20 +58,14 @@ const createTeamMutation = useMutation({
   mutationFn: () => teamApi.create<MyTeam>({
     competitionId: selectedCompetitionId.value,
     name: newTeamName.value.trim(),
-    trackName: selectedCompetitionRequiresTrack.value ? selectedTrackName.value : undefined,
   }),
   onSuccess: (team) => {
     newTeamName.value = ''
-    selectedTrackName.value = ''
     queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
     queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeams(team.competitionId) })
     toast.success(t('teams.createSuccess'))
   },
   onError: () => toast.error(t('teams.actionError')),
-})
-
-watch(selectedCompetitionId, () => {
-  selectedTrackName.value = ''
 })
 
 const joinByTokenMutation = useMutation({
@@ -138,7 +109,6 @@ async function copyToken(token: string) {
 
       <TeamsWorkspace
         v-model:selected-competition-id="selectedCompetitionId"
-        v-model:selected-track-name="selectedTrackName"
         v-model:new-team-name="newTeamName"
         v-model:join-token="joinToken"
         :teams="teams ?? []"
@@ -148,9 +118,6 @@ async function copyToken(token: string) {
         :is-error="isError"
         :loading-competitions="loadingCompetitions"
         :available-competitions="availableCompetitions"
-        :selected-competition-tracks="selectedCompetitionTracks"
-        :selected-competition-requires-track="selectedCompetitionRequiresTrack"
-        :loading-selected-competition="loadingSelectedCompetition"
         :can-create-team="canCreateTeam"
         :create-pending="createTeamMutation.isPending.value"
         :join-pending="joinByTokenMutation.isPending.value"

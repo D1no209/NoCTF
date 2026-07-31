@@ -31,20 +31,6 @@ const auth = useAuthStore()
 const scoreStore = useScoreStore()
 const competitionId = computed(() => route.params.id as string)
 
-interface Competition {
-  id: string
-  title: string
-  description?: string | null
-  status: string
-  startTime: string
-  endTime: string
-  gameModeType: string
-  maxTeamMembers: number
-  teamRegistrationAutoApprove: boolean
-  tracksEnabled: boolean
-  trackNames: string[]
-}
-
 interface Challenge {
   id: string
   title: string
@@ -138,14 +124,13 @@ interface MyCompetitionTeam {
   isLocked: boolean
   isBanned: boolean
   bannedReason?: string | null
-  trackName?: string | null
   registrationStatus: string
   isCaptain: boolean
 }
 
 const { data: competition, isLoading: loadingComp } = useQuery({
   queryKey: computed(() => queryKeys.competition(competitionId.value)),
-  queryFn: () => competitionApi.get<Competition>(competitionId.value),
+  queryFn: () => competitionApi.get(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
@@ -219,8 +204,8 @@ function formatShortDate(iso: string) {
 }
 
 const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
-const isAwdMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awd')
-const isAwdpMode = computed(() => (competition.value?.gameModeType ?? '').toLowerCase() === 'awdp')
+const isAwdMode = computed(() => competition.value?.mode === 'awd')
+const isAwdpMode = computed(() => competition.value?.mode === 'awdp')
 const canManageCompetition = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
 const approvedTeam = computed(() => (myTeams.value ?? []).find(team => team.registrationStatus === 'approved') ?? null)
 const currentTeam = computed(() => approvedTeam.value ?? myTeams.value?.[0] ?? null)
@@ -483,7 +468,7 @@ function bloodStampClass(rank: number) {
               {{ competition.status }}
             </Badge>
             <Badge variant="outline" class="border-border bg-transparent text-foreground">
-              {{ competition.gameModeType }}
+              {{ competition.mode.toUpperCase() }}
             </Badge>
           </div>
         </div>
@@ -560,8 +545,7 @@ function bloodStampClass(rank: number) {
               {{ currentTeam.name }}
             </div>
             <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <span>{{ currentTeam.memberCount }} / {{ competition?.maxTeamMembers ?? 5 }} {{ t('common.members') }}</span>
-              <span v-if="currentTeam.trackName">{{ currentTeam.trackName }}</span>
+              <span v-if="competition">{{ currentTeam.memberCount }} / {{ competition.maxTeamMembers }} {{ t('common.members') }}</span>
               <span class="flex items-center gap-1">
                 <Lock class="size-3" />
                 {{ currentTeam.isLocked ? t('teams.locked') : t('teams.unlocked') }}
@@ -804,7 +788,7 @@ function bloodStampClass(rank: number) {
       :challenge="selectedChallenge"
       :competition-id="competitionId"
       :solved="solvedIds.has(selectedChallenge.id)"
-      :game-mode-type="competition?.gameModeType ?? 'ctf'"
+      :game-mode-type="competition?.mode ?? 'ctf'"
       :is-awd-mode="isAwdMode"
       :is-awdp-mode="isAwdpMode"
       :instance-ready="instanceChallengeIds.has(selectedChallenge.id)"

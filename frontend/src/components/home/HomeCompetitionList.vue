@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import type { PublicCompetition } from '@/api/competitionPresentation'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
+import HomeCompetitionListItem from '@/components/home/HomeCompetitionListItem.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { RouterLink } from 'vue-router'
-import HomeCompetitionListItem, { type HomeCompetition } from '@/components/home/HomeCompetitionListItem.vue'
 
 interface Props {
-  competitions: HomeCompetition[]
+  competitions: PublicCompetition[]
   loading: boolean
 }
 

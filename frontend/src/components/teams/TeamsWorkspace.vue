@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import type { PublicCompetition } from '@/api/competitionPresentation'
 import { AlertCircle, ArrowRight, Copy, Inbox, KeyRound, Loader2, Lock, LogOut, Plus, ShieldAlert } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Panel } from '@/components/ui/panel'
-import { Separator } from '@/components/ui/separator'
 import {
   Select,
   SelectContent,
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface MyTeam {
@@ -31,14 +32,6 @@ interface MyTeam {
   isCaptain: boolean
   isLocked: boolean
   isBanned: boolean
-  trackName?: string | null
-}
-
-interface CompetitionListItem {
-  id: string
-  title: string
-  status: string
-  gameModeType: string
 }
 
 defineProps<{
@@ -48,14 +41,10 @@ defineProps<{
   isLoading: boolean
   isError: boolean
   loadingCompetitions: boolean
-  availableCompetitions: CompetitionListItem[]
+  availableCompetitions: PublicCompetition[]
   selectedCompetitionId: string
-  selectedTrackName: string
-  selectedCompetitionTracks: string[]
   newTeamName: string
   joinToken: string
-  selectedCompetitionRequiresTrack: boolean
-  loadingSelectedCompetition: boolean
   canCreateTeam: boolean
   createPending: boolean
   joinPending: boolean
@@ -64,22 +53,23 @@ defineProps<{
 
 const emit = defineEmits<{
   'update:selectedCompetitionId': [value: string]
-  'update:selectedTrackName': [value: string]
   'update:newTeamName': [value: string]
   'update:joinToken': [value: string]
-  createTeam: []
-  joinByToken: []
-  leaveTeam: [teamId: string]
-  copyToken: [token: string]
-  refetch: []
+  'createTeam': []
+  'joinByToken': []
+  'leaveTeam': [teamId: string]
+  'copyToken': [token: string]
+  'refetch': []
 }>()
 
 const { t } = useI18n()
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const s = status.toLowerCase()
-  if (s === 'approved') return 'default'
-  if (s === 'rejected') return 'destructive'
+  if (s === 'approved')
+    return 'default'
+  if (s === 'rejected')
+    return 'destructive'
   return 'secondary'
 }
 </script>
@@ -104,32 +94,12 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
                 :key="competition.id"
                 :value="competition.id"
               >
-                {{ competition.title }} · {{ competition.gameModeType.toUpperCase() }}
+                {{ competition.title }} · {{ competition.mode.toUpperCase() }}
               </SelectItem>
             </SelectContent>
           </Select>
 
           <Input :model-value="newTeamName" :placeholder="t('teams.teamNamePlaceholder')" @update:model-value="emit('update:newTeamName', String($event))" />
-
-          <Select
-            v-if="selectedCompetitionRequiresTrack"
-            :model-value="selectedTrackName"
-            :disabled="loadingSelectedCompetition"
-            @update:model-value="emit('update:selectedTrackName', String($event))"
-          >
-            <SelectTrigger>
-              <SelectValue :placeholder="loadingSelectedCompetition ? t('common.loading') : t('teams.selectTrack')" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="track in selectedCompetitionTracks"
-                :key="track"
-                :value="track"
-              >
-                {{ track }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
 
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-xs text-muted-foreground">
@@ -210,7 +180,6 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
               </div>
               <div class="flex flex-wrap gap-2">
                 <Badge variant="secondary">{{ team.gameModeType }}</Badge>
-                <Badge v-if="team.trackName" variant="outline">{{ team.trackName }}</Badge>
                 <Badge variant="outline">{{ team.memberCount }} / {{ team.maxTeamMembers }}</Badge>
               </div>
             </CardHeader>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import type { PublicCompetition, PublicCompetitionMode } from '@/api/competitionPresentation'
+import { AlertCircle, ArrowRight, Calendar, Inbox, RotateCw, Search } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { AlertCircle, ArrowRight, Calendar, Inbox, RotateCw, Search, Users } from 'lucide-vue-next'
+import CompetitionListItem from '@/components/competitions/CompetitionListItem.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -16,18 +18,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import CompetitionListItem from '@/components/competitions/CompetitionListItem.vue'
-
-interface Competition {
-  id: string
-  title: string
-  description?: string | null
-  status: string
-  gameModeType?: string | null
-  startTime: string
-  endTime: string
-  registeredTeamCount?: number | null
-}
 
 type LoadState = 'loading' | 'error' | 'empty' | 'filtered-empty' | 'ready'
 
@@ -35,7 +25,7 @@ const props = defineProps<{
   search: string
   statusFilter: string
   modeFilter: string
-  visibleCompetitions: Competition[]
+  visibleCompetitions: PublicCompetition[]
   loadState: LoadState
 }>()
 
@@ -43,14 +33,14 @@ const emit = defineEmits<{
   'update:search': [value: string]
   'update:statusFilter': [value: string]
   'update:modeFilter': [value: string]
-  refresh: []
-  resetFilters: []
+  'refresh': []
+  'resetFilters': []
 }>()
 
 const { t } = useI18n()
 
 const featured = computed(() =>
-  props.visibleCompetitions.find(c => ['running', 'active'].includes(c.status.toLowerCase())),
+  props.visibleCompetitions.find(c => c.status === 'running'),
 )
 
 const gridList = computed(() => {
@@ -59,8 +49,8 @@ const gridList = computed(() => {
   return props.visibleCompetitions.filter(c => c.id !== featured.value!.id)
 })
 
-function modeLabel(mode?: string | null) {
-  return (mode || 'CTF').toUpperCase()
+function modeLabel(mode: PublicCompetitionMode) {
+  return mode.toUpperCase()
 }
 
 function formatDate(iso: string) {
@@ -95,8 +85,10 @@ function formatDate(iso: string) {
           <SelectContent :body-lock="false" :disable-outside-pointer-events="false">
             <SelectItem value="all">{{ t('common.all') }} {{ t('common.status') }}</SelectItem>
             <SelectItem value="draft">{{ t('competitions.status.draft') }}</SelectItem>
+            <SelectItem value="visible">{{ t('competitions.status.visible') }}</SelectItem>
             <SelectItem value="published">{{ t('competitions.status.published') }}</SelectItem>
             <SelectItem value="running">{{ t('competitions.status.running') }}</SelectItem>
+            <SelectItem value="paused">{{ t('competitions.status.paused') }}</SelectItem>
             <SelectItem value="finished">{{ t('competitions.status.finished') }}</SelectItem>
           </SelectContent>
         </Select>
@@ -165,7 +157,7 @@ function formatDate(iso: string) {
               <div class="min-w-0 space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
                   <Badge variant="default" class="animate-status-pulse">{{ t('competitions.status.running') }}</Badge>
-                  <span class="text-xs font-bold uppercase tracking-[0.2em] text-zinc-300">{{ modeLabel(featured.gameModeType) }}</span>
+                  <span class="text-xs font-bold uppercase tracking-[0.2em] text-zinc-300">{{ modeLabel(featured.mode) }}</span>
                 </div>
                 <h2 class="text-2xl font-bold text-zinc-100 md:text-3xl">{{ featured.title }}</h2>
                 <p v-if="featured.description" class="line-clamp-2 text-sm text-zinc-300 md:text-base">{{ featured.description }}</p>
@@ -173,10 +165,6 @@ function formatDate(iso: string) {
                   <div class="flex items-center gap-1.5">
                     <Calendar class="size-3.5" />
                     <span>{{ formatDate(featured.startTime) }} ~ {{ formatDate(featured.endTime) }}</span>
-                  </div>
-                  <div class="flex items-center gap-1.5">
-                    <Users class="size-3.5" />
-                    <span>{{ featured.registeredTeamCount ?? 0 }} {{ t('competitions.registeredTeams') }}</span>
                   </div>
                 </div>
               </div>
