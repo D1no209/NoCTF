@@ -681,6 +681,12 @@ export type NoCtfApplicationCompetitionsLifecycleStartGateError = {
     message?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse = {
+    code: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode = 'ResourceIdConflict' | 'ChallengeOrderConflict' | 'ChallengeTemplateConflict' | 'RevisionConflict' | 'LifecycleStateConflict' | 'ChallengeTemplateNotFound' | 'ChallengeTemplateModeMismatch';
+
 export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     id?: string | null;
     challengeId: string;
@@ -719,6 +725,10 @@ export type NoCtfapiEndpointsAdministrationChallengesSaveChallengeHintRequest = 
     content: string;
     cost?: number;
     publishedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengesDeleteChallengeRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse = {
@@ -763,16 +773,20 @@ export type NoCtfapiEndpointsAdministrationChallengesListChallengeHintsRequest =
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengesRestoreChallengeRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeConfigurationRequest = {
     expectedRevision?: number;
     json: string;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest = {
-    baseScore?: number;
-    order?: number;
-    isPublished?: boolean;
-    expectedRevision?: number;
+    baseScore: number;
+    order: number;
+    isPublished: boolean;
+    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse = {
@@ -4098,7 +4112,7 @@ export type AdminCreateCompetitionChallengeErrors = {
      * Not Found
      */
     404: unknown;
-    409: FastEndpointsErrorResponse;
+    409: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse;
 };
 
 export type AdminCreateCompetitionChallengeError = AdminCreateCompetitionChallengeErrors[keyof AdminCreateCompetitionChallengeErrors];
@@ -4270,11 +4284,17 @@ export type AdminDeleteCompetitionChallengeData = {
         competitionId: string;
         competitionChallengeId: string;
     };
-    query?: never;
+    query: {
+        expectedRevision: number;
+    };
     url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}';
 };
 
 export type AdminDeleteCompetitionChallengeErrors = {
+    /**
+     * Bad Request
+     */
+    400: FastEndpointsErrorResponse;
     /**
      * Unauthorized
      */
@@ -4287,7 +4307,7 @@ export type AdminDeleteCompetitionChallengeErrors = {
      * Not Found
      */
     404: unknown;
-    409: FastEndpointsErrorResponse;
+    409: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse;
 };
 
 export type AdminDeleteCompetitionChallengeError = AdminDeleteCompetitionChallengeErrors[keyof AdminDeleteCompetitionChallengeErrors];
@@ -4364,7 +4384,7 @@ export type AdminUpdateCompetitionChallengeErrors = {
      * Not Found
      */
     404: unknown;
-    409: FastEndpointsErrorResponse;
+    409: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse;
 };
 
 export type AdminUpdateCompetitionChallengeError = AdminUpdateCompetitionChallengeErrors[keyof AdminUpdateCompetitionChallengeErrors];
@@ -4685,11 +4705,17 @@ export type AdminRestoreCompetitionChallengeData = {
         competitionId: string;
         competitionChallengeId: string;
     };
-    query?: never;
+    query: {
+        expectedRevision: number;
+    };
     url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/restore';
 };
 
 export type AdminRestoreCompetitionChallengeErrors = {
+    /**
+     * Bad Request
+     */
+    400: FastEndpointsErrorResponse;
     /**
      * Unauthorized
      */
@@ -4702,7 +4728,7 @@ export type AdminRestoreCompetitionChallengeErrors = {
      * Not Found
      */
     404: unknown;
-    409: FastEndpointsErrorResponse;
+    409: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse;
 };
 
 export type AdminRestoreCompetitionChallengeError = AdminRestoreCompetitionChallengeErrors[keyof AdminRestoreCompetitionChallengeErrors];

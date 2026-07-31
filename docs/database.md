@@ -151,7 +151,9 @@ Challenge owned child：id、challenge_id、object_key、file_name、content_typ
 
 CompetitionChallenge owned child：id、competition_challenge_id、content、cost bigint >= 0、published_at nullable、created_at、updated_at、deleted_at。
 
-Cost=0 且到发布时间后直接可见；Cost>0 需要 HintUnlock ScoringEvent。Hint 变更递增 CompetitionChallenge.Revision 与 Competition.LeaderboardRevision。
+Cost=0 且到发布时间后直接可见；Cost>0 需要 HintUnlock ScoringEvent。Hint 变更与父
+CompetitionChallenge 管理写共享 Competition transaction lock，并在同一事务内递增
+CompetitionChallenge.Revision 与 Competition.LeaderboardRevision。
 
 ## challenge_flags
 

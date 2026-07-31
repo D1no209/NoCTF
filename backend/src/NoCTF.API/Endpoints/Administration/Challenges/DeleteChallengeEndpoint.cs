@@ -1,4 +1,5 @@
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
@@ -7,27 +8,55 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
+public sealed class DeleteChallengeRequest
+{
+    public Guid CompetitionId { get; set; }
+    public Guid CompetitionChallengeId { get; set; }
+    [QueryParam]
+    public int ExpectedRevision { get; set; } = -1;
+}
+
+public sealed class DeleteChallengeValidator : Validator<DeleteChallengeRequest>
+{
+    public DeleteChallengeValidator()
+    {
+        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
+    }
+}
+
 public sealed class DeleteChallengeEndpoint(
     DeleteChallenge delete,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
+    : Endpoint<DeleteChallengeRequest,
+        Results<
+            NoContent,
+            NotFound,
+            ForbidHttpResult,
+            Conflict<CompetitionChallengeConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
         Delete("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminDeleteCompetitionChallenge")
-            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Description(builder => builder.WithName("AdminDeleteCompetitionChallenge"));
         Summary(summary =>
         {
             summary.Summary = "Deletes a competition challenge.";
-            summary.Description = "Soft-deletes the competition link without changing the global challenge template.";
+            summary.Description =
+                "Soft-deletes the competition link at the expected aggregate revision without changing the global challenge template.";
         });
     }
 
     public override async Task<
-        Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+        Results<
+            NoContent,
+            NotFound,
+            ForbidHttpResult,
+            Conflict<CompetitionChallengeConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
+        DeleteChallengeRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
@@ -36,20 +65,27 @@ public sealed class DeleteChallengeEndpoint(
 
         var result = await delete.ExecuteAsync(
             competitionId,
-            Route<Guid>("competitionChallengeId"),
-            user.UserId,
+            request.CompetitionChallengeId,
+            request.ExpectedRevision,
             DateTimeOffset.UtcNow,
             ct);
-        if (result.ErrorCode is "competition_not_found" or "competition_challenge_not_found")
-            return TypedResults.NotFound();
-        if (!result.Succeeded)
+        return result switch
         {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Challenge was not deleted.",
-                detail: result.ErrorMessage);
-        }
-
-        return TypedResults.NoContent();
+            null => TypedResults.NoContent(),
+            ChallengeMutationFailure.CompetitionNotFound
+                or ChallengeMutationFailure.ChallengeNotFound =>
+                TypedResults.NotFound(),
+            ChallengeMutationFailure.RevisionConflict
+                or ChallengeMutationFailure.LifecycleStateConflict =>
+                TypedResults.Conflict(
+                    CompetitionChallengeConflictMapper.ToResponse(result.Value)),
+            ChallengeMutationFailure.InvalidRevision =>
+                TypedResults.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Challenge was not deleted.",
+                    detail: "ExpectedRevision is invalid."),
+            _ => throw new InvalidOperationException(
+                $"Unsupported competition challenge delete failure: {result}.")
+        };
     }
 }

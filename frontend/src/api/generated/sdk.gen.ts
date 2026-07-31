@@ -1139,7 +1139,7 @@ export const adminCreateCompetitionChallengeHint = <ThrowOnError extends boolean
 /**
  * Deletes a competition challenge.
  *
- * Soft-deletes the competition link without changing the global challenge template.
+ * Soft-deletes the competition link at the expected aggregate revision without changing the global challenge template.
  */
 export const adminDeleteCompetitionChallenge = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteCompetitionChallengeData, ThrowOnError>) => (options.client ?? client).delete<AdminDeleteCompetitionChallengeResponses, AdminDeleteCompetitionChallengeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -1276,7 +1276,7 @@ export const adminChallengeConfigurationUpdate = <ThrowOnError extends boolean =
 /**
  * Restores a deleted competition challenge.
  *
- * Restores the competition link only; the global template is not modified.
+ * Restores the competition link at the expected aggregate revision; the global template is not modified.
  */
 export const adminRestoreCompetitionChallenge = <ThrowOnError extends boolean = false>(options: Options<AdminRestoreCompetitionChallengeData, ThrowOnError>) => (options.client ?? client).post<AdminRestoreCompetitionChallengeResponses, AdminRestoreCompetitionChallengeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

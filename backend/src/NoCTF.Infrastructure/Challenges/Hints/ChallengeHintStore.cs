@@ -52,6 +52,10 @@ public sealed class ChallengeHintStore(
         SaveChallengeHintCommand command,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
+            return new(null, ChallengeHintSaveFailure.ScopeNotFound);
+
         var challenge = await db.CompetitionChallenges
             .Include(item => item.Hints)
             .SingleOrDefaultAsync(item =>
@@ -87,10 +91,11 @@ public sealed class ChallengeHintStore(
         hint.UpdatedAt = command.Now;
         challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = command.Now;
-        await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
         try
         {
             await db.SaveChangesAsync(ct);
+            await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
+            await transaction.CommitAsync(ct);
             return new(Map(hint));
         }
         catch (DbUpdateException) when (command.IsCreate)
@@ -106,6 +111,10 @@ public sealed class ChallengeHintStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+            return false;
+
         var challenge = await db.CompetitionChallenges
             .Include(item => item.Hints)
             .SingleOrDefaultAsync(item =>
@@ -118,8 +127,9 @@ public sealed class ChallengeHintStore(
         hint.UpdatedAt = now;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await db.SaveChangesAsync(ct);
+        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await transaction.CommitAsync(ct);
         return true;
     }
 
@@ -130,6 +140,10 @@ public sealed class ChallengeHintStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+            return false;
+
         var challenge = await db.CompetitionChallenges
             .Include(item => item.Hints)
             .SingleOrDefaultAsync(item =>
@@ -143,8 +157,9 @@ public sealed class ChallengeHintStore(
         hint.UpdatedAt = now;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await db.SaveChangesAsync(ct);
+        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
+        await transaction.CommitAsync(ct);
         return true;
     }
 

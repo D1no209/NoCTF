@@ -1,4 +1,3 @@
-using NoCTF.Application.Common;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
@@ -40,13 +39,19 @@ public sealed record ChallengeView(
 
 public enum ChallengeMutationFailure
 {
+    InvalidChallengeId,
+    InvalidBaseScore,
+    InvalidOrder,
+    InvalidRevision,
     CompetitionNotFound,
     TemplateNotFound,
     TemplateModeMismatch,
     ChallengeNotFound,
     ResourceIdConflict,
     ChallengeOrderConflict,
-    RevisionConflict
+    ChallengeTemplateConflict,
+    RevisionConflict,
+    LifecycleStateConflict
 }
 
 public sealed record ChallengeMutationResult(
@@ -79,64 +84,40 @@ public interface IChallengeManagementStore
     Task<ChallengeMutationFailure?> SoftDeleteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        int expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<ChallengeMutationFailure?> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        int expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-}
-
-internal static class ChallengeMutationFailureProtocol
-{
-    public static string Code(ChallengeMutationFailure failure) => failure switch
-    {
-        ChallengeMutationFailure.CompetitionNotFound => "competition_not_found",
-        ChallengeMutationFailure.TemplateNotFound => "challenge_template_not_found",
-        ChallengeMutationFailure.TemplateModeMismatch => "challenge_template_mode_mismatch",
-        ChallengeMutationFailure.ChallengeNotFound => "competition_challenge_not_found",
-        ChallengeMutationFailure.ResourceIdConflict => "resource_id_conflict",
-        ChallengeMutationFailure.ChallengeOrderConflict => "challenge_order_conflict",
-        ChallengeMutationFailure.RevisionConflict => "revision_conflict",
-        _ => "challenge_conflict"
-    };
 }
 
 public sealed class CreateChallenge(
     IChallengeManagementStore store,
     IChallengeConfigurationCatalog configurationCatalog)
 {
-    public async Task<OperationResult<ChallengeView>> ExecuteAsync(
+    public async Task<ChallengeMutationResult> ExecuteAsync(
         CreateCompetitionChallengeCommand command,
         CancellationToken ct = default)
     {
         if (command.ChallengeId == Guid.Empty)
-            return OperationResult<ChallengeView>.Failure("invalid_challenge_id", "ChallengeId is required.");
+            return new(null, ChallengeMutationFailure.InvalidChallengeId);
         if (command.BaseScore < 0)
-            return OperationResult<ChallengeView>.Failure("invalid_base_score", "BaseScore cannot be negative.");
+            return new(null, ChallengeMutationFailure.InvalidBaseScore);
         if (command.Order < 0)
-            return OperationResult<ChallengeView>.Failure("invalid_order", "Order cannot be negative.");
+            return new(null, ChallengeMutationFailure.InvalidOrder);
 
         var competition = await store.GetCompetitionAsync(command.CompetitionId, ct);
         if (competition is null)
-            return OperationResult<ChallengeView>.Failure("competition_not_found", "Competition was not found.");
+            return new(null, ChallengeMutationFailure.CompetitionNotFound);
 
-        var result = await store.CreateAsync(
+        return await store.CreateAsync(
             command,
             configurationCatalog.GetDefaultJson(competition.Mode),
             ct);
-        return result.Challenge is not null
-            ? OperationResult<ChallengeView>.Success(result.Challenge)
-            : Failure(result.Failure);
-    }
-
-    private static OperationResult<ChallengeView> Failure(ChallengeMutationFailure? failure)
-    {
-        var actual = failure ?? ChallengeMutationFailure.ChallengeOrderConflict;
-        return OperationResult<ChallengeView>.Failure(
-            ChallengeMutationFailureProtocol.Code(actual),
-            "Competition challenge was not created.");
     }
 }
 
@@ -171,27 +152,24 @@ public sealed class UpdateChallenge(
     ILeaderboardCache cache,
     IBackendMessagePublisher messages)
 {
-    public async Task<OperationResult<ChallengeView>> ExecuteAsync(
+    public async Task<ChallengeMutationResult> ExecuteAsync(
         UpdateCompetitionChallengeCommand command,
         CancellationToken ct = default)
     {
-        if (command.BaseScore < 0 || command.Order < 0 || command.ExpectedRevision < 0)
-            return OperationResult<ChallengeView>.Failure(
-                "invalid_competition_challenge",
-                "BaseScore, Order, and ExpectedRevision cannot be negative.");
+        if (command.BaseScore < 0)
+            return new(null, ChallengeMutationFailure.InvalidBaseScore);
+        if (command.Order < 0)
+            return new(null, ChallengeMutationFailure.InvalidOrder);
+        if (command.ExpectedRevision < 0)
+            return new(null, ChallengeMutationFailure.InvalidRevision);
 
         var result = await store.UpdateAsync(command, ct);
         if (result.Challenge is null)
-        {
-            var failure = result.Failure ?? ChallengeMutationFailure.RevisionConflict;
-            return OperationResult<ChallengeView>.Failure(
-                ChallengeMutationFailureProtocol.Code(failure),
-                "Competition challenge was not updated.");
-        }
+            return result;
 
         await cache.InvalidateAsync(command.CompetitionId, ct);
         await messages.RebuildCompetitionAsync(command.CompetitionId, ct);
-        return OperationResult<ChallengeView>.Success(result.Challenge);
+        return result;
     }
 }
 
@@ -200,38 +178,63 @@ public sealed class DeleteChallenge(
     ILeaderboardCache cache,
     IBackendMessagePublisher messages)
 {
-    public Task<OperationResult> ExecuteAsync(
+    public Task<ChallengeMutationFailure?> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        Guid actorId,
+        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default) =>
-        ChangeAsync(competitionId, competitionChallengeId, now, restore: false, ct);
+        ChangeAsync(
+            competitionId,
+            competitionChallengeId,
+            expectedRevision,
+            now,
+            restore: false,
+            ct);
 
-    public Task<OperationResult> RestoreAsync(
+    public Task<ChallengeMutationFailure?> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default) =>
-        ChangeAsync(competitionId, competitionChallengeId, now, restore: true, ct);
+        ChangeAsync(
+            competitionId,
+            competitionChallengeId,
+            expectedRevision,
+            now,
+            restore: true,
+            ct);
 
-    private async Task<OperationResult> ChangeAsync(
+    private async Task<ChallengeMutationFailure?> ChangeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        int expectedRevision,
         DateTimeOffset now,
         bool restore,
         CancellationToken ct)
     {
+        if (expectedRevision < 0)
+            return ChallengeMutationFailure.InvalidRevision;
+
         var failure = restore
-            ? await store.RestoreAsync(competitionId, competitionChallengeId, now, ct)
-            : await store.SoftDeleteAsync(competitionId, competitionChallengeId, now, ct);
+            ? await store.RestoreAsync(
+                competitionId,
+                competitionChallengeId,
+                expectedRevision,
+                now,
+                ct)
+            : await store.SoftDeleteAsync(
+                competitionId,
+                competitionChallengeId,
+                expectedRevision,
+                now,
+                ct);
         if (failure is not null)
-            return OperationResult.Failure(
-                ChallengeMutationFailureProtocol.Code(failure.Value),
-                restore ? "Competition challenge was not restored." : "Competition challenge was not deleted.");
+            return failure;
 
         await cache.InvalidateAsync(competitionId, ct);
         await messages.RebuildCompetitionAsync(competitionId, ct);
-        return OperationResult.Success();
+        return null;
     }
 }
