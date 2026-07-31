@@ -147,12 +147,6 @@ services:
       RunnerScoring__Issuer: NoCTF.E2E.Runner
       RunnerScoring__Audience: NoCTF.E2E.Scoring
       RunnerScoring__CallbackBaseUrl: http://backend:8080
-      Storage__Provider: S3
-      Storage__S3__ServiceUrl: http://minio:9000
-      Storage__S3__Bucket: noctf
-      Storage__S3__ForcePathStyle: "true"
-      AWS_ACCESS_KEY_ID: ${NOCTF_E2E_MINIO_USER}
-      AWS_SECRET_ACCESS_KEY: ${NOCTF_E2E_MINIO_PASSWORD}
       Runtime__Docker__Endpoint: unix:///var/run/docker.sock
       Runtime__Docker__Network: ${NOCTF_E2E_NETWORK}
       Runtime__Docker__PublicHost: 127.0.0.1

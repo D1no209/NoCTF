@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Runtime;
-using NoCTF.Infrastructure.Storage;
 using NoCTF.Runner.Composition;
 
 namespace NoCTF.Tests.Unit.Runner;
@@ -73,7 +72,28 @@ public sealed class RunnerAvailabilityOptionsTests
     }
 
     [Test]
-    public async Task Runner_uses_the_configured_s3_object_storage_adapter()
+    public async Task Runner_requires_an_explicit_internal_api_base_url()
+    {
+        Func<ServiceProvider> build = () => BuildServices(
+            new Dictionary<string, string?>(),
+            configureCallbackBaseUrl: false);
+
+        await Assert.That(build).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task Runner_rejects_a_relative_internal_api_base_url()
+    {
+        Func<ServiceProvider> build = () => BuildServices(new Dictionary<string, string?>
+        {
+            ["RunnerScoring:CallbackBaseUrl"] = "backend:8080"
+        });
+
+        await Assert.That(build).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task Runner_does_not_receive_an_object_storage_adapter()
     {
         using var services = BuildServices(new Dictionary<string, string?>
         {
@@ -91,15 +111,20 @@ public sealed class RunnerAvailabilityOptionsTests
             ["Storage:S3:Bucket"] = "noctf"
         });
 
-        var storage = services.GetRequiredService<IObjectStorage>();
+        var storage = services.GetService<IObjectStorage>();
 
-        await Assert.That(storage).IsTypeOf<S3ObjectStorage>();
+        await Assert.That(storage).IsNull();
     }
 
-    private static ServiceProvider BuildServices(IReadOnlyDictionary<string, string?> values)
+    private static ServiceProvider BuildServices(
+        IReadOnlyDictionary<string, string?> values,
+        bool configureCallbackBaseUrl = true)
     {
         var configurationValues = values.ToDictionary(pair => pair.Key, pair => pair.Value);
         configurationValues["ConnectionStrings:Redis"] = "localhost:6379";
+        if (configureCallbackBaseUrl
+            && !configurationValues.ContainsKey("RunnerScoring:CallbackBaseUrl"))
+            configurationValues["RunnerScoring:CallbackBaseUrl"] = "https://api.internal";
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configurationValues)
             .Build();
