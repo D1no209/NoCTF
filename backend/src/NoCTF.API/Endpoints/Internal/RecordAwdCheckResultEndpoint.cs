@@ -53,12 +53,20 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
                 $"runtime:{runtimeId:D}",
                 StringComparison.Ordinal) ||
             !int.TryParse(User.FindFirstValue("generation"), out var generation) ||
+            !long.TryParse(
+                User.FindFirstValue("checker_sequence"),
+                out var checkerSequence) ||
+            !long.TryParse(
+                User.FindFirstValue("processing_version"),
+                out var processingVersion) ||
             !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
             DateTimeOffset.UtcNow > DateTimeOffset.FromUnixTimeSeconds(deadline).AddHours(24))
             return TypedResults.Unauthorized();
         var disposition = await record.AwdAsync(AwdCheckResult.Create(
             runtimeId,
             generation,
+            checkerSequence,
+            processingVersion,
             request.State,
             DateTimeOffset.UtcNow), ct);
         return disposition switch

@@ -16,10 +16,14 @@ public sealed class AwdCheckerResultTests
         var result = AwdCheckResult.Create(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             generation: 2,
+            checkerSequence: 3,
+            processingVersion: 4,
             state,
             DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(result.State).IsEqualTo(state);
+        await Assert.That(result.CheckerSequence).IsEqualTo(3);
+        await Assert.That(result.ProcessingVersion).IsEqualTo(4);
     }
 
     [Test]

@@ -1587,7 +1587,7 @@ revision 冲突合并成不可判定字符串，也不能在活动 CompetitionCh
 - 本节作为独立 Frontend 本地提交，提交说明为
   `feat(admin): decode template mode conflicts`；不 push、不创建 PR。保护文件继续沿用 6.18。
 
-### 6.28 Backend Kubernetes Container 动态 NodePort 与重放安全（2026-07-31，当前最新 Backend）
+### 6.28 Backend Kubernetes Container 动态 NodePort 与重放安全（2026-07-31）
 
 本节完成 runtime 网络审计中不依赖产品取舍的 Kubernetes Container 公网端口缺口。原实现只
 创建 ClusterIP Service，并把请求中的 `containerPort -> 0` 原样写入 receipt，导致 persistent
@@ -1649,10 +1649,76 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
 - 本节作为独立 Backend 本地提交，提交说明为
   `fix(runtime): reconcile kubernetes node ports`；不 push、不创建 PR。保护文件继续沿用
   6.18。
-- 下一项不依赖 Docker egress 产品决策的 Backend 安全纵切，是让 AWD checker callback 的
-  `checker_sequence` / `processing_version` 真正参与持久化 fence，防止同 generation 的旧
-  token 覆盖较新的 checker 状态。Docker `DenyAll/InternetOnly` 的实现仍等待用户在 host
-  firewall executor/sidecar 与 transparent egress gateway 间选择，不自行发明 dataplane。
+- 本节记录的下一项 AWD checker callback sequence/version persistence fence 已在 6.29
+  完成。Docker `DenyAll/InternetOnly` 的实现仍等待用户在 host firewall executor/sidecar
+  与 transparent egress gateway 间选择，不自行发明 dataplane。
+
+### 6.29 Backend AWD checker callback 持久化栅栏（2026-07-31，当前最新 Backend）
+
+本节完成 6.28 指定的下一项安全纵切。原 token issuer 与 API auth policy 已写入并要求
+`checker_sequence` / `processing_version`，但 Endpoint 丢弃这两个 claim，Application 结果
+对象也没有对应字段；PostgreSQL Store 只校验 generation，随后会把旧 callback 的状态冒充为
+当前 checker sequence、推进 `LastAppliedCheckerSequence` 并清除新 checker deadline。现在
+不保留该行为。
+
+#### Claim 贯通、FOR UPDATE fence 与既有多回调语义
+
+- `RecordAwdCheckResultEndpoint` 解析 runtime identity、generation、checker sequence、
+  runtime processing version 与 deadline；数字 claim 非法时在进入 Application/Store 前
+  返回 401。Request body 仍只接受强类型 `AwdServiceState`。
+- `AwdCheckResult` 显式携带 sequence/version；`InternalResultStore.RecordAwdAsync` 在
+  `SELECT ... FOR UPDATE` 取得 Runtime 行锁后比较两个 fence：
+  - token 任一值领先当前 Runtime 时返回 `Conflict`；
+  - 否则任一值落后当前 Runtime 时返回 `Superseded`；
+  - 两项都精确相等时才允许更新 checker 状态、时间、last-applied sequence 与 deadline。
+- 精确 fence 内仍保留现行协议：同一次 checker 执行可以多次回调，后一次 typed status
+  覆盖前一次；并发相同 callback 也仍可返回 `Applied`，但状态未变化时不会重复生成计分
+  事实。sequence/version fence 只阻止旧任务冒充当前任务，不把 callback 改成一次性 token。
+- callback 的 transport receive time 可能与取得行锁的顺序相反。Store 在 Runtime 行锁内先
+  归一化到 PostgreSQL 微秒精度，再相对上一 applied timestamp 严格单调推进；Runtime 状态
+  与 ScoringEvent 共用该时间，避免最终状态与按 OccurredAt 读取的计分时间线分叉。
+- 所有拒绝分支都发生在 revision/scoring 查询和写入之前，不修改 CheckerStatus、
+  CheckerStatusUpdatedAt、LastAppliedCheckerSequence、CheckerDeadlineAt、ScoringEvent、
+  LeaderboardRevision 或 Outbox。
+- 不同 Team/Runtime 可同时改变同一 Competition 的服务状态；LeaderboardRevision 不再对
+  tracked Competition 做客户端 `R -> R+1`，改用数据库表达式原子递增，防止共享 revision
+  丢更新及旧投影误标为最新。
+- `LastAppliedCheckerSequence` 从已校验的 result sequence 写回。原实现还把 checker sequence
+  塞入 `AwdServiceStatus.ProcessingVersion`；该字段按 `docs/database.md` 只属于 submission
+  processing，此类事件现在保持 null。`docs/api.md`、`docs/runtime.md` 与认证文档已同步
+  sequence/version fence 及同次多回调边界。
+
+#### 验证、OpenAPI、Frontend 与远端基线
+
+- 新增 TestServer HTTP 回归，证明两个 JWT fence claim 精确进入 Application、畸形 claim
+  返回 401 且不调用 Store，并验证 `Superseded -> 202`、`Conflict -> 409`。
+- 真实 PostgreSQL/Testcontainers 回归先在旧实现上得到 `Applied`、复现旧 sequence 覆盖，
+  修复后覆盖：同 sequence 多次写、旧 sequence、旧 processing version、未来 sequence、
+  未来 processing version、stale/future 混合输入、逆序 receive time、并发 callback 与
+  拒绝后的完整无副作用；另用共享 SQL barrier 强制两个 Runtime 都先读到同一 Competition
+  revision，再证明原子累加结果为 `R+2`。
+- WSL 原生校验副本、.NET SDK 10.0.301、真实 Docker/Testcontainers：
+  - HTTP + PostgreSQL 定向用例：6/6 passed；
+  - non-Integration：447/447 passed；
+  - Integration：70 total，68 passed、0 failed、2 skipped；两个 skip 仍是未启用的真实
+    Kubernetes dataplane 与未配置 fixture 的真实 Libvirt opt-in；
+  - Release `NoCTF.slnx` build：0 warning、0 error；
+  - 全 solution analyzer、本轮 C# whitespace、EF pending model 与 `git diff --check`
+    passed；独立 blocker-only 复核最终无 P1/P2 或剩余明确测试缺口。
+- OpenAPI 仍为 134 endpoints；两份 artifact 在两次导出前后均字节一致且 byte-stable，
+  SHA-256 都是
+  `3429B4071BA6BF302C422EEAC36B5F4331D0234E33CB2494F32B67EDFEA1763C`。
+  route、request body、response union 与 generated contract 均未改变，因此无需重建
+  Frontend SDK，也没有 URL 或页面适配。
+- 提交前通过 GitHub compare 核验远端 `main` 仍为
+  `1687acbd6c81944cbad2672698b3b3c1002c98da`，与本地已合并基线 `identical`；没有新冲突，
+  不制造空 merge commit。
+- 本节作为独立 Backend 本地提交，提交说明为
+  `fix(runtime): fence awd checker callbacks`；不 push、不创建 PR。保护文件继续沿用 6.18。
+- 当前没有另一项既不依赖正式 Kubernetes/Libvirt 环境、也不需要产品/运维选择的明确
+  Backend 纵切。下一步 Docker `InternetOnly` 必须先用 `$grill-me` 在 host firewall
+  executor/sidecar 与 transparent egress gateway 间取得用户决定；TargetPort ACL 与
+  callback-only gateway 仍按独立决策处理。
 
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
@@ -1662,6 +1728,7 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
   Challenge definition 三个 revision，任一变化均 PlatformFailed、清理且不自动重跑；
 - Docker 直接随机宿主端口、E2E socket GID/清理修正和 shell fixture LF 约束；
 - Kubernetes Container 动态 NodePort、强 identity replay 与 UID-precondition 清理；
+- AWD checker callback sequence/version 的 PostgreSQL 行锁 fence 与旧 token 无副作用拒绝；
 - 四模式全边界、真实 PostgreSQL、EF、OpenAPI 和 solution 门禁。
 
 仍未完成/不属于本轮已部署：
@@ -1675,16 +1742,19 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
   环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境；
-  Kubernetes Container 动态 NodePort 与重放安全已按 6.28 完成；Docker `InternetOnly`、
-  TargetPort ACL 和 callback-only gateway 仍是已记录的后续加固，不阻塞本轮架构迁移。
+  Kubernetes Container 动态 NodePort 与重放安全已按 6.28 完成，AWD checker callback
+  持久化 fence 已按 6.29 完成；Docker `InternetOnly`、TargetPort ACL 和 callback-only
+  gateway 仍是已记录的后续加固，不阻塞本轮架构迁移。
 
 ## 7. 建议的下一交接顺序
 
-1. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
-2. 先完成 AWD checker callback 的 sequence/version persistence fence；Docker
-   `InternetOnly` 等待用户选择 dataplane，TargetPort ACL 与 callback-only gateway 继续按
-   已记录边界逐项决策，不自行扩展产品协议。
-3. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
+1. 先用 `$grill-me` 让用户选择 Docker `InternetOnly` dataplane：
+   host firewall executor/sidecar，或 transparent egress gateway；没有选择前只做只读审计，
+   不自行实现第三种协议。
+2. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
+3. TargetPort ACL 与 callback-only gateway 继续按已记录边界逐项决策，不与
+   `InternetOnly` 偷偷捆绑。
+4. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
 
 如果后续工作出现产品语义或重大架构歧义，停止该步并用 `$grill-me`；可以继续不依赖该
 决策的只读审计，但不能自行发明新协议。
@@ -1714,8 +1784,9 @@ Container 的 URL 无法展开；重放还会按名称信任 Pod/Service/Network
    均已完成。CompetitionChallenge typed 409、delete/restore revision fence 与 Frontend
    generated-SDK 适配已按 6.24/6.25 完成；Challenge template Mode 活动引用 invariant
    Backend 与最小 Frontend decoder 已按 6.26/6.27 完成；Kubernetes Container 动态
-   NodePort 与重放安全按 6.28 完成。引用权限 Backend 测试数量时使用 6.22，引用最新
-   Backend 状态时使用 6.28，引用最新 Frontend 状态时使用 6.27。
+   NodePort 与重放安全按 6.28 完成；AWD checker callback sequence/version 持久化 fence
+   按 6.29 完成。引用权限 Backend 测试数量时使用 6.22，引用最新 Backend 状态时使用
+   6.29，引用最新 Frontend 状态时使用 6.27。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

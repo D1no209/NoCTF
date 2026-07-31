@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Configuration;
@@ -81,7 +83,12 @@ public sealed class AwdCheckerPersistenceTests
                 await Assert.That(outbox.NodeMessages.OfType<RunAwdChecker>().Count()).IsEqualTo(1);
             }
             var up = AwdCheckResult.Create(
-                fixture.RuntimeId, 3, AwdServiceState.Up, fixture.Now.AddSeconds(1));
+                fixture.RuntimeId,
+                3,
+                first.CheckerSequence,
+                first.ProcessingVersion,
+                AwdServiceState.Up,
+                fixture.Now.AddSeconds(1));
             var concurrentCallbacks = await Task.WhenAll(
                 RecordAsync(options, outbox, up, cancellationToken),
                 RecordAsync(options, outbox, up, cancellationToken));
@@ -106,18 +113,26 @@ public sealed class AwdCheckerPersistenceTests
                 .Single(message => message.CheckerSequence == 2);
             await Assert.That(second.CompetitionConfigurationRevision).IsEqualTo(0);
             await Assert.That(second.CompetitionChallengeRevision).IsEqualTo(0);
-            await using (var downDb = new NoCtfDbContext(options))
-            {
-                var store = new InternalResultStore(downDb, outbox);
-                var down = AwdCheckResult.Create(
-                    fixture.RuntimeId, 3, AwdServiceState.Down, fixture.Now.AddSeconds(3));
-                await Assert.That(await store.RecordAwdAsync(down, cancellationToken))
-                    .IsEqualTo(InternalResultDisposition.Applied);
-                var later = AwdCheckResult.Create(
-                    fixture.RuntimeId, 3, AwdServiceState.Up, fixture.Now.AddSeconds(4));
-                await Assert.That(await store.RecordAwdAsync(later, cancellationToken))
-                    .IsEqualTo(InternalResultDisposition.Applied);
-            }
+            var down = AwdCheckResult.Create(
+                fixture.RuntimeId,
+                3,
+                second.CheckerSequence,
+                second.ProcessingVersion,
+                AwdServiceState.Down,
+                fixture.Now.AddSeconds(4));
+            await Assert.That(await RecordAsync(
+                    options, outbox, down, cancellationToken))
+                .IsEqualTo(InternalResultDisposition.Applied);
+            var later = AwdCheckResult.Create(
+                fixture.RuntimeId,
+                3,
+                second.CheckerSequence,
+                second.ProcessingVersion,
+                AwdServiceState.Up,
+                fixture.Now.AddSeconds(3));
+            await Assert.That(await RecordAsync(
+                    options, outbox, later, cancellationToken))
+                .IsEqualTo(InternalResultDisposition.Applied);
 
             await using (var thirdDispatchDb = new NoCtfDbContext(options))
             {
@@ -133,6 +148,72 @@ public sealed class AwdCheckerPersistenceTests
             }
             var third = outbox.NodeMessages.OfType<RunAwdChecker>()
                 .Single(message => message.CheckerSequence == 3);
+            await Assert.That(await RecordAsync(
+                    options, outbox, down, cancellationToken))
+                .IsEqualTo(InternalResultDisposition.Superseded);
+            var staleProcessingVersion = AwdCheckResult.Create(
+                fixture.RuntimeId,
+                3,
+                third.CheckerSequence,
+                third.ProcessingVersion - 1,
+                AwdServiceState.Down,
+                fixture.Now.AddSeconds(5));
+            await Assert.That(await RecordAsync(
+                    options, outbox, staleProcessingVersion, cancellationToken))
+                .IsEqualTo(InternalResultDisposition.Superseded);
+            var futureProcessingVersion = staleProcessingVersion with
+            {
+                ProcessingVersion = third.ProcessingVersion + 1
+            };
+            await Assert.That(await RecordAsync(
+                    options, outbox, futureProcessingVersion, cancellationToken))
+                .IsEqualTo(InternalResultDisposition.Conflict);
+            var futureCheckerSequence = staleProcessingVersion with
+            {
+                CheckerSequence = third.CheckerSequence + 1,
+                ProcessingVersion = third.ProcessingVersion
+            };
+            await Assert.That(await RecordAsync(
+                    options, outbox, futureCheckerSequence, cancellationToken))
+                .IsEqualTo(InternalResultDisposition.Conflict);
+            var mixedFence = futureCheckerSequence with
+            {
+                ProcessingVersion = third.ProcessingVersion - 1
+            };
+            await Assert.That(await RecordAsync(
+                    options, outbox, mixedFence, cancellationToken))
+                .IsEqualTo(InternalResultDisposition.Conflict);
+            await using (var fenceDb = new NoCtfDbContext(options))
+            {
+                var runtime = await fenceDb.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(cancellationToken);
+                await Assert.That(runtime.CheckerStatus).IsEqualTo(AwdServiceState.Up);
+                var expectedUpdatedAt = down.OccurredAt.AddTicks(
+                    -(down.OccurredAt.Ticks % TimeSpan.TicksPerMicrosecond)
+                    + TimeSpan.TicksPerMicrosecond);
+                await Assert.That(runtime.CheckerStatusUpdatedAt)
+                    .IsEqualTo(expectedUpdatedAt);
+                await Assert.That(runtime.LastAppliedCheckerSequence)
+                    .IsEqualTo(second.CheckerSequence);
+                var expectedDeadline = third.Deadline.AddTicks(
+                    -(third.Deadline.Ticks % TimeSpan.TicksPerMicrosecond));
+                await Assert.That(runtime.CheckerDeadlineAt).IsEqualTo(expectedDeadline);
+                var scoringEvents = await fenceDb.ScoringEvents.AsNoTracking()
+                    .Where(item => item.Kind == ScoringEventKind.AwdServiceStatus)
+                    .OrderBy(item => item.OccurredAt)
+                    .ToListAsync(cancellationToken);
+                await Assert.That(scoringEvents).Count().IsEqualTo(2);
+                await Assert.That(scoringEvents.Select(item => item.Result))
+                    .IsEquivalentTo([ScoringResult.Wrong, ScoringResult.Correct]);
+                await Assert.That(scoringEvents.Select(item => item.ProcessingVersion))
+                    .IsEquivalentTo(new long?[] { null, null });
+                var leaderboardRevision = await fenceDb.Competitions.AsNoTracking()
+                    .Select(competition => competition.LeaderboardRevision)
+                    .SingleAsync(cancellationToken);
+                await Assert.That(leaderboardRevision).IsEqualTo(2);
+                await Assert.That(outbox.Published.OfType<ProjectLeaderboard>().Count())
+                    .IsEqualTo(2);
+            }
             await using (var deadlineDb = new NoCtfDbContext(options))
             {
                 var schedule = await deadlineDb.DurableMaintenanceSchedules.SingleAsync(
@@ -186,6 +267,73 @@ public sealed class AwdCheckerPersistenceTests
             await Assert.That(runtimeState.LastAppliedCheckerSequence).IsEqualTo(4);
             await Assert.That(runtimeState.CheckerDeadlineAt).IsNotNull();
             await Assert.That(second.Deadline).IsEqualTo(fixture.Now.AddSeconds(12));
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Concurrent_runtime_callbacks_increment_the_shared_revision_atomically(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_awd_checker_revision")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var revisionReadBarrier = new CompetitionRevisionReadBarrier();
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(revisionReadBarrier)
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var secondRuntimeId = await AddConcurrentRuntimeAsync(
+                options,
+                fixture,
+                cancellationToken);
+            revisionReadBarrier.Enable();
+            var outbox = new RecordingOutbox();
+            var first = AwdCheckResult.Create(
+                fixture.RuntimeId,
+                3,
+                checkerSequence: 1,
+                processingVersion: 7,
+                AwdServiceState.Down,
+                fixture.Now.AddSeconds(1));
+            var second = AwdCheckResult.Create(
+                secondRuntimeId,
+                3,
+                checkerSequence: 1,
+                processingVersion: 7,
+                AwdServiceState.Down,
+                fixture.Now.AddSeconds(1));
+
+            var dispositions = await Task.WhenAll(
+                RecordAsync(options, outbox, first, cancellationToken),
+                RecordAsync(options, outbox, second, cancellationToken));
+
+            await Assert.That(dispositions.Count(
+                disposition => disposition == InternalResultDisposition.Applied))
+                .IsEqualTo(2);
+            await Assert.That(revisionReadBarrier.Arrivals).IsEqualTo(2);
+            await using var verify = new NoCtfDbContext(options);
+            var scoringEvents = await verify.ScoringEvents.AsNoTracking()
+                .Where(item => item.Kind == ScoringEventKind.AwdServiceStatus)
+                .ToListAsync(cancellationToken);
+            await Assert.That(scoringEvents).Count().IsEqualTo(2);
+            await Assert.That(scoringEvents.All(
+                scoringEvent => scoringEvent.Result == ScoringResult.Wrong)).IsTrue();
+            await Assert.That(scoringEvents.Select(scoringEvent => scoringEvent.TeamId).Distinct())
+                .Count().IsEqualTo(2);
+            var leaderboardRevision = await verify.Competitions.AsNoTracking()
+                .Select(competition => competition.LeaderboardRevision)
+                .SingleAsync(cancellationToken);
+            await Assert.That(leaderboardRevision).IsEqualTo(2);
+            await Assert.That(outbox.Published.OfType<ProjectLeaderboard>().Count())
+                .IsEqualTo(2);
         });
     }
 
@@ -282,6 +430,62 @@ public sealed class AwdCheckerPersistenceTests
         return new(now, competitionId, competitionChallengeId, runtimeId);
     }
 
+    private static async Task<Guid> AddConcurrentRuntimeAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var first = await db.RuntimeInstances.SingleAsync(
+            runtime => runtime.Id == fixture.RuntimeId,
+            cancellationToken);
+        first.CheckerSequence = 1;
+        first.CheckerStatus = AwdServiceState.Up;
+        first.CheckerStatusUpdatedAt = fixture.Now;
+        first.CheckerDeadlineAt = fixture.Now.AddSeconds(10);
+
+        var userId = Guid.CreateVersion7();
+        var teamId = Guid.CreateVersion7();
+        var runtimeId = Guid.CreateVersion7();
+        db.Users.Add(NewUser(userId, "member-two", fixture.Now));
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = fixture.CompetitionId,
+            Name = "team-two",
+            NormalizedName = "TEAM-TWO",
+            CaptainId = userId,
+            MemberIds = [userId],
+            InvitationToken = new string('b', 32),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegisteredAt = fixture.Now
+        });
+        db.RuntimeInstances.Add(new RuntimeInstance
+        {
+            Id = runtimeId,
+            CompetitionId = fixture.CompetitionId,
+            CompetitionChallengeId = fixture.CompetitionChallengeId,
+            TeamId = teamId,
+            Generation = 3,
+            RuntimeKind = RuntimeKind.Container,
+            RuntimeProvider = RuntimeProvider.Docker,
+            RunnerPool = "awd",
+            RunnerId = "runner-b",
+            State = RuntimeState.Running,
+            ProcessingVersion = 7,
+            ProviderReceiptJson = "{}",
+            AwdCheckerTargetHost = "service.internal",
+            CheckerStatus = AwdServiceState.Up,
+            CheckerStatusUpdatedAt = fixture.Now,
+            CheckerSequence = 1,
+            CheckerDeadlineAt = fixture.Now.AddSeconds(10),
+            CreatedAt = fixture.Now,
+            RunningAt = fixture.Now
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return runtimeId;
+    }
+
     private static User NewUser(Guid id, string name, DateTimeOffset now) => new()
     {
         Id = id,
@@ -311,18 +515,58 @@ public sealed class AwdCheckerPersistenceTests
         Guid CompetitionChallengeId,
         Guid RuntimeId);
 
+    private sealed class CompetitionRevisionReadBarrier : DbCommandInterceptor
+    {
+        private readonly TaskCompletionSource<bool> release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int arrivals;
+        private int enabled;
+
+        public int Arrivals => Volatile.Read(ref arrivals);
+
+        public void Enable() => Volatile.Write(ref enabled, 1);
+
+        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            if (Volatile.Read(ref enabled) == 0
+                || !command.CommandText.TrimStart().StartsWith(
+                    "SELECT",
+                    StringComparison.OrdinalIgnoreCase)
+                || !command.CommandText.Contains(
+                    "competition_challenges",
+                    StringComparison.OrdinalIgnoreCase)
+                || !command.CommandText.Contains(
+                    "competitions",
+                    StringComparison.OrdinalIgnoreCase))
+                return result;
+
+            if (Interlocked.Increment(ref arrivals) == 2)
+                release.TrySetResult(true);
+            await release.Task.WaitAsync(cancellationToken);
+            return result;
+        }
+    }
+
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {
+        private readonly object sync = new();
+
         public List<object> Published { get; } = [];
         public List<object> NodeMessages { get; } = [];
         public ValueTask PublishAsync<T>(T message)
         {
-            Published.Add(message!);
+            lock (sync)
+                Published.Add(message!);
             return ValueTask.CompletedTask;
         }
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt)
         {
-            Published.Add(message!);
+            lock (sync)
+                Published.Add(message!);
             return ValueTask.CompletedTask;
         }
         public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
@@ -331,7 +575,8 @@ public sealed class AwdCheckerPersistenceTests
             where T : IRunnerPoolMessage => ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage
         {
-            NodeMessages.Add(message!);
+            lock (sync)
+                NodeMessages.Add(message!);
             return ValueTask.CompletedTask;
         }
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
