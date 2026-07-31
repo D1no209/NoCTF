@@ -231,6 +231,7 @@ public sealed class ResourceManagerRolePersistenceTests
                     now.AddHours(2),
                     true,
                     5,
+                    0,
                     ordinaryUserId,
                     now),
                 cancellationToken);

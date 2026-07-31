@@ -12,6 +12,7 @@ public sealed record CreateCompetitionCommand(
     DateTimeOffset EndTime,
     bool TeamRegistrationAutoApprove,
     int MaxTeamMembers,
+    int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId,
     DateTimeOffset CreatedAt);
 
@@ -25,6 +26,7 @@ public sealed record CompetitionView(
     CompetitionStatus Status,
     bool TeamRegistrationAutoApprove,
     int MaxTeamMembers,
+    int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId);
 
 public enum CompetitionCreationState
@@ -52,6 +54,7 @@ public sealed record UpdateCompetitionCommand(
     DateTimeOffset EndTime,
     bool TeamRegistrationAutoApprove,
     int MaxTeamMembers,
+    int MaxConcurrentRuntimeInstancesPerTeam,
     Guid ActorId,
     DateTimeOffset UpdatedAt);
 

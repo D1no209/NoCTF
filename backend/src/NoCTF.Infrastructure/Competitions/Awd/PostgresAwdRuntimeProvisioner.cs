@@ -7,6 +7,7 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Runtime.Instances;
 
 namespace NoCTF.Infrastructure.Competitions.Awd;
 
@@ -29,11 +30,15 @@ public sealed class PostgresAwdRuntimeProvisioner(
         if (status != CompetitionStatus.Running)
             return AwdRuntimeProvisioningOutcome.RejectedBusiness;
 
-        var mode = await db.Competitions.AsNoTracking()
+        var competition = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)
-            .Select(competition => competition.Mode)
+            .Select(competition => new
+            {
+                competition.Mode,
+                competition.MaxConcurrentRuntimeInstancesPerTeam
+            })
             .SingleAsync(cancellationToken);
-        if (mode != GameMode.Awd)
+        if (competition.Mode != GameMode.Awd)
             return AwdRuntimeProvisioningOutcome.NotApplicable;
 
         var challenges = await db.CompetitionChallenges.AsNoTracking()
@@ -56,30 +61,111 @@ public sealed class PostgresAwdRuntimeProvisioner(
                 && !team.IsBanned
                 && team.DeletedAt == null)
             .Select(team => team.Id)
+            .Order()
             .ToListAsync(cancellationToken);
+        foreach (var teamId in teamIds)
+        {
+            await TeamRuntimeQuota.AcquireLockAsync(
+                db,
+                competitionId,
+                teamId,
+                cancellationToken);
+        }
         var challengeIds = challenges.Select(challenge => challenge.Id).ToArray();
-        var existing = await db.RuntimeInstances.AsNoTracking()
-            .Where(runtime => challengeIds.Contains(runtime.CompetitionChallengeId)
-                && runtime.TeamId != null)
-            .Select(runtime => new
-            {
-                runtime.CompetitionChallengeId,
-                TeamId = runtime.TeamId!.Value,
-                runtime.Generation,
-                runtime.State
-            })
+        var existing = await db.RuntimeInstances
+            .Where(runtime => runtime.CompetitionId == competitionId
+                && runtime.Purpose == RuntimePurpose.Player
+                && runtime.TeamId != null
+                && teamIds.Contains(runtime.TeamId.Value))
             .ToListAsync(cancellationToken);
+        var desiredChallengeIds = challengeIds.ToHashSet();
+        if (existing.Any(runtime =>
+                desiredChallengeIds.Contains(runtime.CompetitionChallengeId)
+                && runtime.State == RuntimeState.Stopping))
+            return AwdRuntimeProvisioningOutcome.DeferredCleanup;
         var active = existing
             .Where(runtime => runtime.State is RuntimeState.Queued
                 or RuntimeState.Provisioning
-                or RuntimeState.Running)
-            .Select(runtime => (runtime.CompetitionChallengeId, runtime.TeamId))
+                or RuntimeState.Running
+                or RuntimeState.Stopping)
+            .Select(runtime => (
+                runtime.CompetitionChallengeId,
+                TeamId: runtime.TeamId!.Value))
             .ToHashSet();
+        if (competition.MaxConcurrentRuntimeInstancesPerTeam > 0)
+        {
+            var exceedsQuota = teamIds.Any(teamId =>
+                active
+                    .Where(runtime => runtime.TeamId == teamId)
+                    .Select(runtime => runtime.CompetitionChallengeId)
+                    .Concat(challengeIds)
+                    .Distinct()
+                    .Count() > competition.MaxConcurrentRuntimeInstancesPerTeam);
+            if (exceedsQuota)
+                return AwdRuntimeProvisioningOutcome.CapacityExceeded;
+        }
         var maximumGenerations = existing
-            .GroupBy(runtime => (runtime.CompetitionChallengeId, runtime.TeamId))
+            .GroupBy(runtime => (
+                runtime.CompetitionChallengeId,
+                TeamId: runtime.TeamId!.Value))
             .ToDictionary(group => group.Key, group => group.Max(runtime => runtime.Generation));
 
         var createdAt = timeProvider.GetUtcNow();
+        var cleanupTargets = existing
+            .Where(runtime => runtime.State == RuntimeState.Failed
+                && runtime.ProviderReceiptJson != null
+                && desiredChallengeIds.Contains(runtime.CompetitionChallengeId))
+            .GroupBy(runtime => (
+                runtime.CompetitionChallengeId,
+                TeamId: runtime.TeamId!.Value))
+            .Where(group => !active.Contains(group.Key))
+            .Select(group => group
+                .OrderByDescending(runtime => runtime.Generation)
+                .First())
+            .ToList();
+        if (cleanupTargets.Count > 0)
+        {
+            var challengesById = challenges.ToDictionary(challenge => challenge.Id);
+            foreach (var cleanupTarget in cleanupTargets)
+            {
+                var key = (
+                    cleanupTarget.CompetitionChallengeId,
+                    TeamId: cleanupTarget.TeamId!.Value);
+                var challenge = challengesById[cleanupTarget.CompetitionChallengeId];
+                var template = templates.Get(GameMode.Awd, challenge.DefinitionJson)
+                    ?? throw new InvalidOperationException(
+                        $"Published AWD challenge '{challenge.Id}' has no Runtime template.");
+                var placement = placementPolicy.Resolve(template.RuntimeKind);
+                cleanupTarget.State = RuntimeState.Stopping;
+                cleanupTarget.FailureCode = null;
+                cleanupTarget.RunnerAssignmentReleaseToken = null;
+                cleanupTarget.ProcessingVersion = checked(cleanupTarget.ProcessingVersion + 1);
+                var replacement = new RuntimeInstance
+                {
+                    Id = Guid.CreateVersion7(createdAt),
+                    CompetitionId = competitionId,
+                    CompetitionChallengeId = cleanupTarget.CompetitionChallengeId,
+                    TeamId = cleanupTarget.TeamId,
+                    Purpose = RuntimePurpose.Player,
+                    Generation = checked(maximumGenerations.GetValueOrDefault(key) + 1),
+                    RuntimeKind = template.RuntimeKind,
+                    RuntimeProvider = placement.Provider,
+                    RunnerPool = placement.RunnerPool,
+                    State = RuntimeState.Queued,
+                    ReplacesRuntimeInstanceId = cleanupTarget.Id,
+                    CreatedAt = createdAt
+                };
+                db.RuntimeInstances.Add(replacement);
+                await outbox.PublishAsync(new StopRuntime(
+                    cleanupTarget.Id,
+                    cleanupTarget.ProcessingVersion));
+            }
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
+            return AwdRuntimeProvisioningOutcome.DeferredCleanup;
+        }
+
         var created = new List<RuntimeInstance>();
         foreach (var challenge in challenges)
         {

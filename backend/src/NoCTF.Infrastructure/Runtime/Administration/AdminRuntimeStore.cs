@@ -6,6 +6,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
+using NoCTF.Infrastructure.Runtime.Instances;
 
 namespace NoCTF.Infrastructure.Runtime.Administration;
 
@@ -113,9 +114,21 @@ public sealed class AdminRuntimeStore(
         if (teamId is not null && scope.Competition.Mode is not (GameMode.Ctf or GameMode.Awd))
             return new(null, RuntimeMutationFailure.Unsupported);
 
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({competitionChallengeId.ToString() + ":" + (teamId?.ToString() ?? "shared")}, 0))",
-            ct);
+        if (teamId is Guid lockedTeamId)
+        {
+            await TeamRuntimeQuota.AcquireLockAsync(
+                db,
+                competitionId,
+                lockedTeamId,
+                ct);
+        }
+        else
+        {
+            await SharedRuntimeScopeLock.AcquireAsync(
+                db,
+                competitionChallengeId,
+                ct);
+        }
         var current = await db.RuntimeInstances
             .Where(item =>
                 item.CompetitionChallengeId == competitionChallengeId &&
@@ -127,17 +140,49 @@ public sealed class AdminRuntimeStore(
         {
             if (action == RuntimeAction.Start && current is not null && IsActive(current.State))
                 return new(null, RuntimeMutationFailure.InvalidState);
-            if (action == RuntimeAction.Reset && (current is null || !IsActive(current.State)))
+            if (action == RuntimeAction.Start
+                && await db.RuntimeInstances.AnyAsync(item =>
+                    item.CompetitionId == competitionId &&
+                    item.CompetitionChallengeId == competitionChallengeId &&
+                    item.TeamId == teamId &&
+                    item.Purpose == RuntimePurpose.Player &&
+                    item.State == RuntimeState.Stopping,
+                    ct))
                 return new(null, RuntimeMutationFailure.InvalidState);
-            var requiresCleanup = current is not null
-                && (action == RuntimeAction.Reset
-                    || current.State == RuntimeState.Failed
-                    && !string.IsNullOrWhiteSpace(current.ProviderReceiptJson));
-            if (requiresCleanup)
+            if (action == RuntimeAction.Reset
+                && (current is null
+                    || !CanReset(current)))
+                return new(null, RuntimeMutationFailure.InvalidState);
+            if (teamId is Guid quotaTeamId
+                && !await TeamRuntimeQuota.CanCreateSlotAsync(
+                    db,
+                    competitionId,
+                    quotaTeamId,
+                    competitionChallengeId,
+                    scope.Competition.MaxConcurrentRuntimeInstancesPerTeam,
+                    ct))
+                return new(null, RuntimeMutationFailure.CapacityExceeded);
+            var cleanupTarget = action == RuntimeAction.Reset
+                ? current
+                : await db.RuntimeInstances
+                    .Where(item =>
+                        item.CompetitionId == competitionId &&
+                        item.CompetitionChallengeId == competitionChallengeId &&
+                        item.TeamId == teamId &&
+                        item.Purpose == RuntimePurpose.Player &&
+                        item.State == RuntimeState.Failed &&
+                        item.ProviderReceiptJson != null)
+                    .OrderByDescending(item => item.Generation)
+                    .FirstOrDefaultAsync(ct);
+            if (cleanupTarget is not null)
             {
-                current!.State = RuntimeState.Stopping;
-                current.ProcessingVersion = checked(current.ProcessingVersion + 1);
-                await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
+                cleanupTarget.State = RuntimeState.Stopping;
+                cleanupTarget.FailureCode = null;
+                cleanupTarget.RunnerAssignmentReleaseToken = null;
+                cleanupTarget.ProcessingVersion = checked(cleanupTarget.ProcessingVersion + 1);
+                await outbox.PublishAsync(new StopRuntime(
+                    cleanupTarget.Id,
+                    cleanupTarget.ProcessingVersion));
             }
             var template = templates.Get(scope.Competition.Mode, scope.Template.DefinitionJson);
             if (template is null)
@@ -172,18 +217,20 @@ public sealed class AdminRuntimeStore(
                 RuntimeProvider = placement.Provider,
                 RunnerPool = placement.RunnerPool,
                 State = RuntimeState.Queued,
-                ReplacesRuntimeInstanceId = requiresCleanup ? current?.Id : null,
+                ReplacesRuntimeInstanceId = cleanupTarget?.Id,
                 CreatedAt = now,
                 ExpiresAt = null
             };
             db.RuntimeInstances.Add(entity);
-            if (!requiresCleanup)
+            if (cleanupTarget is null)
                 await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
         }
         else if (action == RuntimeAction.Stop)
         {
             if (current is null || !IsActive(current.State))
                 return new(null, RuntimeMutationFailure.InvalidState);
+            if (current.State == RuntimeState.Stopping)
+                return new(Map(current));
             current.ProcessingVersion = checked(current.ProcessingVersion + 1);
             entity = current;
             if (current.State == RuntimeState.Queued)
@@ -194,6 +241,7 @@ public sealed class AdminRuntimeStore(
             else
             {
                 current.State = RuntimeState.Stopping;
+                current.RunnerAssignmentReleaseToken = null;
                 await outbox.PublishAsync(new StopRuntime(entity.Id, entity.ProcessingVersion));
             }
         }
@@ -228,6 +276,14 @@ public sealed class AdminRuntimeStore(
 
     private static bool IsActive(RuntimeState state) =>
         state is RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping;
+
+    private static bool CanReset(RuntimeInstance instance) =>
+        instance.State is RuntimeState.Provisioning or RuntimeState.Running
+        || instance is
+        {
+            State: RuntimeState.Queued,
+            ReplacesRuntimeInstanceId: null
+        };
 
     private static RuntimeInstanceView Map(RuntimeInstance item) =>
         new(

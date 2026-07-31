@@ -91,6 +91,7 @@ public sealed record RuntimeStopWork(
 public enum RuntimeProvisionWorkStatus
 {
     Current,
+    StopRequested,
     AssignmentRetained,
     AssignmentAbsent
 }
@@ -109,6 +110,7 @@ public interface IRuntimeNodeWorkReader
 public sealed record RuntimeProvisioned(
     Guid RuntimeInstanceId,
     long ProcessingVersion,
+    int Generation,
     string RunnerId,
     RuntimeProvider Provider,
     string ProviderReceiptJson,
@@ -122,7 +124,22 @@ public sealed record RuntimeProvisionFailed(
     Guid RuntimeInstanceId,
     long ProcessingVersion,
     RuntimeFailureCode FailureCode,
-    string? RunnerId = null);
+    string RunnerId);
+
+public sealed record RuntimeProvisionCanceled(
+    Guid RuntimeInstanceId,
+    long ProvisionProcessingVersion,
+    int Generation,
+    string RunnerPool,
+    string RunnerId);
+
+public sealed record RuntimeProvisionTerminated(
+    Guid RuntimeInstanceId,
+    long ProvisionProcessingVersion,
+    int Generation,
+    string RunnerPool,
+    string RunnerId,
+    RuntimeFailureCode FailureCode);
 
 public sealed record RuntimeStopped(Guid RuntimeInstanceId, long ProcessingVersion);
 public sealed record RuntimeStopFailed(

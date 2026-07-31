@@ -12,6 +12,7 @@ namespace NoCTF.Runner.Messages;
 
 public sealed class RuntimeProviderHandler(
     IRuntimeProviderCatalog providers,
+    IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
     IConfiguration configuration,
     IRunnerCapacityGate capacity,
     IRuntimeNodeWorkReader workReader)
@@ -24,19 +25,23 @@ public sealed class RuntimeProviderHandler(
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
+            if (workStatus == RuntimeProvisionWorkStatus.StopRequested)
+                return await CancelProvisionAsync(
+                    message,
+                    message.Definition.Provider,
+                    cancellationToken);
             if (workStatus == RuntimeProvisionWorkStatus.AssignmentAbsent)
-            {
                 await capacity.ReleaseAsync(
                     message.RuntimeInstanceId,
                     message.RunnerId,
                     cancellationToken);
-            }
             return new RuntimeProvisionFailed(
                 message.RuntimeInstanceId,
                 message.ProcessingVersion,
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
+        RuntimeFailureCode? failureCode = null;
         try
         {
             var receipt = await IsolatedContainerProvisioner.ProvisionAsync(
@@ -45,7 +50,7 @@ public sealed class RuntimeProviderHandler(
                 message.Definition,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
-            ExpandedRuntimeUrls expanded;
+            ExpandedRuntimeUrls? expanded = null;
             try
             {
                 expanded = RuntimeUrlExpander.ExpandContainer(
@@ -56,48 +61,35 @@ public sealed class RuntimeProviderHandler(
             }
             catch (InvalidOperationException)
             {
-                await IsolatedContainerProvisioner.DestroyAsync(
-                    providers.Containers(message.Definition.Provider),
-                    providers.Sandbox(message.Definition.Provider),
-                    receipt,
-                    cancellationToken);
-                await ReleaseCapacityAsync(message, cancellationToken);
-                return new RuntimeProvisionFailed(
+                failureCode = RuntimeFailureCode.UrlExpansionFailed;
+            }
+            if (expanded is not null)
+                return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
                     message.ProcessingVersion,
-                    RuntimeFailureCode.UrlExpansionFailed,
-                    message.RunnerId);
-            }
-            return new RuntimeProvisioned(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                ReadRunnerId(),
-                receipt.Provider,
-                JsonSerializer.Serialize(receipt),
-                expanded.Urls,
-                expanded.ParticipantUrlIndexes,
-                message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
-                expanded.ControlCheckUrl,
-                expanded.AwdCheckerTargetHost);
+                    message.Generation,
+                    ReadRunnerId(),
+                    receipt.Provider,
+                    JsonSerializer.Serialize(receipt),
+                    expanded.Urls,
+                    expanded.ParticipantUrlIndexes,
+                    message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
+                    expanded.ControlCheckUrl,
+                    expanded.AwdCheckerTargetHost);
         }
         catch (TimeoutException)
         {
-            await ReleaseCapacityAsync(message, cancellationToken);
-            return new RuntimeProvisionFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.ProvisionTimeout,
-                message.RunnerId);
+            failureCode = RuntimeFailureCode.ProvisionTimeout;
         }
         catch (InvalidOperationException)
         {
-            await ReleaseCapacityAsync(message, cancellationToken);
-            return new RuntimeProvisionFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.ProviderRejected,
-                message.RunnerId);
+            failureCode = RuntimeFailureCode.ProviderRejected;
         }
+        return await CompleteProvisionFailureAsync(
+            message,
+            message.Definition.Provider,
+            failureCode ?? throw new InvalidOperationException("Runtime failure code is unavailable."),
+            cancellationToken);
     }
 
     public async Task<object> Handle(
@@ -117,7 +109,9 @@ public sealed class RuntimeProviderHandler(
                 providers.Sandbox(work.Provider),
                 receipt,
                 cancellationToken);
-            await capacity.ReleaseAsync(message.RuntimeInstanceId, ReadRunnerId(), cancellationToken);
+            await ReleaseStopCapacityOrThrowAsync(
+                message.RuntimeInstanceId,
+                cancellationToken);
             return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
         }
         catch (InvalidOperationException)
@@ -137,96 +131,76 @@ public sealed class RuntimeProviderHandler(
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
+            if (workStatus == RuntimeProvisionWorkStatus.StopRequested)
+                return await CancelProvisionAsync(
+                    message,
+                    message.Definition.Provider,
+                    cancellationToken);
             if (workStatus == RuntimeProvisionWorkStatus.AssignmentAbsent)
-            {
                 await capacity.ReleaseAsync(
                     message.RuntimeInstanceId,
                     message.RunnerId,
                     cancellationToken);
-            }
             return new RuntimeProvisionFailed(
                 message.RuntimeInstanceId,
                 message.ProcessingVersion,
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
-        ComposeReceipt? receipt = null;
+        RuntimeFailureCode? failureCode = null;
         try
         {
             var runtime = providers.Compose(message.Definition.Provider);
-            receipt = await runtime.UpAsync(message.Definition, cancellationToken);
+            var receipt = await runtime.UpAsync(message.Definition, cancellationToken);
             var status = await runtime.GetStatusAsync(receipt, cancellationToken);
             if (status?.Status != RuntimeStatus.Running)
+                failureCode = RuntimeFailureCode.ProviderRejected;
+            else
             {
-                await runtime.DownAsync(receipt, cancellationToken);
-                receipt = null;
-                await ReleaseCapacityAsync(message, cancellationToken);
-                return new RuntimeProvisionFailed(
-                    message.RuntimeInstanceId,
-                    message.ProcessingVersion,
-                    RuntimeFailureCode.ProviderRejected,
-                    message.RunnerId);
+                ExpandedRuntimeUrls? expanded = null;
+                try
+                {
+                    expanded = RuntimeUrlExpander.ExpandCompose(
+                        receipt,
+                        status,
+                        message.Definition.UrlBindings,
+                        message.Definition.ControlCheckUrlBinding,
+                        message.Definition.AwdCheckerTargetBinding);
+                }
+                catch (InvalidOperationException)
+                {
+                    failureCode = RuntimeFailureCode.UrlExpansionFailed;
+                }
+                if (expanded is not null)
+                    return new RuntimeProvisioned(
+                        message.RuntimeInstanceId,
+                        message.ProcessingVersion,
+                        message.Generation,
+                        ReadRunnerId(),
+                        receipt.Provider,
+                        JsonSerializer.Serialize(receipt),
+                        expanded.Urls,
+                        expanded.ParticipantUrlIndexes,
+                        message.Definition.Ttl is { } ttl
+                            ? DateTimeOffset.UtcNow.Add(ttl)
+                            : null,
+                        expanded.ControlCheckUrl,
+                        expanded.AwdCheckerTargetHost);
             }
-
-            ExpandedRuntimeUrls expanded;
-            try
-            {
-                expanded = RuntimeUrlExpander.ExpandCompose(
-                    receipt,
-                    status,
-                    message.Definition.UrlBindings,
-                    message.Definition.ControlCheckUrlBinding,
-                    message.Definition.AwdCheckerTargetBinding);
-            }
-            catch (InvalidOperationException)
-            {
-                await runtime.DownAsync(receipt, cancellationToken);
-                receipt = null;
-                await ReleaseCapacityAsync(message, cancellationToken);
-                return new RuntimeProvisionFailed(
-                    message.RuntimeInstanceId,
-                    message.ProcessingVersion,
-                    RuntimeFailureCode.UrlExpansionFailed,
-                    message.RunnerId);
-            }
-            return new RuntimeProvisioned(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                ReadRunnerId(),
-                receipt.Provider,
-                JsonSerializer.Serialize(receipt),
-                expanded.Urls,
-                expanded.ParticipantUrlIndexes,
-                message.Definition.Ttl is { } ttl
-                    ? DateTimeOffset.UtcNow.Add(ttl)
-                    : null,
-                expanded.ControlCheckUrl,
-                expanded.AwdCheckerTargetHost);
         }
         catch (TimeoutException)
         {
-            if (receipt is not null)
-                await providers.Compose(message.Definition.Provider)
-                    .DownAsync(receipt, cancellationToken);
-            await ReleaseCapacityAsync(message, cancellationToken);
-            return new RuntimeProvisionFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.ProvisionTimeout,
-                message.RunnerId);
+            failureCode = RuntimeFailureCode.ProvisionTimeout;
         }
         catch (InvalidOperationException)
         {
-            if (receipt is not null)
-                await providers.Compose(message.Definition.Provider)
-                    .DownAsync(receipt, cancellationToken);
-            await ReleaseCapacityAsync(message, cancellationToken);
-            return new RuntimeProvisionFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.ProviderRejected,
-                message.RunnerId);
+            failureCode = RuntimeFailureCode.ProviderRejected;
         }
+        return await CompleteProvisionFailureAsync(
+            message,
+            message.Definition.Provider,
+            failureCode ?? throw new InvalidOperationException("Runtime failure code is unavailable."),
+            cancellationToken);
     }
 
     public async Task<object> Handle(
@@ -242,9 +216,8 @@ public sealed class RuntimeProviderHandler(
             var receipt = JsonSerializer.Deserialize<ComposeReceipt>(work.ProviderReceiptJson)
                 ?? throw new InvalidOperationException("Provider receipt is invalid.");
             await providers.Compose(work.Provider).DownAsync(receipt, cancellationToken);
-            await capacity.ReleaseAsync(
+            await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
-                ReadRunnerId(),
                 cancellationToken);
             return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
         }
@@ -265,13 +238,16 @@ public sealed class RuntimeProviderHandler(
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
+            if (workStatus == RuntimeProvisionWorkStatus.StopRequested)
+                return await CancelProvisionAsync(
+                    message,
+                    RuntimeProvider.Libvirt,
+                    cancellationToken);
             if (workStatus == RuntimeProvisionWorkStatus.AssignmentAbsent)
-            {
                 await capacity.ReleaseAsync(
                     message.RuntimeInstanceId,
                     message.RunnerId,
                     cancellationToken);
-            }
             return new RuntimeProvisionFailed(
                 message.RuntimeInstanceId,
                 message.ProcessingVersion,
@@ -279,14 +255,14 @@ public sealed class RuntimeProviderHandler(
                 message.RunnerId);
         }
 
-        OvaRuntimeReceipt? receipt = null;
+        RuntimeFailureCode? failureCode = null;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(message.Definition.OperationTimeout);
         try
         {
             var runtime = providers.Appliance(RuntimeProvider.Libvirt);
-            receipt = await runtime.ImportAsync(message.Definition, timeout.Token);
-            ExpandedRuntimeUrls expanded;
+            var receipt = await runtime.ImportAsync(message.Definition, timeout.Token);
+            ExpandedRuntimeUrls? expanded = null;
             try
             {
                 expanded = RuntimeUrlExpander.ExpandOva(
@@ -296,71 +272,40 @@ public sealed class RuntimeProviderHandler(
             }
             catch (InvalidOperationException)
             {
-                await runtime.DestroyAsync(receipt, cancellationToken);
-                receipt = null;
-                await ReleaseCapacityAsync(message, cancellationToken);
-                return new RuntimeProvisionFailed(
+                failureCode = RuntimeFailureCode.UrlExpansionFailed;
+            }
+            if (expanded is not null)
+                return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
                     message.ProcessingVersion,
-                    RuntimeFailureCode.UrlExpansionFailed,
-                    message.RunnerId);
-            }
-
-            return new RuntimeProvisioned(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                ReadRunnerId(),
-                receipt.Provider,
-                JsonSerializer.Serialize(receipt),
-                expanded.Urls,
-                expanded.ParticipantUrlIndexes,
-                message.Definition.Ttl is { } ttl
-                    ? DateTimeOffset.UtcNow.Add(ttl)
-                    : null,
-                expanded.ControlCheckUrl);
+                    message.Generation,
+                    ReadRunnerId(),
+                    receipt.Provider,
+                    JsonSerializer.Serialize(receipt),
+                    expanded.Urls,
+                    expanded.ParticipantUrlIndexes,
+                    message.Definition.Ttl is { } ttl
+                        ? DateTimeOffset.UtcNow.Add(ttl)
+                        : null,
+                    expanded.ControlCheckUrl);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            if (receipt is not null)
-            {
-                await providers.Appliance(RuntimeProvider.Libvirt)
-                    .DestroyAsync(receipt, cancellationToken);
-            }
-            await ReleaseCapacityAsync(message, cancellationToken);
-            return new RuntimeProvisionFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.ProvisionTimeout,
-                message.RunnerId);
+            failureCode = RuntimeFailureCode.ProvisionTimeout;
         }
         catch (TimeoutException)
         {
-            if (receipt is not null)
-            {
-                await providers.Appliance(RuntimeProvider.Libvirt)
-                    .DestroyAsync(receipt, cancellationToken);
-            }
-            await ReleaseCapacityAsync(message, cancellationToken);
-            return new RuntimeProvisionFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.ProvisionTimeout,
-                message.RunnerId);
+            failureCode = RuntimeFailureCode.ProvisionTimeout;
         }
         catch (InvalidOperationException)
         {
-            if (receipt is not null)
-            {
-                await providers.Appliance(RuntimeProvider.Libvirt)
-                    .DestroyAsync(receipt, cancellationToken);
-            }
-            await ReleaseCapacityAsync(message, cancellationToken);
-            return new RuntimeProvisionFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.ProviderRejected,
-                message.RunnerId);
+            failureCode = RuntimeFailureCode.ProviderRejected;
         }
+        return await CompleteProvisionFailureAsync(
+            message,
+            RuntimeProvider.Libvirt,
+            failureCode ?? throw new InvalidOperationException("Runtime failure code is unavailable."),
+            cancellationToken);
     }
 
     public async Task<object> Handle(
@@ -378,9 +323,8 @@ public sealed class RuntimeProviderHandler(
             var receipt = JsonSerializer.Deserialize<OvaRuntimeReceipt>(work.ProviderReceiptJson)
                 ?? throw new InvalidOperationException("Provider receipt is invalid.");
             await providers.Appliance(work.Provider).DestroyAsync(receipt, cancellationToken);
-            await capacity.ReleaseAsync(
+            await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
-                ReadRunnerId(),
                 cancellationToken);
             return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
         }
@@ -402,10 +346,75 @@ public sealed class RuntimeProviderHandler(
     private string ReadRunnerId() => configuration["Runner:Id"]
         ?? throw new InvalidOperationException("Runner:Id is required.");
 
-    private Task ReleaseCapacityAsync(
+    private async Task<object> CompleteProvisionFailureAsync(
         IRuntimeProvisionMessage message,
-        CancellationToken cancellationToken) =>
-        capacity.ReleaseAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken);
+        RuntimeProvider provider,
+        RuntimeFailureCode failureCode,
+        CancellationToken cancellationToken)
+    {
+        var reconciler = ReadResourceReconciler(provider);
+        await reconciler.DestroyByIdentityAsync(
+            new RuntimeResourceIdentity(message.RuntimeInstanceId, message.Generation),
+            cancellationToken);
+        await ReleaseCapacityOrThrowAsync(message, cancellationToken);
+        return new RuntimeProvisionTerminated(
+            message.RuntimeInstanceId,
+            message.ProcessingVersion,
+            message.Generation,
+            message.RunnerPool,
+            message.RunnerId,
+            failureCode);
+    }
+
+    private async Task<RuntimeProvisionCanceled> CancelProvisionAsync(
+        IRuntimeProvisionMessage message,
+        RuntimeProvider provider,
+        CancellationToken cancellationToken)
+    {
+        var reconciler = ReadResourceReconciler(provider);
+        await reconciler.DestroyByIdentityAsync(
+            new RuntimeResourceIdentity(message.RuntimeInstanceId, message.Generation),
+            cancellationToken);
+        await ReleaseCapacityOrThrowAsync(message, cancellationToken);
+        return new RuntimeProvisionCanceled(
+            message.RuntimeInstanceId,
+            message.ProcessingVersion,
+            message.Generation,
+            message.RunnerPool,
+            message.RunnerId);
+    }
+
+    private IRuntimeManagedResourceReconciler ReadResourceReconciler(
+        RuntimeProvider provider) =>
+        resourceReconcilers.SingleOrDefault(candidate => candidate.Provider == provider)
+        ?? throw new InvalidOperationException(
+            $"Runtime resource reconciliation is unavailable for '{provider}'.");
+
+    private async Task ReleaseCapacityOrThrowAsync(
+        IRuntimeProvisionMessage message,
+        CancellationToken cancellationToken)
+    {
+        var release = await capacity.ReleaseAsync(
+            message.RuntimeInstanceId,
+            message.RunnerId,
+            cancellationToken);
+        if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+            throw new InvalidOperationException(
+                "Runtime capacity belongs to a different Runner assignment.");
+    }
+
+    private async Task ReleaseStopCapacityOrThrowAsync(
+        Guid runtimeInstanceId,
+        CancellationToken cancellationToken)
+    {
+        var release = await capacity.ReleaseAsync(
+            runtimeInstanceId,
+            ReadRunnerId(),
+            cancellationToken);
+        if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+            throw new InvalidOperationException(
+                "Runtime capacity belongs to a different Runner assignment.");
+    }
 }
 
 public static class RuntimeWriteBackHandler
@@ -419,14 +428,27 @@ public static class RuntimeWriteBackHandler
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
-        if (instance is null
-            || instance.ProcessingVersion != message.ProcessingVersion
-            || instance.State != RuntimeState.Provisioning)
+        if (instance is null)
+            return;
+        if (IsLateProvisionSuccessAwaitingCleanup(instance, message))
         {
+            instance.ProviderReceiptJson ??= message.ProviderReceiptJson;
+            instance.RunnerAssignmentReleaseToken = null;
+            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+            await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
+            await db.SaveChangesAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
             return;
         }
+        if (instance.ProcessingVersion != message.ProcessingVersion
+            || instance.State != RuntimeState.Provisioning
+            || instance.Generation != message.Generation
+            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
+            || instance.RuntimeProvider != message.Provider)
+            return;
 
         instance.RunnerId = message.RunnerId;
+        instance.RunnerAssignmentReleaseToken = null;
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
         instance.Urls = [.. message.Urls];
         instance.ParticipantUrlIndexes = [.. message.ParticipantUrlIndexes];
@@ -456,6 +478,7 @@ public static class RuntimeWriteBackHandler
                     submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
                 }
                 instance.State = RuntimeState.Stopping;
+                instance.RunnerAssignmentReleaseToken = null;
                 instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
                 await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
                     instance.Id,
@@ -529,13 +552,75 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         if (instance is null
             || instance.ProcessingVersion != message.ProcessingVersion
-            || instance.State != RuntimeState.Provisioning)
+            || instance.State != RuntimeState.Provisioning
+            || !string.Equals(
+                instance.RunnerId,
+                message.RunnerId,
+                StringComparison.Ordinal))
+            return;
+
+        await PersistProvisionFailureAsync(
+            instance,
+            message.FailureCode,
+            db,
+            cancellationToken);
+    }
+
+    public static async Task Handle(
+        RuntimeProvisionTerminated message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.Id == message.RuntimeInstanceId,
+            cancellationToken);
+        if (instance is null
+            || message.ProvisionProcessingVersion == long.MaxValue
+            || instance.Generation != message.Generation
+            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
+            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
+            || instance.ProviderReceiptJson is not null)
+            return;
+
+        if (instance.State == RuntimeState.Provisioning
+            && instance.ProcessingVersion == message.ProvisionProcessingVersion)
         {
+            await PersistProvisionFailureAsync(
+                instance,
+                message.FailureCode,
+                db,
+                cancellationToken);
             return;
         }
+        if (instance.State != RuntimeState.Stopping
+            || instance.ProcessingVersion <= message.ProvisionProcessingVersion
+            || instance.RunnerAssignmentReleaseToken is not null)
+            return;
 
+        instance.State = RuntimeState.Stopped;
+        instance.StoppedAt = DateTimeOffset.UtcNow;
+        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
+                && candidate.State == RuntimeState.Queued,
+            cancellationToken);
+        if (replacement is not null)
+            await outbox.PublishAsync(new DispatchRuntime(
+                replacement.Id,
+                replacement.ProcessingVersion));
+        await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private static async Task PersistProvisionFailureAsync(
+        RuntimeInstance instance,
+        RuntimeFailureCode failureCode,
+        NoCtfDbContext db,
+        CancellationToken cancellationToken)
+    {
         instance.State = RuntimeState.Failed;
-        instance.FailureCode = message.FailureCode;
+        instance.FailureCode = failureCode;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.SubmissionId is Guid submissionId)
@@ -598,6 +683,91 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Failed;
         instance.FailureCode = message.FailureCode;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
+                && candidate.State == RuntimeState.Queued,
+            cancellationToken);
+        if (replacement is not null)
+        {
+            replacement.State = RuntimeState.Failed;
+            replacement.FailureCode = message.FailureCode;
+            replacement.ProcessingVersion = checked(replacement.ProcessingVersion + 1);
+        }
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public static async Task Handle(
+        RuntimeProvisionCanceled message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.Id == message.RuntimeInstanceId,
+            cancellationToken);
+        if (instance is null
+            || message.ProvisionProcessingVersion == long.MaxValue
+            || instance.State != RuntimeState.Stopping
+            || instance.ProcessingVersion <= message.ProvisionProcessingVersion
+            || instance.Generation != message.Generation
+            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
+            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
+            || instance.RunnerAssignmentReleaseToken is not null
+            || instance.ProviderReceiptJson is not null)
+            return;
+
+        instance.State = RuntimeState.Stopped;
+        instance.StoppedAt = DateTimeOffset.UtcNow;
+        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
+                && candidate.State == RuntimeState.Queued,
+            cancellationToken);
+        if (replacement is not null)
+            await outbox.PublishAsync(new DispatchRuntime(
+                replacement.Id,
+                replacement.ProcessingVersion));
+        await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private static bool IsLateProvisionSuccessAwaitingCleanup(
+        RuntimeInstance instance,
+        RuntimeProvisioned message) =>
+        message.ProcessingVersion < long.MaxValue
+        && instance.State == RuntimeState.Stopping
+        && instance.ProcessingVersion > message.ProcessingVersion
+        && instance.Generation == message.Generation
+        && instance.ProviderReceiptJson is null
+        && instance.RunnerAssignmentReleaseToken is null
+        && instance.RuntimeProvider == message.Provider
+        && string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal);
+
+    private static ValueTask PublishRuntimeStopAsync(
+        ITransactionalMessageOutbox outbox,
+        RuntimeInstance instance,
+        string runnerId) =>
+        instance.RuntimeKind switch
+        {
+            RuntimeKind.Container => outbox.PublishToRunnerNodeAsync(
+                new StopContainerRuntime(
+                    instance.Id,
+                    instance.ProcessingVersion,
+                    instance.RunnerPool,
+                    runnerId)),
+            RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
+                new StopComposeRuntime(
+                    instance.Id,
+                    instance.ProcessingVersion,
+                    instance.RunnerPool,
+                    runnerId)),
+            RuntimeKind.OvaVm => outbox.PublishToRunnerNodeAsync(
+                new StopOvaRuntime(
+                    instance.Id,
+                    instance.ProcessingVersion,
+                    instance.RunnerPool,
+                    runnerId)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported runtime kind '{instance.RuntimeKind}'.")
+        };
 }

@@ -199,6 +199,7 @@ public sealed class InternalResultStore(
         submission.EvaluationResultBodySha256 = result.BodySha256;
         submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
         runtime.State = RuntimeState.Stopping;
+        runtime.RunnerAssignmentReleaseToken = null;
         runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,

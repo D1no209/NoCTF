@@ -5,6 +5,8 @@ public enum AwdRuntimeProvisioningOutcome
     NotApplicable,
     Applied,
     Idempotent,
+    DeferredCleanup,
+    CapacityExceeded,
     RejectedBusiness
 }
 

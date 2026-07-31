@@ -44,6 +44,7 @@ public sealed class CompetitionManagementStore(NoCtfDbContext db) : ICompetition
             Status = CompetitionStatus.Draft,
             TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove,
             MaxTeamMembers = command.MaxTeamMembers,
+            MaxConcurrentRuntimeInstancesPerTeam = command.MaxConcurrentRuntimeInstancesPerTeam,
             CreatedAt = command.CreatedAt,
             UpdatedAt = command.CreatedAt,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
@@ -80,6 +81,9 @@ public sealed class CompetitionManagementStore(NoCtfDbContext db) : ICompetition
                 .SetProperty(x => x.EndAt, command.EndTime)
                 .SetProperty(x => x.TeamRegistrationAutoApprove, command.TeamRegistrationAutoApprove)
                 .SetProperty(x => x.MaxTeamMembers, command.MaxTeamMembers)
+                .SetProperty(
+                    x => x.MaxConcurrentRuntimeInstancesPerTeam,
+                    command.MaxConcurrentRuntimeInstancesPerTeam)
                 .SetProperty(x => x.UpdatedAt, command.UpdatedAt), ct);
         return affected == 1 ? await FindAsync(command.CompetitionId, true, ct) : null;
     }
@@ -110,9 +114,11 @@ public sealed class CompetitionManagementStore(NoCtfDbContext db) : ICompetition
 
     private static IQueryable<CompetitionView> Project(IQueryable<Competition> query) =>
         query.Select(x => new CompetitionView(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt,
-            x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers, x.OwnerId));
+            x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
+            x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
-            x.TeamRegistrationAutoApprove, x.MaxTeamMembers, x.OwnerId);
+            x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
+            x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId);
 }

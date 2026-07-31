@@ -37,10 +37,17 @@ API Start/Stop/Reset/Extend 返回 202、RuntimeInstanceId 与状态 URL。相�
 
 状态动作固定如下：
 
-- Start：没有 Queued/Provisioning/Running/Stopping 实例时，在题目级事务锁内创建 `generation=max+1` 的 Queued 实例；若最新 Failed 仍有 receipt，新实例以它为 replacement 并先执行幂等清理。已有活动实例返回 409 `RuntimeAlreadyActive` 和该实例 Id。
+- Start：没有 Queued/Provisioning/Running/Stopping 实例时，在队伍/比赛级事务锁内创建 `generation=max+1` 的 Queued 实例；历史链仍有 Stopping 时返回 409，等待该次 cleanup 收敛后由客户端重试，避免与在途回执产生丢派发窗口。若历史链有带 receipt 的 Failed 实例，新实例以该未清理 ancestor 为 replacement，并先重试幂等清理。已有活动实例返回 409 `RuntimeAlreadyActive` 和该实例 Id。
 - Stop：仅 Queued/Provisioning/Running 可接受。Queued 可直接变 Stopped；其余变 Stopping 并投递销毁。Stopped/Failed 返回 409 `RuntimeNotActive`，Stopping 返回原实例的 202。
-- Reset：仅 Provisioning/Running/Failed 可接受。在同一事务把旧实例置 Stopping，创建带 `replacesRuntimeInstanceId` 的新 Queued Generation；即使旧状态 Failed，清理仍幂等执行。新实例必须等旧资源完成清理后才能 Provisioning。这个替换对并发额度只占一个槽位。
+- Reset：仅无 predecessor 的 Queued、Provisioning 或 Running 可接受。在同一事务把旧实例置 Stopping，创建带 `replacesRuntimeInstanceId` 的新 Queued Generation；新实例必须等旧资源完成清理后才能 Provisioning。已经等待 ancestor cleanup 的 Queued replacement 和 Stopping 均拒绝 Reset。这个替换对并发额度只占一个槽位。
 - Extend：只修改 Running 实例的 ExpiresAt 和 ProcessingVersion，并投递带新版本的到期消息；旧到期消息到达时版本不符即 superseded。
+
+Provisioning 中收到 Stop/Reset 时，Runner 不能把“数据库尚无 receipt”等同于“Provider
+尚未创建资源”。它先按 RuntimeInstanceId+Generation 做节点侧幂等 identity cleanup，
+再释放容量并回写带 Generation/RunnerPool/RunnerId fence 的强类型取消结果；若 Provider
+已经成功，则迟到 receipt 先持久化，再由原 Runner 执行普通 Stop。等待 ancestor cleanup
+的 Queued replacement 不允许再次 Reset。cleanup 失败时 replacement 同步进入 Failed；
+后续 Start 必须重试未清理 ancestor，不能提前派发新 Generation。
 
 GET 返回最新 Generation；活动实例优先于历史实例。Queued/Provisioning/Stopping 只返回状态和 Id，Running 才返回 URL，Stopped/Failed 返回终态；Failed 返回强类型 RuntimeFailureCode。Provider receipt 与原始错误只向管理者返回。
 
@@ -53,7 +60,10 @@ CTF PerTeamRuntime 不预创建。首次 Start 时创建，每个 Team/Competiti
 - 已到期/开始回收返回 409 RuntimeExpirationStarted。
 - TTL 使用真实 UTC，Paused 不冻结。
 - Stop 销毁资源和运行数据；Reset=销毁后立即新 Generation；固定 PerTeam Flag 不变。
-- MaxConcurrentRuntimeInstancesPerTeam <=0 无限；Container/Compose/OvaVm 各算一个实例。额度统计 Queued/Provisioning/Running/Stopping，Reset 的前后 Generation 合并算一个替换槽。AWD Start Gate 要求额度覆盖全部题；AWDP disposable/KoH shared 不计每队额度。
+- MaxConcurrentRuntimeInstancesPerTeam 在 Competition Create/Update 时必须显式提交，<=0
+  表示无限；Container/Compose/OvaVm 各算一个实例。额度统计
+  Queued/Provisioning/Running/Stopping，Reset 的前后 Generation 合并算一个替换槽。
+  AWD Start Gate 要求额度覆盖全部已发布题；AWDP disposable/KoH shared 不计每队额度。
 
 ## URL Binding
 
@@ -206,9 +216,14 @@ Kubernetes Pod/Deployment/Service/NetworkPolicy 和 Libvirt appliance 均按完�
 精确删除。持久资源不使用 Provider 创建时刻推导的业务 TTL；TTL reaper 只处理带
 `expires-at` 的 disposable 资源，并由同一节点审计消息驱动。
 
-资源审计不释放 Runner capacity。容量 claim/release 仍只由 RuntimeInstance assignment、
-ProcessingVersion 与 release token 的 durable 状态机处理，避免资源清理与容量账本发生
-双重释放。
+资源审计只在两种可精确证明的 cleanup 边界释放 Runner capacity：原 Runner 清理
+`Failed + receipt` assignment，或删除不存在同 Id 活动 assignment 的 exact-generation
+orphan。两者都必须先完成 identity cleanup，再用记录中的 RunnerId 做 owner-checked release；
+`OwnerMismatch` fail-closed，不能清除 durable cleanup marker。离线
+`Provisioning + no receipt` 保留原 assignment 与容量 claim，不释放、不改派；只有原
+provision handler 完成 identity cleanup 后的 typed cancel/termination，或迟到 receipt
+落库后的普通 typed stop，才能推进状态。`ReleaseRunnerCapacity` 仅作为已持久化旧消息的
+tombstone，永远不释放容量或派发 Runtime。
 
 ## Flag 注入
 
@@ -254,8 +269,13 @@ Docker Compose 声明逐服务 PID，Kubernetes Compose 的 PID 由 Pool 统一�
 
 Runner heartbeat/capacity 存 Redis TTL；实际 RunnerId/Pool 与 receipt 存 RuntimeInstance。Redis 故障不派发新实例。
 Runner 使用部署配置的 CPU、内存和 PID 总额度初始化容量，刷新 TTL 时保留当前扣减值。
-Redis 容量丢失但该节点仍有 `Provisioning | Running | Stopping` assignment 时保持离线，
-不会根据可能已经变化的题目配置推算占用；assignment 收敛后才按部署总额度安全重建。
+Redis 容量丢失但该节点仍有 `Provisioning | Running | Stopping` assignment，或仍持有
+exact `Failed + receipt` cleanup assignment 时保持离线，不会根据可能已经变化的题目配置
+推算占用。Worker 对这种已知 cleanup owner 即使 heartbeat 为 Offline 仍投递资源审计；
+assignment cleanup 与容量 release 收敛后才按部署总额度安全重建。
+cleanup 失败留下的 `Failed + receipt` assignment 由原 Runner 的周期资源审计按 identity
+再次销毁；只有销毁成功且容量 claim 已释放后，才清除 receipt/assignment cleanup marker
+并递增 ProcessingVersion。任一步失败或进程中断都由下一轮幂等重放。
 
 ## Checker 调度与状态
 

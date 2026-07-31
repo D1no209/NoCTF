@@ -18,6 +18,7 @@ public sealed class CreateCompetitionRequest
     public DateTimeOffset EndTime { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
     public int MaxTeamMembers { get; set; } = 5;
+    public int? MaxConcurrentRuntimeInstancesPerTeam { get; set; }
 }
 
 public sealed class CreateCompetitionValidator : Validator<CreateCompetitionRequest>
@@ -28,6 +29,7 @@ public sealed class CreateCompetitionValidator : Validator<CreateCompetitionRequ
         RuleFor(request => request.Mode).IsInEnum();
         RuleFor(request => request.EndTime).GreaterThan(request => request.StartTime);
         RuleFor(request => request.MaxTeamMembers).GreaterThan(0);
+        RuleFor(request => request.MaxConcurrentRuntimeInstancesPerTeam).NotNull();
     }
 }
 
@@ -68,6 +70,7 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
             request.EndTime,
             request.TeamRegistrationAutoApprove,
             request.MaxTeamMembers,
+            request.MaxConcurrentRuntimeInstancesPerTeam!.Value,
             user.UserId,
             DateTimeOffset.UtcNow), ct);
         return result.State switch

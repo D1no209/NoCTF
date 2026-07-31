@@ -8844,6 +8844,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "maxConcurrentRuntimeInstancesPerTeam": {
+            "type": "integer",
+            "format": "int32"
+          },
           "ownerId": {
             "type": "string",
             "format": "guid"
@@ -10015,7 +10019,8 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "title"
+          "title",
+          "maxConcurrentRuntimeInstancesPerTeam"
         ],
         "properties": {
           "title": {
@@ -10047,6 +10052,11 @@
             "format": "int32",
             "minimum": 0.0,
             "exclusiveMinimum": true
+          },
+          "maxConcurrentRuntimeInstancesPerTeam": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": false
           }
         }
       },
@@ -10232,7 +10242,8 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "title"
+          "title",
+          "maxConcurrentRuntimeInstancesPerTeam"
         ],
         "properties": {
           "title": {
@@ -10261,6 +10272,11 @@
             "format": "int32",
             "minimum": 0.0,
             "exclusiveMinimum": true
+          },
+          "maxConcurrentRuntimeInstancesPerTeam": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": false
           }
         }
       },

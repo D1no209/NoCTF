@@ -95,7 +95,8 @@ public sealed class AwdpEffectiveConfigurationTests
                     challenge,
                     challenge,
                     true)],
-                1)),
+                1,
+                0)),
             new GameModeCompetitionConfigurationValidator(),
             new GameModeChallengeConfigurationCatalog());
 

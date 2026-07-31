@@ -66,6 +66,48 @@ public class AdminOpenApiRulesTests
             .ToArray()).IsEmpty();
     }
 
+    [Test]
+    public async Task Competition_runtime_quota_is_a_required_non_nullable_contract()
+    {
+        var backend = FindBackendRoot();
+        using var swagger = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(backend, "artifacts", "openapi", "swagger.json")));
+        var schemas = swagger.RootElement
+            .GetProperty("components")
+            .GetProperty("schemas");
+
+        foreach (var schemaName in new[]
+                 {
+                     "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionRequest",
+                     "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionRequest"
+                 })
+        {
+            var schema = schemas.GetProperty(schemaName);
+            await Assert.That(schema.GetProperty("required")
+                    .EnumerateArray()
+                    .Any(property => property.GetString()
+                        == "maxConcurrentRuntimeInstancesPerTeam"))
+                .IsTrue();
+            await AssertQuotaPropertyAsync(schema);
+        }
+
+        await AssertQuotaPropertyAsync(schemas.GetProperty(
+            "NoCTFAPIEndpointsCompetitionsCompetitionResponse"));
+    }
+
+    private static async Task AssertQuotaPropertyAsync(JsonElement schema)
+    {
+        var property = schema.GetProperty("properties")
+            .GetProperty("maxConcurrentRuntimeInstancesPerTeam");
+        await Assert.That(property.GetProperty("type").GetString())
+            .IsEqualTo("integer");
+        await Assert.That(property.GetProperty("format").GetString())
+            .IsEqualTo("int32");
+        var isNullable = property.TryGetProperty("nullable", out var nullable)
+            && nullable.GetBoolean();
+        await Assert.That(isNullable).IsFalse();
+    }
+
     private static bool HasConflictContent(JsonElement response) =>
         response.TryGetProperty("content", out var content)
         && (content.TryGetProperty("application/problem+json", out _)

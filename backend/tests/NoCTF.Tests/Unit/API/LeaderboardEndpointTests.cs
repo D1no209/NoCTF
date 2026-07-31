@@ -144,6 +144,7 @@ public sealed class LeaderboardEndpointTests
                         CompetitionStatus.Running,
                         true,
                         5,
+                        0,
                         Guid.CreateVersion7())
                     : null);
 

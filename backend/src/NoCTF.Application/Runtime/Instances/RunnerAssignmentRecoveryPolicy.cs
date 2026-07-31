@@ -5,8 +5,6 @@ namespace NoCTF.Application.Runtime.Instances;
 public enum RunnerAssignmentRecoveryAction
 {
     Ignore,
-    Redispatch,
-    CompleteStop,
     AwaitOwnerCleanup
 }
 
@@ -18,21 +16,12 @@ public static class RunnerAssignmentRecoveryPolicy
         bool recoveryAlreadyRecorded,
         bool assignmentReleasePending)
     {
-        if (assignmentReleasePending)
-            return RunnerAssignmentRecoveryAction.Ignore;
-
         if (hasReceipt)
-            return recoveryAlreadyRecorded
-                ? RunnerAssignmentRecoveryAction.Ignore
-                : state is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
-                    ? RunnerAssignmentRecoveryAction.AwaitOwnerCleanup
-                    : RunnerAssignmentRecoveryAction.Ignore;
+            return state is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
+                && (!recoveryAlreadyRecorded || assignmentReleasePending)
+                ? RunnerAssignmentRecoveryAction.AwaitOwnerCleanup
+                : RunnerAssignmentRecoveryAction.Ignore;
 
-        return state switch
-        {
-            RuntimeState.Provisioning => RunnerAssignmentRecoveryAction.Redispatch,
-            RuntimeState.Stopping => RunnerAssignmentRecoveryAction.CompleteStop,
-            _ => RunnerAssignmentRecoveryAction.Ignore
-        };
+        return RunnerAssignmentRecoveryAction.Ignore;
     }
 }

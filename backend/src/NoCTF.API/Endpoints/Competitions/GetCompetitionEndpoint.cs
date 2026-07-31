@@ -16,6 +16,7 @@ public sealed record CompetitionResponse(
     CompetitionStatus Status,
     bool TeamRegistrationAutoApprove,
     int MaxTeamMembers,
+    int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId);
 
 [Mapper]

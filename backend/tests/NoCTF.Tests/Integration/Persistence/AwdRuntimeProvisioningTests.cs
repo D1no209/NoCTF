@@ -13,6 +13,7 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Awd;
+using NoCTF.Runner.Messages;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -20,6 +21,288 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class AwdRuntimeProvisioningTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Stopping_runtime_defers_the_entire_pass_then_quota_is_enforced_after_cleanup(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_awd_runtime_quota")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var outbox = new RecordingOutbox();
+            var stoppingTeamId = fixture.ActiveTeamIds.First();
+
+            await using var db = new NoCtfDbContext(options);
+            var competition = await db.Competitions.SingleAsync(
+                item => item.Id == fixture.CompetitionId,
+                cancellationToken);
+            competition.MaxConcurrentRuntimeInstancesPerTeam = 1;
+            var stoppingRuntime = new RuntimeInstance
+            {
+                Id = Guid.CreateVersion7(fixture.Now.AddSeconds(1)),
+                CompetitionId = fixture.CompetitionId,
+                CompetitionChallengeId = fixture.CompetitionChallengeId,
+                TeamId = stoppingTeamId,
+                Purpose = RuntimePurpose.Player,
+                Generation = 1,
+                RuntimeKind = RuntimeKind.Container,
+                RuntimeProvider = RuntimeProvider.Docker,
+                RunnerPool = "awd-tests",
+                State = RuntimeState.Stopping,
+                CreatedAt = fixture.Now
+            };
+            db.RuntimeInstances.Add(stoppingRuntime);
+            await db.SaveChangesAsync(cancellationToken);
+
+            var provisioner = new PostgresAwdRuntimeProvisioner(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(runnerPool: "awd-tests"),
+                outbox,
+                TimeProvider.System);
+            var first = await provisioner.EnsureAsync(
+                fixture.CompetitionId,
+                cancellationToken);
+
+            await Assert.That(first).IsEqualTo(AwdRuntimeProvisioningOutcome.DeferredCleanup);
+            await Assert.That(await db.RuntimeInstances.AsNoTracking().CountAsync(
+                    runtime => runtime.CompetitionId == fixture.CompetitionId,
+                    cancellationToken))
+                .IsEqualTo(1);
+            await Assert.That(await db.RuntimeInstances.AsNoTracking().CountAsync(
+                    runtime => runtime.CompetitionChallengeId == fixture.CompetitionChallengeId
+                        && runtime.TeamId == stoppingTeamId,
+                    cancellationToken))
+                .IsEqualTo(1);
+            await Assert.That(outbox.Published).IsEmpty();
+
+            stoppingRuntime.State = RuntimeState.Stopped;
+            stoppingRuntime.StoppedAt = fixture.Now.AddSeconds(2);
+            await db.SaveChangesAsync(cancellationToken);
+            var resumed = await provisioner.EnsureAsync(
+                fixture.CompetitionId,
+                cancellationToken);
+
+            await Assert.That(resumed).IsEqualTo(AwdRuntimeProvisioningOutcome.Applied);
+            await Assert.That(await db.RuntimeInstances.AsNoTracking().CountAsync(
+                    runtime => runtime.CompetitionId == fixture.CompetitionId,
+                    cancellationToken))
+                .IsEqualTo(3);
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>().Count())
+                .IsEqualTo(2);
+
+            var secondTemplateId = Guid.CreateVersion7(fixture.Now.AddSeconds(2));
+            var secondCompetitionChallengeId = Guid.CreateVersion7(fixture.Now.AddSeconds(2));
+            var definitionJson = await db.Challenges.AsNoTracking()
+                .Where(challenge => challenge.Mode == GameMode.Awd)
+                .Select(challenge => challenge.DefinitionJson)
+                .SingleAsync(cancellationToken);
+            db.Challenges.Add(new Challenge
+            {
+                Id = secondTemplateId,
+                OwnerId = fixture.OwnerId,
+                Mode = GameMode.Awd,
+                Title = "Second AWD service",
+                DefinitionJson = definitionJson,
+                CreatedAt = fixture.Now,
+                UpdatedAt = fixture.Now
+            });
+            db.CompetitionChallenges.Add(new CompetitionChallenge
+            {
+                Id = secondCompetitionChallengeId,
+                CompetitionId = fixture.CompetitionId,
+                ChallengeId = secondTemplateId,
+                Order = 2,
+                IsPublished = true,
+                RulesJson = JsonSerializer.Serialize(
+                    new AwdChallengeConfiguration(
+                        AwdChallengeConfiguration.CurrentSchemaVersion),
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                UpdatedAt = fixture.Now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            var runtimeCount = await db.RuntimeInstances.AsNoTracking().CountAsync(
+                runtime => runtime.CompetitionId == fixture.CompetitionId,
+                cancellationToken);
+            var dispatchCount = outbox.Published.OfType<DispatchRuntime>().Count();
+
+            var rejected = await provisioner.EnsureAsync(
+                fixture.CompetitionId,
+                cancellationToken);
+
+            await Assert.That(rejected)
+                .IsEqualTo(AwdRuntimeProvisioningOutcome.CapacityExceeded);
+            await Assert.That(await db.RuntimeInstances.AsNoTracking().CountAsync(
+                    runtime => runtime.CompetitionId == fixture.CompetitionId,
+                    cancellationToken))
+                .IsEqualTo(runtimeCount);
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>().Count())
+                .IsEqualTo(dispatchCount);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Failed_receipts_wait_for_cleanup_and_stop_results_fence_replacements(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_awd_runtime_cleanup")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var initialVersions = fixture.ActiveTeamIds
+                .Select((teamId, index) => (teamId, Version: (long)(10 + index)))
+                .ToDictionary(item => item.teamId, item => item.Version);
+
+            await using var db = new NoCtfDbContext(options);
+            foreach (var teamId in fixture.ActiveTeamIds)
+            {
+                db.RuntimeInstances.Add(new RuntimeInstance
+                {
+                    Id = Guid.CreateVersion7(fixture.Now.AddSeconds(initialVersions[teamId])),
+                    CompetitionId = fixture.CompetitionId,
+                    CompetitionChallengeId = fixture.CompetitionChallengeId,
+                    TeamId = teamId,
+                    Purpose = RuntimePurpose.Player,
+                    Generation = 1,
+                    RuntimeKind = RuntimeKind.Container,
+                    RuntimeProvider = RuntimeProvider.Docker,
+                    RunnerPool = "awd-tests",
+                    RunnerId = $"runner-{teamId:N}",
+                    RunnerAssignmentReleaseToken = Guid.CreateVersion7(),
+                    State = RuntimeState.Failed,
+                    FailureCode = RuntimeFailureCode.ProviderUnavailable,
+                    ProcessingVersion = initialVersions[teamId],
+                    ProviderReceiptJson = JsonSerializer.Serialize(new { teamId }),
+                    CreatedAt = fixture.Now
+                });
+            }
+            await db.SaveChangesAsync(cancellationToken);
+            var firstOutbox = new RecordingOutbox();
+            var provisioner = new PostgresAwdRuntimeProvisioner(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(runnerPool: "awd-tests"),
+                firstOutbox,
+                TimeProvider.System);
+
+            var first = await provisioner.EnsureAsync(
+                fixture.CompetitionId,
+                cancellationToken);
+
+            await Assert.That(first).IsEqualTo(AwdRuntimeProvisioningOutcome.DeferredCleanup);
+            db.ChangeTracker.Clear();
+            var firstPass = await db.RuntimeInstances.AsNoTracking()
+                .OrderBy(runtime => runtime.TeamId)
+                .ThenBy(runtime => runtime.Generation)
+                .ToListAsync(cancellationToken);
+            await Assert.That(firstPass.Count).IsEqualTo(4);
+            foreach (var teamId in fixture.ActiveTeamIds)
+            {
+                var old = firstPass.Single(runtime => runtime.TeamId == teamId
+                    && runtime.Generation == 1);
+                var replacement = firstPass.Single(runtime => runtime.TeamId == teamId
+                    && runtime.Generation == 2);
+                await Assert.That(old.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(old.FailureCode).IsNull();
+                await Assert.That(old.RunnerAssignmentReleaseToken).IsNull();
+                await Assert.That(old.ProcessingVersion)
+                    .IsEqualTo(checked(initialVersions[teamId] + 1));
+                await Assert.That(replacement.State).IsEqualTo(RuntimeState.Queued);
+                await Assert.That(replacement.ReplacesRuntimeInstanceId).IsEqualTo(old.Id);
+            }
+            await Assert.That(firstOutbox.Published.OfType<StopRuntime>().Count()).IsEqualTo(2);
+            await Assert.That(firstOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            var acknowledgedTeamId = fixture.ActiveTeamIds[0];
+            var failedTeamId = fixture.ActiveTeamIds[1];
+            var acknowledgedOld = firstPass.Single(runtime => runtime.TeamId == acknowledgedTeamId
+                && runtime.Generation == 1);
+            var acknowledgedReplacement = firstPass.Single(runtime => runtime.TeamId == acknowledgedTeamId
+                && runtime.Generation == 2);
+            var failedOld = firstPass.Single(runtime => runtime.TeamId == failedTeamId
+                && runtime.Generation == 1);
+            var failedReplacement = firstPass.Single(runtime => runtime.TeamId == failedTeamId
+                && runtime.Generation == 2);
+            var acknowledgementOutbox = new RecordingOutbox();
+            await RuntimeWriteBackHandler.Handle(
+                new RuntimeStopped(acknowledgedOld.Id, acknowledgedOld.ProcessingVersion),
+                db,
+                acknowledgementOutbox,
+                cancellationToken);
+            await RuntimeWriteBackHandler.Handle(
+                new RuntimeStopFailed(
+                    failedOld.Id,
+                    failedOld.ProcessingVersion,
+                    RuntimeFailureCode.CleanupFailed),
+                db,
+                cancellationToken);
+
+            await Assert.That(acknowledgementOutbox.Published.OfType<DispatchRuntime>()
+                    .Select(message => message.RuntimeInstanceId))
+                .IsEquivalentTo([acknowledgedReplacement.Id]);
+            db.ChangeTracker.Clear();
+            var failedPair = await db.RuntimeInstances.AsNoTracking()
+                .Where(runtime => runtime.Id == failedOld.Id
+                    || runtime.Id == failedReplacement.Id)
+                .ToListAsync(cancellationToken);
+            await Assert.That(failedPair.All(runtime => runtime.State == RuntimeState.Failed
+                && runtime.FailureCode == RuntimeFailureCode.CleanupFailed)).IsTrue();
+            var failedVersionBeforeRetry = failedPair.Single(runtime => runtime.Id == failedOld.Id)
+                .ProcessingVersion;
+
+            var retryOutbox = new RecordingOutbox();
+            var retry = await new PostgresAwdRuntimeProvisioner(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(runnerPool: "awd-tests"),
+                retryOutbox,
+                TimeProvider.System).EnsureAsync(
+                    fixture.CompetitionId,
+                    cancellationToken);
+
+            await Assert.That(retry).IsEqualTo(AwdRuntimeProvisioningOutcome.DeferredCleanup);
+            db.ChangeTracker.Clear();
+            var retriedOld = await db.RuntimeInstances.AsNoTracking().SingleAsync(
+                runtime => runtime.Id == failedOld.Id,
+                cancellationToken);
+            var retriedReplacement = await db.RuntimeInstances.AsNoTracking().SingleAsync(
+                runtime => runtime.TeamId == failedTeamId
+                    && runtime.Generation == 3,
+                cancellationToken);
+            await Assert.That(retriedOld.State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(retriedOld.FailureCode).IsNull();
+            await Assert.That(retriedOld.RunnerAssignmentReleaseToken).IsNull();
+            await Assert.That(retriedOld.ProcessingVersion)
+                .IsEqualTo(checked(failedVersionBeforeRetry + 1));
+            await Assert.That(retriedReplacement.State).IsEqualTo(RuntimeState.Queued);
+            await Assert.That(retriedReplacement.ReplacesRuntimeInstanceId).IsEqualTo(failedOld.Id);
+            await Assert.That(retryOutbox.Published.OfType<StopRuntime>()
+                    .Select(message => message.RuntimeInstanceId))
+                .IsEquivalentTo([failedOld.Id]);
+            await Assert.That(retryOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Running_awd_competition_creates_and_dispatches_missing_team_runtimes_once(
@@ -150,7 +433,12 @@ public sealed class AwdRuntimeProvisioningTests
             Team(blueTeamId, competitionId, blueUserId, "Blue", false, now),
             Team(bannedTeamId, competitionId, bannedUserId, "Banned", true, now));
         await db.SaveChangesAsync(cancellationToken);
-        return new(competitionId, [redTeamId, blueTeamId]);
+        return new(
+            now,
+            ownerId,
+            competitionId,
+            competitionChallengeId,
+            [redTeamId, blueTeamId]);
     }
 
     private static User User(Guid id, string name, DateTimeOffset now) => new()
@@ -185,7 +473,12 @@ public sealed class AwdRuntimeProvisioningTests
             RegisteredAt = now
         };
 
-    private sealed record Fixture(Guid CompetitionId, IReadOnlyList<Guid> ActiveTeamIds);
+    private sealed record Fixture(
+        DateTimeOffset Now,
+        Guid OwnerId,
+        Guid CompetitionId,
+        Guid CompetitionChallengeId,
+        IReadOnlyList<Guid> ActiveTeamIds);
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {

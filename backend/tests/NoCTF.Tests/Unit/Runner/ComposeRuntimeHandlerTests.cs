@@ -39,10 +39,12 @@ public sealed class ComposeRuntimeHandlerTests
     {
         var runtime = new RecordingComposeRuntime();
         var capacity = new RecordingCapacity();
+        var reconciler = new RecordingResourceReconciler(RuntimeProvider.Docker);
         var handler = CreateHandler(
             runtime,
             capacity,
-            new FixedWorkReader(RuntimeProvisionWorkStatus.Current));
+            new FixedWorkReader(RuntimeProvisionWorkStatus.Current),
+            reconciler);
         var message = CreateProvisionMessage() with
         {
             Definition = CreateProvisionMessage().Definition with
@@ -60,12 +62,161 @@ public sealed class ComposeRuntimeHandlerTests
 
         var result = await handler.Handle(message, CancellationToken.None);
 
-        await Assert.That(result).IsTypeOf<RuntimeProvisionFailed>();
-        await Assert.That(((RuntimeProvisionFailed)result).FailureCode)
+        await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
+        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
-        await Assert.That(runtime.DownCount).IsEqualTo(1);
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(
+                message.RuntimeInstanceId,
+                message.Generation)]);
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
+    }
+
+    [Test]
+    public async Task Provision_failure_cleanup_exception_is_not_reclassified_or_released()
+    {
+        var runtime = new RecordingComposeRuntime();
+        var capacity = new RecordingCapacity();
+        var reconciler = new RecordingResourceReconciler(
+            RuntimeProvider.Docker,
+            failCleanup: true);
+        var handler = CreateHandler(
+            runtime,
+            capacity,
+            new FixedWorkReader(RuntimeProvisionWorkStatus.Current),
+            reconciler);
+        var original = CreateProvisionMessage();
+        var message = original with
+        {
+            Definition = original.Definition with
+            {
+                UrlBindings =
+                [
+                    new(
+                        "http://{HOST}:{PORT}",
+                        RuntimeExposure.Participants,
+                        ContainerPort: 8080,
+                        ServiceName: "missing")
+                ]
+            }
+        };
+
+        Func<Task> action = () => handler.Handle(message, CancellationToken.None);
+
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).IsEqualTo("cleanup failed");
+        await Assert.That(runtime.UpCount).IsEqualTo(1);
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(
+                message.RuntimeInstanceId,
+                message.Generation)]);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
+    }
+
+    [Test]
+    public async Task Stop_requested_before_provision_releases_capacity_without_starting_provider()
+    {
+        var runtime = new RecordingComposeRuntime();
+        var operations = new List<string>();
+        var capacity = new RecordingCapacity(operations);
+        var reconciler = new RecordingResourceReconciler(
+            RuntimeProvider.Docker,
+            operations);
+        var handler = CreateHandler(
+            runtime,
+            capacity,
+            new FixedWorkReader(RuntimeProvisionWorkStatus.StopRequested),
+            reconciler);
+        var message = CreateProvisionMessage();
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeProvisionCanceled>();
+        var canceled = (RuntimeProvisionCanceled)result;
+        await Assert.That(canceled.RuntimeInstanceId).IsEqualTo(message.RuntimeInstanceId);
+        await Assert.That(canceled.ProvisionProcessingVersion)
+            .IsEqualTo(message.ProcessingVersion);
+        await Assert.That(canceled.Generation).IsEqualTo(message.Generation);
+        await Assert.That(canceled.RunnerPool).IsEqualTo(message.RunnerPool);
+        await Assert.That(canceled.RunnerId).IsEqualTo(message.RunnerId);
+        await Assert.That(runtime.UpCount).IsEqualTo(0);
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(
+                message.RuntimeInstanceId,
+                message.Generation)]);
+        await Assert.That(capacity.ReleasedRuntimeIds)
+            .IsEquivalentTo([message.RuntimeInstanceId]);
+        await Assert.That(operations.Count).IsEqualTo(2);
+        await Assert.That(operations[0]).IsEqualTo("destroy");
+        await Assert.That(operations[1]).IsEqualTo("release");
+    }
+
+    [Test]
+    public async Task Stop_requested_cleanup_failure_does_not_release_or_acknowledge()
+    {
+        var runtime = new RecordingComposeRuntime();
+        var capacity = new RecordingCapacity();
+        var reconciler = new RecordingResourceReconciler(
+            RuntimeProvider.Docker,
+            failCleanup: true);
+        var handler = CreateHandler(
+            runtime,
+            capacity,
+            new FixedWorkReader(RuntimeProvisionWorkStatus.StopRequested),
+            reconciler);
+
+        Func<Task> action = () => handler.Handle(
+            CreateProvisionMessage(),
+            CancellationToken.None);
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(runtime.UpCount).IsEqualTo(0);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
+    }
+
+    [Test]
+    public async Task Stop_requested_capacity_owner_mismatch_fails_closed()
+    {
+        var runtime = new RecordingComposeRuntime();
+        var capacity = new RecordingCapacity(
+            releaseOutcome: RunnerCapacityReleaseOutcome.OwnerMismatch);
+        var reconciler = new RecordingResourceReconciler(RuntimeProvider.Docker);
+        var handler = CreateHandler(
+            runtime,
+            capacity,
+            new FixedWorkReader(RuntimeProvisionWorkStatus.StopRequested),
+            reconciler);
+        var message = CreateProvisionMessage();
+
+        Func<Task> action = () => handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(runtime.UpCount).IsEqualTo(0);
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(
+                message.RuntimeInstanceId,
+                message.Generation)]);
+        await Assert.That(capacity.ReleasedRuntimeIds)
+            .IsEquivalentTo([message.RuntimeInstanceId]);
+    }
+
+    [Test]
+    public async Task Retained_assignment_does_not_release_running_runtime_capacity()
+    {
+        var runtime = new RecordingComposeRuntime();
+        var capacity = new RecordingCapacity();
+        var handler = CreateHandler(
+            runtime,
+            capacity,
+            new FixedWorkReader(RuntimeProvisionWorkStatus.AssignmentRetained));
+        var message = CreateProvisionMessage();
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeProvisionFailed>();
+        await Assert.That(runtime.UpCount).IsEqualTo(0);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
     }
 
     [Test]
@@ -94,10 +245,39 @@ public sealed class ComposeRuntimeHandlerTests
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
 
+    [Test]
+    public async Task Stop_capacity_owner_mismatch_fails_closed_after_provider_cleanup()
+    {
+        var runtime = new RecordingComposeRuntime();
+        var capacity = new RecordingCapacity(
+            releaseOutcome: RunnerCapacityReleaseOutcome.OwnerMismatch);
+        var receipt = runtime.CreateReceipt();
+        var handler = CreateHandler(
+            runtime,
+            capacity,
+            new FixedWorkReader(
+                RuntimeProvisionWorkStatus.Current,
+                new(RuntimeProvider.Docker, System.Text.Json.JsonSerializer.Serialize(receipt))));
+        var message = new StopComposeRuntime(
+            receipt.OperationId,
+            8,
+            "default",
+            "runner-a");
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
+        await Assert.That(result).IsNotTypeOf<RuntimeStopped>();
+        await Assert.That(runtime.DownCount).IsEqualTo(1);
+        await Assert.That(capacity.ReleasedRuntimeIds)
+            .IsEquivalentTo([message.RuntimeInstanceId]);
+    }
+
     private static RuntimeProviderHandler CreateHandler(
         IComposeRuntime runtime,
         IRunnerCapacityGate capacity,
-        IRuntimeNodeWorkReader reader)
+        IRuntimeNodeWorkReader reader,
+        IRuntimeManagedResourceReconciler? reconciler = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -108,6 +288,7 @@ public sealed class ComposeRuntimeHandlerTests
             .Build();
         return new(
             new RecordingProviderCatalog(runtime),
+            [reconciler ?? new RecordingResourceReconciler(RuntimeProvider.Docker)],
             configuration,
             capacity,
             reader);
@@ -233,7 +414,10 @@ public sealed class ComposeRuntimeHandlerTests
             Task.FromResult(stop);
     }
 
-    private sealed class RecordingCapacity : IRunnerCapacityGate
+    private sealed class RecordingCapacity(
+        List<string>? operations = null,
+        RunnerCapacityReleaseOutcome releaseOutcome = RunnerCapacityReleaseOutcome.Released)
+        : IRunnerCapacityGate
     {
         public List<Guid> ReleasedRuntimeIds { get; } = [];
 
@@ -266,8 +450,33 @@ public sealed class ComposeRuntimeHandlerTests
             string runnerId,
             CancellationToken cancellationToken)
         {
+            operations?.Add("release");
             ReleasedRuntimeIds.Add(runtimeInstanceId);
-            return Task.FromResult(RunnerCapacityReleaseOutcome.Released);
+            return Task.FromResult(releaseOutcome);
+        }
+    }
+
+    private sealed class RecordingResourceReconciler(
+        RuntimeProvider provider,
+        List<string>? operations = null,
+        bool failCleanup = false) : IRuntimeManagedResourceReconciler
+    {
+        public RuntimeProvider Provider { get; } = provider;
+        public List<RuntimeResourceIdentity> Destroyed { get; } = [];
+
+        public Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<RuntimeResourceIdentity>>([]);
+
+        public Task DestroyByIdentityAsync(
+            RuntimeResourceIdentity identity,
+            CancellationToken cancellationToken)
+        {
+            operations?.Add("destroy");
+            Destroyed.Add(identity);
+            return failCleanup
+                ? Task.FromException(new InvalidOperationException("cleanup failed"))
+                : Task.CompletedTask;
         }
     }
 }

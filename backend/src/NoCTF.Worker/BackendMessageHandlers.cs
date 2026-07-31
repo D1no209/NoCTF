@@ -400,6 +400,7 @@ public static class BackendMessageHandlers
         submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
         submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
         runtime.State = RuntimeState.Stopping;
+        runtime.RunnerAssignmentReleaseToken = null;
         runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
@@ -566,7 +567,8 @@ public static class BackendMessageHandlers
             return;
         if (string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
         {
-            if (instance.RunnerAssignmentReleaseToken is not null)
+            if (instance.RunnerId is not null
+                || instance.RunnerAssignmentReleaseToken is not null)
                 return;
 
             instance.State = RuntimeState.Stopped;
@@ -615,14 +617,9 @@ public static class BackendMessageHandlers
             }
 
             instance.State = RuntimeState.Stopping;
+            instance.RunnerAssignmentReleaseToken = null;
             instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
-            if (!string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
-                await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
-            else
-            {
-                instance.State = RuntimeState.Stopped;
-                instance.StoppedAt = now;
-            }
+            await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -640,16 +637,34 @@ public static class BackendMessageHandlers
         var awdOutcome = await awdRuntimes.EnsureAsync(
             message.CompetitionId,
             cancellationToken);
+        if (awdOutcome == AwdRuntimeProvisioningOutcome.DeferredCleanup)
+        {
+            var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+            await outbox.ScheduleAsync(message, retryAt);
+            await outbox.FlushOutgoingMessagesAsync();
+            return;
+        }
         if (awdOutcome != AwdRuntimeProvisioningOutcome.NotApplicable)
             return;
         var kohOutcome = await kohRuntimes.EnsureAsync(
             message.CompetitionId,
             cancellationToken);
+        if (kohOutcome == KohRuntimeProvisioningOutcome.DeferredCleanup)
+        {
+            var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+            await outbox.ScheduleAsync(message, retryAt);
+            await outbox.FlushOutgoingMessagesAsync();
+            return;
+        }
         if (kohOutcome != KohRuntimeProvisioningOutcome.NotApplicable)
             return;
-        var queued = await db.RuntimeInstances
+        var queued = await db.RuntimeInstances.AsNoTracking()
             .Where(instance => instance.CompetitionId == message.CompetitionId
-                && instance.State == RuntimeState.Queued)
+                && instance.State == RuntimeState.Queued
+                && (instance.ReplacesRuntimeInstanceId == null
+                    || db.RuntimeInstances.Any(predecessor =>
+                        predecessor.Id == instance.ReplacesRuntimeInstanceId
+                        && predecessor.State == RuntimeState.Stopped)))
             .OrderBy(instance => instance.CreatedAt)
             .ToListAsync(cancellationToken);
         foreach (var instance in queued)
@@ -697,6 +712,7 @@ public static class BackendMessageHandlers
         foreach (var instance in expiredRuntimes)
         {
             instance.State = RuntimeState.Stopping;
+            instance.RunnerAssignmentReleaseToken = null;
             instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             if (!string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
                 await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
@@ -749,6 +765,16 @@ public static class BackendMessageHandlers
         var resourceAudits = new List<ReconcileRuntimeResources>();
         if (!pageIsFull)
         {
+            var failedCleanupOwners = await db.RuntimeInstances.AsNoTracking()
+                .Where(instance => instance.State == RuntimeState.Failed
+                    && instance.ProviderReceiptJson != null
+                    && instance.RunnerId != null)
+                .Select(instance => new { instance.RunnerPool, instance.RunnerId })
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            var failedCleanupOwnerSet = failedCleanupOwners
+                .Select(owner => (owner.RunnerPool, RunnerId: owner.RunnerId!))
+                .ToHashSet();
             var runtimePools = await db.RuntimeInstances.AsNoTracking()
                 .Select(instance => instance.RunnerPool)
                 .Distinct()
@@ -796,7 +822,8 @@ public static class BackendMessageHandlers
                         await outbox.FlushOutgoingMessagesAsync();
                         return MessageExecutionOutcome.DeferredCapacity;
                     }
-                    if (heartbeat == RunnerHeartbeatStatus.Online)
+                    if (heartbeat == RunnerHeartbeatStatus.Online
+                        || failedCleanupOwnerSet.Contains((pool, inventoryRunnerId)))
                     {
                         resourceAudits.Add(new(
                             pool,
@@ -812,15 +839,22 @@ public static class BackendMessageHandlers
             var instance = assignments[index];
             var runnerId = instance.RunnerId!;
             var heartbeat = heartbeatStatuses[index];
-            if (heartbeat == RunnerHeartbeatStatus.Online)
+            var assignmentReleasePending = instance.RunnerAssignmentReleaseToken is not null;
+            var hasReceipt = !string.IsNullOrWhiteSpace(instance.ProviderReceiptJson);
+            if (!hasReceipt && assignmentReleasePending)
+            {
+                instance.RunnerAssignmentReleaseToken = null;
+                applied = true;
+                continue;
+            }
+            if (heartbeat == RunnerHeartbeatStatus.Online && !assignmentReleasePending)
                 continue;
 
-            var hasReceipt = !string.IsNullOrWhiteSpace(instance.ProviderReceiptJson);
             var action = RunnerAssignmentRecoveryPolicy.Decide(
                 instance.State,
                 hasReceipt,
                 instance.RunnerUnavailableAt is not null,
-                instance.RunnerAssignmentReleaseToken is not null);
+                assignmentReleasePending);
             if (action == RunnerAssignmentRecoveryAction.Ignore)
                 continue;
 
@@ -828,29 +862,9 @@ public static class BackendMessageHandlers
             applied = true;
             switch (action)
             {
-                case RunnerAssignmentRecoveryAction.Redispatch:
-                    instance.RunnerAssignmentReleaseToken = Guid.CreateVersion7();
-                    await outbox.PublishAsync(new ReleaseRunnerCapacity(
-                        instance.Id,
-                        instance.ProcessingVersion,
-                        instance.RunnerPool,
-                        runnerId,
-                        instance.RunnerAssignmentReleaseToken.Value,
-                        RunnerCapacityReleaseContinuation.DispatchRuntime));
-                    break;
-                case RunnerAssignmentRecoveryAction.CompleteStop:
-                    instance.State = RuntimeState.Stopped;
-                    instance.StoppedAt = message.At;
-                    await outbox.PublishAsync(new ReleaseRunnerCapacity(
-                        instance.Id,
-                        instance.ProcessingVersion,
-                        instance.RunnerPool,
-                        runnerId,
-                        Guid.CreateVersion7(),
-                        RunnerCapacityReleaseContinuation.None));
-                    break;
                 case RunnerAssignmentRecoveryAction.AwaitOwnerCleanup:
                     instance.State = RuntimeState.Stopping;
+                    instance.RunnerAssignmentReleaseToken = null;
                     instance.RunnerUnavailableAt = message.At;
                     await PublishRuntimeStopAsync(outbox, instance, runnerId);
                     break;
@@ -886,74 +900,26 @@ public static class BackendMessageHandlers
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
-        _ = await ExecuteRunnerCapacityReleaseAsync(
+        var outcome = await ExecuteRunnerCapacityReleaseAsync(
             message,
             db,
             capacity,
             outbox,
             cancellationToken);
+        if (outcome == MessageExecutionOutcome.Conflict)
+            throw new InvalidOperationException(
+                $"Runner capacity assignment for Runtime '{message.RuntimeInstanceId}' is owned by another Runner.");
     }
 
-    public static async Task<MessageExecutionOutcome> ExecuteRunnerCapacityReleaseAsync(
+    public static Task<MessageExecutionOutcome> ExecuteRunnerCapacityReleaseAsync(
         ReleaseRunnerCapacity message,
         NoCtfDbContext db,
         IRunnerCapacityGate capacity,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
-        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
-            candidate => candidate.Id == message.RuntimeInstanceId,
-            cancellationToken);
-        var assignmentMatches = message.Continuation == RunnerCapacityReleaseContinuation.DispatchRuntime
-            ? instance?.RunnerAssignmentReleaseToken == message.AssignmentReleaseToken
-                && string.Equals(instance?.RunnerId, message.RunnerId, StringComparison.Ordinal)
-            : string.Equals(instance?.RunnerId, message.RunnerId, StringComparison.Ordinal);
-        if (instance is null
-            || !assignmentMatches
-            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal))
-            return MessageExecutionOutcome.Superseded;
-
-        var release = await capacity.ReleaseAsync(
-            message.RuntimeInstanceId,
-            message.RunnerId,
-            cancellationToken);
-        if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
-            return MessageExecutionOutcome.Conflict;
-
-        if (message.Continuation == RunnerCapacityReleaseContinuation.DispatchRuntime)
-        {
-            instance.RunnerAssignmentReleaseToken = null;
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
-            if (instance.State == RuntimeState.Provisioning
-                && instance.ProcessingVersion == checked(message.ProcessingVersion + 1))
-            {
-                instance.State = RuntimeState.Queued;
-                instance.RunnerId = null;
-                await outbox.PublishAsync(new DispatchRuntime(
-                    message.RuntimeInstanceId,
-                    instance.ProcessingVersion));
-            }
-            else if (instance.State == RuntimeState.Stopping
-                && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
-            {
-                instance.State = RuntimeState.Stopped;
-                instance.StoppedAt = DateTimeOffset.UtcNow;
-                var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
-                    candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
-                        && candidate.State == RuntimeState.Queued,
-                    cancellationToken);
-                if (replacement is not null)
-                    await outbox.PublishAsync(new DispatchRuntime(
-                        replacement.Id,
-                        replacement.ProcessingVersion));
-            }
-            await db.SaveChangesAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
-        }
-
-        return release == RunnerCapacityReleaseOutcome.Released
-            ? MessageExecutionOutcome.Applied
-            : MessageExecutionOutcome.Idempotent;
+        // Tombstone: safely consume already-persisted legacy messages without releasing or dispatching.
+        return Task.FromResult(MessageExecutionOutcome.Superseded);
     }
 
     private static void AdvanceMaintenanceSchedule(

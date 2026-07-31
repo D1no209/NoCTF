@@ -86,9 +86,12 @@ public sealed class RunnerAvailabilityPublisher(
             .AnyAsync(
                 instance => instance.RunnerPool == options.RunnerPool
                     && instance.RunnerId == options.RunnerId
+                    && instance.RuntimeProvider == options.Provider!.Value
                     && (instance.State == RuntimeState.Provisioning
                         || instance.State == RuntimeState.Running
-                        || instance.State == RuntimeState.Stopping),
+                        || instance.State == RuntimeState.Stopping
+                        || (instance.State == RuntimeState.Failed
+                            && instance.ProviderReceiptJson != null)),
                 cancellationToken);
 
         return await registry.RegisterAsync(

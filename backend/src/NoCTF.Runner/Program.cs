@@ -35,6 +35,8 @@ builder.UseWolverine(options =>
         .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
     options.Policies.OnException<Npgsql.NpgsqlException>()
         .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
+    options.Policies.OnException<DbUpdateConcurrencyException>()
+        .RetryTimes(5);
     options.ListenToPostgresqlQueue(poolQueueName.Value).UseDurableInbox();
     options.ListenToPostgresqlQueue(nodeQueueName.Value).UseDurableInbox();
     options.PublishMessage<ClaimContainerRuntime>().ToPostgresqlQueue(poolQueueName.Value);

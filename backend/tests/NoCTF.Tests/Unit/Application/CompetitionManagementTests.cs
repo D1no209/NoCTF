@@ -11,13 +11,14 @@ public class CompetitionManagementTests
         var store = new Store();
         var now = DateTimeOffset.UtcNow;
         var command = new CreateCompetitionCommand("Spring CTF", "desc", GameMode.Ctf,
-            now.AddMinutes(1), now.AddHours(2), true, 5, Guid.NewGuid(), now);
+            now.AddMinutes(1), now.AddHours(2), true, 5, 2, Guid.NewGuid(), now);
 
         var result = await new CreateCompetition(store).ExecuteAsync(command);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.Last!.Status).IsEqualTo(CompetitionStatus.Draft);
         await Assert.That(store.Last.Mode).IsEqualTo(GameMode.Ctf);
+        await Assert.That(store.Last.MaxConcurrentRuntimeInstancesPerTeam).IsEqualTo(2);
     }
 
     [Test]
@@ -26,9 +27,9 @@ public class CompetitionManagementTests
         var now = DateTimeOffset.UtcNow;
         var store = new Store();
         var invalidSchedule = await new CreateCompetition(store).ExecuteAsync(new(
-            "CTF", null, GameMode.Ctf, now, now, true, 5, Guid.NewGuid(), now));
+            "CTF", null, GameMode.Ctf, now, now, true, 5, 0, Guid.NewGuid(), now));
         var invalidSize = await new CreateCompetition(store).ExecuteAsync(new(
-            "CTF", null, GameMode.Ctf, now, now.AddHours(1), true, 0, Guid.NewGuid(), now));
+            "CTF", null, GameMode.Ctf, now, now.AddHours(1), true, 0, 0, Guid.NewGuid(), now));
 
         await Assert.That(invalidSchedule.State)
             .IsEqualTo(CompetitionCreationState.InvalidRequest);
@@ -46,9 +47,9 @@ public class CompetitionManagementTests
     public async Task UpdateCompetition_ActiveCompetitionAllowsConfigurationChanges(CompetitionStatus status)
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), status, true, 5, Guid.NewGuid()) };
+        var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), status, true, 5, 0, Guid.NewGuid()) };
         var result = await new UpdateCompetition(store).ExecuteAsync(new(store.Last.Id, "CTF", null,
-            now, now.AddHours(3), true, 5, Guid.NewGuid(), now));
+            now, now.AddHours(3), true, 5, 0, Guid.NewGuid(), now));
 
         await Assert.That(result.Succeeded).IsTrue();
     }
@@ -57,11 +58,12 @@ public class CompetitionManagementTests
     public async Task UpdateCompetition_RunningAllowsDisplayMetadataOnly()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), CompetitionStatus.Running, true, 5, Guid.NewGuid()) };
+        var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), CompetitionStatus.Running, true, 5, 0, Guid.NewGuid()) };
 
         var result = await new UpdateCompetition(store).ExecuteAsync(new(store.Last.Id, "Renamed", "Public details",
             store.Last.StartTime, store.Last.EndTime, store.Last.TeamRegistrationAutoApprove,
-            store.Last.MaxTeamMembers, Guid.NewGuid(), now));
+            store.Last.MaxTeamMembers, store.Last.MaxConcurrentRuntimeInstancesPerTeam,
+            Guid.NewGuid(), now));
 
         await Assert.That(result.Succeeded).IsTrue();
     }
@@ -71,16 +73,22 @@ public class CompetitionManagementTests
     {
         var now = DateTimeOffset.UtcNow;
         var current = new CompetitionView(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now,
-            now.AddHours(2), CompetitionStatus.Running, true, 5, Guid.NewGuid());
+            now.AddHours(2), CompetitionStatus.Running, true, 5, 0, Guid.NewGuid());
         var baseline = new UpdateCompetitionCommand(current.Id, current.Title, current.Description,
             current.StartTime, current.EndTime, current.TeamRegistrationAutoApprove,
-            current.MaxTeamMembers, Guid.NewGuid(), now);
+            current.MaxTeamMembers, current.MaxConcurrentRuntimeInstancesPerTeam,
+            Guid.NewGuid(), now);
         UpdateCompetitionCommand[] mutations =
         [
             baseline with { StartTime = baseline.StartTime.AddMinutes(1) },
             baseline with { EndTime = baseline.EndTime.AddMinutes(1) },
             baseline with { TeamRegistrationAutoApprove = !baseline.TeamRegistrationAutoApprove },
-            baseline with { MaxTeamMembers = baseline.MaxTeamMembers + 1 }
+            baseline with { MaxTeamMembers = baseline.MaxTeamMembers + 1 },
+            baseline with
+            {
+                MaxConcurrentRuntimeInstancesPerTeam =
+                    baseline.MaxConcurrentRuntimeInstancesPerTeam + 1
+            }
         ];
 
         foreach (var mutation in mutations)
@@ -92,10 +100,10 @@ public class CompetitionManagementTests
     public async Task FinishedCompetition_AllowsUpdateButRejectsDelete()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), CompetitionStatus.Finished, true, 5, Guid.NewGuid()) };
+        var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), CompetitionStatus.Finished, true, 5, 0, Guid.NewGuid()) };
 
         var update = await new UpdateCompetition(store).ExecuteAsync(new(store.Last.Id, "Renamed", null,
-            store.Last.StartTime, store.Last.EndTime, true, 5, Guid.NewGuid(), now));
+            store.Last.StartTime, store.Last.EndTime, true, 5, 0, Guid.NewGuid(), now));
         var delete = await new DeleteCompetition(store).ExecuteAsync(store.Last.Id, Guid.NewGuid(), now);
 
         await Assert.That(update.Succeeded).IsTrue();
@@ -106,7 +114,7 @@ public class CompetitionManagementTests
     public async Task DeleteCompetition_RejectsActiveCompetition()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), CompetitionStatus.Running, true, 5, Guid.NewGuid()) };
+        var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), CompetitionStatus.Running, true, 5, 0, Guid.NewGuid()) };
 
         var result = await new DeleteCompetition(store).ExecuteAsync(store.Last.Id, Guid.NewGuid(), now);
 
@@ -121,7 +129,8 @@ public class CompetitionManagementTests
             CancellationToken cancellationToken)
         {
             Last = new(Guid.NewGuid(), command.Title, command.Description, command.Mode, command.StartTime, command.EndTime,
-                CompetitionStatus.Draft, command.TeamRegistrationAutoApprove, command.MaxTeamMembers, command.OwnerId);
+                CompetitionStatus.Draft, command.TeamRegistrationAutoApprove, command.MaxTeamMembers,
+                command.MaxConcurrentRuntimeInstancesPerTeam, command.OwnerId);
             return Task.FromResult(new CompetitionCreationResult(
                 CompetitionCreationState.Created,
                 Last));
