@@ -1,7 +1,11 @@
 import type {
+  AdminDeleteCompetitionChallengeData,
+  AdminRestoreCompetitionChallengeData,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
+  NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode,
+  NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse,
   NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest,
   NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse,
@@ -55,6 +59,10 @@ export interface ChallengeTemplateConflict {
 export interface CompetitionPermissionsConflict {
   code: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode
   userIds: string[]
+}
+
+export interface CompetitionChallengeConflict {
+  code: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode
 }
 
 type ApiResult<T> = {
@@ -139,6 +147,31 @@ export function readChallengeTemplateConflict(error: unknown): ChallengeTemplate
     code: details.code,
     userIds: normalizedIds(details.userIds),
   }
+}
+
+const competitionChallengeConflictCodes
+  = new Set<NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode>([
+    'ResourceIdConflict',
+    'ChallengeOrderConflict',
+    'ChallengeTemplateConflict',
+    'RevisionConflict',
+    'LifecycleStateConflict',
+    'ChallengeTemplateNotFound',
+    'ChallengeTemplateModeMismatch',
+  ])
+
+export function readCompetitionChallengeConflict(
+  error: unknown,
+): CompetitionChallengeConflict | null {
+  if (!(error instanceof ApiError) || error.status !== 409 || !isRecord(error.details))
+    return null
+
+  const details
+    = error.details as NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse
+  if (!details.code || !competitionChallengeConflictCodes.has(details.code))
+    return null
+
+  return { code: details.code }
 }
 
 const competitionPermissionsConflictCodes
@@ -695,18 +728,28 @@ export const competitionChallengeAdminApi = {
       tt('errors.updateCompetitionChallenge'),
     )
   },
-  async delete(competitionId: string, competitionChallengeId: string): Promise<void> {
+  async delete(
+    competitionId: string,
+    competitionChallengeId: string,
+    query: AdminDeleteCompetitionChallengeData['query'],
+  ): Promise<void> {
     await requireSuccess(
       generatedSdk.adminDeleteCompetitionChallenge({
         path: { competitionId, competitionChallengeId },
+        query,
       }),
       tt('errors.requestFailed'),
     )
   },
-  async restore(competitionId: string, competitionChallengeId: string): Promise<void> {
+  async restore(
+    competitionId: string,
+    competitionChallengeId: string,
+    query: AdminRestoreCompetitionChallengeData['query'],
+  ): Promise<void> {
     await requireSuccess(
       generatedSdk.adminRestoreCompetitionChallenge({
         path: { competitionId, competitionChallengeId },
+        query,
       }),
       tt('errors.requestFailed'),
     )

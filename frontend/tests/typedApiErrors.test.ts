@@ -1,7 +1,11 @@
+import type {
+  NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode,
+} from '../src/api/generated/types.gen'
 import { describe, expect, test } from 'bun:test'
 import {
   ApiError,
   readChallengeTemplateConflict,
+  readCompetitionChallengeConflict,
   readCompetitionPermissionsConflict,
   readPlatformRoleAssignmentBlockers,
 } from '../src/api/noctf'
@@ -46,6 +50,43 @@ describe('typed API conflicts', () => {
       ),
     ).toBeNull()
     expect(readChallengeTemplateConflict(new Error('network'))).toBeNull()
+  })
+
+  test('decodes only generated competition challenge conflict codes from HTTP 409', () => {
+    const codes = [
+      'ResourceIdConflict',
+      'ChallengeOrderConflict',
+      'ChallengeTemplateConflict',
+      'RevisionConflict',
+      'LifecycleStateConflict',
+      'ChallengeTemplateNotFound',
+      'ChallengeTemplateModeMismatch',
+    ] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode[]
+
+    for (const code of codes) {
+      expect(
+        readCompetitionChallengeConflict(
+          new ApiError('conflict', 409, { code }),
+        ),
+      ).toEqual({ code })
+    }
+
+    expect(
+      readCompetitionChallengeConflict(
+        new ApiError('conflict', 409, { code: 'UnknownConflict' }),
+      ),
+    ).toBeNull()
+    expect(
+      readCompetitionChallengeConflict(
+        new ApiError('RevisionConflict', 409, 'RevisionConflict'),
+      ),
+    ).toBeNull()
+    expect(
+      readCompetitionChallengeConflict(
+        new ApiError('conflict', 400, { code: 'RevisionConflict' }),
+      ),
+    ).toBeNull()
+    expect(readCompetitionChallengeConflict(new Error('RevisionConflict'))).toBeNull()
   })
 
   test('decodes only generated competition permission conflict codes from HTTP 409', () => {
