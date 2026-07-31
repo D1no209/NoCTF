@@ -18,42 +18,48 @@ public class ChallengeManagementTests
 
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
 
-        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(result.Failure).IsNull();
+        await Assert.That(result.Challenge).IsNotNull();
         await Assert.That(store.CreateCalls).IsEqualTo(1);
     }
 
     [Test]
-    [Arguments(-1L, 0, "invalid_base_score")]
-    [Arguments(100L, -1, "invalid_order")]
-    public async Task CreateChallenge_InvalidDefinition_ReturnsSpecificError(
+    [Arguments(-1L, 0, ChallengeMutationFailure.InvalidBaseScore)]
+    [Arguments(100L, -1, ChallengeMutationFailure.InvalidOrder)]
+    public async Task CreateChallenge_InvalidDefinition_ReturnsTypedFailure(
         long baseScore,
         int order,
-        string expectedError)
+        ChallengeMutationFailure expectedFailure)
     {
         var store = new Store();
 
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
             CreateCommand() with { BaseScore = baseScore, Order = order });
 
-        await Assert.That(result.ErrorCode).IsEqualTo(expectedError);
+        await Assert.That(result.Failure).IsEqualTo(expectedFailure);
+        await Assert.That(result.Challenge).IsNull();
         await Assert.That(store.CreateCalls).IsEqualTo(0);
     }
 
     [Test]
-    public async Task CreateChallenge_OrderConflict_PropagatesTypedErrorCode()
+    [Arguments(ChallengeMutationFailure.ResourceIdConflict)]
+    [Arguments(ChallengeMutationFailure.ChallengeOrderConflict)]
+    [Arguments(ChallengeMutationFailure.ChallengeTemplateConflict)]
+    public async Task CreateChallenge_Conflict_PropagatesTypedFailure(
+        ChallengeMutationFailure expectedFailure)
     {
         var store = new Store
         {
-            CreateResult = new ChallengeMutationResult(null, ChallengeMutationFailure.ChallengeOrderConflict)
+            CreateResult = new ChallengeMutationResult(null, expectedFailure)
         };
 
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
 
-        await Assert.That(result.ErrorCode).IsEqualTo("challenge_order_conflict");
+        await Assert.That(result.Failure).IsEqualTo(expectedFailure);
     }
 
     [Test]
-    public async Task CreateChallenge_TemplateModeMismatch_PropagatesTypedErrorCode()
+    public async Task CreateChallenge_TemplateModeMismatch_PropagatesTypedFailure()
     {
         var store = new Store
         {
@@ -64,7 +70,8 @@ public class ChallengeManagementTests
 
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
 
-        await Assert.That(result.ErrorCode).IsEqualTo("challenge_template_mode_mismatch");
+        await Assert.That(result.Failure)
+            .IsEqualTo(ChallengeMutationFailure.TemplateModeMismatch);
     }
 
     [Test]
@@ -90,20 +97,14 @@ public class ChallengeManagementTests
     [Test]
     [Arguments(ChallengeMutation.Update)]
     [Arguments(ChallengeMutation.Delete)]
+    [Arguments(ChallengeMutation.Restore)]
     public async Task Mutation_ActiveCompetition_IsAllowed(ChallengeMutation mutation)
     {
         var store = new Store { Status = CompetitionStatus.Running };
         var cache = new Cache();
         var scheduler = new Scheduler();
 
-        var error = mutation switch
-        {
-            ChallengeMutation.Update => (await new UpdateChallenge(store, cache, scheduler)
-                .ExecuteAsync(UpdateCommand())).ErrorCode,
-            ChallengeMutation.Delete => (await new DeleteChallenge(store, cache, scheduler)
-                .ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow)).ErrorCode,
-            _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
-        };
+        var error = await ExecuteMutationAsync(mutation, store, cache, scheduler);
 
         await Assert.That(error).IsNull();
         await Assert.That(store.MutationCalls).IsEqualTo(1);
@@ -112,6 +113,7 @@ public class ChallengeManagementTests
     [Test]
     [Arguments(ChallengeMutation.Update)]
     [Arguments(ChallengeMutation.Delete)]
+    [Arguments(ChallengeMutation.Restore)]
     public async Task Mutation_Succeeds_InvalidatesAndQueuesCompetitionRebuild(ChallengeMutation mutation)
     {
         var competitionId = Guid.NewGuid();
@@ -119,23 +121,113 @@ public class ChallengeManagementTests
         var cache = new Cache();
         var scheduler = new Scheduler();
 
-        _ = mutation switch
-        {
-            ChallengeMutation.Update => (object)await new UpdateChallenge(store, cache, scheduler)
-                .ExecuteAsync(UpdateCommand(competitionId)),
-            ChallengeMutation.Delete => await new DeleteChallenge(store, cache, scheduler)
-                .ExecuteAsync(competitionId, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow),
-            _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
-        };
+        var failure = await ExecuteMutationAsync(
+            mutation,
+            store,
+            cache,
+            scheduler,
+            competitionId);
 
+        await Assert.That(failure).IsNull();
+        await Assert.That(store.LastExpectedRevision).IsEqualTo(0);
         await Assert.That(cache.InvalidatedCompetitionId).IsEqualTo(competitionId);
         await Assert.That(scheduler.RebuildCompetitionId).IsEqualTo(competitionId);
+    }
+
+    [Test]
+    [Arguments(ChallengeMutation.Update)]
+    [Arguments(ChallengeMutation.Delete)]
+    [Arguments(ChallengeMutation.Restore)]
+    public async Task Mutation_InvalidRevision_IsRejectedBeforeStoreOrSideEffects(
+        ChallengeMutation mutation)
+    {
+        var store = new Store();
+        var cache = new Cache();
+        var scheduler = new Scheduler();
+
+        var failure = await ExecuteMutationAsync(
+            mutation,
+            store,
+            cache,
+            scheduler,
+            expectedRevision: -1);
+
+        await Assert.That(failure).IsEqualTo(ChallengeMutationFailure.InvalidRevision);
+        await Assert.That(store.MutationCalls).IsEqualTo(0);
+        await Assert.That(cache.InvalidatedCompetitionId).IsNull();
+        await Assert.That(scheduler.RebuildCompetitionId).IsNull();
+    }
+
+    [Test]
+    [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.CompetitionNotFound)]
+    [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.ChallengeNotFound)]
+    [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.ChallengeOrderConflict)]
+    [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.RevisionConflict)]
+    [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.CompetitionNotFound)]
+    [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.ChallengeNotFound)]
+    [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.RevisionConflict)]
+    [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.LifecycleStateConflict)]
+    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.CompetitionNotFound)]
+    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.TemplateNotFound)]
+    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.TemplateModeMismatch)]
+    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeNotFound)]
+    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeOrderConflict)]
+    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeTemplateConflict)]
+    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.RevisionConflict)]
+    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.LifecycleStateConflict)]
+    public async Task Mutation_TypedFailure_DoesNotInvalidateOrQueueRebuild(
+        ChallengeMutation mutation,
+        ChallengeMutationFailure expectedFailure)
+    {
+        var store = new Store { MutationFailure = expectedFailure };
+        var cache = new Cache();
+        var scheduler = new Scheduler();
+
+        var failure = await ExecuteMutationAsync(mutation, store, cache, scheduler);
+
+        await Assert.That(failure).IsEqualTo(expectedFailure);
+        await Assert.That(store.MutationCalls).IsEqualTo(1);
+        await Assert.That(cache.InvalidatedCompetitionId).IsNull();
+        await Assert.That(scheduler.RebuildCompetitionId).IsNull();
     }
 
     public enum ChallengeMutation
     {
         Update,
-        Delete
+        Delete,
+        Restore
+    }
+
+    private static async Task<ChallengeMutationFailure?> ExecuteMutationAsync(
+        ChallengeMutation mutation,
+        Store store,
+        Cache cache,
+        Scheduler scheduler,
+        Guid? competitionId = null,
+        int expectedRevision = 0)
+    {
+        var actualCompetitionId = competitionId ?? Guid.NewGuid();
+        return mutation switch
+        {
+            ChallengeMutation.Update => (await new UpdateChallenge(store, cache, scheduler)
+                .ExecuteAsync(UpdateCommand(actualCompetitionId) with
+                {
+                    ExpectedRevision = expectedRevision
+                })).Failure,
+            ChallengeMutation.Delete => await new DeleteChallenge(store, cache, scheduler)
+                .ExecuteAsync(
+                    actualCompetitionId,
+                    Guid.NewGuid(),
+                    expectedRevision,
+                    DateTimeOffset.UtcNow),
+            ChallengeMutation.Restore => await new DeleteChallenge(store, cache, scheduler)
+                .RestoreAsync(
+                    actualCompetitionId,
+                    Guid.NewGuid(),
+                    expectedRevision,
+                    DateTimeOffset.UtcNow),
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
+        };
     }
 
     private static CreateCompetitionChallengeCommand CreateCommand(Guid? competitionId = null) => new(
@@ -174,8 +266,10 @@ public class ChallengeManagementTests
 
         public CompetitionStatus? Status { get; init; } = CompetitionStatus.Draft;
         public ChallengeMutationResult? CreateResult { get; init; }
+        public ChallengeMutationFailure? MutationFailure { get; init; }
         public int CreateCalls { get; private set; }
         public int MutationCalls { get; private set; }
+        public int? LastExpectedRevision { get; private set; }
         public bool? LastIncludeUnpublished { get; private set; }
 
         public Task<ChallengeCompetitionContext?> GetCompetitionAsync(
@@ -218,27 +312,34 @@ public class ChallengeManagementTests
             CancellationToken cancellationToken)
         {
             MutationCalls++;
-            return Task.FromResult(new ChallengeMutationResult(challenge, null));
+            LastExpectedRevision = command.ExpectedRevision;
+            return Task.FromResult(MutationFailure is null
+                ? new ChallengeMutationResult(challenge)
+                : new ChallengeMutationResult(null, MutationFailure));
         }
 
         public Task<ChallengeMutationFailure?> SoftDeleteAsync(
             Guid competitionId,
             Guid challengeId,
+            int expectedRevision,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             MutationCalls++;
-            return Task.FromResult<ChallengeMutationFailure?>(null);
+            LastExpectedRevision = expectedRevision;
+            return Task.FromResult(MutationFailure);
         }
 
         public Task<ChallengeMutationFailure?> RestoreAsync(
             Guid competitionId,
             Guid challengeId,
+            int expectedRevision,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             MutationCalls++;
-            return Task.FromResult<ChallengeMutationFailure?>(null);
+            LastExpectedRevision = expectedRevision;
+            return Task.FromResult(MutationFailure);
         }
     }
 

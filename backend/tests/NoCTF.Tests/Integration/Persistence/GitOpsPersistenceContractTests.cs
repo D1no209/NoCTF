@@ -248,6 +248,7 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(await competitionChallenges.SoftDeleteAsync(
                 competitionId,
                 competitionChallengeId,
+                3,
                 now,
                 cancellationToken)).IsNull();
             await Assert.That((await competitionChallenges.ListAsync(
@@ -264,6 +265,7 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(await competitionChallenges.RestoreAsync(
                 competitionId,
                 competitionChallengeId,
+                4,
                 now,
                 cancellationToken)).IsNull();
         });

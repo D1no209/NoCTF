@@ -39,6 +39,8 @@ public static class ServiceRegistration
             options.DocumentSettings = settings =>
             {
                 settings.SchemaSettings.ResolveExternalXmlDocumentation = false;
+                settings.OperationProcessors.Add(
+                    new CompetitionChallengeRevisionOperationProcessor());
                 settings.AddAuth("Bearer", new OpenApiSecurityScheme
                 {
                     Type = OpenApiSecuritySchemeType.Http,

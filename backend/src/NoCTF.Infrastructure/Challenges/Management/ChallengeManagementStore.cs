@@ -2,6 +2,7 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Challenges;
 using Npgsql;
 
@@ -60,7 +61,7 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         }
         catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
         {
-            return new(null, ChallengeMutationFailure.ChallengeOrderConflict);
+            return new(null, MapCompetitionChallengeConflict(exception));
         }
     }
 
@@ -118,27 +119,42 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         }
         catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
         {
-            return new(null, ChallengeMutationFailure.ChallengeOrderConflict);
+            return new(null, MapCompetitionChallengeConflict(exception));
         }
     }
 
     public Task<ChallengeMutationFailure?> SoftDeleteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct) =>
-        SetDeletedAsync(competitionId, competitionChallengeId, now, restore: false, ct);
+        SetDeletedAsync(
+            competitionId,
+            competitionChallengeId,
+            expectedRevision,
+            now,
+            restore: false,
+            ct);
 
     public Task<ChallengeMutationFailure?> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct) =>
-        SetDeletedAsync(competitionId, competitionChallengeId, now, restore: true, ct);
+        SetDeletedAsync(
+            competitionId,
+            competitionChallengeId,
+            expectedRevision,
+            now,
+            restore: true,
+            ct);
 
     private async Task<ChallengeMutationFailure?> SetDeletedAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        int expectedRevision,
         DateTimeOffset now,
         bool restore,
         CancellationToken ct)
@@ -147,21 +163,31 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
             return ChallengeMutationFailure.CompetitionNotFound;
 
-        var query = restore
-            ? db.CompetitionChallenges.IgnoreQueryFilters()
-            : db.CompetitionChallenges;
-        var entity = await query.SingleOrDefaultAsync(item =>
+        var entity = await db.CompetitionChallenges.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item =>
             item.Id == competitionChallengeId &&
-            item.CompetitionId == competitionId &&
-            (restore ? item.DeletedAt != null : item.DeletedAt == null), ct);
+            item.CompetitionId == competitionId, ct);
         if (entity is null)
             return ChallengeMutationFailure.ChallengeNotFound;
+        if (entity.Revision != expectedRevision)
+            return ChallengeMutationFailure.RevisionConflict;
+        if ((entity.DeletedAt is null) == restore)
+            return ChallengeMutationFailure.LifecycleStateConflict;
         if (restore)
         {
             await ChallengeWriteLock.AcquireAsync(db, entity.ChallengeId, ct);
-            if (!await db.Challenges.AsNoTracking()
-                    .AnyAsync(challenge => challenge.Id == entity.ChallengeId, ct))
+            var templateMode = await db.Challenges.AsNoTracking()
+                .Where(challenge => challenge.Id == entity.ChallengeId)
+                .Select(challenge => (GameMode?)challenge.Mode)
+                .SingleOrDefaultAsync(ct);
+            if (templateMode is null)
                 return ChallengeMutationFailure.TemplateNotFound;
+            var competitionMode = await db.Competitions.AsNoTracking()
+                .Where(competition => competition.Id == competitionId)
+                .Select(competition => competition.Mode)
+                .SingleAsync(ct);
+            if (templateMode != competitionMode)
+                return ChallengeMutationFailure.TemplateModeMismatch;
         }
 
         entity.DeletedAt = restore ? null : now;
@@ -176,7 +202,8 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
         }
         catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
         {
-            return ChallengeMutationFailure.ChallengeOrderConflict;
+            db.Entry(entity).State = EntityState.Detached;
+            return MapCompetitionChallengeConflict(exception);
         }
     }
 
@@ -240,6 +267,24 @@ public sealed class ChallengeManagementStore(NoCtfDbContext db) : IChallengeMana
     private static bool IsCompetitionChallengeConflict(DbUpdateException exception) =>
         exception.InnerException is PostgresException
         {
-            SqlState: PostgresErrorCodes.UniqueViolation
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "pk_competition_challenges"
+                or "ix_competition_challenges_competition_id_challenge_id"
+                or "ix_competition_challenges_competition_id_order"
+        };
+
+    private static ChallengeMutationFailure MapCompetitionChallengeConflict(
+        DbUpdateException exception) =>
+        ((PostgresException)exception.InnerException!).ConstraintName switch
+        {
+            "pk_competition_challenges" =>
+                ChallengeMutationFailure.ResourceIdConflict,
+            "ix_competition_challenges_competition_id_challenge_id" =>
+                ChallengeMutationFailure.ChallengeTemplateConflict,
+            "ix_competition_challenges_competition_id_order" =>
+                ChallengeMutationFailure.ChallengeOrderConflict,
+            _ => throw new InvalidOperationException(
+                "The competition challenge conflict constraint was not recognized.",
+                exception)
         };
 }

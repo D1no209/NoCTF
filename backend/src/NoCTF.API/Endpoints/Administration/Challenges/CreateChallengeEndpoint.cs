@@ -35,14 +35,18 @@ public sealed class CreateChallengeEndpoint(
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
     : Endpoint<CreateChallengeRequest,
-        Results<Created<ChallengeResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+        Results<
+            Created<ChallengeResponse>,
+            NotFound,
+            ForbidHttpResult,
+            Conflict<CompetitionChallengeConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/challenges");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminCreateCompetitionChallenge")
-            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Description(builder => builder.WithName("AdminCreateCompetitionChallenge"));
         Summary(summary =>
         {
             summary.Summary = "Links a global challenge template to a competition.";
@@ -51,7 +55,12 @@ public sealed class CreateChallengeEndpoint(
     }
 
     public override async Task<
-        Results<Created<ChallengeResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+        Results<
+            Created<ChallengeResponse>,
+            NotFound,
+            ForbidHttpResult,
+            Conflict<CompetitionChallengeConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         CreateChallengeRequest request,
         CancellationToken ct)
     {
@@ -66,22 +75,34 @@ public sealed class CreateChallengeEndpoint(
             request.BaseScore,
             request.Order,
             DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode is "competition_not_found" or "challenge_template_not_found")
-            return TypedResults.NotFound();
-        if (!result.Succeeded)
+        if (result.Challenge is not null)
         {
-            return TypedResults.Problem(
-                statusCode: result.ErrorCode is "challenge_order_conflict" or "resource_id_conflict"
-                    ? StatusCodes.Status409Conflict
-                    : StatusCodes.Status400BadRequest,
-                title: "Challenge was not created.",
-                detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
+            var response = ChallengeMapper.ToResponse(result.Challenge);
+            return TypedResults.Created(
+                $"/api/v1/admin/competitions/{competitionId}/challenges/{response.Id}",
+                response);
         }
 
-        var response = ChallengeMapper.ToResponse(result.Value!);
-        return TypedResults.Created(
-            $"/api/v1/admin/competitions/{competitionId}/challenges/{response.Id}",
-            response);
+        return result.Failure switch
+        {
+            ChallengeMutationFailure.CompetitionNotFound
+                or ChallengeMutationFailure.TemplateNotFound =>
+                TypedResults.NotFound(),
+            ChallengeMutationFailure.ResourceIdConflict
+                or ChallengeMutationFailure.ChallengeOrderConflict
+                or ChallengeMutationFailure.ChallengeTemplateConflict =>
+                TypedResults.Conflict(
+                    CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
+            ChallengeMutationFailure.InvalidChallengeId
+                or ChallengeMutationFailure.InvalidBaseScore
+                or ChallengeMutationFailure.InvalidOrder
+                or ChallengeMutationFailure.TemplateModeMismatch =>
+                TypedResults.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Challenge was not created.",
+                    detail: "Competition challenge values are invalid."),
+            _ => throw new InvalidOperationException(
+                $"Unsupported competition challenge create failure: {result.Failure}.")
+        };
     }
 }

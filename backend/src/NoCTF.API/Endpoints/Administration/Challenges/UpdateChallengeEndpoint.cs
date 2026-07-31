@@ -6,25 +6,68 @@ using NoCTF.API.Endpoints.Challenges;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Teams.Moderation;
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class UpdateChallengeRequest
 {
-    public long BaseScore { get; set; }
-    public int Order { get; set; }
-    public bool IsPublished { get; set; }
-    public int ExpectedRevision { get; set; }
+    public long? BaseScore { get; set; }
+    public int? Order { get; set; }
+    public bool? IsPublished { get; set; }
+    public int? ExpectedRevision { get; set; }
 }
 
 public sealed class UpdateChallengeValidator : Validator<UpdateChallengeRequest>
 {
     public UpdateChallengeValidator()
     {
-        RuleFor(request => request.BaseScore).GreaterThanOrEqualTo(0);
-        RuleFor(request => request.Order).GreaterThanOrEqualTo(0);
-        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
+        RuleFor(request => request.BaseScore).NotNull().GreaterThanOrEqualTo(0);
+        RuleFor(request => request.Order).NotNull().GreaterThanOrEqualTo(0);
+        RuleFor(request => request.IsPublished).NotNull();
+        RuleFor(request => request.ExpectedRevision).NotNull().GreaterThanOrEqualTo(0);
     }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<CompetitionChallengeConflictCode>))]
+public enum CompetitionChallengeConflictCode
+{
+    ResourceIdConflict,
+    ChallengeOrderConflict,
+    ChallengeTemplateConflict,
+    RevisionConflict,
+    LifecycleStateConflict,
+    ChallengeTemplateNotFound,
+    ChallengeTemplateModeMismatch
+}
+
+public sealed record CompetitionChallengeConflictResponse(
+    [property: Required, JsonRequired] CompetitionChallengeConflictCode Code);
+
+internal static class CompetitionChallengeConflictMapper
+{
+    public static CompetitionChallengeConflictResponse ToResponse(
+        ChallengeMutationFailure failure) =>
+        new(failure switch
+        {
+            ChallengeMutationFailure.ResourceIdConflict =>
+                CompetitionChallengeConflictCode.ResourceIdConflict,
+            ChallengeMutationFailure.ChallengeOrderConflict =>
+                CompetitionChallengeConflictCode.ChallengeOrderConflict,
+            ChallengeMutationFailure.ChallengeTemplateConflict =>
+                CompetitionChallengeConflictCode.ChallengeTemplateConflict,
+            ChallengeMutationFailure.RevisionConflict =>
+                CompetitionChallengeConflictCode.RevisionConflict,
+            ChallengeMutationFailure.LifecycleStateConflict =>
+                CompetitionChallengeConflictCode.LifecycleStateConflict,
+            ChallengeMutationFailure.TemplateNotFound =>
+                CompetitionChallengeConflictCode.ChallengeTemplateNotFound,
+            ChallengeMutationFailure.TemplateModeMismatch =>
+                CompetitionChallengeConflictCode.ChallengeTemplateModeMismatch,
+            _ => throw new InvalidOperationException(
+                $"Unsupported competition challenge conflict: {failure}.")
+        });
 }
 
 public sealed class UpdateChallengeEndpoint(
@@ -32,14 +75,18 @@ public sealed class UpdateChallengeEndpoint(
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
     : Endpoint<UpdateChallengeRequest,
-        Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+        Results<
+            Ok<ChallengeResponse>,
+            NotFound,
+            ForbidHttpResult,
+            Conflict<CompetitionChallengeConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
         Put("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminUpdateCompetitionChallenge")
-            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Description(builder => builder.WithName("AdminUpdateCompetitionChallenge"));
         Summary(summary =>
         {
             summary.Summary = "Updates a competition challenge.";
@@ -48,7 +95,12 @@ public sealed class UpdateChallengeEndpoint(
     }
 
     public override async Task<
-        Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+        Results<
+            Ok<ChallengeResponse>,
+            NotFound,
+            ForbidHttpResult,
+            Conflict<CompetitionChallengeConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         UpdateChallengeRequest request,
         CancellationToken ct)
     {
@@ -59,23 +111,32 @@ public sealed class UpdateChallengeEndpoint(
         var result = await update.ExecuteAsync(new UpdateCompetitionChallengeCommand(
             competitionId,
             Route<Guid>("competitionChallengeId"),
-            request.BaseScore,
-            request.Order,
-            request.IsPublished,
-            request.ExpectedRevision,
+            request.BaseScore!.Value,
+            request.Order!.Value,
+            request.IsPublished!.Value,
+            request.ExpectedRevision!.Value,
             DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode is "competition_not_found" or "competition_challenge_not_found")
-            return TypedResults.NotFound();
-        if (!result.Succeeded)
-        {
-            return TypedResults.Problem(
-                statusCode: result.ErrorCode is "revision_conflict" or "challenge_order_conflict"
-                    ? StatusCodes.Status409Conflict
-                    : StatusCodes.Status400BadRequest,
-                title: "Challenge was not updated.",
-                detail: result.ErrorMessage);
-        }
+        if (result.Challenge is not null)
+            return TypedResults.Ok(ChallengeMapper.ToResponse(result.Challenge));
 
-        return TypedResults.Ok(ChallengeMapper.ToResponse(result.Value!));
+        return result.Failure switch
+        {
+            ChallengeMutationFailure.CompetitionNotFound
+                or ChallengeMutationFailure.ChallengeNotFound =>
+                TypedResults.NotFound(),
+            ChallengeMutationFailure.RevisionConflict
+                or ChallengeMutationFailure.ChallengeOrderConflict =>
+                TypedResults.Conflict(
+                    CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
+            ChallengeMutationFailure.InvalidBaseScore
+                or ChallengeMutationFailure.InvalidOrder
+                or ChallengeMutationFailure.InvalidRevision =>
+                TypedResults.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Challenge was not updated.",
+                    detail: "Competition challenge update values are invalid."),
+            _ => throw new InvalidOperationException(
+                $"Unsupported competition challenge update failure: {result.Failure}.")
+        };
     }
 }

@@ -212,6 +212,18 @@ DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallen
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}/restore
 ```
 
+CompetitionChallenge create/update/delete/restore 的并发冲突统一返回强类型
+`CompetitionChallengeConflictResponse`。update body 必须包含完整的 BaseScore、Order、
+IsPublished 与非负 expectedRevision；delete/restore 必须通过 required query
+`expectedRevision` 携带当前聚合 revision。成功的 delete/restore 各递增一次 revision；
+陈旧 revision 返回 `RevisionConflict`，当前 revision 但删除状态方向错误返回
+`LifecycleStateConflict`，不自动合并或静默覆盖。restore 还会在同一事务内重验活动 Challenge
+template、Competition mode 与活动唯一约束。稳定 conflict code 为 `ResourceIdConflict`、
+`ChallengeOrderConflict`、`ChallengeTemplateConflict`、`RevisionConflict`、
+`LifecycleStateConflict`、`ChallengeTemplateNotFound` 和 `ChallengeTemplateModeMismatch`。
+Hint 没有独立 revision，但其增删恢复与 CompetitionChallenge 管理写共享 Competition
+transaction lock，并在同一事务内递增父聚合 revision 与 leaderboard revision。
+
 ## Admin Submission 与判定
 
 ```text

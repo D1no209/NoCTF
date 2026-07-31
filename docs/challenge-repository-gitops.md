@@ -1257,8 +1257,12 @@ Action 先调用 list API，再按 Manifest ID 比较：
 
 ### Revision 与重试
 
-Challenge 与 CompetitionChallenge 聚合更新携带 API 当前返回的 ExpectedRevision。
+Challenge 与 CompetitionChallenge 聚合更新携带 API 当前返回的 ExpectedRevision；
+CompetitionChallenge soft delete/restore 也必须携带当前聚合 revision，不能把生命周期操作
+当作无条件覆盖。
 Attachment、Flag 和 Hint 不拥有独立 Revision；它们按稳定 UUID、删除状态和内容收敛。
+Hint 变更会推进父 CompetitionChallenge revision，因此后续聚合 update/delete/restore 必须
+重新读取父资源，不得复用 Hint 写之前的 revision。
 发生聚合 Revision conflict 时：
 
 1. 重新读取该资源；

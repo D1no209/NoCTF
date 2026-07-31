@@ -5371,9 +5371,9 @@
           "409": {
             "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
                 }
               }
             }
@@ -5720,7 +5720,7 @@
           "Admin"
         ],
         "summary": "Deletes a competition challenge.",
-        "description": "Soft-deletes the competition link without changing the global challenge template.",
+        "description": "Soft-deletes the competition link at the expected aggregate revision without changing the global challenge template.",
         "operationId": "AdminDeleteCompetitionChallenge",
         "parameters": [
           {
@@ -5728,7 +5728,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5736,13 +5737,35 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0.0,
+              "nullable": false
             }
           }
         ],
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -5756,9 +5779,9 @@
           "409": {
             "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
                 }
               }
             }
@@ -5903,9 +5926,9 @@
           "409": {
             "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
                 }
               }
             }
@@ -6481,7 +6504,7 @@
           "Admin"
         ],
         "summary": "Restores a deleted competition challenge.",
-        "description": "Restores the competition link only; the global template is not modified.",
+        "description": "Restores the competition link at the expected aggregate revision; the global template is not modified.",
         "operationId": "AdminRestoreCompetitionChallenge",
         "parameters": [
           {
@@ -6489,7 +6512,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -6497,13 +6521,35 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0.0,
+              "nullable": false
             }
           }
         ],
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -6517,9 +6563,9 @@
           "409": {
             "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
                 }
               }
             }
@@ -10167,6 +10213,40 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ResourceIdConflict",
+          "ChallengeOrderConflict",
+          "ChallengeTemplateConflict",
+          "RevisionConflict",
+          "LifecycleStateConflict",
+          "ChallengeTemplateNotFound",
+          "ChallengeTemplateModeMismatch"
+        ],
+        "enum": [
+          "ResourceIdConflict",
+          "ChallengeOrderConflict",
+          "ChallengeTemplateConflict",
+          "RevisionConflict",
+          "LifecycleStateConflict",
+          "ChallengeTemplateNotFound",
+          "ChallengeTemplateModeMismatch"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationChallengesCreateChallengeRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -10350,6 +10430,10 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationChallengesDeleteChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationChallengesChallengeConfigurationResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -10429,6 +10513,10 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationChallengesRestoreChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeConfigurationRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -10451,24 +10539,34 @@
       "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeRequest": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "baseScore",
+          "order",
+          "isPublished",
+          "expectedRevision"
+        ],
         "properties": {
           "baseScore": {
             "type": "integer",
             "format": "int64",
-            "minimum": 0.0
+            "minimum": 0.0,
+            "nullable": false
           },
           "order": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0.0,
+            "nullable": false
           },
           "isPublished": {
-            "type": "boolean"
+            "type": "boolean",
+            "nullable": false
           },
           "expectedRevision": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0.0,
+            "nullable": false
           }
         }
       },
