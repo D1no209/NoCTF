@@ -35,12 +35,6 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/teams',
-      name: 'teams',
-      component: () => import('@/views/TeamsView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
       path: '/awdp/screen/:gameId',
       name: 'awdp-screen',
       component: () => import('@/views/AwdpScreenView.vue'),

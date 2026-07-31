@@ -7,7 +7,7 @@ import { useScoreStore } from '@/stores/score'
 import { Button } from '@/components/ui/button'
 import BrandLogo from '@/components/BrandLogo.vue'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
-import { Home, LayoutDashboard, Menu, Users } from 'lucide-vue-next'
+import { Home, LayoutDashboard, Menu } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import NotificationCenter from '@/components/notifications/NotificationCenter.vue'
 
@@ -50,14 +50,6 @@ async function handleLogout() {
             active-class="border-primary bg-accent text-foreground"
           >
             {{ t('nav.competitions') }}
-          </RouterLink>
-          <RouterLink
-            to="/teams"
-            class="relative inline-flex items-center gap-1 border-b-[2px] border-transparent px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            active-class="border-primary bg-accent text-foreground"
-          >
-            <Users class="size-4" />
-            {{ t('nav.teams') }}
           </RouterLink>
           <RouterLink
             v-if="canManage"
@@ -107,9 +99,6 @@ async function handleLogout() {
               </RouterLink>
               <RouterLink to="/competitions" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
                 {{ t('nav.competitions') }}
-              </RouterLink>
-              <RouterLink to="/teams" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
-                {{ t('nav.teams') }}
               </RouterLink>
               <RouterLink v-if="canManage" to="/admin" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
                 {{ t('nav.admin') }}

@@ -5,7 +5,7 @@ import { ChevronLeft, Users } from 'lucide-vue-next'
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { competitionApi } from '@/api/noctf'
+import { competitionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
@@ -24,21 +24,14 @@ const displayName = computed(() => scoreStore.myTeamName ?? auth.user?.userName 
 const displayScore = computed(() => scoreStore.myTeamScore)
 const titleText = computed(() => `NoCTF / ${t('common.live')}`)
 
-interface MyCompetitionTeam {
-  id: string
-  name: string
-  registrationStatus: string
-  isBanned: boolean
-}
-
-const { data: myTeams } = useQuery({
-  queryKey: computed(() => queryKeys.myCompetitionTeams(competitionId.value)),
-  queryFn: () => competitionApi.myTeams<MyCompetitionTeam[]>(competitionId.value),
+const { data: myTeam } = useQuery({
+  queryKey: computed(() => queryKeys.myCompetitionTeam(competitionId.value)),
+  queryFn: () => teamApi.getMy(competitionId.value),
   enabled: computed(() => Boolean(competitionId.value)),
 })
 
 const approvedTeam = computed(() =>
-  (myTeams.value ?? []).find(team => team.registrationStatus === 'approved' && !team.isBanned) ?? null,
+  myTeam.value?.registrationStatus === 'approved' ? myTeam.value : null,
 )
 
 const { data: leaderboard } = useQuery<
