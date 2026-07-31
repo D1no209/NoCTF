@@ -4,9 +4,10 @@
 
 ## 1. 下一会话目标
 
-2026-07-31 本轮 outcome、上传补偿、Runtime scope 和 Patch draft 纵切已在本机闭合；
-Frontend 正继续按生成 OpenAPI 契约逐项迁移。Backend 仍有第 7 节列出的三个高置信
-状态机/额度问题，最新状态以 6.33 至 6.44 和第 7 节为准：
+2026-07-31 本轮 outcome、上传补偿、Runtime scope、Patch draft、Runtime cleanup/
+replacement 与团队并发额度纵切已在本机闭合；Frontend 正继续按生成 OpenAPI 契约逐项
+迁移。此前第 7 节列出的三个高置信 Backend 问题均已由 `a234ee6` 完成，最新状态以
+6.33 至 6.47 和第 7 节为准：
 
 - Docker Container/Compose 公开服务最终采用题目容器直接映射 Docker 随机宿主端口；
 - 24 条 `LeaderboardRevision` 写路径均在同一事务发布 invalidation；
@@ -22,10 +23,10 @@ Frontend 正继续按生成 OpenAPI 契约逐项迁移。Backend 仍有第 7 节
   不再退化为 anonymous+IP；
 - PatchUpload 已按既定规范恢复为可替换 draft，替换与 Fix 消费共用事务锁，旧对象通过
   Wolverine durable outbox 清理；
-- 当前环境可执行的后端测试（含真实 PostgreSQL/Redis/Wolverine/Docker 集成）均通过，
-  Frontend 测试/构建、EF 与 OpenAPI 漂移检查也通过；需要目标环境的
-  Kubernetes/Libvirt 用例保持显式 skip，统一 Integration 命令因此触发 minimum-policy
-  violation，而非测试失败，详见 6.44。
+- 当前环境可执行的后端测试（含真实 PostgreSQL/Redis/Wolverine/Docker 集成）均通过：
+  495/495 non-Integration、117/117 可执行 Integration，0 failed；需要目标环境的
+  Kubernetes/Libvirt 各 1 项保持显式 skip。EF 无 pending model，OpenAPI 两份 artifact
+  字节一致，详见 6.47。
 
 2026-07-30 已验证 GitOps 模板 `2571893` 可构建，`validate` 与 `self-test` 均通过。用户经
 `$grill-me` 明确选择方案 A：使用普通 Organizer Bot、普通长生命周期 Access JWT、现有
@@ -43,6 +44,9 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
   的 generated-SDK/契约适配。
 - 6.41 至 6.44 已完成 outcome OpenAPI、上传失败补偿清理、participant Runtime 可见性和
   PatchUpload replacement 的 Backend 修复。
+- 6.45 至 6.47 已完成 provider cleanup/capacity 收敛、replacement/自动 provision
+  状态机，以及 `MaxConcurrentRuntimeInstancesPerTeam` 事务额度、方案 A API 与 AWD
+  start gate。
 - 用户已明确授权 push；`codex/backend-gitops-completion` 已推送，不创建 PR、不合入
   `main`。Frontend 后续优化由协作者并行推进，本会话避免再修改 Frontend。
 - 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
@@ -60,7 +64,7 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - 用户已明确要求 push。2026-07-31 通过 GitHub CLI 认证的 HTTPS fetch 确认
   `origin/main` 仍为当前分支祖先，behind 0，无冲突也无需空 merge。
 - `5660dc3` 的首次推送已通过 GitHub API 核对远端 ref；6.42 至 6.44 的后续 bug fix 与
-  本文也在最终核验后推送到同一工作分支。
+  handoff 已推送到同一工作分支。`a234ee6` 是本轮 Runtime cleanup/quota 代码提交。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
 - 本轮只更新工作分支；没有创建 PR、直接推送 `main` 或执行部署。
@@ -645,9 +649,12 @@ routed network、URL、stop、replacement generation 与 identity cleanup 验证
 - 已注册但此前没有调度入口的 Docker/Kubernetes disposable TTL reaper 现在由同一
   durable 节点审计消息驱动；持久资源不带 `expires-at`，不会按 Provider 创建时刻提前
   回收。
-- orphan cleanup 不释放 capacity。claim/release、replacement 单槽、Runner 失联、
-  receipt cleanup 与 release token 仍由 RuntimeInstance assignment durable 状态机负责，
-  避免双重释放；相关 PostgreSQL/Redis/Wolverine Integration 全量通过。
+- provider orphan sweep 本身不释放 capacity；capacity 只在精确 assignment identity
+  cleanup 后做 owner-checked release。离线 `Provisioning` 且没有 receipt 时缺少资源已
+  清理的证据，因此保持原 Runner assignment 与 Redis claim，不释放、不 redispatch；
+  后续只能由同 identity 的 typed cancel/termination，或迟到 receipt 持久化后 typed stop
+  收敛。历史 `ReleaseRunnerCapacity` durable message 仅由无副作用 tombstone 吸收，不再
+  产生新的 release token 或消息。详见 6.45。
 
 ### 6.6 API、capability/DI 与交付门禁
 
@@ -852,10 +859,11 @@ KoH 完整边界已由 `a953ae1` 独立完成。不要退回预建 Runtime、进
   扣减一次，错误 owner 不能释放，正确 owner 释放后精确恢复。
 - Runner heartbeat 丢失后，新 claim 被拒绝；已经存在的 claim 仍可释放并恢复容量。
   这避免离线节点继续接单，也不会让失联恢复流程因 heartbeat 已过期而无法归还预算。
-- 既有 `RunnerAssignmentReconciliationTests` 6/6 重新通过，继续覆盖离线 assignment
-  redispatch、Redis 不可用时整批 defer、后续 heartbeat 查询不可用时不做部分释放、
-  replacement 等待容量释放、在线节点资源审计和原节点 receipt ownership。消息重放、
-  assignment/orphan 状态收敛没有发现新的生产代码缺陷。
+- `RunnerAssignmentReconciliationTests` 后续已扩充为 13 项，覆盖离线
+  `Provisioning + no receipt` fail-closed、Redis 不可用时整批 defer、后续 heartbeat
+  查询不可用时不做部分释放、replacement 等待精确 cleanup、在线节点资源审计和原节点
+  receipt ownership。旧版“离线 assignment 直接 release/redispatch”语义已经废弃；
+  当前契约详见 6.45。
 - 最新完整后端门禁：solution build 0 warning/0 error；359 non-Integration passed；
   49 Integration passed、0 failed、1 Kubernetes dataplane skipped；EF 无 pending model；
   OpenAPI artifact 无漂移；`git diff --check` 通过。合计 408 passed、0 failed、1 skipped。
@@ -2112,6 +2120,67 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   violation，而非测试或 teardown failure。EF 无 pending model changes；OpenAPI 导出
   134 个 endpoint 且两份 artifact 无漂移；`git diff --check` passed。
 
+### 6.45 Runtime provider cleanup 与 capacity 收敛（2026-07-31）
+
+- 本地提交：`a234ee6 fix(runtime): harden cleanup and team quotas`。
+- Runner/Worker callback 现在使用带 RuntimeInstanceId、ProcessingVersion、Generation、
+  RunnerPool 和 RunnerId 的强类型 cancel/termination/provision outcome；读取、provider
+  清理、数据库回写和 replacement dispatch 均以完整 assignment identity fence 拒绝迟到
+  或串错节点的消息。
+- provider 已经开始创建资源后的失败会先清理精确 identity，再做 owner-checked Redis
+  capacity release；正常 Stop 也只在 receipt cleanup 成功后释放。`OwnerMismatch` fail
+  closed，不会把另一节点持有的预算归还。
+- Stop/Reset 进入 `Stopping` 时清除旧 operation token。迟到的 provision success 会先
+  持久化 receipt、推进 ProcessingVersion，再向原 Runner 发 typed Stop；不再丢失唯一可
+  清理资源的 receipt。
+- `Failed + receipt` 被视为仍持有不可信资源：Runner 保持 offline；独立 reconciliation
+  逐条完成精确 provider cleanup 与 owner-checked capacity release 后，才清除 receipt 和
+  assignment marker。单条失败不会回滚已经成功收敛的其他 assignment。
+- 离线 `Provisioning + no receipt` 没有 cleanup 证据，必须保留原 assignment 和 Redis
+  claim，不 release、不 redispatch。生产代码不再创建 `ReleaseRunnerCapacity`；
+  handler 只作为 legacy durable-message tombstone，恒返回 `Superseded` 且无数据库、
+  Redis、outbox 副作用。maintenance 只清除历史 stale token，不改变 ProcessingVersion。
+
+### 6.46 Runtime replacement 与自动 provision 生命周期（2026-07-31）
+
+- cleanup 失败会同时把直接排队等待的 replacement 标记为 `Failed/CleanupFailed`，避免新
+  generation 永久停在 `Queued`；重放不会重复推进 terminal ProcessingVersion。
+- Player/Admin Start 遇到历史 `Failed + receipt` ancestor 时，会先把该 ancestor 恢复到
+  `Stopping` 并创建 linked replacement；cleanup 完成前不派发。任何历史 `Stopping`
+  ancestor 都拒绝新的 Start；Reset 只接受 root `Queued`、`Provisioning`、`Running`，
+  不接受正在等待 ancestor cleanup 的 queued replacement。
+- AWD/KoH 自动 provision 遇到 `Stopping` 或 `Failed + receipt` 时返回
+  `DeferredCleanup`，Worker 延迟 5 秒重试同一 durable provision message；只有 predecessor
+  已 `Stopped` 的 replacement 才允许派发。cleanup failure 会留下可诊断 terminal 状态，
+  不会提前启动新 generation。
+- KoH 自动 provision 与 Admin mutation 共用完全相同的 shared-scope PostgreSQL advisory
+  lock；Player/Admin/AWD 的 per-team 路径共用 team/competition lock。真实 PostgreSQL
+  并发回归使用确定性 EF command barrier 固定 read/ack 与 lock race，不依赖
+  `pg_stat_activity` 采样。
+
+### 6.47 团队 Runtime 额度、方案 A API 与 AWD start gate（2026-07-31）
+
+- 用户确认 `MaxConcurrentRuntimeInstancesPerTeam` 表示“同一队伍在同一比赛可同时占用的
+  logical challenge Runtime slot 上限”：`Queued/Provisioning/Running/Stopping` 计入，
+  同一 CompetitionChallenge 的 Reset 前后 generation 去重为一个 slot；`<= 0` 表示无限。
+  AWDP disposable target 和 KoH shared Runtime 不占用该 per-team 额度。
+- Create/Update Competition 按方案 A 把该字段作为必填、非 nullable `int32`；response
+  同样返回非 nullable `int`。Player Start、team-scoped Admin Start 和 AWD 自动 provision
+  都在同一事务 advisory lock 内检查并创建，跨入口竞争只能有一个成功，不会超额。
+- AWD 草稿仍允许 challenge Runtime definition 为空；Competition Start 时才强制每个
+  published AWD challenge 有可启动的合法 Runtime definition。正额度还必须至少容纳全部
+  published AWD challenges，否则 start gate 返回强类型
+  `RuntimeQuotaInsufficient`/`RuntimeDefinitionInvalid`。
+- 最终门禁：Release solution build 0 warning/0 error；495/495 non-Integration passed；
+  Integration 共发现 119 项，当前环境可执行的 117/117 passed、0 failed，真实 Kubernetes
+  与 Libvirt 各 1 项因未提供目标环境而显式 skipped。若最低执行数错误设为 119，
+  Microsoft Testing Platform 会因 skipped 不计为 executed 返回 minimum-policy 状态；
+  测试报告本身仍为 passed，标准门禁应使用不高于 117 的最低执行数。
+- EF `has-pending-model-changes` 明确无漂移，没有新增或手改 migration/snapshot。OpenAPI
+  导出仍为 134 endpoints；两份 artifact 字节一致，SHA-256 均为
+  `DF37E8152FBC3DBFE7C53F13DE2D9EE71BE4629C0243C3AD50054203F73D9749`。本轮未生成或
+  修改 Frontend；协作者需从该 OpenAPI 重新生成强类型客户端。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2125,6 +2194,9 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - transactional invalidation、订阅感知刷新、Redis 单航班/CAS/失败恢复与 approved-team 投影；
 - Frontend 生成类型、正确 Hub path、rejoin/heartbeat/polling fallback 与 202 snapshot 保留；
 - 四模式全边界、真实 PostgreSQL、EF、OpenAPI 和 solution 门禁。
+- Runtime provider cleanup/capacity 的完整 identity fence、replacement cleanup 状态机与
+  离线 `Provisioning + no receipt` fail-closed；
+- 团队 logical Runtime slot 事务额度、方案 A 必填 API 和 AWD start-time completeness。
 
 当前尚未执行的交付边界：
 
@@ -2139,25 +2211,24 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 
 Frontend 协作者正在并行优化，本会话不再修改 Frontend。其待办以当前生成 OpenAPI 为准：
 
-1. 迁移 Runtime start/get/reset/stop/extend、numeric state 与 `urls[]`；不能用 Challenge
+1. 先从 6.47 的最新 OpenAPI 重新生成客户端；Competition Create/Update 必须提交
+   `maxConcurrentRuntimeInstancesPerTeam`，读取使用 response 的强类型 `int`。继续通过
+   生成 SDK 与既有运行时配置解析 API base URL，不得在页面或 composable 写死 URL。
+2. 迁移 Runtime start/get/reset/stop/extend、numeric state 与 `urls[]`；不能用 Challenge
    direction 猜 capability，Extend 的 seconds/TTL 产品语义若仍有冲突必须先 `$grill-me`。
-2. 按 6.44 的可替换 draft 实现 multipart Patch upload → Submit Fix → status polling；
+3. 按 6.44 的可替换 draft 实现 multipart Patch upload → Submit Fix → status polling；
    不再使用 pre-signed PUT、teamId、checksum 或 `/patch-submissions` 假协议。
-3. 删除无后端契约的 AWDP screen/SSE 原型，以及 QQBot、Plugins、Penetration Operations、
+4. 删除无后端契约的 AWDP screen/SSE 原型，以及 QQBot、Plugins、Penetration Operations、
    live logs、global audit logs、dynamic SMTP/Infrastructure 等管理入口；Containers 不能
    硬接 `/api/admin/containers`，应另行重建为 competition-scoped Runtime surface。
-4. 逐页把仍有真实语义的 Competition、Challenge Bank、CompetitionChallenge 和 Team
+5. 逐页把仍有真实语义的 Competition、Challenge Bank、CompetitionChallenge 和 Team
    管理调用改为生成 SDK，最后删除 `sdk: any` Proxy，让缺失 operation 在编译期失败。
-5. 每个纵切继续先写失败 contract test，再跑受版本控制 Frontend tests、`vue-tsc`、
+6. 每个纵切继续先写失败 contract test，再跑受版本控制 Frontend tests、`vue-tsc`、
    production build、scoped lint 与 `git diff --check`，独立提交。
 
-Backend 下一步按高置信 bug 继续：
-
-1. 修复 Provisioning 中 Stop/Reset 对迟到 receipt 的握手，避免 provider resource 与无 TTL
-   Redis capacity claim 泄漏。
-2. 修复 Runtime replacement cleanup 失败后新 generation 永久 Queued 的状态机。
-3. 补 `MaxConcurrentRuntimeInstancesPerTeam` 事务内额度执行，以及 AWD start gate 对 published
-   challenge Runtime completeness 的验证；这两个切片均需真实 PostgreSQL/Redis 回归。
+此前列出的三个 Backend 高置信 bug 已全部由 6.45 至 6.47 闭合；当前没有已知、未实现的
+Backend 代码待办。在用户提供真实环境细则前，不再猜测新部署协议；只处理新发现且可复现
+的缺陷，或配合 Frontend 协作者确认生成契约。
 
 用户稍后会提供真实环境部署细则。在此之前：
 
@@ -2199,7 +2270,8 @@ Docker port mapping，host port 固定请求 `0`。
 3. 读取适用 Skill 的完整 `SKILL.md`；编码任务使用 `$karpathy-guidelines`。
 4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做。最新 Frontend 迁移状态
    使用 6.34 至 6.40；最新 outcome、上传补偿、Runtime scope 和 Patch draft Backend 状态
-   使用 6.41 至 6.44。Frontend 协作者正在并行工作，本会话避免修改 Frontend 文件。
+   使用 6.41 至 6.44；Runtime cleanup/replacement/quota 使用 6.45 至 6.47。Frontend
+   协作者正在并行工作，本会话避免修改 Frontend 文件。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
