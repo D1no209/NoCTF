@@ -14,7 +14,9 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest,
+  NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
@@ -962,11 +964,17 @@ export const adminApi = {
   async competition<T = unknown>(id: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{id}', path: { id } }), tt('errors.loadCompetition'))
   },
-  async createCompetition<T = unknown>(body: unknown) {
-    return unwrap(await client.post<{ 201: T }, unknown, false>({ url: '/api/admin/competitions', body }), tt('errors.createCompetition'))
+  async createCompetition(body: NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest) {
+    return unwrap(await generatedSdk.adminCreateCompetition({ body }), tt('errors.createCompetition'))
   },
-  async updateCompetition<T = unknown>(id: string, body: unknown) {
-    return unwrap(await client.put<{ 200: T }, unknown, false>({ url: '/api/admin/competitions/{id}', path: { id }, body }), tt('errors.updateCompetition'))
+  async updateCompetition(
+    competitionId: string,
+    body: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest,
+  ) {
+    return unwrap(
+      await generatedSdk.adminUpdateCompetition({ path: { competitionId }, body }),
+      tt('errors.updateCompetition'),
+    )
   },
   async deleteCompetition(id: string) {
     await requireSuccess(client.delete({ url: '/api/admin/competitions/{id}', path: { id } }), tt('errors.requestFailed'))

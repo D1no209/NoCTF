@@ -392,6 +392,7 @@
   "scoreboard": {
     "title": "Scoreboard",
     "fullBoard": "Full Leaderboard",
+    "bloods": "Challenge bloods",
     "loading": "Loading scoreboard...",
     "empty": "No scores yet.",
     "rank": "#",
@@ -977,6 +978,8 @@
       "difficultyCoefficient": "Difficulty coefficient",
       "autoApproveTeams": "Auto-approve team registration",
       "maxTeamMembers": "Max team members",
+      "maxConcurrentRuntimeInstancesPerTeam": "Runtime instances per team",
+      "maxConcurrentRuntimeInstancesPerTeamHint": "Maximum concurrent challenge runtime slots per team. Use 0 for unlimited.",
       "enableTracks": "Enable tracks",
       "trackNames": "Track names",
       "trackNamesPlaceholder": "Open\nCampus",

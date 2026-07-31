@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { SortingState } from '@tanstack/vue-table'
+import type {
+  NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest,
+  NoCtfDomainCompetitionsGameMode,
+} from '@/api/generated/types.gen'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   createColumnHelper,
@@ -60,6 +64,9 @@ interface CompetitionAdminDto {
   status: string
   startTime: string
   endTime: string
+  teamRegistrationAutoApprove: boolean
+  maxTeamMembers: number
+  maxConcurrentRuntimeInstancesPerTeam: number
   ownerId: string
 }
 
@@ -103,13 +110,26 @@ const isScheduleValid = computed(() => {
 
 const canSave = computed(() => Boolean(form.value.title.trim()) && isScheduleValid.value)
 
-function competitionPayload() {
+function competitionMode(value: string): NoCtfDomainCompetitionsGameMode {
+  switch (value) {
+    case 'Ctf': return 0
+    case 'Awd': return 1
+    case 'Awdp': return 2
+    case 'Koh': return 3
+    default: throw new Error('invalid_competition_mode')
+  }
+}
+
+function competitionPayload(): NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest {
   return {
-    ...form.value,
     title: form.value.title.trim(),
     description: form.value.description.trim() || undefined,
     startTime: new Date(form.value.startTime).toISOString(),
     endTime: new Date(form.value.endTime).toISOString(),
+    teamRegistrationAutoApprove: selectedComp.value?.teamRegistrationAutoApprove ?? true,
+    maxTeamMembers: selectedComp.value?.maxTeamMembers ?? 5,
+    maxConcurrentRuntimeInstancesPerTeam:
+      selectedComp.value?.maxConcurrentRuntimeInstancesPerTeam ?? 0,
   }
 }
 
@@ -125,7 +145,10 @@ const saveMutation = useMutation({
     }
     const body = competitionPayload()
     if (isCreating.value) {
-      await adminApi.createCompetition(body)
+      await adminApi.createCompetition({
+        ...body,
+        mode: competitionMode(form.value.gameModeType),
+      })
     }
     else {
       await adminApi.updateCompetition(selectedComp.value!.id, body)

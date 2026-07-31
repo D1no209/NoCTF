@@ -44,6 +44,7 @@ interface CompetitionDto {
   thirdBloodBonusPercent: number
   teamRegistrationAutoApprove: boolean
   maxTeamMembers: number
+  maxConcurrentRuntimeInstancesPerTeam: number
   tracksEnabled: boolean
   trackNames: string[]
   roundDurationSeconds?: number | null
@@ -140,6 +141,7 @@ const competitionForm = reactive({
   thirdBloodBonusPercent: 0,
   teamRegistrationAutoApprove: true,
   maxTeamMembers: 5,
+  maxConcurrentRuntimeInstancesPerTeam: 0,
   tracksEnabled: false,
   trackNamesText: '',
   roundDurationSeconds: undefined as number | undefined,
@@ -206,6 +208,10 @@ function competitionPayload() {
     thirdBloodBonusPercent: numberOrDefault(competitionForm.thirdBloodBonusPercent, 0),
     teamRegistrationAutoApprove: competitionForm.teamRegistrationAutoApprove,
     maxTeamMembers: numberOrDefault(competitionForm.maxTeamMembers, 5),
+    maxConcurrentRuntimeInstancesPerTeam: numberOrDefault(
+      competitionForm.maxConcurrentRuntimeInstancesPerTeam,
+      0,
+    ),
     tracksEnabled: competitionForm.tracksEnabled,
     trackNames: competitionForm.trackNamesText.split(trackNamesSeparatorPattern).map(item => item.trim()).filter(Boolean),
     roundDurationSeconds: optionalNumber(competitionForm.roundDurationSeconds),
@@ -271,6 +277,8 @@ watch(competition, (value) => {
   competitionForm.thirdBloodBonusPercent = value.thirdBloodBonusPercent ?? 0
   competitionForm.teamRegistrationAutoApprove = value.teamRegistrationAutoApprove ?? true
   competitionForm.maxTeamMembers = value.maxTeamMembers ?? 5
+  competitionForm.maxConcurrentRuntimeInstancesPerTeam
+    = value.maxConcurrentRuntimeInstancesPerTeam ?? 0
   competitionForm.tracksEnabled = value.tracksEnabled ?? false
   competitionForm.trackNamesText = (value.trackNames ?? []).join('\n')
   competitionForm.roundDurationSeconds = value.roundDurationSeconds ?? undefined

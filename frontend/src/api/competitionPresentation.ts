@@ -23,6 +23,7 @@ export interface PublicCompetition {
   status: PublicCompetitionStatus
   teamRegistrationAutoApprove: boolean
   maxTeamMembers: number
+  maxConcurrentRuntimeInstancesPerTeam: number
   ownerId: string
 }
 
@@ -62,6 +63,8 @@ export function toPublicCompetition(
     throw new TypeError('Competition response is missing teamRegistrationAutoApprove.')
   if (typeof value.maxTeamMembers !== 'number')
     throw new TypeError('Competition response is missing maxTeamMembers.')
+  if (typeof value.maxConcurrentRuntimeInstancesPerTeam !== 'number')
+    throw new TypeError('Competition response is missing maxConcurrentRuntimeInstancesPerTeam.')
 
   return {
     id: requireString(value.id, 'id'),
@@ -73,6 +76,7 @@ export function toPublicCompetition(
     status,
     teamRegistrationAutoApprove: value.teamRegistrationAutoApprove,
     maxTeamMembers: value.maxTeamMembers,
+    maxConcurrentRuntimeInstancesPerTeam: value.maxConcurrentRuntimeInstancesPerTeam,
     ownerId: requireString(value.ownerId, 'ownerId'),
   }
 }

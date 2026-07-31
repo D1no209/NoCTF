@@ -104,6 +104,25 @@ const { t } = useI18n()
               <Label>{{ t('admin.competitionDetail.maxTeamMembers') }}</Label>
               <Input v-model.number="competitionForm.maxTeamMembers" type="number" min="1" />
             </div>
+            <div class="grid gap-2">
+              <Label for="max-concurrent-runtime-instances-per-team">
+                {{ t('admin.competitionDetail.maxConcurrentRuntimeInstancesPerTeam') }}
+              </Label>
+              <Input
+                id="max-concurrent-runtime-instances-per-team"
+                v-model.number="competitionForm.maxConcurrentRuntimeInstancesPerTeam"
+                type="number"
+                min="0"
+                step="1"
+                aria-describedby="max-concurrent-runtime-instances-per-team-hint"
+              />
+              <p
+                id="max-concurrent-runtime-instances-per-team-hint"
+                class="text-xs text-muted-foreground"
+              >
+                {{ t('admin.competitionDetail.maxConcurrentRuntimeInstancesPerTeamHint') }}
+              </p>
+            </div>
             <Panel>
               <label class="flex min-h-10 cursor-pointer items-center gap-3 px-3 py-2 text-sm">
                 <input v-model="competitionForm.teamRegistrationAutoApprove" type="checkbox" class="size-4">

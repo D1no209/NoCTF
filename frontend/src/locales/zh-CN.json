@@ -392,6 +392,7 @@
   "scoreboard": {
     "title": "排行榜",
     "fullBoard": "完整排行榜",
+    "bloods": "题目血位",
     "loading": "正在加载排行榜...",
     "empty": "暂无成绩",
     "rank": "排名",
@@ -977,6 +978,8 @@
       "difficultyCoefficient": "难度系数",
       "autoApproveTeams": "队伍报名免审（默认通过）",
       "maxTeamMembers": "队伍最大人数",
+      "maxConcurrentRuntimeInstancesPerTeam": "每队并发题目实例数",
+      "maxConcurrentRuntimeInstancesPerTeamHint": "每支队伍同时占用的题目 Runtime 槽位上限，0 表示不限制。",
       "enableTracks": "启用赛道",
       "trackNames": "赛道名称",
       "trackNamesPlaceholder": "公开赛\n校内赛",
