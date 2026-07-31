@@ -28,6 +28,61 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/notifications",
+      "query": {
+        "limit": 20,
+        "cursor": "mock.notifications.older"
+      },
+      "status": 200,
+      "body": {
+        "items": [],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications",
+      "query": {
+        "limit": 20
+      },
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "019b1a4d-7a00-7000-8000-000000000001",
+            "competitionId": "comp-2026-awdp",
+            "entityId": "019b1a4d-7a00-7000-8000-000000000011",
+            "kind": 3,
+            "payload": {
+              "code": "awd_flag_injection_failed",
+              "competitionChallengeId": "awdp-pwn-1",
+              "challengeFlagId": "019b1a4d-7a00-7000-8000-000000000011",
+              "generation": 4,
+              "processingVersion": 9
+            },
+            "createdAt": "2026-07-05T10:31:30Z"
+          },
+          {
+            "id": "019b1a4d-7a00-7000-8000-000000000002",
+            "competitionId": "comp-2026-awdp",
+            "entityId": "019b1a4d-7a00-7000-8000-000000000012",
+            "kind": 5,
+            "payload": {
+              "code": "awd_checker_callback_missing",
+              "competitionChallengeId": "awdp-web-1",
+              "runtimeInstanceId": "019b1a4d-7a00-7000-8000-000000000021",
+              "generation": 3,
+              "checkerSequence": 18,
+              "processingVersion": 7
+            },
+            "createdAt": "2026-07-05T10:30:45Z"
+          }
+        ],
+        "nextCursor": "mock.notifications.older"
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/competitions",
       "status": 200,
       "body": {

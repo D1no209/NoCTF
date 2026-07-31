@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { UserNotification } from '@/api/noctf'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { Bell, BellOff, CheckCheck, Loader2 } from 'lucide-vue-next'
+import type { PublicNotification } from '@/api/notificationPresentation'
+import { useInfiniteQuery } from '@tanstack/vue-query'
+import { Bell, BellOff, Loader2, RefreshCw } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { notificationApi } from '@/api/noctf'
+import { nextNotificationPageParam } from '@/api/notificationPresentation'
 import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,61 +21,53 @@ import { formatNotificationTime, notificationCopy } from './notificationPresenta
 const { locale, t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
-const queryClient = useQueryClient()
 const open = ref(false)
+const pageSize = 20
 
-const notificationsQuery = useQuery({
+const notificationsQuery = useInfiniteQuery({
   queryKey: queryKeys.notifications,
-  queryFn: () => notificationApi.list(20),
+  queryFn: ({ pageParam, signal }) => notificationApi.listPage({
+    cursor: pageParam ?? undefined,
+    limit: pageSize,
+  }, signal),
+  initialPageParam: null as string | null,
+  getNextPageParam: nextNotificationPageParam,
   enabled: computed(() => auth.isAuthenticated),
   refetchInterval: 30_000,
   staleTime: 10_000,
 })
 
-const markRead = useMutation({
-  mutationFn: (id: string) => notificationApi.markRead(id),
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
+const notifications = computed(() => {
+  const ids = new Set<string>()
+  return (notificationsQuery.data.value?.pages ?? [])
+    .flatMap(page => page.items)
+    .filter((notification) => {
+      if (ids.has(notification.id))
+        return false
+      ids.add(notification.id)
+      return true
+    })
 })
-
-const markAllRead = useMutation({
-  mutationFn: () => notificationApi.markAllRead(),
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
-})
-
-const unreadCount = computed(() => notificationsQuery.data.value?.unreadCount ?? 0)
-const unreadLabel = computed(() => unreadCount.value > 99 ? '99+' : String(unreadCount.value))
-const buttonLabel = computed(() => unreadCount.value > 0
-  ? t('notifications.openUnread', { count: unreadCount.value })
-  : t('notifications.open'))
 
 watch(open, (isOpen) => {
   if (isOpen)
-    notificationsQuery.refetch()
+    void notificationsQuery.refetch()
 })
 
-async function selectNotification(notification: UserNotification) {
-  if (!notification.isRead) {
-    try {
-      await markRead.mutateAsync(notification.id)
-    }
-    catch {
-      // Reading a notification must not block its competition navigation.
-    }
-  }
-
+async function selectNotification(notification: PublicNotification) {
   open.value = false
   if (notification.competitionId)
     await router.push(`/competitions/${notification.competitionId}`)
 }
 
-function title(notification: UserNotification) {
+function title(notification: PublicNotification) {
   const copy = notificationCopy(notification)
-  return t(copy.titleKey, copy.params)
+  return t(copy.titleKey)
 }
 
-function body(notification: UserNotification) {
+function body(notification: PublicNotification) {
   const copy = notificationCopy(notification)
-  return t(copy.bodyKey, copy.params)
+  return t(copy.bodyKey)
 }
 </script>
 
@@ -85,17 +78,10 @@ function body(notification: UserNotification) {
         variant="ghost"
         size="icon-sm"
         class="relative shrink-0 rounded-none"
-        :aria-label="buttonLabel"
-        :title="buttonLabel"
+        :aria-label="t('notifications.open')"
+        :title="t('notifications.open')"
       >
         <Bell class="size-4" aria-hidden="true" />
-        <span
-          v-if="unreadCount > 0"
-          class="absolute -right-1.5 -top-1.5 min-w-5 border-2 border-muted bg-destructive px-1 text-center text-[0.8rem] font-bold leading-4 text-white"
-          aria-hidden="true"
-        >
-          {{ unreadLabel }}
-        </span>
       </Button>
     </DropdownMenuTrigger>
 
@@ -110,30 +96,39 @@ function body(notification: UserNotification) {
             {{ t('notifications.title') }}
           </p>
           <p class="text-xs text-muted-foreground">
-            {{ t('notifications.unreadSummary', { count: unreadCount }) }}
+            {{ t('notifications.historySummary', { count: notifications.length }) }}
           </p>
         </div>
         <Button
-          v-if="unreadCount > 0"
           variant="ghost"
-          size="sm"
-          :disabled="markAllRead.isPending.value"
-          @click="markAllRead.mutate()"
+          size="icon-sm"
+          :aria-label="t('notifications.refresh')"
+          :title="t('notifications.refresh')"
+          :disabled="notificationsQuery.isFetching.value"
+          @click.stop="notificationsQuery.refetch()"
         >
-          <Loader2 v-if="markAllRead.isPending.value" class="animate-spin" />
-          <CheckCheck v-else />
-          {{ t('notifications.markAllRead') }}
+          <RefreshCw
+            :class="{ 'animate-spin': notificationsQuery.isFetching.value }"
+            aria-hidden="true"
+          />
         </Button>
       </div>
 
-      <div v-if="notificationsQuery.isLoading.value" class="space-y-3 p-3" aria-busy="true">
+      <div
+        v-if="notificationsQuery.isLoading.value && notifications.length === 0"
+        class="space-y-3 p-3"
+        aria-busy="true"
+      >
         <div v-for="index in 3" :key="index" class="space-y-2">
           <Skeleton class="h-4 w-2/3 rounded-none" />
           <Skeleton class="h-3 w-full rounded-none" />
         </div>
       </div>
 
-      <div v-else-if="notificationsQuery.isError.value" class="p-5 text-center">
+      <div
+        v-else-if="notificationsQuery.isError.value && notifications.length === 0"
+        class="p-5 text-center"
+      >
         <BellOff class="mx-auto mb-2 size-5 text-muted-foreground" aria-hidden="true" />
         <p class="font-bold">
           {{ t('notifications.loadFailed') }}
@@ -143,7 +138,7 @@ function body(notification: UserNotification) {
         </Button>
       </div>
 
-      <div v-else-if="!notificationsQuery.data.value?.items.length" class="p-6 text-center">
+      <div v-else-if="notifications.length === 0" class="p-6 text-center">
         <Bell class="mx-auto mb-2 size-5 text-muted-foreground" aria-hidden="true" />
         <p class="font-bold">
           {{ t('notifications.empty') }}
@@ -155,20 +150,46 @@ function body(notification: UserNotification) {
 
       <div v-else class="max-h-[min(28rem,70vh)] overflow-y-auto py-1">
         <button
-          v-for="notification in notificationsQuery.data.value?.items"
+          v-for="notification in notifications"
           :key="notification.id"
           type="button"
-          class="relative block w-full border-b border-border px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          :class="notification.isRead ? 'text-muted-foreground' : 'bg-card text-foreground'"
+          class="relative block w-full border-b border-border bg-card px-3 py-3 text-left text-foreground transition-colors last:border-b-0 hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           @click="selectNotification(notification)"
         >
-          <span v-if="!notification.isRead" class="absolute right-3 top-3 size-2 bg-destructive" aria-hidden="true" />
-          <span class="block pr-5 font-bold">{{ title(notification) }}</span>
+          <span class="block font-bold">{{ title(notification) }}</span>
           <span class="mt-1 block line-clamp-3 text-xs leading-5">{{ body(notification) }}</span>
           <time class="mt-1.5 block text-xs tabular-nums" :datetime="notification.createdAt">
             {{ formatNotificationTime(notification.createdAt, locale) }}
           </time>
         </button>
+
+        <div
+          v-if="notificationsQuery.hasNextPage.value || notificationsQuery.isFetchNextPageError.value"
+          class="space-y-2 border-t-2 border-border p-2"
+        >
+          <p
+            v-if="notificationsQuery.isFetchNextPageError.value"
+            class="px-1 text-xs text-destructive"
+            role="alert"
+          >
+            {{ t('notifications.loadOlderFailed') }}
+          </p>
+          <Button
+            v-if="notificationsQuery.hasNextPage.value"
+            variant="outline"
+            size="sm"
+            class="w-full"
+            :disabled="notificationsQuery.isFetchingNextPage.value"
+            @click="notificationsQuery.fetchNextPage()"
+          >
+            <Loader2
+              v-if="notificationsQuery.isFetchingNextPage.value"
+              class="animate-spin"
+              aria-hidden="true"
+            />
+            {{ t('notifications.loadOlder') }}
+          </Button>
+        </div>
       </div>
     </DropdownMenuContent>
   </DropdownMenu>

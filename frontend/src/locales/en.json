@@ -82,8 +82,6 @@
     "loadInstance": "Failed to load instance",
     "destroyInstance": "Failed to destroy instance",
     "extendInstance": "Failed to extend instance",
-    "loadAwdDashboard": "Failed to load AWD dashboard",
-    "loadKohDashboard": "Failed to load KoH dashboard",
     "loadCompetitionView": "Failed to load competition view",
     "loadTeams": "Failed to load teams",
     "loadMyTeams": "Failed to load my teams",
@@ -120,8 +118,7 @@
     "awdpScreenLoad": "Failed to load AWDP screen data",
     "awdpScreenNonJson": "AWDP screen endpoint did not return JSON. Rebuild or restart the backend so /api/awdp/screen/snapshot is registered.",
     "awdpScreenInvalidJson": "AWDP screen endpoint returned invalid JSON",
-    "loadNotifications": "Failed to load notifications",
-    "updateNotifications": "Failed to update notifications"
+    "loadNotifications": "Failed to load notifications"
   },
   "nav": {
     "home": "Home",
@@ -133,50 +130,51 @@
     "score": "pts"
   },
   "notifications": {
-    "title": "Notifications",
-    "open": "Open notifications",
-    "openUnread": "Open notifications, {count} unread",
-    "unreadSummary": "{count} unread",
-    "markAllRead": "Read all",
-    "loadFailed": "Notifications unavailable",
-    "empty": "You're all caught up",
-    "emptyHint": "Competition updates will appear here.",
+    "title": "Event history",
+    "open": "Open event history",
+    "historySummary": "{count} events loaded",
+    "refresh": "Refresh event history",
+    "loadOlder": "Load earlier events",
+    "loadOlderFailed": "Earlier events could not be loaded.",
+    "loadFailed": "Event history unavailable",
+    "empty": "No events recorded",
+    "emptyHint": "Permanent competition and platform events will appear here.",
     "events": {
-      "competitionStarted": {
-        "title": "Competition started",
-        "body": "{competition_name} is now live."
+      "competitionLifecycleChanged": {
+        "title": "Competition lifecycle changed",
+        "body": "A lifecycle event was recorded for this competition."
       },
-      "challengePublished": {
-        "title": "New challenge: {problem_title}",
-        "body": "A {problem_category} challenge is now available."
+      "teamRegistrationChanged": {
+        "title": "Team registration changed",
+        "body": "A team registration event was recorded."
       },
-      "hintPublished": {
-        "title": "New hint: {problem_title}",
-        "body": "{hint_title}: {hint_content}"
+      "submissionEvaluated": {
+        "title": "Submission evaluated",
+        "body": "A submission evaluation event was recorded."
       },
-      "firstBlood": {
-        "title": "First blood",
-        "body": "{team_name} solved {problem_title}."
+      "runtimeStateChanged": {
+        "title": "Runtime state changed",
+        "body": "A challenge runtime state event was recorded."
       },
-      "secondBlood": {
-        "title": "Second blood",
-        "body": "{team_name} solved {problem_title}."
+      "startGateFailed": {
+        "title": "Competition start check failed",
+        "body": "The competition could not pass its start checks."
       },
-      "thirdBlood": {
-        "title": "Third blood",
-        "body": "{team_name} solved {problem_title}."
+      "managementFailure": {
+        "title": "Competition operation warning",
+        "body": "A competition management failure was recorded."
       },
-      "teamPenalized": {
-        "title": "Competition penalty",
-        "body": "{team_name}: {penalty_type}"
+      "awdFlagInjectionFailed": {
+        "title": "AWD Flag injection failed",
+        "body": "A Flag could not be injected into a challenge runtime. Check competition operations."
       },
-      "announcement": {
-        "title": "{announcement_title}",
-        "body": "{announcement_content}"
+      "awdCheckerCallbackMissing": {
+        "title": "AWD checker callback missing",
+        "body": "A checker did not report before its deadline. Check runtime and Runner health."
       },
       "unknown": {
-        "title": "Competition update",
-        "body": "A new competition event is available."
+        "title": "System event",
+        "body": "An event with an unsupported type was recorded."
       }
     }
   },
@@ -423,83 +421,12 @@
     "selectChallenge": "Select challenge",
     "flag": "Flag",
     "uploadPatch": "Upload Patch",
-    "patchArchive": "Patch Archive (.zip, .tar.gz)",
     "dropFile": "Drop file here or click to browse",
     "submitPatch": "Submit Patch",
     "patchStatus": "Patch Status",
     "patchSubmitted": "Patch submitted - validation in progress.",
-    "uploadFailed": "Upload failed ({status}).",
     "patchUploadFailed": "Patch upload failed.",
-    "patchFileHint": ".tar.gz or .tgz max 10MB",
-    "patchSubmissionId": "Submission ID: {id}",
-    "currentTeam": "Current team",
-    "selectedService": "Selected service",
-    "defensePhase": "Defense Phase",
-    "serviceStatus": "Service Status",
-    "attackLog": "Attack Log",
-    "realtimeActivity": "Realtime Activity",
-    "noAttacks": "No attacks yet.",
-    "noServices": "No services available.",
-    "teamHeader": "Team",
-    "statusUp": "UP",
-    "statusDown": "DOWN",
-    "statusUnknown": "?",
-    "battlefield": {
-      "kicker": "AWD realtime awareness",
-      "title": "Central attack field",
-      "metricRound": "Round",
-      "metricQueue": "Queue",
-      "metricSla": "SLA",
-      "railTeams": "Teams",
-      "railServices": "Services",
-      "emptyTeams": "Waiting for GameBox telemetry",
-      "emptyServices": "Waiting for challenge services",
-      "coreRoundLabel": "ROUND",
-      "stateIdle": "IDLE MODE",
-      "statePlayback": "EVENT PLAYBACK",
-      "stateMonitoring": "Monitoring service checks and flag submissions",
-      "emptyPlayed": "No played events in this view.",
-      "healthAllUp": "all up",
-      "healthDown": "{count} down",
-      "healthUnknown": "{count} unknown",
-      "serviceHealthDown": "{down}/{total} down",
-      "serviceHealthUnknown": "{unknown}/{total} unknown",
-      "serviceHealthUp": "{healthy}/{total} up",
-      "defaults": {
-        "service": "service",
-        "attacker": "Attacker",
-        "target": "Target",
-        "team": "Team"
-      },
-      "events": {
-        "attackSuccess": "ATTACK SUCCESS",
-        "attackFailed": "ATTACK FAILED",
-        "serviceDown": "SERVICE DOWN",
-        "serviceRecovered": "SERVICE RECOVERED",
-        "roundStart": "ROUND {round} START",
-        "flagRefreshed": "FLAG REFRESHED",
-        "checkerError": "CHECKER ERROR",
-        "gameboxRestarting": "GAMEBOX RESTARTING"
-      },
-      "summary": {
-        "attack": "{attacker} -> {victim} / {challenge}",
-        "teamChallenge": "{team} / {challenge}",
-        "checkerError": "{challenge} / {reason}",
-        "flagRotation": "Round {round} flag rotation",
-        "round": "Round {round}"
-      },
-      "logLine": {
-        "attack": "{time} {attacker} attack {victim} / {challenge} {result}",
-        "resultSuccess": "success",
-        "resultFailed": "failed",
-        "serviceDown": "{time} {team} / {challenge} service down",
-        "serviceRecovered": "{time} {team} / {challenge} service recovered",
-        "roundStart": "{time} round {round} start",
-        "flagRefresh": "{time} round {round} flag refreshed",
-        "checkerError": "{time} {challenge} checker error",
-        "gameboxRestart": "{time} {team} / {challenge} gamebox restarting"
-      }
-    }
+    "patchFileHint": ".tar.gz or .tgz max 10MB"
   },
   "awdp": {
     "screenEntry": "Command screen",
@@ -700,23 +627,6 @@
       "scoreUpdated": "{round} / {team} round score settled",
       "rankChanged": "{round} / {team} rank changed"
     }
-  },
-  "koh": {
-    "badge": "KoH",
-    "kingOfTheHill": "King of the Hill",
-    "subtitle": "Control the hill and earn points over time.",
-    "challengeCount": "{count} challenge",
-    "challengeCount_plural": "{count} challenges",
-    "loading": "Loading KoH dashboard…",
-    "empty": "No challenges available yet.",
-    "emptyDetail": "No hills have been defined for this competition.",
-    "loadError": "Failed to load KoH dashboard.",
-    "loadErrorDetail": "Refresh the dashboard or check whether the competition is still running.",
-    "controlled": "Controlled",
-    "uncontested": "Uncontested",
-    "controller": "Controller",
-    "history": "History",
-    "noHistory": "No control history yet."
   },
   "admin": {
     "users": {

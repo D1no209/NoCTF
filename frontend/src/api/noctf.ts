@@ -34,6 +34,7 @@ import {
 import { toPublicCompetition } from './competitionPresentation'
 import { client } from './generated/client.gen'
 import * as generatedSdk from './generated/sdk.gen'
+import { toPublicNotificationPage } from './notificationPresentation'
 import {
   toAcceptedFlagSubmission,
   toPublicSubmissionPage,
@@ -276,39 +277,24 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
   return data as T
 }
 
-export interface UserNotification {
-  id: string
-  competitionId?: string | null
-  subjectId?: string | null
-  type: string
-  data: Record<string, string>
-  isRead: boolean
-  createdAt: string
-  readAt?: string | null
-}
-
-export interface UserNotificationPage {
-  items: UserNotification[]
-  unreadCount: number
-}
-
 export const notificationApi = {
-  async list(limit = 20) {
-    return unwrap(await client.get<{ 200: UserNotificationPage }, unknown, false>({
-      url: '/api/notifications',
-      query: { limit },
-    }), tt('errors.loadNotifications'))
-  },
-  async markRead(id: string) {
-    await requireSuccess(client.post<{ 204: never }, unknown, false>({
-      url: '/api/notifications/{id}/read',
-      path: { id },
-    }), tt('errors.updateNotifications'))
-  },
-  async markAllRead() {
-    await requireSuccess(client.post<{ 204: never }, unknown, false>({
-      url: '/api/notifications/read-all',
-    }), tt('errors.updateNotifications'))
+  async listPage(
+    {
+      cursor,
+      limit = 20,
+    }: {
+      cursor?: string | null
+      limit?: number
+    } = {},
+    signal?: AbortSignal,
+  ) {
+    return toPublicNotificationPage(unwrap(
+      await generatedSdk.noCtfapiEndpointsNotificationsListNotificationsEndpoint({
+        query: { cursor, limit },
+        signal,
+      }),
+      tt('errors.loadNotifications'),
+    ))
   },
 }
 
@@ -399,18 +385,6 @@ export const competitionApi = {
       path: { id: competitionId, challengeId },
       body: {},
     }), tt('errors.extendInstance'))
-  },
-  async awdDashboard<T = unknown>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/awd-dashboard',
-      path: { id: competitionId },
-    }), tt('errors.loadAwdDashboard'))
-  },
-  async kohDashboard<T = unknown>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/koh-dashboard',
-      path: { id: competitionId },
-    }), tt('errors.loadKohDashboard'))
   },
   async view<T = unknown>(competitionId: string, viewKey: string) {
     return unwrap(await client.get<{ 200: T }, unknown, false>({

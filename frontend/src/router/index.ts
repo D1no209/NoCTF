@@ -56,16 +56,6 @@ const router = createRouter({
           name: 'competition-detail',
           component: () => import('@/views/CompetitionGatewayView.vue'),
         },
-        {
-          path: 'awd',
-          name: 'awd-dashboard',
-          component: () => import('@/views/AwdDashboardView.vue'),
-        },
-        {
-          path: 'koh',
-          name: 'koh-dashboard',
-          component: () => import('@/views/KohDashboardView.vue'),
-        },
       ],
     },
     {

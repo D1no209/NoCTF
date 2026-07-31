@@ -169,9 +169,6 @@ watch(connection, (conn) => {
     if (notification?.competitionId === props.competitionId)
       fetchLeaderboard()
   })
-  conn.on('ReceiveScoreUpdate', () => {
-    fetchLeaderboard()
-  })
 }, { immediate: true })
 
 watch(() => props.teamId, () => {
