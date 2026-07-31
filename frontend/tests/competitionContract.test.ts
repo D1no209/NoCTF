@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 import { toPublicCompetition } from '../src/api/competitionPresentation'
 import { client } from '../src/api/generated/client.gen'
-import { competitionApi } from '../src/api/noctf'
+import { adminApi, competitionApi } from '../src/api/noctf'
 
 const apiBaseUrl = 'https://api.noctf.test'
 const originalClientConfig = client.getConfig()
@@ -17,6 +17,7 @@ const competition = {
   status: 3,
   teamRegistrationAutoApprove: true,
   maxTeamMembers: 5,
+  maxConcurrentRuntimeInstancesPerTeam: 2,
   ownerId: '22222222-2222-2222-2222-222222222222',
 } as const
 
@@ -31,6 +32,10 @@ const contractFetch: typeof fetch = async (input, init) => {
   if (pathname === '/api/v1/competitions')
     return Response.json({ items: [competition] })
   if (pathname === `/api/v1/competitions/${competition.id}`)
+    return Response.json(competition)
+  if (pathname === '/api/v1/admin/competitions' && request.method === 'POST')
+    return Response.json(competition, { status: 201 })
+  if (pathname === `/api/v1/admin/competitions/${competition.id}` && request.method === 'PUT')
     return Response.json(competition)
 
   return Response.json({}, { status: 404 })
@@ -89,5 +94,43 @@ describe('generated public competition contract', () => {
       .toThrow('Competition response is missing id.')
     expect(() => toPublicCompetition({ ...competition, mode: undefined }))
       .toThrow('Competition response has an unsupported mode.')
+    expect(() => toPublicCompetition({
+      ...competition,
+      maxConcurrentRuntimeInstancesPerTeam: undefined,
+    }))
+      .toThrow('Competition response is missing maxConcurrentRuntimeInstancesPerTeam.')
+  })
+
+  test('admin mutations use generated paths and carry the required runtime quota', async () => {
+    const metadata = {
+      title: competition.title,
+      description: competition.description,
+      startTime: competition.startTime,
+      endTime: competition.endTime,
+      teamRegistrationAutoApprove: competition.teamRegistrationAutoApprove,
+      maxTeamMembers: competition.maxTeamMembers,
+      maxConcurrentRuntimeInstancesPerTeam: competition.maxConcurrentRuntimeInstancesPerTeam,
+    }
+
+    await adminApi.createCompetition({ ...metadata, mode: competition.mode })
+    await adminApi.updateCompetition(competition.id, metadata)
+
+    expect(requests).toHaveLength(2)
+    expect(requests[0]!.method).toBe('POST')
+    expect(new URL(requests[0]!.url).pathname).toBe('/api/v1/admin/competitions')
+    expect(await requests[0]!.clone().json()).toMatchObject({
+      mode: 2,
+      teamRegistrationAutoApprove: true,
+      maxTeamMembers: 5,
+      maxConcurrentRuntimeInstancesPerTeam: 2,
+    })
+    expect(requests[1]!.method).toBe('PUT')
+    expect(new URL(requests[1]!.url).pathname)
+      .toBe(`/api/v1/admin/competitions/${competition.id}`)
+    expect(await requests[1]!.clone().json()).toMatchObject({
+      teamRegistrationAutoApprove: true,
+      maxTeamMembers: 5,
+      maxConcurrentRuntimeInstancesPerTeam: 2,
+    })
   })
 })

@@ -198,7 +198,7 @@ export type NoCtfDomainRuntimeRuntimeProvider = 0 | 1 | 2;
 
 export type NoCtfDomainRuntimeRuntimeState = 0 | 1 | 2 | 3 | 4 | 5;
 
-export type NoCtfDomainRuntimeRuntimeFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type NoCtfDomainRuntimeRuntimeFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
     items?: Array<NoCtfapiEndpointsRuntimeRuntimeTargetResponse>;
@@ -256,6 +256,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     status?: NoCtfDomainCompetitionsCompetitionStatus;
     teamRegistrationAutoApprove?: boolean;
     maxTeamMembers?: number;
+    maxConcurrentRuntimeInstancesPerTeam?: number;
     ownerId?: string;
 };
 
@@ -272,7 +273,7 @@ export type NoCtfApplicationScoringLeaderboardLeaderboardResponse = {
     generatedAt?: string;
     entries?: Array<NoCtfApplicationScoringLeaderboardLeaderboardEntry>;
     subjects?: Array<NoCtfApplicationScoringLeaderboardLeaderboardSubjectSummary>;
-    firstBloods?: Array<NoCtfApplicationScoringLeaderboardLeaderboardFirstBloodSummary>;
+    bloods?: Array<NoCtfApplicationScoringLeaderboardLeaderboardBloodSummary>;
     snapshotRevision?: number;
     targetRevision?: number;
     stale?: boolean;
@@ -309,14 +310,18 @@ export type NoCtfApplicationScoringLeaderboardLeaderboardSlotSummary = {
     label?: string;
     successCount?: number;
     lastOccurredAt?: string | null;
-    firstBloodAt?: string | null;
+    bloodRank?: NoCtfApplicationScoringLeaderboardLeaderboardBloodRank | null;
+    bloodAt?: string | null;
 };
 
 export type NoCtfApplicationScoringLeaderboardLeaderboardSlotKind = 0 | 1 | 2 | 3 | 4 | 5;
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardFirstBloodSummary = {
+export type NoCtfApplicationScoringLeaderboardLeaderboardBloodRank = 1 | 2 | 3;
+
+export type NoCtfApplicationScoringLeaderboardLeaderboardBloodSummary = {
     slotKey?: string;
     slotKind?: NoCtfApplicationScoringLeaderboardLeaderboardSlotKind;
+    bloodRank?: NoCtfApplicationScoringLeaderboardLeaderboardBloodRank;
     teamId?: string;
     teamName?: string;
     occurredAt?: string;
@@ -522,10 +527,18 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     urls?: Array<string>;
     providerReceiptJson?: string | null;
     controlCheckUrl?: string | null;
+    publishedPorts?: Array<NoCtfApplicationRuntimeInstancesRuntimePublishedPortView>;
     createdAt?: string;
     runningAt?: string | null;
     expiresAt?: string | null;
     stoppedAt?: string | null;
+};
+
+export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
+    serviceName?: string | null;
+    containerPort?: number;
+    hostPort?: number;
+    allocatedAt?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeListResponse = {
@@ -613,6 +626,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest 
     endTime?: string;
     teamRegistrationAutoApprove?: boolean;
     maxTeamMembers?: number;
+    maxConcurrentRuntimeInstancesPerTeam: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsGenerateMissingFlagsResponse = {
@@ -676,6 +690,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest 
     endTime?: string;
     teamRegistrationAutoApprove?: boolean;
     maxTeamMembers?: number;
+    maxConcurrentRuntimeInstancesPerTeam: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest = {
@@ -2793,6 +2808,7 @@ export type AdminListRuntimesData = {
         runnerId?: string | null;
         state?: NoCtfDomainRuntimeRuntimeState | null;
         expiresBefore?: string | null;
+        hostPort?: number | null;
         cursor?: string | null;
         limit: number;
     };

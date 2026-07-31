@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type {
+  NoCtfApplicationScoringLeaderboardLeaderboardBloodSummary,
   NoCtfApplicationScoringLeaderboardLeaderboardEntry,
+  NoCtfApplicationScoringLeaderboardLeaderboardResponse,
 } from '@/api/generated/types.gen'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,6 +15,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useScoreStore } from '@/stores/score'
 import {
   asLeaderboardSnapshot,
+  leaderboardBloodRows,
   leaderboardRows,
 } from './leaderboardPresentation'
 
@@ -28,10 +31,11 @@ const emit = defineEmits<{
   scoreUpdate: [entries: LeaderboardEntry[]]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const auth = useAuthStore()
 const scoreStore = useScoreStore()
 const entries = ref<LeaderboardEntry[]>([])
+const bloods = ref<NoCtfApplicationScoringLeaderboardLeaderboardBloodSummary[]>([])
 const loading = ref(true)
 const usingFallback = ref(false)
 let pollInterval: ReturnType<typeof setInterval> | null = null
@@ -57,6 +61,7 @@ const { connection, isConnected, start } = useSignalR({
 })
 
 const sortedEntries = computed(() => leaderboardRows(entries.value))
+const displayedBloods = computed(() => leaderboardBloodRows(bloods.value))
 
 const displayedEntries = computed(() => {
   if (props.full === false)
@@ -84,8 +89,19 @@ function rowTiltClass(index: number) {
   return tilts[index % tilts.length]
 }
 
-function applyLeaderboard(nextEntries: LeaderboardEntry[]) {
-  entries.value = nextEntries
+function formatBloodTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()))
+    return value
+  return new Intl.DateTimeFormat(locale.value, {
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  }).format(date)
+}
+
+function applyLeaderboard(snapshot: NoCtfApplicationScoringLeaderboardLeaderboardResponse) {
+  entries.value = snapshot.entries ?? []
+  bloods.value = snapshot.bloods ?? []
   scoreStore.updateFromLeaderboard(entries.value, props.teamId, props.competitionId)
   emit('scoreUpdate', entries.value)
 }
@@ -96,7 +112,7 @@ async function fetchLeaderboard() {
       await competitionApi.leaderboard(props.competitionId),
     )
     if (leaderboard)
-      applyLeaderboard(leaderboard.entries ?? [])
+      applyLeaderboard(leaderboard)
   }
   catch {
     // Keep the last successful snapshot while polling.
@@ -227,6 +243,39 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="space-y-3">
+      <div v-if="displayedBloods.length" class="space-y-2">
+        <h3 class="text-sm font-bold">
+          {{ t('scoreboard.bloods') }}
+        </h3>
+        <div class="grid gap-2 lg:grid-cols-3">
+          <div
+            v-for="blood in displayedBloods"
+            :key="blood.key"
+            class="flex min-w-0 items-start gap-3 border-2 border-dashed border-foreground/10 bg-[#FDFBF7] px-3 py-2 dark:bg-[#1C1917]"
+          >
+            <div
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-black shadow-sm"
+              :class="rankBadgeClass(blood.bloodRank)"
+              :aria-label="t(blood.labelKey)"
+            >
+              {{ blood.bloodRank }}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 items-baseline gap-2">
+                <span class="shrink-0 text-xs font-bold">{{ t(blood.labelKey) }}</span>
+                <span class="truncate font-semibold">{{ blood.teamName }}</span>
+              </div>
+              <div class="mt-1 flex min-w-0 items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span class="truncate font-mono" :title="blood.slotKey">{{ blood.slotKey }}</span>
+                <time class="shrink-0 tabular-nums" :datetime="blood.occurredAt">
+                  {{ formatBloodTime(blood.occurredAt) }}
+                </time>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="flex items-center justify-between">
         <div>
           <h3 class="text-sm font-bold">

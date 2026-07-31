@@ -705,15 +705,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -721,8 +714,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -784,21 +784,41 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -860,21 +880,41 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -936,12 +976,15 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -952,15 +995,12 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "",
+          "400": {
+            "description": "Bad Request",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -1022,12 +1062,18 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": ""
+          },
+          "503": {
+            "description": "",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -1038,11 +1084,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1202,6 +1252,16 @@
           "409": {
             "description": ""
           },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -1257,6 +1317,16 @@
           },
           "409": {
             "description": ""
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -1314,6 +1384,16 @@
           "409": {
             "description": ""
           },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -1366,21 +1446,21 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1463,15 +1543,11 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": ""
           },
           "401": {
             "description": "Unauthorized"
@@ -1479,11 +1555,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1530,15 +1610,11 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": ""
           },
           "401": {
             "description": "Unauthorized"
@@ -1546,11 +1622,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": ""
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1979,21 +2059,21 @@
           "204": {
             "description": "No Content"
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2074,7 +2154,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -2176,22 +2256,22 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "409": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -2253,18 +2333,18 @@
           "204": {
             "description": "No Content"
           },
+          "404": {
+            "description": "Not Found"
+          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
-          },
-          "404": {
-            "description": "Not Found"
           }
         }
       }
@@ -2376,7 +2456,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -2792,21 +2872,21 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2858,21 +2938,21 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2978,21 +3058,21 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3065,7 +3145,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -3248,6 +3328,15 @@
             }
           },
           {
+            "name": "hostPort",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            }
+          },
+          {
             "name": "cursor",
             "in": "query",
             "schema": {
@@ -3276,21 +3365,21 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3713,8 +3802,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Creates a non-interactive bot user.",
-        "description": "Creates a bot with server-generated dummy email and password values.",
+        "summary": "Creates a non-interactive Organizer Bot.",
+        "description": "Creates a Bot identity that cannot use password login or refresh tokens.",
         "operationId": "AdminPlatformCreateBot",
         "requestBody": {
           "x-name": "CreatePlatformBotRequest",
@@ -3740,21 +3829,21 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3915,8 +4004,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Issues an access token for a bot user.",
-        "description": "Uses the ordinary access-token format with an administrator-selected lifetime.",
+        "summary": "Issues a bounded-lifetime Access JWT for a Bot.",
+        "description": "Uses the ordinary Access scheme and is revoked by the Bot's TokenVersion.",
         "operationId": "AdminPlatformIssueBotToken",
         "parameters": [
           {
@@ -3952,15 +4041,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -3968,8 +4050,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4011,21 +4100,21 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4119,7 +4208,7 @@
           "Admin"
         ],
         "summary": "Updates a platform role and invalidates existing tokens.",
-        "description": "Atomically changes the bounded user role and increments the token version.",
+        "description": "Atomically changes the bounded user role and increments the token version unless active owner or manager assignments block a downgrade.",
         "operationId": "AdminPlatformUpdateUserRole",
         "parameters": [
           {
@@ -4155,12 +4244,15 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse"
                 }
               }
             }
@@ -4171,8 +4263,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4216,12 +4315,12 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse"
                 }
               }
             }
@@ -4231,6 +4330,16 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4412,7 +4521,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -4627,7 +4736,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -4647,6 +4756,123 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/permissions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets the complete competition permission snapshot.",
+        "description": "Returns owner, manager, judge, and observer assignments only to the competition owner or a platform administrator.",
+        "operationId": "AdminGetCompetitionPermissions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replaces competition permission assignments.",
+        "description": "Assigns mutually exclusive manager, judge, and observer user arrays.",
+        "operationId": "AdminUpdateCompetitionPermissions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateCompetitionPermissionsRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -4696,6 +4922,52 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/permission-candidates": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists eligible competition permission candidates.",
+        "description": "Returns a resource-scoped, minimal user projection only to the competition owner or a platform administrator.",
+        "operationId": "AdminListCompetitionPermissionCandidates",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -4877,6 +5149,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -5031,94 +5313,31 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/competitions/{competitionId}/permissions": {
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Replaces competition permission assignments.",
-        "description": "Assigns mutually exclusive manager, judge, and observer user arrays.",
-        "operationId": "AdminUpdateCompetitionPermissions",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "UpdateCompetitionPermissionsRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
           "404": {
             "description": "Not Found"
           },
           "409": {
             "description": "",
             "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -5219,12 +5438,15 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
                 }
               }
             }
@@ -5235,15 +5457,12 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -5356,15 +5575,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -5372,8 +5584,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5495,15 +5714,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -5511,8 +5723,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5590,7 +5809,7 @@
           "Admin"
         ],
         "summary": "Deletes a competition challenge.",
-        "description": "Soft-deletes the competition link without changing the global challenge template.",
+        "description": "Soft-deletes the competition link at the expected aggregate revision without changing the global challenge template.",
         "operationId": "AdminDeleteCompetitionChallenge",
         "parameters": [
           {
@@ -5598,7 +5817,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -5606,7 +5826,19 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0.0,
+              "nullable": false
             }
           }
         ],
@@ -5614,21 +5846,31 @@
           "204": {
             "description": "No Content"
           },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
           "404": {
             "description": "Not Found"
           },
           "409": {
             "description": "",
             "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -5751,12 +5993,15 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
                 }
               }
             }
@@ -5767,15 +6012,12 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -5970,15 +6212,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -5986,8 +6221,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6179,15 +6421,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -6195,8 +6430,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6313,7 +6555,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -6351,7 +6593,7 @@
           "Admin"
         ],
         "summary": "Restores a deleted competition challenge.",
-        "description": "Restores the competition link only; the global template is not modified.",
+        "description": "Restores the competition link at the expected aggregate revision; the global template is not modified.",
         "operationId": "AdminRestoreCompetitionChallenge",
         "parameters": [
           {
@@ -6359,7 +6601,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
             }
           },
           {
@@ -6367,7 +6610,19 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0.0,
+              "nullable": false
             }
           }
         ],
@@ -6375,21 +6630,31 @@
           "204": {
             "description": "No Content"
           },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
           "404": {
             "description": "Not Found"
           },
           "409": {
             "description": "",
             "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -6554,15 +6819,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -6570,8 +6828,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6666,12 +6931,12 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse"
                 }
               }
             }
@@ -6681,6 +6946,16 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6829,15 +7104,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -6845,8 +7113,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -7013,15 +7288,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -7029,8 +7297,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -7172,12 +7447,15 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse"
                 }
               }
             }
@@ -7188,15 +7466,12 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -7304,15 +7579,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -7320,8 +7588,15 @@
           "403": {
             "description": "Forbidden"
           },
-          "404": {
-            "description": "Not Found"
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -7431,7 +7706,7 @@
           "Admin"
         ],
         "summary": "Restores a soft-deleted global challenge template.",
-        "description": "Restores a reusable template for its owner or a platform administrator.",
+        "description": "Restores a reusable template for its owner, a manager, or a platform administrator.",
         "operationId": "AdminChallengeBankRestoreTemplate",
         "parameters": [
           {
@@ -7449,6 +7724,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -7506,12 +7791,15 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse"
                 }
               }
             }
@@ -7522,12 +7810,12 @@
           "403": {
             "description": "Forbidden"
           },
-          "409": {
-            "description": "",
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -7582,12 +7870,15 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse"
                 }
               }
             }
@@ -7598,12 +7889,12 @@
           "403": {
             "description": "Forbidden"
           },
-          "409": {
-            "description": "",
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -8012,37 +8303,86 @@
           }
         }
       },
-      "NoCTFAPIEndpointsSubmissionsListSubmissionsRequest": {
-        "type": "object",
-        "additionalProperties": false
-      },
-      "FastEndpointsErrorResponse": {
-        "type": "object",
-        "description": "the dto used to send an error response to the client",
-        "additionalProperties": false,
-        "properties": {
-          "statusCode": {
-            "type": "integer",
-            "description": "the http status code sent to the client. default is 400.",
-            "format": "int32",
-            "default": 400
+      "MicrosoftAspNetCoreMvcValidationProblemDetails": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
           },
-          "message": {
-            "type": "string",
-            "description": "the message for the error response",
-            "default": "One or more errors occurred!"
-          },
-          "errors": {
+          {
             "type": "object",
-            "description": "the collection of errors for the current context",
             "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
+              "nullable": true
+            },
+            "properties": {
+              "errors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
+        ]
+      },
+      "MicrosoftAspNetCoreHttpHttpValidationProblemDetails": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "properties": {
+              "errors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MicrosoftAspNetCoreMvcProblemDetails": {
+        "type": "object",
+        "additionalProperties": {
+          "nullable": true
+        },
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
         }
+      },
+      "NoCTFAPIEndpointsSubmissionsListSubmissionsRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsSubmissionsAcceptedSubmissionResponse": {
         "type": "object",
@@ -8111,9 +8451,6 @@
       "NoCTFAPIEndpointsSubmissionsSubmitFlagRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "flags"
-        ],
         "properties": {
           "flag": {
             "type": "string",
@@ -8121,7 +8458,7 @@
           },
           "flags": {
             "type": "array",
-            "nullable": false,
+            "nullable": true,
             "items": {
               "type": "string"
             }
@@ -8135,35 +8472,6 @@
           "patchUploadId": {
             "type": "string",
             "format": "guid"
-          }
-        }
-      },
-      "MicrosoftAspNetCoreMvcProblemDetails": {
-        "type": "object",
-        "additionalProperties": {
-          "nullable": true
-        },
-        "properties": {
-          "type": {
-            "type": "string",
-            "nullable": true
-          },
-          "title": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "detail": {
-            "type": "string",
-            "nullable": true
-          },
-          "instance": {
-            "type": "string",
-            "nullable": true
           }
         }
       },
@@ -8337,7 +8645,8 @@
           "ProvisionTimeout",
           "ProviderRejected",
           "CleanupFailed",
-          "UrlExpansionFailed"
+          "UrlExpansionFailed",
+          "PublishedPortRangeExhausted"
         ],
         "enum": [
           0,
@@ -8346,7 +8655,8 @@
           3,
           4,
           5,
-          6
+          6,
+          7
         ]
       },
       "NoCTFAPIEndpointsRuntimeRuntimeTargetListResponse": {
@@ -8545,6 +8855,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "maxConcurrentRuntimeInstancesPerTeam": {
+            "type": "integer",
+            "format": "int32"
+          },
           "ownerId": {
             "type": "string",
             "format": "guid"
@@ -8615,10 +8929,10 @@
               "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSubjectSummary"
             }
           },
-          "firstBloods": {
+          "bloods": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardFirstBloodSummary"
+              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodSummary"
             }
           },
           "snapshotRevision": {
@@ -8741,7 +9055,15 @@
             "format": "date-time",
             "nullable": true
           },
-          "firstBloodAt": {
+          "bloodRank": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodRank"
+              }
+            ]
+          },
+          "bloodAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -8768,7 +9090,21 @@
           5
         ]
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardFirstBloodSummary": {
+      "NoCTFApplicationScoringLeaderboardLeaderboardBloodRank": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "First",
+          "Second",
+          "Third"
+        ],
+        "enum": [
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFApplicationScoringLeaderboardLeaderboardBloodSummary": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -8777,6 +9113,9 @@
           },
           "slotKind": {
             "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSlotKind"
+          },
+          "bloodRank": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodRank"
           },
           "teamId": {
             "type": "string",
@@ -9221,6 +9560,30 @@
           }
         }
       },
+      "FastEndpointsErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "format": "int32",
+            "default": 400
+          },
+          "message": {
+            "type": "string",
+            "default": "One or more errors occurred!"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationTeamsBanTeamRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -9420,6 +9783,12 @@
             "type": "string",
             "nullable": true
           },
+          "publishedPorts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationRuntimeInstancesRuntimePublishedPortView"
+            }
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -9438,6 +9807,28 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationRuntimeInstancesRuntimePublishedPortView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "serviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "containerPort": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hostPort": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "allocatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -9513,9 +9904,23 @@
             "nullable": false
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole2"
           }
         }
+      },
+      "NoCTFDomainIdentityUserRole2": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "User",
+          "Organizer",
+          "Administrator"
+        ],
+        "enum": [
+          "User",
+          "Organizer",
+          "Administrator"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse": {
         "type": "object",
@@ -9563,8 +9968,8 @@
           "expiresInSeconds": {
             "type": "integer",
             "format": "int64",
-            "minimum": 0.0,
-            "exclusiveMinimum": true
+            "maximum": 31536000.0,
+            "minimum": 60.0
           }
         }
       },
@@ -9596,6 +10001,39 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode"
+          },
+          "competitionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "challengeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ActiveOwnerOrManagerAssignments"
+        ],
+        "enum": [
+          "ActiveOwnerOrManagerAssignments"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -9605,11 +10043,48 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode"
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "RolesOverlap",
+          "OwnerIncluded",
+          "UserNotFound",
+          "RoleNotEligible",
+          "EmailNotVerified",
+          "RevisionConflict"
+        ],
+        "enum": [
+          "RolesOverlap",
+          "OwnerIncluded",
+          "UserNotFound",
+          "RoleNotEligible",
+          "EmailNotVerified",
+          "RevisionConflict"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionRequest": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "title"
+          "title",
+          "maxConcurrentRuntimeInstancesPerTeam"
         ],
         "properties": {
           "title": {
@@ -9641,6 +10116,11 @@
             "format": "int32",
             "minimum": 0.0,
             "exclusiveMinimum": true
+          },
+          "maxConcurrentRuntimeInstancesPerTeam": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": false
           }
         }
       },
@@ -9703,6 +10183,45 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "managerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "judgeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "observerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "permissionRevision": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsAdminCompetitionListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -9712,6 +10231,40 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionResponse"
             }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserKind"
+          },
+          "role": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+          },
+          "emailVerified": {
+            "type": "boolean"
           }
         }
       },
@@ -9753,7 +10306,8 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "title"
+          "title",
+          "maxConcurrentRuntimeInstancesPerTeam"
         ],
         "properties": {
           "title": {
@@ -9782,6 +10336,11 @@
             "format": "int32",
             "minimum": 0.0,
             "exclusiveMinimum": true
+          },
+          "maxConcurrentRuntimeInstancesPerTeam": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": false
           }
         }
       },
@@ -9791,11 +10350,13 @@
         "required": [
           "managerIds",
           "judgeIds",
-          "observerIds"
+          "observerIds",
+          "expectedPermissionRevision"
         ],
         "properties": {
           "managerIds": {
             "type": "array",
+            "minLength": 1,
             "nullable": false,
             "items": {
               "type": "string",
@@ -9804,6 +10365,7 @@
           },
           "judgeIds": {
             "type": "array",
+            "minLength": 1,
             "nullable": false,
             "items": {
               "type": "string",
@@ -9812,11 +10374,18 @@
           },
           "observerIds": {
             "type": "array",
+            "minLength": 1,
             "nullable": false,
             "items": {
               "type": "string",
               "format": "guid"
             }
+          },
+          "expectedPermissionRevision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "nullable": false
           }
         }
       },
@@ -9848,6 +10417,40 @@
             "type": "string"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ResourceIdConflict",
+          "ChallengeOrderConflict",
+          "ChallengeTemplateConflict",
+          "RevisionConflict",
+          "LifecycleStateConflict",
+          "ChallengeTemplateNotFound",
+          "ChallengeTemplateModeMismatch"
+        ],
+        "enum": [
+          "ResourceIdConflict",
+          "ChallengeOrderConflict",
+          "ChallengeTemplateConflict",
+          "RevisionConflict",
+          "LifecycleStateConflict",
+          "ChallengeTemplateNotFound",
+          "ChallengeTemplateModeMismatch"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengesCreateChallengeRequest": {
         "type": "object",
@@ -10032,6 +10635,10 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationChallengesDeleteChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationChallengesChallengeConfigurationResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -10111,6 +10718,10 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationChallengesRestoreChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeConfigurationRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -10133,24 +10744,34 @@
       "NoCTFAPIEndpointsAdministrationChallengesUpdateChallengeRequest": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "baseScore",
+          "order",
+          "isPublished",
+          "expectedRevision"
+        ],
         "properties": {
           "baseScore": {
             "type": "integer",
             "format": "int64",
-            "minimum": 0.0
+            "minimum": 0.0,
+            "nullable": false
           },
           "order": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0.0,
+            "nullable": false
           },
           "isPublished": {
-            "type": "boolean"
+            "type": "boolean",
+            "nullable": false
           },
           "expectedRevision": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0.0,
+            "nullable": false
           }
         }
       },
@@ -10227,6 +10848,46 @@
           1
         ]
       },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "userIds"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictCode"
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ResourceIdConflict",
+          "RevisionConflict",
+          "ActiveCompetitionModeConflict",
+          "OwnerIncludedInManagerSet",
+          "UserNotFound",
+          "RoleNotEligible"
+        ],
+        "enum": [
+          "ResourceIdConflict",
+          "RevisionConflict",
+          "ActiveCompetitionModeConflict",
+          "OwnerIncludedInManagerSet",
+          "UserNotFound",
+          "RoleNotEligible"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -10242,10 +10903,10 @@
             "nullable": true
           },
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode2"
           },
           "visibility": {
-            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility"
+            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility2"
           },
           "title": {
             "type": "string",
@@ -10269,6 +10930,34 @@
             "nullable": false
           }
         }
+      },
+      "NoCTFDomainCompetitionsGameMode2": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Ctf",
+          "Awd",
+          "Awdp",
+          "Koh"
+        ],
+        "enum": [
+          "Ctf",
+          "Awd",
+          "Awdp",
+          "Koh"
+        ]
+      },
+      "NoCTFDomainChallengesChallengeVisibility2": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Private",
+          "Shared"
+        ],
+        "enum": [
+          "Private",
+          "Shared"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeFlagRequest": {
         "type": "object",
@@ -10348,16 +11037,29 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "mode",
+          "visibility",
           "title",
           "direction",
-          "definitionJson"
+          "definitionJson",
+          "expectedRevision"
         ],
         "properties": {
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "nullable": false,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode2"
+              }
+            ]
           },
           "visibility": {
-            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility"
+            "nullable": false,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility2"
+              }
+            ]
           },
           "title": {
             "type": "string",
@@ -10383,7 +11085,8 @@
           "expectedRevision": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0.0,
+            "nullable": false
           }
         }
       },

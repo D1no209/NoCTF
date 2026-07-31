@@ -97,6 +97,7 @@
             "status": 3,
             "teamRegistrationAutoApprove": true,
             "maxTeamMembers": 5,
+            "maxConcurrentRuntimeInstancesPerTeam": 0,
             "ownerId": "mock-owner"
           },
           {
@@ -109,6 +110,7 @@
             "status": 2,
             "teamRegistrationAutoApprove": false,
             "maxTeamMembers": 4,
+            "maxConcurrentRuntimeInstancesPerTeam": 0,
             "ownerId": "mock-owner"
           },
           {
@@ -121,6 +123,7 @@
             "status": 0,
             "teamRegistrationAutoApprove": true,
             "maxTeamMembers": 5,
+            "maxConcurrentRuntimeInstancesPerTeam": 0,
             "ownerId": "mock-owner"
           }
         ]
@@ -455,6 +458,7 @@
         "status": 3,
         "teamRegistrationAutoApprove": true,
         "maxTeamMembers": 5,
+        "maxConcurrentRuntimeInstancesPerTeam": 0,
         "ownerId": "mock-owner"
       }
     },
@@ -472,6 +476,7 @@
         "status": 2,
         "teamRegistrationAutoApprove": false,
         "maxTeamMembers": 4,
+        "maxConcurrentRuntimeInstancesPerTeam": 0,
         "ownerId": "mock-owner"
       }
     },
@@ -489,6 +494,7 @@
         "status": 0,
         "teamRegistrationAutoApprove": true,
         "maxTeamMembers": 5,
+        "maxConcurrentRuntimeInstancesPerTeam": 0,
         "ownerId": "mock-owner"
       }
     },
