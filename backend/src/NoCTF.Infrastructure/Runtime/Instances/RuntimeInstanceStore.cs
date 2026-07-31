@@ -202,20 +202,26 @@ public sealed class RuntimeInstanceStore(
             .Where(team =>
                 team.CompetitionId == competitionId &&
                 team.MemberIds.Contains(userId) &&
+                team.DeletedAt == null &&
                 !team.IsBanned &&
                 team.RegistrationStatus == TeamRegistrationStatus.Approved)
             .Join(
-                db.CompetitionChallenges.AsNoTracking(),
+                db.CompetitionChallenges.AsNoTracking()
+                    .Where(challenge =>
+                        challenge.IsPublished &&
+                        challenge.DeletedAt == null),
                 team => team.CompetitionId,
                 challenge => challenge.CompetitionId,
                 (team, challenge) => new { Team = team, Challenge = challenge })
             .Join(
-                db.Competitions.AsNoTracking(),
+                db.Competitions.AsNoTracking()
+                    .Where(competition => competition.DeletedAt == null),
                 pair => pair.Team.CompetitionId,
                 competition => competition.Id,
                 (pair, competition) => new { pair.Team, pair.Challenge, Competition = competition })
             .Join(
-                db.Challenges.AsNoTracking(),
+                db.Challenges.AsNoTracking()
+                    .Where(template => template.DeletedAt == null),
                 item => item.Challenge.ChallengeId,
                 template => template.Id,
                 (item, template) => new { item.Team, item.Challenge, item.Competition, Template = template })
