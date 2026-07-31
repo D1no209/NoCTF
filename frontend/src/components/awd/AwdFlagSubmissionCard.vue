@@ -4,8 +4,8 @@ import { CheckCircle2, Loader2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Panel } from '@/components/ui/panel'
 import { Input } from '@/components/ui/input'
+import { Panel } from '@/components/ui/panel'
 import {
   Select,
   SelectContent,
@@ -15,28 +15,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-interface Team {
-  id: string
-  name: string
-}
-
 interface Challenge {
   id: string
   title: string
 }
 
 defineProps({
-  teams: {
-    type: Array as PropType<Team[]>,
-    default: () => [],
-  },
   challenges: {
     type: Array as PropType<Challenge[]>,
     default: () => [],
-  },
-  selectedVictim: {
-    type: String,
-    required: true,
   },
   selectedChallenge: {
     type: String,
@@ -50,13 +37,16 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  statusMessage: {
+    type: String,
+    default: null,
+  },
 })
 
 const emit = defineEmits<{
-  'update:selectedVictim': [value: string]
   'update:selectedChallenge': [value: string]
   'update:flagInput': [value: string]
-  submit: []
+  'submit': []
 }>()
 
 const { t } = useI18n()
@@ -71,38 +61,20 @@ const { t } = useI18n()
       </CardTitle>
     </CardHeader>
     <CardContent class="space-y-4">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div class="space-y-2">
-          <label>{{ t('awd.victimTeam') }}</label>
-          <Select :model-value="selectedVictim" @update:model-value="emit('update:selectedVictim', String($event))">
-            <SelectTrigger>
-              <SelectValue :placeholder="t('awd.selectTeam')" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem v-for="team in teams" :key="team.id" :value="team.id">
-                  {{ team.name }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div class="space-y-2">
-          <label>{{ t('common.challenge') }}</label>
-          <Select :model-value="selectedChallenge" @update:model-value="emit('update:selectedChallenge', String($event))">
-            <SelectTrigger>
-              <SelectValue :placeholder="t('awd.selectChallenge')" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem v-for="challenge in challenges" :key="challenge.id" :value="challenge.id">
-                  {{ challenge.title }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+      <div class="space-y-2">
+        <label>{{ t('common.challenge') }}</label>
+        <Select :model-value="selectedChallenge" @update:model-value="emit('update:selectedChallenge', String($event))">
+          <SelectTrigger>
+            <SelectValue :placeholder="t('awd.selectChallenge')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem v-for="challenge in challenges" :key="challenge.id" :value="challenge.id">
+                {{ challenge.title }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       <div class="space-y-2">
@@ -125,6 +97,9 @@ const { t } = useI18n()
             {{ t('awd.submitFlag') }}
           </Button>
         </div>
+        <p v-if="statusMessage" class="text-sm text-muted-foreground">
+          {{ statusMessage }}
+        </p>
       </div>
     </CardContent>
   </Panel>

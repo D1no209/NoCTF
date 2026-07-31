@@ -12,6 +12,10 @@ export const queryKeys = {
     competitionChallengeId: string,
   ) => ['challenge-attachments', competitionId, competitionChallengeId] as const,
   submissions: (competitionId: string) => ['submissions', competitionId] as const,
+  submission: (
+    competitionId: string,
+    submissionId: string,
+  ) => ['submission', competitionId, submissionId] as const,
   leaderboard: (competitionId: string) => ['leaderboard', competitionId] as const,
   awdDashboard: (competitionId: string) => ['awd-dashboard', competitionId] as const,
   awdpState: (competitionId: string) => ['awdp-state', competitionId] as const,

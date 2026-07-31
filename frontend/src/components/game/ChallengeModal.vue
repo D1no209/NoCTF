@@ -4,7 +4,7 @@ import type {
   PublicChallengeAttachment,
   PublicChallengeDownload,
 } from '@/api/challengePresentation'
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -14,6 +14,13 @@ import {
 } from '@/api/noctf'
 import { shouldOfferRandomAttachment } from '@/api/challengePresentation'
 import { queryKeys } from '@/api/queryKeys'
+import {
+  getSubmissionOutcome,
+  isSubmissionTerminal,
+  submissionMessageKey,
+  SubmissionOutcome,
+} from '@/api/submissionPresentation'
+import { useFlagSubmission } from '@/composables/useFlagSubmission'
 import { useScoreStore } from '@/stores/score'
 import {
   Dialog,
@@ -34,13 +41,6 @@ import { challengeTypeLabel } from '@/lib/challengeLabels'
 import { normalizeDirection } from '@/lib/challengeDirections'
 import { toast } from 'vue-sonner'
 import { Activity, CheckCircle2, Copy, Crosshair, Download, FileArchive, Loader2, Shield, ShieldCheck, Server, Timer, Trash2, Upload } from 'lucide-vue-next'
-
-interface SubmitResponse {
-  correct: boolean
-  alreadySolved?: boolean
-  result?: string
-  message?: string | null
-}
 
 interface PatchSubmissionStatus {
   id?: string
@@ -128,11 +128,17 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const queryClient = useQueryClient()
 const scoreStore = useScoreStore()
+const {
+  accepted: acceptedSubmission,
+  status: submissionStatus,
+  isSubmitting: submitting,
+  submit: submitFlagAndWait,
+  cancel: cancelFlagSubmission,
+} = useFlagSubmission()
 
 const flagInput = ref('')
-const submitting = ref(false)
-const submitResult = ref<'correct' | 'incorrect' | null>(null)
 const submitError = ref<string | null>(null)
 const patchFile = ref<File | null>(null)
 const patchUploading = ref(false)
@@ -167,7 +173,12 @@ const isDynamicContainer = computed(() => {
 })
 const showContainerControls = computed(() => Boolean(isDynamicContainer.value && props.canCreateInstance !== false))
 const canCreateDynamicInstance = computed(() => Boolean(showContainerControls.value))
-const canSubmitCurrentFlag = computed(() => props.canSubmitFlag !== false)
+const canSubmitFlagsForMode = computed(() =>
+  props.gameModeType?.toLowerCase() !== 'koh',
+)
+const canSubmitCurrentFlag = computed(() =>
+  props.canSubmitFlag !== false && canSubmitFlagsForMode.value,
+)
 const canRequestCurrentDefense = computed(() => props.canRequestDefense !== false)
 const runningInstance = computed(() => instance.value?.status === 'running' && Boolean(instance.value?.containerId))
 const instanceAddress = computed(() => instance.value?.address ?? instance.value?.addresses?.[0] ?? '')
@@ -220,6 +231,43 @@ const awdpBlockedMessage = computed(() => {
   if (awdpState.value?.fixStatus === 'FixSuccess' && awdpState.value.allowDefenseAfterFixSuccess === false) return t('awdp.fixLocked')
   return ''
 })
+const submissionFeedback = computed(() => {
+  if (submitError.value) {
+    return {
+      message: submitError.value,
+      variant: 'destructive' as const,
+    }
+  }
+  if (acceptedSubmission.value && !submissionStatus.value) {
+    return {
+      message: t('challenges.submissionQueued'),
+      variant: 'default' as const,
+    }
+  }
+  if (!submissionStatus.value)
+    return null
+  if (!isSubmissionTerminal(submissionStatus.value)) {
+    return {
+      message: t('challenges.submissionEvaluating'),
+      variant: 'default' as const,
+    }
+  }
+
+  const outcome = getSubmissionOutcome(submissionStatus.value)
+  return {
+    message: t(submissionMessageKey(submissionStatus.value)),
+    variant: outcome === SubmissionOutcome.Correct
+      ? 'success' as const
+      : outcome === SubmissionOutcome.Duplicate
+        ? 'warning' as const
+        : 'destructive' as const,
+  }
+})
+const submissionIsCorrect = computed(() =>
+  submissionStatus.value !== null
+  && isSubmissionTerminal(submissionStatus.value)
+  && getSubmissionOutcome(submissionStatus.value) === SubmissionOutcome.Correct,
+)
 
 type AttachmentAvailability = {
   policy: 'all'
@@ -273,8 +321,8 @@ const {
 
 function onOpenChange(v: boolean) {
   if (!v) {
+    cancelFlagSubmission()
     flagInput.value = ''
-    submitResult.value = null
     submitError.value = null
     patchFile.value = null
     instanceError.value = null
@@ -361,7 +409,21 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => [props.open, props.challenge?.id] as const,
+  ([open, challengeId], previous) => {
+    const previousChallengeId = previous?.[1]
+    if (!open || challengeId !== previousChallengeId) {
+      cancelFlagSubmission()
+      submitError.value = null
+      if (challengeId !== previousChallengeId)
+        flagInput.value = ''
+    }
+  },
+)
+
 onUnmounted(() => {
+  cancelFlagSubmission()
   stopInstancePolling()
   stopClock()
 })
@@ -448,39 +510,33 @@ function onPatchFileChange(e: Event) {
 
 async function submitFlag() {
   if (!props.challenge || !canSubmitCurrentFlag.value || !flagInput.value.trim()) return
-  submitting.value = true
-  submitResult.value = null
   submitError.value = null
 
   try {
-    const data = await competitionApi.submitFlag<SubmitResponse>(
+    const terminalStatus = await submitFlagAndWait(
       props.competitionId,
-      scoreStore.teamId ?? '',
       props.challenge.id,
       flagInput.value.trim(),
     )
+    if (!terminalStatus)
+      return
 
-    if (data?.correct) {
-      submitResult.value = 'correct'
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.submissions(props.competitionId),
+    })
+    if (getSubmissionOutcome(terminalStatus) === SubmissionOutcome.Correct) {
+      flagInput.value = ''
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.leaderboard(props.competitionId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.awdpState(props.competitionId),
+      })
       emit('solved')
-    } else {
-      if (data?.result === 'attempts_exhausted') {
-        submitResult.value = null
-        submitError.value = t('awdp.attackAttemptsExhausted')
-      } else if (data?.result === 'instance_required') {
-        submitResult.value = null
-        submitError.value = t('awdp.instanceRequired')
-      } else if (data?.result === 'instance_expired') {
-        submitResult.value = null
-        submitError.value = t('awdp.instanceExpired')
-      } else {
-        submitResult.value = 'incorrect'
-      }
     }
-  } catch {
+  }
+  catch {
     submitError.value = t('challenges.submissionFailed')
-  } finally {
-    submitting.value = false
   }
 }
 
@@ -711,7 +767,7 @@ function getApiErrorDetail(error: unknown) {
             </Button>
           </Panel>
         </Card>
-        <Alert v-if="((showContainerControls && !isAwdpMode) || isAwdMode) && !canSubmitCurrentFlag">
+        <Alert v-if="canSubmitFlagsForMode && ((showContainerControls && !isAwdpMode) || isAwdMode) && !canSubmitCurrentFlag">
           {{ t('challenges.participantActionRequiresTeam') }}
         </Alert>
         <div v-if="instanceStatus" class="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">{{ instanceStatus }}</div>
@@ -953,7 +1009,7 @@ function getApiErrorDetail(error: unknown) {
           </Panel>
         </Card>
 
-        <div v-if="!solved && !isAwdpMode" class="space-y-2">
+        <div v-if="!solved && !isAwdpMode && canSubmitFlagsForMode" class="space-y-2">
           <Label for="flag-input">{{ t('awd.flag') }}</Label>
           <div class="flex gap-2">
             <Input
@@ -969,18 +1025,11 @@ function getApiErrorDetail(error: unknown) {
           </div>
         </div>
 
-        <!-- Result feedback -->
-        <Alert v-if="submitResult === 'correct'" variant="success">
-          {{ t('challenges.correctFlag') }}
-        </Alert>
-        <Alert v-else-if="submitResult === 'incorrect'" variant="destructive">
-          {{ t('challenges.incorrectFlag') }}
-        </Alert>
-        <Alert v-else-if="submitError" variant="destructive">
-          {{ submitError }}
+        <Alert v-if="submissionFeedback" :variant="submissionFeedback.variant">
+          {{ submissionFeedback.message }}
         </Alert>
 
-        <div v-if="solved && submitResult !== 'correct'" class="text-sm italic text-muted-foreground">
+        <div v-if="solved && !submissionIsCorrect" class="text-sm italic text-muted-foreground">
           {{ t('challenges.alreadySolved') }}
         </div>
       </div>

@@ -7,8 +7,9 @@ import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, Puzzl
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
-import { challengeApi, competitionApi, teamApi } from '@/api/noctf'
+import { challengeApi, competitionApi, submissionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import { solvedCompetitionChallengeIds } from '@/api/submissionPresentation'
 import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
 import ScoreboardView from '@/components/game/ScoreboardView.vue'
@@ -31,16 +32,6 @@ const queryClient = useQueryClient()
 const auth = useAuthStore()
 const scoreStore = useScoreStore()
 const competitionId = computed(() => route.params.id as string)
-
-interface SubmissionItem {
-  challengeId: string
-}
-
-interface SubmissionsResponse {
-  competitionId: string
-  teamId: string
-  solvedChallenges: SubmissionItem[]
-}
 
 interface PatchSubmissionStatus {
   id?: string
@@ -113,19 +104,25 @@ const { data: challenges, isLoading: loadingChallenges } = useQuery({
   enabled: computed(() => !!competitionId.value),
 })
 
-const { data: submissionsResponse, refetch: refetchSubmissions } = useQuery({
-  queryKey: computed(() => queryKeys.submissions(competitionId.value)),
-  queryFn: () => competitionApi.submissions<SubmissionsResponse>(competitionId.value),
-  enabled: computed(() => !!competitionId.value),
-})
-
 const { data: currentTeam, isLoading: loadingMyTeam } = useQuery({
   queryKey: computed(() => queryKeys.myCompetitionTeam(competitionId.value)),
   queryFn: () => teamApi.getMy(competitionId.value),
   enabled: computed(() => !!competitionId.value),
 })
 
-const solvedIds = computed(() => new Set((submissionsResponse.value?.solvedChallenges ?? []).map(s => s.challengeId)))
+const approvedTeam = computed(() =>
+  currentTeam.value?.registrationStatus === 'approved' ? currentTeam.value : null,
+)
+
+const { data: submissions } = useQuery({
+  queryKey: computed(() => queryKeys.submissions(competitionId.value)),
+  queryFn: ({ signal }) => submissionApi.listAll(competitionId.value, signal),
+  enabled: computed(() => Boolean(competitionId.value && approvedTeam.value)),
+})
+
+const solvedIds = computed(() =>
+  solvedCompetitionChallengeIds(submissions.value ?? []),
+)
 
 const effectiveChallenges = computed<PublicChallenge[]>(() => {
   return challenges.value ?? []
@@ -148,8 +145,8 @@ function openChallenge(challenge: PublicChallenge) {
 }
 
 function onChallengeSolved() {
-  refetchSubmissions()
   queryClient.invalidateQueries({ queryKey: queryKeys.submissions(competitionId.value) })
+  queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard(competitionId.value) })
   queryClient.invalidateQueries({ queryKey: queryKeys.awdpState(competitionId.value) })
 }
 
@@ -179,10 +176,8 @@ function formatShortDate(iso: string) {
 const isLoading = computed(() => loadingComp.value || loadingChallenges.value)
 const isAwdMode = computed(() => competition.value?.mode === 'awd')
 const isAwdpMode = computed(() => competition.value?.mode === 'awdp')
+const isKohMode = computed(() => competition.value?.mode === 'koh')
 const canManageCompetition = computed(() => ['Admin', 'Organizer'].includes(auth.userRole))
-const approvedTeam = computed(() =>
-  currentTeam.value?.registrationStatus === 'approved' ? currentTeam.value : null,
-)
 const canUseParticipantActions = computed(() => Boolean(approvedTeam.value))
 const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value))
 const canDownloadAttachments = computed(() =>
@@ -765,7 +760,7 @@ function rotationClass(id: string) {
       :awdp-state="selectedChallengeAwdpState"
       :awdp-current-round="awdpStateData?.currentRound ?? null"
       :can-create-instance="canUseParticipantActions"
-      :can-submit-flag="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canSubmitFlag !== false)"
+      :can-submit-flag="canUseParticipantActions && !isKohMode && (!isAwdpMode || selectedChallengeAwdpState?.canSubmitFlag !== false)"
       :can-request-defense="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canRequestDefense !== false)"
       :can-download-attachments="canDownloadAttachments"
       :has-challenge-detail="Boolean(activeChallengeDetail)"
