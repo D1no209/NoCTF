@@ -10,6 +10,7 @@ using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Submissions.Processing;
+using NoCTF.Tests.Fixtures;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
@@ -201,6 +202,157 @@ public sealed class AwdpFixResultPersistenceTests
             await Assert.That(outbox.NodeMessages.OfType<StopContainerRuntime>().Count())
                 .IsEqualTo(2);
         });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Concurrent_fix_results_increment_the_shared_revision_atomically(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_awdp_result_revision")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var revisionUpdateBarrier = new CompetitionLeaderboardUpdateBarrier();
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(revisionUpdateBarrier)
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var concurrent = await AddConcurrentFixAsync(
+                options,
+                fixture,
+                cancellationToken);
+            var firstOutbox = new RecordingOutbox();
+            var secondOutbox = new RecordingOutbox();
+            var firstResult = AwdpFixResult.Create(
+                fixture.SubmissionId,
+                fixture.RuntimeId,
+                generation: 1,
+                processingVersion: 7,
+                runtimeProcessingVersion: 3,
+                AwdpFixOutcome.Fixed,
+                fixture.Now);
+            var secondResult = AwdpFixResult.Create(
+                concurrent.SubmissionId,
+                concurrent.RuntimeId,
+                generation: 1,
+                processingVersion: 7,
+                runtimeProcessingVersion: 3,
+                AwdpFixOutcome.Fixed,
+                fixture.Now.AddTicks(TimeSpan.TicksPerMicrosecond));
+            revisionUpdateBarrier.Enable();
+
+            var dispositions = await Task.WhenAll(
+                RecordAsync(options, firstOutbox, firstResult, cancellationToken),
+                RecordAsync(options, secondOutbox, secondResult, cancellationToken));
+
+            await Assert.That(dispositions.Count(
+                    disposition => disposition == InternalResultDisposition.Applied))
+                .IsEqualTo(2);
+            await Assert.That(revisionUpdateBarrier.Arrivals).IsEqualTo(2);
+            await using var verify = new NoCtfDbContext(options);
+            var facts = await verify.ScoringEvents.AsNoTracking()
+                .OrderBy(scoringEvent => scoringEvent.SubmissionId)
+                .ToListAsync(cancellationToken);
+            await Assert.That(facts).Count().IsEqualTo(2);
+            await Assert.That(facts.Select(scoringEvent => scoringEvent.SubmissionId))
+                .IsEquivalentTo(new Guid?[]
+                {
+                    fixture.SubmissionId,
+                    concurrent.SubmissionId
+                });
+            var leaderboardRevision = await verify.Competitions.AsNoTracking()
+                .Select(competition => competition.LeaderboardRevision)
+                .SingleAsync(cancellationToken);
+            await Assert.That(leaderboardRevision).IsEqualTo(2);
+            await Assert.That(firstOutbox.Published.Concat(secondOutbox.Published)
+                    .OfType<ProjectLeaderboard>().Count())
+                .IsEqualTo(2);
+        });
+    }
+
+    private static async Task<InternalResultDisposition> RecordAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        ITransactionalMessageOutbox outbox,
+        AwdpFixResult result,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        return await new InternalResultStore(db, outbox)
+            .RecordAwdpAsync(result, cancellationToken);
+    }
+
+    private static async Task<(Guid SubmissionId, Guid RuntimeId)> AddConcurrentFixAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var original = await db.Submissions.AsNoTracking()
+            .SingleAsync(item => item.Id == fixture.SubmissionId, cancellationToken);
+        var submissionId = Guid.CreateVersion7();
+        var runtimeId = Guid.CreateVersion7();
+        var patchUploadId = Guid.CreateVersion7();
+        db.PatchUploads.Add(new PatchUpload
+        {
+            Id = patchUploadId,
+            CompetitionId = original.CompetitionId,
+            CompetitionChallengeId = original.CompetitionChallengeId,
+            TeamId = original.TeamId,
+            UploadedByUserId = original.SubmittedByUserId,
+            ObjectKey = $"patches/{patchUploadId:N}",
+            OriginalFileName = "concurrent-fix.tar.gz",
+            ContentType = "application/gzip",
+            ByteLength = 1,
+            Sha256 = new byte[32],
+            UploadedAt = fixture.Now,
+            ConsumedAt = fixture.Now,
+            SubmissionId = submissionId
+        });
+        db.Submissions.Add(new Submission
+        {
+            Id = submissionId,
+            CompetitionId = original.CompetitionId,
+            TeamId = original.TeamId,
+            CompetitionChallengeId = original.CompetitionChallengeId,
+            SubmittedByUserId = original.SubmittedByUserId,
+            Kind = SubmissionKind.Fix,
+            ReceivedAt = fixture.Now.AddTicks(TimeSpan.TicksPerMicrosecond),
+            PatchUploadId = patchUploadId,
+            EvaluationState = SubmissionEvaluationState.Processing,
+            EvaluationUpdatedAt = fixture.Now,
+            ProcessingVersion = 7
+        });
+        db.RuntimeInstances.Add(new RuntimeInstance
+        {
+            Id = runtimeId,
+            CompetitionId = original.CompetitionId,
+            CompetitionChallengeId = original.CompetitionChallengeId,
+            Purpose = RuntimePurpose.AwdpTarget,
+            SubmissionId = submissionId,
+            SubmissionProcessingVersion = 7,
+            SourceCompetitionConfigurationRevision = 0,
+            SourceCompetitionChallengeRevision = 2,
+            SourceChallengeDefinitionRevision = 0,
+            Generation = 1,
+            RuntimeKind = RuntimeKind.Container,
+            RuntimeProvider = RuntimeProvider.Docker,
+            RunnerPool = "awdp",
+            RunnerId = "runner-b",
+            State = RuntimeState.Running,
+            ProcessingVersion = 3,
+            ProviderReceiptJson = "{}",
+            CreatedAt = fixture.Now,
+            RunningAt = fixture.Now
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return (submissionId, runtimeId);
     }
 
     private static async Task<(Guid SubmissionId, Guid RuntimeId)> AddPendingFixAsync(
@@ -417,7 +569,12 @@ public sealed class AwdpFixResultPersistenceTests
         }
 
         public List<object> NodeMessages { get; } = [];
-        public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
+        public List<object> Published { get; } = [];
+        public ValueTask PublishAsync<T>(T message)
+        {
+            Published.Add(message!);
+            return ValueTask.CompletedTask;
+        }
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
         public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>

@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace NoCTF.Infrastructure.Persistence;
 
-internal static class LeaderboardRevision
+public static class LeaderboardRevision
 {
     public static async Task IncrementAsync(
         NoCtfDbContext db,

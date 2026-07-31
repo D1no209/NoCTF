@@ -94,7 +94,8 @@ created_at, updated_at, deleted_at?
 - FlagDerivationSecret 创建时 CSPRNG 生成，之后不可修改、不可序列化到 DTO/日志。
 - RunningSince 只在 Running 非空。Pause/Finish 时把时间差累加到 AccumulatedRunningSeconds 并清空。
 - EffectiveRunningTime = AccumulatedRunningSeconds + 当前 Running 区间。
-- PermissionRevision、ConfigurationRevision 与 LeaderboardRevision 单调递增。
+- PermissionRevision、ConfigurationRevision 与 LeaderboardRevision 单调递增；所有共享
+  LeaderboardRevision 写入必须使用数据库表达式原子递增，不能先读到客户端再写回 `R+1`。
 
 对 owner_id 与三个 UUID 数组建查询索引；数组使用 GIN。
 
@@ -358,11 +359,14 @@ Wolverine 管理 Inbox、Outbox、Scheduled 与 Dead Letter 表；它们不是 D
 
 ### 重判替换
 
-锁 Submission -> 校验 ProcessingVersion -> 新 ScoringEvent -> 旧事件 DeletedAt -> 更新 CurrentScoringEventId/State -> LeaderboardRevision++ -> Outbox -> commit。
+锁 Submission -> 校验 ProcessingVersion -> 新 ScoringEvent -> 旧事件 DeletedAt -> 更新
+CurrentScoringEventId/State -> 数据库原子 LeaderboardRevision++ -> Outbox -> commit。
 
 ### Hint 解锁
 
-锁 Competition/Team -> 用数据库事实与当前配置计算权威总分 -> 校验覆盖 Cost -> Insert HintUnlock Event -> LeaderboardRevision++ -> Outbox -> commit。
+锁 Competition/Team 解锁键 -> 用数据库事实与当前配置计算权威总分 -> 校验覆盖 Cost ->
+Insert HintUnlock Event -> 数据库原子 LeaderboardRevision++ -> Outbox -> commit。不同 Team
+可以并发解锁，因此不能依赖该锁串行化 Competition 的共享 revision。
 
 ### Runtime 状态
 

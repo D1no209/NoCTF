@@ -226,9 +226,9 @@ public sealed class ChallengeHintStore(
             OccurredAt = now,
             CreatedAt = now
         });
-        competition.LeaderboardRevision = checked(competition.LeaderboardRevision + 1);
         await outbox.PublishAsync(new ProjectLeaderboard(competitionId));
         await db.SaveChangesAsync(ct);
+        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return HintUnlockAttempt.Success(new(Map(hint), true));

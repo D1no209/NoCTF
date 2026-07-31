@@ -190,8 +190,10 @@ public sealed class KohObservationHandler(
                 OccurredAt = message.ObservedAt,
                 CreatedAt = timeProvider.GetUtcNow()
             });
-            target.Competition.LeaderboardRevision =
-                checked(target.Competition.LeaderboardRevision + 1);
+            await LeaderboardRevision.IncrementAsync(
+                db,
+                message.CompetitionId,
+                cancellationToken);
             await outbox.PublishAsync(new ProjectLeaderboard(message.CompetitionId));
         }
 
