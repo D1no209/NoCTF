@@ -6,7 +6,6 @@ import type { ClientOptions as GeneratedClientOptions } from './generated/types.
 import { createMockAwareFetch } from '@/mocks/runtime'
 import {
   clearAuthSession,
-  configureAuthSessionRefresh,
   readAuthSession,
   refreshAuthSessionIfNeeded,
 } from './auth-session'
@@ -81,8 +80,6 @@ export function createClientConfig(
     ? createMockAwareFetch(baseFetch)
     : baseFetch
   const baseUrl = override?.baseUrl ?? import.meta.env.VITE_API_BASE_URL ?? ''
-
-  configureAuthSessionRefresh(appFetch, baseUrl, DEFAULT_REQUEST_TIMEOUT_MS)
 
   return {
     ...override,

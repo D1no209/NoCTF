@@ -1,3 +1,5 @@
+import type { NoCtfapiEndpointsAuthenticationRefreshTokenResponse } from './generated/types.gen'
+
 export interface AuthSession {
   accessToken: string
   userName: string
@@ -6,16 +8,22 @@ export interface AuthSession {
 
 const AUTH_REFRESH_WINDOW_MS = 2 * 60 * 1000
 const DEFAULT_REFRESH_TIMEOUT_MS = 12_000
-const TRAILING_SLASH_RE = /\/$/
 
 type SessionListener = (session: AuthSession | null) => void
+
+interface AuthSessionRefreshResult {
+  data?: NoCtfapiEndpointsAuthenticationRefreshTokenResponse
+  error?: unknown
+  response?: Response
+}
+
+type AuthSessionRefreshOperation = (signal: AbortSignal) => Promise<AuthSessionRefreshResult>
 
 const listeners = new Set<SessionListener>()
 // Access tokens are deliberately process-memory only. The refresh token remains
 // in the server-managed HttpOnly cookie and is never readable by JavaScript.
 let memorySession: AuthSession | null = null
-let refreshFetch: typeof fetch = globalThis.fetch
-let refreshBaseUrl = ''
+let refreshOperation: AuthSessionRefreshOperation | null = null
 let refreshTimeoutMs = DEFAULT_REFRESH_TIMEOUT_MS
 let refreshInFlight: Promise<AuthSession | null> | null = null
 
@@ -73,12 +81,10 @@ export function subscribeAuthSession(listener: SessionListener) {
 }
 
 export function configureAuthSessionRefresh(
-  baseFetch: typeof fetch,
-  baseUrl: string,
+  operation: AuthSessionRefreshOperation,
   timeoutMs = DEFAULT_REFRESH_TIMEOUT_MS,
 ) {
-  refreshFetch = baseFetch
-  refreshBaseUrl = baseUrl.replace(TRAILING_SLASH_RE, '')
+  refreshOperation = operation
   refreshTimeoutMs = timeoutMs
 }
 
@@ -103,27 +109,26 @@ async function refreshAuthSession(session: AuthSession): Promise<AuthSession | n
   const timeout = globalThis.setTimeout(() => controller.abort(), refreshTimeoutMs)
 
   try {
-    const response = await refreshFetch(`${refreshBaseUrl}/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-      },
-      credentials: 'include',
-      signal: controller.signal,
-    })
+    if (!refreshOperation)
+      throw new Error('Session refresh operation is not configured.')
 
-    if (response.status === 401 || response.status === 403) {
+    const result = await refreshOperation(controller.signal)
+    const status = result.response?.status
+    if (status === 401 || status === 403) {
       if (memorySession?.accessToken === session.accessToken)
         clearAuthSession()
       return null
     }
 
-    if (!response.ok)
-      throw new Error(`Session refresh failed with HTTP ${response.status}.`)
+    if (result.error !== undefined || (result.response && !result.response.ok)) {
+      const statusDescription = status === undefined ? '' : ` with HTTP ${status}`
+      throw new Error(`Session refresh failed${statusDescription}.`)
+    }
 
-    const data = await response.json() as Partial<AuthSession>
+    const data = result.data
     if (
-      typeof data.accessToken !== 'string'
+      !data
+      || typeof data.accessToken !== 'string'
       || typeof data.userName !== 'string'
       || typeof data.role !== 'string'
     ) {
