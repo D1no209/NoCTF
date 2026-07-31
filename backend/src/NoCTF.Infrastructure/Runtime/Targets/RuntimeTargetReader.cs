@@ -18,7 +18,10 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
         CancellationToken ct)
     {
         var competition = await db.Competitions.AsNoTracking()
-            .Where(item => item.Id == competitionId && item.Mode == GameMode.Awd)
+            .Where(item =>
+                item.Id == competitionId &&
+                item.Mode == GameMode.Awd &&
+                item.DeletedAt == null)
             .Select(item => new
             {
                 item.Status,
@@ -29,9 +32,19 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
             .SingleOrDefaultAsync(ct);
         if (competition is null || competition.Status != CompetitionStatus.Running)
             return null;
-        if (!await db.CompetitionChallenges.AsNoTracking().AnyAsync(
-                item => item.Id == competitionChallengeId && item.CompetitionId == competitionId,
-                ct))
+        if (!await db.CompetitionChallenges.AsNoTracking()
+                .Where(item =>
+                    item.Id == competitionChallengeId &&
+                    item.CompetitionId == competitionId &&
+                    item.IsPublished &&
+                    item.DeletedAt == null)
+                .Join(
+                    db.Challenges.AsNoTracking()
+                        .Where(template => template.DeletedAt == null),
+                    challenge => challenge.ChallengeId,
+                    template => template.Id,
+                    (challenge, _) => challenge.Id)
+                .AnyAsync(ct))
             return null;
 
         var ownTeamId = await db.Teams.AsNoTracking()
@@ -39,6 +52,7 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
                 team.CompetitionId == competitionId &&
                 team.MemberIds.Contains(userId) &&
                 team.RegistrationStatus == TeamRegistrationStatus.Approved &&
+                team.DeletedAt == null &&
                 !team.IsBanned)
             .Select(team => (Guid?)team.Id)
             .SingleOrDefaultAsync(ct);
@@ -57,6 +71,7 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
                 team.CompetitionId == competitionId &&
                 team.RegistrationStatus == TeamRegistrationStatus.Approved &&
                 !team.IsBanned &&
+                team.DeletedAt == null &&
                 (exposeAll || team.Id == ownTeamId.Value))
             .OrderBy(team => team.RegisteredAt)
             .ThenBy(team => team.Id)
