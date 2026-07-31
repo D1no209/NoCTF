@@ -56,8 +56,7 @@ public class AdminOpenApiRulesTests
             .ToArray()).IsEmpty();
         await Assert.That(operations
             .Where(operation => operation.Value.GetProperty("responses").TryGetProperty("400", out var badRequest)
-                && (!badRequest.TryGetProperty("content", out var content)
-                    || !content.TryGetProperty("application/problem+json", out _)))
+                && !HasValidationProblemContent(badRequest))
             .Select(operation => operation.Route)
             .ToArray()).IsEmpty();
         await Assert.That(operations
@@ -71,6 +70,15 @@ public class AdminOpenApiRulesTests
         response.TryGetProperty("content", out var content)
         && (content.TryGetProperty("application/problem+json", out _)
             || content.TryGetProperty("application/json", out _));
+
+    private static bool HasValidationProblemContent(JsonElement response) =>
+        response.TryGetProperty("content", out var content)
+        && content.TryGetProperty("application/problem+json", out var problem)
+        && problem.TryGetProperty("schema", out var schema)
+        && schema.TryGetProperty("$ref", out var reference)
+        && reference.GetString()!.EndsWith(
+            "ValidationProblemDetails",
+            StringComparison.Ordinal);
 
     private static bool MissingText(JsonElement operation, string propertyName) =>
         !operation.TryGetProperty(propertyName, out var value)

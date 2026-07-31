@@ -1510,6 +1510,67 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
   CompetitionChallenge mode invariant 的缺口；应给出 typed state/409、真实 PostgreSQL
   覆盖与 OpenAPI/client，再适配 Frontend，不得只依赖 start gate 晚拒绝。
 
+### 6.26 Backend Challenge template Mode 活动引用不变量（2026-07-31，当前最新 Backend）
+
+本节完成 6.25 指定的 Backend 纵切。Challenge template update 不再把不存在、无权限和
+revision 冲突合并成不可判定字符串，也不能在活动 CompetitionChallenge 仍引用时改变 Mode。
+没有新增或修改 EF migration。
+
+#### 方案 A、强类型状态与完整请求
+
+- 按用户选择的方案 A，只有 `CompetitionChallenge.DeletedAt != null` 的历史引用不阻塞；
+  任何未软删除引用都会阻止 Mode 改变，即使父 Competition 已软删除。这样 Competition
+  restore 不会重新暴露 template/Competition mode mismatch。
+- `IChallengeBankStore.UpdateAsync`、Application use case 与 Endpoint 统一使用
+  `ChallengeTemplateWriteResult`。`NotFoundOrForbidden` 返回 404；
+  `RevisionConflict` / `ActiveCompetitionModeConflict` 返回 typed
+  `Conflict<ChallengeTemplateConflictResponse>`；无效请求或 definition 返回 400。
+- `ChallengeTemplateConflictResponse.code/userIds` 均为 OpenAPI required。稳定 code 精确为
+  `ResourceIdConflict`、`RevisionConflict`、`ActiveCompetitionModeConflict`、
+  `OwnerIncludedInManagerSet`、`UserNotFound` 与 `RoleNotEligible`。
+- update body 的 Mode、Visibility、Title、Direction、DefinitionJson、ExpectedRevision
+  全部 required；Description 是唯一可选字段。三个值类型使用 nullable transport binding 与
+  `NotNull` validator 区分“缺失”和合法的零值，revision 继续要求 minimum 0。
+
+#### 锁序、失败原子性与真实 PostgreSQL
+
+- update 在事务中只取得 Challenge advisory lock，先校验写权限和 revision，再检查未软删除
+  CompetitionChallenge 的存在性；不追加 Competition lock，因此继续兼容 create/restore 的
+  `Competition → Challenge` 固定锁序。
+- 活动引用下改变 Mode 返回 typed conflict，Mode、Visibility、metadata、DefinitionJson、
+  Revision 与 UpdatedAt 均不变；保持 Mode 的普通 metadata/definition 更新仍成功并只推进一次
+  revision。软删除唯一引用后可改变 Mode，旧引用 restore 在 mismatch 时原子失败，改回 Mode
+  后可以恢复。
+- 真实 PostgreSQL 还覆盖父 Competition 已软删除但引用未删除时仍阻塞、stale revision
+  优先于活动引用冲突，以及双向确定性并发：create 先持有 Competition/Challenge 锁并插入
+  引用时 Mode update 等待后返回 typed conflict；Mode update 先持有 Challenge 锁时 create
+  等待后返回 `TemplateModeMismatch`。两种锁序最终都不产生 mismatch。
+- FastEndpoints 自动 FluentValidation 与 Application 的 invalid request/definition 分支共用
+  `ApiValidationProblemFactory`；运行时媒体类型、OpenAPI metadata 与 typed union 均统一为
+  `application/problem+json` / `ValidationProblemDetails`。最小 TestServer HTTP 回归分别发送
+  空 body 与完整但非法 definition，验证两条真实请求路径的 400 契约，不依赖数据库。
+
+#### 验证、OpenAPI/client 与下一步
+
+- WSL 原生干净副本、.NET SDK 10.0.301、真实 Docker/Testcontainers：
+  - Release `NoCTF.slnx` build：0 warning、0 error；
+  - non-Integration：426/426 passed；
+  - Integration：69 total，67 passed、0 failed、2 skipped；两个 skip 仍是未启用的真实
+    Kubernetes dataplane 与未配置 fixture 的真实 Libvirt opt-in；
+  - 全 solution analyzer、本轮 C# whitespace、EF pending model 与 `git diff --check`
+    passed。
+- OpenAPI 仍为 134 endpoints；两份 artifact 字节一致且第二次导出 byte-stable，SHA-256
+  均为 `3429B4071BA6BF302C422EEAC36B5F4331D0234E33CB2494F32B67EDFEA1763C`。
+  `@hey-api/openapi-ts 0.97.3` 已重建 generated SDK，update body 六项为必填、409 为 typed
+  response；所有 validator 400 也从错误的 `FastEndpointsErrorResponse` 修正为
+  `ValidationProblemDetails`，第二次生成 byte-stable。
+- 本节作为独立 Backend 本地提交，提交说明为
+  `fix(challenges): preserve template mode invariant`；不 push、不创建 PR。保护文件继续
+  沿用 6.18。
+- 下一纵切进入 Frontend：当前没有 Challenge template update UI，不复活已删除的 legacy
+  editor；只让 generated conflict decoder 接受精确六值 enum（含
+  `ActiveCompetitionModeConflict`）并补 fail-closed 测试，不得新增手写 URL 或解析错误文本。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -1524,7 +1585,8 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 - Frontend 的 Bot、Challenge lifecycle inventory、typed role 409、Challenge Bot
   Manager 授权、CompetitionChallenge 稳定 ID/lifecycle 与 Competition 权限完整集合 UI
   均已完成；CompetitionChallenge typed 409、delete/restore revision fence 与其 Frontend
-  generated-SDK 并发适配也已完成。下一项是 Challenge template mode 更新的活动引用 invariant。
+  generated-SDK 并发适配也已完成；Challenge template Mode 活动引用 invariant 的 Backend
+  也已按 6.26 完成。下一项是该 typed conflict 的最小 Frontend decoder 适配。
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
   环境部署与运维验收尚未执行。
 - 未推送远端、未创建 PR、未生产部署。
@@ -1534,9 +1596,8 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 
 ## 7. 建议的下一交接顺序
 
-1. 在 Backend 阻止 Challenge template 在存在活动 CompetitionChallenge 引用时改变
-   GameMode；补稳定 typed conflict、真实 PostgreSQL 失败原子性与 OpenAPI/client，然后
-   适配 Frontend。不得只依赖比赛启动时再发现 mode mismatch。
+1. 完成 Challenge template Mode typed conflict 的最小 Frontend decoder 适配；不得复活
+   已删除的旧 editor、增加手写 URL 或解析错误文本。
 2. 有正式 Kubernetes/Libvirt 环境后执行相应 opt-in dataplane/lifecycle 与运维验收。
 3. 推送必须等待用户明确指令；当前本地 commits 不得自行 push 或创建 PR。
 
@@ -1566,9 +1627,10 @@ Competition 响应，也没有恢复逐人 `/collaborators` 协议；Frontend �
 4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做；Frontend typed 409、
    Bot Manager 授权、CompetitionChallenge lifecycle 与 Competition 权限完整集合 UI
    均已完成。CompetitionChallenge typed 409、delete/restore revision fence 与 Frontend
-   generated-SDK 适配已按 6.24/6.25 完成；下一阶段处理 Challenge template mode 更新的活动
-   引用 invariant。引用权限 Backend 测试数量时使用 6.22，引用最新 Backend 状态时使用
-   6.24，引用最新 Frontend 状态时使用 6.25。
+   generated-SDK 适配已按 6.24/6.25 完成；Challenge template Mode 活动引用 invariant
+   Backend 已按 6.26 完成，下一阶段只做其最小 Frontend decoder 适配。引用权限 Backend
+   测试数量时使用 6.22，引用最新 Backend 状态时使用 6.26，引用最新 Frontend 状态时使用
+   6.25。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；

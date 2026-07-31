@@ -1,7 +1,9 @@
 using FastEndpoints;
 using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Composition;
 using System.Text.Json.Serialization;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Bank;
@@ -13,26 +15,26 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 public sealed class UpdateChallengeTemplateRequest
 {
     [JsonConverter(typeof(JsonStringEnumConverter<GameMode>))]
-    public GameMode Mode { get; set; }
+    public GameMode? Mode { get; set; }
     [JsonConverter(typeof(JsonStringEnumConverter<ChallengeVisibility>))]
-    public ChallengeVisibility Visibility { get; set; }
+    public ChallengeVisibility? Visibility { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Direction { get; set; } = string.Empty;
-    public string DefinitionJson { get; set; } = """{"schemaVersion":1}""";
-    public int ExpectedRevision { get; set; }
+    public string DefinitionJson { get; set; } = string.Empty;
+    public int? ExpectedRevision { get; set; }
 }
 
 public sealed class UpdateChallengeTemplateValidator : Validator<UpdateChallengeTemplateRequest>
 {
     public UpdateChallengeTemplateValidator()
     {
-        RuleFor(request => request.Mode).IsInEnum();
-        RuleFor(request => request.Visibility).IsInEnum();
+        RuleFor(request => request.Mode).NotNull().IsInEnum();
+        RuleFor(request => request.Visibility).NotNull().IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.Direction).NotEmpty().MaximumLength(96);
         RuleFor(request => request.DefinitionJson).NotEmpty();
-        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
+        RuleFor(request => request.ExpectedRevision).NotNull().GreaterThanOrEqualTo(0);
     }
 }
 
@@ -40,14 +42,17 @@ public sealed class UpdateChallengeTemplateEndpoint(
     UpdateChallengeTemplate update,
     IUserContext user)
     : Endpoint<UpdateChallengeTemplateRequest,
-        Results<Ok<ChallengeTemplateResponse>, NotFound, ProblemHttpResult>>
+        Results<
+            Ok<ChallengeTemplateResponse>,
+            NotFound,
+            Conflict<ChallengeTemplateConflictResponse>,
+            ProblemHttpResult>>
 {
     public override void Configure()
     {
         Put("/admin/challenges/{challengeId}");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminChallengeBankUpdateTemplate")
-            .ProducesProblemFE(StatusCodes.Status409Conflict));
+        Description(builder => builder.WithName("AdminChallengeBankUpdateTemplate"));
         Summary(summary =>
         {
             summary.Summary = "Updates global challenge metadata.";
@@ -55,29 +60,61 @@ public sealed class UpdateChallengeTemplateEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeTemplateResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<
+        Results<
+            Ok<ChallengeTemplateResponse>,
+            NotFound,
+            Conflict<ChallengeTemplateConflictResponse>,
+            ProblemHttpResult>> ExecuteAsync(
         UpdateChallengeTemplateRequest request,
         CancellationToken ct)
     {
-        var current = await update.ExecuteAsync(new UpdateChallengeTemplateCommand(
+        var result = await update.ExecuteAsync(new UpdateChallengeTemplateCommand(
             Route<Guid>("challengeId"),
             user.UserId,
             user.IsAdministrator,
-            request.Mode,
-            request.Visibility,
+            request.Mode!.Value,
+            request.Visibility!.Value,
             request.Title,
             request.Description,
             request.Direction,
             request.DefinitionJson,
-            request.ExpectedRevision,
+            request.ExpectedRevision!.Value,
             DateTimeOffset.UtcNow), ct);
-        if (!current.Succeeded)
-            return current.ErrorCode == "challenge_not_found"
-                ? TypedResults.NotFound()
-                : TypedResults.Problem(
-                    statusCode: StatusCodes.Status409Conflict,
-                    title: "Challenge template was not updated.",
-                    detail: current.ErrorMessage);
-        return TypedResults.Ok(ChallengeTemplateMapper.ToResponse(current.Value!));
+        return ChallengeTemplateUpdateResponseMapper.ToResponse(result);
     }
+}
+
+public static class ChallengeTemplateUpdateResponseMapper
+{
+    public static Results<
+        Ok<ChallengeTemplateResponse>,
+        NotFound,
+        Conflict<ChallengeTemplateConflictResponse>,
+        ProblemHttpResult> ToResponse(
+        ChallengeTemplateWriteResult result) =>
+        result.State switch
+        {
+            ChallengeTemplateWriteState.Succeeded =>
+                TypedResults.Ok(ChallengeTemplateMapper.ToResponse(result.Template!)),
+            ChallengeTemplateWriteState.NotFoundOrForbidden =>
+                TypedResults.NotFound(),
+            ChallengeTemplateWriteState.RevisionConflict
+                or ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
+                TypedResults.Conflict(
+                    ChallengeTemplateWriteResponseMapper.ToConflict(result)),
+            ChallengeTemplateWriteState.InvalidRequest
+                or ChallengeTemplateWriteState.InvalidDefinition =>
+                TypedResults.Problem(ApiValidationProblemFactory.Create(
+                    [
+                        new ValidationFailure(
+                            result.State == ChallengeTemplateWriteState.InvalidDefinition
+                                ? nameof(UpdateChallengeTemplateRequest.DefinitionJson)
+                                : "Request",
+                            result.Detail ?? "Challenge template update is invalid.")
+                    ],
+                    StatusCodes.Status400BadRequest)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported challenge template update state: {result.State}.")
+        };
 }

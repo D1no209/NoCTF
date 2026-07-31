@@ -1,4 +1,8 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using NoCTF.Application.Challenges.Bank;
 using NoCTF.API.Endpoints.Administration.ChallengeBank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -34,17 +38,91 @@ public sealed class ChallengeTemplateProtocolTests
             JsonOptions);
 
         await Assert.That(request).IsNotNull();
-        await Assert.That(request!.Mode).IsEqualTo(GameMode.Ctf);
-        await Assert.That(request.Visibility).IsEqualTo(ChallengeVisibility.Private);
+        await Assert.That(request!.Mode!.Value).IsEqualTo(GameMode.Ctf);
+        await Assert.That(request.Visibility!.Value).IsEqualTo(ChallengeVisibility.Private);
     }
 
     [Test]
-    public async Task Conflict_code_serializes_as_a_named_enum()
+    public async Task Update_request_requires_complete_revision_fenced_payload()
     {
-        var json = JsonSerializer.Serialize(
-            ChallengeTemplateConflictCode.RoleNotEligible,
-            JsonOptions);
+        var validator = new UpdateChallengeTemplateValidator();
+        var missing = validator.Validate(new UpdateChallengeTemplateRequest());
 
-        await Assert.That(json).IsEqualTo("\"RoleNotEligible\"");
+        await Assert.That(missing.Errors.Select(error => error.PropertyName))
+            .Contains(nameof(UpdateChallengeTemplateRequest.Mode));
+        await Assert.That(missing.Errors.Select(error => error.PropertyName))
+            .Contains(nameof(UpdateChallengeTemplateRequest.Visibility));
+        await Assert.That(missing.Errors.Select(error => error.PropertyName))
+            .Contains(nameof(UpdateChallengeTemplateRequest.Title));
+        await Assert.That(missing.Errors.Select(error => error.PropertyName))
+            .Contains(nameof(UpdateChallengeTemplateRequest.Direction));
+        await Assert.That(missing.Errors.Select(error => error.PropertyName))
+            .Contains(nameof(UpdateChallengeTemplateRequest.DefinitionJson));
+        await Assert.That(missing.Errors.Select(error => error.PropertyName))
+            .Contains(nameof(UpdateChallengeTemplateRequest.ExpectedRevision));
+        await Assert.That(validator.Validate(new UpdateChallengeTemplateRequest
+        {
+            Mode = GameMode.Ctf,
+            Visibility = ChallengeVisibility.Private,
+            Title = "Template",
+            Direction = "Web",
+            DefinitionJson = """{"schemaVersion":1}""",
+            ExpectedRevision = 0
+        }).IsValid).IsTrue();
+        var negativeRevision = validator.Validate(new UpdateChallengeTemplateRequest
+        {
+            Mode = GameMode.Ctf,
+            Visibility = ChallengeVisibility.Private,
+            Title = "Template",
+            Direction = "Web",
+            DefinitionJson = """{"schemaVersion":1}""",
+            ExpectedRevision = -1
+        });
+        await Assert.That(negativeRevision.Errors
+            .Any(error => error.PropertyName == nameof(
+                UpdateChallengeTemplateRequest.ExpectedRevision))).IsTrue();
+    }
+
+    [Test]
+    [Arguments(ChallengeTemplateConflictCode.RoleNotEligible)]
+    [Arguments(ChallengeTemplateConflictCode.ActiveCompetitionModeConflict)]
+    public async Task Conflict_code_serializes_as_a_named_enum(
+        ChallengeTemplateConflictCode code)
+    {
+        var json = JsonSerializer.Serialize(code, JsonOptions);
+
+        await Assert.That(json).IsEqualTo($"\"{code}\"");
+    }
+
+    [Test]
+    public async Task Update_result_mapping_keeps_runtime_statuses_typed()
+    {
+        var notFound = ChallengeTemplateUpdateResponseMapper.ToResponse(
+            new(ChallengeTemplateWriteState.NotFoundOrForbidden));
+        var revision = ChallengeTemplateUpdateResponseMapper.ToResponse(
+            new(ChallengeTemplateWriteState.RevisionConflict));
+        var activeMode = ChallengeTemplateUpdateResponseMapper.ToResponse(
+            new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict));
+        var invalidDefinition = ChallengeTemplateUpdateResponseMapper.ToResponse(
+            new(
+                ChallengeTemplateWriteState.InvalidDefinition,
+                Detail: "Definition is invalid."));
+
+        await Assert.That(notFound.Result).IsTypeOf<NotFound>();
+        await Assert.That(revision.Result)
+            .IsTypeOf<Conflict<ChallengeTemplateConflictResponse>>();
+        await Assert.That(activeMode.Result)
+            .IsTypeOf<Conflict<ChallengeTemplateConflictResponse>>();
+        var activeModeConflict =
+            (Conflict<ChallengeTemplateConflictResponse>)activeMode.Result;
+        await Assert.That(activeModeConflict.Value!.Code)
+            .IsEqualTo(ChallengeTemplateConflictCode.ActiveCompetitionModeConflict);
+        await Assert.That(invalidDefinition.Result)
+            .IsTypeOf<ProblemHttpResult>();
+        var response = (ProblemHttpResult)invalidDefinition.Result;
+        var value = (ValidationProblemDetails)response.ProblemDetails;
+        await Assert.That(value.Status).IsEqualTo(400);
+        await Assert.That(value.Errors.Keys)
+            .Contains(nameof(UpdateChallengeTemplateRequest.DefinitionJson));
     }
 }
