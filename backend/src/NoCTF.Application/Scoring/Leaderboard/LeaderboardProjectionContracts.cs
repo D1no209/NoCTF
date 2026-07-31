@@ -56,7 +56,7 @@ public interface ILeaderboardProjectorCatalog
 public sealed record LeaderboardProjectionResult(
     IReadOnlyList<LeaderboardEntry> Entries,
     IReadOnlyList<LeaderboardSubjectSummary> Subjects,
-    IReadOnlyList<LeaderboardFirstBloodSummary> FirstBloods);
+    IReadOnlyList<LeaderboardBloodSummary> Bloods);
 
 public interface ILeaderboardProjectionEngine
 {

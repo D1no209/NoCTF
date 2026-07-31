@@ -369,7 +369,7 @@ public sealed class CtfFullBoundaryTests
                 teamId,
                 competitionChallengeId,
                 expectedSolveCount: 0,
-                expectedFirstBloodCount: 0);
+                expectedBloodCount: 0);
 
             var submissionAccepted = await SendJsonAsync(
                 player,
@@ -399,7 +399,7 @@ public sealed class CtfFullBoundaryTests
                 teamId,
                 competitionChallengeId,
                 expectedSolveCount: 1,
-                expectedFirstBloodCount: 1);
+                expectedBloodCount: 1);
 
             var teammateSubmissions = await PollTeamSubmissionsAsync(
                 teammate,
@@ -463,7 +463,7 @@ public sealed class CtfFullBoundaryTests
                 teamId,
                 competitionChallengeId,
                 expectedSolveCount: 1,
-                expectedFirstBloodCount: 1);
+                expectedBloodCount: 1);
 
             var unlockedHint = await SendWithoutBodyForJsonAsync(
                 player,
@@ -869,7 +869,7 @@ public sealed class CtfFullBoundaryTests
         Guid teamId,
         Guid competitionChallengeId,
         int expectedSolveCount,
-        int expectedFirstBloodCount)
+        int expectedBloodCount)
     {
         var entry = leaderboard.GetProperty("entries").EnumerateArray()
             .Single(item => item.GetProperty("teamId").GetGuid() == teamId);
@@ -882,11 +882,12 @@ public sealed class CtfFullBoundaryTests
             .Sum(item => item.GetProperty("solveCount").GetInt32());
         await Assert.That(challengeSolves).IsEqualTo(expectedSolveCount);
         var slotKey = $"challenge:{competitionChallengeId:N}";
-        var firstBloodCount = leaderboard.GetProperty("firstBloods").EnumerateArray()
+        var bloodCount = leaderboard.GetProperty("bloods").EnumerateArray()
             .Count(item =>
                 item.GetProperty("teamId").GetGuid() == teamId
-                && item.GetProperty("slotKey").GetString() == slotKey);
-        await Assert.That(firstBloodCount).IsEqualTo(expectedFirstBloodCount);
+                && item.GetProperty("slotKey").GetString() == slotKey
+                && item.GetProperty("bloodRank").GetInt32() == 1);
+        await Assert.That(bloodCount).IsEqualTo(expectedBloodCount);
     }
 
     private static string RequiredEnvironment(string name) =>

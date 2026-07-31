@@ -87,6 +87,99 @@ public sealed class CtfLeaderboardProjectorTests
     }
 
     [Test]
+    public async Task Projection_engine_exposes_first_second_and_third_bloods_for_each_challenge()
+    {
+        var teams = new[]
+        {
+            Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            Guid.Parse("00000000-0000-0000-0000-000000000002"),
+            Guid.Parse("00000000-0000-0000-0000-000000000003"),
+            Guid.Parse("00000000-0000-0000-0000-000000000004")
+        };
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var start = DateTimeOffset.Parse("2026-07-31T00:00:00Z");
+        var input = new LeaderboardProjectionInput(
+            competitionId,
+            GameMode.Ctf,
+            teams.Select((teamId, index) => new LeaderboardTeamFact(
+                teamId,
+                $"team-{index + 1}",
+                false,
+                false,
+                start)).ToList(),
+            [
+                Fact(teams[0], start, Guid.Parse("10000000-0000-0000-0000-000000000001")),
+                Fact(teams[0], start.AddMilliseconds(500), Guid.Parse("10000000-0000-0000-0000-000000000002")),
+                Fact(teams[1], start.AddSeconds(1), Guid.Parse("20000000-0000-0000-0000-000000000001")),
+                Fact(teams[2], start.AddSeconds(1), Guid.Parse("30000000-0000-0000-0000-000000000001")),
+                Fact(teams[3], start.AddSeconds(3), Guid.Parse("40000000-0000-0000-0000-000000000001"))
+            ],
+            [],
+            [new(challengeId, "Web", false, JsonSerializer.Serialize(
+                new CtfChallengeConfiguration(
+                    CtfChallengeConfiguration.CurrentSchemaVersion,
+                    new(100, 100, 10),
+                    [])))],
+            JsonSerializer.Serialize(new CtfConfiguration(
+                CtfConfiguration.CurrentSchemaVersion,
+                new(100, 100, 10),
+                [])),
+            start);
+
+        var projection = new LeaderboardProjectionEngine(
+            new LeaderboardProjectorCatalog()).Project(input);
+
+        await Assert.That(projection.Bloods).Count().IsEqualTo(3);
+        await Assert.That(projection.Bloods[0].TeamId).IsEqualTo(teams[0]);
+        await Assert.That(projection.Bloods[0].BloodRank)
+            .IsEqualTo(LeaderboardBloodRank.First);
+        await Assert.That(projection.Bloods[1].TeamId).IsEqualTo(teams[1]);
+        await Assert.That(projection.Bloods[1].BloodRank)
+            .IsEqualTo(LeaderboardBloodRank.Second);
+        await Assert.That(projection.Bloods[2].TeamId).IsEqualTo(teams[2]);
+        await Assert.That(projection.Bloods[2].BloodRank)
+            .IsEqualTo(LeaderboardBloodRank.Third);
+        foreach (var blood in projection.Bloods)
+        {
+            var slot = projection.Subjects
+                .Single(subject => subject.SubjectId == blood.TeamId)
+                .Slots
+                .Single(candidate => candidate.SlotKey == blood.SlotKey);
+            await Assert.That(slot.BloodRank).IsEqualTo(blood.BloodRank);
+            await Assert.That(slot.BloodAt).IsEqualTo(blood.OccurredAt);
+        }
+        var fourthSlot = projection.Subjects
+            .Single(subject => subject.SubjectId == teams[3])
+            .Slots
+            .Single();
+        await Assert.That(fourthSlot.BloodRank).IsNull();
+        await Assert.That(fourthSlot.BloodAt).IsNull();
+
+        LeaderboardSubmissionFact Fact(
+            Guid teamId,
+            DateTimeOffset receivedAt,
+            Guid submissionId) =>
+            new(
+                submissionId,
+                teamId,
+                challengeId,
+                SubmissionKind.Flag,
+                receivedAt,
+                new ScoringEvent
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = competitionId,
+                    TeamId = teamId,
+                    CompetitionChallengeId = challengeId,
+                    Kind = ScoringEventKind.SubmissionEvaluation,
+                    Result = ScoringResult.Correct,
+                    OccurredAt = receivedAt,
+                    CreatedAt = receivedAt
+                });
+    }
+
+    [Test]
     public async Task Projector_applies_only_current_wrong_submission_penalty()
     {
         var teamId = Guid.NewGuid();

@@ -74,6 +74,12 @@ new Interpreter(InterpreterOptions.Default)
 
 SolveValuePercentage 以该血位 solveCount 调当前表达式。百分比奖励=`decimal basis * percentage / 100` 后用 MidpointRounding.AwayFromZero 取整。血奖一旦按血位计算，不随以后 solveCount 衰减；配置/重判会重新确定血位和数额。
 
+排行榜响应使用 `bloods[]` 公开每题前三个不同队伍的血位。每项携带强类型
+`bloodRank`（`First/Second/Third`，OpenAPI 数值 1/2/3）、Team、slot 和发生时间；
+`subjects[].slots[]` 对获奖队伍同步携带 nullable `bloodRank` 与 `bloodAt`。同队多条 Correct
+只取最早一条，不得占多个血位；
+第四名及以后不进入 `bloods[]`。血位只属于 CTF Flag solve，不扩展到 AWD/AWDP/KoH。
+
 ## 数值规则
 
 所有持久化 Points/Penalty/Cost 与最终分数是 signed bigint；配置要求非负不代表团队总分不能为负。投影用 checked `Int64` 加减，DynamicExpresso/百分比中间值用 decimal。除 AWD Split 明确使用 Floor 外，decimal 到 bigint 一律 `MidpointRounding.AwayFromZero`；任何 decimal/Int64 overflow 使整次 Competition 投影失败并保留旧快照，不能饱和、绕回或跳过单队。
@@ -110,6 +116,8 @@ Competition；禁止用 tracked entity 的客户端 `R -> R+1` 写回，否则�
 status URL 就是同一个 leaderboard GET，不建立 ProjectionOperation 资源。无快照且正在投影时返回 202、targetRevision 与 Retry-After；投影最终失败且仍无快照时返回 503 `LeaderboardProjectionFailed`。有旧快照时即使新投影失败也返回 200 旧页，携带 `stale=true`、snapshotRevision、targetRevision、lastFailureAt。分页过程中 revision 改变可能出现跨页移动，客户端要求严格一致视图时自行从第一页重读；服务端不因 revision 变化拒绝 cursor。
 
 数据库不保存排行榜/轮次分数表。Redis 丢失后按需重建。
+排行榜响应契约变化时使用新的 Redis snapshot key 版本，避免旧 JSON 快照被当作当前契约
+返回；旧 key 只按原 TTL 自然过期。
 
 ## 公共响应
 
