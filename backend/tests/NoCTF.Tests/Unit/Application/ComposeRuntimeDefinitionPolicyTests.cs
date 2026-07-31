@@ -149,7 +149,8 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
                     RuntimeExposure.Participants,
                     ContainerPort: 8080,
                     ServiceName: "web")
-            ]);
+            ],
+            PublishedPorts: [new("web", 8080, 61000)]);
 
         var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
         var root = Load(prepared);
@@ -169,7 +170,7 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         await Assert.That(Scalar(web, "pids_limit")).IsEqualTo("128");
         await Assert.That(Scalar(web, "privileged")).IsEqualTo("false");
         await Assert.That(ports.Children.Cast<YamlScalarNode>().Single().Value)
-            .IsEqualTo("8080");
+            .IsEqualTo("61000:8080");
         await Assert.That(worker.Children.ContainsKey(new YamlScalarNode("ports"))).IsFalse();
         await Assert.That(
                 Sequence(web, "cap_drop").Children.Cast<YamlScalarNode>().Single().Value)

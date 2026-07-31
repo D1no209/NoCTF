@@ -1,4 +1,5 @@
 using System.Text;
+using System.Security.Cryptography;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using DotNet.Testcontainers.Builders;
@@ -79,6 +80,9 @@ public sealed class DockerContainerLifecycleTests
             ContainerReceipt? receipt = null;
             try
             {
+                var hostPort = RandomNumberGenerator.GetInt32(
+                    RuntimePublishedPortRange.StartPort,
+                    RuntimePublishedPortRange.EndPort + 1);
                 var request = new ContainerRequest(
                     operationId,
                     RuntimeProvider.Docker,
@@ -92,7 +96,7 @@ public sealed class DockerContainerLifecycleTests
                         ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
                         ["noctf.io/generation"] = "1"
                     },
-                    new Dictionary<int, int> { [8080] = 0 },
+                    new Dictionary<int, int> { [8080] = hostPort },
                     new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
                     new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                     TimeSpan.FromMinutes(5),
@@ -115,7 +119,7 @@ public sealed class DockerContainerLifecycleTests
 
                 await Assert.That(receipt.InternalHost)
                     .IsEqualTo("target");
-                await Assert.That(receipt.PortMappings[8080]).IsGreaterThan(0);
+                await Assert.That(receipt.PortMappings[8080]).IsEqualTo(hostPort);
                 await Assert.That(replay.ResourceId).IsEqualTo(receipt.ResourceId);
                 await Assert.That(replay.PortMappings[8080])
                     .IsEqualTo(receipt.PortMappings[8080]);

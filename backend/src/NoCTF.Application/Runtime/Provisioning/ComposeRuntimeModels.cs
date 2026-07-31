@@ -18,7 +18,8 @@ public sealed record ComposeRequest(
     RuntimeUrlBinding? ControlCheckUrlBinding = null,
     RuntimeInternalEndpointBinding? AwdCheckerTargetBinding = null,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? ServiceEnvironment = null,
-    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll);
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll,
+    IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null);
 
 public sealed record ComposeServiceStatus(
     string Name,

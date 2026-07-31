@@ -452,7 +452,11 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 {
                     ["FLAG"] = "flag{compose-runtime}"
                 }
-            });
+            },
+        PublishedPorts:
+        [
+            new("web", 8080, PublishedPort(operationId))
+        ]);
 
     private static ComposeRequest PrivateRequest(Guid operationId) => new(
         operationId,
@@ -490,4 +494,9 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     ["FLAG"] = "flag{compose-replay}"
                 }
             });
+
+    private static int PublishedPort(Guid operationId) =>
+        RuntimePublishedPortRange.StartPort
+        + BitConverter.ToUInt16(operationId.ToByteArray())
+        % new RuntimePublishedPortRange().Count;
 }

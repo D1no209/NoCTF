@@ -416,6 +416,7 @@ public static class BackendMessageHandlers
         DispatchRuntime message,
         NoCtfDbContext db,
         IChallengeRuntimeTemplateCatalog templates,
+        IRuntimePublishedPortAllocator publishedPorts,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
@@ -527,6 +528,38 @@ public static class BackendMessageHandlers
             await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             return;
+        }
+        if (target.Instance.RuntimeProvider == RuntimeProvider.Docker)
+        {
+            var targets = RuntimePublishedPortClaims.Targets(claim);
+            await using var allocationTransaction = db.Database.CurrentTransaction is null
+                ? await db.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+            var allocation = await publishedPorts.AllocateAsync(
+                target.Instance,
+                targets,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+            if (allocation.Failure is { } failure)
+            {
+                target.Instance.State = RuntimeState.Failed;
+                target.Instance.FailureCode = failure ==
+                    RuntimePublishedPortAllocationFailure.RangeExhausted
+                        ? RuntimeFailureCode.PublishedPortRangeExhausted
+                        : RuntimeFailureCode.InvalidConfiguration;
+                target.Instance.ProcessingVersion =
+                    checked(target.Instance.ProcessingVersion + 1);
+                await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
+                if (allocationTransaction is not null)
+                    await allocationTransaction.CommitAsync(cancellationToken);
+                return;
+            }
+            claim = RuntimePublishedPortClaims.Apply(claim, allocation.Mappings);
+            if (targets.Count > 0)
+                await db.SaveChangesAsync(cancellationToken);
+            if (allocationTransaction is not null)
+                await allocationTransaction.CommitAsync(cancellationToken);
         }
         await PublishRuntimeClaimAsync(outbox, claim);
         await outbox.FlushOutgoingMessagesAsync();

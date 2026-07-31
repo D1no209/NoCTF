@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Runtime;
 
@@ -21,14 +22,22 @@ public sealed class ListAdminRuntimesRequest
     [QueryParam] public string? RunnerId { get; set; }
     [QueryParam] public RuntimeState? State { get; set; }
     [QueryParam] public DateTimeOffset? ExpiresBefore { get; set; }
+    [QueryParam] public int? HostPort { get; set; }
     [QueryParam] public string? Cursor { get; set; }
     [QueryParam] public int Limit { get; set; } = 50;
 }
 
 public sealed class ListAdminRuntimesValidator : Validator<ListAdminRuntimesRequest>
 {
-    public ListAdminRuntimesValidator() =>
+    public ListAdminRuntimesValidator()
+    {
         RuleFor(request => request.Limit).InclusiveBetween(1, 200);
+        RuleFor(request => request.HostPort)
+            .InclusiveBetween(
+                RuntimePublishedPortRange.StartPort,
+                RuntimePublishedPortRange.EndPort)
+            .When(request => request.HostPort.HasValue);
+    }
 }
 
 public sealed record AdminRuntimeResponse(
@@ -47,6 +56,7 @@ public sealed record AdminRuntimeResponse(
     IReadOnlyList<string> Urls,
     string? ProviderReceiptJson,
     string? ControlCheckUrl,
+    IReadOnlyList<RuntimePublishedPortView> PublishedPorts,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
@@ -63,7 +73,8 @@ internal static class AdminRuntimeMapping
             view.Id, view.CompetitionId, view.CompetitionChallengeId, view.TeamId,
             view.Generation, view.RuntimeKind, view.Provider, view.RunnerPool,
             view.RunnerId, view.State, view.FailureCode, view.ProcessingVersion,
-            view.Urls, view.ProviderReceiptJson, view.ControlCheckUrl, view.CreatedAt,
+            view.Urls, view.ProviderReceiptJson, view.ControlCheckUrl,
+            view.PublishedPorts ?? [], view.CreatedAt,
             view.RunningAt, view.ExpiresAt, view.StoppedAt);
 }
 
@@ -99,13 +110,14 @@ public sealed class ListAdminRuntimesEndpoint(
         var filterKey = string.Join(
             '|', request.CompetitionChallengeId, request.TeamId, request.RuntimeKind,
             request.Provider, request.RunnerPool, request.RunnerId, request.State,
-            request.ExpiresBefore?.ToString("O", CultureInfo.InvariantCulture));
+            request.ExpiresBefore?.ToString("O", CultureInfo.InvariantCulture),
+            request.HostPort);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
         var items = await runtimes.ListAsync(new(
                 competitionId, request.CompetitionChallengeId, request.TeamId,
                 request.RuntimeKind, request.Provider, request.RunnerPool,
-                request.RunnerId, request.State, request.ExpiresBefore),
+                request.RunnerId, request.State, request.ExpiresBefore, request.HostPort),
             position?.CreatedAt, position?.Id, request.Limit, ct);
         var next = items.Count == request.Limit
             ? cursors.Encode(CursorEndpoint, filterKey, new(items[^1].CreatedAt, items[^1].Id))

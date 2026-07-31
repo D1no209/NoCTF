@@ -190,7 +190,7 @@ public static class ComposeRuntimeDefinitionPolicy
             requireServicePids: true,
             requireDnsServiceNames: false);
         var services = GetRequiredMapping(document, "services");
-        var bindingsByService = BindingsByService(request);
+        var bindingsByService = DockerBindingsByService(request);
 
         foreach (var entry in services.Children)
         {
@@ -220,7 +220,8 @@ public static class ComposeRuntimeDefinitionPolicy
                 SetSequence(
                     service,
                     "ports",
-                    ports.Select(port => port.ToString(CultureInfo.InvariantCulture)));
+                    ports.Select(port =>
+                        $"{port.HostPort.ToString(CultureInfo.InvariantCulture)}:{port.ContainerPort.ToString(CultureInfo.InvariantCulture)}"));
         }
 
         ApplyInternalNetworkPolicy(document, request.Labels);
@@ -296,6 +297,36 @@ public static class ComposeRuntimeDefinitionPolicy
                 .Order()
                 .ToArray(),
             StringComparer.Ordinal);
+
+    private static IReadOnlyDictionary<string, RuntimePublishedPortMapping[]>
+        DockerBindingsByService(ComposeRequest request)
+    {
+        var targets = EndpointBindings(request)
+            .Distinct()
+            .OrderBy(binding => binding.ServiceName, StringComparer.Ordinal)
+            .ThenBy(binding => binding.ContainerPort)
+            .ToArray();
+        var mappings = (request.PublishedPorts ?? [])
+            .OrderBy(mapping => mapping.ServiceName, StringComparer.Ordinal)
+            .ThenBy(mapping => mapping.ContainerPort)
+            .ToArray();
+        if (targets.Length != mappings.Length
+            || targets.Zip(mappings).Any(pair =>
+                !string.Equals(
+                    pair.First.ServiceName,
+                    pair.Second.ServiceName,
+                    StringComparison.Ordinal)
+                || pair.First.ContainerPort != pair.Second.ContainerPort
+                || pair.Second.HostPort is < 1 or > 65535))
+            throw new InvalidOperationException(
+                "Docker Compose published port mappings must exactly match its public endpoint bindings.");
+        return mappings
+            .GroupBy(mapping => mapping.ServiceName!, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.ToArray(),
+                StringComparer.Ordinal);
+    }
 
     private static IEnumerable<ComposeEndpointBinding> EndpointBindings(ComposeRequest request)
     {

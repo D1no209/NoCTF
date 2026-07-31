@@ -25,6 +25,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     {
         if (request.Provider != RuntimeProvider.Docker)
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Docker runtime cannot create another provider.");
+        if (request.PortMappings.Any(mapping =>
+                !options.EffectivePublishedPortRange.Contains(mapping.Value)))
+            throw new ArgumentOutOfRangeException(
+                nameof(request),
+                "Docker published ports must be allocated inside the configured high-port range.");
 
         var exposedPorts = request.ContainerPorts.ToDictionary(port => $"{port}/tcp", _ => new EmptyStruct());
         var bindings = request.PortMappings.ToDictionary(

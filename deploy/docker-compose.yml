@@ -69,6 +69,8 @@ services:
       RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET}}
       RunnerScoring__Issuer: ${RUNNER_SCORING_ISSUER:-NoCTF.Runner}
       RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}
+      Runtime__Provider: ${RUNNER_PROVIDER:-Docker}
+      Runtime__RunnerPool: ${RUNNER_POOL:-default}
       Authentication__RefreshCookieSecure: ${AUTH_REFRESH_COOKIE_SECURE:-false}
       Database__AutoMigrate: "false"
       SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
@@ -177,6 +179,8 @@ services:
       RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET}}
       RunnerScoring__Issuer: ${RUNNER_SCORING_ISSUER:-NoCTF.Runner}
       RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}
+      Runtime__Provider: ${RUNNER_PROVIDER:-Docker}
+      Runtime__RunnerPool: ${RUNNER_POOL:-default}
       Storage__Provider: Local
       Storage__LocalRoot: /app/uploads
     volumes:
