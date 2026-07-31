@@ -75,12 +75,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 await ConnectInternalCallbackAsync(request, response.ID, cancellationToken);
             await client.Containers.StartContainerAsync(
                 response.ID, new ContainerStartParameters(), cancellationToken);
-            var publishedPorts = await ResolvePublishedPortsAsync(
-                response.ID,
-                request.PortMappings.Keys,
-                cancellationToken);
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
-                publishedPorts,
+                SnapshotPublishedPorts(request),
                 options.PublicHost,
                 request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
                     ? "target"
@@ -139,6 +135,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return await CreateAsync(request, cancellationToken);
         }
 
+        ValidateExistingContainer(existing, resourceName, request);
+
         var status = ToRuntimeStatus(existing.State?.Status);
         if (status == RuntimeStatus.Pending)
         {
@@ -175,16 +173,12 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return await CreateAsync(request, cancellationToken);
         }
 
-        var publishedPorts = await ResolvePublishedPortsAsync(
-            existing.ID,
-            request.PortMappings.Keys,
-            cancellationToken);
         return new ContainerReceipt(
             request.OperationId,
             RuntimeProvider.Docker,
             existing.ID,
             RuntimeStatus.Running,
-            publishedPorts,
+            SnapshotPublishedPorts(request),
             options.PublicHost,
             resourceName,
             RuntimeInstanceId: request.RuntimeInstanceId,
@@ -652,42 +646,49 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             string.Equals(network.Name, networkName, StringComparison.Ordinal));
     }
 
-    private async Task<IReadOnlyDictionary<int, int>> ResolvePublishedPortsAsync(
-        string resourceId,
-        IEnumerable<int> targetPorts,
-        CancellationToken cancellationToken)
+    // Host ports are allocated before provisioning. Docker inspect is eventually
+    // consistent immediately after Start and must not replace that durable mapping.
+    private static IReadOnlyDictionary<int, int> SnapshotPublishedPorts(ContainerRequest request) =>
+        request.PortMappings.ToDictionary(pair => pair.Key, pair => pair.Value);
+
+    private static void ValidateExistingContainer(
+        ContainerInspectResponse container,
+        string resourceName,
+        ContainerRequest request)
     {
-        var container = await client.Containers.InspectContainerAsync(
-            resourceId,
-            cancellationToken);
-        return ResolvePublishedPorts(container, targetPorts);
+        var identity = new RuntimeResourceIdentity(
+            request.RuntimeInstanceId ?? request.OperationId,
+            request.Generation);
+        if (!HasResourceIdentity(container.Config?.Labels, identity)
+            || !HasJobKind(container.Config?.Labels, JobKind(request.NetworkPurpose))
+            || !HasPublishedPortBindings(container.HostConfig?.PortBindings, request.PortMappings))
+            throw new InvalidOperationException(
+                $"Docker Container '{resourceName}' has a different ownership identity, purpose, or published port contract.");
     }
 
-    private static IReadOnlyDictionary<int, int> ResolvePublishedPorts(
-        ContainerInspectResponse container,
-        IEnumerable<int> targetPorts) =>
-        targetPorts
-            .Distinct()
-            .Order()
-            .ToDictionary(
-                port => port,
-                port =>
-                {
-                    var key = $"{port}/tcp";
-                    string? hostPort = null;
-                    if (container.NetworkSettings?.Ports is { } ports
-                        && ports.TryGetValue(key, out var portBindings))
-                    {
-                        hostPort = portBindings.FirstOrDefault()?.HostPort;
-                    }
-                    return int.TryParse(
-                        hostPort,
-                        System.Globalization.NumberStyles.None,
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        out var parsed)
-                        ? parsed
-                        : 0;
-                });
+    private static bool HasPublishedPortBindings(
+        IDictionary<string, IList<PortBinding>>? actual,
+        IReadOnlyDictionary<int, int> expected)
+    {
+        if (expected.Count == 0)
+            return actual is null || actual.Count == 0;
+        if (actual is null || actual.Count != expected.Count)
+            return false;
+
+        foreach (var mapping in expected)
+        {
+            if (!actual.TryGetValue($"{mapping.Key}/tcp", out var bindings)
+                || bindings.Count != 1
+                || !int.TryParse(
+                    bindings[0].HostPort,
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var hostPort)
+                || hostPort != mapping.Value)
+                return false;
+        }
+        return true;
+    }
 
     private async Task RemoveContainerAsync(
         string resourceId,

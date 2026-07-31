@@ -180,6 +180,196 @@ public sealed class DockerContainerLifecycleTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Concurrent_persistent_runtimes_keep_their_allocated_ports(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var targetImage = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await targetImage.StartAsync(cancellationToken);
+            var operationIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
+            var platformNetworkName = $"noctf-concurrent-it-{Guid.NewGuid():N}";
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var platformNetwork = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters { Name = platformNetworkName },
+                cancellationToken);
+            using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
+                DockerEndpoint(),
+                platformNetworkName,
+                "localhost"));
+            var publishedPorts = new HashSet<int>();
+            while (publishedPorts.Count < operationIds.Length)
+            {
+                publishedPorts.Add(RandomNumberGenerator.GetInt32(
+                    RuntimePublishedPortRange.StartPort,
+                    RuntimePublishedPortRange.EndPort + 1));
+            }
+            var ports = publishedPorts.ToArray();
+            var receipts = new List<ContainerReceipt>();
+            try
+            {
+                var provisionTasks = operationIds.Select((operationId, index) =>
+                    lifecycle.CreateAsync(
+                        new ContainerRequest(
+                            operationId,
+                            RuntimeProvider.Docker,
+                            "busybox:1.36.1",
+                            ["/bin/sh", "-c", "mkdir -p /www && echo target > /www/index.html && exec httpd -f -p 8080 -h /www"],
+                            new Dictionary<string, string>(),
+                            new Dictionary<string, string>(),
+                            new Dictionary<int, int> { [8080] = ports[index] },
+                            new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                            new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                            TimeSpan.FromMinutes(5),
+                            NetworkName: platformNetworkName,
+                            Generation: 1,
+                            RuntimeInstanceId: operationId),
+                        cancellationToken));
+
+                receipts.AddRange(await Task.WhenAll(provisionTasks));
+                using var http = new HttpClient();
+                for (var index = 0; index < receipts.Count; index++)
+                {
+                    var receipt = receipts[index];
+                    await Assert.That(receipt.PortMappings[8080]).IsEqualTo(ports[index]);
+                    var expanded = RuntimeUrlExpander.ExpandContainer(
+                        receipt,
+                        [new RuntimeUrlBinding(
+                            "http://{HOST}:{PORT}/",
+                            RuntimeExposure.OwnerOnly,
+                            ContainerPort: 8080)],
+                        null);
+                    await Assert.That(expanded.Urls.Single())
+                        .IsEqualTo($"http://localhost:{ports[index]}/");
+                    var response = await GetEventuallyAsync(
+                        http,
+                        expanded.Urls.Single(),
+                        cancellationToken);
+                    await Assert.That(response.Trim()).IsEqualTo("target");
+                }
+            }
+            finally
+            {
+                foreach (var receipt in receipts)
+                    await lifecycle.DestroyAsync(receipt, CancellationToken.None);
+                await docker.Networks.DeleteNetworkAsync(
+                    platformNetwork.ID,
+                    CancellationToken.None);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Ensure_running_rejects_stale_identity_or_port_contract(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var targetImage = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await targetImage.StartAsync(cancellationToken);
+            var operationId = Guid.NewGuid();
+            var platformNetworkName = $"noctf-reconcile-it-{operationId:N}";
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var platformNetwork = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters { Name = platformNetworkName },
+                cancellationToken);
+            using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
+                DockerEndpoint(),
+                platformNetworkName,
+                "localhost"));
+            var ports = new HashSet<int>();
+            while (ports.Count < 2)
+            {
+                ports.Add(RandomNumberGenerator.GetInt32(
+                    RuntimePublishedPortRange.StartPort,
+                    RuntimePublishedPortRange.EndPort + 1));
+            }
+            var allocatedPorts = ports.ToArray();
+            var labels = new Dictionary<string, string>
+            {
+                ["noctf.io/managed"] = "true",
+                ["noctf.io/job-kind"] = "persistent-runtime",
+                ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
+                ["noctf.io/generation"] = "1"
+            };
+            var request = new ContainerRequest(
+                operationId,
+                RuntimeProvider.Docker,
+                "busybox:1.36.1",
+                ["sleep", "300"],
+                new Dictionary<string, string>(),
+                labels,
+                new Dictionary<int, int> { [8080] = allocatedPorts[0] },
+                new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                TimeSpan.FromMinutes(5),
+                NetworkName: platformNetworkName,
+                Generation: 1,
+                RuntimeInstanceId: operationId);
+            ContainerReceipt? receipt = null;
+            try
+            {
+                receipt = await lifecycle.CreateAsync(request, cancellationToken);
+
+                Func<Task> changedPort = async () =>
+                    _ = await lifecycle.EnsureRunningAsync(
+                        request with
+                        {
+                            PortMappings = new Dictionary<int, int>
+                            {
+                                [8080] = allocatedPorts[1]
+                            }
+                        },
+                        cancellationToken);
+                await Assert.That(changedPort).Throws<InvalidOperationException>();
+
+                var generationTwoLabels = labels.ToDictionary(
+                    pair => pair.Key,
+                    pair => pair.Value);
+                generationTwoLabels["noctf.io/generation"] = "2";
+                Func<Task> changedGeneration = async () =>
+                    _ = await lifecycle.EnsureRunningAsync(
+                        request with
+                        {
+                            Labels = generationTwoLabels,
+                            Generation = 2
+                        },
+                        cancellationToken);
+                await Assert.That(changedGeneration).Throws<InvalidOperationException>();
+
+                var existing = await docker.Containers.InspectContainerAsync(
+                    receipt.ResourceId,
+                    cancellationToken);
+                string? actualHostPort = null;
+                if (existing.HostConfig?.PortBindings is { } actualBindings
+                    && actualBindings.TryGetValue("8080/tcp", out var portBindings))
+                    actualHostPort = portBindings.SingleOrDefault()?.HostPort;
+                await Assert.That(actualHostPort)
+                    .IsEqualTo(allocatedPorts[0].ToString(
+                        System.Globalization.CultureInfo.InvariantCulture));
+            }
+            finally
+            {
+                if (receipt is not null)
+                    await lifecycle.DestroyAsync(receipt, CancellationToken.None);
+                await docker.Networks.DeleteNetworkAsync(
+                    platformNetwork.ID,
+                    CancellationToken.None);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task ExecWithInputAsync_WritesStdinWithoutStoppingContainer(CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
