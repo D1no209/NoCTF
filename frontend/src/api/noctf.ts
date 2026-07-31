@@ -129,6 +129,7 @@ const challengeTemplateConflictCodes
   = new Set<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode>([
     'ResourceIdConflict',
     'RevisionConflict',
+    'ActiveCompetitionModeConflict',
     'OwnerIncludedInManagerSet',
     'UserNotFound',
     'RoleNotEligible',

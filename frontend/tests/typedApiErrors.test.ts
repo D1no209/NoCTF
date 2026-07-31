@@ -1,4 +1,5 @@
 import type {
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode as ChallengeTemplateConflictCode,
   NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode,
 } from '../src/api/generated/types.gen'
 import { describe, expect, test } from 'bun:test'
@@ -30,18 +31,31 @@ describe('typed API conflicts', () => {
     ).toBeNull()
   })
 
-  test('decodes challenge permission conflicts without accepting unknown codes', () => {
-    expect(
-      readChallengeTemplateConflict(
-        new ApiError('conflict', 409, {
-          code: 'RevisionConflict',
-          userIds: ['user-b', 'user-a', 'user-a'],
-        }),
-      ),
-    ).toEqual({
-      code: 'RevisionConflict',
-      userIds: ['user-a', 'user-b'],
-    })
+  test('decodes only generated challenge template conflict codes from HTTP 409', () => {
+    const codeMap: Record<ChallengeTemplateConflictCode, true> = {
+      ResourceIdConflict: true,
+      RevisionConflict: true,
+      ActiveCompetitionModeConflict: true,
+      OwnerIncludedInManagerSet: true,
+      UserNotFound: true,
+      RoleNotEligible: true,
+    }
+    const codes = Object.keys(codeMap) as ChallengeTemplateConflictCode[]
+
+    for (const code of codes) {
+      expect(
+        readChallengeTemplateConflict(
+          new ApiError('conflict', 409, {
+            code,
+            userIds: ['user-b', 'user-a', 'user-a'],
+          }),
+        ),
+      ).toEqual({
+        code,
+        userIds: ['user-a', 'user-b'],
+      })
+    }
+
     expect(
       readChallengeTemplateConflict(
         new ApiError('conflict', 409, {
@@ -49,7 +63,17 @@ describe('typed API conflicts', () => {
         }),
       ),
     ).toBeNull()
-    expect(readChallengeTemplateConflict(new Error('network'))).toBeNull()
+    expect(
+      readChallengeTemplateConflict(
+        new ApiError('RevisionConflict', 409, 'RevisionConflict'),
+      ),
+    ).toBeNull()
+    expect(
+      readChallengeTemplateConflict(
+        new ApiError('conflict', 400, { code: 'RevisionConflict' }),
+      ),
+    ).toBeNull()
+    expect(readChallengeTemplateConflict(new Error('RevisionConflict'))).toBeNull()
   })
 
   test('decodes only generated competition challenge conflict codes from HTTP 409', () => {
