@@ -11,4 +11,11 @@ describe('admin navigation layout', () => {
     expect(classes).not.toContain('h-full')
     expect(classes).not.toContain('justify-between')
   })
+
+  test('uses the square brand mark when the sidebar is collapsed', () => {
+    expect(layoutSource).toContain('group-data-[collapsible=icon]:px-2')
+    expect(layoutSource).toContain('<BrandLogo class="h-10 group-data-[collapsible=icon]:hidden" />')
+    expect(layoutSource).toContain('src="/favicon.svg"')
+    expect(layoutSource).toContain('group-data-[collapsible=icon]:block')
+  })
 })

@@ -56,9 +56,15 @@ async function handleLogout() {
 <template>
   <SidebarProvider>
     <Sidebar collapsible="icon" class="border-r-0">
-      <SidebarHeader class="h-20 flex items-center border-b border-white/10 px-4">
-        <div class="flex items-center gap-2 overflow-hidden">
-          <BrandLogo class="h-10" />
+      <SidebarHeader class="h-20 flex items-center border-b border-white/10 px-4 group-data-[collapsible=icon]:px-2">
+        <div class="flex w-full items-center gap-2 overflow-hidden group-data-[collapsible=icon]:justify-center">
+          <BrandLogo class="h-10 group-data-[collapsible=icon]:hidden" />
+          <img
+            src="/favicon.svg"
+            alt="NoCTF"
+            draggable="false"
+            class="hidden size-8 shrink-0 [image-rendering:pixelated] group-data-[collapsible=icon]:block"
+          >
           <div class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
             <span class="mt-0.5 inline-flex w-fit rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">{{ t('nav.admin') }}</span>
           </div>
