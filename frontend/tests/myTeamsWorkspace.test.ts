@@ -5,6 +5,7 @@ import { loadMyTeamRegistrations } from '../src/components/teams/myTeamRegistrat
 
 const navBarSource = await Bun.file(new URL('../src/components/layout/NavBar.vue', import.meta.url)).text()
 const routerSource = await Bun.file(new URL('../src/router/index.ts', import.meta.url)).text()
+const workspaceSource = await Bun.file(new URL('../src/components/teams/MyTeamsWorkspace.vue', import.meta.url)).text()
 
 const competitions: PublicCompetition[] = [
   {
@@ -49,7 +50,7 @@ const team: PublicTeam = {
 }
 
 describe('my teams workspace', () => {
-  test('loads the current registration for every visible competition', async () => {
+  test('returns only competitions where the current user belongs to a team', async () => {
     const requestedCompetitionIds: string[] = []
 
     const result = await loadMyTeamRegistrations(
@@ -61,10 +62,7 @@ describe('my teams workspace', () => {
     )
 
     expect(requestedCompetitionIds).toEqual(competitions.map(competition => competition.id))
-    expect(result).toEqual([
-      { competition: competitions[0], team },
-      { competition: competitions[1], team: null },
-    ])
+    expect(result).toEqual([{ competition: competitions[0], team }])
   })
 
   test('exposes the teams workspace from desktop and mobile navigation', () => {
@@ -72,5 +70,12 @@ describe('my teams workspace', () => {
     expect(routerSource).toContain('name: \'my-teams\'')
     expect(navBarSource.match(/to="\/teams"/g)).toHaveLength(2)
     expect(navBarSource).toContain('t(\'nav.teams\')')
+  })
+
+  test('presents teams as the workspace subject and competitions as context', () => {
+    expect(workspaceSource).toContain(':key="item.team.id"')
+    expect(workspaceSource).toMatch(/<h2[^>]*>\s*\{\{ item\.team\.name \}\}/)
+    expect(workspaceSource).toContain('t(\'teams.competition\')')
+    expect(workspaceSource).not.toContain('v-else class="flex flex-1 items-center p-4"')
   })
 })

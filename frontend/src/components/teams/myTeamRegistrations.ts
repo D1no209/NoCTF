@@ -4,7 +4,7 @@ import { competitionApi, teamApi } from '@/api/noctf'
 
 export interface MyTeamRegistration {
   competition: PublicCompetition
-  team: PublicTeam | null
+  team: PublicTeam
 }
 
 type LoadCompetitions = () => Promise<PublicCompetition[]>
@@ -15,8 +15,12 @@ export async function loadMyTeamRegistrations(
   loadTeam: LoadTeam = teamApi.getMy,
 ): Promise<MyTeamRegistration[]> {
   const competitions = await loadCompetitions()
-  return Promise.all(competitions.map(async competition => ({
+  const registrations = await Promise.all(competitions.map(async competition => ({
     competition,
     team: await loadTeam(competition.id),
   })))
+
+  return registrations.filter(
+    (registration): registration is MyTeamRegistration => registration.team !== null,
+  )
 }

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
-import { ArrowRight, Inbox, UsersRound } from 'lucide-vue-next'
-import { computed } from 'vue'
+import { ArrowRight, CalendarDays, Inbox, LockKeyhole, UsersRound } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { queryKeys } from '@/api/queryKeys'
@@ -15,7 +14,7 @@ import { Card } from '@/components/ui/card'
 import { Panel } from '@/components/ui/panel'
 import { Skeleton } from '@/components/ui/skeleton'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 
 const {
   data: registrations,
@@ -27,16 +26,19 @@ const {
   queryFn: () => loadMyTeamRegistrations(),
 })
 
-const registeredCount = computed(() =>
-  registrations.value?.filter(item => item.team !== null).length ?? 0,
-)
-
 function teamStatusVariant(status: 'pending' | 'approved' | 'rejected') {
   if (status === 'approved')
     return 'default'
   if (status === 'rejected')
     return 'destructive'
   return 'secondary'
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(locale.value, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
 }
 </script>
 
@@ -49,7 +51,7 @@ function teamStatusVariant(status: 'pending' | 'approved' | 'rejected') {
       >
         <template #actions>
           <Badge variant="outline">
-            {{ t('teams.registrationCount', { count: registeredCount }) }}
+            {{ t('teams.teamCount', { count: registrations?.length ?? 0 }) }}
           </Badge>
         </template>
       </PageHeader>
@@ -71,10 +73,10 @@ function teamStatusVariant(status: 'pending' | 'approved' | 'rejected') {
       >
         <Inbox class="size-9 text-muted-foreground" />
         <h2 class="mt-4 font-semibold">
-          {{ t('teams.noCompetitions') }}
+          {{ t('teams.noTeams') }}
         </h2>
         <p class="mt-1 max-w-md text-sm text-muted-foreground">
-          {{ t('teams.noCompetitionsDescription') }}
+          {{ t('teams.noTeamsDescription') }}
         </p>
         <Button class="mt-5" as-child>
           <RouterLink to="/competitions">
@@ -86,60 +88,72 @@ function teamStatusVariant(status: 'pending' | 'approved' | 'rejected') {
       <div v-else class="grid gap-4 lg:grid-cols-2">
         <Card
           v-for="item in registrations"
-          :key="item.competition.id"
+          :key="item.team.id"
           class="flex h-full flex-col gap-5 p-5"
         >
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 <UsersRound class="size-4" />
-                {{ item.competition.mode.toUpperCase() }}
+                {{ t('teams.teamLabel') }}
               </div>
               <h2 class="mt-2 truncate text-lg font-bold">
-                {{ item.competition.title }}
+                {{ item.team.name }}
               </h2>
             </div>
-            <Badge variant="secondary">
-              {{ t(`competitions.status.${item.competition.status}`) }}
+            <Badge :variant="teamStatusVariant(item.team.registrationStatus)">
+              {{ t(`teams.status.${item.team.registrationStatus}`) }}
             </Badge>
           </div>
 
-          <Panel v-if="item.team" class="flex-1 space-y-3 p-4">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                  {{ t('teams.currentRegistration') }}
-                </p>
-                <p class="mt-1 text-lg font-semibold">
-                  {{ item.team.name }}
-                </p>
-              </div>
-              <Badge :variant="teamStatusVariant(item.team.registrationStatus)">
-                {{ t(`teams.status.${item.team.registrationStatus}`) }}
-              </Badge>
-            </div>
-            <p class="text-sm text-muted-foreground">
-              {{ t('teams.memberSummary', {
-                current: item.team.memberCount,
-                maximum: item.competition.maxTeamMembers,
-              }) }}
-            </p>
-          </Panel>
-
-          <Panel v-else class="flex flex-1 items-center p-4">
+          <Panel class="grid flex-1 gap-4 p-4 sm:grid-cols-2">
             <div>
-              <p class="font-semibold">
-                {{ t('teams.notRegistered') }}
+              <p class="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {{ t('teams.competition') }}
               </p>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {{ t('teams.notRegisteredDetail') }}
+              <div class="mt-1 flex flex-wrap items-center gap-2">
+                <p class="font-semibold">
+                  {{ item.competition.title }}
+                </p>
+                <Badge variant="outline">
+                  {{ item.competition.mode.toUpperCase() }}
+                </Badge>
+              </div>
+            </div>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {{ t('teams.members') }}
+              </p>
+              <p class="mt-1 font-semibold">
+                {{ t('teams.memberSummary', {
+                  current: item.team.memberCount,
+                  maximum: item.competition.maxTeamMembers,
+                }) }}
+              </p>
+            </div>
+            <div>
+              <p class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                <CalendarDays class="size-3.5" />
+                {{ t('teams.registeredAt') }}
+              </p>
+              <p class="mt-1 font-semibold">
+                {{ formatDate(item.team.registeredAt) }}
+              </p>
+            </div>
+            <div>
+              <p class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                <LockKeyhole class="size-3.5" />
+                {{ t('teams.rosterState') }}
+              </p>
+              <p class="mt-1 font-semibold">
+                {{ item.team.isLocked ? t('teams.locked') : t('teams.unlocked') }}
               </p>
             </div>
           </Panel>
 
-          <Button as-child :variant="item.team ? 'outline' : 'default'">
+          <Button as-child variant="outline">
             <RouterLink :to="`/competitions/${item.competition.id}/register`">
-              {{ item.team ? t('teams.manageRegistration') : t('teams.registerForCompetition') }}
+              {{ t('teams.manageTeam') }}
               <ArrowRight class="size-4" />
             </RouterLink>
           </Button>
