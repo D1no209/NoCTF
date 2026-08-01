@@ -67,7 +67,7 @@ function title(notification: PublicNotification) {
 
 function body(notification: PublicNotification) {
   const copy = notificationCopy(notification)
-  return t(copy.bodyKey)
+  return t(copy.bodyKey, copy.bodyParams ?? {})
 }
 </script>
 

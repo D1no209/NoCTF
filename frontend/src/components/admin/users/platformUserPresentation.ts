@@ -21,11 +21,18 @@ export const BOT_TOKEN_LIFETIMES = [
   { seconds: 31_536_000, labelKey: 'admin.users.tokenLifetimeYear' },
 ] as const
 
-export function userKindLabelKey(kind?: NoCtfDomainIdentityUserKind) {
+export function userKindLabelKey(
+  kind?: NoCtfDomainIdentityUserKind,
+  role?: NoCtfDomainIdentityUserRole,
+) {
   switch (kind) {
     case PLATFORM_USER_KIND.human:
       return 'admin.users.kindHuman'
     case PLATFORM_USER_KIND.bot:
+      if (role === PLATFORM_USER_ROLE.user)
+        return 'admin.users.kindNotificationRelayBot'
+      if (role === PLATFORM_USER_ROLE.organizer)
+        return 'admin.users.kindGitOpsBot'
       return 'admin.users.kindBot'
     default:
       return 'admin.users.kindUnknown'

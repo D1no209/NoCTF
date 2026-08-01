@@ -219,7 +219,10 @@ export function eligibleCompetitionPermissionCandidates(
         )
       }
 
-      return candidate.emailVerified
+      if (targetRole === 'judge')
+        return candidate.kind === USER_KIND.human && candidate.emailVerified
+
+      return candidate.kind === USER_KIND.bot || candidate.emailVerified
     })
     .sort(compareCandidates)
 }
