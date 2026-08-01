@@ -94,6 +94,7 @@ const selectedUser = ref<PlatformUser | null>(null)
 
 const createBotDialog = ref(false)
 const newBotUserName = ref('')
+const newBotRole = ref(String(PLATFORM_USER_ROLE.user))
 
 const roleDialog = ref(false)
 const newRole = ref(String(PLATFORM_USER_ROLE.user))
@@ -123,7 +124,10 @@ const {
 })
 
 const createBotMutation = useMutation({
-  mutationFn: () => platformAdminApi.createBot(newBotUserName.value.trim()),
+  mutationFn: () => platformAdminApi.createBot(
+    newBotUserName.value.trim(),
+    Number(newBotRole.value) as NoCtfDomainIdentityUserRole,
+  ),
   onSuccess: (user) => {
     createBotDialog.value = false
     newBotUserName.value = ''
@@ -190,6 +194,7 @@ const invalidateTokensMutation = useMutation({
 
 function openCreateBotDialog() {
   newBotUserName.value = ''
+  newBotRole.value = String(PLATFORM_USER_ROLE.user)
   createBotDialog.value = true
 }
 
@@ -336,7 +341,7 @@ const columns = [
     header: t('admin.users.kind'),
     cell: info =>
       h(Badge, { variant: isBot(info.row.original) ? 'default' : 'outline' }, () =>
-        t(userKindLabelKey(info.getValue()))),
+        t(userKindLabelKey(info.getValue(), info.row.original.role))),
   }),
   columnHelper.accessor('role', {
     header: t('admin.users.role'),
@@ -565,17 +570,46 @@ const table = useVueTable({
           <DialogTitle>{{ t('admin.users.createBot') }}</DialogTitle>
           <DialogDescription>{{ t('admin.users.createBotDescription') }}</DialogDescription>
         </DialogHeader>
-        <div class="space-y-2 py-4">
-          <Label for="bot-user-name">{{ t('admin.users.botUserName') }}</Label>
-          <Input
-            id="bot-user-name"
-            v-model="newBotUserName"
-            autocomplete="off"
-            :placeholder="t('admin.users.botUserNamePlaceholder')"
-          />
-          <p class="text-xs text-muted-foreground">
-            {{ t('admin.users.botUserNameHint') }}
-          </p>
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <Label for="bot-purpose">{{ t('admin.users.botPurpose') }}</Label>
+            <Select v-model="newBotRole">
+              <SelectTrigger id="bot-purpose">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="String(PLATFORM_USER_ROLE.user)">
+                  {{ t('admin.users.notificationRelayBot') }}
+                </SelectItem>
+                <SelectItem :value="String(PLATFORM_USER_ROLE.organizer)">
+                  {{ t('admin.users.gitOpsBot') }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p class="text-xs leading-5 text-muted-foreground">
+              {{
+                Number(newBotRole) === PLATFORM_USER_ROLE.user
+                  ? t('admin.users.notificationRelayBotHint')
+                  : t('admin.users.gitOpsBotHint')
+              }}
+            </p>
+          </div>
+          <div class="space-y-2">
+            <Label for="bot-user-name">{{ t('admin.users.botUserName') }}</Label>
+            <Input
+              id="bot-user-name"
+              v-model="newBotUserName"
+              autocomplete="off"
+              :placeholder="
+                Number(newBotRole) === PLATFORM_USER_ROLE.user
+                  ? t('admin.users.notificationRelayBotPlaceholder')
+                  : t('admin.users.botUserNamePlaceholder')
+              "
+            />
+            <p class="text-xs text-muted-foreground">
+              {{ t('admin.users.botUserNameHint') }}
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" @click="createBotDialog = false">

@@ -32,7 +32,7 @@ describe('notification presentation', () => {
       'managementFailure',
     ]
 
-    expect(Object.values(NotificationKind).map((kind, index) =>
+    expect(Object.values(NotificationKind).slice(0, 6).map((kind, index) =>
       notificationCopy(createNotification(kind, {
         code: 'future_code',
         secret: `ignored-${index}`,
@@ -41,6 +41,41 @@ describe('notification presentation', () => {
       titleKey: `notifications.events.${name}.title`,
       bodyKey: `notifications.events.${name}.body`,
     })))
+  })
+
+  test('renders public competition events from safe payload fields only', () => {
+    expect(notificationCopy(createNotification(
+      NotificationKind.BloodAwarded,
+      { challengeTitle: 'Web 100', teamName: 'Snow', bloodRank: 2, flag: 'ignored' },
+    ))).toEqual({
+      titleKey: 'notifications.events.bloodAwarded.title',
+      bodyKey: 'notifications.events.bloodAwarded.body',
+      bodyParams: { challenge: 'Web 100', team: 'Snow', rank: 2 },
+    })
+    expect(notificationCopy(createNotification(
+      NotificationKind.ChallengePublished,
+      { challengeTitle: 'Pwn 100', direction: 'Pwn', definitionJson: 'ignored' },
+    ))).toEqual({
+      titleKey: 'notifications.events.challengePublished.title',
+      bodyKey: 'notifications.events.challengePublished.body',
+      bodyParams: { challenge: 'Pwn 100', direction: 'Pwn' },
+    })
+    expect(notificationCopy(createNotification(
+      NotificationKind.HintPublished,
+      { challengeTitle: 'Crypto 100', cost: 50, content: 'must not render' },
+    ))).toEqual({
+      titleKey: 'notifications.events.hintPublished.title',
+      bodyKey: 'notifications.events.hintPublished.body',
+      bodyParams: { challenge: 'Crypto 100', cost: 50 },
+    })
+    expect(notificationCopy(createNotification(
+      NotificationKind.TeamBanned,
+      { teamName: 'Abuse Team', reason: 'must not render' },
+    ))).toEqual({
+      titleKey: 'notifications.events.teamBanned.title',
+      bodyKey: 'notifications.events.teamBanned.body',
+      bodyParams: { team: 'Abuse Team' },
+    })
   })
 
   test('uses safe fallback copy for a future unsupported kind', () => {

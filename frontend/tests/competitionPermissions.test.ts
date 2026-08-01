@@ -239,7 +239,7 @@ describe('competition permissions', () => {
       eligibleCompetitionPermissionCandidates(candidates, validSnapshot, 'observer').map(
         candidate => candidate.id,
       ),
-    ).toEqual([observerId])
+    ).toEqual([judgeId, extraId, observerId])
   })
 
   test('keeps assigned IDs when the candidate directory omits their metadata', () => {

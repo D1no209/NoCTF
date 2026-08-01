@@ -17,6 +17,10 @@ describe('platform user presentation', () => {
   test('maps bounded user kinds and roles to localized labels', () => {
     expect(userKindLabelKey(PLATFORM_USER_KIND.human)).toBe('admin.users.kindHuman')
     expect(userKindLabelKey(PLATFORM_USER_KIND.bot)).toBe('admin.users.kindBot')
+    expect(userKindLabelKey(PLATFORM_USER_KIND.bot, PLATFORM_USER_ROLE.user))
+      .toBe('admin.users.kindNotificationRelayBot')
+    expect(userKindLabelKey(PLATFORM_USER_KIND.bot, PLATFORM_USER_ROLE.organizer))
+      .toBe('admin.users.kindGitOpsBot')
     expect(userKindLabelKey(undefined)).toBe('admin.users.kindUnknown')
     expect(userRoleLabelKey(PLATFORM_USER_ROLE.user)).toBe('admin.users.roleUser')
     expect(userRoleLabelKey(PLATFORM_USER_ROLE.organizer)).toBe('admin.users.roleOrganizer')
@@ -64,6 +68,8 @@ describe('platform user presentation', () => {
     for (const key of [
       userKindLabelKey(PLATFORM_USER_KIND.human),
       userKindLabelKey(PLATFORM_USER_KIND.bot),
+      userKindLabelKey(PLATFORM_USER_KIND.bot, PLATFORM_USER_ROLE.user),
+      userKindLabelKey(PLATFORM_USER_KIND.bot, PLATFORM_USER_ROLE.organizer),
       userRoleLabelKey(PLATFORM_USER_ROLE.user),
       userRoleLabelKey(PLATFORM_USER_ROLE.organizer),
       userRoleLabelKey(PLATFORM_USER_ROLE.administrator),

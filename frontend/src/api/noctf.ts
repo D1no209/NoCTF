@@ -2,11 +2,10 @@ import type { PublicChallengeDownload } from './challengePresentation'
 import type {
   AdminDeleteCompetitionChallengeData,
   AdminRestoreCompetitionChallengeData,
-  NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest,
-  NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
+  NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest,
   NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode,
   NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse,
   NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest,
@@ -19,10 +18,11 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest,
-  NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
   NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse,
+  NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
   NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest,
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
+  NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
   NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse,
@@ -53,10 +53,12 @@ import { toPublicTeam } from './teamPresentation'
 // while all current endpoints use the generated SDK directly.
 const sdk: any = new Proxy(generatedSdk, {
   get(target, property: string) {
-    if (property in target) return (target as Record<string, unknown>)[property]
+    if (property in target)
+      return (target as Record<string, unknown>)[property]
     return async () => ({ data: undefined, error: new Error(`Unsupported API operation: ${property}`) })
   },
 })
+const absoluteHttpUrlPattern = /^https?:\/\//i
 
 function requestAuthenticationRefresh(signal?: AbortSignal) {
   return generatedSdk.noCtfapiEndpointsAuthenticationRefreshTokenEndpoint({
@@ -98,7 +100,7 @@ export interface CompetitionChallengeConflict {
   code: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode
 }
 
-type ApiResult<T> = {
+interface ApiResult<T> {
   data?: T
   error?: unknown
   response?: Response
@@ -137,10 +139,10 @@ async function requireSuccess<T>(request: Promise<ApiResult<T>>, fallback?: stri
 
 function isEmptyObject(value: unknown) {
   return Boolean(
-    value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    Object.keys(value).length === 0,
+    value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.keys(value).length === 0,
   )
 }
 
@@ -253,7 +255,8 @@ export function readCompetitionPermissionsConflict(
 
 export function apiUrl(path: string) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
-  if (!baseUrl || /^https?:\/\//i.test(path)) return path
+  if (!baseUrl || absoluteHttpUrlPattern.test(path))
+    return path
   return new URL(path, baseUrl).toString()
 }
 
@@ -268,7 +271,7 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method: 'POST',
     headers: {
-      Accept: 'application/json',
+      'Accept': 'application/json',
       'Content-Type': 'application/json',
       ...(token
         ? { Authorization: `Bearer ${token}` }
@@ -1028,10 +1031,16 @@ export const platformAdminApi = {
     const response = unwrap(await generatedSdk.adminPlatformListUsers(), tt('errors.loadUsers'))
     return response.items ?? []
   },
-  async createBot(userName: string): Promise<PlatformUser> {
+  async createBot(
+    userName: string,
+    role: NoCtfDomainIdentityUserRole,
+  ): Promise<PlatformUser> {
     return unwrap(
       await generatedSdk.adminPlatformCreateBot({
-        body: { userName, role: 'Organizer' },
+        body: {
+          userName,
+          role: role === 0 ? 'User' : 'Organizer',
+        },
       }),
       tt('errors.requestFailed'),
     )

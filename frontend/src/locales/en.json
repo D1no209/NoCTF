@@ -179,6 +179,22 @@
         "title": "AWD checker callback missing",
         "body": "A checker did not report before its deadline. Check runtime and Runner health."
       },
+      "bloodAwarded": {
+        "title": "Blood awarded",
+        "body": "{team} claimed blood rank #{rank} on {challenge}."
+      },
+      "challengePublished": {
+        "title": "Challenge published",
+        "body": "{challenge} ({direction}) is now available."
+      },
+      "hintPublished": {
+        "title": "Hint published",
+        "body": "A {cost}-point hint is now available for {challenge}."
+      },
+      "teamBanned": {
+        "title": "Team banned",
+        "body": "{team} was banned from the competition."
+      },
       "unknown": {
         "title": "System event",
         "body": "An event with an unsupported type was recorded."
@@ -666,6 +682,8 @@
       "kind": "Kind",
       "kindHuman": "Human",
       "kindBot": "Bot",
+      "kindNotificationRelayBot": "Notification Relay Bot",
+      "kindGitOpsBot": "GitOps Bot",
       "kindUnknown": "Unknown",
       "role": "Role",
       "tokenVersion": "Token Version",
@@ -685,7 +703,13 @@
       "blockingCompetitions": "Competition IDs",
       "blockingChallenges": "Challenge template IDs",
       "createBot": "Create Bot",
-      "createBotDescription": "Create a non-interactive automation identity with the fixed Organizer role.",
+      "createBotDescription": "Create a least-privilege notification relay or an Organizer-scoped GitOps identity.",
+      "botPurpose": "Bot Purpose",
+      "notificationRelayBot": "Notification Relay Bot",
+      "notificationRelayBotHint": "Uses the User role. Add it as a competition Observer to receive only that competition's notification feed and private leaderboard access.",
+      "notificationRelayBotPlaceholder": "competition-qq-relay",
+      "gitOpsBot": "GitOps Bot",
+      "gitOpsBotHint": "Uses the Organizer role for challenge-bank GitOps workflows. It is never an Administrator.",
       "botUserName": "Bot Username",
       "botUserNamePlaceholder": "competition-gitops",
       "botUserNameHint": "Use 3 to 64 ASCII letters, numbers, underscores, or hyphens.",

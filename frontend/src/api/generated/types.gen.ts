@@ -224,9 +224,18 @@ export type NoCtfapiEndpointsNotificationsNotificationResponse = {
     createdAt?: string;
 };
 
-export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5;
+export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export type NoCtfapiEndpointsNotificationsListNotificationsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsNotificationsNotificationFeedResponse = {
+    items?: Array<NoCtfapiEndpointsNotificationsNotificationResponse>;
+    nextCursor?: string;
+};
+
+export type NoCtfapiEndpointsNotificationsReadNotificationFeedRequest = {
     [key: string]: never;
 };
 
@@ -1805,6 +1814,42 @@ export type NoCtfapiEndpointsNotificationsListNotificationsEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsNotificationsListNotificationsEndpointResponse = NoCtfapiEndpointsNotificationsListNotificationsEndpointResponses[keyof NoCtfapiEndpointsNotificationsListNotificationsEndpointResponses];
+
+export type ReadNotificationFeedData = {
+    body?: never;
+    path?: never;
+    query: {
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/notifications/feed';
+};
+
+export type ReadNotificationFeedErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type ReadNotificationFeedError = ReadNotificationFeedErrors[keyof ReadNotificationFeedErrors];
+
+export type ReadNotificationFeedResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsNotificationsNotificationFeedResponse;
+};
+
+export type ReadNotificationFeedResponse = ReadNotificationFeedResponses[keyof ReadNotificationFeedResponses];
 
 export type NoCtfapiEndpointsInternalDownloadFixArchiveEndpointData = {
     body?: never;

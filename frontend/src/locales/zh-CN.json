@@ -179,6 +179,22 @@
         "title": "AWD Checker 回调缺失",
         "body": "Checker 未在截止时间前回报，请检查运行实例与 Runner 健康状态。"
       },
+      "bloodAwarded": {
+        "title": "血榜已更新",
+        "body": "{team} 在 {challenge} 获得第 {rank} 血。"
+      },
+      "challengePublished": {
+        "title": "题目已发布",
+        "body": "{challenge}（{direction}）现已开放。"
+      },
+      "hintPublished": {
+        "title": "提示已发布",
+        "body": "{challenge} 现已开放一条价值 {cost} 分的提示。"
+      },
+      "teamBanned": {
+        "title": "队伍已封禁",
+        "body": "{team} 已被本场比赛封禁。"
+      },
       "unknown": {
         "title": "系统事件",
         "body": "系统记录了一条暂不支持展示类型的事件。"
@@ -666,6 +682,8 @@
       "kind": "类型",
       "kindHuman": "人工用户",
       "kindBot": "Bot",
+      "kindNotificationRelayBot": "通知转发 Bot",
+      "kindGitOpsBot": "GitOps Bot",
       "kindUnknown": "未知",
       "role": "角色",
       "tokenVersion": "令牌版本",
@@ -685,7 +703,13 @@
       "blockingCompetitions": "比赛 ID",
       "blockingChallenges": "题库模板 ID",
       "createBot": "创建 Bot",
-      "createBotDescription": "创建一个固定为组织者角色、不可交互登录的自动化身份。",
+      "createBotDescription": "创建最小权限的通知转发身份，或具有组织者权限的 GitOps 身份。",
+      "botPurpose": "Bot 用途",
+      "notificationRelayBot": "通知转发 Bot",
+      "notificationRelayBotHint": "使用普通用户角色。将其加入比赛观察员后，只能读取该比赛的通知流和私有排行榜。",
+      "notificationRelayBotPlaceholder": "competition-qq-relay",
+      "gitOpsBot": "GitOps Bot",
+      "gitOpsBotHint": "使用组织者角色处理题库 GitOps 工作流，永远不会获得管理员权限。",
       "botUserName": "Bot 用户名",
       "botUserNamePlaceholder": "competition-gitops",
       "botUserNameHint": "使用 3 至 64 个 ASCII 字母、数字、下划线或连字符。",
