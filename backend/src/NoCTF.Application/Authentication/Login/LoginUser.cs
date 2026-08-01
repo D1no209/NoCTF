@@ -10,6 +10,7 @@ public sealed record LoginResult(
     Guid UserId,
     string UserName,
     UserRole Role,
+    bool EmailVerified,
     string AccessToken,
     DateTimeOffset AccessTokenExpiresAt,
     string RefreshToken);
@@ -29,6 +30,12 @@ public sealed class LoginUser(IUserAuthenticationStore store, IAccessTokenIssuer
         var token = issuer.Issue(user, DateTimeOffset.UtcNow);
         var refreshToken = issuer.IssueRefresh(user);
         return OperationResult<LoginResult>.Success(new(
-            user.Id, user.UserName, user.Role, token.Token, token.ExpiresAt, refreshToken.Token));
+            user.Id,
+            user.UserName,
+            user.Role,
+            user.EmailVerified,
+            token.Token,
+            token.ExpiresAt,
+            refreshToken.Token));
     }
 }

@@ -18,6 +18,7 @@ import { isPlatformUserRole } from '@/api/userRole'
 interface UserInfo {
   userName: string
   role: NoCtfDomainIdentityUserRole
+  emailVerified: boolean
 }
 
 const MIN_REFRESH_RETRY_MS = 30_000
@@ -26,11 +27,16 @@ export const useAuthStore = defineStore('auth', () => {
   const storedSession = readAuthSession()
   const accessToken = ref<string | null>(storedSession?.accessToken ?? null)
   const user = ref<UserInfo | null>(storedSession
-    ? { userName: storedSession.userName, role: storedSession.role }
+    ? {
+        userName: storedSession.userName,
+        role: storedSession.role,
+        emailVerified: storedSession.emailVerified,
+      }
     : null)
 
   const isAuthenticated = computed(() => !!accessToken.value && !isTokenExpired(accessToken.value))
   const userRole = computed(() => user.value?.role ?? null)
+  const emailVerified = computed(() => user.value?.emailVerified ?? null)
   let refreshTimer: number | null = null
 
   function scheduleSessionRefresh(token: string | null) {
@@ -60,7 +66,11 @@ export const useAuthStore = defineStore('auth', () => {
   function applySession(session: AuthSession | null) {
     accessToken.value = session?.accessToken ?? null
     user.value = session
-      ? { userName: session.userName, role: session.role }
+      ? {
+          userName: session.userName,
+          role: session.role,
+          emailVerified: session.emailVerified,
+        }
       : null
     setAuthToken(session?.accessToken ?? null)
     scheduleSessionRefresh(session?.accessToken ?? null)
@@ -73,10 +83,13 @@ export const useAuthStore = defineStore('auth', () => {
     const data = await authApi.login(email, password)
     if (!isPlatformUserRole(data.role))
       throw new TypeError('Login returned an invalid platform role.')
+    if (typeof data.emailVerified !== 'boolean')
+      throw new TypeError('Login returned an invalid email verification state.')
     saveAuthSession({
       accessToken: data.accessToken ?? '',
       userName: data.userName ?? '',
       role: data.role,
+      emailVerified: data.emailVerified,
     })
   }
 
@@ -114,5 +127,20 @@ export const useAuthStore = defineStore('auth', () => {
     return false
   }
 
-  return { user, accessToken, isAuthenticated, userRole, login, register, logout, ensureFreshSession }
+  async function refreshSession() {
+    return await refreshAuthSessionIfNeeded(true)
+  }
+
+  return {
+    user,
+    accessToken,
+    isAuthenticated,
+    userRole,
+    emailVerified,
+    login,
+    register,
+    logout,
+    ensureFreshSession,
+    refreshSession,
+  }
 })

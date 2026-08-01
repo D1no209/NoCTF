@@ -8,7 +8,8 @@ public sealed record AuthenticatedUser(
     string UserName,
     UserRole Role,
     UserKind Kind,
-    int TokenVersion);
+    int TokenVersion,
+    bool EmailVerified = true);
 public sealed record IssuedAccessToken(string Token, DateTimeOffset ExpiresAt);
 public sealed record IssuedRefreshToken(string Token, DateTimeOffset ExpiresAt);
 public sealed record RefreshTokenPrincipal(Guid UserId, int TokenVersion);
@@ -32,6 +33,7 @@ public interface IUserAuthenticationStore
         string userName,
         string email,
         string password,
+        bool emailVerified,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<bool> ChangePasswordAsync(

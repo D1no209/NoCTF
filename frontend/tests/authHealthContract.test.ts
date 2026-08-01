@@ -26,6 +26,7 @@ const contractFetch: typeof fetch = async (input, init) => {
         userId: 'user-1',
         userName: 'operator',
         role: PLATFORM_USER_ROLE.administrator,
+        emailVerified: true,
         accessToken: 'login-token',
         expiresAt: '2026-08-01T00:00:00Z',
       },
@@ -36,6 +37,7 @@ const contractFetch: typeof fetch = async (input, init) => {
         userId: 'user-1',
         userName: 'operator',
         role: PLATFORM_USER_ROLE.administrator,
+        emailVerified: true,
         accessToken: 'refresh-token',
         expiresAt: '2026-08-01T01:00:00Z',
       },
@@ -126,6 +128,7 @@ describe('generated authentication and health contracts', () => {
       accessToken: 'expiring-token',
       userName: 'operator',
       role: PLATFORM_USER_ROLE.administrator,
+      emailVerified: true,
     })
 
     const response = await refreshAuthSessionIfNeeded(true)

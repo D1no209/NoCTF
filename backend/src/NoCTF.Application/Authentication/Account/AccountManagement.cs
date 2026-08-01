@@ -10,25 +10,56 @@ public sealed record RegisterUserCommand(
     string Password,
     DateTimeOffset Now);
 
-public sealed class RegisterUser(IUserAuthenticationStore store)
+public sealed record RegisterUserResult(
+    UserProfile Profile,
+    bool RequiresEmailVerification,
+    bool VerificationEmailQueued);
+
+public sealed class RegisterUser(
+    IUserAuthenticationStore store,
+    IEmailVerificationStore? emailVerification = null)
 {
-    public async Task<OperationResult<UserProfile>> ExecuteAsync(
+    public async Task<OperationResult<RegisterUserResult>> ExecuteAsync(
         RegisterUserCommand command,
         CancellationToken ct = default)
     {
         var userName = command.UserName.Trim();
         var email = command.Email.Trim();
         var id = Guid.CreateVersion7(command.Now);
+        var requiresEmailVerification = emailVerification is not null
+            && await emailVerification.IsRequiredAsync(ct);
         var state = await store.CreateAsync(
-            id, userName, email, command.Password, command.Now, ct);
+            id,
+            userName,
+            email,
+            command.Password,
+            emailVerified: !requiresEmailVerification,
+            command.Now,
+            ct);
         if (state != CreateUserState.Created)
-            return OperationResult<UserProfile>.Failure(
+            return OperationResult<RegisterUserResult>.Failure(
                 state == CreateUserState.EmailConflict
                     ? "email_conflict"
                     : "username_conflict",
                 "The requested account identifier is already in use.");
-        return OperationResult<UserProfile>.Success(
-            new(id, userName, email, UserRole.User, UserKind.Human, false));
+
+        var profile = new UserProfile(
+            id,
+            userName,
+            email,
+            UserRole.User,
+            UserKind.Human,
+            EmailVerified: !requiresEmailVerification);
+        if (!requiresEmailVerification || emailVerification is null)
+            return OperationResult<RegisterUserResult>.Success(new(profile, false, false));
+
+        var verificationState = await emailVerification.IssueAsync(id, command.Now, ct);
+        if (verificationState == EmailVerificationState.Disabled)
+            profile = profile with { EmailVerified = true };
+        return OperationResult<RegisterUserResult>.Success(new(
+            profile,
+            verificationState is not EmailVerificationState.Disabled,
+            verificationState == EmailVerificationState.Issued));
     }
 }
 

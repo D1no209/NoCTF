@@ -20,6 +20,8 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
+  NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse,
+  NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest,
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
@@ -316,16 +318,15 @@ export const authApi = {
     }), tt('errors.registration'))
   },
   async verifyEmail(token: string) {
-    return unwrap(await client.post<{ 200: { status: string } }, unknown, false>({
-      url: '/api/auth/email-verification/verify',
+    return unwrap(await generatedSdk.noCtfapiEndpointsAuthenticationVerifyEmailEndpoint({
       body: { token },
     }), tt('errors.verifyEmail'))
   },
-  async resendEmailVerification(email: string) {
-    return unwrap(await client.post<{ 202: string }, unknown, false>({
-      url: '/api/auth/email-verification/resend',
-      body: { email },
-    }), tt('errors.resendVerification'))
+  async resendEmailVerification() {
+    return unwrap(
+      await generatedSdk.noCtfapiEndpointsAuthenticationResendEmailVerificationEndpoint(),
+      tt('errors.resendVerification'),
+    )
   },
   async refresh() {
     return unwrap(await requestAuthenticationRefresh(), tt('errors.refreshToken'))
@@ -983,6 +984,8 @@ export const challengeBankAdminApi = {
 }
 
 export type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
+export type EmailVerificationConfiguration
+  = NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse
 
 export interface IssuedBotToken {
   accessToken: string
@@ -990,6 +993,37 @@ export interface IssuedBotToken {
 }
 
 export const platformAdminApi = {
+  async emailVerificationConfiguration(): Promise<EmailVerificationConfiguration> {
+    return unwrap(
+      await generatedSdk.adminPlatformGetEmailVerificationConfiguration(),
+      tt('errors.loadEmailVerificationConfiguration'),
+    )
+  },
+  async updateEmailVerificationConfiguration(
+    body: NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest,
+  ): Promise<EmailVerificationConfiguration> {
+    return unwrap(
+      await generatedSdk.adminPlatformUpdateEmailVerificationConfiguration({ body }),
+      tt('errors.saveEmailVerificationConfiguration'),
+    )
+  },
+  async replaceEmailVerificationPassword(
+    password: string,
+    expectedRevision: number,
+  ): Promise<EmailVerificationConfiguration> {
+    return unwrap(
+      await generatedSdk.adminPlatformReplaceEmailVerificationPassword({
+        body: { password, expectedRevision },
+      }),
+      tt('errors.saveEmailVerificationPassword'),
+    )
+  },
+  async sendEmailVerificationTest(): Promise<void> {
+    await requireSuccess(
+      generatedSdk.adminPlatformSendEmailVerificationTest(),
+      tt('errors.sendEmailVerificationTest'),
+    )
+  },
   async users(): Promise<PlatformUser[]> {
     const response = unwrap(await generatedSdk.adminPlatformListUsers(), tt('errors.loadUsers'))
     return response.items ?? []

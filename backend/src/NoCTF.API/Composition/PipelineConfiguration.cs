@@ -11,6 +11,7 @@ public static class PipelineConfiguration
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseAuthorization();
+        app.UseMiddleware<Security.EmailVerificationGateMiddleware>();
         app.Use(async (context, next) =>
         {
             await next();

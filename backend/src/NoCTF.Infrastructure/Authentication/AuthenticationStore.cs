@@ -63,6 +63,7 @@ public sealed class AuthenticationStore(
         string userName,
         string email,
         string password,
+        bool emailVerified,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -84,6 +85,7 @@ public sealed class AuthenticationStore(
             NormalizedEmail = normalizedEmail,
             Kind = UserKind.Human,
             Role = UserRole.User,
+            EmailVerifiedAt = emailVerified ? now : null,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -139,5 +141,11 @@ public sealed class AuthenticationStore(
     private static AuthenticatedUser? ToAuthenticated(User? user) =>
         user is null
             ? null
-            : new(user.Id, user.UserName, user.Role, user.Kind, user.TokenVersion);
+            : new(
+                user.Id,
+                user.UserName,
+                user.Role,
+                user.Kind,
+                user.TokenVersion,
+                user.EmailVerifiedAt is not null);
 }

@@ -11,6 +11,7 @@ public sealed record LoginResponse(
     Guid UserId,
     string UserName,
     UserRole Role,
+    bool EmailVerified,
     string AccessToken,
     DateTimeOffset ExpiresAt);
 
@@ -59,6 +60,7 @@ public sealed class LoginEndpoint(LoginUser login)
             result.Value!.UserId,
             result.Value.UserName,
             result.Value.Role,
+            result.Value.EmailVerified,
             result.Value.AccessToken,
             result.Value.AccessTokenExpiresAt));
     }
