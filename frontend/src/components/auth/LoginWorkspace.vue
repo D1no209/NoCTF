@@ -21,7 +21,7 @@ import {
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { AlertCircle, Loader2 } from 'lucide-vue-next'
+import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -29,6 +29,7 @@ const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 const loginError = ref('')
+const passwordVisible = ref(false)
 
 const formSchema = toTypedSchema(z.object({
   email: z.string().trim().min(1, t('validation.loginIdentifierRequired')),
@@ -95,14 +96,28 @@ const onSubmit = form.handleSubmit(async (values) => {
           <FormField v-slot="{ componentField }" name="password">
             <FormItem>
               <FormLabel>{{ t('auth.password') }}</FormLabel>
-              <FormControl>
-                <Input
-                  type="password"
-                  v-bind="componentField"
+              <div class="relative">
+                <FormControl>
+                  <Input
+                    :type="passwordVisible ? 'text' : 'password'"
+                    class="pr-11"
+                    v-bind="componentField"
+                    :disabled="loading"
+                    autocomplete="current-password"
+                  />
+                </FormControl>
+                <button
+                  type="button"
+                  class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
+                  :aria-label="t(passwordVisible ? 'auth.hidePassword' : 'auth.showPassword')"
+                  :aria-pressed="passwordVisible"
                   :disabled="loading"
-                  autocomplete="current-password"
-                />
-              </FormControl>
+                  @click="passwordVisible = !passwordVisible"
+                >
+                  <EyeOff v-if="passwordVisible" aria-hidden="true" class="size-4" />
+                  <Eye v-else aria-hidden="true" class="size-4" />
+                </button>
+              </div>
               <FormMessage />
             </FormItem>
           </FormField>

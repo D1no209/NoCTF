@@ -6,6 +6,8 @@
     "loginIdentifier": "电子邮箱或用户名",
     "loginIdentifierPlaceholder": "name{'@'}example.com 或 johndoe",
     "password": "密码",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
     "userName": "用户名",
     "loginTitle": "欢迎回来",
     "loginSubtitle": "登录你的 NoCTF 账号",
