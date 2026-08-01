@@ -1515,7 +1515,9 @@
       "sendTest": "Send test to my email",
       "saveSettings": "Save settings",
       "settingsSaved": "Email verification settings saved.",
+      "settingsSavedDescription": "All settings except the SMTP password were persisted and will be restored next time.",
       "settingsSaveFailed": "Could not save email verification settings. Check the URL and SMTP values.",
+      "settingsSaveFailedDescription": "Your current input was preserved. Correct it and save again.",
       "testSent": "SMTP test message sent to your administrator email.",
       "testFailed": "SMTP test failed. Check the saved connection and credentials."
     },

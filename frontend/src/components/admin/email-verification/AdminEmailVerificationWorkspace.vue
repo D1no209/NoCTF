@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { EmailVerificationConfiguration } from '@/api/noctf'
 import {
+  CircleCheck,
+  CircleX,
   KeyRound,
   Loader2,
   MailCheck,
@@ -9,7 +11,7 @@ import {
   Send,
   ShieldCheck,
 } from 'lucide-vue-next'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { platformAdminApi } from '@/api/noctf'
@@ -30,6 +32,7 @@ const replacingPassword = ref(false)
 const testing = ref(false)
 const loadFailed = ref(false)
 const password = ref('')
+const saveFeedback = ref<'success' | 'error' | null>(null)
 
 const form = reactive({
   enabled: false,
@@ -52,6 +55,11 @@ const lastUpdated = computed(() => form.updatedAt
   ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
       .format(new Date(form.updatedAt))
   : t('admin.emailVerification.neverSaved'))
+
+watch(form, () => {
+  if (!saving.value)
+    saveFeedback.value = null
+}, { flush: 'sync' })
 
 function applyConfiguration(configuration: EmailVerificationConfiguration) {
   form.enabled = configuration.enabled ?? false
@@ -90,6 +98,7 @@ async function saveConfiguration() {
     return
 
   saving.value = true
+  saveFeedback.value = null
   try {
     applyConfiguration(await platformAdminApi.updateEmailVerificationConfiguration({
       enabled: form.enabled,
@@ -105,9 +114,11 @@ async function saveConfiguration() {
       smtpTimeoutSeconds: form.smtpTimeoutSeconds,
       expectedRevision: form.revision,
     }))
+    saveFeedback.value = 'success'
     toast.success(t('admin.emailVerification.settingsSaved'))
   }
   catch {
+    saveFeedback.value = 'error'
     toast.error(t('admin.emailVerification.settingsSaveFailed'))
   }
   finally {
@@ -328,6 +339,31 @@ onMounted(loadConfiguration)
               {{ t('admin.emailVerification.saveSettings') }}
             </Button>
           </div>
+
+          <Alert
+            v-if="saveFeedback"
+            :variant="saveFeedback === 'success' ? 'success' : 'destructive'"
+            class="rounded-none border-2"
+            :role="saveFeedback === 'success' ? 'status' : 'alert'"
+            :aria-live="saveFeedback === 'success' ? 'polite' : 'assertive'"
+          >
+            <div class="flex items-start gap-3">
+              <CircleCheck v-if="saveFeedback === 'success'" class="mt-0.5 size-4 shrink-0" />
+              <CircleX v-else class="mt-0.5 size-4 shrink-0" />
+              <div>
+                <AlertTitle>
+                  {{ saveFeedback === 'success'
+                    ? t('admin.emailVerification.settingsSaved')
+                    : t('admin.emailVerification.settingsSaveFailed') }}
+                </AlertTitle>
+                <AlertDescription class="mt-1">
+                  {{ saveFeedback === 'success'
+                    ? t('admin.emailVerification.settingsSavedDescription')
+                    : t('admin.emailVerification.settingsSaveFailedDescription') }}
+                </AlertDescription>
+              </div>
+            </div>
+          </Alert>
         </CardContent>
       </Card>
 
