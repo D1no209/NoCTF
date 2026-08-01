@@ -90,9 +90,9 @@ NoCTF 应用层不设置 Payload Too Large，不主动返回 413：Kestrel `MaxR
 
 ## 配置/Secret
 
-JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔离。PostgreSQL、Redis、S3 credentials、SMTP、FlagDerivationSecret 不写日志。FlagDerivationSecret 是每 Competition 数据，不是部署 Secret。
+JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔离。PostgreSQL、Redis、S3 credentials、SMTP、FlagDerivationSecret 不写日志。FlagDerivationSecret 是每 Competition 数据，不是部署 Secret。`EmailVerification:EncryptionKey` 必须是独立的 Base64 32-byte 部署 Secret，仅用于加密数据库中的 SMTP 密码；API 永不返回该密码。
 
-Runner Pool/Provider/resource max、Redis、Wolverine PostgreSQL transport、S3、CORS/Origin、Cookie Secure、SMTP 是强类型 IOptions 并在进程启动时 ValidateOnStart。
+Runner Pool/Provider/resource max、Redis、Wolverine PostgreSQL transport、S3、CORS/Origin、Cookie Secure 是强类型 IOptions 并在进程启动时 ValidateOnStart。邮箱验证开关、公开 URL 与 SMTP 投递参数由管理员页面写入数据库，API/Worker 动态读取；SMTP 密码只能整体替换，前端不回填也不持久化。
 
 ## 健康与关闭
 

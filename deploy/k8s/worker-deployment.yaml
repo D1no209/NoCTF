@@ -53,6 +53,11 @@ spec:
                 secretKeyRef:
                   name: noctf-secrets
                   key: runner-scoring-key
+            - name: EmailVerification__EncryptionKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: email-verification-encryption-key
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:

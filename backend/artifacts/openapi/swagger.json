@@ -2291,9 +2291,6 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found"
-          },
           "401": {
             "description": "Unauthorized"
           },
@@ -3903,6 +3900,97 @@
         ]
       }
     },
+    "/api/v1/admin/platform/email-verification/configuration": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets email verification and SMTP configuration.",
+        "description": "Returns non-secret platform settings and whether an SMTP password is configured.",
+        "operationId": "AdminPlatformGetEmailVerificationConfiguration",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Updates email verification configuration.",
+        "description": "Applies non-secret verification and SMTP settings with a revision fence.",
+        "operationId": "AdminPlatformUpdateEmailVerificationConfiguration",
+        "requestBody": {
+          "x-name": "UpdateEmailVerificationConfigurationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/users/{userId}": {
       "get": {
         "tags": [
@@ -4161,6 +4249,64 @@
         ]
       }
     },
+    "/api/v1/admin/platform/email-verification/password": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replaces the SMTP password.",
+        "description": "Replaces the encrypted SMTP password without returning it.",
+        "operationId": "AdminPlatformReplaceEmailVerificationPassword",
+        "requestBody": {
+          "x-name": "ReplaceEmailVerificationPasswordRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/dead-letters/{messageId}/requeue": {
       "post": {
         "tags": [
@@ -4185,6 +4331,34 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/email-verification/test": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Tests SMTP delivery.",
+        "description": "Sends a test message to the current administrator.",
+        "operationId": "AdminPlatformSendEmailVerificationTest",
+        "responses": {
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -9437,6 +9611,9 @@
           "role": {
             "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
           },
+          "emailVerified": {
+            "type": "boolean"
+          },
           "accessToken": {
             "type": "string"
           },
@@ -9482,6 +9659,9 @@
           "role": {
             "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
           },
+          "emailVerified": {
+            "type": "boolean"
+          },
           "accessToken": {
             "type": "string"
           },
@@ -9509,6 +9689,12 @@
             "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
           },
           "emailVerified": {
+            "type": "boolean"
+          },
+          "requiresEmailVerification": {
+            "type": "boolean"
+          },
+          "verificationEmailQueued": {
             "type": "boolean"
           }
         }
@@ -9948,6 +10134,60 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "publicBaseUrl": {
+            "type": "string"
+          },
+          "tokenLifetimeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "resendCooldownSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "smtpHost": {
+            "type": "string"
+          },
+          "smtpPort": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "smtpEnableSsl": {
+            "type": "boolean"
+          },
+          "smtpUserName": {
+            "type": "string"
+          },
+          "smtpPasswordConfigured": {
+            "type": "boolean"
+          },
+          "smtpFromAddress": {
+            "type": "string"
+          },
+          "smtpFromName": {
+            "type": "string"
+          },
+          "smtpTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -9998,6 +10238,110 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
             }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "password",
+          "expectedRevision"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 0,
+            "nullable": false
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "publicBaseUrl",
+          "tokenLifetimeMinutes",
+          "resendCooldownSeconds",
+          "smtpHost",
+          "smtpPort",
+          "smtpEnableSsl",
+          "smtpUserName",
+          "smtpFromAddress",
+          "smtpFromName",
+          "smtpTimeoutSeconds",
+          "expectedRevision"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "publicBaseUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0,
+            "nullable": false
+          },
+          "tokenLifetimeMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 10080.0,
+            "minimum": 5.0
+          },
+          "resendCooldownSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 3600.0,
+            "minimum": 30.0
+          },
+          "smtpHost": {
+            "type": "string",
+            "maxLength": 253,
+            "minLength": 0
+          },
+          "smtpPort": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 65535.0,
+            "minimum": 1.0
+          },
+          "smtpEnableSsl": {
+            "type": "boolean"
+          },
+          "smtpUserName": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 0
+          },
+          "smtpFromAddress": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 0
+          },
+          "smtpFromName": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "smtpTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 120.0,
+            "minimum": 1.0
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
           }
         }
       },

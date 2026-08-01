@@ -54,10 +54,10 @@ public sealed class IdentityNormalizationPersistenceTests
                     cancellationToken);
 
                 await Assert.That(first.Succeeded).IsTrue();
-                await Assert.That(first.Value!.UserName).IsEqualTo("Player_One");
+                await Assert.That(first.Value!.Profile.UserName).IsEqualTo("Player_One");
                 await Assert.That(second.Succeeded).IsTrue();
-                firstUserId = first.Value.Id;
-                secondUserId = second.Value!.Id;
+                firstUserId = first.Value.Profile.Id;
+                secondUserId = second.Value!.Profile.Id;
 
                 db.Competitions.Add(new Competition
                 {

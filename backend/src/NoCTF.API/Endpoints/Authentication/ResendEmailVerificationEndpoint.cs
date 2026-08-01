@@ -8,9 +8,8 @@ namespace NoCTF.API.Endpoints.Authentication;
 
 public sealed class ResendEmailVerificationEndpoint(
     ResendEmailVerification resend,
-    IUserContext user,
-    IConfiguration configuration)
-    : EndpointWithoutRequest<Results<NoContent, NotFound, ProblemHttpResult>>
+    IUserContext user)
+    : EndpointWithoutRequest<Results<NoContent, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -24,16 +23,18 @@ public sealed class ResendEmailVerificationEndpoint(
     }
 
     public override async Task<
-        Results<NoContent, NotFound, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
+        Results<NoContent, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
-        if (!configuration.GetValue("Authentication:EmailVerificationEnabled", false))
-            return TypedResults.NotFound();
         var result = await resend.ExecuteAsync(user.UserId, DateTimeOffset.UtcNow, ct);
         return result.Succeeded
             ? TypedResults.NoContent()
             : TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Verification message was not queued.",
-                detail: result.ErrorMessage);
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = result.ErrorCode
+                });
     }
 }

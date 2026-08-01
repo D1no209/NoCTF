@@ -59,7 +59,8 @@ deployment template.
 
 ```bash
 cp .env.example .env
-# Set POSTGRES_PASSWORD, JWT_SECRET, SEED_ADMIN_PASSWORD, and other local values.
+# Set POSTGRES_PASSWORD, JWT_SECRET, SEED_ADMIN_PASSWORD,
+# EMAIL_VERIFICATION_ENCRYPTION_KEY, and other local values.
 docker compose --env-file .env -f deploy/docker-compose.yml up --build --wait
 ```
 

@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Authentication.EmailVerification;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -17,7 +18,9 @@ public sealed class VerifyEmailValidator : Validator<VerifyEmailRequest>
         RuleFor(request => request.Token).NotEmpty().MaximumLength(128);
 }
 
-public sealed class VerifyEmailEndpoint(VerifyEmail verify, IConfiguration configuration)
+public sealed class VerifyEmailEndpoint(
+    VerifyEmail verify,
+    IEmailVerificationConfigurationStore configuration)
     : Endpoint<VerifyEmailRequest, Results<NoContent, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
@@ -36,7 +39,7 @@ public sealed class VerifyEmailEndpoint(VerifyEmail verify, IConfiguration confi
         VerifyEmailRequest request,
         CancellationToken ct)
     {
-        if (!configuration.GetValue("Authentication:EmailVerificationEnabled", false))
+        if (!(await configuration.GetAsync(ct)).Enabled)
             return TypedResults.NotFound();
         var result = await verify.ExecuteAsync(request.Token, DateTimeOffset.UtcNow, ct);
         return result.Succeeded

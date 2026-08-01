@@ -71,18 +71,11 @@ spec:
                 secretKeyRef:
                   name: noctf-secrets
                   key: minio-secret-key
-            - name: EmailVerification__Smtp__UserName
+            - name: EmailVerification__EncryptionKey
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets
-                  key: smtp-username
-                  optional: true
-            - name: EmailVerification__Smtp__Password
-              valueFrom:
-                secretKeyRef:
-                  name: noctf-secrets
-                  key: smtp-password
-                  optional: true
+                  key: email-verification-encryption-key
           resources:
             requests:
               cpu: "250m"

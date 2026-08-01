@@ -8,6 +8,7 @@ public sealed record RefreshAccessTokenResult(
     Guid UserId,
     string UserName,
     UserRole Role,
+    bool EmailVerified,
     string AccessToken,
     DateTimeOffset AccessTokenExpiresAt,
     string RefreshToken);
@@ -34,6 +35,13 @@ public sealed class RefreshAccessToken(IUserAuthenticationStore store, IAccessTo
         var access = issuer.Issue(user, DateTimeOffset.UtcNow);
         var replacement = issuer.IssueRefresh(user);
         return OperationResult<RefreshAccessTokenResult>.Success(
-            new(user.Id, user.UserName, user.Role, access.Token, access.ExpiresAt, replacement.Token));
+            new(
+                user.Id,
+                user.UserName,
+                user.Role,
+                user.EmailVerified,
+                access.Token,
+                access.ExpiresAt,
+                replacement.Token));
     }
 }

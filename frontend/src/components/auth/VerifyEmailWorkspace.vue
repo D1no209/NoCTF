@@ -10,16 +10,15 @@ import AuthLayout from '@/components/layout/AuthLayout.vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useAuthStore } from '@/stores/auth'
 
 type VerificationState = 'waiting' | 'verifying' | 'verified' | 'invalid'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const state = ref<VerificationState>('waiting')
-const email = ref(typeof route.query.email === 'string' ? route.query.email : '')
 const resending = ref(false)
 const retrySeconds = ref(0)
 const deliveryFailed = computed(() => route.query.delivery === 'failed')
@@ -40,9 +39,11 @@ function startRetryCountdown() {
 
 async function verify(token: string) {
   state.value = 'verifying'
-  await router.replace({ name: 'verify-email', query: email.value ? { email: email.value } : {} })
+  await router.replace({ name: 'verify-email' })
   try {
     await authApi.verifyEmail(token)
+    if (auth.isAuthenticated)
+      await auth.refreshSession()
     state.value = 'verified'
   }
   catch {
@@ -51,12 +52,12 @@ async function verify(token: string) {
 }
 
 async function resend() {
-  if (!email.value.trim() || resending.value || retrySeconds.value > 0)
+  if (!auth.isAuthenticated || resending.value || retrySeconds.value > 0)
     return
 
   resending.value = true
   try {
-    await authApi.resendEmailVerification(email.value.trim())
+    await authApi.resendEmailVerification()
     toast.success(t('auth.verificationResent'))
     startRetryCountdown()
   }
@@ -117,36 +118,28 @@ onBeforeUnmount(() => {
 
         <template v-if="state === 'verified'">
           <Button class="h-12 w-full text-base" as-child>
-            <RouterLink to="/login">
-              {{ t('auth.continueToLogin') }}
+            <RouterLink :to="auth.isAuthenticated ? '/competitions' : '/login'">
+              {{ auth.isAuthenticated ? t('auth.continueToApp') : t('auth.continueToLogin') }}
             </RouterLink>
           </Button>
         </template>
 
         <template v-else-if="state !== 'verifying'">
-          <div class="space-y-2">
-            <Label for="verification-email">{{ t('auth.email') }}</Label>
-            <Input
-              id="verification-email"
-              v-model="email"
-              type="email"
-              autocomplete="email"
-              placeholder="name@example.com"
-              :disabled="resending"
-              @keyup.enter="resend"
-            />
-          </div>
-
           <Button
+            v-if="auth.isAuthenticated"
             variant="outline"
             class="h-11 w-full"
-            :disabled="resending || retrySeconds > 0 || !email.trim()"
+            :disabled="resending || retrySeconds > 0"
             @click="resend"
           >
             <Loader2 v-if="resending" class="size-4 animate-spin" />
             <RefreshCw v-else class="size-4" />
             {{ retrySeconds > 0 ? t('auth.resendCountdown', { seconds: retrySeconds }) : t('auth.resendVerification') }}
           </Button>
+
+          <p v-else class="border-2 border-dashed border-border p-3 text-sm text-muted-foreground">
+            {{ t('auth.signInToResend') }}
+          </p>
 
           <Button variant="ghost" class="h-11 w-full" as-child>
             <RouterLink to="/login">

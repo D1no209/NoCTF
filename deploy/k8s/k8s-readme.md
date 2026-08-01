@@ -45,6 +45,7 @@ kubectl create secret generic noctf-secrets \
   --from-literal=db-password='your-db-password' \
   --from-literal=seed-admin-password='your-initial-admin-password' \
   --from-literal=runner-scoring-key='your-runner-scoring-jwt-key-at-least-32-chars' \
+  --from-literal=email-verification-encryption-key='base64-encoded-32-byte-key' \
   --from-literal=minio-access-key='your-minio-access-key' \
   --from-literal=minio-secret-key='your-minio-secret-key'
 ```

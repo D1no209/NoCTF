@@ -26,7 +26,9 @@ public sealed record RegisterResponse(
     string UserName,
     string Email,
     UserRole Role,
-    bool EmailVerified);
+    bool EmailVerified,
+    bool RequiresEmailVerification,
+    bool VerificationEmailQueued);
 
 public sealed class RegisterValidator : Validator<RegisterRequest>
 {
@@ -71,7 +73,8 @@ public sealed class RegisterEndpoint(RegisterUser register)
                 Extensions = { ["code"] = result.ErrorCode }
             });
 
-        var profile = result.Value!;
+        var registration = result.Value!;
+        var profile = registration.Profile;
         return TypedResults.Created(
             $"/api/v1/admin/platform/users/{profile.Id}",
             new RegisterResponse(
@@ -79,6 +82,8 @@ public sealed class RegisterEndpoint(RegisterUser register)
                 profile.UserName,
                 profile.Email,
                 profile.Role,
-                profile.EmailVerified));
+                profile.EmailVerified,
+                registration.RequiresEmailVerification,
+                registration.VerificationEmailQueued));
     }
 }

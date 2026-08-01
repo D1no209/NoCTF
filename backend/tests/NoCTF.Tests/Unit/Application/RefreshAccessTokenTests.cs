@@ -64,7 +64,8 @@ public sealed class RefreshAccessTokenTests
         public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken) =>
             Task.FromResult<UserProfile?>(null);
         public Task<CreateUserState> CreateAsync(Guid userId, string userName, string email,
-            string password, DateTimeOffset now, CancellationToken cancellationToken) =>
+            string password, bool emailVerified, DateTimeOffset now,
+            CancellationToken cancellationToken) =>
             Task.FromResult(CreateUserState.Created);
         public Task<bool> ChangePasswordAsync(Guid userId, string currentPassword,
             string newPassword, DateTimeOffset now, CancellationToken cancellationToken) =>

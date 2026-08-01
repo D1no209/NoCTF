@@ -75,6 +75,12 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
         },
         {
+          path: 'email-verification',
+          name: 'admin-email-verification',
+          component: () => import('@/views/admin/AdminEmailVerificationView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
+        },
+        {
           path: 'competitions',
           name: 'admin-competitions',
           component: () => import('@/views/admin/AdminCompetitionsView.vue'),
@@ -134,6 +140,14 @@ router.beforeEach(async (to) => {
   }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (
+    auth.isAuthenticated
+    && auth.emailVerified === false
+    && to.name !== 'verify-email'
+    && to.name !== 'login'
+  ) {
+    return { name: 'verify-email' }
   }
   if (to.meta.requiresAdminOrOrganizer && !canManagePlatformResources(auth.userRole)) {
     return { name: 'competitions' }

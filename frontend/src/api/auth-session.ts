@@ -8,6 +8,7 @@ export interface AuthSession {
   accessToken: string
   userName: string
   role: NoCtfDomainIdentityUserRole
+  emailVerified: boolean
 }
 
 const AUTH_REFRESH_WINDOW_MS = 2 * 60 * 1000
@@ -137,6 +138,7 @@ async function refreshAuthSession(session: AuthSession | null): Promise<AuthSess
       || typeof data.accessToken !== 'string'
       || typeof data.userName !== 'string'
       || !isPlatformUserRole(data.role)
+      || typeof data.emailVerified !== 'boolean'
     ) {
       throw new TypeError('Session refresh returned an invalid response.')
     }
@@ -145,6 +147,7 @@ async function refreshAuthSession(session: AuthSession | null): Promise<AuthSess
       accessToken: data.accessToken,
       userName: data.userName,
       role: data.role,
+      emailVerified: data.emailVerified,
     }
 
     if (memorySession?.accessToken === session?.accessToken)

@@ -262,6 +262,10 @@ POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
 GET  /api/v1/admin/platform/dead-letters
 GET  /api/v1/admin/platform/dead-letters/{messageId}
 POST /api/v1/admin/platform/dead-letters/{messageId}/requeue
+GET  /api/v1/admin/platform/email-verification/configuration
+PUT  /api/v1/admin/platform/email-verification/configuration
+PUT  /api/v1/admin/platform/email-verification/password
+POST /api/v1/admin/platform/email-verification/test
 ```
 
 Bot 创建请求只包含 UserName 和固定的 `UserRole.Organizer`，不能创建 User 或 Administrator

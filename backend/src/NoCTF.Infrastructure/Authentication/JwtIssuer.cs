@@ -32,6 +32,7 @@ public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
                 new(ClaimTypes.Name, user.UserName),
                 new(ClaimTypes.Role, user.Role.ToString()),
                 new("user_kind", user.Kind.ToString()),
+                new("email_verified", user.EmailVerified ? "true" : "false", ClaimValueTypes.Boolean),
                 new("token_version", user.TokenVersion.ToString()),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
                 new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),

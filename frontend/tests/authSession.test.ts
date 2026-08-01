@@ -75,11 +75,21 @@ describe('auth session refresh', () => {
     const newToken = jwt(now + 60 * 60_000, 'new')
     let requests = 0
 
-    saveAuthSession({ accessToken: oldToken, userName: 'admin', role: PLATFORM_USER_ROLE.administrator })
+    saveAuthSession({
+      accessToken: oldToken,
+      userName: 'admin',
+      role: PLATFORM_USER_ROLE.administrator,
+      emailVerified: true,
+    })
     configureAuthSessionRefresh(async () => {
       requests += 1
       return {
-        data: { accessToken: newToken, userName: 'admin', role: PLATFORM_USER_ROLE.administrator },
+        data: {
+          accessToken: newToken,
+          userName: 'admin',
+          role: PLATFORM_USER_ROLE.administrator,
+          emailVerified: true,
+        },
         error: undefined,
         response: Response.json({}),
       }
@@ -103,7 +113,12 @@ describe('auth session refresh', () => {
     configureAuthSessionRefresh(async () => {
       requests += 1
       return {
-        data: { accessToken: newToken, userName: 'admin', role: PLATFORM_USER_ROLE.administrator },
+        data: {
+          accessToken: newToken,
+          userName: 'admin',
+          role: PLATFORM_USER_ROLE.administrator,
+          emailVerified: true,
+        },
         error: undefined,
         response: Response.json({}),
       }
@@ -114,6 +129,7 @@ describe('auth session refresh', () => {
       accessToken: newToken,
       userName: 'admin',
       role: PLATFORM_USER_ROLE.administrator,
+      emailVerified: true,
     })
     expect(requests).toBe(1)
     expect(readAuthSession()?.accessToken).toBe(newToken)
@@ -121,7 +137,12 @@ describe('auth session refresh', () => {
 
   test('clears a session rejected by the refresh endpoint', async () => {
     const token = jwt(Date.now() + 30_000, 'revoked')
-    saveAuthSession({ accessToken: token, userName: 'admin', role: PLATFORM_USER_ROLE.administrator })
+    saveAuthSession({
+      accessToken: token,
+      userName: 'admin',
+      role: PLATFORM_USER_ROLE.administrator,
+      emailVerified: true,
+    })
     configureAuthSessionRefresh(async () => ({
       data: undefined,
       error: {},

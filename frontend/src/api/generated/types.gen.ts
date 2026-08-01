@@ -422,6 +422,7 @@ export type NoCtfapiEndpointsAuthenticationLoginResponse = {
     userId?: string;
     userName?: string;
     role?: NoCtfDomainIdentityUserRole;
+    emailVerified?: boolean;
     accessToken?: string;
     expiresAt?: string;
 };
@@ -435,6 +436,7 @@ export type NoCtfapiEndpointsAuthenticationRefreshTokenResponse = {
     userId?: string;
     userName?: string;
     role?: NoCtfDomainIdentityUserRole;
+    emailVerified?: boolean;
     accessToken?: string;
     expiresAt?: string;
 };
@@ -445,6 +447,8 @@ export type NoCtfapiEndpointsAuthenticationRegisterResponse = {
     email?: string;
     role?: NoCtfDomainIdentityUserRole;
     emailVerified?: boolean;
+    requiresEmailVerification?: boolean;
+    verificationEmailQueued?: boolean;
 };
 
 export type NoCtfapiEndpointsAuthenticationRegisterRequest = {
@@ -578,6 +582,23 @@ export type NoCtfapiEndpointsAdministrationPlatformDeadLetterResponse = {
     replayable?: boolean;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse = {
+    enabled?: boolean;
+    publicBaseUrl?: string;
+    tokenLifetimeMinutes?: number;
+    resendCooldownSeconds?: number;
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpEnableSsl?: boolean;
+    smtpUserName?: string;
+    smtpPasswordConfigured?: boolean;
+    smtpFromAddress?: string;
+    smtpFromName?: string;
+    smtpTimeoutSeconds?: number;
+    revision?: number;
+    updatedAt?: string;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse = {
     accessToken?: string;
     expiresAt?: string;
@@ -597,6 +618,26 @@ export type NoCtfapiEndpointsAdministrationPlatformListDeadLettersRequest = {
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest = {
+    password: string;
+    expectedRevision: number;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest = {
+    enabled: boolean;
+    publicBaseUrl: string;
+    tokenLifetimeMinutes: number;
+    resendCooldownSeconds: number;
+    smtpHost: string;
+    smtpPort: number;
+    smtpEnableSsl: boolean;
+    smtpUserName: string;
+    smtpFromAddress: string;
+    smtpFromName: string;
+    smtpTimeoutSeconds: number;
+    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse = {
@@ -2306,10 +2347,6 @@ export type NoCtfapiEndpointsAuthenticationResendEmailVerificationEndpointErrors
      * Forbidden
      */
     403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
 };
 
 export type NoCtfapiEndpointsAuthenticationResendEmailVerificationEndpointResponses = {
@@ -3132,6 +3169,66 @@ export type AdminPlatformGetDeadLetterResponses = {
 
 export type AdminPlatformGetDeadLetterResponse = AdminPlatformGetDeadLetterResponses[keyof AdminPlatformGetDeadLetterResponses];
 
+export type AdminPlatformGetEmailVerificationConfigurationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/email-verification/configuration';
+};
+
+export type AdminPlatformGetEmailVerificationConfigurationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformGetEmailVerificationConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse;
+};
+
+export type AdminPlatformGetEmailVerificationConfigurationResponse = AdminPlatformGetEmailVerificationConfigurationResponses[keyof AdminPlatformGetEmailVerificationConfigurationResponses];
+
+export type AdminPlatformUpdateEmailVerificationConfigurationData = {
+    body: NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/email-verification/configuration';
+};
+
+export type AdminPlatformUpdateEmailVerificationConfigurationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformUpdateEmailVerificationConfigurationError = AdminPlatformUpdateEmailVerificationConfigurationErrors[keyof AdminPlatformUpdateEmailVerificationConfigurationErrors];
+
+export type AdminPlatformUpdateEmailVerificationConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse;
+};
+
+export type AdminPlatformUpdateEmailVerificationConfigurationResponse = AdminPlatformUpdateEmailVerificationConfigurationResponses[keyof AdminPlatformUpdateEmailVerificationConfigurationResponses];
+
 export type AdminPlatformGetUserData = {
     body?: never;
     path: {
@@ -3299,6 +3396,39 @@ export type AdminPlatformListUsersResponses = {
 
 export type AdminPlatformListUsersResponse = AdminPlatformListUsersResponses[keyof AdminPlatformListUsersResponses];
 
+export type AdminPlatformReplaceEmailVerificationPasswordData = {
+    body: NoCtfapiEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/email-verification/password';
+};
+
+export type AdminPlatformReplaceEmailVerificationPasswordErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformReplaceEmailVerificationPasswordError = AdminPlatformReplaceEmailVerificationPasswordErrors[keyof AdminPlatformReplaceEmailVerificationPasswordErrors];
+
+export type AdminPlatformReplaceEmailVerificationPasswordResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse;
+};
+
+export type AdminPlatformReplaceEmailVerificationPasswordResponse = AdminPlatformReplaceEmailVerificationPasswordResponses[keyof AdminPlatformReplaceEmailVerificationPasswordResponses];
+
 export type AdminPlatformRequeueDeadLetterData = {
     body?: never;
     path: {
@@ -3329,6 +3459,33 @@ export type AdminPlatformRequeueDeadLetterResponses = {
      */
     202: unknown;
 };
+
+export type AdminPlatformSendEmailVerificationTestData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/email-verification/test';
+};
+
+export type AdminPlatformSendEmailVerificationTestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformSendEmailVerificationTestResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminPlatformSendEmailVerificationTestResponse = AdminPlatformSendEmailVerificationTestResponses[keyof AdminPlatformSendEmailVerificationTestResponses];
 
 export type AdminPlatformUpdateUserRoleData = {
     body: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest;

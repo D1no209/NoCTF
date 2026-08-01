@@ -9,6 +9,7 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Competitions.Koh;
+using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
@@ -37,6 +38,22 @@ public static class BackendMessageHandlers
         IObjectStorage objects,
         CancellationToken cancellationToken) =>
         objects.DeleteAsync(message.ObjectKey, cancellationToken);
+
+    public static async Task Handle(
+        SendEmailVerification message,
+        IEmailVerificationDelivery delivery,
+        CancellationToken cancellationToken)
+    {
+        var state = await delivery.SendVerificationAsync(
+            message.UserId,
+            message.Token,
+            cancellationToken);
+        if (state == EmailVerificationDeliveryState.NotConfigured)
+        {
+            throw new InvalidOperationException(
+                "Email verification delivery was queued without a complete SMTP configuration.");
+        }
+    }
 
     public static async Task Handle(
         DispatchAwdCheckers message,

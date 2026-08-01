@@ -92,6 +92,7 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
         string userName,
         string email,
         string password,
+        bool emailVerified,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult(CreateUserState.Created);
@@ -117,6 +118,9 @@ internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReade
 
 internal sealed class SwaggerEmailVerificationStore : IEmailVerificationStore
 {
+    public Task<bool> IsRequiredAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(false);
+
     public Task<EmailVerificationState> IssueAsync(
         Guid userId,
         DateTimeOffset now,

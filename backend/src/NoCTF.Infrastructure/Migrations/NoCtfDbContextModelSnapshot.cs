@@ -552,6 +552,108 @@ namespace NoCTF.Infrastructure.Migrations
                     b.ToTable("competition_lifecycle_audits", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Identity.EmailVerificationSettings", b =>
+                {
+                    b.Property<short>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<short>("Id"));
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("PublicBaseUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("public_base_url");
+
+                    b.Property<int>("ResendCooldownSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("resend_cooldown_seconds");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<bool>("SmtpEnableSsl")
+                        .HasColumnType("boolean")
+                        .HasColumnName("smtp_enable_ssl");
+
+                    b.Property<string>("SmtpFromAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("smtp_from_address");
+
+                    b.Property<string>("SmtpFromName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("smtp_from_name");
+
+                    b.Property<string>("SmtpHost")
+                        .IsRequired()
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)")
+                        .HasColumnName("smtp_host");
+
+                    b.Property<byte[]>("SmtpPasswordCiphertext")
+                        .HasMaxLength(2048)
+                        .HasColumnType("bytea")
+                        .HasColumnName("smtp_password_ciphertext");
+
+                    b.Property<int>("SmtpPort")
+                        .HasColumnType("integer")
+                        .HasColumnName("smtp_port");
+
+                    b.Property<int>("SmtpTimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("smtp_timeout_seconds");
+
+                    b.Property<string>("SmtpUserName")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("smtp_user_name");
+
+                    b.Property<int>("TokenLifetimeMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("token_lifetime_minutes");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_verification_settings");
+
+                    b.ToTable("email_verification_settings", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = (short)1,
+                            Enabled = false,
+                            PublicBaseUrl = "https://noctf.local",
+                            ResendCooldownSeconds = 60,
+                            Revision = 1L,
+                            SmtpEnableSsl = true,
+                            SmtpFromAddress = "",
+                            SmtpFromName = "NoCTF",
+                            SmtpHost = "",
+                            SmtpPort = 587,
+                            SmtpTimeoutSeconds = 10,
+                            SmtpUserName = "",
+                            TokenLifetimeMinutes = 1440,
+                            UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Identity.EmailVerificationToken", b =>
                 {
                     b.Property<Guid>("Id")

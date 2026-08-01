@@ -26,6 +26,7 @@ import {
   User,
   LogOut,
   Home,
+  MailCheck,
 } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -43,6 +44,11 @@ const navItems = computed(() => {
   ]
   if (isAdmin.value) {
     items.unshift({ to: '/admin/users', label: t('admin.nav.users'), icon: User })
+    items.splice(1, 0, {
+      to: '/admin/email-verification',
+      label: t('admin.nav.emailVerification'),
+      icon: MailCheck,
+    })
   }
   return items
 })

@@ -10,6 +10,7 @@ public sealed record RefreshTokenResponse(
     Guid UserId,
     string UserName,
     UserRole Role,
+    bool EmailVerified,
     string AccessToken,
     DateTimeOffset ExpiresAt);
 
@@ -52,6 +53,7 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
             result.Value.UserId,
             result.Value.UserName,
             result.Value.Role,
+            result.Value.EmailVerified,
             result.Value.AccessToken,
             result.Value.AccessTokenExpiresAt));
     }
