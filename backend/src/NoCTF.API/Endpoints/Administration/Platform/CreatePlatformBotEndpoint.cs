@@ -10,7 +10,13 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 
 public sealed class CreatePlatformBotRequest
 {
-    public string UserName { get; set; } = string.Empty;
+    private string userName = string.Empty;
+
+    public string UserName
+    {
+        get => userName;
+        set => userName = value?.Trim() ?? string.Empty;
+    }
     [JsonConverter(typeof(JsonStringEnumConverter<UserRole>))]
     public UserRole Role { get; set; } = UserRole.Organizer;
 }

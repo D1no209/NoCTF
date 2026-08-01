@@ -1,15 +1,16 @@
 <script setup lang="ts">
+import { toTypedSchema } from '@vee-validate/zod'
+import { Loader2 } from 'lucide-vue-next'
+import { useForm } from 'vee-validate'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { toast } from 'vue-sonner'
-import * as z from 'zod'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
+import { createRegistrationSchema } from '@/components/auth/registrationValidation'
 
+import AuthLayout from '@/components/layout/AuthLayout.vue'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   FormControl,
   FormField,
@@ -17,25 +18,23 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import AuthLayout from '@/components/layout/AuthLayout.vue'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { Loader2 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const loading = ref(false)
-const userNameWhitespacePattern = /\s/u
 
-const formSchema = toTypedSchema(z.object({
-  userName: z.string()
-    .trim()
-    .min(3, t('validation.userNameLength'))
-    .max(64, t('validation.userNameLength'))
-    .refine(value => !userNameWhitespacePattern.test(value), t('validation.userNameWhitespace')),
-  email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
-  password: z.string().min(8, t('validation.passwordMin')),
+const formSchema = toTypedSchema(createRegistrationSchema({
+  userNameRequired: t('validation.userNameRequired'),
+  userNameLength: t('validation.userNameLength'),
+  userNameFormat: t('validation.userNameFormat'),
+  emailRequired: t('validation.emailRequired'),
+  emailInvalid: t('validation.emailInvalid'),
+  passwordRequired: t('validation.passwordRequired'),
+  passwordMin: t('validation.passwordMin'),
 }))
 
 const form = useForm({
@@ -62,9 +61,11 @@ const onSubmit = form.handleSubmit(async (values) => {
     else {
       await router.push('/login')
     }
-  } catch (error: any) {
+  }
+  catch {
     toast.error(t('errors.registerFailed'))
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 })
@@ -74,11 +75,15 @@ const onSubmit = form.handleSubmit(async (values) => {
   <AuthLayout :subtitle="t('auth.registerSubtitle')">
     <Card class="w-full max-w-[470px]">
       <CardHeader class="border-b-2 border-border pb-3 text-center">
-        <CardTitle class="text-2xl font-bold tracking-[0.08em]">{{ t('auth.registerTitle') }}</CardTitle>
-        <p class="mt-2 text-sm text-muted-foreground">{{ t('auth.registerSubtitle') }}</p>
+        <CardTitle class="text-2xl font-bold tracking-[0.08em]">
+          {{ t('auth.registerTitle') }}
+        </CardTitle>
+        <p class="mt-2 text-sm text-muted-foreground">
+          {{ t('auth.registerSubtitle') }}
+        </p>
       </CardHeader>
       <CardContent class="pt-5">
-        <form @submit="onSubmit" class="space-y-5">
+        <form class="space-y-5" @submit="onSubmit">
           <FormField v-slot="{ componentField }" name="userName">
             <FormItem>
               <FormLabel>{{ t('auth.userName') }}</FormLabel>

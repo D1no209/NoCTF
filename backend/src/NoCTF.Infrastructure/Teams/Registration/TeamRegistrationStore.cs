@@ -19,6 +19,7 @@ public sealed class TeamRegistrationStore(
 
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
     {
+        var name = command.Name.Trim();
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
         if (competitionStatus is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
@@ -33,8 +34,8 @@ public sealed class TeamRegistrationStore(
         {
             Id = id,
             CompetitionId = command.CompetitionId,
-            Name = command.Name,
-            NormalizedName = command.Name.ToUpperInvariant(),
+            Name = name,
+            NormalizedName = name.ToUpperInvariant(),
             AvatarUrl = command.AvatarUrl,
             CaptainId = command.UserId,
             MemberIds = [command.UserId],
@@ -150,6 +151,7 @@ public sealed class TeamRegistrationStore(
 
     public async Task<TeamUpdateStoreResult> UpdateAsync(UpdateTeamCommand command, CancellationToken ct)
     {
+        var name = command.Name.Trim();
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var status = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
         if (status is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
@@ -158,8 +160,8 @@ public sealed class TeamRegistrationStore(
             && x.CompetitionId == command.CompetitionId && x.DeletedAt == null, ct);
         if (entity is null) return new(null, TeamRegistrationFailure.TeamNotFound);
         if (entity.IsLocked) return new(null, TeamRegistrationFailure.TeamLocked);
-        entity.Name = command.Name;
-        entity.NormalizedName = command.Name.ToUpperInvariant();
+        entity.Name = name;
+        entity.NormalizedName = name.ToUpperInvariant();
         entity.AvatarUrl = command.AvatarUrl;
         try
         {

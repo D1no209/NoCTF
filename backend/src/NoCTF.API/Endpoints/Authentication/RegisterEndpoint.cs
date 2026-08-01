@@ -10,7 +10,13 @@ namespace NoCTF.API.Endpoints.Authentication;
 
 public sealed class RegisterRequest
 {
-    public string UserName { get; set; } = string.Empty;
+    private string userName = string.Empty;
+
+    public string UserName
+    {
+        get => userName;
+        set => userName = value?.Trim() ?? string.Empty;
+    }
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 }
@@ -30,7 +36,7 @@ public sealed class RegisterValidator : Validator<RegisterRequest>
             .NotEmpty().MinimumLength(3).MaximumLength(64)
             .Matches("^[A-Za-z0-9_-]+$");
         RuleFor(request => request.Email).NotEmpty().EmailAddress().MaximumLength(320);
-        RuleFor(request => request.Password).NotEmpty().MinimumLength(12).MaximumLength(1024);
+        RuleFor(request => request.Password).NotEmpty().MinimumLength(8).MaximumLength(1024);
     }
 }
 

@@ -51,7 +51,7 @@
     "passwordMin": "密码长度至少为 8 个字符",
     "userNameRequired": "请输入用户名",
     "userNameLength": "用户名长度必须为 3 至 64 个字符",
-    "userNameWhitespace": "用户名不能包含空格、换行或制表符"
+    "userNameFormat": "用户名只能包含 ASCII 字母、数字、下划线和连字符"
   },
   "errors": {
     "loginFailed": "邮箱、用户名或密码错误",

@@ -36,7 +36,8 @@ public sealed class PlatformAdministrationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var normalizedUserName = userName.ToUpperInvariant();
+        var trimmedUserName = userName.Trim();
+        var normalizedUserName = trimmedUserName.ToUpperInvariant();
         if (await db.Users.AnyAsync(user => user.NormalizedUserName == normalizedUserName, ct))
             return new(CreateBotState.UserNameConflict);
 
@@ -45,7 +46,7 @@ public sealed class PlatformAdministrationStore(
         var user = new User
         {
             Id = id,
-            UserName = userName,
+            UserName = trimmedUserName,
             NormalizedUserName = normalizedUserName,
             Email = email,
             NormalizedEmail = email.ToUpperInvariant(),

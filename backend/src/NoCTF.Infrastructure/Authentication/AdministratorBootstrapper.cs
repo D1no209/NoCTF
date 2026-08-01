@@ -66,7 +66,7 @@ public sealed class AdministratorBootstrapper(
             || !MailAddress.TryCreate(email, out var parsed)
             || !string.Equals(parsed.Address, email, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("SeedAdmin:Email is invalid.");
-        if (password.Length is < 12 or > 1024)
-            throw new InvalidOperationException("SeedAdmin:Password must contain 12 to 1024 characters.");
+        if (password.Length is < 8 or > 1024)
+            throw new InvalidOperationException("SeedAdmin:Password must contain 8 to 1024 characters.");
     }
 }

@@ -18,7 +18,7 @@ public sealed class ChangePasswordValidator : Validator<ChangePasswordRequest>
     public ChangePasswordValidator()
     {
         RuleFor(request => request.CurrentPassword).NotEmpty().MaximumLength(1024);
-        RuleFor(request => request.NewPassword).NotEmpty().MinimumLength(12).MaximumLength(1024);
+        RuleFor(request => request.NewPassword).NotEmpty().MinimumLength(8).MaximumLength(1024);
         RuleFor(request => request.NewPassword)
             .NotEqual(request => request.CurrentPassword);
     }
