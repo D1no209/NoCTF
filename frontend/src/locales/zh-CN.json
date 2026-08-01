@@ -1515,7 +1515,9 @@
       "sendTest": "向我的邮箱发送测试邮件",
       "saveSettings": "保存配置",
       "settingsSaved": "邮箱验证配置已保存。",
+      "settingsSavedDescription": "除 SMTP 密码外的配置已持久化，下次打开设置时会自动回显。",
       "settingsSaveFailed": "无法保存邮箱验证配置，请检查公开地址和 SMTP 参数。",
+      "settingsSaveFailedDescription": "当前输入已保留，请修正后重新保存。",
       "testSent": "SMTP 测试邮件已发送到当前管理员邮箱。",
       "testFailed": "SMTP 测试失败，请检查已保存的连接与凭据。"
     },
