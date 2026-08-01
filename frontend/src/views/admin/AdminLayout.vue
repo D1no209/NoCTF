@@ -66,7 +66,7 @@ async function handleLogout() {
       </SidebarHeader>
 
       <SidebarContent class="py-2">
-        <SidebarMenu class="h-full justify-between gap-0.5">
+        <SidebarMenu class="gap-0.5">
           <SidebarMenuItem v-for="item in navItems" :key="item.to">
             <SidebarMenuButton
               as-child
