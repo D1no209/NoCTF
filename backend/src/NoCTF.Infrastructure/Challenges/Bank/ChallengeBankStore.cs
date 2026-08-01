@@ -73,13 +73,13 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         bool includeDeleted,
         CancellationToken ct) =>
         await Project(Authorized(
-                includeDeleted
-                    ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
-                    : db.Challenges.AsNoTracking(),
-                actorId,
-                isAdministrator))
-            .OrderByDescending(challenge => challenge.UpdatedAt)
-            .ThenBy(challenge => challenge.Id)
+                    includeDeleted
+                        ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
+                        : db.Challenges.AsNoTracking(),
+                    actorId,
+                    isAdministrator)
+                .OrderByDescending(challenge => challenge.UpdatedAt)
+                .ThenBy(challenge => challenge.Id))
             .ToListAsync(ct);
 
     public Task<ChallengeTemplateView?> FindAsync(
