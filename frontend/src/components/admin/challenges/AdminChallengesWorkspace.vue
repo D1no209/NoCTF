@@ -402,7 +402,7 @@ watch([globalFilter, includeDeleted], () => table.setPageIndex(0))
       </div>
       <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
         <Button as-child>
-          <RouterLink to="/admin/challenges/create">
+          <RouterLink :to="{ name: 'admin-challenge-create' }">
             <Plus class="size-4" />
             {{ t('admin.challenges.create') }}
           </RouterLink>
