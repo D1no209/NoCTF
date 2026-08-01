@@ -16,4 +16,18 @@ describe('login localization', () => {
 
     expect(i18n.global.t('auth.loginIdentifierPlaceholder')).toBe(expected)
   })
+
+  test.each([
+    ['en', en, 'Show password', 'Hide password'],
+    ['zh-CN', zhCN, '显示密码', '隐藏密码'],
+  ])('provides password visibility labels for %s', (locale, messages, showLabel, hideLabel) => {
+    const i18n = createI18n({
+      legacy: false,
+      locale,
+      messages: { [locale]: messages },
+    })
+
+    expect(i18n.global.t('auth.showPassword')).toBe(showLabel)
+    expect(i18n.global.t('auth.hidePassword')).toBe(hideLabel)
+  })
 })

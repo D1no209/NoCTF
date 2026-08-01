@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/zod'
-import { Loader2 } from 'lucide-vue-next'
+import { Eye, EyeOff, Loader2 } from 'lucide-vue-next'
 import { useForm } from 'vee-validate'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -26,6 +26,7 @@ const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const loading = ref(false)
+const passwordVisible = ref(false)
 
 const formSchema = toTypedSchema(createRegistrationSchema({
   userNameRequired: t('validation.userNameRequired'),
@@ -115,14 +116,28 @@ const onSubmit = form.handleSubmit(async (values) => {
           <FormField v-slot="{ componentField }" name="password">
             <FormItem>
               <FormLabel>{{ t('auth.password') }}</FormLabel>
-              <FormControl>
-                <Input
-                  type="password"
-                  v-bind="componentField"
+              <div class="relative">
+                <FormControl>
+                  <Input
+                    :type="passwordVisible ? 'text' : 'password'"
+                    class="pr-11"
+                    v-bind="componentField"
+                    :disabled="loading"
+                    autocomplete="new-password"
+                  />
+                </FormControl>
+                <button
+                  type="button"
+                  class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
+                  :aria-label="t(passwordVisible ? 'auth.hidePassword' : 'auth.showPassword')"
+                  :aria-pressed="passwordVisible"
                   :disabled="loading"
-                  autocomplete="new-password"
-                />
-              </FormControl>
+                  @click="passwordVisible = !passwordVisible"
+                >
+                  <EyeOff v-if="passwordVisible" aria-hidden="true" class="size-4" />
+                  <Eye v-else aria-hidden="true" class="size-4" />
+                </button>
+              </div>
               <FormMessage />
             </FormItem>
           </FormField>

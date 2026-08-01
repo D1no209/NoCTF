@@ -6,6 +6,8 @@
     "loginIdentifier": "Email or username",
     "loginIdentifierPlaceholder": "name{'@'}example.com or johndoe",
     "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "userName": "Username",
     "loginTitle": "Welcome back",
     "loginSubtitle": "Sign in to your NoCTF account",
