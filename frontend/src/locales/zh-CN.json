@@ -123,6 +123,7 @@
   "nav": {
     "home": "首页",
     "competitions": "比赛",
+    "teams": "队伍",
     "backToCompetitions": "返回比赛列表",
     "back": "返回",
     "admin": "管理后台",
@@ -357,6 +358,18 @@
     "noPatchRecords": "这道题还没有 Patch 记录。"
   },
   "teams": {
+    "workspaceTitle": "我的队伍",
+    "workspaceDescription": "集中查看和管理你在每场可见比赛中的队伍报名。",
+    "registrationCount": "已报名 {count} 场",
+    "noCompetitions": "暂无可见比赛",
+    "noCompetitionsDescription": "比赛开放后，可在这里报名队伍或管理已有报名。",
+    "notRegistered": "尚未报名队伍",
+    "memberSummary": "{current} / {maximum} 名成员",
+    "status": {
+      "pending": "等待审核",
+      "approved": "已通过",
+      "rejected": "已拒绝"
+    },
     "registrationTitle": "队伍报名",
     "registrationDescription": "创建队伍或使用邀请 token 加入队伍，通过审核后才能参赛。",
     "registrationDetailFallback": "为这场比赛报名队伍，若开启审核则需要等待管理员通过。",

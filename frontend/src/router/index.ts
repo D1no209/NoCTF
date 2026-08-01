@@ -36,6 +36,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/teams',
+      name: 'my-teams',
+      component: () => import('@/views/MyTeamsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/competitions/:id/register',
       name: 'competition-register',
       component: () => import('@/views/CompetitionRegistrationView.vue'),

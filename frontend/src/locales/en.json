@@ -123,6 +123,7 @@
   "nav": {
     "home": "Home",
     "competitions": "Competitions",
+    "teams": "Teams",
     "backToCompetitions": "Back to Competitions",
     "back": "Back",
     "admin": "Admin",
@@ -357,6 +358,18 @@
     "noPatchRecords": "No patch records for this challenge yet."
   },
   "teams": {
+    "workspaceTitle": "My teams",
+    "workspaceDescription": "Review and manage your team registration for every visible competition.",
+    "registrationCount": "{count} registered",
+    "noCompetitions": "No visible competitions",
+    "noCompetitionsDescription": "Visible competitions will appear here when registration or team management is available.",
+    "notRegistered": "No team registered",
+    "memberSummary": "{current} of {maximum} members",
+    "status": {
+      "pending": "Pending review",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
     "registrationTitle": "Team registration",
     "registrationDescription": "Create a team or join with an invitation token. Challenges unlock after approval.",
     "registrationDetailFallback": "Register a team for this competition, then wait for approval if review is enabled.",

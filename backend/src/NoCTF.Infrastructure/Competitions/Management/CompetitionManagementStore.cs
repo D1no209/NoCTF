@@ -63,7 +63,7 @@ public sealed class CompetitionManagementStore(NoCtfDbContext db) : ICompetition
             .SingleOrDefaultAsync(ct);
 
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken ct) =>
-        await Project(EntityQuery(includeDraft)).OrderByDescending(x => x.StartTime).ToListAsync(ct);
+        await Project(EntityQuery(includeDraft).OrderByDescending(x => x.StartAt)).ToListAsync(ct);
 
     public async Task<CompetitionView?> UpdateAsync(
         UpdateCompetitionCommand command,

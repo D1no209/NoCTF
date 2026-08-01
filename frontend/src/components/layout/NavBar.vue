@@ -1,16 +1,16 @@
 <script setup lang="ts">
+import { Home, LayoutDashboard, Menu, Users } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRouter } from 'vue-router'
 import { canManagePlatformResources } from '@/api/userRole'
-import { useAuthStore } from '@/stores/auth'
-import { useScoreStore } from '@/stores/score'
-import { Button } from '@/components/ui/button'
 import BrandLogo from '@/components/BrandLogo.vue'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
-import { Home, LayoutDashboard, Menu } from 'lucide-vue-next'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import NotificationCenter from '@/components/notifications/NotificationCenter.vue'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { useAuthStore } from '@/stores/auth'
+import { useScoreStore } from '@/stores/score'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -53,6 +53,14 @@ async function handleLogout() {
             {{ t('nav.competitions') }}
           </RouterLink>
           <RouterLink
+            to="/teams"
+            class="relative inline-flex items-center gap-1 border-b-[2px] border-transparent px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            active-class="border-primary bg-accent text-foreground"
+          >
+            <Users class="size-4" />
+            {{ t('nav.teams') }}
+          </RouterLink>
+          <RouterLink
             v-if="canManage"
             to="/admin"
             class="relative inline-flex items-center gap-1 border-b-[2px] border-transparent px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -70,16 +78,20 @@ async function handleLogout() {
         </div>
 
         <NotificationCenter />
-        
+
         <template v-if="auth.isAuthenticated">
           <div v-if="displayName" class="flex min-w-0 items-center gap-2 border-2 border-border bg-card px-2 py-1.5 text-sm">
             <span class="text-muted-foreground hidden lg:inline">{{ displayName }}</span>
           </div>
-          <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="handleLogout">{{ t('auth.logout') }}</Button>
+          <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="handleLogout">
+            {{ t('auth.logout') }}
+          </Button>
         </template>
         <template v-else>
           <RouterLink to="/login" class="hidden sm:block">
-            <Button variant="outline" size="sm">{{ t('auth.login') }}</Button>
+            <Button variant="outline" size="sm">
+              {{ t('auth.login') }}
+            </Button>
           </RouterLink>
         </template>
 
@@ -101,6 +113,9 @@ async function handleLogout() {
               <RouterLink to="/competitions" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
                 {{ t('nav.competitions') }}
               </RouterLink>
+              <RouterLink to="/teams" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
+                {{ t('nav.teams') }}
+              </RouterLink>
               <RouterLink v-if="canManage" to="/admin" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
                 {{ t('nav.admin') }}
               </RouterLink>
@@ -110,11 +125,15 @@ async function handleLogout() {
                   <span class="text-xs text-muted-foreground">{{ t('common.user') }}</span>
                   <span class="font-medium">{{ displayName }}</span>
                 </div>
-                <Button variant="outline" class="w-full mt-4" @click="handleLogout">{{ t('auth.logout') }}</Button>
+                <Button variant="outline" class="w-full mt-4" @click="handleLogout">
+                  {{ t('auth.logout') }}
+                </Button>
               </template>
               <template v-else>
                 <RouterLink to="/login" @click="menuOpen = false">
-                  <Button class="w-full">{{ t('auth.login') }}</Button>
+                  <Button class="w-full">
+                    {{ t('auth.login') }}
+                  </Button>
                 </RouterLink>
               </template>
             </div>
