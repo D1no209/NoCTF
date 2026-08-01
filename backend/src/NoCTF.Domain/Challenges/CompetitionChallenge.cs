@@ -27,6 +27,7 @@ public sealed class CompetitionChallengeHint
     public string Content { get; set; } = string.Empty;
     public long Cost { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
+    public int PublicationRevision { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }

@@ -160,8 +160,13 @@ public sealed class TeamLeaderboardInvalidationPersistenceTests
             await Assert.That(invalidations.Count(
                 message => message.CompetitionId == fixture.MembershipCompetitionId))
                 .IsEqualTo(6);
+            var bans = outbox.Published.OfType<TeamBanned>().ToArray();
+            await Assert.That(bans).Count().IsEqualTo(1);
+            await Assert.That(bans[0].CompetitionId)
+                .IsEqualTo(fixture.MembershipCompetitionId);
+            await Assert.That(bans[0].TeamId).IsEqualTo(fixture.MembershipTeamId);
             await Assert.That(outbox.Published.All(
-                message => message is InvalidateLeaderboard)).IsTrue();
+                message => message is InvalidateLeaderboard or TeamBanned)).IsTrue();
             await Assert.That(outbox.FlushCount).IsEqualTo(12);
 
             await using var verify = new NoCtfDbContext(options);

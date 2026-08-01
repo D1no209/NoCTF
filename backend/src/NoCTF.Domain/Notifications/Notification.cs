@@ -8,6 +8,7 @@ public sealed class Notification
     public Guid? CompetitionId { get; set; }
     public Guid? EntityId { get; set; }
     public NotificationKind Kind { get; set; }
+    public string? SourceEventKey { get; set; }
     public string PayloadJson { get; set; } = "{}";
     public DateTimeOffset CreatedAt { get; set; }
 }
@@ -19,5 +20,9 @@ public enum NotificationKind : short
     SubmissionEvaluated,
     RuntimeStateChanged,
     StartGateFailed,
-    ManagementFailure
+    ManagementFailure,
+    BloodAwarded,
+    ChallengePublished,
+    HintPublished,
+    TeamBanned
 }

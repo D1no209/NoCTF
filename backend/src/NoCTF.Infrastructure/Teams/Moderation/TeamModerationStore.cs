@@ -39,6 +39,14 @@ public sealed class TeamModerationStore(
         await db.SaveChangesAsync(cancellationToken);
         await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, cancellationToken);
         await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
+        if (command.Ban)
+        {
+            await outbox.PublishAsync(new TeamBanned(
+                command.CompetitionId,
+                team.Id,
+                team.Name,
+                command.OccurredAt));
+        }
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return new();
