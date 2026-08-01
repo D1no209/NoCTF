@@ -113,6 +113,12 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(challenge.State)
                 .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
             await Assert.That(challenge.Template!.Id).IsEqualTo(challengeId);
+            await Assert.That((await challengeBank.ListAsync(
+                botId,
+                false,
+                false,
+                cancellationToken)).Select(item => item.Id))
+                .IsEquivalentTo([challengeId]);
 
             var competitionChallengeId = Guid.CreateVersion7(now.AddMilliseconds(4));
             var competitionChallenges = new ChallengeManagementStore(
