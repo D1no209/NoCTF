@@ -17,6 +17,7 @@
 11. [附件与对象存储](storage-attachments.md)
 12. 模式规范：[CTF](game-modes/ctf.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)
 13. [实时与站内通知](realtime-notifications.md)
+14. [QQBOT JWT 接入](qqbot-jwt.md)
 14. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)
 15. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
 
@@ -32,4 +33,4 @@
 
 ## 已废弃内容
 
-旧 Penetration、QQBot、插件式 GameMode、进程内队列、`runtime_operations`、`runtime_artifacts`、TeamMember 顺序队长模型和 CompetitionCollaborator 子表不属于目标架构。仓库历史、旧提交或外部说明中出现这些词时，不得据此恢复它们。
+旧 Penetration、QQBot 专用 Agent/群组同步协议、插件式 GameMode、进程内队列、`runtime_operations`、`runtime_artifacts`、TeamMember 顺序队长模型和 CompetitionCollaborator 子表不属于目标架构。QQBOT 只能作为普通 JWT 通知消费者接入。仓库历史、旧提交或外部说明中出现这些旧设计时，不得据此恢复它们。

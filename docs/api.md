@@ -244,6 +244,7 @@ queue-evaluation 用于 ManualBatch 的 Pending/无旧事件 PlatformFailed 集�
 
 ```text
 GET /api/v1/notifications
+GET /api/v1/notifications/feed
 ```
 
 仅返回当前用户永久事件流，按 CreatedAt desc/Id desc keyset 分页。没有读取、标记已读、删除或计数 Endpoint。
