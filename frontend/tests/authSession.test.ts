@@ -96,6 +96,29 @@ describe('auth session refresh', () => {
     expect(readAuthSession()?.accessToken).toBe(newToken)
   })
 
+  test('restores a cold session from the refresh cookie', async () => {
+    const newToken = jwt(Date.now() + 60 * 60_000, 'restored')
+    let requests = 0
+
+    configureAuthSessionRefresh(async () => {
+      requests += 1
+      return {
+        data: { accessToken: newToken, userName: 'admin', role: PLATFORM_USER_ROLE.administrator },
+        error: undefined,
+        response: Response.json({}),
+      }
+    })
+
+    expect(readAuthSession()).toBeNull()
+    await expect(refreshAuthSessionIfNeeded(true)).resolves.toMatchObject({
+      accessToken: newToken,
+      userName: 'admin',
+      role: PLATFORM_USER_ROLE.administrator,
+    })
+    expect(requests).toBe(1)
+    expect(readAuthSession()?.accessToken).toBe(newToken)
+  })
+
   test('clears a session rejected by the refresh endpoint', async () => {
     const token = jwt(Date.now() + 30_000, 'revoked')
     saveAuthSession({ accessToken: token, userName: 'admin', role: PLATFORM_USER_ROLE.administrator })

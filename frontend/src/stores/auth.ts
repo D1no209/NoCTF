@@ -90,8 +90,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function ensureFreshSession() {
     if (!accessToken.value) {
-      logout()
-      return false
+      try {
+        await refreshAuthSessionIfNeeded(true)
+      }
+      catch {
+        return false
+      }
     }
 
     if (shouldRefreshToken(accessToken.value)) {

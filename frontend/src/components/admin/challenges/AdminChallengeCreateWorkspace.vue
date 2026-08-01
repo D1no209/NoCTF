@@ -1,30 +1,29 @@
 <script setup lang="ts">
+import type { NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest } from '@/api/generated/types.gen'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { ArrowLeft } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { adminApi } from '@/api/noctf'
+import { challengeBankAdminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import ChallengeTemplateForm from '@/components/admin/ChallengeTemplateForm.vue'
 import { Button } from '@/components/ui/button'
-
-interface ChallengeTemplateDto {
-  id: string
-}
 
 const { t } = useI18n()
 const router = useRouter()
 const qc = useQueryClient()
 
 const createMutation = useMutation({
-  mutationFn: async ({ payload, attachmentFile, patchTemplateFile }: { payload: Record<string, unknown>; attachmentFile: File | null; patchTemplateFile: File | null }) => {
-    const saved = await adminApi.createChallenge<ChallengeTemplateDto>(payload)
+  mutationFn: async ({ payload, attachmentFile }: {
+    payload: NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest
+    attachmentFile: File | null
+  }) => {
+    const saved = await challengeBankAdminApi.create(payload)
     if (attachmentFile) {
-      await adminApi.uploadChallengeAttachment(saved.id, attachmentFile)
-    }
-    if (patchTemplateFile) {
-      await adminApi.uploadChallengePatchTemplate(saved.id, patchTemplateFile)
+      if (!saved.id)
+        throw new TypeError('Created challenge template is missing id.')
+      await challengeBankAdminApi.uploadAttachment(saved.id, attachmentFile)
     }
   },
   onSuccess: () => {

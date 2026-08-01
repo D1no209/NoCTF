@@ -5,7 +5,7 @@ import {
   saveAuthSession,
 } from '../src/api/auth-session'
 import { client } from '../src/api/generated/client.gen'
-import { adminApi, authApi } from '../src/api/noctf'
+import { authApi, healthApi } from '../src/api/noctf'
 import { PLATFORM_USER_ROLE } from '../src/api/userRole'
 
 const apiBaseUrl = 'https://api.noctf.test'
@@ -138,7 +138,7 @@ describe('generated authentication and health contracts', () => {
   })
 
   test('admin health uses the generated health endpoint', async () => {
-    await expect(adminApi.health()).resolves.toEqual({ status: 'ok' })
+    await expect(healthApi.get()).resolves.toEqual({ status: 'ok' })
 
     expect(requests).toHaveLength(1)
     expect(new URL(requests[0]!.url).pathname).toBe('/health')

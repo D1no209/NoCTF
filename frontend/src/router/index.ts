@@ -36,12 +36,6 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/awdp/screen/:gameId',
-      name: 'awdp-screen',
-      component: () => import('@/views/AwdpScreenView.vue'),
-      meta: { requiresAuth: false },
-    },
-    {
       path: '/competitions/:id/register',
       name: 'competition-register',
       component: () => import('@/views/CompetitionRegistrationView.vue'),
@@ -75,12 +69,6 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
         },
         {
-          path: 'teams',
-          name: 'admin-teams',
-          component: () => import('@/views/admin/AdminTeamsView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
-        },
-        {
           path: 'competitions',
           name: 'admin-competitions',
           component: () => import('@/views/admin/AdminCompetitionsView.vue'),
@@ -105,12 +93,6 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
-          path: 'competitions/:id/operations',
-          name: 'admin-competition-operations',
-          component: () => import('@/views/admin/AdminCompetitionOperationsView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
-        },
-        {
           path: 'challenges',
           name: 'admin-challenges',
           component: () => import('@/views/admin/AdminChallengesView.vue'),
@@ -123,51 +105,9 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
         {
-          path: 'containers',
-          name: 'admin-containers',
-          component: () => import('@/views/admin/AdminContainersView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
-        },
-        {
-          path: 'plugins',
-          name: 'admin-plugins',
-          component: () => import('@/views/admin/AdminPluginsView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
-        },
-        {
-          path: 'infrastructure',
-          name: 'admin-infrastructure',
-          component: () => import('@/views/admin/AdminInfrastructureView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
-        },
-        {
-          path: 'qqbot',
-          name: 'admin-qqbot',
-          component: () => import('@/views/admin/AdminQqBotView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
-        },
-        {
-          path: 'email-verification',
-          name: 'admin-email-verification',
-          component: () => import('@/views/admin/AdminEmailVerificationView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
-        },
-        {
-          path: 'audit-logs',
-          name: 'admin-audit-logs',
-          component: () => import('@/views/admin/AdminAuditLogsView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
-        },
-        {
           path: 'health',
           name: 'admin-health',
           component: () => import('@/views/admin/AdminHealthView.vue'),
-          meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
-        },
-        {
-          path: 'logs',
-          name: 'admin-logs',
-          component: () => import('@/views/admin/AdminLogsView.vue'),
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
       ],
