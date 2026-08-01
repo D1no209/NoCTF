@@ -10,8 +10,14 @@ namespace NoCTF.API.Endpoints.Teams;
 
 public sealed class CreateTeamRequest
 {
+    private string name = string.Empty;
+
     public Guid CompetitionId { get; set; }
-    public string Name { get; set; } = string.Empty;
+    public string Name
+    {
+        get => name;
+        set => name = value?.Trim() ?? string.Empty;
+    }
     public string? AvatarUrl { get; set; }
 }
 
@@ -30,9 +36,15 @@ public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);
 
 public sealed class UpdateTeamRequest
 {
+    private string name = string.Empty;
+
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
-    public string Name { get; set; } = string.Empty;
+    public string Name
+    {
+        get => name;
+        set => name = value?.Trim() ?? string.Empty;
+    }
     public string? AvatarUrl { get; set; }
 }
 

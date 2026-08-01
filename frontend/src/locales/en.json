@@ -51,7 +51,7 @@
     "passwordMin": "Password must be at least 8 characters",
     "userNameRequired": "Username is required",
     "userNameLength": "Username must be between 3 and 64 characters",
-    "userNameWhitespace": "Username cannot contain spaces, line breaks, or tabs"
+    "userNameFormat": "Username can contain only ASCII letters, numbers, underscores, and hyphens"
   },
   "errors": {
     "loginFailed": "Invalid email, username, or password",

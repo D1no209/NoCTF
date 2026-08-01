@@ -35,7 +35,7 @@ public sealed class AdministratorBootstrapperTests
             {
                 IterationCount = 10_000
             }));
-            var configuration = Configuration("InitialAdministrator123!");
+            var configuration = Configuration("Admin888");
             var bootstrapper = new AdministratorBootstrapper(
                 db,
                 configuration,
@@ -49,11 +49,11 @@ public sealed class AdministratorBootstrapperTests
             await Assert.That(hasher.VerifyHashedPassword(
                     administrator,
                     administrator.PasswordHash,
-                    "InitialAdministrator123!"))
+                    "Admin888"))
                 .IsNotEqualTo(PasswordVerificationResult.Failed);
 
             var originalHash = administrator.PasswordHash;
-            var changedConfiguration = Configuration("ChangedAdministrator123!");
+            var changedConfiguration = Configuration("Change88");
             await new AdministratorBootstrapper(
                     db,
                     changedConfiguration,

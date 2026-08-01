@@ -66,8 +66,10 @@ public sealed class AuthenticationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var normalizedUserName = userName.ToUpperInvariant();
-        var normalizedEmail = email.ToUpperInvariant();
+        var trimmedUserName = userName.Trim();
+        var trimmedEmail = email.Trim();
+        var normalizedUserName = trimmedUserName.ToUpperInvariant();
+        var normalizedEmail = trimmedEmail.ToUpperInvariant();
         if (await db.Users.AnyAsync(user => user.NormalizedUserName == normalizedUserName, ct))
             return CreateUserState.UserNameConflict;
         if (await db.Users.AnyAsync(user => user.NormalizedEmail == normalizedEmail, ct))
@@ -76,9 +78,9 @@ public sealed class AuthenticationStore(
         var user = new User
         {
             Id = userId,
-            UserName = userName,
+            UserName = trimmedUserName,
             NormalizedUserName = normalizedUserName,
-            Email = email,
+            Email = trimmedEmail,
             NormalizedEmail = normalizedEmail,
             Kind = UserKind.Human,
             Role = UserRole.User,
