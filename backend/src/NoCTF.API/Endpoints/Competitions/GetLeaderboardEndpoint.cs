@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Management;
+using NoCTF.API.Security;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -15,7 +16,9 @@ public sealed class GetLeaderboardRequest
 public sealed class GetLeaderboardEndpoint(
     ILeaderboardCache leaderboard,
     IBackendMessagePublisher messages,
-    GetCompetition getCompetition)
+    GetCompetition getCompetition,
+    ICompetitionLeaderboardAccess access,
+    IUserContext user)
     : Endpoint<GetLeaderboardRequest, Results<Ok<LeaderboardResponse>, Accepted<LeaderboardProcessingResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
@@ -31,7 +34,15 @@ public sealed class GetLeaderboardEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         if (await getCompetition.ExecuteAsync(request.CompetitionId, false, cancellationToken) is null)
-            return TypedResults.NotFound();
+        {
+            if (await getCompetition.ExecuteAsync(request.CompetitionId, true, cancellationToken) is null
+                || user.UserId == Guid.Empty
+                || !await access.CanReadPrivateAsync(
+                    user.UserId,
+                    request.CompetitionId,
+                    cancellationToken))
+                return TypedResults.NotFound();
+        }
         var snapshot = await leaderboard.GetAsync(request.CompetitionId, cancellationToken);
         if (snapshot is not null)
         {

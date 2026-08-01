@@ -119,7 +119,7 @@ public sealed class ManagePlatform(
             || !normalized.All(character =>
                 char.IsAsciiLetterOrDigit(character) || character is '_' or '-'))
             return Task.FromResult(new CreateBotResult(CreateBotState.InvalidUserName));
-        if (role != UserRole.Organizer)
+        if (role is not (UserRole.User or UserRole.Organizer))
             return Task.FromResult(new CreateBotResult(CreateBotState.InvalidRole));
         return store.CreateBotAsync(normalized, role, now, ct);
     }

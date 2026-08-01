@@ -61,7 +61,8 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
         var candidates = await db.Users.AsNoTracking()
             .Where(user =>
                 user.Id != ownerId.Value &&
-                (user.Role == UserRole.Organizer ||
+                (user.Kind == UserKind.Bot ||
+                 user.Role == UserRole.Organizer ||
                  user.Role == UserRole.Administrator ||
                  user.EmailVerifiedAt != null))
             .OrderBy(user => user.UserName)
@@ -135,7 +136,7 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
             .ToArray();
         var judgeObserverUsers = await db.Users.AsNoTracking()
             .Where(user => judgeObserverIds.Contains(user.Id))
-            .Select(user => new { user.Id, user.EmailVerifiedAt })
+            .Select(user => new { user.Id, user.Kind, user.EmailVerifiedAt })
             .ToArrayAsync(ct);
         var missingUserIds = judgeObserverIds
             .Except(judgeObserverUsers.Select(user => user.Id))
@@ -146,8 +147,21 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
                 CompetitionPermissionUpdateState.UserNotFound,
                 missingUserIds);
         }
+        var ineligibleJudgeIds = judgeObserverUsers
+            .Where(user => user.Kind == UserKind.Bot && command.JudgeIds.Contains(user.Id))
+            .Select(user => user.Id)
+            .Order()
+            .ToArray();
+        if (ineligibleJudgeIds.Length > 0)
+        {
+            return new(
+                CompetitionPermissionUpdateState.RoleNotEligible,
+                ineligibleJudgeIds);
+        }
         var unverifiedUserIds = judgeObserverUsers
-            .Where(user => user.EmailVerifiedAt is null)
+            .Where(user =>
+                user.Kind == UserKind.Human
+                && user.EmailVerifiedAt is null)
             .Select(user => user.Id)
             .Order()
             .ToArray();

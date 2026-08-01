@@ -64,7 +64,7 @@ public sealed class ListNotificationsEndpoint(
         if (!cursors.TryDecode(
                 request.Cursor,
                 CursorEndpoint,
-                string.Empty,
+                user.UserId.ToString("N"),
                 out var position))
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -90,7 +90,7 @@ public sealed class ListNotificationsEndpoint(
         var next = items.Count == request.Limit
             ? cursors.Encode(
                 CursorEndpoint,
-                string.Empty,
+                user.UserId.ToString("N"),
                 new(items[^1].CreatedAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new NotificationListResponse(response, next));

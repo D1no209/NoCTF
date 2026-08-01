@@ -80,7 +80,7 @@ public sealed class PlatformAdministrationStore(
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
             return new(UpdatePlatformRoleState.UserNotFound);
-        if (user.Kind == UserKind.Bot && role != UserRole.Organizer)
+        if (user.Kind == UserKind.Bot && role == UserRole.Administrator)
             return new(UpdatePlatformRoleState.InvalidBotRole);
         if (role == UserRole.User && user.Role.CanManageResources())
         {
