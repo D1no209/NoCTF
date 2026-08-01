@@ -11,6 +11,7 @@ using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.API.Security;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -44,6 +45,67 @@ public sealed class LeaderboardEndpointTests
         }
     }
 
+    [Test]
+    public async Task Missing_snapshot_returns_accepted_with_retry_after()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var messages = new RecordingMessagePublisher();
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(stale: false, missing: true),
+            messages);
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That(response.Headers.RetryAfter?.Delta)
+            .IsEqualTo(TimeSpan.FromSeconds(2));
+        await Assert.That(messages.ProjectedCompetitionIds)
+            .IsEquivalentTo([competitionId]);
+    }
+
+    [Test]
+    public async Task Projection_failure_returns_service_unavailable_without_requeue()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var messages = new RecordingMessagePublisher();
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(
+                stale: false,
+                missing: true,
+                lastFailureAt: DateTimeOffset.UtcNow),
+            messages);
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+
+        await Assert.That(response.StatusCode)
+            .IsEqualTo(HttpStatusCode.ServiceUnavailable);
+        await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
+    }
+
+    [Test]
+    public async Task Unknown_competition_returns_not_found()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var messages = new RecordingMessagePublisher();
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(stale: false),
+            messages);
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/competitions/{Guid.CreateVersion7()}/leaderboard");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
         Guid competitionId,
         ILeaderboardCache leaderboard,
@@ -61,6 +123,8 @@ public sealed class LeaderboardEndpointTests
         builder.Services.SwaggerDocument();
         builder.Services.AddSingleton(leaderboard);
         builder.Services.AddSingleton(messages);
+        builder.Services.AddSingleton<ICompetitionLeaderboardAccess>(new DenyPrivateAccess());
+        builder.Services.AddSingleton<IUserContext>(new AnonymousUserContext());
         builder.Services.AddSingleton<ICompetitionManagementStore>(
             new CompetitionStore(competitionId));
         builder.Services.AddScoped<GetCompetition>();
@@ -71,20 +135,46 @@ public sealed class LeaderboardEndpointTests
         return app;
     }
 
-    private sealed class CachedLeaderboard(bool stale) : ILeaderboardCache
+    private sealed class DenyPrivateAccess : ICompetitionLeaderboardAccess
+    {
+        public Task<bool> CanReadPrivateAsync(
+            Guid userId,
+            Guid competitionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+    }
+
+    private sealed class AnonymousUserContext : IUserContext
+    {
+        public Guid UserId => Guid.Empty;
+        public bool IsAdministrator => false;
+    }
+
+    private sealed class CachedLeaderboard(
+        bool stale,
+        bool missing = false,
+        DateTimeOffset? lastFailureAt = null) : ILeaderboardCache
     {
         public Task<LeaderboardResponse?> GetAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(new(
-                competitionId,
-                DateTimeOffset.UtcNow,
-                [])
-            {
-                SnapshotRevision = stale ? 1 : 2,
-                TargetRevision = 2,
-                Stale = stale
-            });
+            Task.FromResult<LeaderboardResponse?>(
+                missing
+                    ? null
+                    : new(
+                        competitionId,
+                        DateTimeOffset.UtcNow,
+                        [])
+                    {
+                        SnapshotRevision = stale ? 1 : 2,
+                        TargetRevision = 2,
+                        Stale = stale
+                    });
+
+        public Task<LeaderboardCacheStatus> GetStatusAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new LeaderboardCacheStatus(2, lastFailureAt));
 
         public Task RefreshAsync(
             Guid competitionId,

@@ -214,6 +214,12 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         UserRole.Organizer,
                         false),
                     new Candidate(
+                        ineligibleBotId,
+                        "candidate-ineligible-bot",
+                        UserKind.Bot,
+                        UserRole.User,
+                        false),
+                    new Candidate(
                         verifiedJudgeId,
                         "candidate-verified-judge",
                         UserKind.Human,
@@ -360,6 +366,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                 var ownerId = Guid.CreateVersion7();
                 var existingManagerId = Guid.CreateVersion7();
                 var unverifiedUserId = Guid.CreateVersion7();
+                var notificationBotId = Guid.CreateVersion7();
                 var competitionId = Guid.CreateVersion7();
                 var originalUpdatedAt = now.AddMinutes(-1);
                 originalUpdatedAt = originalUpdatedAt.AddTicks(
@@ -385,6 +392,11 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                             "verification-unverified",
                             UserRole.User,
                             false,
+                            now),
+                        Bot(
+                            notificationBotId,
+                            "verification-notification-bot",
+                            UserRole.User,
                             now)
                     ],
                     cancellationToken);
@@ -423,6 +435,38 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         .IsEquivalentTo([unverifiedUserId]);
                 }
 
+                await using (var botObserverDb = new NoCtfDbContext(options))
+                {
+                    var observer = await new CompetitionPermissionStore(botObserverDb).UpdateAsync(
+                        new UpdateCompetitionPermissionsCommand(
+                            CompetitionId: competitionId,
+                            ActorId: ownerId,
+                            ExpectedPermissionRevision: 3,
+                            ManagerIds: [existingManagerId],
+                            JudgeIds: [],
+                            ObserverIds: [notificationBotId]),
+                        cancellationToken);
+                    await Assert.That(observer.State)
+                        .IsEqualTo(CompetitionPermissionUpdateState.Updated);
+                }
+
+                await using (var botJudgeDb = new NoCtfDbContext(options))
+                {
+                    var judge = await new CompetitionPermissionStore(botJudgeDb).UpdateAsync(
+                        new UpdateCompetitionPermissionsCommand(
+                            CompetitionId: competitionId,
+                            ActorId: ownerId,
+                            ExpectedPermissionRevision: 4,
+                            ManagerIds: [existingManagerId],
+                            JudgeIds: [notificationBotId],
+                            ObserverIds: []),
+                        cancellationToken);
+                    await Assert.That(judge.State)
+                        .IsEqualTo(CompetitionPermissionUpdateState.RoleNotEligible);
+                    await Assert.That(judge.UserIds)
+                        .IsEquivalentTo([notificationBotId]);
+                }
+
                 await using var verifyDb = new NoCtfDbContext(options);
                 var persisted = await verifyDb.Competitions.AsNoTracking()
                     .SingleAsync(
@@ -431,9 +475,10 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                 await Assert.That(persisted.ManagerIds)
                     .IsEquivalentTo([existingManagerId]);
                 await Assert.That(persisted.JudgeIds).IsEmpty();
-                await Assert.That(persisted.ObserverIds).IsEmpty();
-                await Assert.That(persisted.PermissionRevision).IsEqualTo(3);
-                await Assert.That(persisted.UpdatedAt).IsEqualTo(originalUpdatedAt);
+                await Assert.That(persisted.ObserverIds)
+                    .IsEquivalentTo([notificationBotId]);
+                await Assert.That(persisted.PermissionRevision).IsEqualTo(4);
+                await Assert.That(persisted.UpdatedAt).IsNotEqualTo(originalUpdatedAt);
             },
             cancellationToken);
     }

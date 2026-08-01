@@ -19,9 +19,15 @@ public sealed class BotIdentityTests
     }
 
     [Test]
-    public async Task CreateBot_RequiresOrganizerRole()
+    public async Task CreateBot_AcceptsLeastPrivilegeNotificationRelayRole()
     {
         var store = Substitute.For<IPlatformAdministrationStore>();
+        store.CreateBotAsync(
+                Arg.Any<string>(),
+                Arg.Any<UserRole>(),
+                Arg.Any<DateTimeOffset>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new CreateBotResult(CreateBotState.Created));
         var platform = new ManagePlatform(
             store,
             Substitute.For<IAccessTokenIssuer>());
@@ -29,6 +35,27 @@ public sealed class BotIdentityTests
         var result = await platform.CreateBotAsync(
             "repository-bot",
             UserRole.User,
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.State).IsNotEqualTo(CreateBotState.InvalidRole);
+        await store.Received(1).CreateBotAsync(
+            "repository-bot",
+            UserRole.User,
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task CreateBot_RejectsAdministratorRole()
+    {
+        var store = Substitute.For<IPlatformAdministrationStore>();
+        var platform = new ManagePlatform(
+            store,
+            Substitute.For<IAccessTokenIssuer>());
+
+        var result = await platform.CreateBotAsync(
+            "administrator-bot",
+            UserRole.Administrator,
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.State).IsEqualTo(CreateBotState.InvalidRole);

@@ -80,7 +80,7 @@ public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
             UpdatePlatformRoleState.InvalidBotRole => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Role is not valid for a bot.",
-                detail: "GitOps Bots must use the Organizer role."),
+                detail: "Bot identities may use User or Organizer, but never Administrator."),
             _ => throw new InvalidOperationException(
                 $"Unsupported platform role update state: {result.State}.")
         };
