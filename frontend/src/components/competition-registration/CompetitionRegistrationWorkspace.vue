@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, KeyRound, Loader2, Lock, LogOut, UserPlus, Users } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, Loader2, Lock, LogOut, Users } from 'lucide-vue-next'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -13,7 +13,6 @@ import ErrorState from '@/components/state/ErrorState.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Panel } from '@/components/ui/panel'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -22,8 +21,6 @@ const { t } = useI18n()
 const route = useRoute()
 const queryClient = useQueryClient()
 const competitionId = computed(() => route.params.id as string)
-const newTeamName = ref('')
-const joinToken = ref('')
 
 const { data: competition, isLoading: loadingCompetition, isError: competitionError, refetch: refetchCompetition } = useQuery({
   queryKey: computed(() => queryKeys.competition(competitionId.value)),
@@ -40,28 +37,6 @@ const { data: currentTeam, isLoading: loadingTeams } = useQuery({
 const approvedTeam = computed(() =>
   currentTeam.value?.registrationStatus === 'approved' ? currentTeam.value : null,
 )
-
-const createTeamMutation = useMutation({
-  mutationFn: () => teamApi.create(competitionId.value, {
-    name: newTeamName.value.trim(),
-  }),
-  onSuccess: () => {
-    newTeamName.value = ''
-    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeam(competitionId.value) })
-    toast.success(t('teams.createSuccess'))
-  },
-  onError: () => toast.error(t('teams.actionError')),
-})
-
-const joinByTokenMutation = useMutation({
-  mutationFn: () => teamApi.join(competitionId.value, joinToken.value.trim()),
-  onSuccess: () => {
-    joinToken.value = ''
-    queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeam(competitionId.value) })
-    toast.success(t('teams.joinSuccess'))
-  },
-  onError: () => toast.error(t('teams.actionError')),
-})
 
 const leaveTeamMutation = useMutation({
   mutationFn: () => teamApi.leave(competitionId.value),
@@ -121,9 +96,15 @@ function formatDate(iso: string) {
             <PageHeader :title="competition.title" :description="competition.description ?? t('teams.registrationDetailFallback')">
               <template #actions>
                 <div class="flex flex-wrap gap-2">
-                  <Badge :variant="statusVariant(competition.status)">{{ competition.status }}</Badge>
-                  <Badge variant="secondary">{{ competition.mode.toUpperCase() }}</Badge>
-                  <Badge variant="outline">{{ t('teams.maxMembers', { count: competition.maxTeamMembers }) }}</Badge>
+                  <Badge :variant="statusVariant(competition.status)">
+                    {{ competition.status }}
+                  </Badge>
+                  <Badge variant="secondary">
+                    {{ competition.mode.toUpperCase() }}
+                  </Badge>
+                  <Badge variant="outline">
+                    {{ t('teams.maxMembers', { count: competition.maxTeamMembers }) }}
+                  </Badge>
                 </div>
               </template>
             </PageHeader>
@@ -148,7 +129,9 @@ function formatDate(iso: string) {
                   <Users class="size-5 text-primary" />
                   {{ t('teams.registrationTitle') }}
                 </div>
-                <p class="mt-2 text-sm text-muted-foreground">{{ t('teams.registrationDescription') }}</p>
+                <p class="mt-2 text-sm text-muted-foreground">
+                  {{ t('teams.registrationDescription') }}
+                </p>
               </div>
               <Separator />
               <div>
@@ -162,7 +145,9 @@ function formatDate(iso: string) {
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div class="space-y-2">
                         <div class="flex flex-wrap items-center gap-2">
-                          <h3 class="text-lg font-semibold">{{ currentTeam.name }}</h3>
+                          <h3 class="text-lg font-semibold">
+                            {{ currentTeam.name }}
+                          </h3>
                           <Badge :variant="statusVariant(currentTeam.registrationStatus)">
                             {{ currentTeam.registrationStatus }}
                           </Badge>
@@ -179,6 +164,12 @@ function formatDate(iso: string) {
                         <Button v-if="approvedTeam" as-child>
                           <RouterLink :to="`/competitions/${competition.id}`">
                             {{ t('competitions.enter') }}
+                            <ArrowRight class="size-4" />
+                          </RouterLink>
+                        </Button>
+                        <Button variant="outline" as-child>
+                          <RouterLink to="/teams">
+                            {{ t('teams.manageTeam') }}
                             <ArrowRight class="size-4" />
                           </RouterLink>
                         </Button>
@@ -201,37 +192,21 @@ function formatDate(iso: string) {
                   </div>
                 </div>
 
-                <div v-else class="grid gap-4 xl:grid-cols-2">
-                  <Panel class="space-y-3 p-4">
-                    <div class="flex items-center gap-2 font-semibold">
-                      <UserPlus class="size-4 text-primary" />
-                      {{ t('teams.createForCompetition') }}
+                <div v-else>
+                  <Panel class="flex flex-col items-start gap-4 p-5">
+                    <div>
+                      <h3 class="font-semibold">
+                        {{ t('teams.managedOnTeamsTitle') }}
+                      </h3>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {{ t('teams.managedOnTeamsDescription') }}
+                      </p>
                     </div>
-                    <Input v-model="newTeamName" :placeholder="t('teams.teamNamePlaceholder')" />
-                    <Button
-                      class="w-full"
-                      :disabled="!newTeamName.trim() || createTeamMutation.isPending.value"
-                      @click="createTeamMutation.mutate()"
-                    >
-                      <Loader2 v-if="createTeamMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-                      {{ t('teams.createTeam') }}
-                    </Button>
-                  </Panel>
-
-                  <Panel class="space-y-3 p-4">
-                    <div class="flex items-center gap-2 font-semibold">
-                      <KeyRound class="size-4 text-primary" />
-                      {{ t('teams.joinExistingTeam') }}
-                    </div>
-                    <Input v-model="joinToken" :placeholder="t('teams.tokenPlaceholder')" />
-                    <Button
-                      variant="outline"
-                      class="w-full"
-                      :disabled="!joinToken.trim() || joinByTokenMutation.isPending.value"
-                      @click="joinByTokenMutation.mutate()"
-                    >
-                      <Loader2 v-if="joinByTokenMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-                      {{ t('teams.joinByToken') }}
+                    <Button as-child>
+                      <RouterLink to="/teams">
+                        {{ t('teams.openTeamManagement') }}
+                        <ArrowRight class="size-4" />
+                      </RouterLink>
                     </Button>
                   </Panel>
                 </div>
@@ -241,7 +216,9 @@ function formatDate(iso: string) {
 
           <Card class="px-4 py-4">
             <div class="space-y-3">
-              <div class="text-sm font-bold uppercase tracking-[0.12em]">{{ t('teams.registrationRules') }}</div>
+              <div class="text-sm font-bold uppercase tracking-[0.12em]">
+                {{ t('teams.registrationRules') }}
+              </div>
               <Separator />
               <div class="space-y-3 text-sm text-muted-foreground">
                 <Panel class="p-4">

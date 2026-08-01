@@ -5,11 +5,12 @@ import { toPublicTeam } from '../src/api/teamPresentation'
 
 const apiBaseUrl = 'https://api.noctf.test'
 const competitionId = '11111111-1111-1111-1111-111111111111'
+const teamId = '22222222-2222-2222-2222-222222222222'
 const originalClientConfig = client.getConfig()
 const requests: Request[] = []
 
 const team = {
-  id: '22222222-2222-2222-2222-222222222222',
+  id: teamId,
   competitionId,
   name: 'Byte Brigade',
   avatarUrl: null,
@@ -44,6 +45,8 @@ const contractFetch: typeof fetch = async (input, init) => {
   }
   if (pathname === `${teamsPath}/join` && request.method === 'POST')
     return new Response(null, { status: 204 })
+  if (pathname === `${teamsPath}/${teamId}` && request.method === 'PUT')
+    return Response.json({ ...team, name: 'Renamed Brigade', avatarUrl: 'https://cdn.noctf.test/team.png' })
   if (pathname === teamsPath && request.method === 'POST')
     return Response.json(team, { status: 201 })
   if (pathname === teamsPath)
@@ -121,6 +124,26 @@ describe('generated public team contract', () => {
     expect(await requests[0]!.json()).toEqual({
       name: team.name,
       avatarUrl: null,
+    })
+  })
+
+  test('updates a team with the generated competition-scoped contract', async () => {
+    await expect(teamApi.update(competitionId, teamId, {
+      name: 'Renamed Brigade',
+      avatarUrl: 'https://cdn.noctf.test/team.png',
+    })).resolves.toMatchObject({
+      id: teamId,
+      name: 'Renamed Brigade',
+      avatarUrl: 'https://cdn.noctf.test/team.png',
+    })
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.method).toBe('PUT')
+    expect(new URL(requests[0]!.url).pathname)
+      .toBe(`/api/v1/competitions/${competitionId}/teams/${teamId}`)
+    expect(await requests[0]!.json()).toEqual({
+      name: 'Renamed Brigade',
+      avatarUrl: 'https://cdn.noctf.test/team.png',
     })
   })
 
