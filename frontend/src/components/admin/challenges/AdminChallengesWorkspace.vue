@@ -18,6 +18,7 @@ import {
   Copy,
   Loader2,
   MoreHorizontal,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -25,6 +26,7 @@ import {
 } from 'lucide-vue-next'
 import { computed, h, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { challengeBankAdminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
@@ -398,19 +400,26 @@ watch([globalFilter, includeDeleted], () => table.setPageIndex(0))
           {{ t('admin.challenges.lifecycleSubtitle') }}
         </p>
       </div>
-      <Button
-        :variant="includeDeleted ? 'default' : 'outline'"
-        class="w-full sm:w-auto"
-        :aria-pressed="includeDeleted"
-        @click="includeDeleted = !includeDeleted"
-      >
-        <ArchiveRestore class="size-4" />
-        {{
-          includeDeleted
-            ? t('admin.challenges.hideDeleted')
-            : t('admin.challenges.includeDeleted')
-        }}
-      </Button>
+      <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <Button as-child>
+          <RouterLink to="/admin/challenges/create">
+            <Plus class="size-4" />
+            {{ t('admin.challenges.create') }}
+          </RouterLink>
+        </Button>
+        <Button
+          :variant="includeDeleted ? 'default' : 'outline'"
+          :aria-pressed="includeDeleted"
+          @click="includeDeleted = !includeDeleted"
+        >
+          <ArchiveRestore class="size-4" />
+          {{
+            includeDeleted
+              ? t('admin.challenges.hideDeleted')
+              : t('admin.challenges.includeDeleted')
+          }}
+        </Button>
+      </div>
     </div>
 
     <Card class="grid min-w-0 gap-3 p-3 sm:grid-cols-[minmax(0,24rem)_auto] sm:items-center">
