@@ -21,17 +21,9 @@ import {
 import {
   BadgeCheck,
   Activity,
-  ClipboardList,
-  Container,
-  FileText,
-  Plug,
   Puzzle,
-  Network,
-  Bot,
-  MailCheck,
   Trophy,
   User,
-  Users,
   LogOut,
   Home,
 } from 'lucide-vue-next'
@@ -46,21 +38,13 @@ const isAdmin = computed(() => isPlatformAdministrator(auth.userRole))
 const navItems = computed(() => {
   const items = [
     { to: '/admin/competitions', label: t('admin.nav.competitions'), icon: Trophy },
-    { to: '/admin/teams', label: t('admin.nav.teams'), icon: Users },
     { to: '/admin/challenges', label: t('admin.nav.challenges'), icon: Puzzle },
-    { to: '/admin/containers', label: t('admin.nav.containers'), icon: Container },
-    { to: '/admin/plugins', label: t('admin.nav.plugins'), icon: Plug },
-    { to: '/admin/infrastructure', label: t('admin.nav.infrastructure'), icon: Network, adminOnly: true },
-    { to: '/admin/qqbot', label: t('admin.nav.qqBot'), icon: Bot, adminOnly: true },
-    { to: '/admin/email-verification', label: t('admin.nav.emailVerification'), icon: MailCheck, adminOnly: true },
-    { to: '/admin/audit-logs', label: t('admin.nav.auditLogs'), icon: ClipboardList, adminOnly: true },
     { to: '/admin/health', label: t('admin.nav.health'), icon: Activity },
-    { to: '/admin/logs', label: t('admin.nav.liveLogs'), icon: FileText },
   ]
   if (isAdmin.value) {
     items.unshift({ to: '/admin/users', label: t('admin.nav.users'), icon: User })
   }
-  return items.filter(item => !item.adminOnly || isAdmin.value)
+  return items
 })
 
 async function handleLogout() {

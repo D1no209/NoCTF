@@ -94,7 +94,9 @@ export function configureAuthSessionRefresh(
 
 export async function refreshAuthSessionIfNeeded(force = false): Promise<AuthSession | null> {
   const session = readAuthSession()
-  if (!session || (!force && !shouldRefreshToken(session.accessToken)))
+  if (!session && !force)
+    return null
+  if (session && !force && !shouldRefreshToken(session.accessToken))
     return session
 
   if (refreshInFlight)
@@ -108,7 +110,7 @@ export async function refreshAuthSessionIfNeeded(force = false): Promise<AuthSes
   return refreshInFlight
 }
 
-async function refreshAuthSession(session: AuthSession): Promise<AuthSession | null> {
+async function refreshAuthSession(session: AuthSession | null): Promise<AuthSession | null> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), refreshTimeoutMs)
 
@@ -119,7 +121,7 @@ async function refreshAuthSession(session: AuthSession): Promise<AuthSession | n
     const result = await refreshOperation(controller.signal)
     const status = result.response?.status
     if (status === 401 || status === 403) {
-      if (memorySession?.accessToken === session.accessToken)
+      if (memorySession?.accessToken === session?.accessToken)
         clearAuthSession()
       return null
     }
@@ -145,7 +147,7 @@ async function refreshAuthSession(session: AuthSession): Promise<AuthSession | n
       role: data.role,
     }
 
-    if (memorySession?.accessToken === session.accessToken)
+    if (memorySession?.accessToken === session?.accessToken)
       saveAuthSession(refreshed)
 
     return readAuthSession()

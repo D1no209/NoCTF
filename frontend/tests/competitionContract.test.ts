@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 import { toPublicCompetition } from '../src/api/competitionPresentation'
 import { client } from '../src/api/generated/client.gen'
-import { adminApi, competitionApi } from '../src/api/noctf'
+import { competitionAdminApi, competitionApi } from '../src/api/noctf'
 
 const apiBaseUrl = 'https://api.noctf.test'
 const originalClientConfig = client.getConfig()
@@ -35,8 +35,14 @@ const contractFetch: typeof fetch = async (input, init) => {
     return Response.json(competition)
   if (pathname === '/api/v1/admin/competitions' && request.method === 'POST')
     return Response.json(competition, { status: 201 })
+  if (pathname === '/api/v1/admin/competitions' && request.method === 'GET')
+    return Response.json({ items: [competition] })
   if (pathname === `/api/v1/admin/competitions/${competition.id}` && request.method === 'PUT')
     return Response.json(competition)
+  if (pathname === `/api/v1/admin/competitions/${competition.id}` && request.method === 'GET')
+    return Response.json(competition)
+  if (pathname === `/api/v1/admin/competitions/${competition.id}` && request.method === 'DELETE')
+    return new Response(null, { status: 204 })
 
   return Response.json({}, { status: 404 })
 }
@@ -112,8 +118,8 @@ describe('generated public competition contract', () => {
       maxConcurrentRuntimeInstancesPerTeam: competition.maxConcurrentRuntimeInstancesPerTeam,
     }
 
-    await adminApi.createCompetition({ ...metadata, mode: competition.mode })
-    await adminApi.updateCompetition(competition.id, metadata)
+    await competitionAdminApi.create({ ...metadata, mode: competition.mode })
+    await competitionAdminApi.update(competition.id, metadata)
 
     expect(requests).toHaveLength(2)
     expect(requests[0]!.method).toBe('POST')
@@ -132,5 +138,17 @@ describe('generated public competition contract', () => {
       maxTeamMembers: 5,
       maxConcurrentRuntimeInstancesPerTeam: 2,
     })
+  })
+
+  test('admin reads and deletes use generated v1 paths', async () => {
+    await expect(competitionAdminApi.list()).resolves.toEqual([competition])
+    await expect(competitionAdminApi.get(competition.id)).resolves.toEqual(competition)
+    await expect(competitionAdminApi.delete(competition.id)).resolves.toBeUndefined()
+
+    expect(requests.map(request => [request.method, new URL(request.url).pathname])).toEqual([
+      ['GET', '/api/v1/admin/competitions'],
+      ['GET', `/api/v1/admin/competitions/${competition.id}`],
+      ['DELETE', `/api/v1/admin/competitions/${competition.id}`],
+    ])
   })
 })

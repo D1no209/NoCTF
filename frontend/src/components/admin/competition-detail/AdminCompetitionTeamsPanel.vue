@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Check, Loader2, Lock, ShieldAlert, Unlock, X } from 'lucide-vue-next'
+import type { NoCtfapiEndpointsTeamsTeamResponse } from '@/api/generated/types.gen'
+import { Check, Loader2, ShieldAlert, ShieldCheck, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,23 +14,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-interface CompetitionTeamDto {
-  id: string
-  name: string
-  captainName: string
-  memberCount: number
-  inviteToken: string
-  isLocked: boolean
-  isBanned: boolean
-  bannedReason?: string | null
-  trackName?: string | null
-  registrationStatus: string
-  registeredAt: string
-  approvedAt?: string | null
-}
-
 defineProps<{
-  competitionTeams?: CompetitionTeamDto[]
+  competitionTeams?: NoCtfapiEndpointsTeamsTeamResponse[]
   loadingTeams: boolean
   maxTeamMembers: number
 }>()
@@ -37,11 +23,16 @@ defineProps<{
 const emit = defineEmits<{
   approve: [teamId: string]
   reject: [teamId: string]
-  toggleLock: [payload: { teamId: string, isLocked: boolean }]
-  toggleBan: [payload: { teamId: string, isBanned: boolean }]
+  ban: [teamId: string]
+  unban: [teamId: string]
 }>()
 
 const { t } = useI18n()
+const registrationStatuses = ['pending', 'approved', 'rejected'] as const
+
+function statusLabel(status: NoCtfapiEndpointsTeamsTeamResponse['registrationStatus']) {
+  return status === undefined ? 'unknown' : registrationStatuses[status]
+}
 </script>
 
 <template>
@@ -55,54 +46,38 @@ const { t } = useI18n()
         <TableRow>
           <TableHead>{{ t('admin.teams.name') }}</TableHead>
           <TableHead>{{ t('admin.teams.members') }}</TableHead>
-          <TableHead>{{ t('admin.competitionDetail.track') }}</TableHead>
+          <TableHead>{{ t('admin.teams.captain') }}</TableHead>
           <TableHead>{{ t('common.status') }}</TableHead>
-          <TableHead>{{ t('admin.competitionDetail.locked') }}</TableHead>
-          <TableHead>{{ t('admin.competitionDetail.banned') }}</TableHead>
           <TableHead class="text-right">{{ t('common.actions') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         <TableRow v-if="loadingTeams">
-          <TableCell colspan="7" class="h-20 text-center text-muted-foreground">
-            <Loader2 class="mr-2 inline size-4 animate-spin" />
-            {{ t('common.loading') }}
+          <TableCell colspan="5" class="h-20 text-center text-muted-foreground">
+            <Loader2 class="mr-2 inline size-4 animate-spin" />{{ t('common.loading') }}
           </TableCell>
         </TableRow>
         <TableRow v-else-if="!competitionTeams?.length">
-          <TableCell colspan="7" class="h-20 text-center text-muted-foreground">
-            {{ t('admin.competitionDetail.noTeams') }}
-          </TableCell>
+          <TableCell colspan="5" class="h-20 text-center text-muted-foreground">{{ t('admin.competitionDetail.noTeams') }}</TableCell>
         </TableRow>
         <TableRow v-for="team in competitionTeams" v-else :key="team.id">
           <TableCell>
-            <div class="font-medium">{{ team.name }}</div>
-            <div class="text-xs text-muted-foreground">{{ team.captainName }}</div>
-            <code class="mt-1 block text-[10px] text-muted-foreground">{{ team.inviteToken }}</code>
+            <div class="font-medium">{{ team.name ?? '-' }}</div>
+            <code class="text-[10px] text-muted-foreground">{{ team.id }}</code>
           </TableCell>
-          <TableCell>{{ team.memberCount }} / {{ maxTeamMembers }}</TableCell>
-          <TableCell class="text-xs text-muted-foreground">{{ team.trackName || '-' }}</TableCell>
+          <TableCell>{{ team.memberIds?.length ?? 0 }} / {{ maxTeamMembers }}</TableCell>
+          <TableCell><code class="text-xs text-muted-foreground">{{ team.captainId ?? '-' }}</code></TableCell>
           <TableCell>
-            <Badge :variant="team.registrationStatus === 'approved' ? 'default' : team.registrationStatus === 'rejected' ? 'destructive' : 'secondary'">
-              {{ team.registrationStatus }}
-            </Badge>
-          </TableCell>
-          <TableCell>
-            <Badge :variant="team.isLocked ? 'outline' : 'secondary'">
-              {{ team.isLocked ? t('admin.competitionDetail.locked') : t('admin.competitionDetail.unlocked') }}
-            </Badge>
-          </TableCell>
-          <TableCell>
-            <Badge :variant="team.isBanned ? 'destructive' : 'secondary'">
-              {{ team.isBanned ? t('admin.competitionDetail.banned') : t('admin.competitionDetail.normal') }}
+            <Badge :variant="statusLabel(team.registrationStatus) === 'approved' ? 'default' : statusLabel(team.registrationStatus) === 'rejected' ? 'destructive' : 'secondary'">
+              {{ statusLabel(team.registrationStatus) }}
             </Badge>
           </TableCell>
           <TableCell class="text-right">
-            <div class="flex justify-end gap-1">
-              <Button v-if="team.registrationStatus !== 'approved'" variant="ghost" size="icon" class="size-8" @click="emit('approve', team.id)"><Check class="size-4" /></Button>
-              <Button v-if="team.registrationStatus !== 'rejected'" variant="ghost" size="icon" class="size-8 text-destructive" @click="emit('reject', team.id)"><X class="size-4" /></Button>
-              <Button variant="ghost" size="icon" class="size-8" @click="emit('toggleLock', { teamId: team.id, isLocked: !team.isLocked })"><Unlock v-if="team.isLocked" class="size-4" /><Lock v-else class="size-4" /></Button>
-              <Button variant="ghost" size="icon" class="size-8" :class="team.isBanned ? '' : 'text-destructive'" @click="emit('toggleBan', { teamId: team.id, isBanned: team.isBanned })"><ShieldAlert class="size-4" /></Button>
+            <div v-if="team.id" class="flex flex-wrap justify-end gap-1">
+              <Button variant="ghost" size="icon" class="size-8" :title="t('admin.competitionDetail.approveTeam')" @click="emit('approve', team.id)"><Check class="size-4" /></Button>
+              <Button variant="ghost" size="icon" class="size-8 text-destructive" :title="t('admin.competitionDetail.rejectTeam')" @click="emit('reject', team.id)"><X class="size-4" /></Button>
+              <Button variant="ghost" size="icon" class="size-8 text-destructive" :title="t('admin.competitionDetail.banTeam')" @click="emit('ban', team.id)"><ShieldAlert class="size-4" /></Button>
+              <Button variant="ghost" size="icon" class="size-8" :title="t('admin.competitionDetail.unbanTeam')" @click="emit('unban', team.id)"><ShieldCheck class="size-4" /></Button>
             </div>
           </TableCell>
         </TableRow>

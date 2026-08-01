@@ -10,7 +10,7 @@ import {
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { adminApi } from '@/api/noctf'
+import { healthApi } from '@/api/noctf'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -27,7 +27,7 @@ async function fetchHealth(silent = false) {
     loading.value = true
 
   try {
-    health.value = await adminApi.health()
+    health.value = await healthApi.get()
     lastUpdated.value = new Date()
   }
   catch {

@@ -27,7 +27,7 @@ import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { adminApi } from '@/api/noctf'
+import { competitionAdminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -68,6 +68,40 @@ interface CompetitionAdminDto {
   maxTeamMembers: number
   maxConcurrentRuntimeInstancesPerTeam: number
   ownerId: string
+}
+
+const competitionModes = ['Ctf', 'Awd', 'Awdp', 'Koh'] as const
+const competitionStatuses = ['Draft', 'Visible', 'Published', 'Running', 'Paused', 'Finished'] as const
+
+function toCompetitionAdminDto(value: Awaited<ReturnType<typeof competitionAdminApi.list>>[number]): CompetitionAdminDto {
+  if (
+    !value.id
+    || !value.title
+    || value.mode === undefined
+    || value.status === undefined
+    || !value.startTime
+    || !value.endTime
+    || value.teamRegistrationAutoApprove === undefined
+    || value.maxTeamMembers === undefined
+    || value.maxConcurrentRuntimeInstancesPerTeam === undefined
+    || !value.ownerId
+  ) {
+    throw new TypeError('Admin competition response is incomplete.')
+  }
+
+  return {
+    id: value.id,
+    title: value.title,
+    description: value.description ?? undefined,
+    gameModeType: competitionModes[value.mode],
+    status: competitionStatuses[value.status],
+    startTime: value.startTime,
+    endTime: value.endTime,
+    teamRegistrationAutoApprove: value.teamRegistrationAutoApprove,
+    maxTeamMembers: value.maxTeamMembers,
+    maxConcurrentRuntimeInstancesPerTeam: value.maxConcurrentRuntimeInstancesPerTeam,
+    ownerId: value.ownerId,
+  }
 }
 
 const globalFilter = ref('')
@@ -135,7 +169,7 @@ function competitionPayload(): NoCtfapiEndpointsAdministrationCompetitionsUpdate
 
 const { data: competitions, isLoading, isError, refetch } = useQuery({
   queryKey: queryKeys.adminCompetitions,
-  queryFn: () => adminApi.competitions<CompetitionAdminDto[]>(),
+  queryFn: async () => (await competitionAdminApi.list()).map(toCompetitionAdminDto),
 })
 
 const saveMutation = useMutation({
@@ -145,13 +179,13 @@ const saveMutation = useMutation({
     }
     const body = competitionPayload()
     if (isCreating.value) {
-      await adminApi.createCompetition({
+      await competitionAdminApi.create({
         ...body,
         mode: competitionMode(form.value.gameModeType),
       })
     }
     else {
-      await adminApi.updateCompetition(selectedComp.value!.id, body)
+      await competitionAdminApi.update(selectedComp.value!.id, body)
     }
   },
   onSuccess: () => {
@@ -166,7 +200,7 @@ const saveMutation = useMutation({
 
 const deleteMutation = useMutation({
   mutationFn: async (id: string) => {
-    await adminApi.deleteCompetition(id)
+    await competitionAdminApi.delete(id)
   },
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCompetitions })
@@ -350,13 +384,6 @@ const table = useVueTable({
                   <DropdownMenuItem @click="router.push(`/competitions/${row.original.id}`)">
                     <ExternalLink class="mr-2 size-4" />
                     {{ t('admin.competitions.viewPublic') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    v-if="row.original.gameModeType.toLowerCase() === 'awdp'"
-                    @click="router.push({ name: 'awdp-screen', params: { gameId: row.original.id } })"
-                  >
-                    <ExternalLink class="mr-2 size-4" />
-                    {{ t('awdp.screenEntry') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem class="text-destructive focus:text-destructive" @click="openDelete(row.original)">
