@@ -91,6 +91,20 @@ describe('generated email verification contracts', () => {
       password: 'replacement-secret',
       expectedRevision: 4,
     })
+    expect(await requests[1]!.json()).toEqual({
+      enabled: true,
+      publicBaseUrl: configuration.publicBaseUrl,
+      tokenLifetimeMinutes: 1440,
+      resendCooldownSeconds: 60,
+      smtpHost: configuration.smtpHost,
+      smtpPort: 587,
+      smtpEnableSsl: true,
+      smtpUserName: configuration.smtpUserName,
+      smtpFromAddress: configuration.smtpFromAddress,
+      smtpFromName: configuration.smtpFromName,
+      smtpTimeoutSeconds: 10,
+      expectedRevision: 4,
+    })
   })
 
   test('verification and authenticated resend use the generated v1 endpoints', async () => {

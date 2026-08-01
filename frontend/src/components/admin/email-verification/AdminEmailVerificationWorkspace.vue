@@ -109,7 +109,6 @@ async function saveConfiguration() {
   }
   catch {
     toast.error(t('admin.emailVerification.settingsSaveFailed'))
-    await loadConfiguration()
   }
   finally {
     saving.value = false
