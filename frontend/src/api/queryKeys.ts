@@ -1,4 +1,5 @@
 export const queryKeys = {
+  currentUser: ['current-user'] as const,
   notifications: ['notifications'] as const,
   competitions: ['competitions'] as const,
   competition: (id: string) => ['competition', id] as const,

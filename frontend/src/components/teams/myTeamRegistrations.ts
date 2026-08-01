@@ -7,20 +7,39 @@ export interface MyTeamRegistration {
   team: PublicTeam
 }
 
+export interface MyTeamsWorkspaceData {
+  registrations: MyTeamRegistration[]
+  availableCompetitions: PublicCompetition[]
+}
+
 type LoadCompetitions = () => Promise<PublicCompetition[]>
 type LoadTeam = (competitionId: string) => Promise<PublicTeam | null>
 
-export async function loadMyTeamRegistrations(
+export async function loadMyTeamsWorkspace(
   loadCompetitions: LoadCompetitions = competitionApi.list,
   loadTeam: LoadTeam = teamApi.getMy,
-): Promise<MyTeamRegistration[]> {
+): Promise<MyTeamsWorkspaceData> {
   const competitions = await loadCompetitions()
-  const registrations = await Promise.all(competitions.map(async competition => ({
+  const memberships = await Promise.all(competitions.map(async competition => ({
     competition,
     team: await loadTeam(competition.id),
   })))
 
-  return registrations.filter(
+  const registrations = memberships.filter(
     (registration): registration is MyTeamRegistration => registration.team !== null,
   )
+  const unavailableStatuses = new Set<PublicCompetition['status']>([
+    'running',
+    'paused',
+    'finished',
+  ])
+
+  return {
+    registrations,
+    availableCompetitions: memberships
+      .filter(membership =>
+        membership.team === null && !unavailableStatuses.has(membership.competition.status),
+      )
+      .map(membership => membership.competition),
+  }
 }

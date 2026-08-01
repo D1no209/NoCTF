@@ -1,11 +1,12 @@
 import type { PublicCompetition } from '../src/api/competitionPresentation'
 import type { PublicTeam } from '../src/api/teamPresentation'
 import { describe, expect, test } from 'bun:test'
-import { loadMyTeamRegistrations } from '../src/components/teams/myTeamRegistrations'
+import { loadMyTeamsWorkspace } from '../src/components/teams/myTeamRegistrations'
 
 const navBarSource = await Bun.file(new URL('../src/components/layout/NavBar.vue', import.meta.url)).text()
 const routerSource = await Bun.file(new URL('../src/router/index.ts', import.meta.url)).text()
 const workspaceSource = await Bun.file(new URL('../src/components/teams/MyTeamsWorkspace.vue', import.meta.url)).text()
+const registrationWorkspaceSource = await Bun.file(new URL('../src/components/competition-registration/CompetitionRegistrationWorkspace.vue', import.meta.url)).text()
 
 const competitions: PublicCompetition[] = [
   {
@@ -50,10 +51,10 @@ const team: PublicTeam = {
 }
 
 describe('my teams workspace', () => {
-  test('returns only competitions where the current user belongs to a team', async () => {
+  test('separates current teams from competitions that can accept a new team', async () => {
     const requestedCompetitionIds: string[] = []
 
-    const result = await loadMyTeamRegistrations(
+    const result = await loadMyTeamsWorkspace(
       async () => competitions,
       async (competitionId) => {
         requestedCompetitionIds.push(competitionId)
@@ -62,7 +63,10 @@ describe('my teams workspace', () => {
     )
 
     expect(requestedCompetitionIds).toEqual(competitions.map(competition => competition.id))
-    expect(result).toEqual([{ competition: competitions[0], team }])
+    expect(result).toEqual({
+      registrations: [{ competition: competitions[0], team }],
+      availableCompetitions: [competitions[1]],
+    })
   })
 
   test('exposes the teams workspace from desktop and mobile navigation', () => {
@@ -77,5 +81,13 @@ describe('my teams workspace', () => {
     expect(workspaceSource).toMatch(/<h2[^>]*>\s*\{\{ item\.team\.name \}\}/)
     expect(workspaceSource).toContain('t(\'teams.competition\')')
     expect(workspaceSource).not.toContain('v-else class="flex flex-1 items-center p-4"')
+  })
+
+  test('owns team creation and editing instead of delegating creation to competition pages', () => {
+    expect(workspaceSource).toContain('teamApi.create(')
+    expect(workspaceSource).toContain('teamApi.update(')
+    expect(registrationWorkspaceSource).not.toContain('teamApi.create(')
+    expect(registrationWorkspaceSource).not.toContain('teamApi.join(')
+    expect(registrationWorkspaceSource).toContain('to="/teams"')
   })
 })

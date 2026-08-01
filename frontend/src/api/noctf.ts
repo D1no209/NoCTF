@@ -27,6 +27,7 @@ import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
   NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse,
   NoCtfapiEndpointsTeamsCreateTeamRequest,
+  NoCtfapiEndpointsTeamsUpdateTeamRequest,
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
 import type { PublicSubmissionListItem } from './submissionPresentation'
@@ -308,6 +309,15 @@ export const notificationApi = {
 }
 
 export const authApi = {
+  async getMe() {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsAuthenticationGetMeEndpoint(),
+      tt('errors.requestFailed'),
+    )
+    if (!response.userId)
+      throw new ApiError(tt('errors.requestFailed'))
+    return response
+  },
   async login(email: string, password: string) {
     return unwrap(await generatedSdk.noCtfapiEndpointsAuthenticationLoginEndpoint({
       body: { login: email, password },
@@ -652,6 +662,20 @@ export const teamApi = {
         body,
       }),
       tt('errors.createTeam'),
+    )
+    return toPublicTeam(response)
+  },
+  async update(
+    competitionId: string,
+    teamId: string,
+    body: NoCtfapiEndpointsTeamsUpdateTeamRequest & { name: string },
+  ) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsTeamsUpdateTeamEndpoint({
+        path: { competitionId, teamId },
+        body,
+      }),
+      tt('errors.updateTeam'),
     )
     return toPublicTeam(response)
   },
