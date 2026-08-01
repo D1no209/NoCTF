@@ -30,6 +30,8 @@ public sealed class CompetitionManagementPersistenceTests
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7();
             var competitionId = Guid.CreateVersion7();
+            var laterCompetitionId = Guid.CreateVersion7();
+            var draftCompetitionId = Guid.CreateVersion7();
 
             await using var db = new NoCtfDbContext(options);
             await db.Database.MigrateAsync(cancellationToken);
@@ -45,29 +47,48 @@ public sealed class CompetitionManagementPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Competitions.Add(new Competition
-            {
-                Id = competitionId,
-                OwnerId = ownerId,
-                Title = "Competition persistence",
-                Mode = GameMode.Ctf,
-                StartAt = now,
-                EndAt = now.AddHours(1),
-                Status = CompetitionStatus.Published,
-                MaxTeamMembers = 5,
-                ConfigurationJson = "{}",
-                FlagDerivationSecret = new byte[32],
-                CreatedAt = now,
-                UpdatedAt = now,
-                ConfigurationUpdatedAt = now
-            });
+            db.Competitions.AddRange(
+                Competition(competitionId, ownerId, "Competition persistence", now,
+                    CompetitionStatus.Published),
+                Competition(laterCompetitionId, ownerId, "Later competition", now.AddHours(2),
+                    CompetitionStatus.Published),
+                Competition(draftCompetitionId, ownerId, "Hidden draft", now.AddHours(4),
+                    CompetitionStatus.Draft));
             await db.SaveChangesAsync(cancellationToken);
 
-            var result = await new CompetitionManagementStore(db)
+            var store = new CompetitionManagementStore(db);
+            var result = await store
                 .FindAsync(competitionId, includeDraft: false, cancellationToken);
+            var listed = await store.ListAsync(includeDraft: false, cancellationToken);
 
             await Assert.That(result).IsNotNull();
             await Assert.That(result!.Id).IsEqualTo(competitionId);
+            await Assert.That(listed).Count().IsEqualTo(2);
+            await Assert.That(listed[0].Id).IsEqualTo(laterCompetitionId);
+            await Assert.That(listed[1].Id).IsEqualTo(competitionId);
         });
     }
+
+    private static Competition Competition(
+        Guid id,
+        Guid ownerId,
+        string title,
+        DateTimeOffset startAt,
+        CompetitionStatus status) =>
+        new()
+        {
+            Id = id,
+            OwnerId = ownerId,
+            Title = title,
+            Mode = GameMode.Ctf,
+            StartAt = startAt,
+            EndAt = startAt.AddHours(1),
+            Status = status,
+            MaxTeamMembers = 5,
+            ConfigurationJson = "{}",
+            FlagDerivationSecret = new byte[32],
+            CreatedAt = startAt,
+            UpdatedAt = startAt,
+            ConfigurationUpdatedAt = startAt
+        };
 }

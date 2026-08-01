@@ -20,6 +20,7 @@ export const queryKeys = {
   awdpState: (competitionId: string) => ['awdp-state', competitionId] as const,
   awdpScreen: (gameId: string) => ['awdp-screen', gameId] as const,
   teams: (competitionId: string) => ['teams', competitionId] as const,
+  myTeams: ['my-teams'] as const,
   myCompetitionTeam: (competitionId: string) => ['my-competition-team', competitionId] as const,
   patchSubmissions: (competitionId: string) => ['patch-submissions', competitionId] as const,
   adminCompetitions: ['admin-competitions'] as const,
