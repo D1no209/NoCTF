@@ -46,6 +46,9 @@ builder.UseWolverine(options =>
         options.PublishMessage<DrainSubmissions>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<SendEmailVerification>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<CleanupObject>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<ChallengePublished>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<TeamBanned>().ToPostgresqlQueue("noctf-worker");
     }
 });
 

@@ -51,3 +51,11 @@ public sealed record LeaderboardEntry(
     int SolveCount,
     DateTimeOffset? LastScoreAt,
     IReadOnlyList<LeaderboardChallengeSummary> Challenges);
+
+public interface ICompetitionLeaderboardAccess
+{
+    Task<bool> CanReadPrivateAsync(
+        Guid userId,
+        Guid competitionId,
+        CancellationToken cancellationToken);
+}

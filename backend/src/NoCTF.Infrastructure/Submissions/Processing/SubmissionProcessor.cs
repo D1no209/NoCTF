@@ -3,6 +3,7 @@ using System.Data;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
@@ -316,10 +317,77 @@ public sealed class SubmissionProcessor(
             db,
             submission.CompetitionId,
             cancellationToken);
+        var bloodAward = await TryCreateBloodAwardAsync(
+            submission,
+            evaluation,
+            cancellationToken);
         await outbox.PublishAsync(new InvalidateLeaderboard(submission.CompetitionId));
+        if (bloodAward is not null)
+            await outbox.PublishAsync(bloodAward);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private async Task<BloodAwarded?> TryCreateBloodAwardAsync(
+        Submission submission,
+        Evaluation evaluation,
+        CancellationToken ct)
+    {
+        if (submission.Kind != SubmissionKind.Flag
+            || evaluation.Decision.Result != ScoringResult.Correct)
+            return null;
+
+        var competitionMode = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == submission.CompetitionId)
+            .Select(competition => competition.Mode)
+            .SingleAsync(ct);
+        if (competitionMode != GameMode.Ctf)
+            return null;
+
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({"blood:" + submission.CompetitionChallengeId.ToString("N")}, 0))",
+            ct);
+        var solvedTeamIds = await db.Submissions.AsNoTracking()
+            .Where(candidate =>
+                candidate.CompetitionId == submission.CompetitionId
+                && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
+                && candidate.Kind == SubmissionKind.Flag
+                && candidate.CurrentScoringEventId != null
+                && candidate.Id != submission.Id)
+            .Join(
+                db.ScoringEvents.AsNoTracking().Where(@event =>
+                    @event.DeletedAt == null
+                    && @event.Result == ScoringResult.Correct),
+                candidate => candidate.CurrentScoringEventId,
+                @event => (Guid?)@event.Id,
+                (candidate, _) => candidate.TeamId)
+            .Distinct()
+            .ToArrayAsync(ct);
+        if (solvedTeamIds.Contains(submission.TeamId) || solvedTeamIds.Length >= 3)
+            return null;
+
+        var context = await db.CompetitionChallenges.AsNoTracking()
+            .Where(challenge => challenge.Id == submission.CompetitionChallengeId)
+            .Join(
+                db.Challenges.AsNoTracking(),
+                challenge => challenge.ChallengeId,
+                template => template.Id,
+                (challenge, template) => new { template.Title })
+            .Join(
+                db.Teams.AsNoTracking().Where(team => team.Id == submission.TeamId),
+                _ => submission.TeamId,
+                team => team.Id,
+                (challenge, team) => new { challenge.Title, TeamName = team.Name })
+            .SingleAsync(ct);
+        return new BloodAwarded(
+            submission.CompetitionId,
+            submission.CompetitionChallengeId,
+            context.Title,
+            (LeaderboardBloodRank)(solvedTeamIds.Length + 1),
+            submission.TeamId,
+            context.TeamName,
+            evaluation.Decision.OccurredAt);
     }
 
     private sealed record Evaluation(

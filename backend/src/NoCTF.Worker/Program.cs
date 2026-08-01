@@ -16,6 +16,7 @@ builder.Services.AddNoCtfInfrastructure(builder.Configuration);
 builder.UseWolverine(options =>
 {
     options.Discovery.IncludeType(typeof(BackendMessageHandlers));
+    options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
     var postgres = builder.Configuration.GetConnectionString("PostgreSql")
         ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
     options.PersistMessagesWithPostgresql(postgres, WolverinePersistenceSchemas.Worker);
@@ -46,6 +47,10 @@ builder.UseWolverine(options =>
     options.PublishMessage<RecordKohObservation>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<InvalidateLeaderboard>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<BloodAwarded>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<ChallengePublished>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<TeamBanned>().ToPostgresqlQueue("noctf-worker");
 });
 
 var host = builder.Build();

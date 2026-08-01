@@ -194,10 +194,45 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
                 expectedOrder: 2,
                 cancellationToken);
 
-            await lifecycleOutbox.Received(3).PublishAsync(
+            await using (var publishedEditDb = new NoCtfDbContext(options))
+            {
+                var result = await CreateManagementStore(
+                        publishedEditDb,
+                        lifecycleOutbox)
+                    .UpdateAsync(
+                        new UpdateCompetitionChallengeCommand(
+                            fixture.RevisionCompetitionId,
+                            fixture.RevisionCompetitionChallengeId,
+                            800,
+                            2,
+                            true,
+                            3,
+                            now.AddSeconds(7)),
+                        cancellationToken);
+                await Assert.That(result.Failure).IsNull();
+                await Assert.That(result.Challenge).IsNotNull();
+            }
+            await AssertStateAsync(
+                options,
+                fixture.RevisionCompetitionId,
+                fixture.RevisionCompetitionChallengeId,
+                expectedRevision: 4,
+                expectedDeleted: false,
+                expectedLeaderboardRevision: 14,
+                expectedBaseScore: 800,
+                expectedOrder: 2,
+                cancellationToken);
+
+            await lifecycleOutbox.Received(4).PublishAsync(
                 Arg.Is<InvalidateLeaderboard>(message =>
                     message!.CompetitionId == fixture.RevisionCompetitionId));
-            await lifecycleOutbox.Received(3).FlushOutgoingMessagesAsync();
+            await lifecycleOutbox.Received(1).PublishAsync(
+                Arg.Is<ChallengePublished>(message =>
+                    message!.CompetitionId == fixture.RevisionCompetitionId
+                    && message.CompetitionChallengeId
+                        == fixture.RevisionCompetitionChallengeId
+                    && message.Revision == 3));
+            await lifecycleOutbox.Received(4).FlushOutgoingMessagesAsync();
 
             await AssertRestoreFailureIsAtomicAsync(
                 options,

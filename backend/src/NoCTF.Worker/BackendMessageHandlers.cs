@@ -239,6 +239,7 @@ public static class BackendMessageHandlers
                 CompetitionId = message.CompetitionId,
                 EntityId = message.ChallengeFlagId,
                 Kind = NotificationKind.RuntimeStateChanged,
+                SourceEventKey = $"awd-flag-injection-failed:{message.ChallengeFlagId:N}:{message.ProcessingVersion}",
                 PayloadJson = payload,
                 CreatedAt = message.OccurredAt
             });
@@ -286,6 +287,7 @@ public static class BackendMessageHandlers
                 CompetitionId = message.CompetitionId,
                 EntityId = failureId,
                 Kind = NotificationKind.ManagementFailure,
+                SourceEventKey = $"awd-checker-callback-missing:{failureId:N}",
                 PayloadJson = payload,
                 CreatedAt = message.OccurredAt
             });

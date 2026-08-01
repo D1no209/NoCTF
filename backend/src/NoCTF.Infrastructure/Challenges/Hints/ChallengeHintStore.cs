@@ -85,9 +85,12 @@ public sealed class ChallengeHintStore(
             };
             db.Set<CompetitionChallengeHint>().Add(hint);
         }
+        var wasPublished = hint.PublishedAt is { } previousPublishedAt
+            && previousPublishedAt <= command.Now;
         hint.Content = command.Content;
         hint.Cost = command.Cost;
         hint.PublishedAt = command.PublishedAt;
+        hint.PublicationRevision = checked(hint.PublicationRevision + 1);
         hint.UpdatedAt = command.Now;
         challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = command.Now;
@@ -96,6 +99,13 @@ public sealed class ChallengeHintStore(
             await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
             await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
+            await QueueHintPublicationAsync(
+                command.CompetitionId,
+                challenge,
+                hint,
+                command.Now,
+                wasPublished,
+                ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
             return new(Map(hint));
@@ -126,6 +136,7 @@ public sealed class ChallengeHintStore(
         if (hint is null)
             return false;
         hint.DeletedAt = now;
+        hint.PublicationRevision = checked(hint.PublicationRevision + 1);
         hint.UpdatedAt = now;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
@@ -158,12 +169,20 @@ public sealed class ChallengeHintStore(
         if (hint is null)
             return false;
         hint.DeletedAt = null;
+        hint.PublicationRevision = checked(hint.PublicationRevision + 1);
         hint.UpdatedAt = now;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        await QueueHintPublicationAsync(
+            competitionId,
+            challenge,
+            hint,
+            now,
+            wasPublished: false,
+            ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return true;
@@ -313,6 +332,37 @@ public sealed class ChallengeHintStore(
             competition.ConfigurationJson, competition.StartAt, lifecycleAudits,
             awdRounds, projectedAt));
         return result.Entries.SingleOrDefault(item => item.TeamId == teamId)?.Score ?? 0;
+    }
+
+    private async Task QueueHintPublicationAsync(
+        Guid competitionId,
+        CompetitionChallenge challenge,
+        CompetitionChallengeHint hint,
+        DateTimeOffset now,
+        bool wasPublished,
+        CancellationToken ct)
+    {
+        if (hint.PublishedAt is not { } publishedAt)
+            return;
+        if (publishedAt <= now && wasPublished)
+            return;
+
+        var challengeTitle = await db.Challenges.AsNoTracking()
+            .Where(template => template.Id == challenge.ChallengeId)
+            .Select(template => template.Title)
+            .SingleAsync(ct);
+        var message = new PublishHintNotification(
+            competitionId,
+            challenge.Id,
+            hint.Id,
+            challengeTitle,
+            hint.Cost,
+            publishedAt,
+            hint.PublicationRevision);
+        if (publishedAt <= now)
+            await outbox.PublishAsync(message);
+        else
+            await outbox.ScheduleAsync(message, publishedAt);
     }
 
     private Task<bool> ScopeExistsAsync(Guid competitionId, Guid competitionChallengeId, CancellationToken ct) =>

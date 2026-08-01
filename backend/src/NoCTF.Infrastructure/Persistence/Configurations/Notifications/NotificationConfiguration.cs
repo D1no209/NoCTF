@@ -11,8 +11,11 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         builder.ToTable("notifications");
         builder.HasKey(notification => notification.Id);
         builder.Property(notification => notification.Kind).HasConversion<short>();
+        builder.Property(notification => notification.SourceEventKey).HasMaxLength(256);
         builder.Property(notification => notification.PayloadJson).HasColumnType("jsonb");
         builder.HasIndex(notification => new { notification.UserId, notification.CreatedAt, notification.Id });
+        builder.HasIndex(notification => new { notification.UserId, notification.SourceEventKey })
+            .IsUnique();
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
             .HasForeignKey(notification => notification.UserId)
             .OnDelete(DeleteBehavior.Restrict);

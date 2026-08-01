@@ -108,6 +108,7 @@ public sealed class ChallengeManagementStore(
         if (entity.Revision != command.ExpectedRevision)
             return new(null, ChallengeMutationFailure.RevisionConflict);
 
+        var becamePublished = !entity.IsPublished && command.IsPublished;
         entity.BaseScore = command.BaseScore;
         entity.Order = command.Order;
         entity.IsPublished = command.IsPublished;
@@ -118,6 +119,18 @@ public sealed class ChallengeManagementStore(
             await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
             await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
+            if (becamePublished)
+            {
+                var publishedTemplate = await db.Challenges.AsNoTracking()
+                    .SingleAsync(challenge => challenge.Id == entity.ChallengeId, ct);
+                await outbox.PublishAsync(new ChallengePublished(
+                    command.CompetitionId,
+                    entity.Id,
+                    publishedTemplate.Title,
+                    publishedTemplate.Direction,
+                    command.UpdatedAt,
+                    entity.Revision));
+            }
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
             var template = await db.Challenges.AsNoTracking()
