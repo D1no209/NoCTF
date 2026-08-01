@@ -336,7 +336,7 @@ created_at, running_at?, expires_at?, stopped_at?
 - submissions：管理列表使用 `(competition_id, received_at DESC, id DESC)`，题/队/类型/状态各以前导 CompetitionId 建组合索引；Flag 精确查使用 `(competition_id, submitted_flag_sha256, received_at DESC, id DESC)`。
 - scoring_events：投影使用 `(competition_id, deleted_at, occurred_at, id)`，Submission 历史使用 `(submission_id, created_at, id)`，AWD 攻击去重使用 CompetitionChallenge/Specification/Team/VictimTeam/Result 的组合索引。
 - runtime_instances：当前实例使用 `(competition_challenge_id, team_id, generation DESC)`；Runner claim 使用 `(runner_pool, state, created_at, id)`；Checker 调度使用 `(state, next_checker_due_at) WHERE next_checker_due_at IS NOT NULL`。
-- notifications：`(user_id, created_at DESC, id DESC)`；LifecycleAudit：`(competition_id, occurred_at, id)`。
+- notifications：`(user_id, created_at DESC, id DESC)` 与唯一 `(user_id, source_event_key)`；LifecycleAudit：`(competition_id, occurred_at, id)`。
 
 索引只优化候选集，不能替代 Application 的归属、权限、Flag 原文固定时间比较或计分规则。
 

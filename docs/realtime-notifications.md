@@ -24,4 +24,6 @@ API 多副本使用 Redis SignalR backplane。断线不补历史；客户端重�
 
 Payload 由 NotificationKind 对应强类型 DTO 序列化，只含安全展示字段。按 CreatedAt desc/Id desc keyset 查询。没有 Read/MarkAllRead/Delete/Expiry API。
 
-QQBot、群组同步和外发 Agent 是旧设计，不在目标架构中。
+旧的 QQBot 公钥 Agent、群组同步和专用投递协议不在目标架构中。QQBOT 作为普通
+User Bot 使用 Bearer JWT 消费自身的 `/notifications/feed`，并复用现有排行榜接口；
+平台不维护 QQ 群、投递状态或 QQBOT 专用通知表。详见 [QQBOT JWT 接入](qqbot-jwt.md)。
