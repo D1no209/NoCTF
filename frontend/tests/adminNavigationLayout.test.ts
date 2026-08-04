@@ -25,4 +25,13 @@ describe('admin navigation layout', () => {
     expect(layoutSource).toContain('label: t(\'admin.nav.platformSettings\')')
     expect(layoutSource).not.toContain('to: \'/admin/email-verification\'')
   })
+
+  test('places platform configuration after health status', () => {
+    const healthIndex = layoutSource.indexOf("to: '/admin/health'")
+    const settingsIndex = layoutSource.indexOf("to: '/admin/settings/basic'")
+
+    expect(healthIndex).toBeGreaterThan(-1)
+    expect(settingsIndex).toBeGreaterThan(healthIndex)
+    expect(layoutSource).toContain('items.push({')
+  })
 })

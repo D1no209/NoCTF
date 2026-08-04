@@ -64,7 +64,7 @@ const navItems = computed(() => {
       label: t('admin.nav.users'),
       icon: User,
     })
-    items.splice(1, 0, {
+    items.push({
       to: '/admin/settings/basic',
       activePrefix: '/admin/settings',
       label: t('admin.nav.platformSettings'),
