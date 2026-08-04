@@ -1616,6 +1616,41 @@
       "testSent": "SMTP 测试邮件已发送到当前管理员邮箱。",
       "testFailed": "SMTP 测试失败，请检查已保存的连接与凭据。"
     },
+    "settings": {
+      "title": "平台配置",
+      "subtitle": "在统一的管理员工作区中配置公开身份、账号验证与版本信息。",
+      "tabs": {
+        "basic": "平台基本信息",
+        "emailVerification": "邮箱验证",
+        "information": "平台信息"
+      },
+      "basic": {
+        "title": "平台基本信息",
+        "subtitle": "配置 NoCTF 全站使用的公开名称、简介与 Logo。",
+        "logo": "平台 Logo",
+        "replaceLogo": "更换 Logo",
+        "logoHint": "支持 PNG、JPEG 或 WebP，最大 5 MiB；当前界面推荐使用透明背景 PNG。",
+        "logoInvalid": "请选择不超过 5 MiB 的 PNG、JPEG 或 WebP Logo。",
+        "logoUploaded": "平台 Logo 已更新",
+        "logoUploadFailed": "无法上传平台 Logo，配置可能已变化，请刷新后重试。",
+        "identity": "公开身份",
+        "identityDescription": "这些字段对外公开，并显示在应用的共享界面中。",
+        "name": "平台名称",
+        "description": "平台简介",
+        "descriptionPlaceholder": "简要介绍这个平台...",
+        "initialConfiguration": "初始配置",
+        "lastUpdated": "最后保存：{value}",
+        "saved": "平台基本信息已保存",
+        "saveFailed": "无法保存平台基本信息，请刷新后重新提交。"
+      },
+      "information": {
+        "title": "平台信息",
+        "subtitle": "查看当前运行版本以及此代码仓库的贡献者。",
+        "version": "运行版本",
+        "versionDescription": "此版本由当前运行的 API 程序集报告，代表已部署的后端构建。",
+        "contributors": "贡献者"
+      }
+    },
     "nav": {
       "users": "用户",
       "teams": "队伍",
@@ -1625,6 +1660,7 @@
       "infrastructure": "基础设施",
       "qqBot": "QQ 机器人",
       "emailVerification": "邮箱验证",
+      "platformSettings": "平台配置",
       "auditLogs": "审计日志",
       "health": "健康状态",
       "liveLogs": "实时日志",

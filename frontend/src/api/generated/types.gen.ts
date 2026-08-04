@@ -210,6 +210,12 @@ export type NoCtfapiEndpointsRuntimeRuntimeTargetResponse = {
     urls?: Array<string>;
 };
 
+export type NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse = {
+    name?: string;
+    description?: string | null;
+    logoUrl?: string | null;
+};
+
 export type NoCtfapiEndpointsNotificationsNotificationListResponse = {
     items?: Array<NoCtfapiEndpointsNotificationsNotificationResponse>;
     nextCursor?: string | null;
@@ -659,6 +665,24 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
     updatedAt?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse = {
+    name?: string;
+    description?: string | null;
+    logoUrl?: string | null;
+    revision?: number;
+    updatedAt?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse = {
+    version?: string;
+    contributors?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformContributorResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformContributorResponse = {
+    id?: string;
+    avatarUrl?: string;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse = {
     accessToken?: string;
     expiresAt?: string;
@@ -700,6 +724,12 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfig
     expectedRevision: number;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformConfigurationRequest = {
+    name: string;
+    description?: string | null;
+    expectedRevision: number;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse = {
     code?: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode;
     competitionIds?: Array<string>;
@@ -710,6 +740,11 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflic
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest = {
     role?: NoCtfDomainIdentityUserRole;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
+    file: Blob | File;
+    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse = {
@@ -1829,6 +1864,36 @@ export type NoCtfapiEndpointsRuntimeStopRuntimeEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsRuntimeStopRuntimeEndpointResponse = NoCtfapiEndpointsRuntimeStopRuntimeEndpointResponses[keyof NoCtfapiEndpointsRuntimeStopRuntimeEndpointResponses];
+
+export type PlatformLogoGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/logo';
+};
+
+export type PlatformLogoGetErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PlatformConfigurationGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/configuration';
+};
+
+export type PlatformConfigurationGetResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse;
+};
+
+export type PlatformConfigurationGetResponse = PlatformConfigurationGetResponses[keyof PlatformConfigurationGetResponses];
 
 export type NoCtfapiEndpointsNotificationsListNotificationsEndpointData = {
     body?: never;
@@ -3488,6 +3553,93 @@ export type AdminPlatformUpdateEmailVerificationConfigurationResponses = {
 
 export type AdminPlatformUpdateEmailVerificationConfigurationResponse = AdminPlatformUpdateEmailVerificationConfigurationResponses[keyof AdminPlatformUpdateEmailVerificationConfigurationResponses];
 
+export type AdminPlatformGetConfigurationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/configuration';
+};
+
+export type AdminPlatformGetConfigurationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformGetConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse;
+};
+
+export type AdminPlatformGetConfigurationResponse = AdminPlatformGetConfigurationResponses[keyof AdminPlatformGetConfigurationResponses];
+
+export type AdminPlatformUpdateConfigurationData = {
+    body: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformConfigurationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/configuration';
+};
+
+export type AdminPlatformUpdateConfigurationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformUpdateConfigurationError = AdminPlatformUpdateConfigurationErrors[keyof AdminPlatformUpdateConfigurationErrors];
+
+export type AdminPlatformUpdateConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse;
+};
+
+export type AdminPlatformUpdateConfigurationResponse = AdminPlatformUpdateConfigurationResponses[keyof AdminPlatformUpdateConfigurationResponses];
+
+export type AdminPlatformGetInformationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/information';
+};
+
+export type AdminPlatformGetInformationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformGetInformationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse;
+};
+
+export type AdminPlatformGetInformationResponse = AdminPlatformGetInformationResponses[keyof AdminPlatformGetInformationResponses];
+
 export type AdminPlatformInvalidateUserTokensData = {
     body?: never;
     path: {
@@ -3785,6 +3937,39 @@ export type AdminPlatformUpdateUserRoleResponses = {
 };
 
 export type AdminPlatformUpdateUserRoleResponse = AdminPlatformUpdateUserRoleResponses[keyof AdminPlatformUpdateUserRoleResponses];
+
+export type AdminPlatformUploadLogoData = {
+    body: NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/configuration/logo';
+};
+
+export type AdminPlatformUploadLogoErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformUploadLogoError = AdminPlatformUploadLogoErrors[keyof AdminPlatformUploadLogoErrors];
+
+export type AdminPlatformUploadLogoResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse;
+};
+
+export type AdminPlatformUploadLogoResponse = AdminPlatformUploadLogoResponses[keyof AdminPlatformUploadLogoResponses];
 
 export type AdminListCompetitionsData = {
     body?: never;

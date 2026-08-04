@@ -76,9 +76,34 @@ const router = createRouter({
         },
         {
           path: 'email-verification',
-          name: 'admin-email-verification',
-          component: () => import('@/views/admin/AdminEmailVerificationView.vue'),
+          redirect: { name: 'admin-email-verification' },
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
+        },
+        {
+          path: 'settings',
+          component: () => import('@/views/admin/AdminSettingsLayout.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
+          children: [
+            {
+              path: '',
+              redirect: { name: 'admin-platform-basic' },
+            },
+            {
+              path: 'basic',
+              name: 'admin-platform-basic',
+              component: () => import('@/views/admin/AdminPlatformBasicView.vue'),
+            },
+            {
+              path: 'email-verification',
+              name: 'admin-email-verification',
+              component: () => import('@/views/admin/AdminEmailVerificationView.vue'),
+            },
+            {
+              path: 'information',
+              name: 'admin-platform-information',
+              component: () => import('@/views/admin/AdminPlatformInformationView.vue'),
+            },
+          ],
         },
         {
           path: 'competitions',

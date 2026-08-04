@@ -1,33 +1,33 @@
 <script setup lang="ts">
+import {
+  Activity,
+  BadgeCheck,
+  Home,
+  LogOut,
+  Puzzle,
+  Settings,
+  Trophy,
+  User,
+} from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { isPlatformAdministrator } from '@/api/userRole'
-import { useAuthStore } from '@/stores/auth'
-import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
+import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
-  SidebarInset,
 } from '@/components/ui/sidebar'
-import {
-  BadgeCheck,
-  Activity,
-  Puzzle,
-  Trophy,
-  User,
-  LogOut,
-  Home,
-  MailCheck,
-} from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -38,16 +38,37 @@ const isAdmin = computed(() => isPlatformAdministrator(auth.userRole))
 
 const navItems = computed(() => {
   const items = [
-    { to: '/admin/competitions', label: t('admin.nav.competitions'), icon: Trophy },
-    { to: '/admin/challenges', label: t('admin.nav.challenges'), icon: Puzzle },
-    { to: '/admin/health', label: t('admin.nav.health'), icon: Activity },
+    {
+      to: '/admin/competitions',
+      activePrefix: '',
+      label: t('admin.nav.competitions'),
+      icon: Trophy,
+    },
+    {
+      to: '/admin/challenges',
+      activePrefix: '',
+      label: t('admin.nav.challenges'),
+      icon: Puzzle,
+    },
+    {
+      to: '/admin/health',
+      activePrefix: '',
+      label: t('admin.nav.health'),
+      icon: Activity,
+    },
   ]
   if (isAdmin.value) {
-    items.unshift({ to: '/admin/users', label: t('admin.nav.users'), icon: User })
+    items.unshift({
+      to: '/admin/users',
+      activePrefix: '',
+      label: t('admin.nav.users'),
+      icon: User,
+    })
     items.splice(1, 0, {
-      to: '/admin/email-verification',
-      label: t('admin.nav.emailVerification'),
-      icon: MailCheck,
+      to: '/admin/settings/basic',
+      activePrefix: '/admin/settings',
+      label: t('admin.nav.platformSettings'),
+      icon: Settings,
     })
   }
   return items
@@ -83,7 +104,7 @@ async function handleLogout() {
             <SidebarMenuButton
               as-child
               :tooltip="item.label"
-              :is-active="route.path === item.to"
+              :is-active="route.path === item.to || Boolean(item.activePrefix && route.path.startsWith(item.activePrefix))"
             >
               <RouterLink :to="item.to" class="flex items-center gap-3">
                 <component :is="item.icon" class="size-4" />
@@ -102,8 +123,12 @@ async function handleLogout() {
                 {{ auth.user?.userName?.charAt(0)?.toUpperCase() ?? 'A' }}
               </div>
               <div class="min-w-0">
-                <div class="truncate text-sm font-semibold text-white">{{ auth.user?.userName ?? t('nav.admin') }}</div>
-                <div class="text-xs text-slate-400">{{ auth.userRole }}</div>
+                <div class="truncate text-sm font-semibold text-white">
+                  {{ auth.user?.userName ?? t('nav.admin') }}
+                </div>
+                <div class="text-xs text-slate-400">
+                  {{ auth.userRole }}
+                </div>
               </div>
             </div>
           </div>
@@ -134,7 +159,7 @@ async function handleLogout() {
         <div class="h-4 w-px bg-border mx-2" />
         <div class="flex min-w-0 flex-1 items-center gap-3">
           <h1 class="truncate text-xl font-bold tracking-tight">
-            {{ navItems.find(i => i.to === route.path)?.label || t('nav.admin') }}
+            {{ navItems.find(i => i.to === route.path || (i.activePrefix && route.path.startsWith(i.activePrefix)))?.label || t('nav.admin') }}
           </h1>
           <span v-if="isAdmin" class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-600">
             <BadgeCheck class="size-3.5" />
@@ -149,7 +174,7 @@ async function handleLogout() {
           <LanguageSwitch />
         </div>
       </header>
-      
+
       <main class="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
         <RouterView v-slot="{ Component }">
           <transition
