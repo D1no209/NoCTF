@@ -8,6 +8,8 @@ public sealed class AccessTokenVersionReader(NoCtfDbContext db) : IAccessTokenVe
 {
     public Task<bool> IsCurrentAsync(Guid userId, int tokenVersion, CancellationToken cancellationToken) =>
         db.Users.AsNoTracking().AnyAsync(
-            user => user.Id == userId && user.TokenVersion == tokenVersion,
+            user => user.Id == userId
+                && user.AccountStatus == NoCTF.Domain.Identity.UserAccountStatus.Active
+                && user.TokenVersion == tokenVersion,
             cancellationToken);
 }

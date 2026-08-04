@@ -579,11 +579,14 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     email?: string;
     kind?: NoCtfDomainIdentityUserKind;
     role?: NoCtfDomainIdentityUserRole;
+    accountStatus?: NoCtfDomainIdentityUserAccountStatus;
     tokenVersion?: number;
     emailVerified?: boolean;
     createdAt?: string;
     updatedAt?: string;
 };
+
+export type NoCtfDomainIdentityUserAccountStatus = 0 | 1 | 2 | 3;
 
 export type NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest = {
     userName: string;
@@ -591,6 +594,44 @@ export type NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest = {
 };
 
 export type NoCtfDomainIdentityUserRole2 = 'User' | 'Organizer' | 'Administrator';
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionResponse = {
+    outcome?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode = 'PhysicallyDeleted' | 'Anonymized';
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse = {
+    code?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictCode;
+    preview?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictCode = 'HardDeleteBlocked' | 'SelfDeletionForbidden' | 'LastAdministratorProtected' | 'AlreadyAnonymized';
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse = {
+    userId?: string;
+    userName?: string;
+    accountStatus?: NoCtfDomainIdentityUserAccountStatus;
+    canHardDelete?: boolean;
+    canAnonymize?: boolean;
+    selfDeletionForbidden?: boolean;
+    lastAdministratorProtected?: boolean;
+    references?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceResponse = {
+    code?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode;
+    count?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode = 'CompetitionOwner' | 'CompetitionCollaborator' | 'ChallengeOwner' | 'ChallengeManager' | 'TeamCaptain' | 'TeamMember' | 'Submission' | 'PatchUpload' | 'Notification' | 'ScoringEvent' | 'CompetitionLifecycleAudit' | 'UserAccountLifecycleAudit';
+
+export type NoCtfapiEndpointsAdministrationPlatformDeletePlatformUserRequest = {
+    mode: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode;
+    reason: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode = 'HardDelete' | 'Anonymize';
 
 export type NoCtfapiEndpointsAdministrationPlatformDeadLetterResponse = {
     messageId?: string;
@@ -3281,6 +3322,79 @@ export type AdminPlatformCreateBotResponses = {
 
 export type AdminPlatformCreateBotResponse = AdminPlatformCreateBotResponses[keyof AdminPlatformCreateBotResponses];
 
+export type AdminPlatformDeleteUserData = {
+    body: NoCtfapiEndpointsAdministrationPlatformDeletePlatformUserRequest;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}';
+};
+
+export type AdminPlatformDeleteUserErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse;
+};
+
+export type AdminPlatformDeleteUserError = AdminPlatformDeleteUserErrors[keyof AdminPlatformDeleteUserErrors];
+
+export type AdminPlatformDeleteUserResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionResponse;
+};
+
+export type AdminPlatformDeleteUserResponse = AdminPlatformDeleteUserResponses[keyof AdminPlatformDeleteUserResponses];
+
+export type AdminPlatformGetUserData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}';
+};
+
+export type AdminPlatformGetUserErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminPlatformGetUserResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse;
+};
+
+export type AdminPlatformGetUserResponse = AdminPlatformGetUserResponses[keyof AdminPlatformGetUserResponses];
+
 export type AdminPlatformGetDeadLetterData = {
     body?: never;
     path: {
@@ -3373,39 +3487,6 @@ export type AdminPlatformUpdateEmailVerificationConfigurationResponses = {
 };
 
 export type AdminPlatformUpdateEmailVerificationConfigurationResponse = AdminPlatformUpdateEmailVerificationConfigurationResponses[keyof AdminPlatformUpdateEmailVerificationConfigurationResponses];
-
-export type AdminPlatformGetUserData = {
-    body?: never;
-    path: {
-        userId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/platform/users/{userId}';
-};
-
-export type AdminPlatformGetUserErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AdminPlatformGetUserResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse;
-};
-
-export type AdminPlatformGetUserResponse = AdminPlatformGetUserResponses[keyof AdminPlatformGetUserResponses];
 
 export type AdminPlatformInvalidateUserTokensData = {
     body?: never;
@@ -3540,6 +3621,39 @@ export type AdminPlatformListUsersResponses = {
 };
 
 export type AdminPlatformListUsersResponse = AdminPlatformListUsersResponses[keyof AdminPlatformListUsersResponses];
+
+export type AdminPlatformPreviewUserDeletionData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}/deletion-preview';
+};
+
+export type AdminPlatformPreviewUserDeletionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminPlatformPreviewUserDeletionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse;
+};
+
+export type AdminPlatformPreviewUserDeletionResponse = AdminPlatformPreviewUserDeletionResponses[keyof AdminPlatformPreviewUserDeletionResponses];
 
 export type AdminPlatformReplaceEmailVerificationPasswordData = {
     body: NoCtfapiEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest;

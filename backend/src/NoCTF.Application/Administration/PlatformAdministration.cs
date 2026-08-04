@@ -9,6 +9,7 @@ public sealed record PlatformUserView(
     string Email,
     UserKind Kind,
     UserRole Role,
+    UserAccountStatus AccountStatus,
     int TokenVersion,
     bool EmailVerified,
     DateTimeOffset CreatedAt,
@@ -48,6 +49,7 @@ public enum IssueBotTokenFailure
     None,
     UserNotFound,
     UserIsNotBot,
+    UserInactive,
     InvalidLifetime
 }
 
@@ -137,6 +139,8 @@ public sealed class ManagePlatform(
             return new(null, IssueBotTokenFailure.UserNotFound);
         if (user.Kind != UserKind.Bot)
             return new(null, IssueBotTokenFailure.UserIsNotBot);
+        if (user.AccountStatus != UserAccountStatus.Active)
+            return new(null, IssueBotTokenFailure.UserInactive);
         try
         {
             var lifetime = TimeSpan.FromTicks(checked(expiresInSeconds * TimeSpan.TicksPerSecond));

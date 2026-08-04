@@ -19,6 +19,10 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest,
   NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse,
+  NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse,
+  NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode,
+  NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode,
+  NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
   NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest,
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
@@ -1056,12 +1060,29 @@ export const challengeBankAdminApi = {
 }
 
 export type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
+export type PlatformUserDeletionPreview
+  = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse
+export type PlatformUserDeletionMode
+  = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode
+export type PlatformUserDeletionOutcome
+  = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode
 export type EmailVerificationConfiguration
   = NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse
 
 export interface IssuedBotToken {
   accessToken: string
   expiresAt: string
+}
+
+export function readPlatformUserDeletionConflict(
+  error: unknown,
+): NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse | null {
+  if (!(error instanceof ApiError) || error.status !== 409 || !isRecord(error.details))
+    return null
+
+  const details
+    = error.details as NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse
+  return details.code ? details : null
 }
 
 export const platformAdminApi = {
@@ -1099,6 +1120,29 @@ export const platformAdminApi = {
   async users(): Promise<PlatformUser[]> {
     const response = unwrap(await generatedSdk.adminPlatformListUsers(), tt('errors.loadUsers'))
     return response.items ?? []
+  },
+  async previewUserDeletion(userId: string): Promise<PlatformUserDeletionPreview> {
+    return unwrap(
+      await generatedSdk.adminPlatformPreviewUserDeletion({ path: { userId } }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async deleteUser(
+    userId: string,
+    mode: PlatformUserDeletionMode,
+    reason: string,
+  ): Promise<PlatformUserDeletionOutcome> {
+    const response = unwrap(
+      await generatedSdk.adminPlatformDeleteUser({
+        path: { userId },
+        body: { mode, reason },
+      }),
+      tt('errors.requestFailed'),
+    )
+    if (!response.outcome)
+      throw new ApiError(tt('errors.requestFailed'))
+
+    return response.outcome
   },
   async createBot(userName: string, role: NoCtfDomainIdentityUserRole): Promise<PlatformUser> {
     return unwrap(

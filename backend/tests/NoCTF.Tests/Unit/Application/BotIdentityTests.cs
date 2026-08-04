@@ -83,4 +83,30 @@ public sealed class BotIdentityTests
             .IsEqualTo(IssueBotTokenFailure.InvalidLifetime);
         await store.DidNotReceiveWithAnyArgs().FindUserAsync(default, default);
     }
+
+    [Test]
+    public async Task IssueBotToken_RejectsInactiveBotAccount()
+    {
+        var userId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var store = Substitute.For<IPlatformAdministrationStore>();
+        store.FindUserAsync(userId, Arg.Any<CancellationToken>()).Returns(new PlatformUserView(
+            userId,
+            "retired-bot",
+            BotIdentity.DummyEmail(userId),
+            UserKind.Bot,
+            UserRole.User,
+            UserAccountStatus.Anonymized,
+            4,
+            false,
+            now,
+            now));
+        var tokenIssuer = Substitute.For<IAccessTokenIssuer>();
+        var platform = new ManagePlatform(store, tokenIssuer);
+
+        var result = await platform.IssueBotTokenAsync(userId, 3600, now);
+
+        await Assert.That(result.Failure).IsEqualTo(IssueBotTokenFailure.UserInactive);
+        tokenIssuer.DidNotReceiveWithAnyArgs().Issue(default!, default, default);
+    }
 }

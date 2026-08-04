@@ -1,4 +1,5 @@
 using NoCTF.Application.Administration;
+using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Identity;
 
 namespace NoCTF.Infrastructure.Administration;
@@ -27,4 +28,22 @@ public sealed class OpenApiPlatformAdministrationStore : IPlatformAdministration
     public Task<bool> RequeueDeadLetterAsync(
         Guid messageId, CancellationToken cancellationToken) =>
         Task.FromResult(false);
+}
+
+public sealed class OpenApiUserAccountAdministrationStore : IUserAccountAdministrationStore
+{
+    public Task<UserDeletionPreview?> PreviewDeletionAsync(
+        Guid userId,
+        Guid actorUserId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<UserDeletionPreview?>(null);
+
+    public Task<UserDeletionStoreResult> DeleteAsync(
+        Guid userId,
+        Guid actorUserId,
+        UserDeletionMode mode,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new UserDeletionStoreResult(UserDeletionState.UserNotFound));
 }

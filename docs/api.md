@@ -12,8 +12,11 @@ POST /api/v1/auth/logout
 POST /api/v1/auth/email-verification/verify
 POST /api/v1/auth/email-verification/resend
 GET  /api/v1/auth/me
+PUT  /api/v1/auth/me/profile
+POST /api/v1/auth/me/avatar
 PUT  /api/v1/auth/password
 POST /api/v1/auth/logout-all
+GET  /api/v1/users/{userId}/avatar
 ```
 
 Login/Refresh 返回 AccessToken 与 ExpiresAt；Refresh Cookie 不出现在 body。
@@ -256,6 +259,8 @@ GET /api/v1/notifications/feed
 ```text
 GET  /api/v1/admin/platform/users
 GET  /api/v1/admin/platform/users/{userId}
+GET  /api/v1/admin/platform/users/{userId}/deletion-preview
+DELETE /api/v1/admin/platform/users/{userId}
 POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
 PUT  /api/v1/admin/platform/users/{userId}/role
@@ -276,6 +281,11 @@ ExpiresAt，不签发 Refresh Token。Role 更新与 token invalidate 原子递�
 Dead Letter DTO 隐去 JWT、Flag/Submission 原文和 archive 内容；requeue 创建新的 durable
 delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作
 DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
+
+删除用户前必须读取影响预览。没有任何业务引用时可物理删除；存在比赛、题目、队伍、
+提交、计分、通知或生命周期审计引用时，只允许不可逆匿名化并停用。匿名化会清除个人
+资料、认证信息和资源协作权限，使所有现有 Token 失效，但保留所有权、队伍成员关系和
+历史事实。两种删除方式都要求管理员原因，并记录独立账号生命周期审计，不级联删除业务数据。
 
 ## Internal v1
 

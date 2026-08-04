@@ -58,6 +58,10 @@ public sealed class IssuePlatformBotTokenEndpoint(ManagePlatform platform)
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Token was not issued.",
                 detail: "The selected user is not a bot."),
+            IssueBotTokenFailure.UserInactive => TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Token was not issued.",
+                detail: "The selected bot account is not active."),
             IssueBotTokenFailure.InvalidLifetime => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Token was not issued.",
