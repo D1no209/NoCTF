@@ -147,6 +147,12 @@ const router = createRouter({
           component: () => import('@/views/admin/AdminHealthView.vue'),
           meta: { requiresAuth: true, requiresAdminOrOrganizer: true },
         },
+        {
+          path: 'platform-logs',
+          name: 'admin-platform-logs',
+          component: () => import('@/views/admin/AdminPlatformLogsView.vue'),
+          meta: { requiresAuth: true, requiresAdminOrOrganizer: true, requiresAdmin: true },
+        },
       ],
     },
     {

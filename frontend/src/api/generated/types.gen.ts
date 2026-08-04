@@ -700,6 +700,61 @@ export type NoCtfapiEndpointsAdministrationPlatformListDeadLettersRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
+    id?: string;
+    kind?: NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind;
+    subjectId?: string;
+    competitionId?: string | null;
+    actorId?: string | null;
+    fromCompetitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
+    toCompetitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
+    userAccountAction?: NoCtfDomainIdentityUserAccountLifecycleAction | null;
+    subjectDisplayName?: string | null;
+    reason?: string | null;
+    automatic?: boolean;
+    occurredAt?: string;
+};
+
+export type NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind = 0 | 1;
+
+export type NoCtfDomainIdentityUserAccountLifecycleAction = 0 | 1 | 2 | 3;
+
+export type NoCtfapiEndpointsAdministrationPlatformListPlatformAuditLogsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformLogListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse>;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse = {
+    cursor?: string;
+    timestamp?: string;
+    service?: NoCtfApplicationAdministrationPlatformLogsPlatformLogService;
+    level?: NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel;
+    category?: string;
+    eventId?: number;
+    eventName?: string | null;
+    message?: string;
+    exceptionType?: string | null;
+    exceptionMessage?: string | null;
+    competitionId?: string | null;
+    runtimeInstanceId?: string | null;
+};
+
+export type NoCtfApplicationAdministrationPlatformLogsPlatformLogService = 0 | 1 | 2;
+
+export type NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type NoCtfapiEndpointsAdministrationPlatformListPlatformLogsRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse>;
 };
@@ -3746,6 +3801,89 @@ export type AdminPlatformListDeadLettersResponses = {
 };
 
 export type AdminPlatformListDeadLettersResponse = AdminPlatformListDeadLettersResponses[keyof AdminPlatformListDeadLettersResponses];
+
+export type AdminPlatformListAuditLogsData = {
+    body?: never;
+    path?: never;
+    query: {
+        kind?: NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind | null;
+        from?: string | null;
+        to?: string | null;
+        competitionId?: string | null;
+        actorId?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/admin/platform/audit-logs';
+};
+
+export type AdminPlatformListAuditLogsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformListAuditLogsError = AdminPlatformListAuditLogsErrors[keyof AdminPlatformListAuditLogsErrors];
+
+export type AdminPlatformListAuditLogsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogListResponse;
+};
+
+export type AdminPlatformListAuditLogsResponse = AdminPlatformListAuditLogsResponses[keyof AdminPlatformListAuditLogsResponses];
+
+export type AdminPlatformListLogsData = {
+    body?: never;
+    path?: never;
+    query: {
+        minimumLevel: NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel;
+        service?: NoCtfApplicationAdministrationPlatformLogsPlatformLogService | null;
+        from?: string | null;
+        to?: string | null;
+        competitionId?: string | null;
+        runtimeInstanceId?: string | null;
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/admin/platform/logs';
+};
+
+export type AdminPlatformListLogsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type AdminPlatformListLogsError = AdminPlatformListLogsErrors[keyof AdminPlatformListLogsErrors];
+
+export type AdminPlatformListLogsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformLogListResponse;
+};
+
+export type AdminPlatformListLogsResponse = AdminPlatformListLogsResponses[keyof AdminPlatformListLogsResponses];
 
 export type AdminPlatformListUsersData = {
     body?: never;

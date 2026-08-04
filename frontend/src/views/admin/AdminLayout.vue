@@ -5,6 +5,7 @@ import {
   Home,
   LogOut,
   Puzzle,
+  ScrollText,
   Settings,
   Trophy,
   User,
@@ -64,12 +65,20 @@ const navItems = computed(() => {
       label: t('admin.nav.users'),
       icon: User,
     })
-    items.push({
-      to: '/admin/settings/basic',
-      activePrefix: '/admin/settings',
-      label: t('admin.nav.platformSettings'),
-      icon: Settings,
-    })
+    items.push(
+      {
+        to: '/admin/platform-logs',
+        activePrefix: '',
+        label: t('admin.nav.platformLogs'),
+        icon: ScrollText,
+      },
+      {
+        to: '/admin/settings/basic',
+        activePrefix: '/admin/settings',
+        label: t('admin.nav.platformSettings'),
+        icon: Settings,
+      },
+    )
   }
   return items
 })
