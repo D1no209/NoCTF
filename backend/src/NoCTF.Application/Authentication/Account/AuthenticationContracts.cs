@@ -19,7 +19,10 @@ public sealed record UserProfile(
     string Email,
     UserRole Role,
     UserKind Kind,
-    bool EmailVerified);
+    bool EmailVerified,
+    string? Description = null,
+    string? AvatarObjectKey = null);
+public sealed record UserAvatarReplacement(UserProfile Profile, string? PreviousObjectKey);
 public enum CreateUserState { Created, UserNameConflict, EmailConflict }
 
 public interface IUserAuthenticationStore
@@ -28,6 +31,17 @@ public interface IUserAuthenticationStore
     Task<bool> VerifyPasswordAsync(Guid userId, string password, CancellationToken cancellationToken);
     Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken);
     Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken);
+    Task<UserProfile?> UpdateProfileAsync(
+        Guid userId,
+        string? description,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<UserAvatarReplacement?> ReplaceAvatarAsync(
+        Guid userId,
+        string objectKey,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<string?> GetAvatarObjectKeyAsync(Guid userId, CancellationToken cancellationToken);
     Task<CreateUserState> CreateAsync(
         Guid userId,
         string userName,

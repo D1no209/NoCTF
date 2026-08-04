@@ -21,6 +21,9 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<AdministratorBootstrapper>();
         services.AddScoped<RegisterUser>();
         services.AddScoped<GetCurrentUser>();
+        services.AddScoped<UpdateCurrentUserProfile>();
+        services.AddScoped<ReplaceCurrentUserAvatar>();
+        services.AddScoped<GetUserAvatar>();
         services.AddScoped<ChangePassword>();
         services.AddScoped<LogoutAll>();
         services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();

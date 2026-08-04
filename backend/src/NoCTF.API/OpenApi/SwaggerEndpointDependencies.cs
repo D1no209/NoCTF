@@ -87,6 +87,22 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
     public Task<bool> VerifyPasswordAsync(Guid userId, string password, CancellationToken cancellationToken) => Task.FromResult(false);
     public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult<UserProfile?>(null);
+    public Task<UserProfile?> UpdateProfileAsync(
+        Guid userId,
+        string? description,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<UserProfile?>(null);
+    public Task<UserAvatarReplacement?> ReplaceAvatarAsync(
+        Guid userId,
+        string objectKey,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<UserAvatarReplacement?>(null);
+    public Task<string?> GetAvatarObjectKeyAsync(
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<string?>(null);
     public Task<CreateUserState> CreateAsync(
         Guid userId,
         string userName,
