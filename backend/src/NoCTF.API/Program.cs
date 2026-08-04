@@ -12,6 +12,8 @@ using NSwag.AspNetCore;
 using NSwag.Generation.AspNetCore;
 using Microsoft.AspNetCore.Http.Features;
 using NoCTF.Infrastructure.Administration;
+using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Infrastructure.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 var exportSwagger = args.Contains("--export-openapi", StringComparer.OrdinalIgnoreCase)
@@ -25,6 +27,10 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContext, HttpUserContext>();
 builder.Services.AddNoCtfApi(builder.Configuration, includeInfrastructure: true);
 builder.Services.AddNoCtfAuthentication(builder.Configuration);
+if (!exportSwagger)
+    builder.Services.AddNoCtfPlatformLogging(
+        builder.Configuration,
+        PlatformLogService.Api);
 builder.UseWolverine(options =>
 {
     if (!exportSwagger)
@@ -82,6 +88,7 @@ if (exportSwagger)
     return;
 }
 app.MapHub<CompetitionHub>("/hubs/v1/competitions");
+app.MapHub<PlatformLogHub>("/hubs/v1/admin/platform-logs");
 app.Run();
 
 public partial class Program;

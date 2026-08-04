@@ -275,6 +275,8 @@ GET  /api/v1/admin/platform/configuration
 PUT  /api/v1/admin/platform/configuration
 POST /api/v1/admin/platform/configuration/logo
 GET  /api/v1/admin/platform/information
+GET  /api/v1/admin/platform/logs
+GET  /api/v1/admin/platform/audit-logs
 POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
 PUT  /api/v1/admin/platform/users/{userId}/role
@@ -292,9 +294,17 @@ Bot 创建请求只包含 UserName 和固定的 `UserRole.Organizer`，不能创
 Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。
 Token 签发请求包含正数 ExpiresInSeconds，只接受 Bot 身份，返回一次普通 AccessToken 与
 ExpiresAt，不签发 Refresh Token。Role 更新与 token invalidate 原子递增 User.TokenVersion。
-Dead Letter DTO 隐去 JWT、Flag/Submission 原文和 archive 内容；requeue 创建新的 durable
+Dead Letter DTO 只返回投递元数据，省略消息 body、异常正文和 archive 内容；requeue 创建新的 durable
 delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作
 DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
+
+平台日志使用有上限的 Redis Stream 聚合 API、Worker、Runner 的结构化日志，并通过管理员
+专用 SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。历史查询默认从 Warning 开始，
+支持按服务、最低级别、时间、Competition 与 RuntimeInstance 筛选和游标翻页。日志入口与
+读取投影都会保留结构化作用域；密码、Token、Authorization/Cookie、SMTP 凭据和通用
+Secret 必须在写入 Redis 前脱敏。平台管理员属于可信角色，Flag 不在日志层强制脱敏，但业务
+代码仍不得为调试目的主动打印 Flag。审计查询直接聚合现有 Competition lifecycle 与用户账号
+lifecycle 不可变事实，不复制业务历史，也不新增日志业务表。
 
 删除用户前必须读取影响预览。没有任何业务引用时可物理删除；存在比赛、题目、队伍、
 提交、计分、通知或生命周期审计引用时，只允许不可逆匿名化并停用。匿名化会清除个人

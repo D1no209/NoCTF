@@ -1,0 +1,112 @@
+using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Identity;
+using NoCTF.Infrastructure.Administration;
+using NoCTF.Infrastructure.Persistence;
+using Testcontainers.PostgreSql;
+
+namespace NoCTF.Tests.Integration.Administration;
+
+[Category("Integration")]
+[NotInParallel]
+public sealed class PlatformAuditLogStoreTests
+{
+    [Test]
+    [Timeout(120_000)]
+    public async Task Existing_immutable_audits_are_aggregated_without_a_new_log_table(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_platform_audits")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.Parse("2026-08-05T00:00:00Z");
+            var actorId = Guid.CreateVersion7(now);
+            var targetId = Guid.CreateVersion7(now.AddMilliseconds(1));
+            var competitionId = Guid.CreateVersion7(now.AddMilliseconds(2));
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                await seed.Database.MigrateAsync(cancellationToken);
+                seed.Users.AddRange(
+                    CreateUser(actorId, "audit-actor", now),
+                    CreateUser(targetId, "audit-target", now));
+                seed.Competitions.Add(new Competition
+                {
+                    Id = competitionId,
+                    Title = "Audit competition",
+                    OwnerId = actorId,
+                    Mode = GameMode.Ctf,
+                    Status = CompetitionStatus.Running,
+                    ConfigurationJson = "{}",
+                    ConfigurationUpdatedAt = now,
+                    FlagDerivationSecret = new byte[32],
+                    StartAt = now.AddHours(-1),
+                    EndAt = now.AddHours(1),
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    LifecycleAudits =
+                    [
+                        new CompetitionLifecycleAudit
+                        {
+                            Id = Guid.CreateVersion7(now.AddMilliseconds(3)),
+                            CompetitionId = competitionId,
+                            From = CompetitionStatus.Published,
+                            To = CompetitionStatus.Running,
+                            ActorId = actorId,
+                            Reason = "start",
+                            OccurredAt = now.AddMinutes(1)
+                        }
+                    ]
+                });
+                seed.UserAccountLifecycleAudits.Add(new UserAccountLifecycleAudit
+                {
+                    Id = Guid.CreateVersion7(now.AddMilliseconds(4)),
+                    TargetUserId = targetId,
+                    TargetUserName = "audit-target",
+                    ActorUserId = actorId,
+                    Action = UserAccountLifecycleAction.Disabled,
+                    Reason = "policy",
+                    OccurredAt = now.AddMinutes(2)
+                });
+                await seed.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var db = new NoCtfDbContext(options);
+            var store = new PlatformAuditLogStore(db);
+            var all = await store.QueryAsync(
+                new(null, null, null, null, actorId, 10),
+                cancellationToken);
+            await Assert.That(all).Count().IsEqualTo(2);
+            await Assert.That(all[0].Kind).IsEqualTo(PlatformAuditKind.UserAccountLifecycle);
+            await Assert.That(all[1].Kind).IsEqualTo(PlatformAuditKind.CompetitionLifecycle);
+
+            var competitionOnly = await store.QueryAsync(
+                new(null, null, null, competitionId, null, 10),
+                cancellationToken);
+            await Assert.That(competitionOnly).Count().IsEqualTo(1);
+            await Assert.That(competitionOnly[0].CompetitionId).IsEqualTo(competitionId);
+        });
+    }
+
+    private static User CreateUser(Guid id, string userName, DateTimeOffset now) =>
+        new()
+        {
+            Id = id,
+            UserName = userName,
+            NormalizedUserName = userName.ToUpperInvariant(),
+            Email = $"{userName}@example.test",
+            NormalizedEmail = $"{userName}@EXAMPLE.TEST",
+            PasswordHash = "test",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+}
