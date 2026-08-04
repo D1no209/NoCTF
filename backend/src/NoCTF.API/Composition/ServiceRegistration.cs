@@ -69,7 +69,6 @@ public static class ServiceRegistration
             services.AddScoped<GetCurrentUser>();
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
-            services.AddScoped<IEmailVerificationStore, SwaggerEmailVerificationStore>();
             services.AddScoped<ResendEmailVerification>();
             services.AddScoped<VerifyEmail>();
             services.AddScoped<ModerateTeam>();
