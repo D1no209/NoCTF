@@ -19,17 +19,21 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest,
   NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse,
+  NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse,
+  NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
   NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest,
+  NoCtfapiEndpointsAdministrationPlatformUpdatePlatformConfigurationRequest,
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
   NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
   NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse,
+  NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse,
   NoCtfapiEndpointsTeamsCreateTeamRequest,
   NoCtfapiEndpointsTeamsUpdateTeamRequest,
   NoCtfDomainIdentityUserRole,
@@ -1060,6 +1064,12 @@ export const challengeBankAdminApi = {
 }
 
 export type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
+export type PublicPlatformConfiguration
+  = NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse
+export type PlatformConfiguration
+  = NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse
+export type PlatformInformation
+  = NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse
 export type PlatformUserDeletionPreview
   = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse
 export type PlatformUserDeletionMode
@@ -1074,6 +1084,15 @@ export interface IssuedBotToken {
   expiresAt: string
 }
 
+export const platformApi = {
+  async configuration(): Promise<PublicPlatformConfiguration> {
+    return unwrap(
+      await generatedSdk.platformConfigurationGet(),
+      tt('errors.requestFailed'),
+    )
+  },
+}
+
 export function readPlatformUserDeletionConflict(
   error: unknown,
 ): NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse | null {
@@ -1086,6 +1105,34 @@ export function readPlatformUserDeletionConflict(
 }
 
 export const platformAdminApi = {
+  async platformConfiguration(): Promise<PlatformConfiguration> {
+    return unwrap(
+      await generatedSdk.adminPlatformGetConfiguration(),
+      tt('errors.requestFailed'),
+    )
+  },
+  async updatePlatformConfiguration(
+    body: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformConfigurationRequest,
+  ): Promise<PlatformConfiguration> {
+    return unwrap(
+      await generatedSdk.adminPlatformUpdateConfiguration({ body }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async uploadPlatformLogo(file: File, expectedRevision: number): Promise<PlatformConfiguration> {
+    return unwrap(
+      await generatedSdk.adminPlatformUploadLogo({
+        body: { file, expectedRevision },
+      }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async platformInformation(): Promise<PlatformInformation> {
+    return unwrap(
+      await generatedSdk.adminPlatformGetInformation(),
+      tt('errors.requestFailed'),
+    )
+  },
   async emailVerificationConfiguration(): Promise<EmailVerificationConfiguration> {
     return unwrap(
       await generatedSdk.adminPlatformGetEmailVerificationConfiguration(),

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Administration;
+using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Administration.UserAccounts;
 
 namespace NoCTF.Infrastructure.Administration;
@@ -16,6 +17,7 @@ internal static class AdministrationInfrastructure
         {
             services.AddScoped<IPlatformAdministrationStore, OpenApiPlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, OpenApiUserAccountAdministrationStore>();
+            services.AddScoped<IPlatformConfigurationStore, OpenApiPlatformConfigurationStore>();
         }
         else
         {
@@ -24,10 +26,12 @@ internal static class AdministrationInfrastructure
             services.AddSingleton(_ => new WolverineProcessDeadLetters(postgres));
             services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
+            services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();
         }
 
         services.AddScoped<ManagePlatform>();
         services.AddScoped<ManageUserAccounts>();
+        services.AddScoped<ManagePlatformConfiguration>();
         return services;
     }
 }

@@ -1408,6 +1408,43 @@
         ]
       }
     },
+    "/api/v1/platform/logo": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Returns the current platform logo.",
+        "description": "Streams the administrator-configured public raster logo.",
+        "operationId": "PlatformLogo_Get",
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/configuration": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Returns public platform branding.",
+        "description": "Exposes the configured name, description, and revisioned logo URL.",
+        "operationId": "PlatformConfiguration_Get",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformPublicPlatformConfigurationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "tags": [
@@ -4325,6 +4362,132 @@
         ]
       }
     },
+    "/api/v1/admin/platform/configuration": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Returns editable platform branding configuration.",
+        "description": "Returns public branding fields with their optimistic revision.",
+        "operationId": "AdminPlatformGetConfiguration",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Updates platform name and description.",
+        "description": "Applies public branding text with an optimistic revision fence.",
+        "operationId": "AdminPlatformUpdateConfiguration",
+        "requestBody": {
+          "x-name": "UpdatePlatformConfigurationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformConfigurationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/information": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Returns the running platform version and contributors.",
+        "description": "Reports build metadata and the repository contributor identity snapshot.",
+        "operationId": "AdminPlatformGetInformation",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformInformationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/users/{userId}/tokens/invalidate": {
       "post": {
         "tags": [
@@ -4761,6 +4924,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/configuration/logo": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replaces the public platform logo.",
+        "description": "Stores a validated raster logo and advances the platform configuration revision.",
+        "operationId": "AdminPlatformUploadLogo",
+        "requestBody": {
+          "x-name": "UploadPlatformLogoRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUploadPlatformLogoRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformConfigurationResponse"
                 }
               }
             }
@@ -9198,6 +9419,23 @@
           }
         }
       },
+      "NoCTFAPIEndpointsPlatformPublicPlatformConfigurationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsNotificationsNotificationListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -10771,6 +11009,58 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformConfigurationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformInformationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "contributors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformContributorResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformContributorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -10928,6 +11218,34 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformConfigurationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "expectedRevision"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0,
+            "nullable": false
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0,
+            "nullable": true
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -10967,6 +11285,28 @@
         "properties": {
           "role": {
             "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformUploadPlatformLogoRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "expectedRevision"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "nullable": false
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0.0,
+            "nullable": false,
+            "exclusiveMinimum": true
           }
         }
       },

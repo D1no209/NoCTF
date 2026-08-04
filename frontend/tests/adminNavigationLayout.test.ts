@@ -18,4 +18,11 @@ describe('admin navigation layout', () => {
     expect(layoutSource).toContain('src="/favicon.svg"')
     expect(layoutSource).toContain('group-data-[collapsible=icon]:block')
   })
+
+  test('groups administrator-only controls under platform configuration', () => {
+    expect(layoutSource).toContain('to: \'/admin/settings/basic\'')
+    expect(layoutSource).toContain('activePrefix: \'/admin/settings\'')
+    expect(layoutSource).toContain('label: t(\'admin.nav.platformSettings\')')
+    expect(layoutSource).not.toContain('to: \'/admin/email-verification\'')
+  })
 })

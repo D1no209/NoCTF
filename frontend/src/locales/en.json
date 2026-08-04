@@ -1616,6 +1616,41 @@
       "testSent": "SMTP test message sent to your administrator email.",
       "testFailed": "SMTP test failed. Check the saved connection and credentials."
     },
+    "settings": {
+      "title": "Platform Configuration",
+      "subtitle": "Manage public identity, account verification, and build information from one administrator workspace.",
+      "tabs": {
+        "basic": "Platform Basics",
+        "emailVerification": "Email Verification",
+        "information": "Platform Information"
+      },
+      "basic": {
+        "title": "Platform Basics",
+        "subtitle": "Set the public name, description, and logo used across NoCTF.",
+        "logo": "Platform Logo",
+        "replaceLogo": "Replace Logo",
+        "logoHint": "PNG, JPEG, or WebP. Maximum 5 MiB. A transparent PNG works best in the current interface.",
+        "logoInvalid": "Choose a PNG, JPEG, or WebP logo no larger than 5 MiB.",
+        "logoUploaded": "Platform logo updated.",
+        "logoUploadFailed": "Could not upload the platform logo. The configuration may have changed; reload and try again.",
+        "identity": "Public Identity",
+        "identityDescription": "These values are public and appear in the shared application shell.",
+        "name": "Platform Name",
+        "description": "Platform Description",
+        "descriptionPlaceholder": "A short public description of this platform...",
+        "initialConfiguration": "Initial configuration",
+        "lastUpdated": "Last saved: {value}",
+        "saved": "Platform basics saved.",
+        "saveFailed": "Could not save platform basics. Reload and apply the changes again."
+      },
+      "information": {
+        "title": "Platform Information",
+        "subtitle": "Inspect the running build and the contributors represented in this repository.",
+        "version": "Running Version",
+        "versionDescription": "Reported by the running API assembly, so this value reflects the deployed backend build.",
+        "contributors": "Contributors"
+      }
+    },
     "nav": {
       "users": "Users",
       "teams": "Teams",
@@ -1625,6 +1660,7 @@
       "infrastructure": "Infrastructure",
       "qqBot": "QQ Bot",
       "emailVerification": "Email verification",
+      "platformSettings": "Platform Configuration",
       "auditLogs": "Audit Logs",
       "health": "Health",
       "liveLogs": "Live Logs",

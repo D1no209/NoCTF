@@ -1,4 +1,7 @@
 export const queryKeys = {
+  platformConfiguration: ['platform-configuration'] as const,
+  adminPlatformConfiguration: ['admin-platform-configuration'] as const,
+  adminPlatformInformation: ['admin-platform-information'] as const,
   currentUser: ['current-user'] as const,
   notifications: ['notifications'] as const,
   competitions: ['competitions'] as const,

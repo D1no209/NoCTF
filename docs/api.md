@@ -2,6 +2,16 @@
 
 本文列出目标资源面。每个路由对应一个 StronglyTyped FastEndpoint 文件；请求/响应/Validator 放在该文件。业务码和精确 result union 依 [API 通用规范](api-conventions.md)。
 
+## Platform
+
+```text
+GET  /api/v1/platform/configuration
+GET  /api/v1/platform/logo
+```
+
+公开平台配置返回名称、简介与通过 LinkGenerator 生成的 revisioned Logo 路径；未配置自定义
+Logo 时 Logo 路由返回 404，前端使用随包默认品牌资源。
+
 ## Authentication
 
 ```text
@@ -261,6 +271,10 @@ GET  /api/v1/admin/platform/users
 GET  /api/v1/admin/platform/users/{userId}
 GET  /api/v1/admin/platform/users/{userId}/deletion-preview
 DELETE /api/v1/admin/platform/users/{userId}
+GET  /api/v1/admin/platform/configuration
+PUT  /api/v1/admin/platform/configuration
+POST /api/v1/admin/platform/configuration/logo
+GET  /api/v1/admin/platform/information
 POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
 PUT  /api/v1/admin/platform/users/{userId}/role
@@ -286,6 +300,10 @@ DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
 提交、计分、通知或生命周期审计引用时，只允许不可逆匿名化并停用。匿名化会清除个人
 资料、认证信息和资源协作权限，使所有现有 Token 失效，但保留所有权、队伍成员关系和
 历史事实。两种删除方式都要求管理员原因，并记录独立账号生命周期审计，不级联删除业务数据。
+
+平台配置以 revision fence 更新名称、简介和对象存储 Logo；Logo 上传只接受内容签名与 MIME
+一致的 PNG/JPEG/WebP。平台信息从运行中的 API 程序集读取版本，并返回已核验的仓库贡献者
+ID 与头像，不把 GitHub 可用性变成管理后台的运行时依赖。
 
 ## Internal v1
 
