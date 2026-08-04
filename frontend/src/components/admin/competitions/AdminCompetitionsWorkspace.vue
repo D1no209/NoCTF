@@ -228,6 +228,12 @@ function openDelete(comp: CompetitionAdminDto) {
   deleteDialog.value = true
 }
 
+function deleteSelectedCompetition() {
+  const competitionId = selectedComp.value?.id
+  if (competitionId)
+    deleteMutation.mutate(competitionId)
+}
+
 function goPermissions(comp: CompetitionAdminDto) {
   router.push({
     name: 'admin-competition-detail',
@@ -386,7 +392,7 @@ const table = useVueTable({
                     {{ t('admin.competitions.viewPublic') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem class="text-destructive focus:text-destructive" @click="openDelete(row.original)">
+                  <DropdownMenuItem class="text-destructive focus:text-destructive" @select="openDelete(row.original)">
                     <Trash2 class="mr-2 size-4" />
                     {{ t('common.delete') }}
                   </DropdownMenuItem>
@@ -436,7 +442,7 @@ const table = useVueTable({
       v-model:open="deleteDialog"
       :title="selectedComp?.title"
       :deleting="deleteMutation.isPending.value"
-      @confirm="deleteMutation.mutate(selectedComp!.id)"
+      @confirm="deleteSelectedCompetition"
     />
   </div>
 </template>
