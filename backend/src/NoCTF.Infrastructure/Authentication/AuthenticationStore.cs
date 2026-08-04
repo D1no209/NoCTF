@@ -55,7 +55,48 @@ public sealed class AuthenticationStore(
                 user.Email,
                 user.Role,
                 user.Kind,
-                user.EmailVerifiedAt != null))
+                user.EmailVerifiedAt != null,
+                user.Description,
+                user.AvatarObjectKey))
+            .SingleOrDefaultAsync(ct);
+
+    public async Task<UserProfile?> UpdateProfileAsync(
+        Guid userId,
+        string? description,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        if (user is null)
+            return null;
+
+        user.Description = description;
+        user.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+        return ToProfile(user);
+    }
+
+    public async Task<UserAvatarReplacement?> ReplaceAvatarAsync(
+        Guid userId,
+        string objectKey,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        if (user is null)
+            return null;
+
+        var previousObjectKey = user.AvatarObjectKey;
+        user.AvatarObjectKey = objectKey;
+        user.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+        return new UserAvatarReplacement(ToProfile(user), previousObjectKey);
+    }
+
+    public Task<string?> GetAvatarObjectKeyAsync(Guid userId, CancellationToken ct) =>
+        db.Users.AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => user.AvatarObjectKey)
             .SingleOrDefaultAsync(ct);
 
     public async Task<CreateUserState> CreateAsync(
@@ -148,4 +189,15 @@ public sealed class AuthenticationStore(
                 user.Kind,
                 user.TokenVersion,
                 user.EmailVerifiedAt is not null);
+
+    private static UserProfile ToProfile(User user) =>
+        new(
+            user.Id,
+            user.UserName,
+            user.Email,
+            user.Role,
+            user.Kind,
+            user.EmailVerifiedAt is not null,
+            user.Description,
+            user.AvatarObjectKey);
 }

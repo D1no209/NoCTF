@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Security;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Domain.Identity;
@@ -12,9 +13,47 @@ public sealed record CurrentUserResponse(
     string Email,
     UserRole Role,
     UserKind Kind,
-    bool EmailVerified);
+    bool EmailVerified,
+    string? Description,
+    string? AvatarUrl);
 
-public sealed class GetMeEndpoint(GetCurrentUser getCurrent, IUserContext user)
+internal static class CurrentUserMapping
+{
+    public static CurrentUserResponse ToResponse(
+        UserProfile profile,
+        LinkGenerator links,
+        HttpContext httpContext)
+    {
+        string? avatarUrl = null;
+        if (!string.IsNullOrWhiteSpace(profile.AvatarObjectKey))
+        {
+            var path = links.GetPathByName(
+                httpContext,
+                "UserAvatar_Get",
+                new { userId = profile.Id });
+            if (path is not null)
+            {
+                var revision = Uri.EscapeDataString(Path.GetFileName(profile.AvatarObjectKey));
+                avatarUrl = $"{path}?revision={revision}";
+            }
+        }
+
+        return new(
+            profile.Id,
+            profile.UserName,
+            profile.Email,
+            profile.Role,
+            profile.Kind,
+            profile.EmailVerified,
+            profile.Description,
+            avatarUrl);
+    }
+}
+
+public sealed class GetMeEndpoint(
+    GetCurrentUser getCurrent,
+    IUserContext user,
+    LinkGenerator links)
     : EndpointWithoutRequest<Results<Ok<CurrentUserResponse>, NotFound>>
 {
     public override void Configure()
@@ -34,12 +73,6 @@ public sealed class GetMeEndpoint(GetCurrentUser getCurrent, IUserContext user)
         var profile = await getCurrent.ExecuteAsync(user.UserId, ct);
         return profile is null
             ? TypedResults.NotFound()
-            : TypedResults.Ok(new CurrentUserResponse(
-                profile.Id,
-                profile.UserName,
-                profile.Email,
-                profile.Role,
-                profile.Kind,
-                profile.EmailVerified));
+            : TypedResults.Ok(CurrentUserMapping.ToResponse(profile, links, HttpContext));
     }
 }

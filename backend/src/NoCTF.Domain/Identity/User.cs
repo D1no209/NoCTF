@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace NoCTF.Domain.Identity;
 
 /// <summary>Represents a platform identity.</summary>
@@ -12,6 +14,10 @@ public sealed class User
     public UserKind Kind { get; set; }
     public UserRole Role { get; set; }
     public int TokenVersion { get; set; }
+    [MaxLength(500)]
+    public string? Description { get; set; }
+    [MaxLength(1024)]
+    public string? AvatarObjectKey { get; set; }
     public DateTimeOffset? EmailVerifiedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

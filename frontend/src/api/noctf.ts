@@ -56,7 +56,10 @@ const sdk: any = new Proxy(generatedSdk, {
   get(target, property: string) {
     if (property in target)
       return (target as Record<string, unknown>)[property]
-    return async () => ({ data: undefined, error: new Error(`Unsupported API operation: ${property}`) })
+    return async () => ({
+      data: undefined,
+      error: new Error(`Unsupported API operation: ${property}`),
+    })
   },
 })
 const absoluteHttpUrlPattern = /^https?:\/\//i
@@ -110,9 +113,7 @@ interface ApiResult<T> {
 function unwrap<T>(result: ApiResult<T>, fallback = tt('errors.requestFailed')): T {
   if (result.error) {
     const status = result.response?.status
-    const details = isEmptyObject(result.error) && status
-      ? `HTTP ${status}`
-      : result.error
+    const details = isEmptyObject(result.error) && status ? `HTTP ${status}` : result.error
     throw new ApiError(fallback, status, details)
   }
   return result.data as T
@@ -128,9 +129,7 @@ function unwrapChallengeDownload(
 
   return {
     content,
-    fileName: readDownloadFileName(
-      result.response?.headers.get('Content-Disposition') ?? null,
-    ),
+    fileName: readDownloadFileName(result.response?.headers.get('Content-Disposition') ?? null),
   }
 }
 
@@ -140,10 +139,7 @@ async function requireSuccess<T>(request: Promise<ApiResult<T>>, fallback?: stri
 
 function isEmptyObject(value: unknown) {
   return Boolean(
-    value
-    && typeof value === 'object'
-    && !Array.isArray(value)
-    && Object.keys(value).length === 0,
+    value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0,
   )
 }
 
@@ -274,9 +270,7 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-      ...(token
-        ? { Authorization: `Bearer ${token}` }
-        : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     credentials: 'include',
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -298,13 +292,15 @@ export const notificationApi = {
     } = {},
     signal?: AbortSignal,
   ) {
-    return toPublicNotificationPage(unwrap(
-      await generatedSdk.noCtfapiEndpointsNotificationsListNotificationsEndpoint({
-        query: { cursor, limit },
-        signal,
-      }),
-      tt('errors.loadNotifications'),
-    ))
+    return toPublicNotificationPage(
+      unwrap(
+        await generatedSdk.noCtfapiEndpointsNotificationsListNotificationsEndpoint({
+          query: { cursor, limit },
+          signal,
+        }),
+        tt('errors.loadNotifications'),
+      ),
+    )
   },
 }
 
@@ -318,22 +314,43 @@ export const authApi = {
       throw new ApiError(tt('errors.requestFailed'))
     return response
   },
+  async updateProfile(description: string | null) {
+    return unwrap(
+      await generatedSdk.authenticationUpdateMyProfile({ body: { description } }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async uploadAvatar(file: File) {
+    return unwrap(
+      await generatedSdk.authenticationUploadMyAvatar({ body: { file } }),
+      tt('errors.requestFailed'),
+    )
+  },
   async login(email: string, password: string) {
-    return unwrap(await generatedSdk.noCtfapiEndpointsAuthenticationLoginEndpoint({
-      body: { login: email, password },
-      credentials: 'include',
-    }), tt('errors.login'))
+    return unwrap(
+      await generatedSdk.noCtfapiEndpointsAuthenticationLoginEndpoint({
+        body: { login: email, password },
+        credentials: 'include',
+      }),
+      tt('errors.login'),
+    )
   },
   async register(userName: string, email: string, password: string) {
-    return unwrap(await generatedSdk.noCtfapiEndpointsAuthenticationRegisterEndpoint({
-      body: { userName, email, password },
-      credentials: 'include',
-    }), tt('errors.registration'))
+    return unwrap(
+      await generatedSdk.noCtfapiEndpointsAuthenticationRegisterEndpoint({
+        body: { userName, email, password },
+        credentials: 'include',
+      }),
+      tt('errors.registration'),
+    )
   },
   async verifyEmail(token: string) {
-    return unwrap(await generatedSdk.noCtfapiEndpointsAuthenticationVerifyEmailEndpoint({
-      body: { token },
-    }), tt('errors.verifyEmail'))
+    return unwrap(
+      await generatedSdk.noCtfapiEndpointsAuthenticationVerifyEmailEndpoint({
+        body: { token },
+      }),
+      tt('errors.verifyEmail'),
+    )
   },
   async resendEmailVerification() {
     return unwrap(
@@ -372,7 +389,10 @@ export const competitionApi = {
     return toPublicCompetition(response)
   },
   async create(body: Record<string, unknown>) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint({ body }), tt('errors.createCompetition'))
+    return unwrap(
+      await sdk.noCtfapiEndpointsCompetitionsCreateCompetitionEndpoint({ body }),
+      tt('errors.createCompetition'),
+    )
   },
   async leaderboard(
     competitionId: string,
@@ -385,39 +405,61 @@ export const competitionApi = {
     )
   },
   async createInstance<T = unknown>(competitionId: string, challengeId: string) {
-    return unwrap(await client.post<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/instance',
-      path: { id: competitionId, challengeId },
-      body: {},
-    }), tt('errors.createInstance'))
+    return unwrap(
+      await client.post<{ 200: T }, unknown, false>({
+        url: '/api/competitions/{id}/challenges/{challengeId}/instance',
+        path: { id: competitionId, challengeId },
+        body: {},
+      }),
+      tt('errors.createInstance'),
+    )
   },
   async getInstance<T = unknown>(competitionId: string, challengeId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/instance',
-      path: { id: competitionId, challengeId },
-    }), tt('errors.loadInstance'))
+    return unwrap(
+      await client.get<{ 200: T }, unknown, false>({
+        url: '/api/competitions/{id}/challenges/{challengeId}/instance',
+        path: { id: competitionId, challengeId },
+      }),
+      tt('errors.loadInstance'),
+    )
   },
   async destroyInstance<T = unknown>(competitionId: string, challengeId: string) {
-    return unwrap(await client.delete<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/instance',
-      path: { id: competitionId, challengeId },
-    }), tt('errors.destroyInstance'))
+    return unwrap(
+      await client.delete<{ 200: T }, unknown, false>({
+        url: '/api/competitions/{id}/challenges/{challengeId}/instance',
+        path: { id: competitionId, challengeId },
+      }),
+      tt('errors.destroyInstance'),
+    )
   },
   async extendInstance<T = unknown>(competitionId: string, challengeId: string) {
-    return unwrap(await client.post<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/challenges/{challengeId}/instance/extend',
-      path: { id: competitionId, challengeId },
-      body: {},
-    }), tt('errors.extendInstance'))
+    return unwrap(
+      await client.post<{ 200: T }, unknown, false>({
+        url: '/api/competitions/{id}/challenges/{challengeId}/instance/extend',
+        path: { id: competitionId, challengeId },
+        body: {},
+      }),
+      tt('errors.extendInstance'),
+    )
   },
   async view<T = unknown>(competitionId: string, viewKey: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/views/{viewKey}',
-      path: { id: competitionId, viewKey },
-    }), tt('errors.loadCompetitionView'))
+    return unwrap(
+      await client.get<{ 200: T }, unknown, false>({
+        url: '/api/competitions/{id}/views/{viewKey}',
+        path: { id: competitionId, viewKey },
+      }),
+      tt('errors.loadCompetitionView'),
+    )
   },
-  async submitPatch<T = unknown>(competitionId: string, teamId: string, challengeId: string, file: File) {
-    const checksum = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())))
+  async submitPatch<T = unknown>(
+    competitionId: string,
+    teamId: string,
+    challengeId: string,
+    file: File,
+  ) {
+    const checksum = Array.from(
+      new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())),
+    )
       .map(byte => byte.toString(16).padStart(2, '0'))
       .join('')
     const upload = await postJson<{
@@ -436,7 +478,8 @@ export const competitionApi = {
     const uploadUrl = new URL(upload.uploadUrl, applicationOrigin)
     const token = readAuthSession()?.accessToken
     const apiOrigin = new URL(apiUrl('/'), applicationOrigin).origin
-    const isApiUpload = uploadUrl.origin === apiOrigin && uploadUrl.pathname.startsWith('/storage/uploads/')
+    const isApiUpload
+      = uploadUrl.origin === apiOrigin && uploadUrl.pathname.startsWith('/storage/uploads/')
     const uploadBody = isApiUpload
       ? (() => {
           const form = new FormData()
@@ -448,9 +491,7 @@ export const competitionApi = {
       method: 'PUT',
       headers: {
         ...(isApiUpload ? {} : { 'Content-Type': file.type || 'application/octet-stream' }),
-        ...(isApiUpload && token
-          ? { Authorization: `Bearer ${token}` }
-          : {}),
+        ...(isApiUpload && token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: uploadBody,
     })
@@ -463,35 +504,46 @@ export const competitionApi = {
     })
   },
   async patchSubmissions<T = unknown[]>(competitionId: string) {
-    return unwrap(await client.get<{ 200: T }, unknown, false>({
-      url: '/api/competitions/{id}/patch-submissions',
-      path: { id: competitionId },
-    }), tt('errors.loadPatchSubmissions'))
+    return unwrap(
+      await client.get<{ 200: T }, unknown, false>({
+        url: '/api/competitions/{id}/patch-submissions',
+        path: { id: competitionId },
+      }),
+      tt('errors.loadPatchSubmissions'),
+    )
   },
   async patchSubmission(competitionId: string, submissionId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsGetPatchSubmissionEndpoint({
-      path: { id: competitionId, submissionId },
-    }), tt('errors.loadPatchSubmissions'))
+    return unwrap(
+      await sdk.noCtfapiEndpointsCompetitionsGetPatchSubmissionEndpoint({
+        path: { id: competitionId, submissionId },
+      }),
+      tt('errors.loadPatchSubmissions'),
+    )
   },
   async capabilities(competitionId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsGetCompetitionCapabilitiesEndpoint({
-      path: { id: competitionId },
-    }), tt('errors.loadCompetition'))
+    return unwrap(
+      await sdk.noCtfapiEndpointsCompetitionsGetCompetitionCapabilitiesEndpoint({
+        path: { id: competitionId },
+      }),
+      tt('errors.loadCompetition'),
+    )
   },
-  async action(
-    competitionId: string,
-    actionKey: string,
-    body: Record<string, unknown>,
-  ) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsPostCompetitionActionEndpoint({
-      path: { id: competitionId, actionKey },
-      body,
-    }), tt('errors.requestFailed'))
+  async action(competitionId: string, actionKey: string, body: Record<string, unknown>) {
+    return unwrap(
+      await sdk.noCtfapiEndpointsCompetitionsPostCompetitionActionEndpoint({
+        path: { id: competitionId, actionKey },
+        body,
+      }),
+      tt('errors.requestFailed'),
+    )
   },
   async scoreboard(competitionId: string) {
-    return unwrap(await sdk.noCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpoint({
-      path: { id: competitionId },
-    }), tt('errors.loadLeaderboard'))
+    return unwrap(
+      await sdk.noCtfapiEndpointsCompetitionsGetCompetitionScoreboardEndpoint({
+        path: { id: competitionId },
+      }),
+      tt('errors.loadLeaderboard'),
+    )
   },
 }
 
@@ -516,20 +568,13 @@ async function listSubmissionPage(
 
 export const submissionApi = {
   listPage: listSubmissionPage,
-  async listAll(
-    competitionId: string,
-    signal?: AbortSignal,
-  ): Promise<PublicSubmissionListItem[]> {
+  async listAll(competitionId: string, signal?: AbortSignal): Promise<PublicSubmissionListItem[]> {
     const submissions: PublicSubmissionListItem[] = []
     const seenCursors = new Set<string>()
     let cursor: string | null | undefined
 
     do {
-      const page = await listSubmissionPage(
-        competitionId,
-        { limit: 200, cursor },
-        signal,
-      )
+      const page = await listSubmissionPage(competitionId, { limit: 200, cursor }, signal)
       submissions.push(...page.items)
       cursor = page.nextCursor
 
@@ -558,11 +603,7 @@ export const submissionApi = {
     )
     return toAcceptedFlagSubmission(response)
   },
-  async getStatus(
-    competitionId: string,
-    submissionId: string,
-    signal?: AbortSignal,
-  ) {
+  async getStatus(competitionId: string, submissionId: string, signal?: AbortSignal) {
     const response = unwrap(
       await generatedSdk.noCtfapiEndpointsSubmissionsGetSubmissionStatusEndpoint({
         path: { competitionId, submissionId },
@@ -587,12 +628,14 @@ export const challengeApi = {
     return response.items.map(toPublicChallenge)
   },
   async get(competitionId: string, competitionChallengeId: string) {
-    return toPublicChallenge(unwrap(
-      await generatedSdk.noCtfapiEndpointsChallengesGetChallengeEndpoint({
-        path: { competitionId, competitionChallengeId },
-      }),
-      tt('errors.loadChallenges'),
-    ))
+    return toPublicChallenge(
+      unwrap(
+        await generatedSdk.noCtfapiEndpointsChallengesGetChallengeEndpoint({
+          path: { competitionId, competitionChallengeId },
+        }),
+        tt('errors.loadChallenges'),
+      ),
+    )
   },
   async listAttachments(competitionId: string, competitionChallengeId: string) {
     const response = unwrap(
@@ -618,10 +661,7 @@ export const challengeApi = {
       tt('errors.requestFailed'),
     )
   },
-  async downloadRandomAttachment(
-    competitionId: string,
-    competitionChallengeId: string,
-  ) {
+  async downloadRandomAttachment(competitionId: string, competitionChallengeId: string) {
     return unwrapChallengeDownload(
       await generatedSdk.noCtfapiEndpointsChallengesDownloadRandomChallengeAttachmentEndpoint({
         path: { competitionId, competitionChallengeId },
@@ -698,7 +738,8 @@ export const teamApi = {
   },
 }
 
-export type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
+export type ChallengeTemplate
+  = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
 export type AdminCompetition = NoCtfapiEndpointsCompetitionsCompetitionResponse
 export type CompetitionChallenge = NoCtfapiEndpointsChallengesChallengeResponse
 export type CompetitionPermissions
@@ -784,7 +825,9 @@ export const competitionTeamAdminApi = {
 }
 
 export const competitionRuntimeAdminApi = {
-  async list(competitionId: string): Promise<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse[]> {
+  async list(
+    competitionId: string,
+  ): Promise<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse[]> {
     const response = unwrap(
       await generatedSdk.adminListRuntimes({
         path: { competitionId },
@@ -800,13 +843,17 @@ export const competitionRuntimeAdminApi = {
   ) {
     const competitionChallengeId = requireRuntimeChallengeId(runtime)
     if (runtime.teamId) {
-      return unwrap(await generatedSdk.adminResetTeamRuntime({
-        path: { competitionId, teamId: runtime.teamId, competitionChallengeId },
-      }))
+      return unwrap(
+        await generatedSdk.adminResetTeamRuntime({
+          path: { competitionId, teamId: runtime.teamId, competitionChallengeId },
+        }),
+      )
     }
-    return unwrap(await generatedSdk.adminResetSharedRuntime({
-      path: { competitionId, competitionChallengeId },
-    }))
+    return unwrap(
+      await generatedSdk.adminResetSharedRuntime({
+        path: { competitionId, competitionChallengeId },
+      }),
+    )
   },
   async stop(
     competitionId: string,
@@ -814,13 +861,17 @@ export const competitionRuntimeAdminApi = {
   ) {
     const competitionChallengeId = requireRuntimeChallengeId(runtime)
     if (runtime.teamId) {
-      return unwrap(await generatedSdk.adminStopTeamRuntime({
-        path: { competitionId, teamId: runtime.teamId, competitionChallengeId },
-      }))
+      return unwrap(
+        await generatedSdk.adminStopTeamRuntime({
+          path: { competitionId, teamId: runtime.teamId, competitionChallengeId },
+        }),
+      )
     }
-    return unwrap(await generatedSdk.adminStopSharedRuntime({
-      path: { competitionId, competitionChallengeId },
-    }))
+    return unwrap(
+      await generatedSdk.adminStopSharedRuntime({
+        path: { competitionId, competitionChallengeId },
+      }),
+    )
   },
 }
 
@@ -849,10 +900,7 @@ export const competitionPermissionsAdminApi = {
       tt('errors.requestFailed'),
     )
   },
-  async update(
-    competitionId: string,
-    body: UpdateCompetitionPermissionsRequest,
-  ): Promise<void> {
+  async update(competitionId: string, body: UpdateCompetitionPermissionsRequest): Promise<void> {
     await requireSuccess(
       generatedSdk.adminUpdateCompetitionPermissions({
         path: { competitionId },
@@ -864,10 +912,7 @@ export const competitionPermissionsAdminApi = {
 }
 
 export const competitionChallengeAdminApi = {
-  async list(
-    competitionId: string,
-    includeDeleted: boolean,
-  ): Promise<CompetitionChallenge[]> {
+  async list(competitionId: string, includeDeleted: boolean): Promise<CompetitionChallenge[]> {
     const response = unwrap(
       await generatedSdk.adminListCompetitionChallenges({
         path: { competitionId },
@@ -1055,10 +1100,7 @@ export const platformAdminApi = {
     const response = unwrap(await generatedSdk.adminPlatformListUsers(), tt('errors.loadUsers'))
     return response.items ?? []
   },
-  async createBot(
-    userName: string,
-    role: NoCtfDomainIdentityUserRole,
-  ): Promise<PlatformUser> {
+  async createBot(userName: string, role: NoCtfDomainIdentityUserRole): Promise<PlatformUser> {
     return unwrap(
       await generatedSdk.adminPlatformCreateBot({
         body: {

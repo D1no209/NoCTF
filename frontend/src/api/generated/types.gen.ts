@@ -421,6 +421,8 @@ export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     role?: NoCtfDomainIdentityUserRole;
     kind?: NoCtfDomainIdentityUserKind;
     emailVerified?: boolean;
+    description?: string | null;
+    avatarUrl?: string | null;
 };
 
 export type NoCtfDomainIdentityUserRole = 0 | 1 | 2;
@@ -464,6 +466,14 @@ export type NoCtfapiEndpointsAuthenticationRegisterRequest = {
     userName: string;
     email: string;
     password: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationUpdateMyProfileRequest = {
+    description?: string | null;
+};
+
+export type NoCtfapiEndpointsAuthenticationUploadMyAvatarRequest = {
+    file: Blob | File;
 };
 
 export type NoCtfapiEndpointsAuthenticationVerifyEmailRequest = {
@@ -2262,6 +2272,22 @@ export type NoCtfapiEndpointsAuthenticationGetMeEndpointResponses = {
 
 export type NoCtfapiEndpointsAuthenticationGetMeEndpointResponse = NoCtfapiEndpointsAuthenticationGetMeEndpointResponses[keyof NoCtfapiEndpointsAuthenticationGetMeEndpointResponses];
 
+export type UserAvatarGetData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{userId}/avatar';
+};
+
+export type UserAvatarGetErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
 export type NoCtfapiEndpointsAuthenticationLoginEndpointData = {
     body: NoCtfapiEndpointsAuthenticationLoginRequest;
     path?: never;
@@ -2402,6 +2428,80 @@ export type NoCtfapiEndpointsAuthenticationResendEmailVerificationEndpointRespon
 };
 
 export type NoCtfapiEndpointsAuthenticationResendEmailVerificationEndpointResponse = NoCtfapiEndpointsAuthenticationResendEmailVerificationEndpointResponses[keyof NoCtfapiEndpointsAuthenticationResendEmailVerificationEndpointResponses];
+
+export type AuthenticationUpdateMyProfileData = {
+    body: NoCtfapiEndpointsAuthenticationUpdateMyProfileRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/profile';
+};
+
+export type AuthenticationUpdateMyProfileErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AuthenticationUpdateMyProfileError = AuthenticationUpdateMyProfileErrors[keyof AuthenticationUpdateMyProfileErrors];
+
+export type AuthenticationUpdateMyProfileResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationCurrentUserResponse;
+};
+
+export type AuthenticationUpdateMyProfileResponse = AuthenticationUpdateMyProfileResponses[keyof AuthenticationUpdateMyProfileResponses];
+
+export type AuthenticationUploadMyAvatarData = {
+    body: NoCtfapiEndpointsAuthenticationUploadMyAvatarRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/avatar';
+};
+
+export type AuthenticationUploadMyAvatarErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AuthenticationUploadMyAvatarError = AuthenticationUploadMyAvatarErrors[keyof AuthenticationUploadMyAvatarErrors];
+
+export type AuthenticationUploadMyAvatarResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationCurrentUserResponse;
+};
+
+export type AuthenticationUploadMyAvatarResponse = AuthenticationUploadMyAvatarResponses[keyof AuthenticationUploadMyAvatarResponses];
 
 export type NoCtfapiEndpointsAuthenticationVerifyEmailEndpointData = {
     body: NoCtfapiEndpointsAuthenticationVerifyEmailRequest;
