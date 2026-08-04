@@ -26,12 +26,14 @@ describe('admin navigation layout', () => {
     expect(layoutSource).not.toContain('to: \'/admin/email-verification\'')
   })
 
-  test('places platform configuration after health status', () => {
-    const healthIndex = layoutSource.indexOf("to: '/admin/health'")
-    const settingsIndex = layoutSource.indexOf("to: '/admin/settings/basic'")
+  test('places platform logs below health and before platform configuration', () => {
+    const healthIndex = layoutSource.indexOf('to: \'/admin/health\'')
+    const logsIndex = layoutSource.indexOf('to: \'/admin/platform-logs\'')
+    const settingsIndex = layoutSource.indexOf('to: \'/admin/settings/basic\'')
 
     expect(healthIndex).toBeGreaterThan(-1)
-    expect(settingsIndex).toBeGreaterThan(healthIndex)
-    expect(layoutSource).toContain('items.push({')
+    expect(logsIndex).toBeGreaterThan(healthIndex)
+    expect(settingsIndex).toBeGreaterThan(logsIndex)
+    expect(layoutSource).toContain('label: t(\'admin.nav.platformLogs\')')
   })
 })

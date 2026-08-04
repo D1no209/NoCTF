@@ -1566,6 +1566,71 @@
         "Error": "Error"
       }
     },
+    "platformLogs": {
+      "title": "Platform Logs",
+      "subtitle": "Inspect API, Worker, and Runner runtime logs, immutable business audits, and Wolverine dead letters in one place. Warning and above is the default view.",
+      "adminOnly": "Platform administrators only",
+      "redaction": "Passwords, tokens, cookies, Authorization values, SMTP credentials, and other secrets are always redacted. Trusted platform administrators may view plaintext Flags in logs.",
+      "connected": "Live connection active",
+      "reconnecting": "Restoring live connection",
+      "realtimeUnavailable": "Live logs are temporarily unavailable",
+      "realtimeFallback": "Historical queries remain available. The page retries the live connection every 15 seconds.",
+      "pause": "Pause live stream",
+      "resume": "Resume live stream",
+      "loadOlder": "Load older logs",
+      "exception": "Exception details",
+      "tabs": {
+        "live": "Live Logs",
+        "audit": "Audit Logs",
+        "deadLetters": "Dead Letters"
+      },
+      "filters": {
+        "title": "Log filters",
+        "level": "Minimum level",
+        "service": "Service",
+        "from": "From",
+        "to": "To",
+        "competition": "Competition ID",
+        "runtime": "Runtime instance ID",
+        "apply": "Apply filters",
+        "reset": "Restore defaults"
+      },
+      "audit": {
+        "kind": "Audit kind",
+        "competitionLifecycle": "Competition lifecycle",
+        "accountLifecycle": "Account lifecycle",
+        "time": "Time",
+        "action": "Action",
+        "subject": "Subject",
+        "actor": "Actor ID",
+        "reason": "Reason",
+        "automatic": "Automatic system action"
+      },
+      "deadLetters": {
+        "search": "Search message type, source, exception, or message ID...",
+        "metadataOnly": "Message bodies and exception text are never returned to the browser.",
+        "time": "Sent at",
+        "message": "Message",
+        "source": "Source",
+        "exception": "Exception type",
+        "action": "Action",
+        "requeue": "Requeue",
+        "confirmRequeue": "Confirm requeue",
+        "notReplayable": "Not replayable",
+        "requeued": "Dead letter requeued.",
+        "requeueFailed": "Failed to requeue dead letter."
+      },
+      "empty": {
+        "live": "No logs match the current filters.",
+        "audit": "No audits match the current filters.",
+        "deadLetters": "No matching dead letters."
+      },
+      "errors": {
+        "history": "Failed to load platform logs.",
+        "audit": "Failed to load audit logs.",
+        "deadLetters": "Failed to load dead letters."
+      }
+    },
     "emailVerification": {
       "title": "Email verification",
       "subtitle": "Control the registration gate and SMTP delivery without exposing credentials to the browser.",
@@ -1661,6 +1726,7 @@
       "qqBot": "QQ Bot",
       "emailVerification": "Email verification",
       "platformSettings": "Platform Configuration",
+      "platformLogs": "Platform Logs",
       "auditLogs": "Audit Logs",
       "health": "Health",
       "liveLogs": "Live Logs",
