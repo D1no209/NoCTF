@@ -107,6 +107,7 @@ public static class ServiceRegistration
             signalR.AddStackExchangeRedis(redis);
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisSubmissionResultRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisLeaderboardRefreshRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisPlatformLogRelay>();
         }
         services.AddRateLimiter(options =>
         {

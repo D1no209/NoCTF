@@ -11,9 +11,14 @@ using Wolverine.EntityFrameworkCore;
 using Wolverine.Postgresql;
 using Wolverine.ErrorHandling;
 using NoCTF.Infrastructure.Administration;
+using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Infrastructure.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddNoCtfRunner(builder.Configuration);
+builder.Services.AddNoCtfPlatformLogging(
+    builder.Configuration,
+    PlatformLogService.Runner);
 var postgres = builder.Configuration.GetConnectionString("PostgreSql")
     ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
 builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(

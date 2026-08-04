@@ -1,5 +1,6 @@
 using NoCTF.Application.Administration;
 using NoCTF.Application.Administration.UserAccounts;
+using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Domain.Identity;
 
 namespace NoCTF.Infrastructure.Administration;
@@ -46,4 +47,20 @@ public sealed class OpenApiUserAccountAdministrationStore : IUserAccountAdminist
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult(new UserDeletionStoreResult(UserDeletionState.UserNotFound));
+}
+
+public sealed class OpenApiPlatformLogReader : IPlatformLogReader
+{
+    public Task<PlatformLogQueryResult> QueryAsync(
+        PlatformLogQuery query,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new PlatformLogQueryResult(PlatformLogReadState.Available, []));
+}
+
+public sealed class OpenApiPlatformAuditLogStore : IPlatformAuditLogStore
+{
+    public Task<IReadOnlyList<PlatformAuditView>> QueryAsync(
+        PlatformAuditQuery query,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PlatformAuditView>>([]);
 }

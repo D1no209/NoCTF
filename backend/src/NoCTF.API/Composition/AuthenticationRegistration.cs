@@ -26,7 +26,9 @@ public static class AuthenticationRegistration
                 {
                     OnMessageReceived = context =>
                     {
-                        if (context.HttpContext.Request.Path.StartsWithSegments("/hubs/v1/competitions")
+                        if ((context.HttpContext.Request.Path.StartsWithSegments("/hubs/v1/competitions")
+                                || context.HttpContext.Request.Path.StartsWithSegments(
+                                    "/hubs/v1/admin/platform-logs"))
                             && context.Request.Query.TryGetValue("access_token", out var token))
                             context.Token = token;
                         return Task.CompletedTask;

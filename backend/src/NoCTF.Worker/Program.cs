@@ -10,9 +10,14 @@ using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
 using NoCTF.Infrastructure.Administration;
+using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Infrastructure.Observability;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddNoCtfInfrastructure(builder.Configuration);
+builder.Services.AddNoCtfPlatformLogging(
+    builder.Configuration,
+    PlatformLogService.Worker);
 builder.UseWolverine(options =>
 {
     options.Discovery.IncludeType(typeof(BackendMessageHandlers));
