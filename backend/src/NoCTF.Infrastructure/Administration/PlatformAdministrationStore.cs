@@ -18,7 +18,8 @@ public sealed class PlatformAdministrationStore(
             .OrderBy(user => user.CreatedAt)
             .ThenBy(user => user.Id)
             .Select(user => new PlatformUserView(
-                user.Id, user.UserName, user.Email, user.Kind, user.Role, user.TokenVersion,
+                user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
+                user.TokenVersion,
                 user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
             .ToListAsync(ct);
 
@@ -26,7 +27,8 @@ public sealed class PlatformAdministrationStore(
         db.Users.AsNoTracking()
             .Where(user => user.Id == userId)
             .Select(user => new PlatformUserView(
-                user.Id, user.UserName, user.Email, user.Kind, user.Role, user.TokenVersion,
+                user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
+                user.TokenVersion,
                 user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
             .SingleOrDefaultAsync(ct);
 
@@ -52,6 +54,7 @@ public sealed class PlatformAdministrationStore(
             NormalizedEmail = email.ToUpperInvariant(),
             Kind = UserKind.Bot,
             Role = role,
+            AccountStatus = UserAccountStatus.Active,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -147,7 +150,8 @@ public sealed class PlatformAdministrationStore(
 
     private static PlatformUserView Map(User user) =>
         new(
-            user.Id, user.UserName, user.Email, user.Kind, user.Role, user.TokenVersion,
+            user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
+            user.TokenVersion,
             user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt);
 
     private static DeadLetterView Map(DeadLetterEnvelope envelope) =>

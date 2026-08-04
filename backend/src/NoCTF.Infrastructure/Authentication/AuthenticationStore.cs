@@ -17,6 +17,7 @@ public sealed class AuthenticationStore(
         var normalized = login.Trim().ToUpperInvariant();
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(
             item => item.Kind == UserKind.Human
+                && item.AccountStatus == UserAccountStatus.Active
                 && (item.NormalizedEmail == normalized
                 || item.NormalizedUserName == normalized
                 || item.Id.ToString() == login),
@@ -29,7 +30,9 @@ public sealed class AuthenticationStore(
         string password,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(item =>
+            item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
+            ct);
         if (user is null || user.Kind != UserKind.Human)
             return false;
         var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
@@ -44,7 +47,8 @@ public sealed class AuthenticationStore(
 
     public async Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken ct) =>
         ToAuthenticated(await db.Users.AsNoTracking().SingleOrDefaultAsync(
-            item => item.Id == userId, ct));
+            item => item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
+            ct));
 
     public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken ct) =>
         db.Users.AsNoTracking()
@@ -66,7 +70,9 @@ public sealed class AuthenticationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(item =>
+            item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
+            ct);
         if (user is null)
             return null;
 
@@ -82,7 +88,9 @@ public sealed class AuthenticationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(item =>
+            item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
+            ct);
         if (user is null)
             return null;
 
@@ -95,7 +103,7 @@ public sealed class AuthenticationStore(
 
     public Task<string?> GetAvatarObjectKeyAsync(Guid userId, CancellationToken ct) =>
         db.Users.AsNoTracking()
-            .Where(user => user.Id == userId)
+            .Where(user => user.Id == userId && user.AccountStatus == UserAccountStatus.Active)
             .Select(user => user.AvatarObjectKey)
             .SingleOrDefaultAsync(ct);
 
@@ -126,6 +134,7 @@ public sealed class AuthenticationStore(
             NormalizedEmail = normalizedEmail,
             Kind = UserKind.Human,
             Role = UserRole.User,
+            AccountStatus = UserAccountStatus.Active,
             EmailVerifiedAt = emailVerified ? now : null,
             CreatedAt = now,
             UpdatedAt = now
@@ -154,7 +163,9 @@ public sealed class AuthenticationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(item =>
+            item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
+            ct);
         if (user is null
             || user.Kind != UserKind.Human
             || passwordHasher.VerifyHashedPassword(
@@ -172,7 +183,8 @@ public sealed class AuthenticationStore(
         Guid userId,
         DateTimeOffset now,
         CancellationToken ct) =>
-        await db.Users.Where(user => user.Id == userId)
+        await db.Users.Where(user =>
+                user.Id == userId && user.AccountStatus == UserAccountStatus.Active)
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(user => user.TokenVersion, user => user.TokenVersion + 1)

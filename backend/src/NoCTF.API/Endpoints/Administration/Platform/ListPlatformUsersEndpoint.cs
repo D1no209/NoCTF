@@ -11,6 +11,7 @@ public sealed record PlatformUserResponse(
     string Email,
     UserKind Kind,
     UserRole Role,
+    UserAccountStatus AccountStatus,
     int TokenVersion,
     bool EmailVerified,
     DateTimeOffset CreatedAt,
@@ -22,7 +23,8 @@ internal static class PlatformUserMapping
 {
     public static PlatformUserResponse ToResponse(PlatformUserView view) =>
         new(
-            view.Id, view.UserName, view.Email, view.Kind, view.Role, view.TokenVersion,
+            view.Id, view.UserName, view.Email, view.Kind, view.Role, view.AccountStatus,
+            view.TokenVersion,
             view.EmailVerified, view.CreatedAt, view.UpdatedAt);
 }
 

@@ -4054,6 +4054,138 @@
         ]
       }
     },
+    "/api/v1/admin/platform/users/{userId}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Deletes or irreversibly anonymizes a platform user.",
+        "description": "Physical deletion is allowed only without business references. Anonymization preserves all historical records and never cascades them.",
+        "operationId": "AdminPlatformDeleteUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "DeletePlatformUserRequest",
+          "description": "",
+          "content": {
+            "*/*": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformDeletePlatformUserRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformDeletePlatformUserRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets one platform user.",
+        "description": "Returns platform identity and token-version metadata to administrators only.",
+        "operationId": "AdminPlatformGetUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/dead-letters/{messageId}": {
       "get": {
         "tags": [
@@ -4182,54 +4314,6 @@
                 }
               }
             }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/platform/users/{userId}": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Gets one platform user.",
-        "description": "Returns platform identity and token-version metadata to administrators only.",
-        "operationId": "AdminPlatformGetUser",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -4434,6 +4518,54 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/users/{userId}/deletion-preview": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Previews the impact of deleting a platform user.",
+        "description": "Reports historical references and whether physical deletion or irreversible anonymization is currently allowed.",
+        "operationId": "AdminPlatformPreviewUserDeletion",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -10321,6 +10453,9 @@
           "role": {
             "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
           },
+          "accountStatus": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserAccountStatus"
+          },
           "tokenVersion": {
             "type": "integer",
             "format": "int32"
@@ -10337,6 +10472,22 @@
             "format": "date-time"
           }
         }
+      },
+      "NoCTFDomainIdentityUserAccountStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Active",
+          "Banned",
+          "Disabled",
+          "Anonymized"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformCreatePlatformBotRequest": {
         "type": "object",
@@ -10369,6 +10520,175 @@
           "User",
           "Organizer",
           "Administrator"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "PhysicallyDeleted",
+          "Anonymized"
+        ],
+        "enum": [
+          "PhysicallyDeleted",
+          "Anonymized"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionConflictCode"
+          },
+          "preview": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "HardDeleteBlocked",
+          "SelfDeletionForbidden",
+          "LastAdministratorProtected",
+          "AlreadyAnonymized"
+        ],
+        "enum": [
+          "HardDeleteBlocked",
+          "SelfDeletionForbidden",
+          "LastAdministratorProtected",
+          "AlreadyAnonymized"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "accountStatus": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityUserAccountStatus"
+          },
+          "canHardDelete": {
+            "type": "boolean"
+          },
+          "canAnonymize": {
+            "type": "boolean"
+          },
+          "selfDeletionForbidden": {
+            "type": "boolean"
+          },
+          "lastAdministratorProtected": {
+            "type": "boolean"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionReferenceResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionReferenceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionOwner",
+          "CompetitionCollaborator",
+          "ChallengeOwner",
+          "ChallengeManager",
+          "TeamCaptain",
+          "TeamMember",
+          "Submission",
+          "PatchUpload",
+          "Notification",
+          "ScoringEvent",
+          "CompetitionLifecycleAudit",
+          "UserAccountLifecycleAudit"
+        ],
+        "enum": [
+          "CompetitionOwner",
+          "CompetitionCollaborator",
+          "ChallengeOwner",
+          "ChallengeManager",
+          "TeamCaptain",
+          "TeamMember",
+          "Submission",
+          "PatchUpload",
+          "Notification",
+          "ScoringEvent",
+          "CompetitionLifecycleAudit",
+          "UserAccountLifecycleAudit"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformDeletePlatformUserRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "reason"
+        ],
+        "properties": {
+          "mode": {
+            "nullable": false,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionMode"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionMode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "HardDelete",
+          "Anonymize"
+        ],
+        "enum": [
+          "HardDelete",
+          "Anonymize"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse": {

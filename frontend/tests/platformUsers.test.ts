@@ -2,11 +2,14 @@ import { describe, expect, test } from 'bun:test'
 import { createI18n } from 'vue-i18n'
 import {
   BOT_TOKEN_LIFETIMES,
+  deletionReferenceLabelKey,
   isBot,
   isHuman,
   isValidBotUserName,
+  PLATFORM_USER_ACCOUNT_STATUS,
   PLATFORM_USER_KIND,
   PLATFORM_USER_ROLE,
+  userAccountStatusLabelKey,
   userKindLabelKey,
   userRoleLabelKey,
 } from '../src/components/admin/users/platformUserPresentation'
@@ -17,14 +20,29 @@ describe('platform user presentation', () => {
   test('maps bounded user kinds and roles to localized labels', () => {
     expect(userKindLabelKey(PLATFORM_USER_KIND.human)).toBe('admin.users.kindHuman')
     expect(userKindLabelKey(PLATFORM_USER_KIND.bot)).toBe('admin.users.kindBot')
-    expect(userKindLabelKey(PLATFORM_USER_KIND.bot, PLATFORM_USER_ROLE.user))
-      .toBe('admin.users.kindNotificationRelayBot')
-    expect(userKindLabelKey(PLATFORM_USER_KIND.bot, PLATFORM_USER_ROLE.organizer))
-      .toBe('admin.users.kindGitOpsBot')
+    expect(userKindLabelKey(PLATFORM_USER_KIND.bot, PLATFORM_USER_ROLE.user)).toBe(
+      'admin.users.kindNotificationRelayBot',
+    )
+    expect(userKindLabelKey(PLATFORM_USER_KIND.bot, PLATFORM_USER_ROLE.organizer)).toBe(
+      'admin.users.kindGitOpsBot',
+    )
     expect(userKindLabelKey(undefined)).toBe('admin.users.kindUnknown')
     expect(userRoleLabelKey(PLATFORM_USER_ROLE.user)).toBe('admin.users.roleUser')
     expect(userRoleLabelKey(PLATFORM_USER_ROLE.organizer)).toBe('admin.users.roleOrganizer')
     expect(userRoleLabelKey(PLATFORM_USER_ROLE.administrator)).toBe('admin.users.roleAdmin')
+    expect(userAccountStatusLabelKey(PLATFORM_USER_ACCOUNT_STATUS.active)).toBe(
+      'admin.users.statusActive',
+    )
+    expect(userAccountStatusLabelKey(PLATFORM_USER_ACCOUNT_STATUS.banned)).toBe(
+      'admin.users.statusBanned',
+    )
+    expect(userAccountStatusLabelKey(PLATFORM_USER_ACCOUNT_STATUS.disabled)).toBe(
+      'admin.users.statusDisabled',
+    )
+    expect(userAccountStatusLabelKey(PLATFORM_USER_ACCOUNT_STATUS.anonymized)).toBe(
+      'admin.users.statusAnonymized',
+    )
+    expect(deletionReferenceLabelKey('Submission')).toBe('admin.users.deletionReference.Submission')
   })
 
   test('keeps Bot and Human actions mutually exclusive', () => {
@@ -73,6 +91,14 @@ describe('platform user presentation', () => {
       userRoleLabelKey(PLATFORM_USER_ROLE.user),
       userRoleLabelKey(PLATFORM_USER_ROLE.organizer),
       userRoleLabelKey(PLATFORM_USER_ROLE.administrator),
+      userAccountStatusLabelKey(PLATFORM_USER_ACCOUNT_STATUS.active),
+      userAccountStatusLabelKey(PLATFORM_USER_ACCOUNT_STATUS.banned),
+      userAccountStatusLabelKey(PLATFORM_USER_ACCOUNT_STATUS.disabled),
+      userAccountStatusLabelKey(PLATFORM_USER_ACCOUNT_STATUS.anonymized),
+      deletionReferenceLabelKey('CompetitionOwner'),
+      deletionReferenceLabelKey('Submission'),
+      deletionReferenceLabelKey('ScoringEvent'),
+      deletionReferenceLabelKey('UserAccountLifecycleAudit'),
       ...BOT_TOKEN_LIFETIMES.map(option => option.labelKey),
       'admin.users.createBot',
       'admin.users.issueToken',
@@ -82,6 +108,10 @@ describe('platform user presentation', () => {
       'admin.users.roleDowngradeBlockedHint',
       'admin.users.blockingCompetitions',
       'admin.users.blockingChallenges',
+      'admin.users.deleteAccount',
+      'admin.users.deletionImpact',
+      'admin.users.physicalDelete',
+      'admin.users.anonymizeAndDeactivate',
     ]) {
       expect(i18n.global.t(key)).not.toBe(key)
     }

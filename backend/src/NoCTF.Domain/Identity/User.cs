@@ -13,6 +13,7 @@ public sealed class User
     public string PasswordHash { get; set; } = string.Empty;
     public UserKind Kind { get; set; }
     public UserRole Role { get; set; }
+    public UserAccountStatus AccountStatus { get; set; }
     public int TokenVersion { get; set; }
     [MaxLength(500)]
     public string? Description { get; set; }

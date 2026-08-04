@@ -1,4 +1,6 @@
 import type {
+  NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode,
+  NoCtfDomainIdentityUserAccountStatus,
   NoCtfDomainIdentityUserKind,
   NoCtfDomainIdentityUserRole,
 } from '@/api/generated/types.gen'
@@ -13,6 +15,13 @@ export const PLATFORM_USER_KIND = {
   human: 0,
   bot: 1,
 } as const satisfies Record<string, NoCtfDomainIdentityUserKind>
+
+export const PLATFORM_USER_ACCOUNT_STATUS = {
+  active: 0,
+  banned: 1,
+  disabled: 2,
+  anonymized: 3,
+} as const satisfies Record<string, NoCtfDomainIdentityUserAccountStatus>
 
 export const BOT_TOKEN_LIFETIMES = [
   { seconds: 86_400, labelKey: 'admin.users.tokenLifetimeDay' },
@@ -48,6 +57,27 @@ export function userRoleLabelKey(role?: NoCtfDomainIdentityUserRole) {
     default:
       return 'admin.users.roleUser'
   }
+}
+
+export function userAccountStatusLabelKey(status?: NoCtfDomainIdentityUserAccountStatus) {
+  switch (status) {
+    case PLATFORM_USER_ACCOUNT_STATUS.active:
+      return 'admin.users.statusActive'
+    case PLATFORM_USER_ACCOUNT_STATUS.banned:
+      return 'admin.users.statusBanned'
+    case PLATFORM_USER_ACCOUNT_STATUS.disabled:
+      return 'admin.users.statusDisabled'
+    case PLATFORM_USER_ACCOUNT_STATUS.anonymized:
+      return 'admin.users.statusAnonymized'
+    default:
+      return 'admin.users.statusUnknown'
+  }
+}
+
+export function deletionReferenceLabelKey(
+  code?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode,
+) {
+  return code ? `admin.users.deletionReference.${code}` : 'admin.users.deletionReference.unknown'
 }
 
 export function isBot(user: PlatformUser) {

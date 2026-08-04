@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { SortingState } from '@tanstack/vue-table'
 import type { NoCtfDomainIdentityUserRole } from '@/api/generated/types.gen'
-import type { IssuedBotToken, PlatformRoleAssignmentBlockers, PlatformUser } from '@/api/noctf'
+import type {
+  IssuedBotToken,
+  PlatformRoleAssignmentBlockers,
+  PlatformUser,
+  PlatformUserDeletionMode,
+  PlatformUserDeletionPreview,
+} from '@/api/noctf'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -11,7 +17,6 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-
   useVueTable,
 } from '@tanstack/vue-table'
 import {
@@ -25,13 +30,19 @@ import {
   Search,
   ShieldAlert,
   ShieldOff,
+  Trash2,
+  TriangleAlert,
   UserCog,
   User as UserIcon,
 } from 'lucide-vue-next'
 import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { platformAdminApi, readPlatformRoleAssignmentBlockers } from '@/api/noctf'
+import {
+  platformAdminApi,
+  readPlatformRoleAssignmentBlockers,
+  readPlatformUserDeletionConflict,
+} from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -73,10 +84,13 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import {
   BOT_TOKEN_LIFETIMES,
+  deletionReferenceLabelKey,
   isBot,
   isHuman,
   isValidBotUserName,
+  PLATFORM_USER_ACCOUNT_STATUS,
   PLATFORM_USER_ROLE,
+  userAccountStatusLabelKey,
   userKindLabelKey,
   userRoleLabelKey,
 } from './platformUserPresentation'
@@ -107,10 +121,21 @@ const tokenCopied = ref(false)
 
 const invalidateTokensDialog = ref(false)
 
+const deletionDialog = ref(false)
+const deletionPreview = ref<PlatformUserDeletionPreview | null>(null)
+const deletionPreviewLoading = ref(false)
+const deletionPreviewError = ref(false)
+const deletionReason = ref('')
+const deletionConflictCode = ref<string | null>(null)
+
 const canCreateBot = computed(() => isValidBotUserName(newBotUserName.value))
 const hasRoleChange = computed(() => {
   const currentRole = selectedUser.value?.role ?? PLATFORM_USER_ROLE.user
   return Number(newRole.value) !== currentRole
+})
+const hasValidDeletionReason = computed(() => {
+  const length = deletionReason.value.trim().length
+  return length >= 3 && length <= 500
 })
 
 const {
@@ -124,10 +149,11 @@ const {
 })
 
 const createBotMutation = useMutation({
-  mutationFn: () => platformAdminApi.createBot(
-    newBotUserName.value.trim(),
-    Number(newBotRole.value) as NoCtfDomainIdentityUserRole,
-  ),
+  mutationFn: () =>
+    platformAdminApi.createBot(
+      newBotUserName.value.trim(),
+      Number(newBotRole.value) as NoCtfDomainIdentityUserRole,
+    ),
   onSuccess: (user) => {
     createBotDialog.value = false
     newBotUserName.value = ''
@@ -192,6 +218,34 @@ const invalidateTokensMutation = useMutation({
   onError: () => toast.error(t('admin.users.actionErrorInvalidateTokens')),
 })
 
+const deleteUserMutation = useMutation({
+  mutationFn: ({
+    id,
+    mode,
+    reason,
+  }: {
+    id: string
+    mode: PlatformUserDeletionMode
+    reason: string
+  }) => platformAdminApi.deleteUser(id, mode, reason),
+  onSuccess: async (outcome) => {
+    deletionDialog.value = false
+    await queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers })
+    toast.success(
+      outcome === 'PhysicallyDeleted'
+        ? t('admin.users.physicalDeleteSuccess')
+        : t('admin.users.anonymizeSuccess'),
+    )
+  },
+  onError: (error) => {
+    const conflict = readPlatformUserDeletionConflict(error)
+    deletionConflictCode.value = conflict?.code ?? null
+    if (conflict?.preview)
+      deletionPreview.value = conflict.preview
+    toast.error(t('admin.users.deleteError'))
+  },
+})
+
 function openCreateBotDialog() {
   newBotUserName.value = ''
   newBotRole.value = String(PLATFORM_USER_ROLE.user)
@@ -233,6 +287,44 @@ function openIssueTokenDialog(user: PlatformUser) {
 function openInvalidateTokensDialog(user: PlatformUser) {
   selectedUser.value = user
   invalidateTokensDialog.value = true
+}
+
+async function loadDeletionPreview() {
+  const userId = selectedUser.value?.id
+  if (!userId)
+    return
+
+  deletionPreviewLoading.value = true
+  deletionPreviewError.value = false
+  deletionConflictCode.value = null
+  try {
+    deletionPreview.value = await platformAdminApi.previewUserDeletion(userId)
+  }
+  catch {
+    deletionPreviewError.value = true
+    toast.error(t('admin.users.deletionPreviewError'))
+  }
+  finally {
+    deletionPreviewLoading.value = false
+  }
+}
+
+function openDeletionDialog(user: PlatformUser) {
+  selectedUser.value = user
+  deletionPreview.value = null
+  deletionReason.value = ''
+  deletionPreviewError.value = false
+  deletionConflictCode.value = null
+  deletionDialog.value = true
+  void loadDeletionPreview()
+}
+
+function deleteUser(mode: PlatformUserDeletionMode) {
+  const userId = selectedUser.value?.id
+  if (!userId || !hasValidDeletionReason.value)
+    return
+
+  deleteUserMutation.mutate({ id: userId, mode, reason: deletionReason.value.trim() })
 }
 
 function updateUserRole() {
@@ -313,6 +405,16 @@ function roleVariant(role?: NoCtfDomainIdentityUserRole): 'default' | 'secondary
   return 'secondary'
 }
 
+function statusVariant(status?: number): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (status === PLATFORM_USER_ACCOUNT_STATUS.active)
+    return 'default'
+  if (status === PLATFORM_USER_ACCOUNT_STATUS.banned)
+    return 'destructive'
+  if (status === PLATFORM_USER_ACCOUNT_STATUS.disabled)
+    return 'secondary'
+  return 'outline'
+}
+
 const columnHelper = createColumnHelper<PlatformUser>()
 
 const columns = [
@@ -348,6 +450,12 @@ const columns = [
     cell: info =>
       h(Badge, { variant: roleVariant(info.getValue()) }, () =>
         t(userRoleLabelKey(info.getValue()))),
+  }),
+  columnHelper.accessor('accountStatus', {
+    header: t('admin.users.accountStatus'),
+    cell: info =>
+      h(Badge, { variant: statusVariant(info.getValue()) }, () =>
+        t(userAccountStatusLabelKey(info.getValue()))),
   }),
   columnHelper.accessor('tokenVersion', {
     header: t('admin.users.tokenVersion'),
@@ -505,25 +613,39 @@ const table = useVueTable({
                 <DropdownMenuContent align="end" class="w-[210px]">
                   <DropdownMenuLabel>{{ t('common.actions') }}</DropdownMenuLabel>
                   <DropdownMenuItem
-                    v-if="isHuman(row.original)"
-                    @click="openRoleDialog(row.original)"
+                    v-if="
+                      isHuman(row.original)
+                        && row.original.accountStatus === PLATFORM_USER_ACCOUNT_STATUS.active
+                    "
+                    @select="openRoleDialog(row.original)"
                   >
                     <UserCog class="mr-2 size-4" />
                     {{ t('admin.users.changeRole') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    v-if="isBot(row.original)"
-                    @click="openIssueTokenDialog(row.original)"
+                    v-if="
+                      isBot(row.original)
+                        && row.original.accountStatus === PLATFORM_USER_ACCOUNT_STATUS.active
+                    "
+                    @select="openIssueTokenDialog(row.original)"
                   >
                     <KeyRound class="mr-2 size-4" />
                     {{ t('admin.users.issueToken') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
+                    v-if="row.original.accountStatus === PLATFORM_USER_ACCOUNT_STATUS.active"
                     class="text-destructive focus:text-destructive"
-                    @click="openInvalidateTokensDialog(row.original)"
+                    @select="openInvalidateTokensDialog(row.original)"
                   >
                     <ShieldOff class="mr-2 size-4" />
                     {{ t('admin.users.invalidateTokens') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    class="text-destructive focus:text-destructive"
+                    @select="openDeletionDialog(row.original)"
+                  >
+                    <Trash2 class="mr-2 size-4" />
+                    {{ t('admin.users.deleteAccount') }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -768,9 +890,7 @@ const table = useVueTable({
         <template v-if="issuedToken">
           <DialogHeader>
             <DialogTitle>
-              {{
-                t('admin.users.tokenReady', { name: issuedToken.userName })
-              }}
+              {{ t('admin.users.tokenReady', { name: issuedToken.userName }) }}
             </DialogTitle>
             <DialogDescription>{{ t('admin.users.tokenOneTimeWarning') }}</DialogDescription>
           </DialogHeader>
@@ -836,6 +956,155 @@ const table = useVueTable({
           >
             <Loader2 v-if="invalidateTokensMutation.isPending.value" class="size-4 animate-spin" />
             {{ t('admin.users.invalidateTokens') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="deletionDialog">
+      <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-[620px]">
+        <DialogHeader>
+          <DialogTitle class="text-destructive">
+            {{
+              t('admin.users.deleteDialogTitle', {
+                name: selectedUser ? displayName(selectedUser) : '',
+              })
+            }}
+          </DialogTitle>
+          <DialogDescription>{{ t('admin.users.deleteDialogDescription') }}</DialogDescription>
+        </DialogHeader>
+
+        <div v-if="deletionPreviewLoading" class="space-y-3 py-3">
+          <Skeleton class="h-20 w-full" />
+          <Skeleton class="h-28 w-full" />
+        </div>
+
+        <Alert v-else-if="deletionPreviewError" variant="destructive">
+          <AlertTitle>{{ t('admin.users.deletionPreviewError') }}</AlertTitle>
+          <AlertDescription class="mt-3">
+            <Button variant="outline" size="sm" @click="loadDeletionPreview">
+              {{ t('common.retry') }}
+            </Button>
+          </AlertDescription>
+        </Alert>
+
+        <div v-else-if="deletionPreview" class="space-y-4 py-2">
+          <Alert
+            v-if="
+              deletionPreview.selfDeletionForbidden || deletionPreview.lastAdministratorProtected
+            "
+            variant="destructive"
+          >
+            <TriangleAlert class="size-4" />
+            <AlertTitle>{{ t('admin.users.deletionBlocked') }}</AlertTitle>
+            <AlertDescription>
+              {{
+                deletionPreview.selfDeletionForbidden
+                  ? t('admin.users.selfDeletionForbidden')
+                  : t('admin.users.lastAdministratorProtected')
+              }}
+            </AlertDescription>
+          </Alert>
+
+          <Alert v-if="deletionConflictCode" variant="destructive">
+            <TriangleAlert class="size-4" />
+            <AlertTitle>{{ t('admin.users.deleteConflict') }}</AlertTitle>
+            <AlertDescription>
+              {{ t(`admin.users.deletionConflict.${deletionConflictCode}`) }}
+            </AlertDescription>
+          </Alert>
+
+          <div class="border bg-muted/30 p-4">
+            <div class="flex items-center justify-between gap-4">
+              <p class="font-semibold">
+                {{ t('admin.users.deletionImpact') }}
+              </p>
+              <Badge variant="outline">
+                {{
+                  t('admin.users.referenceCount', {
+                    count:
+                      deletionPreview.references?.reduce(
+                        (sum, item) => sum + (item.count ?? 0),
+                        0,
+                      ) ?? 0,
+                  })
+                }}
+              </Badge>
+            </div>
+            <div v-if="deletionPreview.references?.length" class="mt-3 divide-y border-y">
+              <div
+                v-for="reference in deletionPreview.references"
+                :key="reference.code"
+                class="flex items-center justify-between gap-4 py-2 text-sm"
+              >
+                <span>{{ t(deletionReferenceLabelKey(reference.code)) }}</span>
+                <code class="font-mono text-xs tabular-nums">{{ reference.count ?? 0 }}</code>
+              </div>
+            </div>
+            <p v-else class="mt-3 text-sm text-muted-foreground">
+              {{ t('admin.users.noDeletionReferences') }}
+            </p>
+          </div>
+
+          <div
+            v-if="deletionPreview.canHardDelete"
+            class="border border-destructive/40 bg-destructive/10 p-4 text-sm leading-6 text-destructive"
+          >
+            <p class="font-semibold">
+              {{ t('admin.users.physicalDeleteAvailable') }}
+            </p>
+            <p>{{ t('admin.users.physicalDeleteWarning') }}</p>
+          </div>
+          <div
+            v-else-if="deletionPreview.canAnonymize"
+            class="border border-destructive/40 bg-destructive/10 p-4 text-sm leading-6 text-destructive"
+          >
+            <p class="font-semibold">
+              {{ t('admin.users.anonymizeRequired') }}
+            </p>
+            <p>{{ t('admin.users.anonymizeWarning') }}</p>
+          </div>
+
+          <div
+            v-if="deletionPreview.canHardDelete || deletionPreview.canAnonymize"
+            class="space-y-2"
+          >
+            <Label for="user-deletion-reason">{{ t('admin.users.deletionReason') }}</Label>
+            <Textarea
+              id="user-deletion-reason"
+              v-model="deletionReason"
+              :placeholder="t('admin.users.deletionReasonPlaceholder')"
+              maxlength="500"
+              rows="3"
+            />
+            <div class="flex justify-between gap-3 text-xs text-muted-foreground">
+              <span>{{ t('admin.users.deletionReasonHint') }}</span>
+              <span class="tabular-nums">{{ deletionReason.length }}/500</span>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" @click="deletionDialog = false">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            v-if="deletionPreview?.canHardDelete"
+            variant="destructive"
+            :disabled="deleteUserMutation.isPending.value || !hasValidDeletionReason"
+            @click="deleteUser('HardDelete')"
+          >
+            <Loader2 v-if="deleteUserMutation.isPending.value" class="size-4 animate-spin" />
+            {{ t('admin.users.physicalDelete') }}
+          </Button>
+          <Button
+            v-else-if="deletionPreview?.canAnonymize"
+            variant="destructive"
+            :disabled="deleteUserMutation.isPending.value || !hasValidDeletionReason"
+            @click="deleteUser('Anonymize')"
+          >
+            <Loader2 v-if="deleteUserMutation.isPending.value" class="size-4 animate-spin" />
+            {{ t('admin.users.anonymizeAndDeactivate') }}
           </Button>
         </DialogFooter>
       </DialogContent>

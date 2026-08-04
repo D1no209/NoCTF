@@ -9,9 +9,30 @@ import {
   readCompetitionChallengeConflict,
   readCompetitionPermissionsConflict,
   readPlatformRoleAssignmentBlockers,
+  readPlatformUserDeletionConflict,
 } from '../src/api/noctf'
 
 describe('typed API conflicts', () => {
+  test('preserves the deletion preview returned by an HTTP 409 conflict', () => {
+    const preview = {
+      userId: 'user-a',
+      canHardDelete: false,
+      canAnonymize: true,
+      references: [{ code: 'Submission' as const, count: 2 }],
+    }
+    const error = new ApiError('blocked', 409, {
+      code: 'HardDeleteBlocked',
+      preview,
+    })
+
+    expect(readPlatformUserDeletionConflict(error)).toEqual({
+      code: 'HardDeleteBlocked',
+      preview,
+    })
+    expect(readPlatformUserDeletionConflict(new ApiError('bad request', 400, {}))).toBeNull()
+    expect(readPlatformUserDeletionConflict(new Error('conflict'))).toBeNull()
+  })
+
   test('decodes platform role blockers and normalizes resource IDs', () => {
     const error = new ApiError('blocked', 409, {
       code: 'ActiveOwnerOrManagerAssignments',
@@ -64,14 +85,10 @@ describe('typed API conflicts', () => {
       ),
     ).toBeNull()
     expect(
-      readChallengeTemplateConflict(
-        new ApiError('RevisionConflict', 409, 'RevisionConflict'),
-      ),
+      readChallengeTemplateConflict(new ApiError('RevisionConflict', 409, 'RevisionConflict')),
     ).toBeNull()
     expect(
-      readChallengeTemplateConflict(
-        new ApiError('conflict', 400, { code: 'RevisionConflict' }),
-      ),
+      readChallengeTemplateConflict(new ApiError('conflict', 400, { code: 'RevisionConflict' })),
     ).toBeNull()
     expect(readChallengeTemplateConflict(new Error('RevisionConflict'))).toBeNull()
   })
@@ -88,27 +105,19 @@ describe('typed API conflicts', () => {
     ] as const satisfies readonly NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode[]
 
     for (const code of codes) {
-      expect(
-        readCompetitionChallengeConflict(
-          new ApiError('conflict', 409, { code }),
-        ),
-      ).toEqual({ code })
+      expect(readCompetitionChallengeConflict(new ApiError('conflict', 409, { code }))).toEqual({
+        code,
+      })
     }
 
     expect(
-      readCompetitionChallengeConflict(
-        new ApiError('conflict', 409, { code: 'UnknownConflict' }),
-      ),
+      readCompetitionChallengeConflict(new ApiError('conflict', 409, { code: 'UnknownConflict' })),
     ).toBeNull()
     expect(
-      readCompetitionChallengeConflict(
-        new ApiError('RevisionConflict', 409, 'RevisionConflict'),
-      ),
+      readCompetitionChallengeConflict(new ApiError('RevisionConflict', 409, 'RevisionConflict')),
     ).toBeNull()
     expect(
-      readCompetitionChallengeConflict(
-        new ApiError('conflict', 400, { code: 'RevisionConflict' }),
-      ),
+      readCompetitionChallengeConflict(new ApiError('conflict', 400, { code: 'RevisionConflict' })),
     ).toBeNull()
     expect(readCompetitionChallengeConflict(new Error('RevisionConflict'))).toBeNull()
   })
@@ -143,9 +152,7 @@ describe('typed API conflicts', () => {
       ),
     ).toBeUndefined()
     expect(
-      readCompetitionPermissionsConflict(
-        new ApiError('RevisionConflict', 409, 'RevisionConflict'),
-      ),
+      readCompetitionPermissionsConflict(new ApiError('RevisionConflict', 409, 'RevisionConflict')),
     ).toBeUndefined()
     expect(
       readCompetitionPermissionsConflict(
