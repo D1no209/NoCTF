@@ -50,7 +50,8 @@ public enum CompetitionEventKind : short
     CheatIncidentConfirmed,
     CheatIncidentDismissed,
     CheatIncidentSuperseded,
-    CheatIncidentCorrected
+    CheatIncidentCorrected,
+    ProtectedCompetitionExportCreated
 }
 
 public enum CompetitionEventLevel : short

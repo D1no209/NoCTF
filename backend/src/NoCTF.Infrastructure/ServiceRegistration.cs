@@ -13,6 +13,7 @@ using NoCTF.Infrastructure.Scoring;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.Submissions;
 using NoCTF.Infrastructure.Teams;
+using NoCTF.Infrastructure.DataExports;
 
 namespace NoCTF.Infrastructure;
 
@@ -47,6 +48,7 @@ public static class ServiceRegistration
         services.AddNoCtfCompetitions();
         services.AddNoCtfAuthentication();
         services.AddNoCtfAdministration(configuration, exporting);
+        services.AddNoCtfDataExports();
 
         return services;
     }

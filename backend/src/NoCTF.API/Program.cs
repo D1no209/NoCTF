@@ -63,6 +63,9 @@ builder.UseWolverine(options =>
         options.PublishMessage<TeamBanCorrected>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<CompetitionEventCommitted>()
             .ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<GenerateDataExport>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<ExpireDataExport>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<PurgeDataExport>().ToPostgresqlQueue("noctf-worker");
     }
 });
 

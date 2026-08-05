@@ -25,6 +25,7 @@ builder.UseWolverine(options =>
     options.Discovery.IncludeType(typeof(BackendMessageHandlers));
     options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
     options.Discovery.IncludeType(typeof(CompetitionEventMessageHandlers));
+    options.Discovery.IncludeType(typeof(DataExportMessageHandlers));
     var postgres = builder.Configuration.GetConnectionString("PostgreSql")
         ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
     options.PersistMessagesWithPostgresql(postgres, WolverinePersistenceSchemas.Worker);
@@ -66,6 +67,9 @@ builder.UseWolverine(options =>
         .ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<CompetitionEventCommitted>()
         .ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<GenerateDataExport>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<ExpireDataExport>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<PurgeDataExport>().ToPostgresqlQueue("noctf-worker");
 });
 
 var host = builder.Build();

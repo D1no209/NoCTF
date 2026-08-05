@@ -29,5 +29,7 @@ public enum NotificationKind : short
     CompetitionQuestionReplied,
     CompetitionQuestionStatusChanged,
     CheatIncidentDetected,
-    TeamBanCorrected
+    TeamBanCorrected,
+    DataExportReady,
+    DataExportFailed
 }
