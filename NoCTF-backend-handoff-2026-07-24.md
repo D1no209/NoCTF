@@ -7,7 +7,7 @@
 2026-07-31 本轮 outcome、上传补偿、Runtime scope、Patch draft、Runtime cleanup/
 replacement、团队并发额度与 CTF 排行榜前三血纵切已在本机闭合；Frontend 正继续按生成 OpenAPI 契约逐项
 迁移。此前第 7 节列出的三个高置信 Backend 问题均已由 `a234ee6` 完成，最新状态以
-6.33 至 6.56 和第 7 节为准：
+6.33 至 6.58 和第 7 节为准：
 
 - Docker Container/Compose 公开服务最终采用题目容器直接映射 Docker 随机宿主端口；
 - 24 条 `LeaderboardRevision` 写路径均在同一事务发布 invalidation；
@@ -52,7 +52,9 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
   不可变事件日志，以及 CTF/AWDP 跨队 Flag 检测与人工裁决纵切。
 - 6.55 已完成管理员平台运行日志固定保留/容量、强类型筛选、导出和事实投影审计；6.56 已完成
   安全忘记密码/邮箱重置、会话全失效、密码变更通知和前端恢复流程。
-- 历史阶段曾明确授权 push；当前 6.49 至 6.56 任务明确禁止 push/deploy，新增本地提交均未推送。
+- 6.57 已完成完整比赛 ZIP 与平台审计导出；6.58 已完成 PostgreSQL、对象存储和 Wolverine
+  持久状态的加密备份、隔离恢复与自动演练工具。
+- 历史阶段曾明确授权 push；当前 6.49 至 6.58 任务明确禁止 push/deploy，新增本地提交均未推送。
   6.56 明确包含前端恢复流程；协作者拥有的其他 Frontend 未提交文件继续受保护。
 - 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
   的旧条目重新列为待办。
@@ -71,7 +73,7 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - `5660dc3` 的首次推送已通过 GitHub API 核对远端 ref；6.42 至 6.44 的后续 bug fix 与
   handoff 已推送到同一工作分支。`a234ee6` 是 Runtime cleanup/quota 代码提交；
   `f9216b9` 是 CTF 排行榜前三血代码提交。
-- 当前本地功能 HEAD 为 `03647e7f feat(auth): add secure password recovery`；该提交和随后
+- 当前本地功能 HEAD 为 `92a6205 feat(operations): add verified disaster recovery tooling`；该提交和随后
   的 HANDOFF 提交均遵循当前任务边界，仅保留在本地，未 push、未部署。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
@@ -2680,6 +2682,48 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   本地 mock 没有 hub 而显示预期的降级提示，历史/审计操作不受影响。浏览器标签和本地 Vite 监听
   已清理，未访问或修改现网。
 
+### 6.58 PostgreSQL、对象存储与 Wolverine 灾难恢复（2026-08-06）
+
+- 功能提交：`92a6205 feat(operations): add verified disaster recovery tooling`。本阶段只增加
+  外部运维工具、CI 恢复演练和权威文档；没有应用 API、管理页面、业务表、EF migration、
+  OpenAPI 或 generated SDK 变化，未 push、未部署，也没有修改目标环境配置。
+- 用户通过 `$grill-me` 回答八项 `A`，确认：采用外部 CLI 而非应用内备份；生成停写期间的离散
+  一致性恢复点而非伪装成在线 PITR；完整保留 `public`、`wolverine_api`、`wolverine_worker`、
+  `wolverine_runner`；备份当前 bucket 全部对象和必要元数据；产物使用 age recipient 加密并由
+  独立 Minisign key 签名；部署 Secret 独立保存并通过非秘密 `secretSetId` 绑定；只允许恢复到
+  隔离的空 database/空 bucket；参考目标为 RPO 不超过 24 小时、RTO 不超过 4 小时、恢复点保留
+  30 天，生产调度、异地复制、删除和告警继续由目标环境负责。
+- 新增 `deploy/recovery` 工具镜像，固定 PostgreSQL 16、MinIO Client image digest，并提供
+  `backup`、`restore`、`verify` 三个入口。备份前后均拒绝存在其他 PostgreSQL client connection，
+  要求运维先停止 API、Worker、Runner 和 migration job；PostgreSQL custom dump 包含业务事实、
+  Wolverine Inbox/Outbox/durable queue/scheduled/dead letter，对象逐项保存内容、`Content-Type` 和
+  `x-amz-meta-sha256`。Redis 明确不备份，恢复后从 PostgreSQL、在线 Runner 和流量重建。
+- 加密包使用 `noctf.disaster-recovery/1` manifest，记录恢复点时间、schema、逐表行数、对象数/
+  字节数、文件 SHA-256、Wolverine 恢复语义和外部 Secret 集标识，不记录数据库/S3 地址或凭据。
+  恢复先验证 Minisign 来源、age 完整性、安全 tar 路径、manifest 和全文件 checksum，再拒绝任何
+  非空目标；写入后重新比较所有受保护 schema 的逐表行数，并下载每个对象核验 key、内容 SHA-256、
+  Content-Type 与 SHA 元数据。目标 database/bucket 名必须与 manifest 一致，工具不提供覆盖、合并
+  或原地恢复。
+- Secret 不进入产物：JWT signing key、Runner scoring key、数据库/S3 凭据、age identity、
+  Minisign signing key 与 `EmailVerification__EncryptionKey` 必须由外部 Secret 系统恢复；否则
+  既有 session/内部签名或数据库内 SMTP 密文不能按原环境工作。签名 secret key 在自动化挂载时
+  不使用交互式口令，依赖 Secret 系统加密、最小权限只读挂载；恢复端只分发 public key。
+- `deploy/recovery/rehearse.sh` 只创建带唯一名称的两套 PostgreSQL、两套 MinIO、临时 network 与
+  工具 image，退出后精确清理。最终真实 Docker 演练 passed，覆盖比赛永久事件、三个 Wolverine
+  schema、多个对象及其元数据、快照后源数据变化不会进入恢复点、恢复后逐表/逐对象一致性、
+  Minisign 篡改拒绝和非空目标拒绝。ShellCheck（`-x -P SCRIPTDIR`）与全部脚本 `bash -n`
+  passed；CI 新增同一恢复演练门禁。
+- 后端 `dotnet build backend/NoCTF.slnx --no-restore` 为 0 warning/0 error；EF
+  `has-pending-model-changes` 返回无模型漂移（全局 EF CLI 8.0.11 对 runtime 10.0.4 仅提示版本
+  较旧）；`git diff --check` 与 Markdown 相对链接检查 passed。主机缺少仓库锁定的 SDK 10.0.300，
+  构建/EF 检查期间仅在工作树临时使用已安装的 10.0.201，结束后已将 `global.json` 恢复为
+  10.0.300，未纳入提交。
+- non-Integration 全套发现 595 项，594 passed、1 failed：
+  `ChallengeTemplateProtocolTests.Update_request_requires_complete_revision_fenced_payload` 仍是 6.56/
+  6.57 已记录的 FastEndpoints Validator 进程内注册隔离基线，单独进程复验 1/1 passed，本阶段
+  未触及该文件。Actionlint 在既有 OpenAPI workflow 的 `for i in {1..60}` 报唯一 SC2034；忽略该
+  既有 warning 后 workflow lint passed，本阶段新增 recovery step 无新增诊断。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2709,15 +2753,17 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   generated-SDK 前端恢复流程。
 - 完整比赛 ZIP 归档、平台审计 NDJSON、默认 Flag 脱敏/受审计明文例外、Wolverine 异步任务、
   24 小时对象/30 天元数据生命周期及 generated-SDK 管理前端。
+- PostgreSQL 业务与 Wolverine durable state、S3 对象/元数据的一体化停写恢复点、age 加密、
+  Minisign 来源认证、空目标 fail-closed 恢复及真实 Docker 自动演练。
 
 当前尚未执行的交付边界：
 
-- 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；正式
-  环境部署、监控、备份恢复与运维验收尚未执行。
+- 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；灾备工具的
+  隔离 Docker 演练已完成，正式环境部署、监控、备份调度/异地保留和生产恢复验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
 - `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e`、
-  `03647e7f`、`7b479f4`、`5923e57` 及各自 HANDOFF 提交是当前任务新增的
+  `03647e7f`、`7b479f4`、`5923e57`、`92a6205` 及各自 HANDOFF 提交是当前任务新增的
   本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
   push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
@@ -2728,18 +2774,18 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
 P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
 6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成，完整比赛与审计
-数据导出由 6.57 完成。Administrator MFA 已由用户明确暂缓。下一阶段继续 TODO 第 8 节后续安全
-与运维待办：
+数据导出由 6.57 完成，PostgreSQL/对象存储/Wolverine 灾难恢复工具与演练由 6.58 完成。
+Administrator MFA 已由用户明确暂缓。下一阶段继续 TODO 第 8 节后续安全与运维待办：
 
-1. 跳过 Administrator MFA，下一纵切先审计 PostgreSQL、对象存储和 Wolverine 队列的现有备份、
-   恢复、校验和演练入口；涉及生产保留、RPO/RTO、加密、对象版本或队列恢复语义时必须先
-   `$grill-me`，不得猜测生产策略。
-2. 不重做比赛/审计导出、平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、
+1. 跳过 Administrator MFA，下一纵切审计“封禁申诉、误判更正和公开更正通知”的既有封禁来源、
+   CompetitionEvent、通知、权限与匿名化边界；申诉人资格、处理角色、公开粒度、时限及对比赛
+   计分/队伍状态的影响必须先 `$grill-me`，不得直接新增申诉表或复用私密咨询冒充正式申诉。
+2. 不重做灾备工具、比赛/审计导出、平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、
    管理审计投影或忘记密码流程；单比赛永久事实仍以 `competition_events` 为唯一来源。未经用户
    后续明确恢复范围，不实现或重新规划 Administrator MFA。
 3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
-4. 未经新任务明确授权，继续不 push、不部署。
+4. 未经新任务明确授权，继续不 push、不部署；生产备份调度、异地保留和真实恢复仍等待目标环境。
 
 用户稍后会提供真实环境部署细则。在此之前：
 
@@ -2790,8 +2836,9 @@ Docker port mapping，host port 固定请求 `0`。
    更正使用 6.54；管理员平台日志保留、筛选、签名分页、导出和投影审计使用 6.55；忘记密码
    流程以 6.56 的 hash-only Token、枚举防护、双层限流、全会话失效、密码变更通知和恢复前端为准；
    完整比赛/审计导出以 6.57 的单表任务、Repeatable Read、对象生命周期、Flag 边界和 generated-SDK
-   前端为准。Administrator MFA 已由用户明确暂缓，不得继续实现或追问。下一纵切按 `TODO.md`
-   第 8 节审计 PostgreSQL、对象存储与 Wolverine 备份恢复演练；不要回滚或重做 `/profile`、SMTP、
+   前端为准；灾难恢复以 6.58 的停写一致性、完整 Wolverine schema、age+Minisign、外部 Secret、
+   空目标和逐表/逐对象校验为准。Administrator MFA 已由用户明确暂缓，不得继续实现或追问。
+   下一纵切按 `TODO.md` 第 8 节审计封禁申诉、误判更正和公开更正通知；不要回滚或重做 `/profile`、SMTP、
    排行榜可见性、咨询、比赛日志、反作弊、平台日志、忘记密码或数据导出流程。
 5. 继续实现时固定执行：
    - 失败测试；
