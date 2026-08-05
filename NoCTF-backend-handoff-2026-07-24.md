@@ -1,13 +1,13 @@
 # NoCTF 后端目标架构交接
 
-> 创建于 2026-07-24，最后核验于 2026-08-05。文件名保留原日期，本文内容以最后核验日期为准。
+> 创建于 2026-07-24，最后核验于 2026-08-06。文件名保留原日期，本文内容以最后核验日期为准。
 
 ## 1. 下一会话目标
 
 2026-07-31 本轮 outcome、上传补偿、Runtime scope、Patch draft、Runtime cleanup/
 replacement、团队并发额度与 CTF 排行榜前三血纵切已在本机闭合；Frontend 正继续按生成 OpenAPI 契约逐项
 迁移。此前第 7 节列出的三个高置信 Backend 问题均已由 `a234ee6` 完成，最新状态以
-6.33 至 6.48 和第 7 节为准：
+6.33 至 6.56 和第 7 节为准：
 
 - Docker Container/Compose 公开服务最终采用题目容器直接映射 Docker 随机宿主端口；
 - 24 条 `LeaderboardRevision` 写路径均在同一事务发布 invalidation；
@@ -50,8 +50,10 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - 6.48 已完成 CTF 排行榜一血、二血、三血的统一强类型投影与 OpenAPI 契约；计分公式未改。
 - 6.49 至 6.54 已完成独立个人资料、MailKit SMTP、排行榜冻结/黑灯、默认私密咨询、单比赛
   不可变事件日志，以及 CTF/AWDP 跨队 Flag 检测与人工裁决纵切。
-- 用户已明确授权 push；`codex/backend-gitops-completion` 已推送，不创建 PR、不合入
-  `main`。Frontend 后续优化由协作者并行推进，本会话避免再修改 Frontend。
+- 6.55 已完成管理员平台运行日志固定保留/容量、强类型筛选、导出和事实投影审计；6.56 已完成
+  安全忘记密码/邮箱重置、会话全失效、密码变更通知和前端恢复流程。
+- 历史阶段曾明确授权 push；当前 6.49 至 6.56 任务明确禁止 push/deploy，新增本地提交均未推送。
+  6.56 明确包含前端恢复流程；协作者拥有的其他 Frontend 未提交文件继续受保护。
 - 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
   的旧条目重新列为待办。
 - “后端 100%”不表示已经生产部署，也不表示 Kubernetes/Libvirt 所有可选基础设施已在
@@ -69,6 +71,8 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - `5660dc3` 的首次推送已通过 GitHub API 核对远端 ref；6.42 至 6.44 的后续 bug fix 与
   handoff 已推送到同一工作分支。`a234ee6` 是 Runtime cleanup/quota 代码提交；
   `f9216b9` 是 CTF 排行榜前三血代码提交。
+- 当前本地功能 HEAD 为 `03647e7f feat(auth): add secure password recovery`；该提交和随后
+  的 HANDOFF 提交均遵循当前任务边界，仅保留在本地，未 push、未部署。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
 - 本轮只更新工作分支；没有创建 PR、直接推送 `main` 或执行部署。
@@ -2564,6 +2568,56 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   anchor 触发的 download 事件。验收标签、临时配置、监听进程和两个一次性容器均已清理，未触碰
   既有 `deploy-*` 数据或服务。
 
+### 6.56 安全忘记密码与邮箱重置（2026-08-06）
+
+- 功能提交：`03647e7f feat(auth): add secure password recovery`。本提交只在本地分支，未 push、
+  未部署；平台信息读取程序集元数据，仓库没有需要随本纵切递增的显式运行版本。
+- 用户通过 `$grill-me` 回答 `AAAAA`，确认五项产品与安全决策：只新增一个
+  `password_reset_tokens` 表，业务表仅保存 SHA-256，Token 单次使用且可撤销；申请接口只接收
+  email，所有合法 email 形状统一返回 generic 202；重置不依赖“注册邮箱验证”开关，只允许
+  Active、已验证邮箱的 Human，Bot/Banned/Disabled/Anonymized 均不处理；默认 Token 30 分钟、
+  同账号 60 秒冷却且每小时最多 3 次、同 IP 15 分钟最多 5 次，新 Token 使旧 Token 失效；完成
+  后不自动登录，而是在同一事务修改密码、消费 Token、使其余 Token 失效、递增 TokenVersion，
+  清除 refresh cookie，发送密码已变更通知并由前端返回登录页。
+- `PasswordResetStore` 使用 PostgreSQL per-user advisory transaction lock 固定并发单赢家；Token
+  由 CSPRNG 生成，比较使用 fixed-time equality，外键为 Restrict。请求不存在账号、账号不可用、
+  账号限流或 SMTP 未配置时都不向匿名调用方暴露内部状态。Wolverine durable message 只在投递
+  边界携带原始 Token，`ToString()` 强制脱敏，普通日志只记录 UserId。密码变更邮件即使注册邮箱
+  验证开关关闭也会发送。
+- EF CLI 生成 `20260805162117_AddPasswordResetTokens` 及 designer/snapshot，未手改 migration 或
+  snapshot；账号物理删除/匿名化前显式清理 reset token，不改变历史业务数据的 Restrict 语义。
+  `dotnet ef migrations has-pending-model-changes` 返回无模型漂移。
+- 新增强类型 FastEndpoints 契约：
+  `POST /api/v1/auth/password-reset/request` 返回 generic typed 202 body `{ accepted: true }`，IP 限流
+  429 进入 OpenAPI；`POST /api/v1/auth/password-reset/complete` 返回 204 或稳定 typed 400
+  `InvalidOrExpired`。Endpoint 使用 `Endpoint<TRequest,TResponse>`、`ExecuteAsync`、具体
+  HttpResults、`Results<T...>` 与 `TypedResults`，业务规则均位于 Application/Infrastructure。
+- 管理邮箱配置契约增加 password reset lifetime/cooldown/hourly limit 三个强类型整数；前端只通过
+  generated SDK 和现有 `authApi` 薄封装调用。新增 `/forgot-password`、`/reset-password`，登录页
+  提供恢复入口；申请成功始终显示相同隐私文案。重置页有两个独立、可访问的密码明文切换按钮，
+  Token 初始化后立即从地址栏移除；成功后清空本地认证状态并返回登录页。邮箱 placeholder 使用
+  Vue i18n literal `{'@'}`，避免 `name@example.com` 被消息编译器误解析。
+- OpenAPI 路由漂移门禁为 171 条文档化 v1 路由，另有 `GET /health`。两份 artifact 字节一致，
+  SHA-256 均为 `B844F6BF808FCD01F0E267E8343744F3EF0784F803075492CDAED3ECF775916F`；SDK
+  hash：index `F121F460383F13276F48E7FE32724A7C8700BA2AE8CD2CC70B6094706B49BBF8`，sdk
+  `9659981B41A9F2BBEA137735E33B6C270D14DAFE0F4FCAF879DBF31AEC067A32`，types
+  `508DDC5F3A75DC62AA3A077368129A1636FD24029F3B013E4B72D40D43408195`。
+- 后端最终验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 warning/0 error；
+  `PasswordResetEndpointTests` 8/8 passed；真实 PostgreSQL password reset 与 GreenMail SMTP 类
+  6/6 passed，覆盖并发单赢家、hash-only、旧 Token 失效、账号限流、账号资格、TokenVersion、
+  密码更新和关闭注册验证时的两类邮件。non-Integration 全套发现 593 项，589 passed、4 failed；
+  四个失败均为既有 FastEndpoints Validator 进程内注册隔离问题，受影响的四个测试类随后分别在
+  独立进程运行，共 20/20 passed。该基线问题没有混入本功能提交，后续应单独修复测试隔离。
+- 前端最终验证：`bun test` 178/178 passed；`vue-tsc` 与 production `bun run build` passed；触及
+  文件 scoped ESLint 为 0 error，`AuthLayout.vue` 保留 12 条本阶段未引入的单行内容换行 warning。
+  仓库级 lint 仍被 generated/vendor/config/旧文件的大量既有基线阻塞，没有全局 `--fix`。
+  `git diff --check` passed。
+- 使用内置浏览器连接本地 Vite 完成实际验收：登录恢复入口、申请页、无 Token 失效态、有效 Token
+  表单、两个密码眼睛、短密码/不一致的内联错误，以及 Token 从 URL 移除均正常。移动端验收发现
+  Auth grid item 的 intrinsic width 导致 375px 页面横向溢出，已给 AuthLayout section/content
+  增加 `min-w-0`；复验失效页和有效表单 document scrollWidth 均等于 viewport，桌面 1265px
+  同样无溢出。本地 Vite 监听和浏览器标签已清理，未访问或修改现网。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2589,6 +2643,8 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - CTF/AWDP 跨队 Flag 隐蔽检测、事件派生裁决、受审计证据、封禁/更正和管理前端。
 - 管理员平台运行日志每日 Redis 分片、固定保留/容量、强类型筛选、签名分页、JSONL 导出与事实
   投影审计。
+- 安全忘记密码/邮箱重置、hash-only 单次 Token、账号/IP 双层限流、全会话失效、变更通知与
+  generated-SDK 前端恢复流程。
 
 当前尚未执行的交付边界：
 
@@ -2596,7 +2652,8 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
-- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e` 及各自 HANDOFF 提交是当前任务新增的
+- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e`、
+  `03647e7f` 及各自 HANDOFF 提交是当前任务新增的
   本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
   push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
@@ -2606,12 +2663,14 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 
 最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
 P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
-6.54 完成；P2 管理员平台日志由 6.55 完成。下一阶段进入 TODO 第 8 节后续安全与运维待办：
+6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成。下一阶段继续
+TODO 第 8 节后续安全与运维待办：
 
-1. 先按 TODO 顺序审计“忘记密码/邮箱重置”现状与真实缺口；涉及 Token 失效、邮件枚举防护、
-   限流或恢复语义且无法从现有模型确定时，使用 `$grill-me`。
+1. 先审计 Administrator TOTP/Passkey 二次验证的现有模型与真实缺口。TOTP 与 Passkey 的首发
+   范围、恢复码、强制策略、敏感操作 step-up 和凭据撤销语义会改变安全产品边界，必须先使用
+   `$grill-me`，不得自行混合两套协议。
 2. 不重做平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、导出或管理审计
-   投影；单比赛永久事实仍以 `competition_events` 为唯一来源。
+   投影，也不重做忘记密码流程；单比赛永久事实仍以 `competition_events` 为唯一来源。
 3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
 4. 未经新任务明确授权，继续不 push、不部署。
@@ -2662,9 +2721,11 @@ Docker port mapping，host port 固定请求 `0`。
    TLS 模式、可选 SMTP 认证和脱敏失败使用 6.50；排行榜冻结、黑灯、BOT/通知边界使用
    6.51；默认私密咨询、可选匿名公开回答和通知使用 6.52；单比赛不可变事件、三层可见性、
    导出、Flag 审计和实时刷新使用 6.53；跨队 Flag 检测、事件派生裁决、受审计证据、封禁和
-   更正使用 6.54；管理员平台日志保留、筛选、签名分页、导出和投影审计使用 6.55。下一纵切按
-   `TODO.md` 第 8 节审计“忘记密码/邮箱重置”缺口，不要回滚或重做 `/profile`、SMTP、排行榜
-   可见性、咨询、比赛日志、反作弊或平台日志。
+   更正使用 6.54；管理员平台日志保留、筛选、签名分页、导出和投影审计使用 6.55；忘记密码
+   流程以 6.56 的 hash-only Token、枚举防护、双层限流、全会话失效、密码变更通知和恢复前端为准。
+   下一纵切按 `TODO.md` 第 8 节审计 Administrator TOTP/Passkey 二次验证，并先使用
+   `$grill-me` 固定安全产品边界；不要回滚或重做 `/profile`、SMTP、排行榜可见性、咨询、比赛
+   日志、反作弊、平台日志或忘记密码流程。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
